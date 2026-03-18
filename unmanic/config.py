@@ -134,6 +134,9 @@ class Config(object, metaclass=SingletonType):
             self.set_config_item('ui_address', kwargs.get('address'), save_settings=False)
 
         # Apply fork-safe defaults after all explicit config has loaded.
+        # Effective precedence for this fork is:
+        # defaults -> environment -> settings.json -> explicit constructor args -> safe default fill-ins
+        # The final safe-default layer only fills unset values and should not override explicit operator choices.
         self.__apply_large_library_safe_defaults()
 
         # Apply settings to the unmanic logger

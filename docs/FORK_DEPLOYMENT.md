@@ -2,6 +2,8 @@
 
 This fork is intended to build from a single repository checkout. The frontend is vendored at `unmanic/webserver/frontend`, and clean builds are validated with Node.js 22.
 
+Config precedence for this fork is: built-in defaults, then environment variables, then `settings.json`, then explicit CLI or constructor arguments, and finally the large-library safe-default layer only for still-unset values. In practice, explicit operator configuration wins over the fork safety profile.
+
 ## Canonical Source Build
 
 ```bash
@@ -50,6 +52,8 @@ Mount these paths for production:
 - If the root page does not load but readiness is healthy, inspect `/config/.unmanic/logs/tornado.log` for routing or handler exceptions.
 - If startup fails immediately, verify `/config` is writable, `/library` exists and is readable, and `/tmp/unmanic` exists on writable fast storage.
 - If worker threads fail to settle, look for `WORKER_THREAD_STARTUP_FAILED` or `WORKER_THREAD_STOP_TIMEOUT` in the application log before retrying.
+- If jobs are picked up but fail during processing, look for `WORKER_TASK_PROCESSING_FAILED`, `WORKER_RUNNER_FAILED`, `WORKER_COMMAND_FAILED`, or `WORKER_FINAL_MOVE_FAILED`.
+- If post-processing fails after a worker run, look for `POSTPROCESS_FILE_COPY_FAILED`, `POSTPROCESS_DESTINATION_SIZE_UNAVAILABLE`, or `POSTPROCESS_SOURCE_METADATA_UNAVAILABLE`.
 
 ## Large-Library Guardrails
 

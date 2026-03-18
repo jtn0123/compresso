@@ -183,6 +183,11 @@ jobs:
           test "${#wheels[@]}" -eq 1
           printf 'wheel=%s\n' "${wheels[0]}"
 
+      - name: Verify packaged frontend assets
+        run: |
+          WHEEL_PATH=$(find dist -maxdepth 1 -type f -name "*.whl" | sort | tail -n 1)
+          python -m zipfile -l "${WHEEL_PATH}" | grep "unmanic/webserver/public/index.html"
+
       # Read the python package distribution data (save version to file)
       - name: Read python package distribution data
         id: py_build_data

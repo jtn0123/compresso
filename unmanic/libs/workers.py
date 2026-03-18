@@ -454,6 +454,7 @@ class Worker(threading.Thread):
                 except queue.Empty:
                     continue
                 except Exception as e:
+                    self.logger.error("WORKER_TASK_PROCESSING_FAILED worker=%s", self.name)
                     self.logger.exception("Exception in processing job with %s: %s", self.name, e)
 
         self.logger.info("Stopping worker")
@@ -800,6 +801,9 @@ class Worker(threading.Thread):
                             file_in = data.get("file_out")
                     else:
                         # If file conversion was not successful
+                        self.logger.error("WORKER_RUNNER_FAILED runner=%s file=%s",
+                                          runner_id,
+                                          original_abspath)
                         self.logger.error("Error while running worker process '%s' on file '%s'",
                                           runner_id,
                                           original_abspath)
@@ -867,6 +871,7 @@ class Worker(threading.Thread):
                 # This section adds a small pause and logs the error if that is the case.
                 # I have not yet figured out a solution as this is difficult to reproduce.
                 if not os.path.exists(current_file_out):
+                    self.logger.error("WORKER_FINAL_OUTPUT_MISSING file=%s", file_in)
                     self.logger.error("Error - current_file_out path does not exist! '%s'", file_in)
                     self.event.wait(1)
 
@@ -886,6 +891,7 @@ class Worker(threading.Thread):
                     # Use shutil module to move the file to the final task cache location
                     shutil.move(current_file_out, task_cache_path)
             except Exception as e:
+                self.logger.error("WORKER_FINAL_MOVE_FAILED source=%s dest=%s", current_file_out, task_cache_path)
                 self.logger.exception("Exception in final move operation of file %s to %s: %s",
                                       current_file_out,
                                       task_cache_path,
@@ -906,6 +912,7 @@ class Worker(threading.Thread):
 
         # If the overall result of the jobs carried out on this task were not successful, log the failure and return False
         if not overall_success:
+            self.logger.warning("WORKER_TASK_FAILED file=%s", original_abspath)
             self.logger.warning("Failed to process task for file '%s'", original_abspath)
         return overall_success
 
@@ -1026,6 +1033,7 @@ class Worker(threading.Thread):
             if sub_proc.returncode == 0:
                 return True
             else:
+                self.logger.error("WORKER_COMMAND_FAILED file=%s command=%s", data.get("file_in"), exec_command)
                 self.logger.error("Command run against '%s' exited with non-zero status. "
                                   "Download command dump from history for more information. %s",
                                   data.get("file_in"),
@@ -1033,6 +1041,7 @@ class Worker(threading.Thread):
                 return False
 
         except Exception as e:
+            self.logger.error("WORKER_COMMAND_EXCEPTION file=%s", data.get("file_in"))
             self.logger.error("Error while executing the command against file %s. %s",
                               data.get("file_in"),
                               e)

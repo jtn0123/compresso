@@ -448,6 +448,7 @@ class PostProcessor(threading.Thread):
             # Mark move process a success
             return True
         except Exception as e:
+            self.logger.error("POSTPROCESS_FILE_COPY_FAILED source=%s dest=%s", file_in, file_out)
             self._log("Exception while copying file {} to {}:".format(file_in, file_out),
                       message2=str(e), level="exception")
             file_move_processes_success = False
@@ -495,6 +496,7 @@ class PostProcessor(threading.Thread):
                 try:
                     destination_size = os.path.getsize(dest_path)
                 except OSError:
+                    self.logger.warning("POSTPROCESS_DESTINATION_SIZE_UNAVAILABLE path=%s", dest_path)
                     self._log("Could not get destination file size for '{}'".format(dest_path), level='warning')
 
         # Extract media metadata for compression stats (codec, resolution, container)
@@ -506,6 +508,7 @@ class PostProcessor(threading.Thread):
             try:
                 source_meta = extract_media_metadata(source_abspath)
             except Exception as e:
+                self.logger.warning("POSTPROCESS_SOURCE_METADATA_UNAVAILABLE path=%s", source_abspath)
                 self._log("Could not extract source metadata: {}".format(e), level='warning')
         # Destination metadata only on success
         if task_dump.get('task_success', False):

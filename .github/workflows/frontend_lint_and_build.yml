@@ -36,3 +36,7 @@ jobs:
 
     - name: Build frontend
       run: npm run build:publish
+
+    - name: Verify built frontend assets
+      run: |
+        test -f dist/spa/index.html

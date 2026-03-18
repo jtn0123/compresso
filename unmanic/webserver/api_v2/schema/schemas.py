@@ -33,8 +33,7 @@ from marshmallow import Schema, fields, validate
 
 
 class BaseSchema(Schema):
-    class Meta:
-        ordered = True
+    pass
 
 
 # RESPONSES
@@ -1343,7 +1342,7 @@ class SessionStateSuccessSchema(BaseSchema):
         description="User email",
         example="example@gmail.com",
     )
-    created = fields.Number(
+    created = fields.Float(
         required=False,
         description="Session time created",
         example=1627793093.676484,
@@ -1378,7 +1377,7 @@ class SessionAuthCodeSchema(BaseSchema):
         description="User email",
         example="/support-auth-api/v2/app_auth/link_with_user_code/123456",
     )
-    expires_in = fields.Number(
+    expires_in = fields.Int(
         required=True,
         description="The time until the user_code expires",
         example=120,

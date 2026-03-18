@@ -252,6 +252,59 @@ class TestClass(object):
             Tasks.delete().execute()
             os.unlink(test_path)
 
+    @pytest.mark.integrationtest
+    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    def test_task_handler_restart_preserves_dedupe_and_accepts_new_work(self, mock_plugin_handler):
+        mock_plugin_handler.return_value = MagicMock()
+
+        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as first_file:
+            first_path = first_file.name
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as second_file:
+            second_path = second_file.name
+
+        try:
+            Tasks.delete().execute()
+            time.sleep(0.2)
+
+            first_item = {
+                'pathname': first_path,
+                'library_id': 1,
+                'priority_score': 0,
+            }
+            self.scheduledtasks.put(first_item)
+            self.task_handler.process_scheduledtasks_queue()
+            time.sleep(0.5)
+
+            self.task_handler.stop()
+            self.task_handler.join()
+
+            self.event = threading.Event()
+            self.task_handler = TaskHandler(self.data_queues, self.task_queue, self.event)
+            self.task_handler.daemon = True
+            self.task_handler.start()
+
+            self.scheduledtasks.put(first_item)
+            self.task_handler.process_scheduledtasks_queue()
+
+            second_item = {
+                'pathname': second_path,
+                'library_id': 2,
+                'priority_score': 5,
+            }
+            self.inotifytasks.put(second_item)
+            self.task_handler.process_inotifytasks_queue()
+            time.sleep(0.5)
+
+            first_task = Tasks.select().where(Tasks.abspath == os.path.abspath(first_path))
+            second_task = Tasks.select().where(Tasks.abspath == os.path.abspath(second_path))
+            assert first_task.count() == 1
+            assert second_task.count() == 1
+            assert second_task.get().library_id == 2
+        finally:
+            Tasks.delete().execute()
+            os.unlink(first_path)
+            os.unlink(second_path)
+
 
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

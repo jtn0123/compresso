@@ -223,7 +223,13 @@ setup(
     extras_require={
         'dev': requirements_dev()
     },
-    packages=find_namespace_packages(include=[f"{src_dir}*"]),
+    packages=find_namespace_packages(
+        include=[f"{src_dir}*"],
+        exclude=[
+            f"{src_dir}.webserver.frontend*",
+            f"{src_dir}.webserver.public*",
+        ],
+    ),
     include_package_data=True,
     exclude_package_data={
         src_dir: [

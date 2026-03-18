@@ -46,6 +46,40 @@ def test_safe_defaults_can_be_disabled_from_config_file():
 
 
 @pytest.mark.unittest
+def test_settings_file_overrides_environment_but_constructor_args_override_both(monkeypatch):
+    reset_singletons()
+    config_path = tempfile.mkdtemp(prefix='unmanic_tests_config_')
+    with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
+        json.dump({
+            'ui_port': 9001,
+            'enable_library_scanner': True,
+        }, infile)
+
+    monkeypatch.setenv('ui_port', '9000')
+
+    settings = config.Config(config_path=config_path, port=9002)
+
+    assert settings.get_ui_port() == 9002
+    assert settings.get_enable_library_scanner() is True
+
+
+@pytest.mark.unittest
+def test_safe_defaults_only_fill_unset_values():
+    reset_singletons()
+    config_path = tempfile.mkdtemp(prefix='unmanic_tests_config_')
+    with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
+        json.dump({
+            'number_of_workers': 6,
+            'concurrent_file_testers': 4,
+        }, infile)
+
+    settings = config.Config(config_path=config_path)
+
+    assert settings.get_number_of_workers() == 6
+    assert settings.get_concurrent_file_testers() == 4
+
+
+@pytest.mark.unittest
 def test_validate_startup_environment_rejects_missing_library():
     reset_singletons()
     base_dir = tempfile.mkdtemp(prefix='unmanic_tests_startup_')
