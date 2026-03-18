@@ -9,6 +9,9 @@
 """
 
 from unmanic.libs import history
+from unmanic.libs.logs import UnmanicLogging
+
+logger = UnmanicLogging.get_logger('compression_stats')
 
 
 def get_compression_summary(library_id=None):
@@ -69,7 +72,6 @@ def get_pending_estimate():
 
     :return: dict with estimated savings
     """
-    from unmanic.libs.task import Task
     from unmanic.libs.unmodels import Tasks
 
     history_logging = history.History()
@@ -82,7 +84,8 @@ def get_pending_estimate():
         total_pending_size = 0
         for t in pending_query:
             total_pending_size += (t.source_size or 0)
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to query pending tasks: %s", str(e))
         pending_count = 0
         total_pending_size = 0
 

@@ -40,9 +40,6 @@ class ApiPreviewHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
-        self.params = kwargs.get("params")
-
     async def create_preview(self):
         """
         Preview - create

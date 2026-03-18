@@ -8,7 +8,7 @@
 
 """
 
-from marshmallow import fields
+from marshmallow import fields, validate
 from unmanic.webserver.api_v2.schema.schemas import BaseSchema, BaseSuccessSchema, RequestTableDataSchema
 
 
@@ -27,6 +27,7 @@ class RequestHealthCheckScanSchema(BaseSchema):
         required=False,
         load_default='quick',
         description="Check mode: 'quick' or 'thorough'",
+        validate=validate.OneOf(['quick', 'thorough']),
     )
 
 
@@ -40,6 +41,7 @@ class RequestHealthCheckLibraryScanSchema(BaseSchema):
         required=False,
         load_default='quick',
         description="Check mode: 'quick' or 'thorough'",
+        validate=validate.OneOf(['quick', 'thorough']),
     )
 
 
@@ -53,7 +55,8 @@ class RequestHealthCheckStatusSchema(RequestTableDataSchema):
     status_filter = fields.Str(
         required=False,
         allow_none=True,
-        description="Optional status filter: healthy, corrupted, unchecked, checking",
+        description="Optional status filter: healthy, corrupted, warning, unchecked, checking",
+        validate=validate.OneOf(['healthy', 'corrupted', 'warning', 'unchecked', 'checking']),
     )
 
 
@@ -77,6 +80,7 @@ class HealthCheckSummaryResponseSchema(BaseSuccessSchema):
     """Schema for health summary response"""
     healthy = fields.Int()
     corrupted = fields.Int()
+    warning = fields.Int()
     unchecked = fields.Int()
     checking = fields.Int()
     total = fields.Int()
@@ -89,3 +93,18 @@ class HealthCheckStatusResponseSchema(BaseSuccessSchema):
     recordsTotal = fields.Int()
     recordsFiltered = fields.Int()
     results = fields.List(fields.Raw())
+
+
+class RequestHealthCheckWorkersSchema(BaseSchema):
+    """Schema for setting worker count"""
+    worker_count = fields.Int(
+        required=True,
+        description="Number of concurrent scan workers (1-16)",
+    )
+
+
+class HealthCheckWorkersResponseSchema(BaseSuccessSchema):
+    """Schema for worker count response"""
+    worker_count = fields.Int()
+    scanning = fields.Boolean()
+    scan_progress = fields.Raw()

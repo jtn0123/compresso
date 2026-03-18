@@ -47,10 +47,10 @@ class TestCompressionStats(object):
         }
         self.db_connection = Database.select_database(database_settings)
 
-        from unmanic.libs.unmodels import CompletedTasks
+        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
         from unmanic.libs.unmodels.compressionstats import CompressionStats
 
-        self.db_connection.create_tables([CompletedTasks, CompressionStats])
+        self.db_connection.create_tables([CompletedTasks, CompletedTasksCommandLogs, CompressionStats])
 
         # Wait for the queue-based writes to complete
         import time
@@ -330,6 +330,177 @@ class TestCompressionStats(object):
         ]
         for key in expected_keys:
             assert key in row, "Missing key: {}".format(key)
+
+
+    # ------------------------------------------------------------------
+    # order_by whitelist (B1)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    def test_invalid_order_column_falls_back_to_finish_time(self):
+        """An invalid order column should not crash; results still returned."""
+        from unmanic.libs.history import History
+        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from unmanic.libs.unmodels import CompletedTasks
+        CompressionStats.delete().execute()
+        CompletedTasks.delete().execute()
+
+        t = self._create_completed_task(label='order_test.mkv')
+        self._create_stats(t, source_size=1000, dest_size=500, library_id=1)
+
+        history = History()
+        result = history.get_compression_stats_paginated(
+            order={'column': 'DROP TABLE', 'dir': 'desc'}
+        )
+        assert result['recordsTotal'] == 1
+        assert len(result['results']) == 1
+
+    @pytest.mark.unittest
+    def test_valid_order_column_source_size(self):
+        """Ordering by source_size asc should return smallest first."""
+        from unmanic.libs.history import History
+        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from unmanic.libs.unmodels import CompletedTasks
+        CompressionStats.delete().execute()
+        CompletedTasks.delete().execute()
+
+        t1 = self._create_completed_task(label='big.mkv')
+        t2 = self._create_completed_task(label='small.mkv')
+        self._create_stats(t1, source_size=5000, dest_size=2500, library_id=1)
+        self._create_stats(t2, source_size=1000, dest_size=500, library_id=1)
+
+        history = History()
+        result = history.get_compression_stats_paginated(
+            order={'column': 'source_size', 'dir': 'asc'}
+        )
+        assert result['results'][0]['source_size'] == 1000
+        assert result['results'][1]['source_size'] == 5000
+
+    # ------------------------------------------------------------------
+    # Compression ratio edge cases (B5)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    def test_compression_stats_ratio_calculation(self):
+        """source=1000, dest=250 → ratio=0.25, space_saved=750."""
+        from unmanic.libs.history import History
+        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from unmanic.libs.unmodels import CompletedTasks
+        CompressionStats.delete().execute()
+        CompletedTasks.delete().execute()
+
+        task = self._create_completed_task(label='ratio_test.mkv')
+        self._create_stats(task, source_size=1000, dest_size=250, library_id=1)
+
+        history = History()
+        result = history.get_compression_stats_for_task(task.id)
+        assert result['ratio'] == 0.25
+        assert result['space_saved'] == 750
+
+    @pytest.mark.unittest
+    def test_compression_stats_zero_source_size(self):
+        """source=0 → ratio=0, no division error."""
+        from unmanic.libs.history import History
+        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from unmanic.libs.unmodels import CompletedTasks
+        CompressionStats.delete().execute()
+        CompletedTasks.delete().execute()
+
+        task = self._create_completed_task(label='zero_source.mkv')
+        self._create_stats(task, source_size=0, dest_size=0, library_id=1)
+
+        history = History()
+        result = history.get_compression_stats_for_task(task.id)
+        assert result['ratio'] == 0
+        assert result['space_saved'] == 0
+
+
+    # ------------------------------------------------------------------
+    # save_task_history with zero source_size (D1)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    def test_stats_recorded_with_zero_source_size(self):
+        """save_task_history with source_size=0 and task_success=True should still create a CompressionStats row."""
+        from unmanic.libs.history import History
+        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from unmanic.libs.unmodels import CompletedTasks
+        CompressionStats.delete().execute()
+        CompletedTasks.delete().execute()
+
+        history = History()
+        result = history.save_task_history({
+            'task_label': 'zero_source_test.mkv',
+            'abspath': '/media/zero_source_test.mkv',
+            'task_success': True,
+            'start_time': datetime.datetime.now(),
+            'finish_time': datetime.datetime.now(),
+            'processed_by_worker': 'worker-0',
+            'log': '',
+            'source_size': 0,
+            'destination_size': 500,
+            'library_id': 1,
+            'source_codec': 'h264',
+            'destination_codec': 'hevc',
+            'source_resolution': '1080p',
+            'source_container': 'mkv',
+            'destination_container': 'mp4',
+        })
+        assert result is True
+
+        # Verify a CompressionStats row was created
+        count = CompressionStats.select().count()
+        assert count >= 1
+
+        # Fetch the latest stats entry
+        stats = CompressionStats.select().order_by(CompressionStats.id.desc()).get()
+        assert stats.source_size == 0
+        assert stats.destination_size == 500
+        assert stats.source_codec == 'h264'
+
+
+    # ------------------------------------------------------------------
+    # Negative space_saved edge case (Issue #29)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    def test_negative_space_saved(self):
+        """When dest > source (file grew), space_saved should be negative."""
+        from unmanic.libs.history import History
+        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        CompressionStats.delete().execute()
+        CompletedTasksCommandLogs.delete().execute()
+        CompletedTasks.delete().execute()
+
+        task = self._create_completed_task(label='grew.mkv')
+        self._create_stats(task, source_size=1000, dest_size=1500, library_id=1)
+
+        history = History()
+        result = history.get_compression_stats_for_task(task.id)
+        assert result['space_saved'] == -500
+        assert result['ratio'] == 1.5
+
+    @pytest.mark.unittest
+    def test_summary_with_negative_space_saved(self):
+        """Summary should handle files that grew in size."""
+        from unmanic.libs.history import History
+        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        CompressionStats.delete().execute()
+        CompletedTasksCommandLogs.delete().execute()
+        CompletedTasks.delete().execute()
+
+        t1 = self._create_completed_task(label='shrunk.mkv')
+        t2 = self._create_completed_task(label='grew.mkv')
+        self._create_stats(t1, source_size=2000, dest_size=1000, library_id=1)
+        self._create_stats(t2, source_size=1000, dest_size=1500, library_id=1)
+
+        history = History()
+        summary = history.get_library_compression_summary()
+        # total_source=3000, total_dest=2500, space_saved=500
+        assert summary['space_saved'] == 500
+        assert summary['file_count'] == 2
 
 
 if __name__ == '__main__':

@@ -12,6 +12,7 @@
 """
 
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -38,6 +39,132 @@ class PreviewManager:
     def __init__(self):
         self.logger = UnmanicLogging.get_logger(name=__class__.__name__)
         self.settings = config.Config()
+
+    def _run_plugin_pipeline(self, segment_path, encoded_path, library_id):
+        """
+        Run the library's plugin pipeline on a segment to produce an encoded file.
+
+        This is a simplified version of the worker plugin execution loop.
+
+        :param segment_path: Path to the source segment
+        :param encoded_path: Desired output path for the encoded file
+        :param library_id: Library ID whose plugins to use
+        :return: True if pipeline ran successfully, False otherwise
+        """
+        try:
+            from unmanic.libs.plugins import PluginsHandler
+        except ImportError:
+            self.logger.warning("PluginsHandler not available, cannot run plugin pipeline")
+            return False
+
+        try:
+            plugin_handler = PluginsHandler()
+            plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type(
+                'worker.process', library_id=library_id
+            )
+        except Exception as e:
+            self.logger.warning("Failed to load plugins: %s", str(e))
+            return False
+
+        if not plugin_modules:
+            return False
+
+        data = {
+            "worker_log": [],
+            "library_id": library_id,
+            "exec_command": [],
+            "current_command": [],
+            "command_progress_parser": None,
+            "file_in": segment_path,
+            "file_out": None,
+            "original_file_path": segment_path,
+            "repeat": False,
+        }
+
+        job_dir = os.path.dirname(encoded_path)
+        intermediate_files = []
+
+        try:
+            for i, plugin_module in enumerate(plugin_modules):
+                _, ext = os.path.splitext(data['file_in'])
+                plugin_out = os.path.join(job_dir, 'plugin_{}{}'.format(i, ext))
+                data['file_out'] = plugin_out
+                data['exec_command'] = []
+                data['repeat'] = False
+
+                try:
+                    plugin_handler.exec_plugin_runner(
+                        data, plugin_module.get('plugin_id'), 'worker.process'
+                    )
+                except Exception as e:
+                    self.logger.warning("Plugin %s runner failed: %s",
+                                        plugin_module.get('plugin_id'), str(e))
+                    return False
+
+                if data['exec_command']:
+                    try:
+                        result = subprocess.run(
+                            data['exec_command'],
+                            capture_output=True, text=True, timeout=300
+                        )
+                        if result.returncode != 0:
+                            self.logger.warning("Plugin %s command failed: %s",
+                                                plugin_module.get('plugin_id'),
+                                                result.stderr[-500:] if result.stderr else '')
+                            return False
+                    except subprocess.TimeoutExpired:
+                        self.logger.warning("Plugin %s command timed out",
+                                            plugin_module.get('plugin_id'))
+                        return False
+
+                    # Chain: set next input to this output if it exists
+                    if os.path.exists(data['file_out']):
+                        # Track old file_in for cleanup (but not the original segment)
+                        if data['file_in'] != segment_path:
+                            intermediate_files.append(data['file_in'])
+                        data['file_in'] = data['file_out']
+
+            # Determine the final pipeline output
+            pipeline_output = data['file_in']
+
+            # If not already mp4, remux to mp4 for browser playability
+            _, final_ext = os.path.splitext(pipeline_output)
+            if final_ext.lower() != '.mp4':
+                remux_path = os.path.join(job_dir, 'remuxed.mp4')
+                # Try remux (copy codecs)
+                remux_cmd = [
+                    'ffmpeg', '-y', '-i', pipeline_output,
+                    '-c:v', 'copy', '-c:a', 'aac',
+                    remux_path,
+                ]
+                result = subprocess.run(remux_cmd, capture_output=True, text=True, timeout=300)
+                if result.returncode != 0:
+                    # Remux failed (non-mp4-compatible codec), re-encode at CRF 18
+                    reencode_cmd = [
+                        'ffmpeg', '-y', '-i', pipeline_output,
+                        '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+                        '-c:a', 'aac', '-b:a', '128k',
+                        remux_path,
+                    ]
+                    result = subprocess.run(reencode_cmd, capture_output=True, text=True, timeout=300)
+                    if result.returncode != 0:
+                        self.logger.warning("Remux/re-encode to MP4 failed: %s",
+                                            result.stderr[-500:] if result.stderr else '')
+                        return False
+                pipeline_output = remux_path
+
+            # Copy final output to encoded_path
+            shutil.copy2(pipeline_output, encoded_path)
+            return True
+
+        finally:
+            # Clean up intermediate files
+            for f in intermediate_files:
+                try:
+                    if os.path.exists(f):
+                        os.remove(f)
+                except OSError:
+                    pass
 
     def get_preview_cache_dir(self):
         """Get the base directory for preview cache files."""
@@ -97,6 +224,7 @@ class PreviewManager:
             'encoded_codec': '',
             'vmaf_score': None,
             'ssim_score': None,
+            'encoded_by_pipeline': False,
         }
 
         with self._lock:
@@ -153,24 +281,31 @@ class PreviewManager:
             if result.returncode != 0:
                 raise RuntimeError("Source web encode failed: {}".format(result.stderr[-500:] if result.stderr else ''))
 
-            # Step 3: Encode using a standard encode to simulate the library pipeline
-            # We use reasonable defaults here. A full plugin pipeline integration
-            # would require running the actual plugin runners, which is complex.
-            # For now, use a standard CRF 23 encode as the "encoded" version.
-            self.logger.info("Preview [%s]: Creating encoded preview", job_id)
-            encoded_cmd = [
-                'ffmpeg', '-y',
-                '-i', segment_path,
-                '-c:v', 'libx264',
-                '-crf', '23',
-                '-preset', 'medium',
-                '-c:a', 'aac',
-                '-b:a', '128k',
-                encoded_path,
-            ]
-            result = subprocess.run(encoded_cmd, capture_output=True, text=True, timeout=300)
-            if result.returncode != 0:
-                raise RuntimeError("Encoded preview failed: {}".format(result.stderr[-500:] if result.stderr else ''))
+            # Step 3: Encode using library's plugin pipeline
+            pipeline_success = False
+            try:
+                pipeline_success = self._run_plugin_pipeline(segment_path, encoded_path, job['library_id'])
+            except Exception as e:
+                self.logger.warning("Preview [%s]: Plugin pipeline failed: %s", job_id, str(e))
+
+            if not pipeline_success:
+                # Fallback: standard CRF 23
+                self.logger.info("Preview [%s]: Falling back to default encode", job_id)
+                encoded_cmd = [
+                    'ffmpeg', '-y',
+                    '-i', segment_path,
+                    '-c:v', 'libx264',
+                    '-crf', '23',
+                    '-preset', 'medium',
+                    '-c:a', 'aac',
+                    '-b:a', '128k',
+                    encoded_path,
+                ]
+                result = subprocess.run(encoded_cmd, capture_output=True, text=True, timeout=300)
+                if result.returncode != 0:
+                    raise RuntimeError("Encoded preview failed: {}".format(result.stderr[-500:] if result.stderr else ''))
+
+            job['encoded_by_pipeline'] = pipeline_success
 
             # Get file sizes
             if os.path.exists(source_web_path):
@@ -213,8 +348,8 @@ class PreviewManager:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode == 0:
                 return result.stdout.strip()
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug("Codec detection failed for %s: %s", filepath, str(e))
         return ''
 
     def compute_quality_metrics(self, source_path, encoded_path):
@@ -235,13 +370,12 @@ class PreviewManager:
                 'ffmpeg', '-y',
                 '-i', encoded_path,
                 '-i', source_path,
-                '-lavfi', 'ssim',
+                '-lavfi', '[0:v][1:v]ssim',
                 '-f', 'null', '-',
             ]
             result = subprocess.run(ssim_cmd, capture_output=True, text=True, timeout=120)
             if result.returncode == 0 and result.stderr:
-                import re
-                match = re.search(r'All:(\d+\.\d+)', result.stderr)
+                match = re.search(r'All:(\d+(?:\.\d+)?)', result.stderr)
                 if match:
                     ssim_score = float(match.group(1))
         except Exception as e:
@@ -253,15 +387,14 @@ class PreviewManager:
                 'ffmpeg', '-y',
                 '-i', encoded_path,
                 '-i', source_path,
-                '-lavfi', 'libvmaf',
+                '-lavfi', '[0:v][1:v]libvmaf',
                 '-f', 'null', '-',
             ]
             result = subprocess.run(vmaf_cmd, capture_output=True, text=True, timeout=300)
             if result.returncode == 0 and result.stderr:
-                import re
-                match = re.search(r'VMAF score:\s*(\d+\.\d+)', result.stderr)
+                match = re.search(r'VMAF score:\s*(\d+(?:\.\d+)?)', result.stderr)
                 if not match:
-                    match = re.search(r'vmaf_score:\s*(\d+\.\d+)', result.stderr)
+                    match = re.search(r'vmaf_score:\s*(\d+(?:\.\d+)?)', result.stderr)
                 if match:
                     vmaf_score = float(match.group(1))
         except Exception as e:
@@ -290,6 +423,7 @@ class PreviewManager:
             'encoded_codec': job.get('encoded_codec', ''),
             'vmaf_score': job.get('vmaf_score'),
             'ssim_score': job.get('ssim_score'),
+            'encoded_by_pipeline': job.get('encoded_by_pipeline', False),
         }
 
         if job['status'] == 'ready':

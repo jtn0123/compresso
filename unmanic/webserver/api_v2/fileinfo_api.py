@@ -35,9 +35,6 @@ class ApiFileinfoHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
-        self.params = kwargs.get("params")
-
     async def probe_file(self):
         """
         FileInfo - probe file

@@ -10,6 +10,7 @@
 """
 
 import pytest
+from unittest.mock import patch
 
 from unmanic.webserver.helpers.fileinfo import format_probe_data, _is_hdr
 
@@ -224,6 +225,105 @@ class TestHdrDetection(object):
 
     def test_missing_key_is_not_hdr(self):
         assert _is_hdr({}) is False
+
+    def test_bt2020_primaries_is_hdr(self):
+        assert _is_hdr({'color_primaries': 'bt2020'}) is True
+
+    def test_bt2020_case_insensitive(self):
+        assert _is_hdr({'color_primaries': 'BT2020'}) is True
+
+    def test_smpte2084_case_insensitive(self):
+        assert _is_hdr({'color_transfer': 'SMPTE2084'}) is True
+
+
+# ------------------------------------------------------------------
+# TestTagsSafety
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestTagsSafety(object):
+    """Tests for non-dict tags handling in format_probe_data."""
+
+    def test_audio_stream_with_non_dict_tags(self):
+        """Audio stream with string tags → no crash, language/title empty."""
+        probe = {
+            'streams': [{
+                'codec_type': 'audio',
+                'index': 0,
+                'codec_name': 'aac',
+                'codec_long_name': 'AAC',
+                'profile': 'LC',
+                'tags': 'some string',
+            }],
+            'format': {},
+        }
+        result = format_probe_data(probe)
+        audio = result['audio_streams'][0]
+        assert audio['language'] == ''
+        assert audio['title'] == ''
+
+    def test_subtitle_stream_with_none_tags(self):
+        """Subtitle stream with None tags → no crash, language/title empty."""
+        probe = {
+            'streams': [{
+                'codec_type': 'subtitle',
+                'index': 0,
+                'codec_name': 'srt',
+                'codec_long_name': 'SubRip',
+                'profile': '',
+                'tags': None,
+            }],
+            'format': {},
+        }
+        result = format_probe_data(probe)
+        sub = result['subtitle_streams'][0]
+        assert sub['language'] == ''
+        assert sub['title'] == ''
+
+
+# ------------------------------------------------------------------
+# TestProbeAndFormat (B2)
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestProbeAndFormat(object):
+    """Tests for probe_and_format()."""
+
+    @patch('unmanic.webserver.helpers.fileinfo.probe_file', return_value=None)
+    def test_probe_failure_returns_none(self, mock_probe):
+        """probe_and_format returns None when probe_file returns None."""
+        from unmanic.webserver.helpers.fileinfo import probe_and_format
+        result = probe_and_format('/nonexistent/file.mkv')
+        assert result is None
+
+    @patch('unmanic.webserver.helpers.fileinfo.probe_file')
+    def test_probe_success_returns_formatted(self, mock_probe):
+        """probe_and_format returns formatted result with expected keys."""
+        mock_probe.return_value = {
+            'streams': [
+                {'codec_type': 'video', 'index': 0, 'codec_name': 'h264',
+                 'codec_long_name': 'H.264', 'profile': 'High',
+                 'width': 1920, 'height': 1080},
+            ],
+            'format': {
+                'filename': '/test/file.mkv',
+                'format_name': 'matroska',
+                'format_long_name': 'Matroska',
+                'duration': '120.0',
+                'size': '1000000',
+                'bit_rate': '66666',
+                'nb_streams': '1',
+            },
+        }
+        from unmanic.webserver.helpers.fileinfo import probe_and_format
+        result = probe_and_format('/test/file.mkv')
+        assert result is not None
+        assert 'video_streams' in result
+        assert 'audio_streams' in result
+        assert 'subtitle_streams' in result
+        assert 'format' in result
+        assert len(result['video_streams']) == 1
+        assert result['video_streams'][0]['codec_name'] == 'h264'
 
 
 if __name__ == '__main__':

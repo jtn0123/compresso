@@ -64,9 +64,6 @@ class ApiCompressionHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
-        self.params = kwargs.get("params")
-
     async def get_compression_stats(self):
         """
         Compression - per-file stats
@@ -134,14 +131,7 @@ class ApiCompressionHandler(BaseApiHandler):
                             CompressionSummarySchema
         """
         try:
-            # Parse optional library_id from query string
-            library_id = self.get_argument('library_id', None)
-            if library_id is not None:
-                try:
-                    library_id = int(library_id)
-                except (ValueError, TypeError):
-                    library_id = None
-
+            library_id = self._parse_library_id_arg()
             summary = compression_stats.get_compression_summary(library_id=library_id)
 
             response = self.build_response(

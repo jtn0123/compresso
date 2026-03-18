@@ -15,10 +15,12 @@ from unmanic.webserver.api_v2.schema.healthcheck_schemas import (
     RequestHealthCheckScanSchema,
     RequestHealthCheckLibraryScanSchema,
     RequestHealthCheckStatusSchema,
+    RequestHealthCheckWorkersSchema,
     HealthCheckScanResponseSchema,
     HealthCheckLibraryScanResponseSchema,
     HealthCheckSummaryResponseSchema,
     HealthCheckStatusResponseSchema,
+    HealthCheckWorkersResponseSchema,
 )
 from unmanic.webserver.helpers import healthcheck
 
@@ -45,10 +47,22 @@ class ApiHealthcheckHandler(BaseApiHandler):
             "supported_methods": ["POST"],
             "call_method":       "get_status_list",
         },
+        {
+            "path_pattern":      r"/healthcheck/cancel-scan",
+            "supported_methods": ["POST"],
+            "call_method":       "cancel_scan",
+        },
+        {
+            "path_pattern":      r"/healthcheck/workers",
+            "supported_methods": ["GET"],
+            "call_method":       "get_workers",
+        },
+        {
+            "path_pattern":      r"/healthcheck/workers",
+            "supported_methods": ["POST"],
+            "call_method":       "set_workers",
+        },
     ]
-
-    def initialize(self, **kwargs):
-        self.params = kwargs.get("params")
 
     async def scan_file(self):
         """
@@ -150,6 +164,39 @@ class ApiHealthcheckHandler(BaseApiHandler):
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
+    async def cancel_scan(self):
+        """
+        HealthCheck - cancel scan
+        ---
+        description: Cancel the currently running library scan.
+        responses:
+            200:
+                description: 'Returns cancellation status.'
+                content:
+                    application/json:
+                        schema:
+                            HealthCheckLibraryScanResponseSchema
+        """
+        try:
+            cancelled = healthcheck.cancel_scan()
+
+            response = self.build_response(
+                HealthCheckLibraryScanResponseSchema(),
+                {
+                    "success": True,
+                    "started": False,
+                    "message": "Scan cancellation requested" if cancelled else "No scan is currently running",
+                }
+            )
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
     async def get_summary(self):
         """
         HealthCheck - summary
@@ -180,6 +227,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
                     "success":        True,
                     "healthy":        summary.get('healthy', 0),
                     "corrupted":      summary.get('corrupted', 0),
+                    "warning":        summary.get('warning', 0),
                     "unchecked":      summary.get('unchecked', 0),
                     "checking":       summary.get('checking', 0),
                     "total":          summary.get('total', 0),
@@ -239,6 +287,84 @@ class ApiHealthcheckHandler(BaseApiHandler):
                     "recordsTotal":    statuses.get('recordsTotal', 0),
                     "recordsFiltered": statuses.get('recordsFiltered', 0),
                     "results":         statuses.get('results', []),
+                }
+            )
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_workers(self):
+        """
+        HealthCheck - get workers
+        ---
+        description: Get current worker count and scan status.
+        responses:
+            200:
+                description: 'Returns worker count and scan progress.'
+                content:
+                    application/json:
+                        schema:
+                            HealthCheckWorkersResponseSchema
+        """
+        try:
+            workers_info = healthcheck.get_scan_workers()
+
+            response = self.build_response(
+                HealthCheckWorkersResponseSchema(),
+                {
+                    "success":       True,
+                    "worker_count":  workers_info.get('worker_count', 1),
+                    "scanning":      workers_info.get('scanning', False),
+                    "scan_progress": workers_info.get('progress', {}),
+                }
+            )
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def set_workers(self):
+        """
+        HealthCheck - set workers
+        ---
+        description: Set the number of concurrent scan workers.
+        requestBody:
+            description: Worker count.
+            required: True
+            content:
+                application/json:
+                    schema:
+                        RequestHealthCheckWorkersSchema
+        responses:
+            200:
+                description: 'Returns updated worker count.'
+                content:
+                    application/json:
+                        schema:
+                            HealthCheckWorkersResponseSchema
+        """
+        try:
+            json_request = self.read_json_request(RequestHealthCheckWorkersSchema())
+
+            worker_count = healthcheck.set_scan_workers(json_request.get('worker_count', 1))
+            workers_info = healthcheck.get_scan_workers()
+
+            response = self.build_response(
+                HealthCheckWorkersResponseSchema(),
+                {
+                    "success":       True,
+                    "worker_count":  worker_count,
+                    "scanning":      workers_info.get('scanning', False),
+                    "scan_progress": workers_info.get('progress', {}),
                 }
             )
             self.write_success(response)

@@ -13,6 +13,7 @@
 """
 
 import os
+import time
 import pytest
 import tempfile
 from unittest.mock import patch, MagicMock
@@ -234,6 +235,244 @@ class TestPreviewManager(object):
         assert not os.path.exists(job_dir)
 
 
+    # ------------------------------------------------------------------
+    # cleanup_old_previews (B3)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    def test_cleanup_old_previews_removes_expired_jobs(self):
+        """Jobs older than CLEANUP_AGE should be removed by cleanup_old_previews."""
+        mgr = self._make_manager()
+
+        job_dir = tempfile.mkdtemp(prefix='preview_expired_')
+        mgr._jobs['expired-job'] = {
+            'job_id': 'expired-job',
+            'job_dir': job_dir,
+            'status': 'ready',
+            'created_at': time.time() - mgr.CLEANUP_AGE - 100,
+        }
+
+        mgr.cleanup_old_previews()
+        assert 'expired-job' not in mgr._jobs
+
+    @pytest.mark.unittest
+    def test_cleanup_old_previews_keeps_recent_jobs(self):
+        """Jobs newer than CLEANUP_AGE should be retained by cleanup_old_previews."""
+        mgr = self._make_manager()
+
+        job_dir = tempfile.mkdtemp(prefix='preview_recent_')
+        mgr._jobs['recent-job'] = {
+            'job_id': 'recent-job',
+            'job_dir': job_dir,
+            'status': 'ready',
+            'created_at': time.time() - 60,  # 1 minute ago
+        }
+
+        mgr.cleanup_old_previews()
+        assert 'recent-job' in mgr._jobs
+        # Clean up
+        if os.path.exists(job_dir):
+            import shutil
+            shutil.rmtree(job_dir)
+
+    # ------------------------------------------------------------------
+    # _get_video_codec (B4)
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_get_video_codec_success(self, mock_run):
+        """_get_video_codec returns codec name on success."""
+        mock_run.return_value = MagicMock(returncode=0, stdout='hevc\n')
+        mgr = self._make_manager()
+        result = mgr._get_video_codec('/test/file.mkv')
+        assert result == 'hevc'
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_get_video_codec_failure(self, mock_run):
+        """_get_video_codec returns empty string on failure."""
+        mock_run.side_effect = OSError("ffprobe not found")
+        mgr = self._make_manager()
+        result = mgr._get_video_codec('/test/file.mkv')
+        assert result == ''
+
+    # ------------------------------------------------------------------
+    # _run_plugin_pipeline
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.plugins.PluginsHandler')
+    def test_run_plugin_pipeline_no_plugins_returns_false(self, mock_ph_class):
+        """Empty plugin list returns False."""
+        mock_ph = MagicMock()
+        mock_ph.get_enabled_plugin_modules_by_type.return_value = []
+        mock_ph_class.return_value = mock_ph
+        mgr = self._make_manager()
+        result = mgr._run_plugin_pipeline('/tmp/seg.mkv', '/tmp/enc.mp4', library_id=1)
+        assert result is False
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('unmanic.libs.plugins.PluginsHandler')
+    def test_run_plugin_pipeline_success(self, mock_ph_class, mock_run):
+        """Plugin sets exec_command, subprocess runs, returns True."""
+        import shutil as _shutil
+
+        job_dir = tempfile.mkdtemp(prefix='preview_pipeline_')
+        seg_path = os.path.join(job_dir, 'segment.mkv')
+        enc_path = os.path.join(job_dir, 'encoded.mp4')
+        with open(seg_path, 'w') as f:
+            f.write('fake')
+
+        mock_ph = MagicMock()
+        plugin_module = {'plugin_id': 'test_plugin'}
+        mock_ph.get_enabled_plugin_modules_by_type.return_value = [plugin_module]
+
+        def set_exec_command(data, plugin_id, plugin_type):
+            data['exec_command'] = ['echo', 'test']
+            # Create the output file
+            with open(data['file_out'], 'w') as f:
+                f.write('encoded')
+            return True
+
+        mock_ph.exec_plugin_runner.side_effect = set_exec_command
+        mock_ph_class.return_value = mock_ph
+
+        # Mock subprocess: the remux command needs to create the output file
+        def mock_subprocess_run(cmd, **kwargs):
+            # If this is a remux/encode command that produces remuxed.mp4, create it
+            for arg in cmd:
+                if isinstance(arg, str) and arg.endswith('remuxed.mp4'):
+                    with open(arg, 'w') as f:
+                        f.write('remuxed')
+                    break
+            return MagicMock(returncode=0, stderr='')
+        mock_run.side_effect = mock_subprocess_run
+
+        mgr = self._make_manager()
+        # Create the encoded output so shutil.copy2 works
+        with open(enc_path, 'w') as f:
+            f.write('placeholder')
+        result = mgr._run_plugin_pipeline(seg_path, enc_path, library_id=1)
+        assert result is True
+
+        # Cleanup
+        _shutil.rmtree(job_dir, ignore_errors=True)
+
+    # ------------------------------------------------------------------
+    # _generate_preview pipeline integration
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.PreviewManager.compute_quality_metrics')
+    @patch('unmanic.libs.preview.PreviewManager._get_video_codec')
+    @patch('unmanic.libs.preview.PreviewManager._run_plugin_pipeline')
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_generate_preview_falls_back_on_pipeline_failure(
+        self, mock_run, mock_pipeline, mock_codec, mock_metrics
+    ):
+        """When _run_plugin_pipeline returns False, fallback CRF 23 encode is used."""
+        mock_pipeline.return_value = False
+        mock_codec.return_value = 'h264'
+        mock_metrics.return_value = (None, None)
+        mock_run.return_value = MagicMock(returncode=0, stderr='')
+
+        mgr = self._make_manager()
+
+        # Create a temp file for source
+        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as f:
+            tmp_path = f.name
+
+        try:
+            with patch('unmanic.libs.preview.threading.Thread') as mock_thread:
+                mock_thread_instance = MagicMock()
+                mock_thread.return_value = mock_thread_instance
+
+                job_id = mgr.create_preview(
+                    source_path=tmp_path,
+                    start_time=0,
+                    duration=5,
+                    library_id=1,
+                )
+
+            # Run _generate_preview directly
+            job = mgr._jobs[job_id]
+            # Create job_dir files so os.path.exists checks pass
+            os.makedirs(job['job_dir'], exist_ok=True)
+
+            mgr._generate_preview(job_id)
+
+            # Pipeline was called but returned False
+            mock_pipeline.assert_called_once()
+
+            # subprocess.run should have been called for:
+            # 1. segment extraction, 2. source_web encode, 3. fallback CRF 23 encode
+            assert mock_run.call_count == 3
+            # The third call should contain CRF 23 args
+            third_call_args = mock_run.call_args_list[2][0][0]
+            assert '-crf' in third_call_args
+            crf_idx = third_call_args.index('-crf')
+            assert third_call_args[crf_idx + 1] == '23'
+
+            # encoded_by_pipeline should be False
+            assert job['encoded_by_pipeline'] is False
+        finally:
+            os.unlink(tmp_path)
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.PreviewManager.compute_quality_metrics')
+    @patch('unmanic.libs.preview.PreviewManager._get_video_codec')
+    @patch('unmanic.libs.preview.PreviewManager._run_plugin_pipeline')
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_generate_preview_uses_pipeline_when_available(
+        self, mock_run, mock_pipeline, mock_codec, mock_metrics
+    ):
+        """When _run_plugin_pipeline returns True, pipeline is used and encoded_by_pipeline is True."""
+        mock_pipeline.return_value = True
+        mock_codec.return_value = 'h264'
+        mock_metrics.return_value = (None, None)
+        mock_run.return_value = MagicMock(returncode=0, stderr='')
+
+        mgr = self._make_manager()
+
+        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as f:
+            tmp_path = f.name
+
+        try:
+            with patch('unmanic.libs.preview.threading.Thread') as mock_thread:
+                mock_thread_instance = MagicMock()
+                mock_thread.return_value = mock_thread_instance
+
+                job_id = mgr.create_preview(
+                    source_path=tmp_path,
+                    start_time=0,
+                    duration=5,
+                    library_id=1,
+                )
+
+            job = mgr._jobs[job_id]
+            os.makedirs(job['job_dir'], exist_ok=True)
+            # Create the encoded_path so os.path.exists works for size check
+            with open(job['encoded_path'], 'w') as f:
+                f.write('fake encoded')
+            with open(job['source_web_path'], 'w') as f:
+                f.write('fake source web')
+
+            mgr._generate_preview(job_id)
+
+            mock_pipeline.assert_called_once()
+
+            # subprocess.run should have been called only for:
+            # 1. segment extraction, 2. source_web encode (NOT for CRF 23 fallback)
+            assert mock_run.call_count == 2
+
+            # encoded_by_pipeline should be True
+            assert job['encoded_by_pipeline'] is True
+        finally:
+            os.unlink(tmp_path)
+
+
 class TestPreviewQualityMetrics(object):
     """
     TestPreviewQualityMetrics
@@ -371,6 +610,60 @@ class TestPreviewQualityMetrics(object):
         assert result['ssim_score'] == 0.9812
 
     @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_ssim_command_uses_stream_mapping(self, mock_run):
+        """SSIM ffmpeg command includes [0:v][1:v]ssim filter."""
+        ssim_result = MagicMock(returncode=0, stderr='All:0.9500')
+        vmaf_result = MagicMock(returncode=0, stderr='VMAF score: 90.0')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+
+        ssim_call_args = mock_run.call_args_list[0][0][0]
+        lavfi_idx = ssim_call_args.index('-lavfi')
+        assert '[0:v][1:v]ssim' in ssim_call_args[lavfi_idx + 1]
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_vmaf_command_uses_stream_mapping(self, mock_run):
+        """VMAF ffmpeg command includes [0:v][1:v]libvmaf filter."""
+        ssim_result = MagicMock(returncode=0, stderr='All:0.9500')
+        vmaf_result = MagicMock(returncode=0, stderr='VMAF score: 90.0')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+
+        vmaf_call_args = mock_run.call_args_list[1][0][0]
+        lavfi_idx = vmaf_call_args.index('-lavfi')
+        assert '[0:v][1:v]libvmaf' in vmaf_call_args[lavfi_idx + 1]
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_integer_ssim_score_parsed(self, mock_run):
+        """Integer SSIM score 'All:1' → ssim_score=1.0."""
+        ssim_result = MagicMock(returncode=0, stderr='All:1')
+        vmaf_result = MagicMock(returncode=0, stderr='no match')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert ssim == pytest.approx(1.0)
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_integer_vmaf_score_parsed(self, mock_run):
+        """Integer VMAF score 'VMAF score: 100' → vmaf_score=100.0."""
+        ssim_result = MagicMock(returncode=0, stderr='no match')
+        vmaf_result = MagicMock(returncode=0, stderr='VMAF score: 100')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert vmaf == pytest.approx(100.0)
+
+    @pytest.mark.unittest
     def test_job_without_quality_scores(self):
         """Job without quality scores → vmaf_score/ssim_score are None."""
         mgr = self._make_manager()
@@ -388,6 +681,41 @@ class TestPreviewQualityMetrics(object):
         result = mgr.get_job_status('no-quality')
         assert result['vmaf_score'] is None
         assert result['ssim_score'] is None
+
+    @pytest.mark.unittest
+    def test_job_status_includes_encoded_by_pipeline(self):
+        """get_job_status includes encoded_by_pipeline field."""
+        mgr = self._make_manager()
+        mgr._jobs['pipeline-job'] = {
+            'job_id': 'pipeline-job',
+            'status': 'ready',
+            'error': None,
+            'source_size': 5000,
+            'encoded_size': 3000,
+            'source_codec': 'hevc',
+            'encoded_codec': 'h264',
+            'vmaf_score': 90.0,
+            'ssim_score': 0.98,
+            'encoded_by_pipeline': True,
+        }
+        result = mgr.get_job_status('pipeline-job')
+        assert result['encoded_by_pipeline'] is True
+
+    @pytest.mark.unittest
+    def test_job_status_encoded_by_pipeline_defaults_false(self):
+        """get_job_status defaults encoded_by_pipeline to False when not set."""
+        mgr = self._make_manager()
+        mgr._jobs['no-pipeline'] = {
+            'job_id': 'no-pipeline',
+            'status': 'running',
+            'error': None,
+            'source_size': 0,
+            'encoded_size': 0,
+            'source_codec': '',
+            'encoded_codec': '',
+        }
+        result = mgr.get_job_status('no-pipeline')
+        assert result['encoded_by_pipeline'] is False
 
 
 if __name__ == '__main__':

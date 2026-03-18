@@ -36,6 +36,7 @@ import time
 
 from unmanic import config
 from unmanic.libs import common, history
+from unmanic.libs.ffprobe_utils import probe_file, extract_media_metadata
 from unmanic.libs.frontend_push_messages import FrontendPushMessages
 from unmanic.libs.library import Library
 from unmanic.libs.logs import UnmanicLogging
@@ -333,10 +334,10 @@ class PostProcessor(threading.Thread):
         if def_cache_path not in destination_data['abspath']:
             remove_source_file = False
 
-        self._log(f"Cache path: {def_cache_path}", level='debug')
+        self._log("Cache path: {}".format(def_cache_path), level='debug')
         self._log(
-            f"Remote source: {source_data['abspath']}, destination file: {destination_data['abspath']}.", level='debug')
-        self._log(f"Task cache path: {cache_path}", level='debug')
+            "Remote source: {}, destination file: {}.".format(source_data['abspath'], destination_data['abspath']), level='debug')
+        self._log("Task cache path: {}".format(cache_path), level='debug')
 
         # Remove the source
         if os.path.exists(source_data.get('abspath')) and remove_source_file:
@@ -365,13 +366,13 @@ class PostProcessor(threading.Thread):
                     library_tdir, os.path.basename(cache_path)), [], 'DEFAULT', move=True)
                 if not capture_success:
                     raise Exception("Failed to copy back to network share")
-            except:
+            except Exception:
                 os.mkdir(cache_tdir)
                 self.__copy_file(cache_path, os.path.join(
                     cache_tdir, os.path.basename(cache_path)), [], 'DEFAULT', move=True)
                 tdir = cache_tdir
             finally:
-                self._log(f"tdir: {tdir}", level='debug')
+                self._log("tdir: {}".format(tdir), level='debug')
         else:
             self._log("Final cache file '{}' does not exist!".format(cache_path), level="warning")
 
@@ -486,6 +487,7 @@ class PostProcessor(threading.Thread):
 
         # Capture destination file size for compression stats
         destination_size = 0
+        dest_path = ''
         if task_dump.get('task_success', False) and destination_data:
             dest_path = destination_data.get('abspath', '')
             if dest_path and os.path.exists(dest_path):
@@ -494,18 +496,41 @@ class PostProcessor(threading.Thread):
                 except OSError:
                     self._log("Could not get destination file size for '{}'".format(dest_path), level='warning')
 
+        # Extract media metadata for compression stats (codec, resolution, container)
+        # Always extract source metadata (even on failure, for stats tracking)
+        source_meta = {}
+        dest_meta = {}
+        source_abspath = source_data.get('abspath', '') if source_data else ''
+        if source_abspath and os.path.exists(source_abspath):
+            try:
+                source_meta = extract_media_metadata(source_abspath)
+            except Exception as e:
+                self._log("Could not extract source metadata: {}".format(e), level='warning')
+        # Destination metadata only on success
+        if task_dump.get('task_success', False):
+            if dest_path and os.path.exists(dest_path):
+                try:
+                    dest_meta = extract_media_metadata(dest_path)
+                except Exception as e:
+                    self._log("Could not extract destination metadata: {}".format(e), level='debug')
+
         history_logging.save_task_history(
             {
-                'task_label':          task_dump.get('task_label', ''),
-                'abspath':             task_dump.get('abspath', ''),
-                'task_success':        task_dump.get('task_success', False),
-                'start_time':          task_dump.get('start_time', ''),
-                'finish_time':         task_dump.get('finish_time', ''),
-                'processed_by_worker': task_dump.get('processed_by_worker', ''),
-                'log':                 task_dump.get('log', ''),
-                'source_size':         task_dump.get('source_size', 0),
-                'destination_size':    destination_size,
-                'library_id':          task_dump.get('library_id', 1),
+                'task_label':            task_dump.get('task_label', ''),
+                'abspath':               task_dump.get('abspath', ''),
+                'task_success':          task_dump.get('task_success', False),
+                'start_time':            task_dump.get('start_time', ''),
+                'finish_time':           task_dump.get('finish_time', ''),
+                'processed_by_worker':   task_dump.get('processed_by_worker', ''),
+                'log':                   task_dump.get('log', ''),
+                'source_size':           task_dump.get('source_size', 0),
+                'destination_size':      destination_size,
+                'library_id':            task_dump.get('library_id', 1),
+                'source_codec':          source_meta.get('codec', ''),
+                'destination_codec':     dest_meta.get('codec', ''),
+                'source_resolution':     source_meta.get('resolution', ''),
+                'source_container':      source_meta.get('container', ''),
+                'destination_container': dest_meta.get('container', ''),
             }
         )
 

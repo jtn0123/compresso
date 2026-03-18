@@ -147,14 +147,14 @@ class TestHealthCheckThoroughCheck(object):
 
     @patch('unmanic.libs.healthcheck.subprocess.run')
     @patch('unmanic.libs.healthcheck.os.path.exists', return_value=True)
-    def test_10_or_fewer_error_lines_still_healthy(self, mock_exists, mock_run):
-        """10 or fewer error lines with returncode 0 → still healthy."""
+    def test_10_or_fewer_error_lines_returns_warning(self, mock_exists, mock_run):
+        """1-10 error lines with returncode 0 → warning status."""
         error_lines = '\n'.join(['warning {}'.format(i) for i in range(5)])
         mock_run.return_value = MagicMock(returncode=0, stderr=error_lines)
         mgr = self._make_manager()
-        ok, err = mgr.thorough_check('/test/file.mkv')
-        assert ok is True
-        assert err == ''
+        status, err = mgr.thorough_check('/test/file.mkv')
+        assert status == 'warning'
+        assert '5 warning(s)' in err
 
     @patch('unmanic.libs.healthcheck.subprocess.run')
     @patch('unmanic.libs.healthcheck.os.path.exists', return_value=True)
@@ -295,6 +295,22 @@ class TestHealthCheckCheckFile(object):
         result2 = mgr.check_file('/test/errors.mkv', library_id=1, mode='quick')
         assert result2['error_count'] == 2
 
+    @patch.object(
+        __import__('unmanic.libs.healthcheck', fromlist=['HealthCheckManager']).HealthCheckManager,
+        'thorough_check', return_value=('warning', '5 warning(s): line1')
+    )
+    def test_warning_result_creates_warning_row(self, mock_thorough):
+        from unmanic.libs.unmodels import HealthStatus
+        self._seed_row('/test/warn.mkv')
+        mgr = self._make_manager()
+        result = mgr.check_file('/test/warn.mkv', library_id=1, mode='thorough')
+        assert result['status'] == 'warning'
+        time.sleep(0.1)
+
+        row = HealthStatus.get(HealthStatus.abspath == '/test/warn.mkv')
+        assert row.status == 'warning'
+        assert row.error_count >= 1
+
 
 # ------------------------------------------------------------------
 # TestHealthSummary
@@ -340,6 +356,7 @@ class TestHealthSummary(object):
         summary = mgr.get_health_summary()
         assert summary['healthy'] == 0
         assert summary['corrupted'] == 0
+        assert summary['warning'] == 0
         assert summary['unchecked'] == 0
         assert summary['checking'] == 0
         assert summary['total'] == 0
@@ -355,8 +372,21 @@ class TestHealthSummary(object):
         summary = mgr.get_health_summary()
         assert summary['healthy'] == 2
         assert summary['corrupted'] == 1
+        assert summary['warning'] == 0
         assert summary['unchecked'] == 1
         assert summary['total'] == 4
+
+    def test_warning_status_counted(self):
+        from unmanic.libs.unmodels import HealthStatus
+        HealthStatus.create(abspath='/w1.mkv', status='warning', library_id=1)
+        HealthStatus.create(abspath='/w2.mkv', status='warning', library_id=1)
+        HealthStatus.create(abspath='/h1.mkv', status='healthy', library_id=1)
+
+        mgr = self._make_manager()
+        summary = mgr.get_health_summary()
+        assert summary['warning'] == 2
+        assert summary['healthy'] == 1
+        assert summary['total'] == 3
 
     def test_library_id_filter(self):
         from unmanic.libs.unmodels import HealthStatus
@@ -463,6 +493,30 @@ class TestHealthStatusesPaginated(object):
         assert result['recordsFiltered'] == 1
         assert result['results'][0]['library_id'] == 2
 
+    def test_invalid_order_column_falls_back_to_last_checked(self):
+        from unmanic.libs.unmodels import HealthStatus
+        HealthStatus.create(abspath='/ord1.mkv', status='healthy', library_id=1)
+        HealthStatus.create(abspath='/ord2.mkv', status='healthy', library_id=1)
+
+        mgr = self._make_manager()
+        result = mgr.get_health_statuses_paginated(
+            order={'column': 'DROP TABLE', 'dir': 'desc'}
+        )
+        assert result['recordsTotal'] == 2
+        assert len(result['results']) == 2
+
+    def test_valid_order_column_works(self):
+        from unmanic.libs.unmodels import HealthStatus
+        HealthStatus.create(abspath='/z_last.mkv', status='healthy', library_id=1)
+        HealthStatus.create(abspath='/a_first.mkv', status='healthy', library_id=1)
+
+        mgr = self._make_manager()
+        result = mgr.get_health_statuses_paginated(
+            order={'column': 'abspath', 'dir': 'asc'}
+        )
+        assert result['results'][0]['abspath'] == '/a_first.mkv'
+        assert result['results'][1]['abspath'] == '/z_last.mkv'
+
     def test_result_rows_have_expected_keys(self):
         from unmanic.libs.unmodels import HealthStatus
         HealthStatus.create(
@@ -495,6 +549,7 @@ class TestScheduleLibraryScan(object):
     def teardown_method(self):
         from unmanic.libs.healthcheck import HealthCheckManager
         HealthCheckManager._scanning = False
+        HealthCheckManager._worker_count_requested = 1
 
     @patch('unmanic.libs.healthcheck.threading.Thread')
     def test_first_call_returns_true(self, mock_thread):
@@ -511,6 +566,169 @@ class TestScheduleLibraryScan(object):
         mgr.schedule_library_scan(library_id=1, mode='quick')
         result = mgr.schedule_library_scan(library_id=1, mode='quick')
         assert result is False
+
+
+    # ------------------------------------------------------------------
+    # is_scanning / get_scan_progress (B6)
+    # ------------------------------------------------------------------
+
+    @patch('unmanic.libs.healthcheck.threading.Thread')
+    def test_is_scanning_reflects_scan_state(self, mock_thread):
+        """is_scanning should be True while scanning and False after reset."""
+        from unmanic.libs.healthcheck import HealthCheckManager
+        mock_thread.return_value = MagicMock()
+        mgr = self._make_manager()
+
+        assert HealthCheckManager.is_scanning() is False
+        mgr.schedule_library_scan(library_id=1, mode='quick')
+        assert HealthCheckManager.is_scanning() is True
+
+        # Reset
+        HealthCheckManager._scanning = False
+        assert HealthCheckManager.is_scanning() is False
+
+    def test_get_scan_progress_returns_dict(self):
+        """get_scan_progress should return a dict with expected keys."""
+        from unmanic.libs.healthcheck import HealthCheckManager
+        progress = HealthCheckManager.get_scan_progress()
+        assert isinstance(progress, dict)
+
+
+# ------------------------------------------------------------------
+# TestHealthCheckWorkers
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestHealthCheckWorkers(object):
+    """Tests for worker count management and enriched scan progress."""
+
+    def teardown_method(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        HealthCheckManager._worker_count_requested = 1
+
+    def test_set_worker_count_clamps_range(self):
+        """set 0 -> get 1, set 100 -> get 16."""
+        from unmanic.libs.healthcheck import HealthCheckManager
+        HealthCheckManager.set_worker_count(0)
+        assert HealthCheckManager.get_worker_count() == 1
+        HealthCheckManager.set_worker_count(100)
+        assert HealthCheckManager.get_worker_count() == 16
+        HealthCheckManager.set_worker_count(4)
+        assert HealthCheckManager.get_worker_count() == 4
+        # Reset
+        HealthCheckManager.set_worker_count(1)
+
+    def test_scan_progress_includes_worker_info(self):
+        """Scan progress should include worker-related fields."""
+        from unmanic.libs.healthcheck import HealthCheckManager
+        progress = HealthCheckManager.get_scan_progress()
+        assert 'workers' in progress
+        assert 'max_workers' in progress
+        assert 'files_per_second' in progress
+        assert 'eta_seconds' in progress
+
+
+# ------------------------------------------------------------------
+# TestCancelScan
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestCancelScan(object):
+    """Tests for cancel_scan()."""
+
+    def teardown_method(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        HealthCheckManager._scanning = False
+        HealthCheckManager._cancel_requested = False
+        HealthCheckManager._worker_count_requested = 1
+
+    def test_cancel_when_not_scanning_returns_false(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        result = HealthCheckManager.cancel_scan()
+        assert result is False
+
+    @patch('unmanic.libs.healthcheck.threading.Thread')
+    def test_cancel_when_scanning_returns_true(self, mock_thread):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        mock_thread.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        mgr.schedule_library_scan(library_id=1, mode='quick')
+        result = HealthCheckManager.cancel_scan()
+        assert result is True
+        assert HealthCheckManager._cancel_requested is True
+
+
+# ------------------------------------------------------------------
+# TestCheckFileEdgeCases
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestCheckFileEdgeCases(object):
+    """Edge case tests for check_file (Issue #29)."""
+
+    def _make_manager(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        return HealthCheckManager()
+
+    @patch('unmanic.libs.healthcheck.probe_file')
+    @patch('unmanic.libs.healthcheck.os.path.exists', return_value=True)
+    def test_zero_byte_file_detected(self, mock_exists, mock_probe):
+        """A zero-byte file should return no streams."""
+        mock_probe.return_value = {'streams': [], 'format': {'size': '0'}}
+        mgr = self._make_manager()
+        ok, err = mgr.quick_check('/test/empty.mkv')
+        assert ok is False
+        assert 'No streams' in err
+
+    @patch('unmanic.libs.healthcheck.probe_file')
+    @patch('unmanic.libs.healthcheck.os.path.exists', return_value=True)
+    def test_negative_duration_detected(self, mock_exists, mock_probe):
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video'}],
+            'format': {'duration': '-1.0'},
+        }
+        mgr = self._make_manager()
+        ok, err = mgr.quick_check('/test/negative_dur.mkv')
+        assert ok is False
+        assert 'zero or negative' in err
+
+
+# ------------------------------------------------------------------
+# TestHistoryOrderWhitelist
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestHistoryOrderWhitelist(object):
+    """Tests for get_historic_task_list_filtered_and_sorted column whitelist (Issue #3)."""
+
+    db_connection = None
+
+    def setup_class(self):
+        self.config_path = tempfile.mkdtemp(prefix='unmanic_tests_history_order_')
+        self.db_file = os.path.join(self.config_path, 'test_history_order.db')
+        database_settings = {
+            "TYPE": "SQLITE",
+            "FILE": self.db_file,
+            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+        }
+        self.db_connection = Database.select_database(database_settings)
+
+        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        self.db_connection.create_tables([CompletedTasks, CompletedTasksCommandLogs])
+        time.sleep(0.5)
+
+        from unmanic import config
+        self.settings = config.Config(config_path=self.config_path)
+
+    def test_invalid_column_does_not_crash(self):
+        """Passing __class__ or other invalid column should not crash."""
+        from unmanic.libs.history import History
+        history = History()
+        result = history.get_historic_task_list_filtered_and_sorted(
+            order={'column': '__class__', 'dir': 'asc'}
+        )
+        # Should return without error (empty or with results)
+        assert result is not None
 
 
 if __name__ == '__main__':

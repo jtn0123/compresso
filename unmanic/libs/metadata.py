@@ -339,10 +339,12 @@ class UnmanicFileMetadata:
             return
         now = datetime.now()
         FileMetadataPaths.update(
-            file_metadata=file_metadata_id,
             path_type=path_type,
             updated_at=now,
-        ).where(FileMetadataPaths.path == path).execute()
+        ).where(
+            (FileMetadataPaths.file_metadata == file_metadata_id) &
+            (FileMetadataPaths.path == path)
+        ).execute()
 
         row = FileMetadataPaths.get_or_none(
             (FileMetadataPaths.file_metadata == file_metadata_id) &

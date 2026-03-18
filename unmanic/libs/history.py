@@ -32,7 +32,6 @@
 
 import os
 import json
-from operator import attrgetter
 
 from unmanic import config
 from unmanic.libs import common
@@ -102,11 +101,16 @@ class History(object):
                 query = query.where(CompletedTasks.finish_time <= before_time)
 
             # Get order by
+            ALLOWED_ORDER_COLUMNS = {'id', 'task_label', 'task_success', 'start_time', 'finish_time', 'processed_by_worker', 'abspath'}
             if order:
+                col = order.get("column", "id")
+                if col not in ALLOWED_ORDER_COLUMNS:
+                    col = "id"
+                order_field = getattr(CompletedTasks, col, CompletedTasks.id)
                 if order.get("dir") == "asc":
-                    order_by = attrgetter(order.get("column"))(CompletedTasks).asc()
+                    order_by = order_field.asc()
                 else:
-                    order_by = attrgetter(order.get("column"))(CompletedTasks).desc()
+                    order_by = order_field.desc()
 
                 query = query.order_by(order_by)
 
@@ -262,10 +266,10 @@ class History(object):
             new_historic_task = self.create_historic_task_entry(task_data)
             # Create an entry of the data from the source ffprobe
             self.create_historic_task_ffmpeg_log_entry(new_historic_task, task_data.get('log', ''))
-            # Create compression stats entry if size data is available
+            # Create compression stats entry for successful tasks
             source_size = task_data.get('source_size', 0)
             destination_size = task_data.get('destination_size', 0)
-            if source_size and source_size > 0:
+            if task_data.get('task_success', False):
                 self.create_compression_stats_entry(
                     new_historic_task,
                     source_size=source_size,
@@ -458,13 +462,17 @@ class History(object):
         records_filtered = query.count()
 
         # Default order
+        ALLOWED_CS_COLUMNS = {'source_size', 'destination_size', 'library_id'}
+        ALLOWED_CT_COLUMNS = {'finish_time', 'task_label', 'task_success'}
         if order:
             col = order.get('column', 'finish_time')
             direction = order.get('dir', 'desc')
-            if col in ('source_size', 'destination_size', 'library_id'):
+            if col in ALLOWED_CS_COLUMNS:
                 order_field = getattr(CompressionStats, col)
+            elif col in ALLOWED_CT_COLUMNS:
+                order_field = getattr(CompletedTasks, col)
             else:
-                order_field = getattr(CompletedTasks, col, CompletedTasks.finish_time)
+                order_field = CompletedTasks.finish_time
             if direction == 'asc':
                 query = query.order_by(order_field.asc())
             else:

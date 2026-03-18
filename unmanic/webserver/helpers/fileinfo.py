@@ -77,13 +77,17 @@ def format_probe_data(probe_data):
                 'bit_rate': _safe_int(stream.get('bit_rate')),
                 'duration': _safe_float(stream.get('duration')),
             })
-            tags = stream.get('tags', {})
+            tags = stream.get('tags') or {}
+            if not isinstance(tags, dict):
+                tags = {}
             info['language'] = tags.get('language', '')
             info['title'] = tags.get('title', '')
             audio_streams.append(info)
 
         elif codec_type == 'subtitle':
-            tags = stream.get('tags', {})
+            tags = stream.get('tags') or {}
+            if not isinstance(tags, dict):
+                tags = {}
             info.update({
                 'language': tags.get('language', ''),
                 'title': tags.get('title', ''),
@@ -123,9 +127,15 @@ def probe_and_format(filepath):
 
 def _is_hdr(stream):
     """Check if a video stream is HDR based on color metadata."""
-    transfer = stream.get('color_transfer', '')
-    hdr_transfers = ['smpte2084', 'arib-std-b67', 'smpte428']
-    return transfer in hdr_transfers
+    transfer = stream.get('color_transfer', '').lower()
+    hdr_transfers = {'smpte2084', 'arib-std-b67', 'smpte428'}
+    if transfer in hdr_transfers:
+        return True
+    # Secondary signal: BT.2020 color primaries suggest HDR content
+    primaries = stream.get('color_primaries', '').lower()
+    if primaries == 'bt2020':
+        return True
+    return False
 
 
 def _safe_int(value):

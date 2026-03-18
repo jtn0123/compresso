@@ -9,6 +9,24 @@
 """
 
 from unmanic.libs.healthcheck import HealthCheckManager
+from unmanic.libs.logs import UnmanicLogging
+
+logger = UnmanicLogging.get_logger('healthcheck_helper')
+
+
+def validate_library_exists(library_id):
+    """
+    Validate that a library ID exists in the database.
+    Returns True if valid, raises ValueError if not.
+    """
+    if library_id is None:
+        return True
+    try:
+        from unmanic.libs.unmodels import Libraries
+        Libraries.get_by_id(library_id)
+        return True
+    except Exception:
+        raise ValueError("Library with ID {} does not exist".format(library_id))
 
 
 def check_single_file(filepath, library_id=1, mode='quick'):
@@ -42,9 +60,29 @@ def get_health_statuses_paginated(params):
     )
 
 
+def cancel_scan():
+    """Cancel the current library scan."""
+    return HealthCheckManager.cancel_scan()
+
+
 def get_scan_progress():
     """Get current scan progress."""
     return {
+        'scanning': HealthCheckManager.is_scanning(),
+        'progress': HealthCheckManager.get_scan_progress(),
+    }
+
+
+def set_scan_workers(count):
+    """Set the number of concurrent scan workers."""
+    HealthCheckManager.set_worker_count(count)
+    return HealthCheckManager.get_worker_count()
+
+
+def get_scan_workers():
+    """Get current worker count and scan status."""
+    return {
+        'worker_count': HealthCheckManager.get_worker_count(),
         'scanning': HealthCheckManager.is_scanning(),
         'progress': HealthCheckManager.get_scan_progress(),
     }

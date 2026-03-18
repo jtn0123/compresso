@@ -107,5 +107,104 @@ class TestProbeFile(object):
         assert kwargs['timeout'] == 120
 
 
+@pytest.mark.unittest
+class TestExtractMediaMetadata(object):
+    """Tests for extract_media_metadata()."""
+
+    def _call(self, *args, **kwargs):
+        from unmanic.libs.ffprobe_utils import extract_media_metadata
+        return extract_media_metadata(*args, **kwargs)
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file')
+    def test_extracts_codec_from_video_stream(self, mock_probe):
+        """Video stream codec is extracted."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'hevc', 'height': 1080}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['codec'] == 'hevc'
+
+    @pytest.mark.parametrize('height,expected', [
+        (2160, '4K'),
+        (1080, '1080p'),
+        (720, '720p'),
+        (480, '480p'),
+        (360, '360p'),
+    ])
+    @patch('unmanic.libs.ffprobe_utils.probe_file')
+    def test_extracts_resolution_labels(self, mock_probe, height, expected):
+        """Resolution label matches height."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'height': height}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['resolution'] == expected
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file')
+    def test_extracts_container_from_extension(self, mock_probe):
+        """Container is derived from file extension."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'height': 1080}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['container'] == 'mkv'
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file')
+    def test_no_video_stream_returns_empty_codec(self, mock_probe):
+        """Probe with only audio → empty codec and resolution."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'audio', 'codec_name': 'aac'}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['codec'] == ''
+        assert result['resolution'] == ''
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file', return_value=None)
+    def test_probe_failure_returns_empty_with_container(self, mock_probe):
+        """probe_file returns None → estimated codec, container still set."""
+        result = self._call('/test/file.mkv')
+        assert 'h264' in result['codec']
+        assert 'estimated' in result['codec']
+        assert result['resolution'] == ''
+        assert result['container'] == 'mkv'
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file', return_value=None)
+    def test_codec_fallback_on_probe_failure_mp4(self, mock_probe):
+        """probe_file returns None on .mp4 → codec contains 'h264 (estimated)'."""
+        result = self._call('/test/file.mp4')
+        assert result['codec'] == 'h264 (estimated)'
+        assert result['container'] == 'mp4'
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file', return_value=None)
+    def test_codec_fallback_on_probe_failure_webm(self, mock_probe):
+        """probe_file returns None on .webm → codec contains 'vp9 (estimated)'."""
+        result = self._call('/test/file.webm')
+        assert result['codec'] == 'vp9 (estimated)'
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file', return_value=None)
+    def test_codec_fallback_unknown_extension(self, mock_probe):
+        """probe_file returns None on unknown extension → empty codec."""
+        result = self._call('/test/file.xyz')
+        assert result['codec'] == ''
+
+    @patch('unmanic.libs.ffprobe_utils.probe_file')
+    def test_first_video_stream_used(self, mock_probe):
+        """Multiple video streams → first one's codec used."""
+        mock_probe.return_value = {
+            'streams': [
+                {'codec_type': 'video', 'codec_name': 'hevc', 'height': 2160},
+                {'codec_type': 'video', 'codec_name': 'h264', 'height': 720},
+            ],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['codec'] == 'hevc'
+        assert result['resolution'] == '4K'
+
+
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

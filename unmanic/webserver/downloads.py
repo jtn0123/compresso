@@ -83,10 +83,20 @@ class DownloadsHandler(web.RequestHandler):
         # Set file details
         abspath = link_data.get('abspath', '')
         basename = link_data.get('basename', '')
+
+        # Validate path - resolve symlinks and ensure it's a real file path
+        if abspath:
+            abspath = os.path.realpath(abspath)
+
         # Return 404 on file not found
-        if not os.path.exists(abspath):
+        if not abspath or not os.path.exists(abspath):
             # Link ID must not be valid
             self.write_error(404)
+            return
+
+        # Security: ensure the resolved path is not a directory
+        if os.path.isdir(abspath):
+            self.write_error(403)
             return
 
         self.set_header('Content-Type', 'application/octet-stream')
