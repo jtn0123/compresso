@@ -100,6 +100,7 @@ class RootService:
         deadline = time.time() + timeout
         while time.time() < deadline:
             if thread.is_alive():
+                self.logger.info("WORKER_THREAD_STARTED name=%s", name)
                 return
             time.sleep(0.1)
         message = "WORKER_THREAD_STARTUP_FAILED name={} did not remain alive".format(name)
@@ -351,7 +352,10 @@ class RootService:
         for thread in self.threads:
             self.logger.info("Waiting for thread {} to stop".format(thread['name']))
             thread['thread'].join(10)
-            self.logger.info("Thread {} has successfully stopped".format(thread['name']))
+            if thread['thread'].is_alive():
+                self.logger.error("WORKER_THREAD_STOP_TIMEOUT name=%s", thread['name'])
+            else:
+                self.logger.info("WORKER_THREAD_STOPPED name=%s", thread['name'])
         self.threads = []
 
     def sig_handle(self, signum, frame):

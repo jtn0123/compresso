@@ -35,6 +35,7 @@ import shutil
 import subprocess
 import sys
 import glob
+import tempfile
 from setuptools import setup, find_packages, Command, find_namespace_packages
 import setuptools.command.build_py
 
@@ -107,32 +108,44 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
 
         public_asset_path = os.path.abspath(os.path.join('.', 'build', 'lib', src_dir, 'webserver', 'public'))
         frontend_path = os.path.abspath(os.path.join('.', 'build', 'lib', src_dir, 'webserver', 'frontend'))
+        source_frontend_path = os.path.abspath(os.path.join(project_root_dir, src_dir, 'webserver', 'frontend'))
 
         npm_bin = shutil.which("npm")
         if not npm_bin:
             raise RuntimeError("npm is required to build the vendored frontend. Install Node.js 22 and retry.")
-        if not os.path.exists(os.path.join(frontend_path, 'package-lock.json')):
+        if not os.path.exists(os.path.join(source_frontend_path, 'package-lock.json')):
             raise RuntimeError("Frontend package-lock.json is missing. Restore the vendored frontend lockfile.")
 
-        # Start by clearing out anything if this was pulled from a dirty tree
+        # Build the frontend from a clean staged copy so local source-tree artifacts
+        # like node_modules never influence the produced package.
         shutil.rmtree(public_asset_path, ignore_errors=True)
-        shutil.rmtree(os.path.join(frontend_path, 'node_modules'), ignore_errors=True)
+        shutil.rmtree(frontend_path, ignore_errors=True)
 
-        # Install all modules
-        subprocess.run(
-            [npm_bin, "ci", "--no-audit", "--no-fund"],
-            check=True,
-            cwd=frontend_path,
-        )
-        # Build the frontend
-        subprocess.run(
-            [npm_bin, "run", "build:publish"],
-            check=True,
-            cwd=frontend_path,
-        )
+        with tempfile.TemporaryDirectory(prefix='unmanic-frontend-build-') as temp_dir:
+            staged_frontend_path = os.path.join(temp_dir, 'frontend')
+            shutil.copytree(
+                source_frontend_path,
+                staged_frontend_path,
+                ignore=shutil.ignore_patterns(
+                    'node_modules', 'dist', '.quasar', '.idea',
+                    'src-cordova', 'src-capacitor', 'src-bex',
+                ),
+            )
 
-        # Move built dist to templates directory
-        shutil.move(os.path.join(frontend_path, 'dist', 'spa'), public_asset_path)
+            subprocess.run(
+                [npm_bin, "ci", "--no-audit", "--no-fund"],
+                check=True,
+                cwd=staged_frontend_path,
+            )
+            subprocess.run(
+                [npm_bin, "run", "build:publish"],
+                check=True,
+                cwd=staged_frontend_path,
+            )
+
+            os.makedirs(os.path.dirname(public_asset_path), exist_ok=True)
+            shutil.move(os.path.join(staged_frontend_path, 'dist', 'spa'), public_asset_path)
+
         # Remove the frontend source from the package (we will not distribute these)
         shutil.rmtree(frontend_path, ignore_errors=True)
 
@@ -151,8 +164,12 @@ class CleanCommand(Command):
     def run():
         shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'build')), ignore_errors=True)
         shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'dist')), ignore_errors=True)
-        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), '*.pyc')), ignore_errors=True)
         shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'unmanic.egg-info')), ignore_errors=True)
+        for pyc_file in glob.glob(os.path.join(os.path.dirname(__file__), '*.pyc')):
+            try:
+                os.remove(pyc_file)
+            except FileNotFoundError:
+                pass
         [shutil.rmtree(f) for f in glob.glob(src_dir + "/**/__pycache__", recursive=True)]
 
 
@@ -208,6 +225,20 @@ setup(
     },
     packages=find_namespace_packages(include=[f"{src_dir}*"]),
     include_package_data=True,
+    exclude_package_data={
+        src_dir: [
+            'webserver/frontend/node_modules/*',
+            'webserver/frontend/node_modules/**',
+            'webserver/frontend/dist/*',
+            'webserver/frontend/dist/**',
+            'webserver/frontend/.quasar/*',
+            'webserver/frontend/.quasar/**',
+            'webserver/frontend/public/*',
+            'webserver/frontend/public/**',
+            'webserver/frontend/.idea/*',
+            'webserver/frontend/.idea/**',
+        ],
+    },
     entry_points={
         'console_scripts': [
             '%s=%s.service:main' % (module_name, module_name)

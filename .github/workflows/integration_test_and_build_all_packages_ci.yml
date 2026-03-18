@@ -51,13 +51,12 @@ jobs:
             ${{ runner.os }}-pip-
 
       # Restore the apt cache if it exists
-      # TODO: Fix this cache. Its not really working at all. It would be nice to have tho.
-      - name: Restore python cache
+      - name: Restore apt cache
         id: apt-cache
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-cache
+          key: ${{ runner.os }}-apt-cache-ffmpeg
 
       # Download FFMPEG
       - name: Download FFMPEG
@@ -156,6 +155,10 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
+      - name: Clean build artifacts
+        run: |
+          rm -rf build dist
+
       # Setup node environment for building unmanic's webui
       - uses: actions/setup-node@v4
         with:
@@ -174,12 +177,18 @@ jobs:
           python -m build --no-isolation --skip-dependency-check --wheel
           python -m build --no-isolation --skip-dependency-check --sdist
 
+      - name: Verify single wheel output
+        run: |
+          mapfile -t wheels < <(find dist -maxdepth 1 -type f -name "*.whl" | sort)
+          test "${#wheels[@]}" -eq 1
+          printf 'wheel=%s\n' "${wheels[0]}"
+
       # Read the python package distribution data (save version to file)
       - name: Read python package distribution data
         id: py_build_data
         run: |
           PY_VERSION=$(python ./setup.py  --quiet --version)
-          PY_BDIST_PATH=$(ls  dist/*.whl | head -n1)
+          PY_BDIST_PATH=$(find dist -maxdepth 1 -type f -name "*.whl" | sort | tail -n 1)
           PY_BDIST_FILE=${PY_BDIST_PATH#*/}
           echo "py_version=${PY_VERSION}" >> $GITHUB_OUTPUT
           echo "py_bdist_file=${PY_BDIST_FILE}" >> $GITHUB_OUTPUT
@@ -215,9 +224,10 @@ jobs:
       - name: Restore python package distribution data
         id: py_build_data
         run: |
+          rm -rf ./dist
           mkdir -p ./dist
-          find ./artifacts/ -type f -name "*.whl" -exec cp -n {} ./dist/ \;
-          find ./artifacts/ -type f -name "VERSION.txt" -exec cp -n {} ./dist/ \;
+          find ./artifacts/ -type f -name "*.whl" -exec cp {} ./dist/ \;
+          find ./artifacts/ -type f -name "VERSION.txt" -exec cp {} ./dist/ \;
           ls -l ./dist/
           PY_VERSION=$(cat ./dist/VERSION.txt)
           echo "py_version=${PY_VERSION}" >> $GITHUB_OUTPUT
@@ -358,6 +368,8 @@ jobs:
       - name: Build local smoke-test image
         if: success()
         run: |
+          mapfile -t wheels < <(find dist -maxdepth 1 -type f -name "*.whl" | sort)
+          test "${#wheels[@]}" -eq 1
           docker build -f docker/Dockerfile -t unmanic-smoke:ci .
 
       - name: Smoke test Docker runtime
@@ -389,7 +401,9 @@ jobs:
             sleep 2
           done
 
+          grep -q '"ready": true' /tmp/unmanic-readiness.json
           curl -fsSL -o /tmp/unmanic-root.html http://127.0.0.1:8888/
+          grep -q STARTUP_SUMMARY "${tmp_root}/config/.unmanic/logs/unmanic.log"
 
   build_pypi:
     name: Publish package to PyPI
@@ -412,9 +426,10 @@ jobs:
       - name: Restore python package distribution data
         id: py_build_data
         run: |
+          rm -rf ./dist
           mkdir -p ./dist
-          find ./artifacts/ -type f -name "*.whl" -exec cp -n {} ./dist/ \;
-          find ./artifacts/ -type f -name "*.tar.gz" -exec cp -n {} ./dist/ \;
+          find ./artifacts/ -type f -name "*.whl" -exec cp {} ./dist/ \;
+          find ./artifacts/ -type f -name "*.tar.gz" -exec cp {} ./dist/ \;
           ls -l ./dist/
 
       # Push the artifacts to PyPI repo

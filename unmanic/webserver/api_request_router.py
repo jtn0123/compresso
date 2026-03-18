@@ -39,7 +39,10 @@ from unmanic import config
 
 
 class Handle404(tornado.web.RequestHandler):
-    def get(self):
+    def initialize(self, **kwargs):
+        pass
+
+    def get(self, *args, **kwargs):
         self.set_status(404)
         self.write('404 Not Found')
 
@@ -70,7 +73,7 @@ class APIRequestRouter(tornado.routing.Router):
         try:
             # Fetch handler class from api module matching api version
             handler = getattr(importlib.import_module("unmanic.webserver.api_{}".format(api_version)), endpoint_handler)
-        except KeyError:
+        except (AttributeError, KeyError, ModuleNotFoundError):
             tornado.log.app_log.warning("Unable to find handler for path: {}".format(endpoint_handler), exc_info=True)
             handler = Handle404
 

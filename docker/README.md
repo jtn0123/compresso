@@ -4,7 +4,7 @@
 ### Building the Source
 Before building the image, you need to have built the unmanic python package:
 ```bash
-rm -rfv ./build && rm -fv ./dist/unmanic-*
+rm -rf ./build ./dist
 python3 -m pip install -r requirements.txt -r requirements-dev.txt
 python3 -m build --no-isolation --skip-dependency-check --wheel
 python3 -m build --no-isolation --skip-dependency-check --sdist

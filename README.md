@@ -97,8 +97,9 @@ To run from source:
     ```
 4) Build and install the package:
     ```bash
+    rm -rf build dist
     python3 -m build --no-isolation --skip-dependency-check --wheel
-    python3 -m pip install --user dist/*.whl
+    python3 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
     ```
 5) Run Unmanic:
     ```bash

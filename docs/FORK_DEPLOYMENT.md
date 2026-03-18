@@ -5,9 +5,10 @@ This fork is intended to build from a single repository checkout. The frontend i
 ## Canonical Source Build
 
 ```bash
+rm -rf build dist
 python3 -m pip install -r requirements.txt -r requirements-dev.txt
 python3 -m build --no-isolation --skip-dependency-check --wheel
-python3 -m pip install --user dist/*.whl
+python3 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
 unmanic
 ```
 
@@ -24,6 +25,7 @@ cd ../../..
 ## Canonical Docker Build
 
 ```bash
+rm -rf build dist
 python3 -m pip install -r requirements.txt -r requirements-dev.txt
 python3 -m build --no-isolation --skip-dependency-check --wheel
 python3 -m build --no-isolation --skip-dependency-check --sdist
@@ -41,6 +43,13 @@ Mount these paths for production:
 - Wait for `GET /unmanic/api/v2/healthcheck/readiness` to return `200`.
 - Treat any `503` response as "startup is not complete yet" and inspect the returned `stages`, `details`, and `errors`.
 - Confirm the startup logs include `STARTUP_SUMMARY` lines before enabling real work.
+
+## Troubleshooting
+
+- If readiness stays `503`, inspect `/config/.unmanic/logs/unmanic.log` for `STARTUP_VALIDATION_FAILED`, `STARTUP_READINESS_TIMEOUT`, `STARTUP_READINESS_PARTIAL_FAILURE`, or `UI_SERVER_STARTUP_FAILED`.
+- If the root page does not load but readiness is healthy, inspect `/config/.unmanic/logs/tornado.log` for routing or handler exceptions.
+- If startup fails immediately, verify `/config` is writable, `/library` exists and is readable, and `/tmp/unmanic` exists on writable fast storage.
+- If worker threads fail to settle, look for `WORKER_THREAD_STARTUP_FAILED` or `WORKER_THREAD_STOP_TIMEOUT` in the application log before retrying.
 
 ## Large-Library Guardrails
 
