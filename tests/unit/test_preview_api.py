@@ -109,6 +109,15 @@ class TestPreviewApiStatus(ApiTestBase):
         assert resp.code == 200
         data = self.parse_response(resp)
         assert data['status'] == 'ready'
+        assert data['job_id'] == 'abc123'
+        assert data['source_url'] == '/unmanic/preview/abc123/source_web.mp4'
+        assert data['encoded_url'] == '/unmanic/preview/abc123/encoded.mp4'
+        assert data['source_size'] == 5000
+        assert data['encoded_size'] == 3000
+        assert data['source_codec'] == 'hevc'
+        assert data['encoded_codec'] == 'h264'
+        assert data['vmaf_score'] == 92.5
+        assert data['ssim_score'] == 0.98
 
     @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
     def test_get_status_not_found(self, mock_pm_class):

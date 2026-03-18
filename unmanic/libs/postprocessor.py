@@ -408,6 +408,7 @@ class PostProcessor(threading.Thread):
         else:
             self._log("Copy file triggered by ({}) {} --> {}".format(plugin_id, file_in, file_out))
 
+        file_move_processes_success = True
         try:
             # Ensure the src and dst are not the same file
             if os.path.exists(file_out) and os.path.samefile(file_in, file_out):

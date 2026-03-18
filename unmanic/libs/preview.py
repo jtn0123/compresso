@@ -185,8 +185,8 @@ class PreviewManager:
         :return: job_id string
         """
         # Validate inputs
-        if not os.path.exists(source_path):
-            raise ValueError("Source file does not exist: {}".format(source_path))
+        if not os.path.isfile(source_path):
+            raise ValueError("Source file does not exist or is not a file: {}".format(source_path))
 
         if duration > self.MAX_DURATION:
             duration = self.MAX_DURATION

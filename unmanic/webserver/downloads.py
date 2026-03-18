@@ -116,7 +116,7 @@ class DownloadsHandler(web.RequestHandler):
         except Exception:
             pass
 
-        if allowed_roots and not any(abspath.startswith(root) for root in allowed_roots):
+        if allowed_roots and not any(abspath.startswith(root + os.sep) or abspath == root for root in allowed_roots):
             self.write_error(403)
             return
 

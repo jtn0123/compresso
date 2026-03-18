@@ -54,6 +54,73 @@ class TestHistoryApiGetTasks(ApiTestBase):
         assert len(data['results']) == 2
 
     @patch(COMPLETED_TASKS + '.prepare_filtered_completed_tasks')
+    def test_get_completed_tasks_with_filters(self, mock_prepare):
+        """Verify filter params are passed through to helper."""
+        mock_prepare.return_value = {
+            'recordsTotal': 1,
+            'recordsFiltered': 1,
+            'successCount': 1,
+            'failedCount': 0,
+            'results': [
+                {'id': 1, 'task_label': 'a.mkv', 'task_success': True, 'finish_time': 1704067200, 'has_metadata': False},
+            ],
+        }
+        resp = self.post_json('/history/tasks', {
+            'start': 5,
+            'length': 25,
+            'search_value': 'movie',
+            'status': 'success',
+            'order_by': 'task_label',
+            'order_direction': 'asc',
+        })
+        assert resp.code == 200
+        call_args = mock_prepare.call_args[0][0]
+        assert call_args['start'] == 5
+        assert call_args['length'] == 25
+        assert call_args['search_value'] == 'movie'
+        assert call_args['status'] == 'success'
+        assert call_args['order']['column'] == 'task_label'
+        assert call_args['order']['dir'] == 'asc'
+
+    @patch(COMPLETED_TASKS + '.prepare_filtered_completed_tasks')
+    def test_get_completed_tasks_empty_results(self, mock_prepare):
+        mock_prepare.return_value = {
+            'recordsTotal': 0,
+            'recordsFiltered': 0,
+            'successCount': 0,
+            'failedCount': 0,
+            'results': [],
+        }
+        resp = self.post_json('/history/tasks', {'start': 0, 'length': 10})
+        assert resp.code == 200
+        data = self.parse_response(resp)
+        assert data['recordsTotal'] == 0
+        assert data['results'] == []
+
+    @patch(COMPLETED_TASKS + '.prepare_filtered_completed_tasks')
+    def test_get_completed_tasks_response_has_all_fields(self, mock_prepare):
+        mock_prepare.return_value = {
+            'recordsTotal': 1,
+            'recordsFiltered': 1,
+            'successCount': 1,
+            'failedCount': 0,
+            'results': [
+                {'id': 1, 'task_label': 'x.mkv', 'task_success': True, 'finish_time': 1704067200, 'has_metadata': True},
+            ],
+        }
+        resp = self.post_json('/history/tasks', {'start': 0, 'length': 10})
+        assert resp.code == 200
+        data = self.parse_response(resp)
+        assert 'recordsTotal' in data
+        assert 'recordsFiltered' in data
+        assert 'successCount' in data
+        assert 'failedCount' in data
+        assert 'results' in data
+        row = data['results'][0]
+        assert row['task_label'] == 'x.mkv'
+        assert row['task_success'] is True
+
+    @patch(COMPLETED_TASKS + '.prepare_filtered_completed_tasks')
     def test_get_completed_tasks_internal_error(self, mock_prepare):
         mock_prepare.side_effect = Exception("DB error")
         resp = self.post_json('/history/tasks', {
