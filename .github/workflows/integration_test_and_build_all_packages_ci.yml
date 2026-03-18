@@ -98,10 +98,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 22
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: unmanic/webserver/frontend/package-lock.json
 
@@ -162,7 +162,7 @@ jobs:
       # Setup node environment for building unmanic's webui
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       # Build python dist package
       - name: Build python dist package
@@ -174,7 +174,8 @@ jobs:
           python ./setup.py  --quiet fullversion
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}/raw/${GITHUB_REF#refs/heads}/"
           sed -i "s|(./docs/|(${REPO_URL:?}/docs/|g" README.md
-          python -m build --no-isolation --skip-dependency-check --wheel
+          python -m build --no-isolation --skip-dependency-check --wheel 2>&1 | tee /tmp/build-wheel.log
+          ! grep -q "absent from the \`packages\` configuration" /tmp/build-wheel.log
           python -m build --no-isolation --skip-dependency-check --sdist
 
       - name: Verify single wheel output

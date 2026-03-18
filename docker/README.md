@@ -12,7 +12,7 @@ python3 -m build --no-isolation --skip-dependency-check --sdist
 
 This fork vendors the frontend directly in the main repository. A recursive clone is no longer required.
 
-Node.js 22 is the supported frontend build baseline for this fork.
+Node.js 24 is the supported frontend build baseline for this fork.
 The Python build performs a clean frontend install from the committed lockfile as part of package creation.
 
 

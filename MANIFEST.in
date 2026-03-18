@@ -7,35 +7,31 @@ include logo.png
 include requirements.txt
 include requirements-dev.txt
 
-# Include module files
-recursive-include unmanic **
+# Include python source files
+recursive-include unmanic *.py
 include versioninfo.py
+include unmanic/version
+recursive-include unmanic/migrations_v1 *.md
+recursive-include unmanic/webserver/docs *.json *.yaml *.md
+recursive-include unmanic/webserver/templates *.html
 
-# Exclude compiled files
-global-exclude *.py[cod]
-global-exclude .DS_Store
+# Include vendored frontend source as build input for source distributions
+graft unmanic/webserver/frontend/src
+graft unmanic/webserver/frontend/public
+graft unmanic/webserver/frontend/scripts
+include unmanic/webserver/frontend/.editorconfig
+include unmanic/webserver/frontend/.env.example
+include unmanic/webserver/frontend/.eslintignore
+include unmanic/webserver/frontend/.eslintrc.js
+include unmanic/webserver/frontend/LICENSE
+include unmanic/webserver/frontend/README.md
+include unmanic/webserver/frontend/AGENTS.md
+include unmanic/webserver/frontend/babel.config.js
+include unmanic/webserver/frontend/jsconfig.json
+include unmanic/webserver/frontend/package-lock.json
+include unmanic/webserver/frontend/package.json
+include unmanic/webserver/frontend/postcss.config.cjs
+include unmanic/webserver/frontend/quasar.conf.js
 
-# Exclude frontend development files
-exclude unmanic/webserver/frontend/.git
-prune unmanic/webserver/frontend/.github
-prune unmanic/webserver/frontend/.idea
-prune unmanic/webserver/frontend/.quasar
-prune unmanic/webserver/frontend/dist
+# Prune local-only frontend install artifacts from source distributions
 prune unmanic/webserver/frontend/node_modules
-prune unmanic/webserver/frontend/src-bex
-prune unmanic/webserver/frontend/src-capacitor
-prune unmanic/webserver/frontend/src-cordova
-global-exclude npm-debug.log*
-global-exclude yarn-debug.log*
-global-exclude yarn-error.log*
-global-exclude *.suo
-global-exclude *.ntvs*
-global-exclude *.njsproj
-global-exclude *.sln
-# Exclude tests
-recursive-exclude tests **
-# Exclude virtual env
-recursive-exclude venv **
-
-# Remove all frontend compiled assets
-prune unmanic/webserver/public

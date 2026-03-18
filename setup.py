@@ -36,7 +36,6 @@ import subprocess
 import sys
 import glob
 import tempfile
-import warnings
 from setuptools import setup, find_packages, Command, find_namespace_packages
 import setuptools.command.build_py
 
@@ -46,17 +45,6 @@ if sys.version_info[0] < 3:
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 import versioninfo
-
-# The vendored frontend lives under the Python package tree so setuptools treats
-# its directories as importable namespace packages during build discovery. We
-# intentionally exclude those paths from distribution and build published assets
-# into `unmanic.webserver.public` instead, so suppress that specific warning.
-warnings.filterwarnings(
-    "ignore",
-    message=r"Package 'unmanic\.webserver\.frontend.*' is absent from the `packages` configuration\.",
-    category=Warning,
-    module=r"setuptools\.command\.build_py",
-)
 
 project_root_dir = os.path.dirname(os.path.realpath(__file__))
 src_dir = 'unmanic'
@@ -219,6 +207,26 @@ def requirements_dev():
         return f.read().splitlines()
 
 
+def collect_runtime_package_data():
+    package_root = os.path.join(project_root_dir, src_dir)
+    runtime_roots = [
+        'migrations_v1',
+        os.path.join('webserver', 'docs'),
+        os.path.join('webserver', 'templates'),
+    ]
+    package_files = ['version']
+    for runtime_root in runtime_roots:
+        absolute_root = os.path.join(package_root, runtime_root)
+        for current_root, dirnames, filenames in os.walk(absolute_root):
+            dirnames[:] = [dirname for dirname in dirnames if dirname != '__pycache__']
+            for filename in filenames:
+                if filename.endswith(('.pyc', '.pyo')):
+                    continue
+                absolute_path = os.path.join(current_root, filename)
+                package_files.append(os.path.relpath(absolute_path, package_root))
+    return sorted(set(package_files))
+
+
 setup(
     name=module_name,
     version=module_version,
@@ -235,27 +243,10 @@ setup(
     extras_require={
         'dev': requirements_dev()
     },
-    packages=find_namespace_packages(
-        include=[f"{src_dir}*"],
-        exclude=[
-            f"{src_dir}.webserver.frontend*",
-            f"{src_dir}.webserver.public*",
-        ],
-    ),
-    include_package_data=True,
-    exclude_package_data={
-        src_dir: [
-            'webserver/frontend/node_modules/*',
-            'webserver/frontend/node_modules/**',
-            'webserver/frontend/dist/*',
-            'webserver/frontend/dist/**',
-            'webserver/frontend/.quasar/*',
-            'webserver/frontend/.quasar/**',
-            'webserver/frontend/public/*',
-            'webserver/frontend/public/**',
-            'webserver/frontend/.idea/*',
-            'webserver/frontend/.idea/**',
-        ],
+    packages=find_packages(include=[f"{src_dir}*"]),
+    include_package_data=False,
+    package_data={
+        src_dir: collect_runtime_package_data(),
     },
     entry_points={
         'console_scripts': [

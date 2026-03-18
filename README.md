@@ -82,7 +82,7 @@ For up-to-date installation instructions, follow the [Unmanic documentation](htt
 
 To run from source:
 
-1) Install Python 3 and Node.js 22.x.
+1) Install Python 3 and Node.js 24.x.
 2) Install Python build dependencies:
     ```
     python3 -m pip install -r requirements.txt -r requirements-dev.txt
@@ -107,7 +107,7 @@ To run from source:
     ```
 6) Open your web browser and navigate to http://localhost:8888/
 
-Node.js 22 is the supported frontend build baseline for this fork. Newer Node releases may work, but CI and release validation use Node 22.
+Node.js 24 is the supported frontend build baseline for this fork. Node 22 may still work, but CI and release validation now use Node 24.
 
 The Python package build performs its own clean frontend install from the committed lockfile, so a pre-existing `node_modules` directory is not required.
 
