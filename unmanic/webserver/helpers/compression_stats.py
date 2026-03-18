@@ -39,6 +39,30 @@ def get_compression_stats_paginated(params):
     )
 
 
+def get_codec_distribution(library_id=None):
+    """Get codec distribution data."""
+    history_logging = history.History()
+    return history_logging.get_codec_distribution(library_id=library_id)
+
+
+def get_resolution_distribution(library_id=None):
+    """Get resolution distribution data."""
+    history_logging = history.History()
+    return history_logging.get_resolution_distribution(library_id=library_id)
+
+
+def get_container_distribution(library_id=None):
+    """Get container distribution data."""
+    history_logging = history.History()
+    return history_logging.get_container_distribution(library_id=library_id)
+
+
+def get_space_saved_over_time(library_id=None, interval='day'):
+    """Get space saved over time data."""
+    history_logging = history.History()
+    return history_logging.get_space_saved_over_time(library_id=library_id, interval=interval)
+
+
 def get_pending_estimate():
     """
     Estimate potential space savings for pending tasks based on historical compression ratio.

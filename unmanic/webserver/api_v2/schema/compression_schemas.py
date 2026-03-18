@@ -81,3 +81,25 @@ class PendingEstimateSchema(BaseSuccessSchema):
     estimated_output_size = fields.Int()
     estimated_savings = fields.Int()
     avg_ratio_used = fields.Float()
+
+
+class CodecDistributionSchema(BaseSuccessSchema):
+    """Schema for codec distribution response"""
+    source_codecs = fields.List(fields.Raw())
+    destination_codecs = fields.List(fields.Raw())
+
+
+class ResolutionDistributionSchema(BaseSuccessSchema):
+    """Schema for resolution distribution response"""
+    resolutions = fields.List(fields.Raw())
+
+
+class ContainerDistributionSchema(BaseSuccessSchema):
+    """Schema for container distribution response"""
+    source_containers = fields.List(fields.Raw())
+    destination_containers = fields.List(fields.Raw())
+
+
+class TimelineSchema(BaseSuccessSchema):
+    """Schema for space saved timeline response"""
+    data = fields.List(fields.Raw())

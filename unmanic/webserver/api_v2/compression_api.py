@@ -17,6 +17,10 @@ from unmanic.webserver.api_v2.schema.compression_schemas import (
     CompressionStatsSchema,
     CompressionSummarySchema,
     PendingEstimateSchema,
+    CodecDistributionSchema,
+    ResolutionDistributionSchema,
+    ContainerDistributionSchema,
+    TimelineSchema,
 )
 from unmanic.webserver.helpers import compression_stats
 
@@ -37,6 +41,26 @@ class ApiCompressionHandler(BaseApiHandler):
             "path_pattern":      r"/compression/pending-estimate",
             "supported_methods": ["GET"],
             "call_method":       "get_pending_estimate",
+        },
+        {
+            "path_pattern":      r"/compression/codec-distribution",
+            "supported_methods": ["GET"],
+            "call_method":       "get_codec_distribution",
+        },
+        {
+            "path_pattern":      r"/compression/resolution-distribution",
+            "supported_methods": ["GET"],
+            "call_method":       "get_resolution_distribution",
+        },
+        {
+            "path_pattern":      r"/compression/container-distribution",
+            "supported_methods": ["GET"],
+            "call_method":       "get_container_distribution",
+        },
+        {
+            "path_pattern":      r"/compression/timeline",
+            "supported_methods": ["GET"],
+            "call_method":       "get_timeline",
         },
     ]
 
@@ -166,6 +190,154 @@ class ApiCompressionHandler(BaseApiHandler):
                     "estimated_output_size": estimate.get('estimated_output_size', 0),
                     "estimated_savings":    estimate.get('estimated_savings', 0),
                     "avg_ratio_used":       estimate.get('avg_ratio_used', 1.0),
+                }
+            )
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    def _parse_library_id_arg(self):
+        """Parse optional library_id from query string."""
+        library_id = self.get_argument('library_id', None)
+        if library_id is not None:
+            try:
+                return int(library_id)
+            except (ValueError, TypeError):
+                return None
+        return None
+
+    async def get_codec_distribution(self):
+        """
+        Compression - codec distribution
+        ---
+        description: Returns codec distribution data for charts.
+        responses:
+            200:
+                description: 'Returns codec distribution.'
+                content:
+                    application/json:
+                        schema:
+                            CodecDistributionSchema
+        """
+        try:
+            library_id = self._parse_library_id_arg()
+            data = compression_stats.get_codec_distribution(library_id=library_id)
+
+            response = self.build_response(
+                CodecDistributionSchema(),
+                {
+                    "success":             True,
+                    "source_codecs":       data.get('source_codecs', []),
+                    "destination_codecs":  data.get('destination_codecs', []),
+                }
+            )
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_resolution_distribution(self):
+        """
+        Compression - resolution distribution
+        ---
+        description: Returns resolution distribution data for charts.
+        responses:
+            200:
+                description: 'Returns resolution distribution.'
+                content:
+                    application/json:
+                        schema:
+                            ResolutionDistributionSchema
+        """
+        try:
+            library_id = self._parse_library_id_arg()
+            data = compression_stats.get_resolution_distribution(library_id=library_id)
+
+            response = self.build_response(
+                ResolutionDistributionSchema(),
+                {
+                    "success":      True,
+                    "resolutions":  data,
+                }
+            )
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_container_distribution(self):
+        """
+        Compression - container distribution
+        ---
+        description: Returns container distribution data for charts.
+        responses:
+            200:
+                description: 'Returns container distribution.'
+                content:
+                    application/json:
+                        schema:
+                            ContainerDistributionSchema
+        """
+        try:
+            library_id = self._parse_library_id_arg()
+            data = compression_stats.get_container_distribution(library_id=library_id)
+
+            response = self.build_response(
+                ContainerDistributionSchema(),
+                {
+                    "success":                True,
+                    "source_containers":      data.get('source_containers', []),
+                    "destination_containers": data.get('destination_containers', []),
+                }
+            )
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_timeline(self):
+        """
+        Compression - space saved timeline
+        ---
+        description: Returns space saved over time for charting.
+        responses:
+            200:
+                description: 'Returns timeline data.'
+                content:
+                    application/json:
+                        schema:
+                            TimelineSchema
+        """
+        try:
+            library_id = self._parse_library_id_arg()
+            interval = self.get_argument('interval', 'day')
+            if interval not in ('day', 'week', 'month'):
+                interval = 'day'
+
+            data = compression_stats.get_space_saved_over_time(library_id=library_id, interval=interval)
+
+            response = self.build_response(
+                TimelineSchema(),
+                {
+                    "success": True,
+                    "data":    data,
                 }
             )
             self.write_success(response)

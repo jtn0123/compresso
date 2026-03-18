@@ -27,3 +27,5 @@ class CompressionStats(BaseModel):
     destination_codec = TextField(null=True, default='')
     source_resolution = TextField(null=True, default='')
     library_id = IntegerField(null=False, default=1, index=True)
+    source_container = TextField(null=True, default='')
+    destination_container = TextField(null=True, default='')

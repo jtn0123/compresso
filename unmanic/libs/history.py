@@ -274,6 +274,8 @@ class History(object):
                     destination_codec=task_data.get('destination_codec', ''),
                     source_resolution=task_data.get('source_resolution', ''),
                     library_id=task_data.get('library_id', 1),
+                    source_container=task_data.get('source_container', ''),
+                    destination_container=task_data.get('destination_container', ''),
                 )
         except Exception as error:
             self.logger.exception("Failed to save historic task entry to database. %s", error)
@@ -323,7 +325,8 @@ class History(object):
     @staticmethod
     def create_compression_stats_entry(historic_task, source_size=0, destination_size=0,
                                        source_codec='', destination_codec='',
-                                       source_resolution='', library_id=1):
+                                       source_resolution='', library_id=1,
+                                       source_container='', destination_container=''):
         """
         Create a compression stats entry for a completed task.
 
@@ -334,6 +337,8 @@ class History(object):
         :param destination_codec:
         :param source_resolution:
         :param library_id:
+        :param source_container:
+        :param destination_container:
         :return:
         """
         CompressionStats.create(
@@ -344,6 +349,8 @@ class History(object):
             destination_codec=destination_codec or '',
             source_resolution=source_resolution or '',
             library_id=library_id,
+            source_container=source_container or '',
+            destination_container=destination_container or '',
         )
 
     def get_library_compression_summary(self, library_id=None):
@@ -494,3 +501,124 @@ class History(object):
             'recordsFiltered': records_filtered,
             'results': results,
         }
+
+    def get_codec_distribution(self, library_id=None):
+        """
+        Get distribution of source and destination codecs.
+
+        :param library_id: Optional library ID filter
+        :return: dict with source_codecs and destination_codecs lists
+        """
+        source_query = CompressionStats.select(
+            CompressionStats.source_codec,
+            fn.COUNT(CompressionStats.id).alias('count'),
+        )
+        dest_query = CompressionStats.select(
+            CompressionStats.destination_codec,
+            fn.COUNT(CompressionStats.id).alias('count'),
+        )
+
+        if library_id is not None:
+            source_query = source_query.where(CompressionStats.library_id == library_id)
+            dest_query = dest_query.where(CompressionStats.library_id == library_id)
+
+        source_query = source_query.where(CompressionStats.source_codec != '').group_by(CompressionStats.source_codec)
+        dest_query = dest_query.where(CompressionStats.destination_codec != '').group_by(CompressionStats.destination_codec)
+
+        source_codecs = [{'codec': row.source_codec, 'count': row.count} for row in source_query]
+        dest_codecs = [{'codec': row.destination_codec, 'count': row.count} for row in dest_query]
+
+        return {
+            'source_codecs': source_codecs,
+            'destination_codecs': dest_codecs,
+        }
+
+    def get_resolution_distribution(self, library_id=None):
+        """
+        Get distribution of source resolutions.
+
+        :param library_id: Optional library ID filter
+        :return: list of {resolution, count}
+        """
+        query = CompressionStats.select(
+            CompressionStats.source_resolution,
+            fn.COUNT(CompressionStats.id).alias('count'),
+        )
+
+        if library_id is not None:
+            query = query.where(CompressionStats.library_id == library_id)
+
+        query = query.where(CompressionStats.source_resolution != '').group_by(CompressionStats.source_resolution)
+
+        return [{'resolution': row.source_resolution, 'count': row.count} for row in query]
+
+    def get_container_distribution(self, library_id=None):
+        """
+        Get distribution of source and destination containers.
+
+        :param library_id: Optional library ID filter
+        :return: dict with source_containers and destination_containers lists
+        """
+        source_query = CompressionStats.select(
+            CompressionStats.source_container,
+            fn.COUNT(CompressionStats.id).alias('count'),
+        )
+        dest_query = CompressionStats.select(
+            CompressionStats.destination_container,
+            fn.COUNT(CompressionStats.id).alias('count'),
+        )
+
+        if library_id is not None:
+            source_query = source_query.where(CompressionStats.library_id == library_id)
+            dest_query = dest_query.where(CompressionStats.library_id == library_id)
+
+        source_query = source_query.where(CompressionStats.source_container != '').group_by(CompressionStats.source_container)
+        dest_query = dest_query.where(CompressionStats.destination_container != '').group_by(CompressionStats.destination_container)
+
+        source_containers = [{'container': row.source_container, 'count': row.count} for row in source_query]
+        dest_containers = [{'container': row.destination_container, 'count': row.count} for row in dest_query]
+
+        return {
+            'source_containers': source_containers,
+            'destination_containers': dest_containers,
+        }
+
+    def get_space_saved_over_time(self, library_id=None, interval='day'):
+        """
+        Get space saved over time, grouped by date interval.
+
+        :param library_id: Optional library ID filter
+        :param interval: 'day', 'week', or 'month'
+        :return: list of {date, space_saved, file_count}
+        """
+        if interval == 'month':
+            date_trunc = fn.strftime('%Y-%m', CompletedTasks.finish_time)
+        elif interval == 'week':
+            date_trunc = fn.strftime('%Y-W%W', CompletedTasks.finish_time)
+        else:
+            date_trunc = fn.strftime('%Y-%m-%d', CompletedTasks.finish_time)
+
+        query = (
+            CompressionStats
+            .select(
+                date_trunc.alias('date_group'),
+                fn.SUM(CompressionStats.source_size - CompressionStats.destination_size).alias('space_saved'),
+                fn.COUNT(CompressionStats.id).alias('file_count'),
+            )
+            .join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id))
+        )
+
+        if library_id is not None:
+            query = query.where(CompressionStats.library_id == library_id)
+
+        query = query.group_by(date_trunc).order_by(date_trunc.asc())
+
+        results = []
+        for row in query:
+            results.append({
+                'date': row.date_group,
+                'space_saved': row.space_saved or 0,
+                'file_count': row.file_count or 0,
+            })
+
+        return results
