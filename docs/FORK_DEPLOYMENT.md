@@ -88,6 +88,30 @@ Mount these paths for production:
 - Stop the container cleanly if you see repeated `STARTUP_`, `UI_SERVER_`, or worker failure messages, then inspect `/config/.unmanic/logs`.
 - Restart once using the same mounted `/config` directory and confirm the app comes back ready before scaling up.
 
+## First 30 Minutes After Boot
+
+1. Check readiness: `curl http://localhost:8888/unmanic/api/v2/healthcheck/readiness` — wait for a `200` response.
+2. Open the web UI at `http://localhost:8888/` and confirm the dashboard loads.
+3. Inspect the startup summary: look for `STARTUP_SUMMARY` in `/config/.unmanic/logs/unmanic.log`.
+4. Confirm `/library` contents match expectations (correct mount, expected files visible).
+5. Confirm `/tmp/unmanic` is writable with sufficient free space (`df -h /tmp/unmanic` inside the container).
+6. Verify the worker count in the UI or logs matches expectations (default: 2 with safe defaults).
+7. Enable one known-safe, non-destructive flow; do **not** enable library scanning yet.
+8. Queue a single test file manually, then watch it through worker and post-processing stages in the logs.
+9. Stop the container cleanly, restart it, and confirm readiness returns `200` and task history is preserved.
+
+## Plugin Canary Guide
+
+A progressive trust-building sequence for new plugin configurations:
+
+1. Start with non-destructive plugins (metadata readers, report generators).
+2. Test on disposable or sample media copied into `/library` — never on originals first.
+3. Confirm output path behavior: does the plugin write alongside the original, to a configured output directory, or replace in-place?
+4. Confirm overwrite/replacement behavior: correct output size, expected format, original handled as expected.
+5. Inspect both `WORKER_` and `POSTPROCESS_` log markers for the same task ID to verify the full pipeline.
+6. Only then widen scope: enable inotify or scheduled scan on one folder, watch one full cycle, then expand to the full library.
+7. **High-risk note:** any plugin that replaces, renames, or relocates originals is high-risk until tested on a disposable set. Treat these with extra caution.
+
 ## Production Checklist
 
 - The repo builds cleanly from a fresh checkout.
@@ -96,6 +120,8 @@ Mount these paths for production:
 - The Docker image builds successfully if you are deploying with Docker.
 - `/config`, `/library`, and `/tmp/unmanic` are mounted to the intended persistent locations.
 - `GET /unmanic/api/v2/healthcheck/readiness` returns `200`.
+- "First 30 Minutes After Boot" checklist completed successfully.
+- Plugin canary steps passed on test media before enabling full library automation.
 - A sample file or small test library completes scan, queue, processing, and post-processing successfully.
 - Application logs show expected startup, worker, and plugin activity with no repeated errors.
 - Only after the sample run is clean should you enable the full media library.

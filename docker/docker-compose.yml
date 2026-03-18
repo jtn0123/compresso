@@ -1,0 +1,29 @@
+# Canonical production docker-compose for Unmanic fork.
+# For the full deployment guide and large-library checklist, see:
+#   docs/FORK_DEPLOYMENT.md
+#
+# After starting, wait for the readiness endpoint before enabling workflows:
+#   curl http://localhost:8888/unmanic/api/v2/healthcheck/readiness
+#
+# For GPU-accelerated transcoding, see the nvidia and vaapi compose templates
+# in this directory.
+
+services:
+  unmanic:
+    image: josh5/unmanic:latest
+    ports:
+      - "8888:8888"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    volumes:
+      # Persistent application state, database, settings, and logs.
+      - /path/to/config:/config
+      # Media library root. Unmanic reads from and (depending on plugins) writes back here.
+      - /path/to/library:/library
+      # Transcode and processing cache. Use fast local storage with headroom for
+      # multiple in-flight jobs. This is not just scratch space — it is part of
+      # the normal processing pipeline.
+      - /path/to/cache:/tmp/unmanic
+    restart: unless-stopped

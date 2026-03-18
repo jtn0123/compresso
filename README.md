@@ -1,9 +1,32 @@
-Unmanic - Library Optimiser  
-===========================
+# Unmanic Fork — Deployment-Hardened Library Optimiser
 
 ![UNMANIC - Library Optimiser](https://github.com/unmanic/unmanic/raw/master/logo.png)
 
-<a href='https://ko-fi.com/I2I21F8E1' target='_blank'><img height='26' style='border:0px;height:26px;' src='https://cdn.ko-fi.com/cdn/kofi1.png?v=2' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+This is a fork of [Josh5/Unmanic](https://github.com/Unmanic/unmanic) focused on reproducible builds, CI validation, Docker runtime smoke testing, and large-library guardrails. The goal is a single-checkout build that an operator can deploy confidently against a large media library without surprises. All upstream functionality is preserved; the changes are in build hygiene, operational safety, and deployment tooling.
+
+### What Changed from Upstream
+
+- Frontend vendored in-repo (no submodule/recursive clone required)
+- Node.js 24 build baseline, validated in CI
+- CI validates frontend lint/build, Python wheel, and Docker runtime smoke test
+- Readiness endpoint at `/unmanic/api/v2/healthcheck/readiness`
+- Large-library safe defaults (conservative worker cap, explicit cache path)
+- SQLite maintenance on container startup
+- Structured log markers for startup/worker/post-processing failures
+
+### Supported Deploy Paths
+
+- **Docker (recommended)** — see [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`docs/FORK_DEPLOYMENT.md`](docs/FORK_DEPLOYMENT.md)
+- **Source** — see [Install and Run](#install-and-run) below
+
+### Fork Status
+
+- Builds from a single repo checkout (no submodules)
+- CI validates frontend, wheel, and Docker runtime smoke test
+- Readiness endpoint available at `/unmanic/api/v2/healthcheck/readiness`
+- Stage on a canary media subset before full-library rollout
+
+---
 
 [![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/unmanic/unmanic?color=009dc7&label=latest%20release&logo=github&logoColor=%23403d3d&style=flat-square)](https://github.com/unmanic/unmanic/releases)
 [![GitHub issues](https://img.shields.io/github/issues-raw/unmanic/unmanic?color=009dc7&logo=github&logoColor=%23403d3d&style=flat-square)](https://github.com/unmanic/unmanic/issues?q=is%3Aopen+is%3Aissue)
@@ -15,13 +38,11 @@ Unmanic - Library Optimiser
 [![Docker Pulls](https://img.shields.io/docker/pulls/josh5/unmanic?color=009dc7&logo=docker&logoColor=%23403d3d&style=for-the-badge)](https://hub.docker.com/r/josh5/unmanic)
 [![Docker Image Size (tag)](https://img.shields.io/docker/image-size/josh5/unmanic/latest?color=009dc7&label=docker%20image%20size&logo=docker&logoColor=%23403d3d&style=for-the-badge)](https://hub.docker.com/r/josh5/unmanic)
 
-
-
-
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Unmanic/unmanic/python_lint_and_run_unit_tests.yml?branch=master&style=flat-square&logo=github&logoColor=403d3d&label=Unit%20Tests)](https://github.com/Unmanic/unmanic/actions/workflows/python_lint_and_run_unit_tests.yml?query=branch%3Amaster)
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Unmanic/unmanic/integration_test_and_build_all_packages_ci.yml?branch=master&style=flat-square&logo=github&logoColor=403d3d&label=Package%20Build)](https://github.com/Unmanic/unmanic/actions/workflows/integration_test_and_build_all_packages_ci.yml?query=branch%3Amaster)
 
 [![GitHub license](https://img.shields.io/github/license/unmanic/unmanic?color=009dc7&style=flat-square)]()
+
 ---
 
 Unmanic is a simple tool for optimising your file library. You can use it to convert your files into a single, uniform format, manage file movements based on timestamps, or execute custom commands against a file based on its file size.
@@ -47,6 +68,10 @@ Some examples of how you may use Unmanic:
 - Run any custom command against files matching a certain extension or above a configured file size.
 
 ### Table Of Contents
+
+[What Changed from Upstream](#what-changed-from-upstream)
+
+[Fork Status](#fork-status)
 
 [Dependencies](#dependencies)
 

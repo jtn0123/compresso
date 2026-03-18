@@ -22,4 +22,6 @@ Simply run this command from the root of the project:
 docker build -f ./docker/Dockerfile -t josh5/unmanic:staging .
 ```
 
+A canonical production [`docker-compose.yml`](docker-compose.yml) is included in this directory as a starting point.
+
 For the recommended production layout and a large-library checklist, see [../docs/FORK_DEPLOYMENT.md](../docs/FORK_DEPLOYMENT.md).
