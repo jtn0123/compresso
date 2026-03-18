@@ -34,6 +34,7 @@ import pytest
 import time
 import tempfile
 import threading
+from unittest.mock import patch, MagicMock
 
 from tests.support_.test_data import data_queues, mock_jobqueue_class
 from unmanic.libs.taskhandler import TaskHandler
@@ -68,19 +69,19 @@ class TestClass(object):
         # Create temp config path
         config_path = tempfile.mkdtemp(prefix='unmanic_tests_')
 
-        # Create connection to a test DB
-        from unmanic.libs import unmodels
-        app_dir = os.path.dirname(os.path.abspath(__file__))
+        # Create connection to a test DB (use temp file, not :memory:, for sqliteq compatibility)
+        self.db_file = os.path.join(config_path, 'test_taskhandler.db')
         database_settings = {
             "TYPE":           "SQLITE",
-            "FILE":           ':memory:',
-            "MIGRATIONS_DIR": os.path.join(app_dir, 'migrations'),
+            "FILE":           self.db_file,
+            "MIGRATIONS_DIR": os.path.join(config_path, 'migrations'),
         }
         from unmanic.libs.unmodels.lib import Database
         self.db_connection = Database.select_database(database_settings)
 
         # Create required tables
         self.db_connection.create_tables([Tasks])
+        time.sleep(0.5)
 
         # import config
         from unmanic import config
@@ -132,20 +133,66 @@ class TestClass(object):
         assert not self.task_handler.is_alive()
 
     @pytest.mark.integrationtest
-    @pytest.mark.skip(reason="This test needs to be re-written to work with the TaskHandler DB integration")
-    def test_task_handler_can_process_scheduled_tasks_queue(self):
-        test_path_string = 'scheduledtasks'
-        self.scheduledtasks.put(test_path_string)
-        self.task_handler.process_scheduledtasks_queue()
-        assert (test_path_string == self.task_queue.added_item)
+    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    def test_task_handler_can_process_scheduled_tasks_queue(self, mock_plugin_handler):
+        """Scheduled tasks queue items (dicts) are added to the Tasks DB table."""
+        mock_plugin_handler.return_value = MagicMock()
+
+        # Create a real temp file so os.path.getsize works
+        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as f:
+            test_path = f.name
+
+        try:
+            Tasks.delete().execute()
+            time.sleep(0.2)
+
+            item = {
+                'pathname': test_path,
+                'library_id': 1,
+                'priority_score': 0,
+            }
+            self.scheduledtasks.put(item)
+            self.task_handler.process_scheduledtasks_queue()
+            time.sleep(0.5)
+
+            abspath = os.path.abspath(test_path)
+            task_row = Tasks.select().where(Tasks.abspath == abspath)
+            assert task_row.count() == 1
+            assert task_row.get().library_id == 1
+        finally:
+            Tasks.delete().execute()
+            os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @pytest.mark.skip(reason="This test needs to be re-written to work with the TaskHandler DB integration")
-    def test_task_handler_can_process_inotify_tasks_queue(self):
-        test_path_string = '/tests/support_/videos/small/big_buck_bunny_144p_1mb.3gp'
-        self.inotifytasks.put(test_path_string)
-        self.task_handler.process_inotifytasks_queue()
-        assert (test_path_string == self.task_queue.added_item)
+    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    def test_task_handler_can_process_inotify_tasks_queue(self, mock_plugin_handler):
+        """Inotify tasks queue items (dicts) are added to the Tasks DB table."""
+        mock_plugin_handler.return_value = MagicMock()
+
+        # Create a real temp file so os.path.getsize works
+        with tempfile.NamedTemporaryFile(suffix='.3gp', delete=False) as f:
+            test_path = f.name
+
+        try:
+            Tasks.delete().execute()
+            time.sleep(0.2)
+
+            item = {
+                'pathname': test_path,
+                'library_id': 1,
+                'priority_score': 0,
+            }
+            self.inotifytasks.put(item)
+            self.task_handler.process_inotifytasks_queue()
+            time.sleep(0.5)
+
+            abspath = os.path.abspath(test_path)
+            task_row = Tasks.select().where(Tasks.abspath == abspath)
+            assert task_row.count() == 1
+            assert task_row.get().library_id == 1
+        finally:
+            Tasks.delete().execute()
+            os.unlink(test_path)
 
 
 if __name__ == '__main__':
