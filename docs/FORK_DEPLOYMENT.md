@@ -64,6 +64,20 @@ Mount these paths for production:
 - Review plugin behavior carefully before enabling automation against the whole library.
 - Keep the first production run limited to a canary directory or a small library subset.
 
+## Plugin Review Checklist
+
+- Treat any plugin that replaces, renames, or relocates media as a high-risk workflow until it has succeeded on a disposable test file set.
+- Prefer enabling scanners or inotify automation only after plugin settings have been reviewed for output paths, overwrite behavior, and post-processing expectations.
+- If library automation is enabled with plugins, watch for `PLUGIN_AUTOMATION_REVIEW_RECOMMENDED` in the logs as a reminder to validate the workflow before widening scope.
+- If jobs fail after a plugin run, inspect worker and post-processing markers together instead of treating them as separate failures. A bad plugin output path often shows up as a worker success followed by post-processing failure.
+
+## Safe Defaults Reference
+
+- `large_library_safe_defaults=true` keeps this fork conservative unless you explicitly opt out.
+- `default_worker_cap=2` is the fallback only when `number_of_workers` is unset.
+- Explicit settings in `settings.json` or CLI arguments override the fork-safe defaults.
+- `cache_path` should point at fast writable storage; it is not just scratch space, it is part of the normal processing pipeline.
+
 ## Small-Library Canary Run
 
 - Start the container with your final `/config`, `/library`, and `/tmp/unmanic` mounts.

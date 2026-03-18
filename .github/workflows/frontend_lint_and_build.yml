@@ -40,3 +40,7 @@ jobs:
     - name: Verify built frontend assets
       run: |
         test -f dist/spa/index.html
+
+    - name: Audit direct production dependencies
+      run: |
+        npm audit --omit=dev

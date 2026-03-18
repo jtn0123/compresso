@@ -13,33 +13,25 @@ include versioninfo.py
 
 # Exclude compiled files
 global-exclude *.py[cod]
+global-exclude .DS_Store
 
 # Exclude frontend development files
-recursive-exclude unmanic/webserver/frontend **/*.git*
-recursive-exclude unmanic/webserver/frontend **/dist/**
-recursive-exclude unmanic/webserver/frontend **/node_modules/**
-recursive-exclude unmanic/webserver/frontend **/.quasar/**
-# Exclude cordova related directories and files
-recursive-exclude unmanic/webserver/frontend **/src-cordova/node_modules/**
-recursive-exclude unmanic/webserver/frontend **/src-cordova/platforms/**
-recursive-exclude unmanic/webserver/frontend **/src-cordova/plugins/**
-recursive-exclude unmanic/webserver/frontend **/src-cordova/www/**
-# Exclude capacitor related directories and files
-recursive-exclude unmanic/webserver/frontend **/src-capacitor/www/**
-recursive-exclude unmanic/webserver/frontend **/src-capacitor/node_modules/**
-# Exclude BEX related directories and files
-recursive-exclude unmanic/webserver/frontend **/src-bex/www/**
-recursive-exclude unmanic/webserver/frontend **/src-bex/js/core/**
-# Exclude any log files
-recursive-exclude unmanic/webserver/frontend **/npm-debug.log*
-recursive-exclude unmanic/webserver/frontend **/yarn-debug.log*
-recursive-exclude unmanic/webserver/frontend **/yarn-error.log*
-# Exclude editor directories and files
-recursive-exclude unmanic/webserver/frontend **/*.suo
-recursive-exclude unmanic/webserver/frontend **/*.ntvs*
-recursive-exclude unmanic/webserver/frontend **/*.njsproj
-recursive-exclude unmanic/webserver/frontend **/*.sln
-recursive-exclude unmanic/webserver/frontend **/.idea/**
+exclude unmanic/webserver/frontend/.git
+prune unmanic/webserver/frontend/.github
+prune unmanic/webserver/frontend/.idea
+prune unmanic/webserver/frontend/.quasar
+prune unmanic/webserver/frontend/dist
+prune unmanic/webserver/frontend/node_modules
+prune unmanic/webserver/frontend/src-bex
+prune unmanic/webserver/frontend/src-capacitor
+prune unmanic/webserver/frontend/src-cordova
+global-exclude npm-debug.log*
+global-exclude yarn-debug.log*
+global-exclude yarn-error.log*
+global-exclude *.suo
+global-exclude *.ntvs*
+global-exclude *.njsproj
+global-exclude *.sln
 # Exclude tests
 recursive-exclude tests **
 # Exclude virtual env

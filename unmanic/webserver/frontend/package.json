@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.17.0",
-    "axios": "^1.2.1",
+    "axios": "^1.13.6",
     "core-js": "^3.31.1",
     "js-bbcode-parser": "^3.0.4",
     "quasar": "^2.8.0",

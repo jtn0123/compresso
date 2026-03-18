@@ -1392,7 +1392,7 @@ class SettingsReadAndWriteSchema(BaseSchema):
 
     settings = fields.Dict(
         required=True,
-        description="The current settings",
+        description="The current settings, including fork-specific deployment defaults such as safe startup behavior and worker caps",
         example={
             "ui_port":                    8888,
             "debugging":                  False,
@@ -1402,7 +1402,10 @@ class SettingsReadAndWriteSchema(BaseSchema):
             "schedule_full_scan_minutes": 1440,
             "follow_symlinks":            True,
             "run_full_scan_on_start":     False,
-            "cache_path":                 "/tmp/unmanic"
+            "cache_path":                 "/tmp/unmanic",
+            "large_library_safe_defaults": True,
+            "startup_readiness_timeout_seconds": 30,
+            "default_worker_cap":         2
         },
     )
 

@@ -36,6 +36,7 @@ import subprocess
 import sys
 import glob
 import tempfile
+import warnings
 from setuptools import setup, find_packages, Command, find_namespace_packages
 import setuptools.command.build_py
 
@@ -45,6 +46,17 @@ if sys.version_info[0] < 3:
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 import versioninfo
+
+# The vendored frontend lives under the Python package tree so setuptools treats
+# its directories as importable namespace packages during build discovery. We
+# intentionally exclude those paths from distribution and build published assets
+# into `unmanic.webserver.public` instead, so suppress that specific warning.
+warnings.filterwarnings(
+    "ignore",
+    message=r"Package 'unmanic\.webserver\.frontend.*' is absent from the `packages` configuration\.",
+    category=Warning,
+    module=r"setuptools\.command\.build_py",
+)
 
 project_root_dir = os.path.dirname(os.path.realpath(__file__))
 src_dir = 'unmanic'

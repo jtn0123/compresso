@@ -31,8 +31,11 @@
 """
 from unmanic import config
 from unmanic.libs.library import Library
+from unmanic.libs.logs import UnmanicLogging
 from unmanic.libs.unplugins import PluginExecutor
 from unmanic.webserver.helpers import plugins
+
+logger = UnmanicLogging.get_logger(name="SettingsHelper")
 
 
 def save_library_config(library_id, library_config=None, plugin_config=None):
@@ -78,6 +81,16 @@ def save_library_config(library_id, library_config=None, plugin_config=None):
     # Update enabled plugins (if the data was given)
     enabled_plugins = plugin_config.get('enabled_plugins')
     if enabled_plugins is not None:
+        enable_scanner = bool(library_config.get('enable_scanner', library.get_enable_scanner()))
+        enable_inotify = bool(library_config.get('enable_inotify', library.get_enable_inotify()))
+        if enabled_plugins and (enable_scanner or enable_inotify):
+            logger.warning(
+                "PLUGIN_AUTOMATION_REVIEW_RECOMMENDED library_id=%s enable_scanner=%s enable_inotify=%s plugin_count=%s",
+                library_id,
+                enable_scanner,
+                enable_inotify,
+                len(enabled_plugins),
+            )
         # Ensure plugins are installed (install them if they are not)
         repo_refreshed = False
         for ep in enabled_plugins:
