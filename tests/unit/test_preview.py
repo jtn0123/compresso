@@ -718,5 +718,46 @@ class TestPreviewQualityMetrics(object):
         assert result['encoded_by_pipeline'] is False
 
 
+class TestPreviewJobTimeout(object):
+    """Tests for preview job timeout (Phase 3B)."""
+
+    def setup_class(self):
+        config_path = tempfile.mkdtemp(prefix='unmanic_tests_timeout_')
+        from unmanic import config
+        self.settings = config.Config(config_path=config_path)
+
+    def _make_manager(self):
+        from unmanic.libs.preview import PreviewManager
+        mgr = PreviewManager()
+        mgr._jobs = {}
+        mgr._current_job = None
+        return mgr
+
+    @pytest.mark.unittest
+    def test_max_job_timeout_constant(self):
+        from unmanic.libs.preview import PreviewManager
+        assert PreviewManager.MAX_JOB_TIMEOUT == 600
+
+    @pytest.mark.unittest
+    def test_check_timeout_raises_on_expired(self):
+        mgr = self._make_manager()
+        mgr._jobs['expired'] = {
+            'job_id': 'expired',
+            'created_at': time.time() - 700,
+        }
+        with pytest.raises(RuntimeError, match="timed out"):
+            mgr._check_timeout('expired')
+
+    @pytest.mark.unittest
+    def test_check_timeout_does_not_raise_on_fresh(self):
+        mgr = self._make_manager()
+        mgr._jobs['fresh'] = {
+            'job_id': 'fresh',
+            'created_at': time.time(),
+        }
+        # Should not raise
+        mgr._check_timeout('fresh')
+
+
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

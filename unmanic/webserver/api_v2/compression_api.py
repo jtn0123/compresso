@@ -23,6 +23,7 @@ from unmanic.webserver.api_v2.schema.compression_schemas import (
     TimelineSchema,
 )
 from unmanic.webserver.helpers import compression_stats
+from unmanic.webserver.helpers.healthcheck import validate_library_exists
 
 
 class ApiCompressionHandler(BaseApiHandler):
@@ -87,6 +88,8 @@ class ApiCompressionHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestCompressionStatsSchema())
 
+            validate_library_exists(json_request.get('library_id'))
+
             params = {
                 'start':        json_request.get('start', 0),
                 'length':       json_request.get('length', 10),
@@ -110,6 +113,10 @@ class ApiCompressionHandler(BaseApiHandler):
             )
             self.write_success(response)
             return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
+            return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
             return
@@ -132,6 +139,7 @@ class ApiCompressionHandler(BaseApiHandler):
         """
         try:
             library_id = self._parse_library_id_arg()
+            validate_library_exists(library_id)
             summary = compression_stats.get_compression_summary(library_id=library_id)
 
             response = self.build_response(
@@ -147,6 +155,10 @@ class ApiCompressionHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
@@ -216,6 +228,7 @@ class ApiCompressionHandler(BaseApiHandler):
         """
         try:
             library_id = self._parse_library_id_arg()
+            validate_library_exists(library_id)
             data = compression_stats.get_codec_distribution(library_id=library_id)
 
             response = self.build_response(
@@ -227,6 +240,10 @@ class ApiCompressionHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
@@ -250,6 +267,7 @@ class ApiCompressionHandler(BaseApiHandler):
         """
         try:
             library_id = self._parse_library_id_arg()
+            validate_library_exists(library_id)
             data = compression_stats.get_resolution_distribution(library_id=library_id)
 
             response = self.build_response(
@@ -260,6 +278,10 @@ class ApiCompressionHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
@@ -283,6 +305,7 @@ class ApiCompressionHandler(BaseApiHandler):
         """
         try:
             library_id = self._parse_library_id_arg()
+            validate_library_exists(library_id)
             data = compression_stats.get_container_distribution(library_id=library_id)
 
             response = self.build_response(
@@ -294,6 +317,10 @@ class ApiCompressionHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
@@ -317,6 +344,7 @@ class ApiCompressionHandler(BaseApiHandler):
         """
         try:
             library_id = self._parse_library_id_arg()
+            validate_library_exists(library_id)
             interval = self.get_argument('interval', 'day')
             if interval not in ('day', 'week', 'month'):
                 interval = 'day'
@@ -331,6 +359,10 @@ class ApiCompressionHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))

@@ -27,7 +27,7 @@ class HealthCheckManager:
 
     _lock = threading.Lock()
     _scanning = False
-    _cancel_requested = False
+    _cancel_event = threading.Event()
     _scan_progress = {
         'total': 0,
         'checked': 0,
@@ -231,7 +231,10 @@ class HealthCheckManager:
         if search_value:
             query = query.where(HealthStatus.abspath.contains(search_value))
 
-        records_total = HealthStatus.select().count()
+        records_total_query = HealthStatus.select()
+        if library_id is not None:
+            records_total_query = records_total_query.where(HealthStatus.library_id == library_id)
+        records_total = records_total_query.count()
         records_filtered = query.count()
 
         ALLOWED_ORDER_COLUMNS = {'last_checked', 'abspath', 'status', 'check_mode', 'library_id', 'error_count'}
@@ -283,7 +286,7 @@ class HealthCheckManager:
             if self._scanning:
                 return False
             HealthCheckManager._scanning = True
-            HealthCheckManager._cancel_requested = False
+            HealthCheckManager._cancel_event.clear()
 
         thread = threading.Thread(
             target=self._run_library_scan,
@@ -303,7 +306,7 @@ class HealthCheckManager:
 
         while True:
             # Check for cancellation
-            if HealthCheckManager._cancel_requested:
+            if HealthCheckManager._cancel_event.is_set():
                 break
 
             try:
@@ -409,7 +412,7 @@ class HealthCheckManager:
 
             # Monitor loop: check for worker count changes and track alive workers
             while any(t.is_alive() for t in workers) or not file_queue.empty():
-                if HealthCheckManager._cancel_requested:
+                if HealthCheckManager._cancel_event.is_set():
                     # Drain the queue to stop workers
                     while not file_queue.empty():
                         try:
@@ -457,7 +460,9 @@ class HealthCheckManager:
         finally:
             with self._lock:
                 HealthCheckManager._scanning = False
-                HealthCheckManager._cancel_requested = False
+                HealthCheckManager._cancel_event.clear()
+            with HealthCheckManager._file_locks_lock:
+                HealthCheckManager._file_locks.clear()
 
     @classmethod
     def is_scanning(cls):
@@ -465,8 +470,9 @@ class HealthCheckManager:
 
     @classmethod
     def get_scan_progress(cls):
+        import copy
         with cls._lock:
-            return dict(cls._scan_progress)
+            return copy.deepcopy(cls._scan_progress)
 
     @classmethod
     def set_worker_count(cls, count):
@@ -479,7 +485,7 @@ class HealthCheckManager:
         """Request cancellation of the current library scan."""
         with cls._lock:
             if cls._scanning:
-                cls._cancel_requested = True
+                cls._cancel_event.set()
                 return True
             return False
 

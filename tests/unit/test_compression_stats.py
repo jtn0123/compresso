@@ -52,9 +52,8 @@ class TestCompressionStats(object):
 
         self.db_connection.create_tables([CompletedTasks, CompletedTasksCommandLogs, CompressionStats])
 
-        # Wait for the queue-based writes to complete
-        import time
-        time.sleep(0.5)
+        # Force sync after table creation
+        self.db_connection.execute_sql('SELECT 1')
 
         from unmanic import config
         self.settings = config.Config(config_path=self.config_path)

@@ -69,7 +69,26 @@ class BaseApiHandler(RequestHandler):
     STATUS_ERROR_EXTERNAL = 400
     STATUS_ERROR_ENDPOINT_NOT_FOUND = 404
     STATUS_ERROR_METHOD_NOT_ALLOWED = 405
+    STATUS_ERROR_RATE_LIMITED = 429
     STATUS_ERROR_INTERNAL = 500
+
+    def prepare(self):
+        """Check rate limits before routing to handler methods."""
+        from unmanic.webserver.api_v2.rate_limiter import get_rate_limiter
+        limiter = get_rate_limiter()
+        ip = self.request.remote_ip
+        path = self.request.path
+
+        allowed, remaining, reset_time = limiter.check_rate_limit(ip, path)
+        self.set_header('X-RateLimit-Remaining', str(remaining))
+        self.set_header('X-RateLimit-Reset', str(reset_time))
+
+        if not allowed:
+            self.set_status(self.STATUS_ERROR_RATE_LIMITED, reason="Too Many Requests")
+            self.finish({
+                'error': '429: Too Many Requests',
+                'messages': {'rate_limit': 'Rate limit exceeded. Try again in {} seconds.'.format(reset_time)},
+            })
 
     def set_default_headers(self):
         """

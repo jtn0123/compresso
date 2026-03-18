@@ -87,6 +87,8 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckScanSchema())
 
+            healthcheck.validate_library_exists(json_request.get('library_id'))
+
             result = healthcheck.check_single_file(
                 filepath=json_request.get('file_path'),
                 library_id=json_request.get('library_id', 1),
@@ -106,6 +108,10 @@ class ApiHealthcheckHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
@@ -137,6 +143,8 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckLibraryScanSchema())
 
+            healthcheck.validate_library_exists(json_request.get('library_id'))
+
             started = healthcheck.scan_library(
                 library_id=json_request.get('library_id'),
                 mode=json_request.get('mode', 'quick'),
@@ -156,6 +164,10 @@ class ApiHealthcheckHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))

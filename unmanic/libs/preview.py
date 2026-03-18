@@ -34,6 +34,7 @@ class PreviewManager:
     _jobs = {}
 
     MAX_DURATION = 30  # seconds
+    MAX_JOB_TIMEOUT = 600  # 10 minutes max per preview job
     CLEANUP_AGE = 86400  # 24 hours in seconds
 
     def __init__(self):
@@ -237,6 +238,19 @@ class PreviewManager:
 
         return job_id
 
+    def _check_timeout(self, job_id):
+        """Check if a preview job has exceeded MAX_JOB_TIMEOUT and raise if so."""
+        job = self._jobs.get(job_id)
+        if not job:
+            raise RuntimeError("Job {} not found".format(job_id))
+        elapsed = time.time() - job['created_at']
+        if elapsed > self.MAX_JOB_TIMEOUT:
+            raise RuntimeError(
+                "Preview job {} timed out after {:.0f}s (limit {}s)".format(
+                    job_id, elapsed, self.MAX_JOB_TIMEOUT
+                )
+            )
+
     def _generate_preview(self, job_id):
         """Generate preview clips in a background thread."""
         job = self._jobs.get(job_id)
@@ -252,6 +266,7 @@ class PreviewManager:
             encoded_path = job['encoded_path']
 
             # Step 1: Extract segment from original (stream copy — fast)
+            self._check_timeout(job_id)
             self.logger.info("Preview [%s]: Extracting segment from %s", job_id, source_path)
             extract_cmd = [
                 'ffmpeg', '-y',
@@ -266,6 +281,7 @@ class PreviewManager:
                 raise RuntimeError("Segment extraction failed: {}".format(result.stderr[-500:] if result.stderr else ''))
 
             # Step 2: Re-encode source to browser-playable MP4 (high quality reference)
+            self._check_timeout(job_id)
             self.logger.info("Preview [%s]: Creating browser-playable source reference", job_id)
             source_web_cmd = [
                 'ffmpeg', '-y',
@@ -282,6 +298,7 @@ class PreviewManager:
                 raise RuntimeError("Source web encode failed: {}".format(result.stderr[-500:] if result.stderr else ''))
 
             # Step 3: Encode using library's plugin pipeline
+            self._check_timeout(job_id)
             pipeline_success = False
             try:
                 pipeline_success = self._run_plugin_pipeline(segment_path, encoded_path, job['library_id'])
@@ -318,6 +335,7 @@ class PreviewManager:
             job['encoded_codec'] = self._get_video_codec(encoded_path)
 
             # Step 4: Compute quality metrics (VMAF/SSIM) if possible
+            self._check_timeout(job_id)
             self.logger.info("Preview [%s]: Computing quality metrics", job_id)
             vmaf_score, ssim_score = self.compute_quality_metrics(source_web_path, encoded_path)
             job['vmaf_score'] = vmaf_score

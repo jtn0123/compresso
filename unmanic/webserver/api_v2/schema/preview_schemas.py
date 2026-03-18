@@ -8,7 +8,7 @@
 
 """
 
-from marshmallow import fields
+from marshmallow import fields, validate
 from unmanic.webserver.api_v2.schema.schemas import BaseSchema, BaseSuccessSchema
 
 
@@ -22,11 +22,13 @@ class RequestPreviewCreateSchema(BaseSchema):
         required=False,
         description="Start time in seconds",
         load_default=0,
+        validate=validate.Range(min=0),
     )
     duration = fields.Float(
         required=False,
         description="Duration in seconds (max 30)",
         load_default=10,
+        validate=validate.Range(min=0.1, max=30),
     )
     library_id = fields.Int(
         required=False,

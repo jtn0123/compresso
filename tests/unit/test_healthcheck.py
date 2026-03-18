@@ -14,8 +14,6 @@ import datetime
 import os
 import subprocess
 import tempfile
-import time
-
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -201,7 +199,7 @@ class TestHealthCheckCheckFile(object):
 
         from unmanic.libs.unmodels import HealthStatus
         self.db_connection.create_tables([HealthStatus])
-        time.sleep(0.5)
+        self.db_connection.execute_sql('SELECT 1')
 
         from unmanic import config
         self.settings = config.Config(config_path=self.config_path)
@@ -212,7 +210,7 @@ class TestHealthCheckCheckFile(object):
     def setup_method(self):
         from unmanic.libs.unmodels import HealthStatus
         HealthStatus.delete().execute()
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
 
     def _make_manager(self):
         from unmanic.libs.healthcheck import HealthCheckManager
@@ -222,7 +220,6 @@ class TestHealthCheckCheckFile(object):
         """Pre-seed a HealthStatus row so check_file's get_or_create finds it."""
         from unmanic.libs.unmodels import HealthStatus
         HealthStatus.create(abspath=abspath, library_id=library_id, status='unchecked')
-        time.sleep(0.1)
 
     @patch.object(
         __import__('unmanic.libs.healthcheck', fromlist=['HealthCheckManager']).HealthCheckManager,
@@ -235,7 +232,7 @@ class TestHealthCheckCheckFile(object):
         result = mgr.check_file('/test/healthy.mkv', library_id=1, mode='quick')
         assert result['status'] == 'healthy'
         assert result['error_detail'] == ''
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
 
         row = HealthStatus.get(HealthStatus.abspath == '/test/healthy.mkv')
         assert row.status == 'healthy'
@@ -251,7 +248,7 @@ class TestHealthCheckCheckFile(object):
         result = mgr.check_file('/test/bad.mkv', library_id=1, mode='quick')
         assert result['status'] == 'corrupted'
         assert 'No streams' in result['error_detail']
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
 
         row = HealthStatus.get(HealthStatus.abspath == '/test/bad.mkv')
         assert row.status == 'corrupted'
@@ -277,9 +274,9 @@ class TestHealthCheckCheckFile(object):
         self._seed_row('/test/update.mkv')
         mgr = self._make_manager()
         mgr.check_file('/test/update.mkv', library_id=1, mode='quick')
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
         mgr.check_file('/test/update.mkv', library_id=1, mode='quick')
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
         count = HealthStatus.select().where(HealthStatus.abspath == '/test/update.mkv').count()
         assert count == 1
 
@@ -291,7 +288,7 @@ class TestHealthCheckCheckFile(object):
         self._seed_row('/test/errors.mkv')
         mgr = self._make_manager()
         result1 = mgr.check_file('/test/errors.mkv', library_id=1, mode='quick')
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
         result2 = mgr.check_file('/test/errors.mkv', library_id=1, mode='quick')
         assert result2['error_count'] == 2
 
@@ -305,7 +302,7 @@ class TestHealthCheckCheckFile(object):
         mgr = self._make_manager()
         result = mgr.check_file('/test/warn.mkv', library_id=1, mode='thorough')
         assert result['status'] == 'warning'
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
 
         row = HealthStatus.get(HealthStatus.abspath == '/test/warn.mkv')
         assert row.status == 'warning'
@@ -334,7 +331,7 @@ class TestHealthSummary(object):
 
         from unmanic.libs.unmodels import HealthStatus
         self.db_connection.create_tables([HealthStatus])
-        time.sleep(0.5)
+        self.db_connection.execute_sql('SELECT 1')
 
         from unmanic import config
         self.settings = config.Config(config_path=self.config_path)
@@ -345,7 +342,7 @@ class TestHealthSummary(object):
     def setup_method(self):
         from unmanic.libs.unmodels import HealthStatus
         HealthStatus.delete().execute()
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
 
     def _make_manager(self):
         from unmanic.libs.healthcheck import HealthCheckManager
@@ -423,7 +420,7 @@ class TestHealthStatusesPaginated(object):
 
         from unmanic.libs.unmodels import HealthStatus
         self.db_connection.create_tables([HealthStatus])
-        time.sleep(0.5)
+        self.db_connection.execute_sql('SELECT 1')
 
         from unmanic import config
         self.settings = config.Config(config_path=self.config_path)
@@ -434,7 +431,7 @@ class TestHealthStatusesPaginated(object):
     def setup_method(self):
         from unmanic.libs.unmodels import HealthStatus
         HealthStatus.delete().execute()
-        time.sleep(0.1)
+        self.db_connection.execute_sql('SELECT 1')
 
     def _make_manager(self):
         from unmanic.libs.healthcheck import HealthCheckManager
@@ -639,7 +636,7 @@ class TestCancelScan(object):
     def teardown_method(self):
         from unmanic.libs.healthcheck import HealthCheckManager
         HealthCheckManager._scanning = False
-        HealthCheckManager._cancel_requested = False
+        HealthCheckManager._cancel_event.clear()
         HealthCheckManager._worker_count_requested = 1
 
     def test_cancel_when_not_scanning_returns_false(self):
@@ -655,7 +652,7 @@ class TestCancelScan(object):
         mgr.schedule_library_scan(library_id=1, mode='quick')
         result = HealthCheckManager.cancel_scan()
         assert result is True
-        assert HealthCheckManager._cancel_requested is True
+        assert HealthCheckManager._cancel_event.is_set() is True
 
 
 # ------------------------------------------------------------------
@@ -715,7 +712,7 @@ class TestHistoryOrderWhitelist(object):
 
         from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
         self.db_connection.create_tables([CompletedTasks, CompletedTasksCommandLogs])
-        time.sleep(0.5)
+        self.db_connection.execute_sql('SELECT 1')
 
         from unmanic import config
         self.settings = config.Config(config_path=self.config_path)
@@ -729,6 +726,162 @@ class TestHistoryOrderWhitelist(object):
         )
         # Should return without error (empty or with results)
         assert result is not None
+
+
+# ------------------------------------------------------------------
+# TestRecordsTotalRespectsLibraryId (Phase 3B — verifying 2A fix)
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestRecordsTotalRespectsLibraryId(object):
+    """Verify recordsTotal respects library_id filter after 2A fix."""
+
+    db_connection = None
+
+    def setup_class(self):
+        self.config_path = tempfile.mkdtemp(prefix='unmanic_tests_records_total_')
+        self.db_file = os.path.join(self.config_path, 'test_records_total.db')
+        database_settings = {
+            "TYPE": "SQLITE",
+            "FILE": self.db_file,
+            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+        }
+        self.db_connection = Database.select_database(database_settings)
+
+        from unmanic.libs.unmodels import HealthStatus
+        self.db_connection.create_tables([HealthStatus])
+        self.db_connection.execute_sql('SELECT 1')
+
+        from unmanic import config
+        self.settings = config.Config(config_path=self.config_path)
+
+    def setup_method(self):
+        from unmanic.libs.unmodels import HealthStatus
+        HealthStatus.delete().execute()
+        self.db_connection.execute_sql('SELECT 1')
+
+    def _make_manager(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        return HealthCheckManager()
+
+    def test_records_total_filtered_by_library_id(self):
+        from unmanic.libs.unmodels import HealthStatus
+        HealthStatus.create(abspath='/lib1a.mkv', status='healthy', library_id=1)
+        HealthStatus.create(abspath='/lib1b.mkv', status='healthy', library_id=1)
+        HealthStatus.create(abspath='/lib2a.mkv', status='healthy', library_id=2)
+        HealthStatus.create(abspath='/lib2b.mkv', status='healthy', library_id=2)
+        HealthStatus.create(abspath='/lib2c.mkv', status='healthy', library_id=2)
+
+        mgr = self._make_manager()
+        result = mgr.get_health_statuses_paginated(library_id=2)
+        assert result['recordsTotal'] == 3
+        assert result['recordsFiltered'] == 3
+
+    def test_records_total_no_filter_counts_all(self):
+        from unmanic.libs.unmodels import HealthStatus
+        HealthStatus.create(abspath='/all1.mkv', status='healthy', library_id=1)
+        HealthStatus.create(abspath='/all2.mkv', status='corrupted', library_id=2)
+
+        mgr = self._make_manager()
+        result = mgr.get_health_statuses_paginated()
+        assert result['recordsTotal'] == 2
+
+
+# ------------------------------------------------------------------
+# TestCancelEventThreadSafe (Phase 3B — threading.Event)
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestCancelEventThreadSafe(object):
+    """Verify _cancel_event is a threading.Event and works correctly."""
+
+    def teardown_method(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        HealthCheckManager._scanning = False
+        HealthCheckManager._cancel_event.clear()
+
+    def test_cancel_event_is_threading_event(self):
+        import threading
+        from unmanic.libs.healthcheck import HealthCheckManager
+        assert isinstance(HealthCheckManager._cancel_event, threading.Event)
+
+    def test_cancel_event_set_and_clear(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        assert not HealthCheckManager._cancel_event.is_set()
+        HealthCheckManager._cancel_event.set()
+        assert HealthCheckManager._cancel_event.is_set()
+        HealthCheckManager._cancel_event.clear()
+        assert not HealthCheckManager._cancel_event.is_set()
+
+
+# ------------------------------------------------------------------
+# TestGetScanProgressDeepCopy (Phase 3A — verifying Phase 2A fix)
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestGetScanProgressDeepCopy(object):
+    """Verify get_scan_progress returns a deep copy (nested dicts independent)."""
+
+    def teardown_method(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        HealthCheckManager._scan_progress['workers'] = {}
+
+    def test_modifying_returned_workers_does_not_affect_original(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+
+        # Set up some worker data
+        with HealthCheckManager._lock:
+            HealthCheckManager._scan_progress['workers'] = {
+                0: {'status': 'checking', 'current_file': '/test.mkv'}
+            }
+
+        progress = HealthCheckManager.get_scan_progress()
+        # Mutate the returned dict
+        progress['workers'][0]['status'] = 'MUTATED'
+        progress['workers'][99] = {'status': 'injected'}
+
+        # Original should be unchanged
+        with HealthCheckManager._lock:
+            original = HealthCheckManager._scan_progress['workers']
+        assert original[0]['status'] == 'checking'
+        assert 99 not in original
+
+
+# ------------------------------------------------------------------
+# TestFileLocksClearedAfterScan (Phase 3A — verifying Phase 2E fix)
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestFileLocksClearedAfterScan(object):
+    """Verify _file_locks is cleared after _run_library_scan completes."""
+
+    def teardown_method(self):
+        from unmanic.libs.healthcheck import HealthCheckManager
+        HealthCheckManager._scanning = False
+        HealthCheckManager._file_locks.clear()
+
+    @patch('unmanic.libs.healthcheck.HealthCheckManager.check_file')
+    def test_file_locks_cleared_after_scan(self, mock_check):
+        from unmanic.libs.healthcheck import HealthCheckManager
+
+        # Simulate some accumulated file locks
+        HealthCheckManager._file_locks = {
+            '/old/file1.mkv': MagicMock(),
+            '/old/file2.mkv': MagicMock(),
+        }
+
+        mgr = HealthCheckManager()
+
+        # Mock the library lookup to return an empty directory
+        with patch('unmanic.libs.healthcheck.os.walk', return_value=[]):
+            mock_lib = MagicMock()
+            mock_lib.path = '/empty/library'
+            with patch('unmanic.libs.unmodels.Libraries') as mock_libs:
+                mock_libs.get_by_id.return_value = mock_lib
+                mgr._run_library_scan(library_id=1, mode='quick')
+
+        # After scan, file locks should be cleared
+        assert len(HealthCheckManager._file_locks) == 0
 
 
 if __name__ == '__main__':

@@ -100,6 +100,7 @@ class RequestHealthCheckWorkersSchema(BaseSchema):
     worker_count = fields.Int(
         required=True,
         description="Number of concurrent scan workers (1-16)",
+        validate=validate.Range(min=1, max=16),
     )
 
 

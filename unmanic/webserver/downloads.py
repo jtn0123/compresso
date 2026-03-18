@@ -32,6 +32,7 @@
 import os
 import threading
 import time
+import urllib.parse
 import uuid
 
 from tornado import iostream, web
@@ -41,6 +42,7 @@ from unmanic.libs.singleton import SingletonType
 
 class DownloadsLinks(object, metaclass=SingletonType):
     _download_links = {}
+    _lock = threading.RLock()
 
     def __remove_expired(self):
         """
@@ -50,8 +52,7 @@ class DownloadsLinks(object, metaclass=SingletonType):
         """
         time_now = time.time()
         keys = [t for t in self._download_links]
-        lock = threading.RLock()
-        with lock:
+        with self._lock:
             for k in keys:
                 if k in self._download_links:
                     if self._download_links[k].get('expires', 0) < time_now:
@@ -60,8 +61,7 @@ class DownloadsLinks(object, metaclass=SingletonType):
 
     def generate_download_link(self, link_data):
         link_id = str(uuid.uuid4())
-        lock = threading.RLock()
-        with lock:
+        with self._lock:
             # Expire in 1 min
             link_data['expires'] = (time.time() + 60)
             self._download_links[link_id] = link_data
@@ -99,8 +99,36 @@ class DownloadsHandler(web.RequestHandler):
             self.write_error(403)
             return
 
+        # Security: verify path is within an allowed directory
+        allowed_roots = set()
+        try:
+            from unmanic.libs.unmodels import Libraries
+            for lib in Libraries.select(Libraries.path):
+                if lib.path:
+                    allowed_roots.add(os.path.realpath(lib.path))
+        except Exception:
+            pass
+        try:
+            from unmanic import config
+            cache_path = config.Config().get_cache_path()
+            if cache_path:
+                allowed_roots.add(os.path.realpath(cache_path))
+        except Exception:
+            pass
+
+        if allowed_roots and not any(abspath.startswith(root) for root in allowed_roots):
+            self.write_error(403)
+            return
+
         self.set_header('Content-Type', 'application/octet-stream')
-        self.set_header('Content-Disposition', 'attachment; filename={}'.format(basename))
+        quoted_basename = urllib.parse.quote(basename, safe='')
+        self.set_header(
+            'Content-Disposition',
+            'attachment; filename="{}"; filename*=UTF-8\'\'{}'.format(
+                basename.encode('ascii', 'replace').decode('ascii'),
+                quoted_basename,
+            )
+        )
 
         # Serve file download in 1MB chunks
         with open(abspath, 'rb') as f:

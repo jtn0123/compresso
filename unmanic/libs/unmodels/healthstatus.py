@@ -25,7 +25,7 @@ class HealthStatus(BaseModel):
     status = TextField(null=False, default='unchecked', index=True)  # unchecked, healthy, warning, corrupted, checking
     check_mode = TextField(null=True, default='quick')  # quick, thorough
     error_detail = TextField(null=True, default='')
-    last_checked = DateTimeField(null=True, default=None)
+    last_checked = DateTimeField(null=True, default=None, index=True)
     error_count = IntegerField(null=False, default=0)
 
     class Meta:

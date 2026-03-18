@@ -15,8 +15,6 @@
 import datetime
 import os
 import tempfile
-import time
-
 import pytest
 
 from unmanic.libs.unmodels.lib import Database
@@ -44,7 +42,7 @@ class TestCompressionDistributions(object):
         from unmanic.libs.unmodels import CompletedTasks
         from unmanic.libs.unmodels.compressionstats import CompressionStats
         self.db_connection.create_tables([CompletedTasks, CompressionStats])
-        time.sleep(0.5)
+        self.db_connection.execute_sql('SELECT 1')
 
         from unmanic import config
         self.settings = config.Config(config_path=self.config_path)

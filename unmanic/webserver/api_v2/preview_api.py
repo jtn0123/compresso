@@ -63,6 +63,32 @@ class ApiPreviewHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPreviewCreateSchema())
 
+            from unmanic.webserver.helpers.healthcheck import validate_library_exists
+            validate_library_exists(json_request.get('library_id'))
+
+            # Validate source_path is within an allowed directory
+            source_path = json_request.get('source_path')
+            if source_path:
+                import os
+                real_path = os.path.realpath(source_path)
+                allowed_roots = set()
+                try:
+                    from unmanic.libs.unmodels import Libraries
+                    for lib in Libraries.select(Libraries.path):
+                        if lib.path:
+                            allowed_roots.add(os.path.realpath(lib.path))
+                except Exception:
+                    pass
+                try:
+                    from unmanic import config
+                    cache_path = config.Config().get_cache_path()
+                    if cache_path:
+                        allowed_roots.add(os.path.realpath(cache_path))
+                except Exception:
+                    pass
+                if allowed_roots and not any(real_path.startswith(root + os.sep) or real_path == root for root in allowed_roots):
+                    raise ValueError("Source path is not within an allowed directory")
+
             preview_manager = PreviewManager()
             job_id = preview_manager.create_preview(
                 source_path=json_request.get('source_path'),
