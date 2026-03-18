@@ -136,6 +136,8 @@ class ApiPreviewHandler(BaseApiHandler):
                 "encoded_size":  status.get('encoded_size', 0),
                 "source_codec":  status.get('source_codec', ''),
                 "encoded_codec": status.get('encoded_codec', ''),
+                "vmaf_score":    status.get('vmaf_score'),
+                "ssim_score":    status.get('ssim_score'),
             }
 
             response = self.build_response(PreviewStatusResponseSchema(), response_data)

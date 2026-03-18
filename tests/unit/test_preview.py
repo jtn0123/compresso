@@ -234,5 +234,161 @@ class TestPreviewManager(object):
         assert not os.path.exists(job_dir)
 
 
+class TestPreviewQualityMetrics(object):
+    """
+    TestPreviewQualityMetrics
+
+    Tests for compute_quality_metrics() and get_job_status() quality fields.
+    """
+
+    def setup_class(self):
+        config_path = tempfile.mkdtemp(prefix='unmanic_tests_quality_')
+        from unmanic import config
+        self.settings = config.Config(config_path=config_path)
+
+    def teardown_class(self):
+        pass
+
+    def _make_manager(self):
+        from unmanic.libs.preview import PreviewManager
+        mgr = PreviewManager()
+        mgr._jobs = {}
+        mgr._current_job = None
+        return mgr
+
+    # ------------------------------------------------------------------
+    # compute_quality_metrics
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_ssim_only_vmaf_fails(self, mock_run):
+        """SSIM succeeds, VMAF raises → ssim_score set, vmaf_score None."""
+        ssim_result = MagicMock(returncode=0, stderr='[Parsed_ssim_0] SSIM All:0.9812 (17.26)')
+        mock_run.side_effect = [ssim_result, OSError("libvmaf not available")]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert ssim == pytest.approx(0.9812)
+        assert vmaf is None
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_vmaf_only_ssim_fails(self, mock_run):
+        """SSIM raises, VMAF succeeds → vmaf_score set, ssim_score None."""
+        vmaf_result = MagicMock(returncode=0, stderr='VMAF score: 95.32')
+        mock_run.side_effect = [OSError("ssim failed"), vmaf_result]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert vmaf == pytest.approx(95.32)
+        assert ssim is None
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_both_succeed(self, mock_run):
+        """Both SSIM and VMAF succeed → both scores set."""
+        ssim_result = MagicMock(returncode=0, stderr='All:0.9500 (13.01)')
+        vmaf_result = MagicMock(returncode=0, stderr='VMAF score: 88.50')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert ssim == pytest.approx(0.95)
+        assert vmaf == pytest.approx(88.50)
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_alternate_vmaf_pattern(self, mock_run):
+        """Alternate vmaf_score pattern is parsed."""
+        ssim_result = MagicMock(returncode=0, stderr='no ssim match here')
+        vmaf_result = MagicMock(returncode=0, stderr='vmaf_score: 91.00')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert vmaf == pytest.approx(91.00)
+        assert ssim is None
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_both_fail(self, mock_run):
+        """Both raise OSError → (None, None)."""
+        mock_run.side_effect = [OSError("ssim fail"), OSError("vmaf fail")]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert vmaf is None
+        assert ssim is None
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_ssim_success_no_regex_match(self, mock_run):
+        """SSIM returncode=0 but no regex match → ssim_score is None."""
+        ssim_result = MagicMock(returncode=0, stderr='no useful output')
+        vmaf_result = MagicMock(returncode=0, stderr='also nothing useful')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert ssim is None
+        assert vmaf is None
+
+    @pytest.mark.unittest
+    @patch('unmanic.libs.preview.subprocess.run')
+    def test_vmaf_success_no_regex_match(self, mock_run):
+        """VMAF returncode=0 but no regex match → vmaf_score is None."""
+        ssim_result = MagicMock(returncode=0, stderr='All:0.9700')
+        vmaf_result = MagicMock(returncode=0, stderr='completed but no score')
+        mock_run.side_effect = [ssim_result, vmaf_result]
+
+        mgr = self._make_manager()
+        vmaf, ssim = mgr.compute_quality_metrics('/src.mp4', '/enc.mp4')
+        assert ssim == pytest.approx(0.97)
+        assert vmaf is None
+
+    # ------------------------------------------------------------------
+    # get_job_status with quality scores
+    # ------------------------------------------------------------------
+
+    @pytest.mark.unittest
+    def test_job_with_quality_scores(self):
+        """Job with vmaf/ssim scores includes them in status."""
+        mgr = self._make_manager()
+        mgr._jobs['quality-job'] = {
+            'job_id': 'quality-job',
+            'status': 'ready',
+            'error': None,
+            'source_size': 5000,
+            'encoded_size': 3000,
+            'source_codec': 'hevc',
+            'encoded_codec': 'h264',
+            'vmaf_score': 92.5,
+            'ssim_score': 0.9812,
+        }
+        result = mgr.get_job_status('quality-job')
+        assert result['vmaf_score'] == 92.5
+        assert result['ssim_score'] == 0.9812
+
+    @pytest.mark.unittest
+    def test_job_without_quality_scores(self):
+        """Job without quality scores → vmaf_score/ssim_score are None."""
+        mgr = self._make_manager()
+        mgr._jobs['no-quality'] = {
+            'job_id': 'no-quality',
+            'status': 'running',
+            'error': None,
+            'source_size': 0,
+            'encoded_size': 0,
+            'source_codec': '',
+            'encoded_codec': '',
+            'vmaf_score': None,
+            'ssim_score': None,
+        }
+        result = mgr.get_job_status('no-quality')
+        assert result['vmaf_score'] is None
+        assert result['ssim_score'] is None
+
+
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

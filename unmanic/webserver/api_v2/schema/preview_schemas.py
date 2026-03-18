@@ -59,6 +59,8 @@ class PreviewStatusResponseSchema(BaseSuccessSchema):
     encoded_size = fields.Int(load_default=0)
     source_codec = fields.Str(load_default='')
     encoded_codec = fields.Str(load_default='')
+    vmaf_score = fields.Float(allow_none=True, load_default=None)
+    ssim_score = fields.Float(allow_none=True, load_default=None)
 
 
 class RequestPreviewCleanupSchema(BaseSchema):

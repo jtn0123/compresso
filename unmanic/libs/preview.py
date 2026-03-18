@@ -95,6 +95,8 @@ class PreviewManager:
             'encoded_size': 0,
             'source_codec': '',
             'encoded_codec': '',
+            'vmaf_score': None,
+            'ssim_score': None,
         }
 
         with self._lock:
@@ -180,6 +182,12 @@ class PreviewManager:
             job['source_codec'] = self._get_video_codec(source_path)
             job['encoded_codec'] = self._get_video_codec(encoded_path)
 
+            # Step 4: Compute quality metrics (VMAF/SSIM) if possible
+            self.logger.info("Preview [%s]: Computing quality metrics", job_id)
+            vmaf_score, ssim_score = self.compute_quality_metrics(source_web_path, encoded_path)
+            job['vmaf_score'] = vmaf_score
+            job['ssim_score'] = ssim_score
+
             job['status'] = 'ready'
             self.logger.info("Preview [%s]: Complete", job_id)
 
@@ -209,6 +217,58 @@ class PreviewManager:
             pass
         return ''
 
+    def compute_quality_metrics(self, source_path, encoded_path):
+        """
+        Compute VMAF and SSIM quality metrics between source and encoded.
+        Returns (vmaf_score, ssim_score) — either can be None if unavailable.
+
+        :param source_path: Path to the source/reference video
+        :param encoded_path: Path to the encoded/distorted video
+        :return: tuple (float or None, float or None)
+        """
+        vmaf_score = None
+        ssim_score = None
+
+        # Try SSIM first (more widely available)
+        try:
+            ssim_cmd = [
+                'ffmpeg', '-y',
+                '-i', encoded_path,
+                '-i', source_path,
+                '-lavfi', 'ssim',
+                '-f', 'null', '-',
+            ]
+            result = subprocess.run(ssim_cmd, capture_output=True, text=True, timeout=120)
+            if result.returncode == 0 and result.stderr:
+                import re
+                match = re.search(r'All:(\d+\.\d+)', result.stderr)
+                if match:
+                    ssim_score = float(match.group(1))
+        except Exception as e:
+            self.logger.debug("SSIM computation failed: %s", str(e))
+
+        # Try VMAF (requires libvmaf)
+        try:
+            vmaf_cmd = [
+                'ffmpeg', '-y',
+                '-i', encoded_path,
+                '-i', source_path,
+                '-lavfi', 'libvmaf',
+                '-f', 'null', '-',
+            ]
+            result = subprocess.run(vmaf_cmd, capture_output=True, text=True, timeout=300)
+            if result.returncode == 0 and result.stderr:
+                import re
+                match = re.search(r'VMAF score:\s*(\d+\.\d+)', result.stderr)
+                if not match:
+                    match = re.search(r'vmaf_score:\s*(\d+\.\d+)', result.stderr)
+                if match:
+                    vmaf_score = float(match.group(1))
+        except Exception as e:
+            self.logger.debug("VMAF computation failed (libvmaf may not be available): %s", str(e))
+
+        return vmaf_score, ssim_score
+
     def get_job_status(self, job_id):
         """
         Get the status of a preview job.
@@ -228,6 +288,8 @@ class PreviewManager:
             'encoded_size': job.get('encoded_size', 0),
             'source_codec': job.get('source_codec', ''),
             'encoded_codec': job.get('encoded_codec', ''),
+            'vmaf_score': job.get('vmaf_score'),
+            'ssim_score': job.get('ssim_score'),
         }
 
         if job['status'] == 'ready':
