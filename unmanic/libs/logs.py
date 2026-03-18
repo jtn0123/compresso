@@ -38,7 +38,7 @@ import time
 from logging.handlers import RotatingFileHandler
 from queue import Queue, Empty, Full
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from json_log_formatter import JSONFormatter
 
 from unmanic.libs.notifications import Notifications
@@ -76,9 +76,11 @@ class ForwardJSONFormatter(JSONFormatter):
         if ts_str:
             try:
                 ts_float = float(ts_str)
-                extra['time'] = datetime.utcfromtimestamp(ts_float).isoformat()
+                extra['time'] = datetime.fromtimestamp(ts_float, tz=timezone.utc).isoformat()
             except Exception:
                 pass  # Ignore this. The default formatter will add a "time" record
+        if 'time' not in extra:
+            extra['time'] = datetime.now(tz=timezone.utc)
         return super(ForwardJSONFormatter, self).json_record(message, extra, record)
 
 
@@ -436,7 +438,7 @@ class ForwardLogHandler(logging.Handler):
             return
 
         timestamp = self._parse_buffer_filename_timestamp(filename)
-        current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        current_hour = datetime.now(tz=timezone.utc).replace(minute=0, second=0, microsecond=0)
         if timestamp and timestamp >= current_hour:
             return
 
@@ -450,7 +452,7 @@ class ForwardLogHandler(logging.Handler):
         """Remove buffer files that sit beyond the configured retention horizon."""
         if not self.buffer_retention_max_days or self.buffer_retention_max_days <= 0:
             return
-        threshold = datetime.utcnow() - timedelta(days=self.buffer_retention_max_days)
+        threshold = datetime.now(tz=timezone.utc) - timedelta(days=self.buffer_retention_max_days)
 
         # TODO: remove legacy `.json` cleanup once all older buffer files are gone in the wild.
         if os.path.isdir(self.buffer_path):
@@ -537,7 +539,7 @@ class ForwardLogHandler(logging.Handler):
 
     def _get_hourly_buffer_file(self):
         """Return the JSONL filename for the current UTC hour."""
-        current_hour = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        current_hour = datetime.now(tz=timezone.utc).replace(minute=0, second=0, microsecond=0)
         timestamp = current_hour.strftime("%Y%m%dT%H")
         return os.path.join(self.buffer_path, f"log_buffer_{timestamp}.jsonl")
 
