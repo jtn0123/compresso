@@ -106,6 +106,11 @@ class Config(object, metaclass=SingletonType):
         self.number_of_workers = None
         self.worker_event_schedules = None
 
+        # Fork-specific deployment hardening defaults
+        self.large_library_safe_defaults = True
+        self.startup_readiness_timeout_seconds = 30
+        self.default_worker_cap = 2
+
         # Import env variables and override all previous settings.
         self.__import_settings_from_env()
 
@@ -128,8 +133,22 @@ class Config(object, metaclass=SingletonType):
         if kwargs.get('address'):
             self.set_config_item('ui_address', kwargs.get('address'), save_settings=False)
 
+        # Apply fork-safe defaults after all explicit config has loaded.
+        self.__apply_large_library_safe_defaults()
+
         # Apply settings to the unmanic logger
         self.__setup_unmanic_logger()
+
+    def __apply_large_library_safe_defaults(self):
+        if not self.get_large_library_safe_defaults():
+            return
+
+        # Keep the deployment defaults conservative without overriding explicitly stored values.
+        self.enable_library_scanner = False if self.enable_library_scanner is None else self.enable_library_scanner
+        self.run_full_scan_on_start = False if self.run_full_scan_on_start is None else self.run_full_scan_on_start
+        self.concurrent_file_testers = int(self.concurrent_file_testers or 2)
+        if self.number_of_workers is None:
+            self.number_of_workers = self.get_default_worker_cap()
 
     def get_config_as_dict(self):
         """
@@ -562,6 +581,32 @@ class Config(object, metaclass=SingletonType):
         :return:
         """
         return self.installation_public_address
+
+    def get_large_library_safe_defaults(self):
+        """
+        Get setting - large_library_safe_defaults
+
+        :return:
+        """
+        if isinstance(self.large_library_safe_defaults, str):
+            return self.large_library_safe_defaults.lower() in ('true', '1', 'yes', 'on')
+        return bool(self.large_library_safe_defaults)
+
+    def get_startup_readiness_timeout_seconds(self):
+        """
+        Get setting - startup_readiness_timeout_seconds
+
+        :return:
+        """
+        return max(1, int(self.startup_readiness_timeout_seconds))
+
+    def get_default_worker_cap(self):
+        """
+        Get setting - default_worker_cap
+
+        :return:
+        """
+        return max(1, int(self.default_worker_cap))
 
     def get_remote_installations(self):
         """

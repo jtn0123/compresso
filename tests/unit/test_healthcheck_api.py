@@ -211,3 +211,51 @@ class TestHealthcheckApiWorkers(ApiTestBase):
     def test_set_workers_missing_count(self):
         resp = self.post_json('/healthcheck/workers', {})
         assert resp.code == 400
+
+
+@pytest.mark.unittest
+class TestHealthcheckApiReadiness(ApiTestBase):
+    __test__ = True
+    handler_class = ApiHealthcheckHandler
+
+    @patch('unmanic.webserver.helpers.healthcheck.get_startup_readiness')
+    def test_get_readiness_success(self, mock_readiness):
+        mock_readiness.return_value = {
+            'ready': True,
+            'stages': {
+                'config_loaded': True,
+                'startup_validation': True,
+                'db_ready': True,
+                'threads_ready': True,
+                'ui_server_ready': True,
+            },
+            'details': {'ui_server_ready': '0.0.0.0:8888'},
+            'errors': [],
+        }
+
+        resp = self.get_json('/healthcheck/readiness')
+        assert resp.code == 200
+        data = self.parse_response(resp)
+        assert data['success'] is True
+        assert data['ready'] is True
+
+    @patch('unmanic.webserver.helpers.healthcheck.get_startup_readiness')
+    def test_get_readiness_not_ready(self, mock_readiness):
+        mock_readiness.return_value = {
+            'ready': False,
+            'stages': {
+                'config_loaded': True,
+                'startup_validation': True,
+                'db_ready': True,
+                'threads_ready': True,
+                'ui_server_ready': False,
+            },
+            'details': {'ui_server_ready': 'bind failed'},
+            'errors': [{'stage': 'ui_server_ready', 'message': 'bind failed'}],
+        }
+
+        resp = self.get_json('/healthcheck/readiness')
+        assert resp.code == 503
+        data = self.parse_response(resp)
+        assert data['success'] is False
+        assert data['ready'] is False

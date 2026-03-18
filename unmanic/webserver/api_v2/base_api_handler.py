@@ -72,6 +72,9 @@ class BaseApiHandler(RequestHandler):
     STATUS_ERROR_RATE_LIMITED = 429
     STATUS_ERROR_INTERNAL = 500
 
+    def initialize(self, **kwargs):
+        self.params = kwargs.get('params', [])
+
     def prepare(self):
         """Check rate limits before routing to handler methods."""
         from unmanic.webserver.api_v2.rate_limiter import get_rate_limiter

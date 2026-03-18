@@ -45,6 +45,7 @@ from unmanic import config
 from unmanic.libs import common
 from unmanic.libs.logs import UnmanicLogging
 from unmanic.libs.singleton import SingletonType
+from unmanic.libs.startup import StartupState
 from unmanic.webserver.downloads import DownloadsHandler
 
 public_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "webserver", "public"))
@@ -175,53 +176,63 @@ class UIServer(threading.Thread):
         asyncio.set_event_loop(asyncio.new_event_loop())
         self.started = True
 
-        # Configure tornado server based on config
-        self.update_tornado_settings()
-
-        # Load the app
-        self.app = self.make_web_app()
-
-        # Configure SSL/TLS if enabled
-        ssl_options_config = None
-        if self.config.get_ssl_enabled():
-            certfile = self.config.get_ssl_certfilepath()
-            keyfile = self.config.get_ssl_keyfilepath()
-
-            if certfile and keyfile:
-                # Verify certificate and key files exist
-                if not os.path.exists(certfile):
-                    self._log(f"SSL certificate file not found: {certfile}", level="error")
-                    raise SystemExit
-                if not os.path.exists(keyfile):
-                    self._log(f"SSL key file not found: {keyfile}", level="error")
-                    raise SystemExit
-
-                ssl_options_config = {
-                    "certfile": certfile,
-                    "keyfile": keyfile,
-                }
-                self._log(f"HTTPS enabled on port {self.config.get_ui_port()}", level="info")
-            else:
-                self._log("SSL enabled but certificate/key files not provided", level="error")
-                raise SystemExit
-
-        # Web Server
-        self.server = tornado.httpserver.HTTPServer(
-            self.app,
-            ssl_options=ssl_options_config,
-        )
-
         try:
+            # Configure tornado server based on config
+            self.update_tornado_settings()
+
+            # Load the app
+            self.app = self.make_web_app()
+
+            # Configure SSL/TLS if enabled
+            ssl_options_config = None
+            if self.config.get_ssl_enabled():
+                certfile = self.config.get_ssl_certfilepath()
+                keyfile = self.config.get_ssl_keyfilepath()
+
+                if certfile and keyfile:
+                    # Verify certificate and key files exist
+                    if not os.path.exists(certfile):
+                        self._log(f"SSL certificate file not found: {certfile}", level="error")
+                        raise RuntimeError("SSL certificate file not found: {}".format(certfile))
+                    if not os.path.exists(keyfile):
+                        self._log(f"SSL key file not found: {keyfile}", level="error")
+                        raise RuntimeError("SSL key file not found: {}".format(keyfile))
+
+                    ssl_options_config = {
+                        "certfile": certfile,
+                        "keyfile": keyfile,
+                    }
+                    self._log(f"HTTPS enabled on port {self.config.get_ui_port()}", level="info")
+                else:
+                    self._log("SSL enabled but certificate/key files not provided", level="error")
+                    raise RuntimeError("SSL enabled but certificate/key files not provided")
+
+            # Web Server
+            self.server = tornado.httpserver.HTTPServer(
+                self.app,
+                ssl_options=ssl_options_config,
+            )
+
             self.server.listen(int(self.config.get_ui_port()), address=self.config.get_ui_address())
+            StartupState().mark_ready(
+                'ui_server_ready',
+                detail="{}:{}".format(self.config.get_ui_address() or '0.0.0.0', self.config.get_ui_port()),
+            )
+            self._log("UI_SERVER_READY port={}".format(self.config.get_ui_port()), level="info")
+
+            self.io_loop = tornado.ioloop.IOLoop.current()
+            self.io_loop.start()
         except socket.error as e:
-            self._log("Exception when setting WebUI port {}:".format(self.config.get_ui_port()), message2=str(e),
-                      level="warning")
-            raise SystemExit
-
-        self.io_loop = tornado.ioloop.IOLoop.current()
-        self.io_loop.start()
-
-        self._log("Leaving UIServer loop...")
+            message = "UI_SERVER_STARTUP_FAILED port={} error={}".format(self.config.get_ui_port(), str(e))
+            StartupState().mark_error('ui_server_ready', message)
+            self._log(message, level="error")
+        except Exception as e:
+            message = "UI_SERVER_STARTUP_FAILED error={}".format(str(e))
+            StartupState().mark_error('ui_server_ready', message)
+            self._log(message, level="error")
+        finally:
+            self.started = False
+            self._log("Leaving UIServer loop...")
 
     def make_web_app(self):
         # Start with web application routes

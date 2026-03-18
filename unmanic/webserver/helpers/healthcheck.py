@@ -10,6 +10,7 @@
 
 from unmanic.libs.healthcheck import HealthCheckManager
 from unmanic.libs.logs import UnmanicLogging
+from unmanic.libs.startup import StartupState
 
 logger = UnmanicLogging.get_logger('healthcheck_helper')
 
@@ -86,3 +87,8 @@ def get_scan_workers():
         'scanning': HealthCheckManager.is_scanning(),
         'progress': HealthCheckManager.get_scan_progress(),
     }
+
+
+def get_startup_readiness():
+    """Get deployment readiness state for startup-critical services."""
+    return StartupState().snapshot()

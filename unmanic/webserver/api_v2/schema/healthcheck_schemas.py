@@ -109,3 +109,16 @@ class HealthCheckWorkersResponseSchema(BaseSuccessSchema):
     worker_count = fields.Int()
     scanning = fields.Boolean()
     scan_progress = fields.Raw()
+
+
+class HealthCheckReadinessErrorSchema(BaseSchema):
+    stage = fields.Str()
+    message = fields.Str()
+
+
+class HealthCheckReadinessResponseSchema(BaseSuccessSchema):
+    """Schema for deployment readiness response"""
+    ready = fields.Boolean()
+    stages = fields.Dict(keys=fields.Str(), values=fields.Boolean())
+    details = fields.Dict(keys=fields.Str(), values=fields.Raw())
+    errors = fields.List(fields.Nested(HealthCheckReadinessErrorSchema))

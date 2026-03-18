@@ -39,7 +39,7 @@ import threading
 import psutil
 
 from unmanic import config, metadata
-from unmanic.libs import libraryscanner, common, eventmonitor
+from unmanic.libs import libraryscanner, common, eventmonitor, startup
 from unmanic.libs.db_migrate import Migrations
 from unmanic.libs.logs import UnmanicLogging
 from unmanic.libs.scheduler import ScheduledTasksManager
@@ -92,14 +92,27 @@ class RootService:
         UnmanicLogging.metric("root_service_started")
 
         self.event = threading.Event()
+        self.startup_state = startup.StartupState()
 
         self._mgr = None
+
+    def _verify_thread_started(self, name, thread, timeout=5):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if thread.is_alive():
+                return
+            time.sleep(0.1)
+        message = "WORKER_THREAD_STARTUP_FAILED name={} did not remain alive".format(name)
+        self.logger.error(message)
+        self.startup_state.mark_error('threads_ready', message)
+        raise RuntimeError(message)
 
     def start_handler(self, data_queues, task_queue):
         self.logger.info("Starting TaskHandler")
         handler = TaskHandler(data_queues, task_queue, self.event)
         handler.daemon = True
         handler.start()
+        self._verify_thread_started('TaskHandler', handler)
         self.threads.append({
             'name':   'TaskHandler',
             'thread': handler
@@ -111,6 +124,7 @@ class RootService:
         postprocessor = PostProcessor(data_queues, task_queue, self.event)
         postprocessor.daemon = True
         postprocessor.start()
+        self._verify_thread_started('PostProcessor', postprocessor)
         self.threads.append({
             'name':   'PostProcessor',
             'thread': postprocessor
@@ -122,6 +136,7 @@ class RootService:
         foreman = Foreman(data_queues, settings, task_queue, self.event)
         foreman.daemon = True
         foreman.start()
+        self._verify_thread_started('Foreman', foreman)
         self.threads.append({
             'name':   'Foreman',
             'thread': foreman
@@ -133,6 +148,7 @@ class RootService:
         library_scanner_manager = libraryscanner.LibraryScannerManager(data_queues, self.event)
         library_scanner_manager.daemon = True
         library_scanner_manager.start()
+        self._verify_thread_started('LibraryScannerManager', library_scanner_manager)
         self.threads.append({
             'name':   'LibraryScannerManager',
             'thread': library_scanner_manager
@@ -145,13 +161,14 @@ class RootService:
             event_monitor_manager = eventmonitor.EventMonitorManager(data_queues, self.event)
             event_monitor_manager.daemon = True
             event_monitor_manager.start()
+            self._verify_thread_started('EventMonitorManager', event_monitor_manager)
             self.threads.append({
                 'name':   'EventMonitorManager',
                 'thread': event_monitor_manager
             })
             return event_monitor_manager
         else:
-            self.logger.warn("Unable to start EventMonitorManager as no event monitor module was found")
+            self.logger.error("EVENT_MONITOR_UNAVAILABLE no event monitor module was found")
 
     def start_ui_server(self, data_queues, foreman):
         self.logger.info("Starting UIServer")
@@ -169,6 +186,7 @@ class RootService:
         scheduled_tasks_manager = ScheduledTasksManager(self.event)
         scheduled_tasks_manager.daemon = True
         scheduled_tasks_manager.start()
+        self._verify_thread_started('ScheduledTasksManager', scheduled_tasks_manager)
         self.threads.append({
             'name':   'ScheduledTasksManager',
             'thread': scheduled_tasks_manager
@@ -223,6 +241,7 @@ class RootService:
         )
         thread.stop = abort_flag.set
         thread.start()
+        self._verify_thread_started('RootServiceResourceLogger', thread)
         self.threads.append({
             'name':   'RootServiceResourceLogger',
             'thread': thread
@@ -244,7 +263,13 @@ class RootService:
 
         # Clear cache directory
         self.logger.info("Clearing previous cache")
-        common.clean_files_in_cache_dir(settings.get_cache_path())
+        try:
+            common.clean_files_in_cache_dir(settings.get_cache_path())
+        except Exception as e:
+            message = "STARTUP_CACHE_CLEANUP_FAILED cache_path={} error={}".format(settings.get_cache_path(), str(e))
+            self.logger.error(message)
+            self.startup_state.mark_error('startup_validation', message)
+            raise
 
         self.logger.info("Starting all threads")
 
@@ -277,6 +302,45 @@ class RootService:
 
         # Start main thread resource logger
         self.start_resource_logger()
+        thread_names = [thread['name'] for thread in self.threads if thread['name'] != 'UIServer']
+        self.startup_state.mark_ready('threads_ready', detail=", ".join(thread_names))
+
+    def log_startup_summary(self, settings):
+        summary = startup.build_startup_summary(settings, eventmonitor.event_monitor_module)
+        self.logger.info("STARTUP_SUMMARY library_path=%s", summary['library_path'])
+        self.logger.info("STARTUP_SUMMARY cache_path=%s", summary['cache_path'])
+        self.logger.info("STARTUP_SUMMARY config_path=%s", summary['config_path'])
+        self.logger.info(
+            "STARTUP_SUMMARY scan_enabled=%s full_scan_on_start=%s concurrent_file_testers=%s",
+            summary['enable_library_scanner'],
+            summary['run_full_scan_on_start'],
+            summary['concurrent_file_testers'],
+        )
+        self.logger.info(
+            "STARTUP_SUMMARY worker_count=%s event_monitor_active=%s safe_defaults=%s",
+            summary['worker_count'],
+            summary['event_monitor_active'],
+            summary['safe_defaults'],
+        )
+
+    def wait_for_startup_readiness(self, settings):
+        deadline = time.time() + settings.get_startup_readiness_timeout_seconds()
+        while time.time() < deadline:
+            snapshot = self.startup_state.snapshot()
+            if snapshot.get('ready'):
+                return snapshot
+            if snapshot.get('errors'):
+                break
+            time.sleep(0.2)
+
+        snapshot = self.startup_state.snapshot()
+        if snapshot.get('errors'):
+            self.logger.error("STARTUP_READINESS_PARTIAL_FAILURE stages=%s errors=%s",
+                              snapshot.get('stages'), snapshot.get('errors'))
+        else:
+            self.logger.error("STARTUP_READINESS_TIMEOUT stages=%s details=%s",
+                              snapshot.get('stages'), snapshot.get('details'))
+        raise RuntimeError("Startup readiness check failed")
 
     def stop_threads(self):
         self.logger.info("Stopping all threads")
@@ -318,14 +382,49 @@ class RootService:
         # Set the shared manager for PluginChildProcess
         set_shared_manager(self._mgr)
 
+        self.startup_state.reset()
+
         # Init the configuration
-        settings = config.Config()
+        try:
+            settings = config.Config()
+            self.startup_state.mark_ready('config_loaded', detail=settings.get_config_path())
+        except Exception as e:
+            message = "STARTUP_CONFIG_LOAD_FAILED error={}".format(str(e))
+            self.logger.error(message)
+            self.startup_state.mark_error('config_loaded', message)
+            raise
+
+        # Validate deployment paths before worker startup.
+        try:
+            startup.validate_startup_environment(settings)
+            self.startup_state.mark_ready('startup_validation', detail='validated')
+        except Exception as e:
+            message = "STARTUP_VALIDATION_FAILED error={}".format(str(e))
+            self.logger.error(message)
+            self.startup_state.mark_error('startup_validation', message)
+            raise
 
         # Init the database
-        self.db_connection = init_db(settings.get_config_path())
+        try:
+            self.db_connection = init_db(settings.get_config_path())
+            self.startup_state.mark_ready('db_ready', detail=settings.get_config_path())
+        except Exception as e:
+            message = "STARTUP_DB_INIT_FAILED error={}".format(str(e))
+            self.logger.error(message)
+            self.startup_state.mark_error('db_ready', message)
+            raise
 
         # Start all threads
-        self.start_threads(settings)
+        try:
+            self.start_threads(settings)
+            self.wait_for_startup_readiness(settings)
+            self.log_startup_summary(settings)
+        except Exception as e:
+            message = "STARTUP_THREADING_FAILED error={}".format(str(e))
+            self.logger.error(message)
+            if not self.startup_state.snapshot().get('errors'):
+                self.startup_state.mark_error('threads_ready', message)
+            raise
 
         # Watch for the term signal
         if os.name == "nt":

@@ -250,7 +250,9 @@ RUN \
         && \
         echo "**** Install unmanic from pre-built wheel ****" \
             && ls -l /src/ \
-            && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir /src/*.whl \
+            && WHEEL_PATH="$(ls -1 /src/*.whl | sort | tail -n 1)" \
+            && echo "Installing ${WHEEL_PATH}" \
+            && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir "${WHEEL_PATH}" \
         && \
         echo "**** Make default paths for unmanic library ****" \
             && mkdir -p /library

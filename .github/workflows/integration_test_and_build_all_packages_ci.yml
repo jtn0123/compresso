@@ -355,6 +355,42 @@ jobs:
           cache-from: type=gha,scope=${{ steps.prepare.outputs.service_name }}-main
           cache-to: type=gha,scope=${{ steps.prepare.outputs.service_name }}-main,mode=max
 
+      - name: Build local smoke-test image
+        if: success()
+        run: |
+          docker build -f docker/Dockerfile -t unmanic-smoke:ci .
+
+      - name: Smoke test Docker runtime
+        if: success()
+        run: |
+          set -euo pipefail
+          tmp_root=$(mktemp -d)
+          mkdir -p "${tmp_root}/config" "${tmp_root}/library" "${tmp_root}/cache"
+          docker run -d --rm --name unmanic-smoke \
+            -p 8888:8888 \
+            -e PUID=$(id -u) \
+            -e PGID=$(id -g) \
+            -v "${tmp_root}/config:/config" \
+            -v "${tmp_root}/library:/library" \
+            -v "${tmp_root}/cache:/tmp/unmanic" \
+            unmanic-smoke:ci
+
+          cleanup() {
+            docker logs --tail 200 unmanic-smoke || true
+            docker rm -f unmanic-smoke >/dev/null 2>&1 || true
+            rm -rf "${tmp_root}"
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8888/unmanic/api/v2/healthcheck/readiness >/tmp/unmanic-readiness.json; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl -fsSL -o /tmp/unmanic-root.html http://127.0.0.1:8888/
+
   build_pypi:
     name: Publish package to PyPI
     needs: py_build

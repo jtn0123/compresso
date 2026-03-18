@@ -21,6 +21,7 @@ from unmanic.webserver.api_v2.schema.healthcheck_schemas import (
     HealthCheckSummaryResponseSchema,
     HealthCheckStatusResponseSchema,
     HealthCheckWorkersResponseSchema,
+    HealthCheckReadinessResponseSchema,
 )
 from unmanic.webserver.helpers import healthcheck
 
@@ -61,6 +62,11 @@ class ApiHealthcheckHandler(BaseApiHandler):
             "path_pattern":      r"/healthcheck/workers",
             "supported_methods": ["POST"],
             "call_method":       "set_workers",
+        },
+        {
+            "path_pattern":      r"/healthcheck/readiness",
+            "supported_methods": ["GET"],
+            "call_method":       "get_readiness",
         },
     ]
 
@@ -248,6 +254,44 @@ class ApiHealthcheckHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_readiness(self):
+        """
+        HealthCheck - readiness
+        ---
+        description: Get deployment readiness status for startup-critical services.
+        responses:
+            200:
+                description: 'Returns readiness state when the service is ready.'
+                content:
+                    application/json:
+                        schema:
+                            HealthCheckReadinessResponseSchema
+        """
+        try:
+            readiness = healthcheck.get_startup_readiness()
+            response = self.build_response(
+                HealthCheckReadinessResponseSchema(),
+                {
+                    "success": readiness.get('ready', False),
+                    "ready":   readiness.get('ready', False),
+                    "stages":  readiness.get('stages', {}),
+                    "details": readiness.get('details', {}),
+                    "errors":  readiness.get('errors', []),
+                }
+            )
+            if readiness.get('ready', False):
+                self.write_success(response)
+            else:
+                self.set_status(503, reason="Service Unavailable")
+                self.finish(response)
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
