@@ -35,6 +35,8 @@ import warnings
 
 from .compression_api import ApiCompressionHandler
 from .docs_api import ApiDocsHandler
+from .fileinfo_api import ApiFileinfoHandler
+from .healthcheck_api import ApiHealthcheckHandler
 from .preview_api import ApiPreviewHandler
 from .filebrowser_api import ApiFilebrowserHandler
 from .history_api import ApiHistoryHandler
@@ -53,6 +55,8 @@ __author__ = 'Josh.5 (jsunnex@gmail.com)'
 __all__ = (
     'ApiCompressionHandler',
     'ApiDocsHandler',
+    'ApiFileinfoHandler',
+    'ApiHealthcheckHandler',
     'ApiPreviewHandler',
     'ApiFilebrowserHandler',
     'ApiHistoryHandler',

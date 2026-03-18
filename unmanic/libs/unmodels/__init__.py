@@ -48,5 +48,6 @@ from .tasks import Tasks
 from .workergroups import WorkerGroupTags, WorkerGroups
 from .workerschedules import WorkerSchedules
 from .compressionstats import CompressionStats
+from .healthstatus import HealthStatus
 
 __author__ = 'Josh.5 (jsunnex@gmail.com)'
