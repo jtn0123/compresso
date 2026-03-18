@@ -267,6 +267,15 @@ class UIServer(threading.Thread):
             ),
         ])
 
+        # Add preview static file handler
+        preview_cache_dir = os.path.join(self.config.get_cache_path(), 'preview')
+        os.makedirs(preview_cache_dir, exist_ok=True)
+        app.add_handlers(r'.*', [
+            (r"/unmanic/preview/(.*)", tornado.web.StaticFileHandler, dict(
+                path=preview_cache_dir
+            )),
+        ])
+
         # Add widgets routes
         from unmanic.webserver.plugins import DataPanelRequestHandler
         from unmanic.webserver.plugins import PluginStaticFileHandler

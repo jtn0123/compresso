@@ -37,7 +37,8 @@ from operator import attrgetter
 from unmanic import config
 from unmanic.libs import common
 from unmanic.libs.logs import UnmanicLogging
-from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+from peewee import fn
+from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, CompressionStats
 
 try:
     from json.decoder import JSONDecodeError
@@ -261,6 +262,19 @@ class History(object):
             new_historic_task = self.create_historic_task_entry(task_data)
             # Create an entry of the data from the source ffprobe
             self.create_historic_task_ffmpeg_log_entry(new_historic_task, task_data.get('log', ''))
+            # Create compression stats entry if size data is available
+            source_size = task_data.get('source_size', 0)
+            destination_size = task_data.get('destination_size', 0)
+            if source_size and source_size > 0:
+                self.create_compression_stats_entry(
+                    new_historic_task,
+                    source_size=source_size,
+                    destination_size=destination_size,
+                    source_codec=task_data.get('source_codec', ''),
+                    destination_codec=task_data.get('destination_codec', ''),
+                    source_resolution=task_data.get('source_resolution', ''),
+                    library_id=task_data.get('library_id', 1),
+                )
         except Exception as error:
             self.logger.exception("Failed to save historic task entry to database. %s", error)
             return False
@@ -305,3 +319,178 @@ class History(object):
                                                   finish_time=task_data['finish_time'],
                                                   processed_by_worker=task_data['processed_by_worker'])
         return new_historic_task
+
+    @staticmethod
+    def create_compression_stats_entry(historic_task, source_size=0, destination_size=0,
+                                       source_codec='', destination_codec='',
+                                       source_resolution='', library_id=1):
+        """
+        Create a compression stats entry for a completed task.
+
+        :param historic_task:
+        :param source_size:
+        :param destination_size:
+        :param source_codec:
+        :param destination_codec:
+        :param source_resolution:
+        :param library_id:
+        :return:
+        """
+        CompressionStats.create(
+            completedtask=historic_task,
+            source_size=source_size,
+            destination_size=destination_size,
+            source_codec=source_codec or '',
+            destination_codec=destination_codec or '',
+            source_resolution=source_resolution or '',
+            library_id=library_id,
+        )
+
+    def get_library_compression_summary(self, library_id=None):
+        """
+        Get aggregate compression statistics, optionally filtered by library.
+
+        :param library_id: Optional library ID to filter by
+        :return: dict with total_source_size, total_destination_size, file_count, avg_ratio, per_library breakdown
+        """
+        query = CompressionStats.select(
+            CompressionStats.library_id,
+            fn.SUM(CompressionStats.source_size).alias('total_source'),
+            fn.SUM(CompressionStats.destination_size).alias('total_dest'),
+            fn.COUNT(CompressionStats.id).alias('file_count'),
+        )
+
+        if library_id is not None:
+            query = query.where(CompressionStats.library_id == library_id)
+
+        query = query.group_by(CompressionStats.library_id)
+
+        per_library = []
+        grand_total_source = 0
+        grand_total_dest = 0
+        grand_file_count = 0
+
+        for row in query:
+            total_source = row.total_source or 0
+            total_dest = row.total_dest or 0
+            file_count = row.file_count or 0
+            avg_ratio = (total_dest / total_source) if total_source > 0 else 0
+
+            per_library.append({
+                'library_id': row.library_id,
+                'total_source_size': total_source,
+                'total_destination_size': total_dest,
+                'file_count': file_count,
+                'avg_ratio': round(avg_ratio, 4),
+                'space_saved': total_source - total_dest,
+            })
+
+            grand_total_source += total_source
+            grand_total_dest += total_dest
+            grand_file_count += file_count
+
+        grand_avg_ratio = (grand_total_dest / grand_total_source) if grand_total_source > 0 else 0
+
+        return {
+            'total_source_size': grand_total_source,
+            'total_destination_size': grand_total_dest,
+            'file_count': grand_file_count,
+            'avg_ratio': round(grand_avg_ratio, 4),
+            'space_saved': grand_total_source - grand_total_dest,
+            'per_library': per_library,
+        }
+
+    def get_compression_stats_for_task(self, task_id):
+        """
+        Get compression stats for a single completed task.
+
+        :param task_id: The completed task ID
+        :return: dict or None
+        """
+        try:
+            stats = CompressionStats.get(CompressionStats.completedtask == task_id)
+            ratio = (stats.destination_size / stats.source_size) if stats.source_size > 0 else 0
+            return {
+                'source_size': stats.source_size,
+                'destination_size': stats.destination_size,
+                'source_codec': stats.source_codec,
+                'destination_codec': stats.destination_codec,
+                'source_resolution': stats.source_resolution,
+                'library_id': stats.library_id,
+                'ratio': round(ratio, 4),
+                'space_saved': stats.source_size - stats.destination_size,
+            }
+        except CompressionStats.DoesNotExist:
+            return None
+
+    def get_compression_stats_paginated(self, start=0, length=10, search_value=None,
+                                         library_id=None, order=None):
+        """
+        Get paginated compression stats joined with completed task labels.
+
+        :return: dict with recordsTotal, recordsFiltered, results
+        """
+        query = (
+            CompressionStats
+            .select(
+                CompressionStats,
+                CompletedTasks.task_label,
+                CompletedTasks.task_success,
+                CompletedTasks.finish_time,
+            )
+            .join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id))
+        )
+
+        if library_id is not None:
+            query = query.where(CompressionStats.library_id == library_id)
+
+        if search_value:
+            query = query.where(CompletedTasks.task_label.contains(search_value))
+
+        records_total = CompressionStats.select().count()
+        records_filtered = query.count()
+
+        # Default order
+        if order:
+            col = order.get('column', 'finish_time')
+            direction = order.get('dir', 'desc')
+            if col in ('source_size', 'destination_size', 'library_id'):
+                order_field = getattr(CompressionStats, col)
+            else:
+                order_field = getattr(CompletedTasks, col, CompletedTasks.finish_time)
+            if direction == 'asc':
+                query = query.order_by(order_field.asc())
+            else:
+                query = query.order_by(order_field.desc())
+        else:
+            query = query.order_by(CompletedTasks.finish_time.desc())
+
+        if length:
+            query = query.limit(length).offset(start)
+
+        results = []
+        for row in query:
+            source_size = row.source_size or 0
+            dest_size = row.destination_size or 0
+            ratio = (dest_size / source_size) if source_size > 0 else 0
+            results.append({
+                'id': row.id,
+                'completedtask_id': row.completedtask_id,
+                'task_label': row.completedtask.task_label,
+                'task_success': row.completedtask.task_success,
+                'finish_time': row.completedtask.finish_time,
+                'source_size': source_size,
+                'destination_size': dest_size,
+                'source_codec': row.source_codec or '',
+                'destination_codec': row.destination_codec or '',
+                'source_resolution': row.source_resolution or '',
+                'library_id': row.library_id,
+                'ratio': round(ratio, 4),
+                'space_saved': source_size - dest_size,
+            })
+
+        return {
+            'recordsTotal': records_total,
+            'recordsFiltered': records_filtered,
+            'results': results,
+        }

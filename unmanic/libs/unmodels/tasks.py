@@ -51,3 +51,4 @@ class Tasks(BaseModel):
     finish_time = DateTimeField(null=True, default=datetime.datetime.now)
     processed_by_worker = TextField(null=True)
     log = TextField(null=False, default='')
+    source_size = BigIntegerField(null=True, default=0)

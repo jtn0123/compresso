@@ -76,6 +76,8 @@ class ScheduledTasksManager(threading.Thread):
         # Run a completed task cleanup every 60 minutes and on startup
         self.scheduler.every(12).hours.do(self.manage_completed_tasks)
         self.manage_completed_tasks()
+        # Run preview cleanup every hour
+        self.scheduler.every(1).hours.do(self.cleanup_old_previews)
 
         # Loop every 2 seconds to check if a task is due to be run
         while not self.abort_flag.is_set():
@@ -209,3 +211,12 @@ class ScheduledTasksManager(threading.Thread):
             return
 
         self.logger.info("Deleted %s %s completed tasks", count, inc_status)
+
+    def cleanup_old_previews(self):
+        """Clean up preview jobs older than 24 hours."""
+        try:
+            from unmanic.libs.preview import PreviewManager
+            preview_manager = PreviewManager()
+            preview_manager.cleanup_old_previews()
+        except Exception as e:
+            self.logger.error("Failed to cleanup old previews: %s", e)

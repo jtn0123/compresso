@@ -148,33 +148,8 @@ class Library(object):
 
     @staticmethod
     def within_library_count_limits():
-        # Fetch level from session
-        from unmanic.libs.session import Session
-        s = Session()
-        s.register_unmanic()
-
+        # All features unlocked — no library count limits
         frontend_messages = FrontendPushMessages()
-
-        if s.level <= 1:
-            # Fetch all enabled plugins
-            library_count = Libraries.select().count()
-
-            # Ensure enabled plugins are within limits
-            # Function was returned above if the user was logged in and able to use infinite
-            if library_count > s.library_count:
-                # If the frontend messages queue was included in request, append a message
-                frontend_messages.add(
-                    {
-                        'id':      'libraryEnabledLimits',
-                        'type':    'error',
-                        'code':    'libraryEnabledLimits',
-                        'message': '',
-                        'timeout': 0
-                    }
-                )
-                return False
-
-        # If the frontend messages queue was included in request, remove the notification as we are currently within limits
         frontend_messages.remove_item('libraryEnabledLimits')
         return True
 

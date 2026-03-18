@@ -484,6 +484,16 @@ class PostProcessor(threading.Thread):
 
         self._log_completed_task_data(task_dump, source_data, destination_data)
 
+        # Capture destination file size for compression stats
+        destination_size = 0
+        if task_dump.get('task_success', False) and destination_data:
+            dest_path = destination_data.get('abspath', '')
+            if dest_path and os.path.exists(dest_path):
+                try:
+                    destination_size = os.path.getsize(dest_path)
+                except OSError:
+                    self._log("Could not get destination file size for '{}'".format(dest_path), level='warning')
+
         history_logging.save_task_history(
             {
                 'task_label':          task_dump.get('task_label', ''),
@@ -493,6 +503,9 @@ class PostProcessor(threading.Thread):
                 'finish_time':         task_dump.get('finish_time', ''),
                 'processed_by_worker': task_dump.get('processed_by_worker', ''),
                 'log':                 task_dump.get('log', ''),
+                'source_size':         task_dump.get('source_size', 0),
+                'destination_size':    destination_size,
+                'library_id':          task_dump.get('library_id', 1),
             }
         )
 

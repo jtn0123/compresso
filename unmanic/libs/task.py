@@ -195,6 +195,8 @@ class Task(object):
             'processed_by_worker': self.task.processed_by_worker,
             'errors':              self.errors,
             'log':                 self.task.log,
+            'source_size':         self.task.source_size or 0,
+            'library_id':         self.task.library_id,
         }
         return task_dict
 
@@ -224,9 +226,16 @@ class Task(object):
         :return:
         """
         try:
-            self.task = Tasks.create(abspath=abspath, status='creating', library_id=library_id)
+            # Record source file size at task creation
+            source_size = 0
+            try:
+                source_size = os.path.getsize(abspath)
+            except OSError:
+                self.logger.warning("Could not get file size for '%s'", abspath)
+
+            self.task = Tasks.create(abspath=abspath, status='creating', library_id=library_id, source_size=source_size)
             self.save()
-            self.logger.debug("Created new task with ID: %s for %s", self.task, abspath)
+            self.logger.debug("Created new task with ID: %s for %s (source_size=%d)", self.task, abspath, source_size)
 
             # Set the cache path to use during the transcoding
             self.set_cache_path()

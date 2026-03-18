@@ -47,5 +47,6 @@ from .taskmetadata import TaskMetadata
 from .tasks import Tasks
 from .workergroups import WorkerGroupTags, WorkerGroups
 from .workerschedules import WorkerSchedules
+from .compressionstats import CompressionStats
 
 __author__ = 'Josh.5 (jsunnex@gmail.com)'
