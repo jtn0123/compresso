@@ -88,17 +88,44 @@ jobs:
           ls -l ./tests/support_/videos/*/
           pytest -m integrationtest
 
+  frontend_reproducibility:
+    name: Verify frontend reproducibility
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: unmanic/webserver/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: unmanic/webserver/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build:publish
+
   py_build:
-    name: Build Python package
-    needs: integration_tests
+    name: Build Python package from clean checkout
+    needs:
+      - integration_tests
+      - frontend_reproducibility
     runs-on: ubuntu-latest
 
     steps:
-      # Fetch full git repository and all submodules
+      # Fetch full git repository
       - name: Checkout project
         uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
 
       # Checkout tags
       - name: Fetch tags

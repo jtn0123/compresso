@@ -52,7 +52,6 @@ jobs:
         flake8 . --count --exit-zero --max-line-length=127 --statistics
 
     # Unit testing is disabled until further notice... Thank-you and goodbye
-    # # Run pytest unit tests
-    # - name: Test with pytest
-    #   run: |
-    #     pytest -m unittest
+    - name: Test with pytest
+      run: |
+        pytest -q tests/unit

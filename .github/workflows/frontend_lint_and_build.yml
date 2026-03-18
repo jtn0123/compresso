@@ -1,0 +1,38 @@
+name: Frontend Lint & Build
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "master"
+      - "staging"
+
+jobs:
+  frontend_lint_and_build:
+    name: Lint & Build Frontend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: unmanic/webserver/frontend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node 22
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: "npm"
+        cache-dependency-path: unmanic/webserver/frontend/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Lint frontend
+      run: npm run lint
+
+    - name: Build frontend
+      run: npm run build:publish

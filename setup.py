@@ -108,22 +108,26 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
         public_asset_path = os.path.abspath(os.path.join('.', 'build', 'lib', src_dir, 'webserver', 'public'))
         frontend_path = os.path.abspath(os.path.join('.', 'build', 'lib', src_dir, 'webserver', 'frontend'))
 
+        npm_bin = shutil.which("npm")
+        if not npm_bin:
+            raise RuntimeError("npm is required to build the vendored frontend. Install Node.js 22 and retry.")
+        if not os.path.exists(os.path.join(frontend_path, 'package-lock.json')):
+            raise RuntimeError("Frontend package-lock.json is missing. Restore the vendored frontend lockfile.")
+
         # Start by clearing out anything if this was pulled from a dirty tree
         shutil.rmtree(public_asset_path, ignore_errors=True)
         shutil.rmtree(os.path.join(frontend_path, 'node_modules'), ignore_errors=True)
 
         # Install all modules
         subprocess.run(
-            "npm ci",
+            [npm_bin, "ci", "--no-audit", "--no-fund"],
             check=True,
-            shell=True,
             cwd=frontend_path,
         )
         # Build the frontend
         subprocess.run(
-            "npm run build:publish",
+            [npm_bin, "run", "build:publish"],
             check=True,
-            shell=True,
             cwd=frontend_path,
         )
 

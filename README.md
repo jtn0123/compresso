@@ -82,19 +82,35 @@ For up-to-date installation instructions, follow the [Unmanic documentation](htt
 
 To run from source:
 
-1) Install the Python dependencies listed above then run:
-2) Run:
+1) Install Python 3 and Node.js 22.x.
+2) Install Python build dependencies:
     ```
-    # Ensure the submodules are checked out
-    git submodule update --init --recursive
-    
-    # Build and install the project into your home directory
-    python3 ./setup.py install --user
-    
-    # Run Unmanic
+    python3 -m pip install -r requirements.txt -r requirements-dev.txt
+    ```
+3) Optionally run the frontend validation steps used in CI:
+    ```bash
+    cd unmanic/webserver/frontend
+    npm ci
+    npm run lint
+    npm run build:publish
+    cd ../../..
+    ```
+4) Build and install the package:
+    ```bash
+    python3 -m build --no-isolation --skip-dependency-check --wheel
+    python3 -m pip install --user dist/*.whl
+    ```
+5) Run Unmanic:
+    ```bash
     unmanic
     ```
-3) Open your web browser and navigate to http://localhost:8888/
+6) Open your web browser and navigate to http://localhost:8888/
+
+Node.js 22 is the supported frontend build baseline for this fork. Newer Node releases may work, but CI and release validation use Node 22.
+
+The Python package build performs its own clean frontend install from the committed lockfile, so a pre-existing `node_modules` directory is not required.
+
+For a production-focused source or Docker workflow, including a deployment checklist for large libraries, see [docs/FORK_DEPLOYMENT.md](./docs/FORK_DEPLOYMENT.md).
 
 ## License and Contribution
 
