@@ -103,3 +103,23 @@ class ContainerDistributionSchema(BaseSuccessSchema):
 class TimelineSchema(BaseSuccessSchema):
     """Schema for space saved timeline response"""
     data = fields.List(fields.Raw())
+
+
+class LibraryAnalysisRequestSchema(BaseSchema):
+    """Schema for library analysis request"""
+    library_id = fields.Int(required=True, description="Library ID to analyze")
+
+
+class LibraryAnalysisStatusSchema(BaseSuccessSchema):
+    """Schema for library analysis status response"""
+    status = fields.Str()
+    progress = fields.Raw()
+    version = fields.Int()
+    results = fields.Raw(allow_none=True)
+
+
+class OptimizationProgressSchema(BaseSuccessSchema):
+    """Schema for optimization progress response"""
+    total_files = fields.Int()
+    processed_files = fields.Int()
+    percent = fields.Float()

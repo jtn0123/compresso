@@ -49,5 +49,6 @@ from .workergroups import WorkerGroupTags, WorkerGroups
 from .workerschedules import WorkerSchedules
 from .compressionstats import CompressionStats
 from .healthstatus import HealthStatus
+from .libraryanalysiscache import LibraryAnalysisCache
 
 __author__ = 'Josh.5 (jsunnex@gmail.com)'

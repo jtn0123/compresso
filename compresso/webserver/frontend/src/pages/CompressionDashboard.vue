@@ -104,6 +104,97 @@
         </q-card>
       </div>
 
+      <!-- Library Analysis Section -->
+      <q-card class="q-mb-lg">
+        <q-card-section>
+          <div class="row items-center no-wrap">
+            <div class="col">
+              <div class="text-h6">{{ $t('flow.libraryAnalysis') }}</div>
+            </div>
+            <div class="col-auto q-gutter-sm">
+              <q-btn
+                v-if="analysisStatus !== 'running'"
+                outline
+                color="primary"
+                :label="analysisResults ? $t('flow.reanalyze') : $t('flow.analyzeButton')"
+                icon="analytics"
+                :disable="!selectedLibraryId"
+                @click="startAnalysis"
+              />
+            </div>
+          </div>
+          <div v-if="!selectedLibraryId" class="text-caption text-grey q-mt-sm">
+            Select a library to analyze
+          </div>
+        </q-card-section>
+
+        <!-- Progress bar during analysis -->
+        <q-card-section v-if="analysisStatus === 'running'">
+          <div class="text-caption q-mb-xs">
+            {{ $t('flow.analysisProgress', { checked: analysisProgress.checked || 0, total: analysisProgress.total || 0 }) }}
+          </div>
+          <q-linear-progress
+            :value="analysisProgress.total > 0 ? analysisProgress.checked / analysisProgress.total : 0"
+            color="primary"
+            rounded
+            size="8px"
+          />
+        </q-card-section>
+
+        <!-- Analysis results -->
+        <template v-if="analysisResults && analysisResults.groups">
+          <q-card-section>
+            <div class="text-body2 q-mb-md">
+              {{ analysisResults.total_files }} files ({{ formatBytes(analysisResults.total_size_bytes) }})
+              <template v-if="analysisResults.total_estimated_savings_bytes > 0">
+                — estimated savings: {{ formatBytes(analysisResults.total_estimated_savings_bytes) }}
+              </template>
+            </div>
+
+            <q-table
+              :rows="analysisResults.groups"
+              :columns="analysisColumns"
+              row-key="codec"
+              flat
+              dense
+              hide-pagination
+              :pagination="{ rowsPerPage: 0 }"
+            >
+              <template v-slot:body-cell-confidence="cellProps">
+                <q-td :cellProps="cellProps">
+                  <q-badge
+                    :color="confidenceColor(cellProps.row.confidence)"
+                    :text-color="cellProps.row.confidence === 'optimal' ? 'dark' : 'white'"
+                  >
+                    {{ confidenceLabel(cellProps.row.confidence) }}
+                    <template v-if="cellProps.row.historical_sample_count > 0">
+                      ({{ cellProps.row.historical_sample_count }})
+                    </template>
+                  </q-badge>
+                </q-td>
+              </template>
+              <template v-slot:body-cell-estimated_savings="cellProps">
+                <q-td :cellProps="cellProps">
+                  <template v-if="cellProps.row.confidence === 'optimal'">
+                    <span class="text-grey">{{ $t('flow.alreadyOptimal') }}</span>
+                  </template>
+                  <template v-else-if="cellProps.row.confidence === 'none'">
+                    <span class="text-grey">{{ $t('flow.noEstimate') }}</span>
+                  </template>
+                  <template v-else>
+                    {{ cellProps.row.estimated_savings_pct }}% (~{{ formatBytes(cellProps.row.estimated_savings_bytes) }})
+                  </template>
+                </q-td>
+              </template>
+            </q-table>
+          </q-card-section>
+          <q-card-section v-if="analysisResults.last_run" class="text-caption text-grey">
+            {{ $t('flow.lastAnalyzed') }}: {{ analysisResults.last_run }}
+            — {{ $t('flow.estimatesLive') }}
+          </q-card-section>
+        </template>
+      </q-card>
+
       <!-- Per-Library Breakdown -->
       <q-card class="q-mb-lg" v-if="summary.per_library && summary.per_library.length > 0">
         <q-card-section>
@@ -221,6 +312,95 @@ export default {
     const timelineInterval = ref('day');
     const chartsLoading = ref(false);
 
+    const analysisStatus = ref('none');
+    const analysisProgress = ref({ checked: 0, total: 0 });
+    const analysisResults = ref(null);
+    const analysisVersion = ref(0);
+    let analysisPollTimer = null;
+
+    const analysisColumns = [
+      { name: 'codec', label: t('flow.analysisCodec'), field: 'codec', align: 'left' },
+      { name: 'resolution', label: t('flow.analysisResolution'), field: 'resolution', align: 'left' },
+      { name: 'count', label: t('flow.analysisCount'), field: 'count', align: 'right', sortable: true },
+      { name: 'total_size_bytes', label: t('flow.analysisTotalSize'), field: 'total_size_bytes', align: 'right', format: (v) => formatBytes(v) },
+      { name: 'avg_bitrate_mbps', label: t('flow.analysisAvgBitrate'), field: 'avg_bitrate_mbps', align: 'right', format: (v) => v > 0 ? v.toFixed(1) + ' Mbps' : '-' },
+      { name: 'estimated_savings', label: t('flow.analysisEstSavings'), field: 'estimated_savings_pct', align: 'right' },
+      { name: 'confidence', label: t('flow.analysisConfidence'), field: 'confidence', align: 'center' },
+    ];
+
+    function confidenceColor(level) {
+      const map = { high: 'positive', medium: 'warning', low: 'grey', none: 'grey-4', optimal: 'grey-4' };
+      return map[level] || 'grey';
+    }
+    function confidenceLabel(level) {
+      const map = {
+        high: t('flow.confidenceHigh'),
+        medium: t('flow.confidenceMedium'),
+        low: t('flow.confidenceLow'),
+        none: t('flow.confidenceNone'),
+        optimal: t('flow.alreadyOptimal'),
+      };
+      return map[level] || level;
+    }
+
+    async function startAnalysis() {
+      if (!selectedLibraryId.value) return;
+      try {
+        await axios.post(getCompressoApiUrl('v2', 'compression/library-analysis'), {
+          library_id: selectedLibraryId.value,
+        });
+        analysisStatus.value = 'running';
+        pollAnalysisStatus();
+      } catch (error) {
+        console.error('Error starting analysis:', error);
+      }
+    }
+
+    async function pollAnalysisStatus() {
+      if (!selectedLibraryId.value) return;
+      try {
+        const response = await axios.post(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
+          library_id: selectedLibraryId.value,
+        });
+        if (response.data) {
+          analysisStatus.value = response.data.status || 'none';
+          analysisProgress.value = response.data.progress || { checked: 0, total: 0 };
+          if (response.data.results) {
+            analysisResults.value = response.data.results;
+            analysisVersion.value = response.data.version || 0;
+          }
+        }
+        if (analysisStatus.value === 'running') {
+          analysisPollTimer = setTimeout(pollAnalysisStatus, 2000);
+        }
+      } catch (error) {
+        console.error('Error polling analysis status:', error);
+        analysisStatus.value = 'error';
+      }
+    }
+
+    async function loadAnalysisIfAvailable() {
+      if (!selectedLibraryId.value) return;
+      try {
+        const response = await axios.post(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
+          library_id: selectedLibraryId.value,
+        });
+        if (response.data) {
+          analysisStatus.value = response.data.status || 'none';
+          analysisProgress.value = response.data.progress || { checked: 0, total: 0 };
+          if (response.data.results) {
+            analysisResults.value = response.data.results;
+            analysisVersion.value = response.data.version || 0;
+          }
+          if (analysisStatus.value === 'running') {
+            analysisPollTimer = setTimeout(pollAnalysisStatus, 2000);
+          }
+        }
+      } catch (error) {
+        // No analysis available — that's fine
+      }
+    }
+
     const statsResults = ref([]);
     const searchValue = ref('');
     const loading = ref(false);
@@ -337,7 +517,10 @@ export default {
 
     async function onLibraryChange() {
       pagination.value.page = 1;
-      await Promise.all([loadSummary(), loadCharts(), loadStats()]);
+      analysisResults.value = null;
+      analysisStatus.value = 'none';
+      if (analysisPollTimer) clearTimeout(analysisPollTimer);
+      await Promise.all([loadSummary(), loadCharts(), loadStats(), loadAnalysisIfAvailable()]);
     }
 
     function onIntervalChange(newInterval) {
@@ -385,11 +568,19 @@ export default {
       pagination,
       libraryColumns,
       fileColumns,
+      analysisColumns,
+      analysisStatus,
+      analysisProgress,
+      analysisResults,
+      analysisVersion,
       formatBytes,
       loadStats,
       onTableRequest,
       onLibraryChange,
       onIntervalChange,
+      startAnalysis,
+      confidenceColor,
+      confidenceLabel,
     };
   }
 }

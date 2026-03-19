@@ -116,6 +116,32 @@ class FileTest(object):
         decision_plugin = None
         file_issues = []
 
+        # Codec pre-filter (before plugins, for speed)
+        from compresso.libs.library import Library
+        try:
+            library = Library(self.library_id)
+            target_codecs = library.get_target_codecs()
+            skip_codecs = library.get_skip_codecs()
+            if target_codecs or skip_codecs:
+                from compresso.libs.ffprobe_utils import extract_media_metadata
+                try:
+                    meta = extract_media_metadata(path)
+                    file_codec = meta.get('codec', '').lower()
+                    # Strip "(estimated)" suffix from codec hint
+                    if ' (estimated)' in file_codec:
+                        file_codec = file_codec.replace(' (estimated)', '')
+                    if file_codec:
+                        if skip_codecs and file_codec in [c.lower() for c in skip_codecs]:
+                            return False, [{'id': 'codec_skip',
+                                            'message': "Codec '{}' in skip list — '{}'".format(file_codec, path)}], 0, None
+                        if target_codecs and file_codec not in [c.lower() for c in target_codecs]:
+                            return False, [{'id': 'codec_target',
+                                            'message': "Codec '{}' not in target list — '{}'".format(file_codec, path)}], 0, None
+                except Exception as e:
+                    self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, str(e))
+        except Exception as e:
+            self.logger.debug("Codec pre-filter skipped for '%s': %s", path, str(e))
+
         # TODO: Remove this
         if self.file_in_compresso_ignore_lockfile(path):
             file_issues.append({

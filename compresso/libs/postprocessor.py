@@ -132,9 +132,42 @@ class PostProcessor(threading.Thread):
             self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
 
         if self.current_task.get_task_type() == 'local':
-            # Check if approval workflow is enabled
-            if self.settings.get_approval_required() and self.current_task.task.success:
-                self._stage_for_approval()
+            # Size guardrail check (before staging or finalization)
+            if self.current_task.task.success:
+                try:
+                    library = Library(self.current_task.get_task_library_id())
+                    if library.get_size_guardrail_enabled():
+                        source_size = self.current_task.task.source_size or 0
+                        cache_path = self.current_task.get_cache_path()
+                        if source_size > 0 and cache_path and os.path.exists(cache_path):
+                            output_size = os.path.getsize(cache_path)
+                            ratio_pct = (output_size / source_size) * 100
+                            min_pct = library.get_size_guardrail_min_pct()
+                            max_pct = library.get_size_guardrail_max_pct()
+                            if ratio_pct < min_pct or ratio_pct > max_pct:
+                                self._log("Size guardrail REJECTED: {:.1f}% (allowed {}-{}%)".format(
+                                    ratio_pct, min_pct, max_pct))
+                                self.current_task.task.success = False
+                                self.current_task.task.save()
+                except Exception as e:
+                    self._log("Exception in size guardrail check", message2=str(e), level="warning")
+
+            # Determine replacement policy (per-library with global fallback)
+            try:
+                library = Library(self.current_task.get_task_library_id())
+                policy = library.get_replacement_policy()
+            except Exception:
+                policy = ''
+            if not policy:
+                policy = 'approval_required' if self.settings.get_approval_required() else 'replace'
+
+            if self.current_task.task.success:
+                if policy == 'approval_required':
+                    self._stage_for_approval()
+                elif policy == 'keep_both':
+                    self._finalize_local_task_keep_both()
+                else:
+                    self._finalize_local_task()
             else:
                 self._finalize_local_task()
         else:
@@ -200,6 +233,29 @@ class PostProcessor(threading.Thread):
             self.current_task.delete()
         except Exception as e:
             self._log("Exception in removing task from task list", message2=str(e), level="exception")
+
+    def _finalize_local_task_keep_both(self):
+        """Finalize task but keep original — save output alongside with codec suffix."""
+        try:
+            dest_data = self.current_task.get_destination_data()
+            source_data = self.current_task.get_source_data()
+            if dest_data['abspath'] == source_data['abspath']:
+                # Same filename — add codec suffix to avoid overwriting
+                base, ext = os.path.splitext(dest_data['abspath'])
+                try:
+                    meta = extract_media_metadata(self.current_task.get_cache_path())
+                    codec = meta.get('codec', 'transcoded')
+                except Exception:
+                    codec = 'transcoded'
+                new_path = "{}.{}{}".format(base, codec, ext)
+                counter = 1
+                while os.path.exists(new_path) and counter <= 100:
+                    new_path = "{}.{}.{}{}".format(base, codec, counter, ext)
+                    counter += 1
+                self.current_task.set_destination_path(new_path)
+        except Exception as e:
+            self._log("Exception in keep_both path adjustment", message2=str(e), level="warning")
+        self._finalize_local_task()
 
     def _finalize_remote_task(self):
         """Run the standard remote task postprocessing."""
@@ -606,6 +662,17 @@ class PostProcessor(threading.Thread):
                 'destination_container': dest_meta.get('container', ''),
             }
         )
+
+        # Bump analysis cache version so frontend knows estimates may have changed
+        try:
+            from compresso.libs.unmodels import LibraryAnalysisCache
+            lib_id = task_dump.get('library_id', 1)
+            cache_entry = LibraryAnalysisCache.get_or_none(LibraryAnalysisCache.library_id == lib_id)
+            if cache_entry:
+                cache_entry.version += 1
+                cache_entry.save()
+        except Exception:
+            pass  # Non-critical — don't break postprocessor for cache bump
 
         # Execute event plugin runners
         plugin_handler = PluginsHandler()

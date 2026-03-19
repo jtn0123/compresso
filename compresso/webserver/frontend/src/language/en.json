@@ -1,4 +1,68 @@
 {
+  "systemStatus": {
+    "title": "System",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "disk": "Disk",
+    "gpu": "GPU",
+    "noGpu": "No GPU",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connecting": "Connecting...",
+    "realtimeActive": "Real-time updates active",
+    "realtimeLost": "Real-time updates lost — data may be stale",
+    "uptime": "Uptime"
+  },
+  "common": {
+    "updatedAgo": "Updated {time}",
+    "dataStale": "Data may be stale"
+  },
+  "dashboardStats": {
+    "spaceSaved": "Space Saved",
+    "filesProcessed": "Files Processed",
+    "avgRatio": "Avg Ratio",
+    "queueDepth": "Queue",
+    "healthStatus": "Health",
+    "pendingApprovals": "Approvals",
+    "viewDetails": "View details",
+    "fetchError": "Failed to load"
+  },
+  "workers": {
+    "cpuLabel": "CPU",
+    "memLabel": "MEM",
+    "gpuLabel": "GPU",
+    "workerType": "Worker Type",
+    "workerTypeCpu": "CPU",
+    "workerTypeGpu": "GPU",
+    "noGpuDetected": "No GPUs detected on this system",
+    "groupSummary": "Worker Groups",
+    "activeCount": "{count} active",
+    "idleCount": "{count} idle",
+    "pausedCount": "{count} paused",
+    "noGroupsActive": "No worker groups active",
+    "workerCountUpdated": "Worker count updated",
+    "workerCountFailed": "Failed to update worker count"
+  },
+  "linkedNodes": {
+    "title": "Linked Nodes",
+    "noNodes": "No linked installations",
+    "fetchError": "Failed to load linked nodes",
+    "configure": "Configure",
+    "receiving": "Receiving",
+    "sending": "Sending",
+    "online": "Online",
+    "offline": "Offline"
+  },
+  "healthCheckPanel": {
+    "title": "Health Check Workers",
+    "scanning": "Scanning",
+    "notScanning": "Idle",
+    "workers": "Workers",
+    "viewDetails": "View Health Check",
+    "fetchError": "Failed to load health check status",
+    "workerCountFailed": "Failed to update worker count",
+    "noData": "No health data"
+  },
   "navigation": {
     "dashboard": "Dashboard",
     "settings": "Settings",
@@ -818,5 +882,44 @@
       "noteLineTwo": "Sponsorship funds (e.g., via Patreon) are used to hire or contract outside help, maintain infrastructure, and fuel my coffee addiction.",
       "noteLineThree": "Supporting Compresso also sustains our wider free and open-source development."
     }
+  },
+  "flow": {
+    "codecFilter": "Codec Filter",
+    "codecFilterHelp": "Target = only process these codecs. Skip = never process these. Leave both empty to process all.",
+    "targetCodecs": "Target Codecs",
+    "skipCodecs": "Skip Codecs",
+    "sizeGuardrails": "Size Guardrails",
+    "sizeGuardrailsHelp": "Reject files whose output falls outside this size range relative to the original.",
+    "minOutputSize": "Minimum Output Size (%)",
+    "maxOutputSize": "Maximum Output Size (%)",
+    "replacementPolicy": "After Processing",
+    "policyReplace": "Auto-replace original",
+    "policyApproval": "Require approval before replacing",
+    "policyKeepBoth": "Keep both files",
+    "policyGlobalDefault": "Use global setting",
+    "sizeGuardrailRejected": "Size guardrail rejected — output was {ratio}% of original (allowed {min}-{max}%)",
+    "flowSummary": "Processing Flow",
+    "libraryAnalysis": "Library Analysis",
+    "analyzeButton": "Analyze Library",
+    "reanalyze": "Re-analyze",
+    "analyzing": "Analyzing library...",
+    "analysisProgress": "Scanned {checked} of {total} files",
+    "analysisCodec": "Codec",
+    "analysisResolution": "Resolution",
+    "analysisCount": "Files",
+    "analysisTotalSize": "Total Size",
+    "analysisAvgBitrate": "Avg Bitrate",
+    "analysisEstSavings": "Est. Savings",
+    "analysisConfidence": "Confidence",
+    "confidenceHigh": "High",
+    "confidenceMedium": "Medium",
+    "confidenceLow": "Low",
+    "confidenceNone": "No data",
+    "analysisSummary": "{count} files ({size}) could save ~{savings} based on {samples} historical encodes",
+    "alreadyOptimal": "Already optimal",
+    "noEstimate": "Process some files first to see estimates",
+    "lastAnalyzed": "Last analyzed",
+    "estimatesLive": "Estimates update as files are processed",
+    "optimizationProgress": "Optimized"
   }
 }

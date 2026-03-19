@@ -76,6 +76,19 @@ def save_library_config(library_id, library_config=None, plugin_config=None):
         library.set_enable_inotify(library_config.get('enable_inotify', library.get_enable_inotify()))
         library.set_priority_score(library_config.get('priority_score', library.get_priority_score()))
         library.set_tags(library_config.get('tags', library.get_tags()))
+        # Flow settings
+        if 'target_codecs' in library_config:
+            library.set_target_codecs(library_config.get('target_codecs'))
+        if 'skip_codecs' in library_config:
+            library.set_skip_codecs(library_config.get('skip_codecs'))
+        if 'size_guardrail_enabled' in library_config:
+            library.set_size_guardrail_enabled(library_config.get('size_guardrail_enabled'))
+        if 'size_guardrail_min_pct' in library_config:
+            library.set_size_guardrail_min_pct(library_config.get('size_guardrail_min_pct'))
+        if 'size_guardrail_max_pct' in library_config:
+            library.set_size_guardrail_max_pct(library_config.get('size_guardrail_max_pct'))
+        if 'replacement_policy' in library_config:
+            library.set_replacement_policy(library_config.get('replacement_policy'))
 
     # Update enabled plugins (if the data was given)
     enabled_plugins = plugin_config.get('enabled_plugins')
@@ -151,6 +164,8 @@ def save_worker_group_config(data):
     worker_group.set_name(data.get('name', worker_group.get_name()))
     # Store the number of workers
     worker_group.set_number_of_workers(data.get('number_of_workers', worker_group.get_number_of_workers()))
+    # Store the worker type
+    worker_group.set_worker_type(data.get('worker_type', worker_group.get_worker_type()))
 
     # Set lists
     worker_group.set_tags(data.get('tags', worker_group.get_tags()))

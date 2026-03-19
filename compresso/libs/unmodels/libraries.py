@@ -47,6 +47,15 @@ class Libraries(BaseModel):
     enable_scanner = BooleanField(null=False, default=False)
     enable_inotify = BooleanField(null=False, default=False)
     priority_score = BigIntegerField(null=False, default=0)
+    # Flow settings — codec filtering
+    target_codecs = TextField(default='')
+    skip_codecs = TextField(default='')
+    # Flow settings — size guardrails
+    size_guardrail_enabled = BooleanField(default=False)
+    size_guardrail_min_pct = IntegerField(default=20)
+    size_guardrail_max_pct = IntegerField(default=80)
+    # Flow settings — per-library replacement policy
+    replacement_policy = TextField(default='')
     # ManyToMany Linking field. Does not create a column in the DB. See linking table below
     tags = ManyToManyField(Tags, backref='tags')
 

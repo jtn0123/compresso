@@ -512,6 +512,7 @@ class ApiSettingsHandler(BaseApiHandler):
                     "locked":                 worker_group.get_locked(),
                     "name":                   worker_group.get_name(),
                     "number_of_workers":      worker_group.get_number_of_workers(),
+                    "worker_type":            worker_group.get_worker_type(),
                     "worker_event_schedules": worker_group.get_worker_event_schedules(),
                     "tags":                   worker_group.get_tags(),
                 }
@@ -978,15 +979,21 @@ class ApiSettingsHandler(BaseApiHandler):
                 library_config = Library(json_request.get('id'))
                 library_settings = {
                     "library_config": {
-                        "id":                 library_config.get_id(),
-                        "name":               library_config.get_name(),
-                        "path":               library_config.get_path(),
-                        "locked":             library_config.get_locked(),
-                        "enable_remote_only": library_config.get_enable_remote_only(),
-                        "enable_scanner":     library_config.get_enable_scanner(),
-                        "enable_inotify":     library_config.get_enable_inotify(),
-                        "priority_score":     library_config.get_priority_score(),
-                        "tags":               library_config.get_tags(),
+                        "id":                      library_config.get_id(),
+                        "name":                    library_config.get_name(),
+                        "path":                    library_config.get_path(),
+                        "locked":                  library_config.get_locked(),
+                        "enable_remote_only":      library_config.get_enable_remote_only(),
+                        "enable_scanner":          library_config.get_enable_scanner(),
+                        "enable_inotify":          library_config.get_enable_inotify(),
+                        "priority_score":          library_config.get_priority_score(),
+                        "tags":                    library_config.get_tags(),
+                        "target_codecs":           library_config.get_target_codecs(),
+                        "skip_codecs":             library_config.get_skip_codecs(),
+                        "size_guardrail_enabled":  library_config.get_size_guardrail_enabled(),
+                        "size_guardrail_min_pct":  library_config.get_size_guardrail_min_pct(),
+                        "size_guardrail_max_pct":  library_config.get_size_guardrail_max_pct(),
+                        "replacement_policy":      library_config.get_replacement_policy(),
                     },
                     "plugins":        {
                         "enabled_plugins": library_config.get_enabled_plugins(),

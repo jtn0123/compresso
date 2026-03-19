@@ -20,6 +20,9 @@ from compresso.webserver.api_v2.schema.compression_schemas import (
     ResolutionDistributionSchema,
     ContainerDistributionSchema,
     TimelineSchema,
+    LibraryAnalysisRequestSchema,
+    LibraryAnalysisStatusSchema,
+    OptimizationProgressSchema,
 )
 from compresso.webserver.helpers import compression_stats
 from compresso.webserver.helpers.healthcheck import validate_library_exists
@@ -61,6 +64,21 @@ class ApiCompressionHandler(BaseApiHandler):
             "path_pattern":      r"/compression/timeline",
             "supported_methods": ["GET"],
             "call_method":       "get_timeline",
+        },
+        {
+            "path_pattern":      r"/compression/library-analysis",
+            "supported_methods": ["POST"],
+            "call_method":       "start_library_analysis",
+        },
+        {
+            "path_pattern":      r"/compression/library-analysis/status",
+            "supported_methods": ["POST"],
+            "call_method":       "get_library_analysis_status",
+        },
+        {
+            "path_pattern":      r"/compression/optimization-progress",
+            "supported_methods": ["GET"],
+            "call_method":       "get_optimization_progress",
         },
     ]
 
@@ -362,6 +380,155 @@ class ApiCompressionHandler(BaseApiHandler):
         except ValueError as ve:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
             self.write_error()
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def start_library_analysis(self):
+        """
+        Compression - start library analysis
+        ---
+        description: Triggers a background analysis of a library's media files.
+        requestBody:
+            required: True
+            content:
+                application/json:
+                    schema:
+                        LibraryAnalysisRequestSchema
+        responses:
+            200:
+                description: 'Analysis started or already running.'
+                content:
+                    application/json:
+                        schema:
+                            LibraryAnalysisStatusSchema
+        """
+        try:
+            json_request = self.read_json_request(LibraryAnalysisRequestSchema())
+            library_id = json_request.get('library_id')
+            if not library_id:
+                raise ValueError("library_id is required")
+
+            validate_library_exists(library_id)
+
+            from compresso.webserver.helpers import library_analysis
+            result = library_analysis.start_analysis(library_id)
+
+            response = self.build_response(
+                LibraryAnalysisStatusSchema(),
+                {
+                    "success":  True,
+                    "status":   result.get('status', 'running'),
+                    "progress": result.get('progress', {}),
+                    "version":  0,
+                    "results":  None,
+                }
+            )
+            self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_library_analysis_status(self):
+        """
+        Compression - get library analysis status
+        ---
+        description: Returns analysis progress and cached results for a library.
+        requestBody:
+            required: True
+            content:
+                application/json:
+                    schema:
+                        LibraryAnalysisRequestSchema
+        responses:
+            200:
+                description: 'Returns analysis status and results.'
+                content:
+                    application/json:
+                        schema:
+                            LibraryAnalysisStatusSchema
+        """
+        try:
+            json_request = self.read_json_request(LibraryAnalysisRequestSchema())
+            library_id = json_request.get('library_id')
+            if not library_id:
+                raise ValueError("library_id is required")
+
+            from compresso.webserver.helpers import library_analysis
+            result = library_analysis.get_analysis_status(library_id)
+
+            response = self.build_response(
+                LibraryAnalysisStatusSchema(),
+                {
+                    "success":  True,
+                    "status":   result.get('status', 'none'),
+                    "progress": result.get('progress', {}),
+                    "version":  result.get('version', 0),
+                    "results":  result.get('results'),
+                }
+            )
+            self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_optimization_progress(self):
+        """
+        Compression - optimization progress
+        ---
+        description: Returns library optimization progress (processed vs total files).
+        responses:
+            200:
+                description: 'Returns optimization progress.'
+                content:
+                    application/json:
+                        schema:
+                            OptimizationProgressSchema
+        """
+        try:
+            from compresso.libs.unmodels import CompressionStats, LibraryAnalysisCache
+
+            processed_files = CompressionStats.select().count()
+
+            total_files = 0
+            for cache in LibraryAnalysisCache.select():
+                total_files += cache.file_count
+
+            if total_files == 0:
+                total_files = processed_files
+
+            percent = (processed_files / total_files * 100) if total_files > 0 else 0
+
+            response = self.build_response(
+                OptimizationProgressSchema(),
+                {
+                    "success":         True,
+                    "total_files":     total_files,
+                    "processed_files": processed_files,
+                    "percent":         round(percent, 1),
+                }
+            )
+            self.write_success(response)
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))

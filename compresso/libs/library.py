@@ -29,6 +29,7 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import json
 import random
 
 from compresso.config import Config
@@ -124,14 +125,20 @@ class Library(object):
                 lib.save()
             # Create library config dictionary
             library_config = {
-                'id':                 lib.id,
-                'name':               lib.name,
-                'path':               lib.path,
-                'locked':             lib.locked,
-                'enable_remote_only': lib.enable_remote_only,
-                'enable_scanner':     lib.enable_scanner,
-                'enable_inotify':     lib.enable_inotify,
-                'tags':               [],
+                'id':                      lib.id,
+                'name':                    lib.name,
+                'path':                    lib.path,
+                'locked':                  lib.locked,
+                'enable_remote_only':      lib.enable_remote_only,
+                'enable_scanner':          lib.enable_scanner,
+                'enable_inotify':          lib.enable_inotify,
+                'target_codecs':           lib.target_codecs or '',
+                'skip_codecs':             lib.skip_codecs or '',
+                'size_guardrail_enabled':  bool(lib.size_guardrail_enabled),
+                'size_guardrail_min_pct':  lib.size_guardrail_min_pct,
+                'size_guardrail_max_pct':  lib.size_guardrail_max_pct,
+                'replacement_policy':      lib.replacement_policy or '',
+                'tags':                    [],
             }
             # Append tags
             for tag in lib.tags.order_by(Tags.name):
@@ -306,6 +313,72 @@ class Library(object):
         # Clear out the current linking table of tags linked to this library
         # Add new links for each tag that was fetched matching the provided names
         self.model.tags.add(tags_select_query, clear_existing=True)
+
+    # --- Flow settings: Codec filtering ---
+
+    def get_target_codecs(self):
+        raw = self.model.target_codecs or ''
+        if not raw:
+            return []
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_target_codecs(self, value):
+        if isinstance(value, list):
+            self.model.target_codecs = json.dumps(value)
+        else:
+            self.model.target_codecs = value or ''
+
+    def get_skip_codecs(self):
+        raw = self.model.skip_codecs or ''
+        if not raw:
+            return []
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_skip_codecs(self, value):
+        if isinstance(value, list):
+            self.model.skip_codecs = json.dumps(value)
+        else:
+            self.model.skip_codecs = value or ''
+
+    # --- Flow settings: Size guardrails ---
+
+    def get_size_guardrail_enabled(self):
+        return bool(self.model.size_guardrail_enabled)
+
+    def set_size_guardrail_enabled(self, value):
+        self.model.size_guardrail_enabled = bool(value)
+
+    def get_size_guardrail_min_pct(self):
+        return self.model.size_guardrail_min_pct
+
+    def set_size_guardrail_min_pct(self, value):
+        val = max(5, min(95, int(value)))
+        self.model.size_guardrail_min_pct = val
+
+    def get_size_guardrail_max_pct(self):
+        return self.model.size_guardrail_max_pct
+
+    def set_size_guardrail_max_pct(self, value):
+        val = max(50, min(100, int(value)))
+        self.model.size_guardrail_max_pct = val
+
+    # --- Flow settings: Replacement policy ---
+
+    def get_replacement_policy(self):
+        return self.model.replacement_policy or ''
+
+    def set_replacement_policy(self, value):
+        valid_policies = ('', 'replace', 'approval_required', 'keep_both')
+        policy = value or ''
+        if policy not in valid_policies:
+            policy = ''
+        self.model.replacement_policy = policy
 
     def get_enabled_plugins(self, include_settings=False):
         """

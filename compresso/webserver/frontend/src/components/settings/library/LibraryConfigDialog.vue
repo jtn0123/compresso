@@ -17,6 +17,16 @@
       <div :class="isMobile ? 'q-px-none' : ''">
         <q-card flat>
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
+            <!-- Flow Summary Bar -->
+            <FlowSummaryBar
+              :target-codecs="targetCodecs"
+              :skip-codecs="skipCodecs"
+              :size-guardrail-enabled="sizeGuardrailEnabled"
+              :size-guardrail-min-pct="sizeGuardrailMinPct"
+              :size-guardrail-max-pct="sizeGuardrailMaxPct"
+              :replacement-policy="replacementPolicy"
+            />
+
             <div class="row items-center no-wrap q-mb-md">
               <div class="col">
                 <div class="text-h5">
@@ -241,6 +251,98 @@
 
           <q-separator/>
 
+          <!-- Codec Filter Section -->
+          <q-card-section :class="isMobile ? 'q-px-none' : ''">
+            <div class="text-h6 q-mb-sm">{{ $t('flow.codecFilter') }}</div>
+            <div class="text-caption text-grey q-mb-md">{{ $t('flow.codecFilterHelp') }}</div>
+
+            <div class="q-pb-sm">
+              <q-select
+                filled
+                use-chips
+                multiple
+                new-value-mode="add-unique"
+                v-model="targetCodecs"
+                :options="targetCodecOptions"
+                :label="$t('flow.targetCodecs')"
+              />
+            </div>
+
+            <div class="q-pb-sm">
+              <q-select
+                filled
+                use-chips
+                multiple
+                new-value-mode="add-unique"
+                v-model="skipCodecs"
+                :options="skipCodecOptions"
+                :label="$t('flow.skipCodecs')"
+              />
+            </div>
+          </q-card-section>
+
+          <q-separator/>
+
+          <!-- Size Guardrails Section -->
+          <q-card-section :class="isMobile ? 'q-px-none' : ''">
+            <div class="text-h6 q-mb-sm">{{ $t('flow.sizeGuardrails') }}</div>
+            <div class="text-caption text-grey q-mb-md">{{ $t('flow.sizeGuardrailsHelp') }}</div>
+
+            <q-item tag="label" class="border-hover" style="padding-left:12px">
+              <q-item-section>
+                <q-item-label>{{ $t('flow.sizeGuardrails') }}</q-item-label>
+              </q-item-section>
+              <q-item-section avatar>
+                <q-toggle v-model="sizeGuardrailEnabled" />
+              </q-item-section>
+            </q-item>
+
+            <div v-if="sizeGuardrailEnabled" class="q-mt-md q-gutter-md">
+              <div>
+                <div class="text-caption">{{ $t('flow.minOutputSize') }}: {{ sizeGuardrailMinPct }}%</div>
+                <q-slider
+                  v-model="sizeGuardrailMinPct"
+                  :min="5"
+                  :max="95"
+                  :step="5"
+                  label
+                  :label-value="sizeGuardrailMinPct + '%'"
+                  color="negative"
+                />
+              </div>
+              <div>
+                <div class="text-caption">{{ $t('flow.maxOutputSize') }}: {{ sizeGuardrailMaxPct }}%</div>
+                <q-slider
+                  v-model="sizeGuardrailMaxPct"
+                  :min="50"
+                  :max="100"
+                  :step="5"
+                  label
+                  :label-value="sizeGuardrailMaxPct + '%'"
+                  color="warning"
+                />
+              </div>
+            </div>
+          </q-card-section>
+
+          <q-separator/>
+
+          <!-- Replacement Policy Section -->
+          <q-card-section :class="isMobile ? 'q-px-none' : ''">
+            <div class="text-h6 q-mb-sm">{{ $t('flow.replacementPolicy') }}</div>
+
+            <q-select
+              outlined
+              v-model="replacementPolicy"
+              :options="replacementPolicyOptions"
+              emit-value
+              map-options
+              :label="$t('flow.replacementPolicy')"
+            />
+          </q-card-section>
+
+          <q-separator/>
+
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
             <div class="row items-center no-wrap q-mb-md">
               <div class="col">
@@ -341,6 +443,7 @@ import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
 import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
 import PluginSelectorDialog from 'components/settings/plugins/PluginSelectorDialog.vue'
 import LibraryConfigurePluginFlowList from 'components/settings/library/partials/LibraryConfigurePluginFlowList'
+import FlowSummaryBar from 'components/settings/library/partials/FlowSummaryBar.vue'
 import JsonImportExportDialog from 'components/settings/library/JsonImportExportDialog.vue'
 import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog'
 import CompressoListActionButton from "components/ui/buttons/CompressoListActionButton.vue"
@@ -370,6 +473,12 @@ const enableScanner = ref(null)
 const enableInotify = ref(null)
 const priorityScore = ref(null)
 const tags = ref(null)
+const targetCodecs = ref([])
+const skipCodecs = ref([])
+const sizeGuardrailEnabled = ref(false)
+const sizeGuardrailMinPct = ref(20)
+const sizeGuardrailMaxPct = ref(80)
+const replacementPolicy = ref('')
 const enabledPlugins = ref(null)
 const componentKey = ref(1)
 const showLoading = ref(false)
@@ -379,6 +488,14 @@ const selectDirectoryInitialPath = ref('')
 const selectDirectoryListType = ref('directories')
 const pluginSelectorDialogRef = ref(null)
 const pluginSelectorHidePlugins = ref([])
+const targetCodecOptions = ['h264', 'mpeg4', 'mpeg2video', 'wmv3', 'vc1', 'theora', 'vp8', 'xvid', 'divx']
+const skipCodecOptions = ['hevc', 'av1', 'vp9']
+const replacementPolicyOptions = [
+  { label: t('flow.policyGlobalDefault'), value: '' },
+  { label: t('flow.policyReplace'), value: 'replace' },
+  { label: t('flow.policyApproval'), value: 'approval_required' },
+  { label: t('flow.policyKeepBoth'), value: 'keep_both' },
+]
 
 const saveAction = computed(() => {
   const hasChanges = isDirty.value
@@ -423,6 +540,12 @@ const currentSnapshot = computed(() => {
     enableInotify: enableInotify.value,
     priorityScore: priorityScore.value,
     tags: [...tags.value],
+    targetCodecs: [...targetCodecs.value],
+    skipCodecs: [...skipCodecs.value],
+    sizeGuardrailEnabled: sizeGuardrailEnabled.value,
+    sizeGuardrailMinPct: sizeGuardrailMinPct.value,
+    sizeGuardrailMaxPct: sizeGuardrailMaxPct.value,
+    replacementPolicy: replacementPolicy.value,
     enabledPlugins: pluginSnapshot
   })
 })
@@ -457,6 +580,12 @@ const fetchLibraryConfig = (libraryId) => {
     enableInotify.value = libraryConfig.enable_inotify
     priorityScore.value = libraryConfig.priority_score
     tags.value = libraryConfig.tags
+    targetCodecs.value = libraryConfig.target_codecs || []
+    skipCodecs.value = libraryConfig.skip_codecs || []
+    sizeGuardrailEnabled.value = libraryConfig.size_guardrail_enabled || false
+    sizeGuardrailMinPct.value = libraryConfig.size_guardrail_min_pct ?? 20
+    sizeGuardrailMaxPct.value = libraryConfig.size_guardrail_max_pct ?? 80
+    replacementPolicy.value = libraryConfig.replacement_policy || ''
     enabledPlugins.value = response.data.plugins.enabled_plugins
     updateSnapshot()
   })
@@ -474,6 +603,12 @@ const saveLibraryConfig = async ({ hideOnSuccess = false } = {}) => {
       enable_inotify: enableInotify.value,
       priority_score: priorityScore.value,
       tags: tags.value,
+      target_codecs: targetCodecs.value,
+      skip_codecs: skipCodecs.value,
+      size_guardrail_enabled: sizeGuardrailEnabled.value,
+      size_guardrail_min_pct: sizeGuardrailMinPct.value,
+      size_guardrail_max_pct: sizeGuardrailMaxPct.value,
+      replacement_policy: replacementPolicy.value,
     },
     plugins: {
       enabled_plugins: enabledPlugins.value,
@@ -727,6 +862,12 @@ const resetLibraryConfig = () => {
   enableInotify.value = null
   priorityScore.value = null
   tags.value = null
+  targetCodecs.value = []
+  skipCodecs.value = []
+  sizeGuardrailEnabled.value = false
+  sizeGuardrailMinPct.value = 20
+  sizeGuardrailMaxPct.value = 80
+  replacementPolicy.value = ''
   enabledPlugins.value = null
   originalSnapshot.value = null
 }
