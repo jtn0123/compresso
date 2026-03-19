@@ -359,7 +359,7 @@ jobs:
       # ---
       - name: Build Image
         if: success()
-        uses: docker/build-push-action@b32b51a8eda65d6793cd0494a773d4f6bcef32dc #v6.11.0
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 #v7.0.0
         with:
           context: .
           file: docker/Dockerfile
