@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/jtn0123/compresso/compare/v1.0.0...v1.1.0) (2026-03-19)
+
+
+### Features
+
+* new Compresso visual identity ([e51bded](https://github.com/jtn0123/compresso/commit/e51bded6c5bdf04e47a3d9deccd48339689fdf96)), closes [#1a6b4a](https://github.com/jtn0123/compresso/issues/1a6b4a) [#22916a](https://github.com/jtn0123/compresso/issues/22916a) [#e8a525](https://github.com/jtn0123/compresso/issues/e8a525) [#7c5cbf](https://github.com/jtn0123/compresso/issues/7c5cbf) [#13291f](https://github.com/jtn0123/compresso/issues/13291f) [#1a3d2d](https://github.com/jtn0123/compresso/issues/1a3d2d)
+
 # 1.0.0 (2026-03-19)
 
 
