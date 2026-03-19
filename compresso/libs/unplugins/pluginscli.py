@@ -257,7 +257,7 @@ class PluginsCLI(object):
 
         # Generate menu menu
         print()
-        print('INFO: https://docs.unmanic.app/docs/development/writing_plugins/plugin_runner_types')
+        print('INFO: https://github.com/jtn0123/compresso#install-and-run')
         plugin_runners_inquirer = inquirer.Checkbox(
             'selected_plugins',
             message="Which Plugin runner(s) will be used?",

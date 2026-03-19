@@ -107,7 +107,7 @@
                       </q-item-section>
                     </q-item>
                     <q-item clickable dense class="support-link-row rounded-borders"
-                            @click="openExternalURL('https://docs.unmanic.app/docs/')">
+                            @click="openExternalURL('https://github.com/jtn0123/compresso#install-and-run')">
                       <q-item-section avatar>
                         <q-icon color="primary" name="article" size="18px"/>
                       </q-item-section>

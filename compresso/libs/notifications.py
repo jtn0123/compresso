@@ -82,7 +82,7 @@ class Notifications(Queue, metaclass=SingletonType):
                 'label':      'updateAvailableLabel',
                 'message':    'updateAvailableMessage',
                 'navigation': {
-                    'url': 'https://docs.unmanic.app',
+                    'url': 'https://github.com/jtn0123/compresso',
                 },
             })
 

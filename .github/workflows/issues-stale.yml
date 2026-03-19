@@ -35,9 +35,9 @@ jobs:
         uses: actions/stale@v5
         with:
           close-issue-message: >
-            This issue was related to a plugin and not the core Unmanic project.
+            This issue was related to a plugin and not the core Compresso project.
             Please open issues against the plugin's source repo which can be found in
-            https://github.com/orgs/Unmanic/repositories and not against one of the core projects.
+            https://github.com/jtn0123/compresso and not against one of the core projects.
           days-before-stale: 0
           days-before-close: 0
           only-issue-labels: "invalid:plugin"
@@ -47,7 +47,7 @@ jobs:
         uses: actions/stale@v5
         with:
           close-issue-message: >
-            This issue was related to documentation and not the core Unmanic project.
+            This issue was related to documentation and not the core Compresso project.
             Please open issues against the documentation repo at
             https://github.com/jtn0123/compresso and not against one of the core projects.
           days-before-stale: 0

@@ -23,11 +23,11 @@ def _make_filetest():
 
 
 # ------------------------------------------------------------------
-# TestFileInUnmanicIgnoreLockfile
+# TestFileInCompressoIgnoreLockfile
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestFileInUnmanicIgnoreLockfile:
+class TestFileInCompressoIgnoreLockfile:
 
     def test_exact_match_returns_true(self, tmp_path):
         ignore_file = tmp_path / '.compressoignore'

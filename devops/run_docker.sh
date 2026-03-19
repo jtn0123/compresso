@@ -206,7 +206,7 @@ start_container() {
         -e PGID="$PGID" \
         -e DEBUGGING="$DEBUG" \
         -e USE_CUSTOM_SUPPORT_API="$USE_CUSTOM_SUPPORT_API" \
-        -e UNMANIC_RUN_COMMAND="$RUN_COMMAND" \
+        -e COMPRESSO_RUN_COMMAND="$RUN_COMMAND" \
         -e PROFILE_UNMANIC="$ENABLE_PROFILING" \
         -p "$EXT_PORT":8888 \
         -v "$PROJECT_BASE":/app:Z \

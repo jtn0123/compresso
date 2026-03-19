@@ -4,7 +4,7 @@
 """
     tests.unit.test_logging_validation.py
 
-    Validates that Unmanic's logging infrastructure produces
+    Validates that Compresso's logging infrastructure produces
     structured JSON output with expected fields.
 """
 

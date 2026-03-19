@@ -4,7 +4,7 @@
 """
     tests.unit.test_benchmark.py
 
-    Performance benchmarks for critical Unmanic operations.
+    Performance benchmarks for critical Compresso operations.
     Run with: pytest tests/unit/test_benchmark.py -v --benchmark-enable
     Requires pytest-benchmark: pip install pytest-benchmark
 """

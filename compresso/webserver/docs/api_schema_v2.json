@@ -1,7 +1,7 @@
 {
     "info": {
-        "description": "Documentation for the Unmanic application API",
-        "title": "Unmanic API",
+        "description": "Documentation for the Compresso application API",
+        "title": "Compresso API",
         "version": "2"
     },
     "servers": [
@@ -516,7 +516,7 @@
                         "type": "object",
                         "description": "The navigation links of the notification",
                         "example": {
-                            "url": "https://docs.unmanic.app"
+                            "url": "https://github.com/jtn0123/compresso"
                         },
                         "additionalProperties": {}
                     }
@@ -1666,7 +1666,7 @@
                     "name": {
                         "type": "string",
                         "description": "The plugin repo name",
-                        "example": "Josh.5 Development Plugins for Unmanic"
+                        "example": "Josh.5 Development Plugins for Compresso"
                     },
                     "icon": {
                         "type": "string",
@@ -2401,7 +2401,7 @@
                             "\n\nRUNNER: \nRemux Video Files [Pass #1]\n\n",
                             "\nExecuting plugin runner... Please wait",
                             "\nRunner did not request to execute a command",
-                            "\n\nNo Plugin requested to run commands for this file '/tmp/compresso/unmanic_remote_pending_library-1635746225.3336523/file.mp4'"
+                            "\n\nNo Plugin requested to run commands for this file '/tmp/compresso/compresso_remote_pending_library-1635746225.3336523/file.mp4'"
                         ],
                         "items": {
                             "type": "string"

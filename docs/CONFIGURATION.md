@@ -8,9 +8,9 @@
 | `PGID` | `1000` | Group ID for the runtime process |
 | `TZ` | System default | Container timezone (e.g. `America/New_York`) |
 | `DEBUGGING` | unset | Set to `true` to enable dev mode (`--dev` flag) |
-| `UNMANIC_SQLITE_MAINTENANCE` | `basic` | SQLite maintenance mode: `basic`, `full`, or `off` |
-| `UNMANIC_DB_PATH` | `/config/.compresso/config/compresso.db` | Path to the SQLite database |
-| `UNMANIC_RUN_COMMAND` | unset | Custom run command template (use `{cmd}` as placeholder) |
+| `COMPRESSO_SQLITE_MAINTENANCE` | `basic` | SQLite maintenance mode: `basic`, `full`, or `off` |
+| `COMPRESSO_DB_PATH` | `/config/.compresso/config/compresso.db` | Path to the SQLite database |
+| `COMPRESSO_RUN_COMMAND` | unset | Custom run command template (use `{cmd}` as placeholder) |
 | `USE_CUSTOM_SUPPORT_API` | unset | `test` or `dev` to override the support API URL |
 
 ## Volume Mounts

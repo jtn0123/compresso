@@ -59,14 +59,14 @@
             <CompressoStandardButton
               :label="$t('components.docs.trialWelcome.docsLinkLabel')"
               icon-right="open_in_new"
-              href="https://docs.unmanic.app/docs/"
+              href="https://github.com/jtn0123/compresso#install-and-run"
               target="_blank"
               rel="noopener"
             />
             <CompressoStandardButton
               :label="$t('components.docs.trialWelcome.discordLinkLabel')"
               icon-right="open_in_new"
-              href="https://unmanic.app/discord"
+              href="https://github.com/jtn0123/compresso/issues"
               target="_blank"
               rel="noopener"
             />
@@ -85,7 +85,7 @@
           class="q-mt-sm"
           :label="$t('components.docs.trialWelcome.limitationsLinkLabel')"
           icon-right="open_in_new"
-          href="https://docs.unmanic.app/#feature-comparison"
+          href="https://github.com/jtn0123/compresso"
           target="_blank"
           rel="noopener"
         />

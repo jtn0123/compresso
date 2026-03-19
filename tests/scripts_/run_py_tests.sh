@@ -84,5 +84,5 @@ docker run -ti --rm \
     -e NUMBER_OF_WORKERS=${NUMBER_OF_WORKERS} \
     -e SCHEDULE_FULL_SCAN_MINUTES=${SCHEDULE_FULL_SCAN_MINUTES} \
     -e RUN_FULL_SCAN_ON_START=${RUN_FULL_SCAN_ON_START} \
-    josh5/unmanic bash
+    jtn0123/compresso bash
 

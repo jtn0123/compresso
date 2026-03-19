@@ -29,5 +29,5 @@ venv/**
 .eggs/**
 build/**
 dist/**
-compresso.egg-info/**
+*.egg-info/**
 *.egg

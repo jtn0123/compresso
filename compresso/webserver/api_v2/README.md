@@ -1,4 +1,4 @@
-# Unmanic API
+# Compresso API
 
 ## Rules regarding endpoint creation:
 1. All data will be returned in JSON format.

@@ -36,8 +36,8 @@ run_init_scripts() {
 }
 
 sqlite_maintenance() {
-    local db_path="${UNMANIC_DB_PATH:-/config/.compresso/config/compresso.db}"
-    local maintenance_mode="${UNMANIC_SQLITE_MAINTENANCE:-basic}"
+    local db_path="${COMPRESSO_DB_PATH:-/config/.compresso/config/compresso.db}"
+    local maintenance_mode="${COMPRESSO_SQLITE_MAINTENANCE:-basic}"
 
     if [[ "${maintenance_mode}" == "off" ]]; then
         return
@@ -62,7 +62,7 @@ sqlite_maintenance() {
         sqlite3 "${db_path}" "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize; VACUUM;"
         ;;
     *)
-        log "Unknown UNMANIC_SQLITE_MAINTENANCE mode '${maintenance_mode}', skipping"
+        log "Unknown COMPRESSO_SQLITE_MAINTENANCE mode '${maintenance_mode}', skipping"
         ;;
     esac
 }
@@ -154,10 +154,10 @@ main() {
             ;;
         esac
         compresso_cmd=("$1" "${compresso_params[@]}" "${@:2}")
-        if [[ -n "${UNMANIC_RUN_COMMAND:-}" ]]; then
+        if [[ -n "${COMPRESSO_RUN_COMMAND:-}" ]]; then
             compresso_cmd_str=$(printf '%q ' "${compresso_cmd[@]}")
             compresso_cmd_str=${compresso_cmd_str% }
-            run_cmd="${UNMANIC_RUN_COMMAND//\{cmd\}/${compresso_cmd_str}}"
+            run_cmd="${COMPRESSO_RUN_COMMAND//\{cmd\}/${compresso_cmd_str}}"
             log "Using custom run command: ${run_cmd}"
             if [[ "${EUID}" -eq 0 ]]; then
                 if command -v gosu >/dev/null 2>&1; then

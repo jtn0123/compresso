@@ -42,11 +42,11 @@ Since Compresso can be used for running any commands, you will need to ensure th
 ## Screen-shots
 
 #### Dashboard:
-![Screen-shot - Dashboard](./docs/images/unmanic-dashboard-processing-anime.png)
+![Screen-shot - Dashboard](./docs/images/compresso-dashboard-processing-anime.png)
 #### File metrics:
-![Screen-shot - Desktop](./docs/images/unmanic-file-size-data-panel-anime.png)
+![Screen-shot - Desktop](./docs/images/compresso-file-size-data-panel-anime.png)
 #### Installed plugins:
-![Screen-shot - Desktop](./docs/images/unmanic-list-installed-plugins.png)
+![Screen-shot - Desktop](./docs/images/compresso-list-installed-plugins.png)
 
 ## Install and Run
 

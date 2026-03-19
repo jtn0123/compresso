@@ -611,7 +611,7 @@ class NotificationDataSchema(BaseSchema):
     navigation = fields.Dict(
         required=True,
         description="The navigation links of the notification",
-        example={'url': "https://docs.unmanic.app"},
+        example={'url': "https://github.com/jtn0123/compresso"},
     )
 
 

@@ -268,7 +268,7 @@ jobs:
           BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
           SERVICE_NAME=compresso
-          DOCKER_HUB_IMAGE=docker.io/josh5/${SERVICE_NAME:?}
+          DOCKER_HUB_IMAGE=docker.io/jtn0123/${SERVICE_NAME:?}
           GHCR_IMAGE=ghcr.io/${ORG:?}/${SERVICE_NAME:?}
 
           DOCKER_TAGS=""
@@ -294,7 +294,7 @@ jobs:
           fi
 
           DOCKER_PUSH="true"
-          if [[ ${DOCKER_HUB_IMAGE} != 'docker.io/josh5/compresso' ]]; then
+          if [[ ${DOCKER_HUB_IMAGE} != 'docker.io/jtn0123/compresso' ]]; then
             DOCKER_PUSH="false"
           fi
 
@@ -351,7 +351,7 @@ jobs:
           labels: |
             maintainer=Josh.5
             source.version=${{ steps.prepare.outputs.sha_short }}
-            source.project=Unmanic
+            source.project=Compresso
             source.service=${{ steps.prepare.outputs.service_name }}
             org.opencontainers.image.title=${{ steps.prepare.outputs.service_name }}
             org.opencontainers.image.created=${{ steps.prepare.outputs.docker_build_date }}

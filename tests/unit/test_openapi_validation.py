@@ -26,12 +26,12 @@ class TestSwaggerSpecGeneration:
     def test_apispec_produces_valid_spec(self):
         """Verify apispec produces a valid OpenAPI 3.0 structure."""
         spec = APISpec(
-            title="Unmanic API",
+            title="Compresso API",
             version="2.0.0",
             openapi_version="3.0.0",
         )
         d = spec.to_dict()
-        assert d['info']['title'] == "Unmanic API"
+        assert d['info']['title'] == "Compresso API"
         assert d['openapi'] == "3.0.0"
         assert 'paths' in d
         assert 'info' in d
