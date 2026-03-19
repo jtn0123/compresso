@@ -57,7 +57,14 @@
               <div class="text-subtitle2">{{ logsPath }}</div>
             </div>
             <q-space class="gt-xs"/>
-            <div class="col-12 col-sm-auto q-mt-sm q-mt-sm-none">
+            <div class="col-12 col-sm-auto q-mt-sm q-mt-sm-none q-gutter-sm row">
+              <q-btn
+                @click="clearLogs"
+                outline
+                color="warning"
+                icon-right="delete_sweep"
+                label="Clear"
+              />
               <q-btn
                 @click="downloadLogs"
                 outline
@@ -303,6 +310,11 @@ const setLogRetention = (value) => {
       actions: [{ icon: 'close', color: 'white' }]
     })
   })
+}
+
+const clearLogs = () => {
+  currentLog.value = []
+  currentRawLog.value = []
 }
 
 const downloadLogs = () => {
