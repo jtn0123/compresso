@@ -435,7 +435,7 @@ class RootService:
             while self.run_threads:
                 try:
                     time.sleep(1)
-                except (KeyboardInterrupt, SystemExit) as e:
+                except (KeyboardInterrupt, SystemExit):
                     break
         else:
             signal.signal(signal.SIGINT, self.sig_handle)

@@ -6,6 +6,7 @@ python_functions = ["test_*"]
 markers = [
     "unittest: Unit tests.",
     "integrationtest: Integration tests.",
+    "benchmark: Performance benchmark tests.",
 ]
 filterwarnings = [
     "ignore:.*invalid escape sequence.*:DeprecationWarning",
@@ -20,26 +21,38 @@ omit = ["*/tests/*", "*/test_*", "*/webserver/frontend/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 25
+fail_under = 30
 
 [tool.ruff]
 line-length = 127
 target-version = "py38"
 exclude = [
-    "venv", ".idea", "dev_environment", "dist", "build",
+    "venv", ".venv", ".idea", "dev_environment", "dist", "build",
     "unmanic/webserver/frontend",
 ]
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]
 ignore = [
-    "E722",  # bare except — matches current flake8 config
-    "E241",  # multiple spaces before operator
-    "F401",  # unused imports
-    "F403",  # wildcard imports
-    "F405",  # undefined from wildcard
-    "F841",  # unused local variable
+    "E241",  # multiple spaces before operator — used for alignment
+    "E501",  # line too long — enforced advisory only (many pre-existing)
+    "F402",  # import shadowed by loop variable — false positive on common patterns
+    "F403",  # wildcard imports — used in __init__.py and basemodel
+    "F405",  # undefined from wildcard — consequence of F403
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = [
+    "unmanic/webserver/frontend",
+    "venv",
+    ".venv",
+    "dist",
+    "build",
+]

@@ -30,7 +30,6 @@
 
 """
 import copy
-import gc
 import inspect
 import os
 import importlib.util
@@ -370,7 +369,7 @@ class PluginExecutor(object):
         plugin_modules = []
 
         # Ensure called runner type exists
-        if not plugin_type in plugin_types.get_all_plugin_types():
+        if plugin_type not in plugin_types.get_all_plugin_types():
             self.logger.error("Provided plugin type does not exist! %s", plugin_type)
             return plugin_modules
 
@@ -481,8 +480,6 @@ class PluginExecutor(object):
 
         try:
             plugin_settings = plugin_module.Settings(library_id=library_id)
-            plugin_form_settings = copy.deepcopy(plugin_settings.get_form_settings())
-
             save_result = True
             for key in settings:
                 value = settings.get(key)

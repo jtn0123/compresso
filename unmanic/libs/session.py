@@ -30,10 +30,8 @@
 
 """
 import datetime
-import os
 import time
 
-from unmanic import config
 from unmanic.libs.logs import UnmanicLogging
 from unmanic.libs.singleton import SingletonType
 from unmanic.libs.unmodels import Installation

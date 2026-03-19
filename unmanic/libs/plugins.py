@@ -382,7 +382,7 @@ class PluginsHandler(object, metaclass=SingletonType):
                         plugin_executor.reload_plugin_module(plugin.get('plugin_id'))
 
                         return result
-                    except Exception as e:
+                    except Exception:
                         self.logger.exception("Exception while installing plugin '%s'.", plugin)
 
         return False
@@ -595,7 +595,7 @@ class PluginsHandler(object, metaclass=SingletonType):
                 join_condition = (
                     (EnabledPlugins.plugin_id == Plugins.id) & (EnabledPlugins.library_id == library_id))
                 query = query.join(EnabledPlugins, join_type='LEFT OUTER JOIN', on=join_condition)
-                query = query.where(EnabledPlugins.plugin_id != None)
+                query = query.where(EnabledPlugins.plugin_id.is_null(False))
 
             # Get order by
             if order:

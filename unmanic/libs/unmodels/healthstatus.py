@@ -8,7 +8,6 @@
 
 """
 
-import datetime
 
 from peewee import *
 from unmanic.libs.unmodels.lib import BaseModel

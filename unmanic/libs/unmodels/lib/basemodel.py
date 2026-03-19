@@ -3,23 +3,23 @@
 
 """
     unmanic.basemodel.py
- 
+
     Written by:               Josh.5 <jsunnex@gmail.com>
     Date:                     22 Jun 2019, (1:58 PM)
- 
+
     Copyright:
            Copyright (C) Josh Sunnex - All Rights Reserved
- 
+
            Permission is hereby granted, free of charge, to any person obtaining a copy
            of this software and associated documentation files (the "Software"), to deal
            in the Software without restriction, including without limitation the rights
            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
            copies of the Software, and to permit persons to whom the Software is
            furnished to do so, subject to the following conditions:
-  
+
            The above copyright notice and this permission notice shall be included in all
            copies or substantial portions of the Software.
-  
+
            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
            EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
            MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -34,10 +34,9 @@ from peewee import *
 from playhouse.sqliteq import SqliteQueueDatabase
 from datetime import datetime
 from base64 import b64decode
-from playhouse.shortcuts import model_to_dict, dict_to_model
+from playhouse.shortcuts import model_to_dict
 
 # Do not initialise the database until the model is called.
-from unmanic.libs.singleton import SingletonType
 
 db = DatabaseProxy()  # Create a proxy for our db.
 

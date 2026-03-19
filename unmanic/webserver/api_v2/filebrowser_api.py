@@ -29,14 +29,12 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
-import os
 
 import tornado.log
 from unmanic.libs import session
 from unmanic.libs.uiserver import UnmanicDataQueues
 from unmanic.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
-from unmanic.webserver.api_v2.schema.schemas import DirectoryListingResultsSchema, DocumentContentSuccessSchema, \
-    RequestDirectoryListingDataSchema
+from unmanic.webserver.api_v2.schema.schemas import DirectoryListingResultsSchema, RequestDirectoryListingDataSchema
 from unmanic.webserver.helpers.filebrowser import DirectoryListing
 
 

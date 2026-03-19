@@ -133,14 +133,14 @@ class PluginType(object):
         if not isinstance(result_data, dict):
             # This runner function is not returning anything
             error = "Plugin '{0} - {1}()' has failed to return any output data.".format(plugin_id,
-                                                                                        plugin_runner, data_tree)
+                                                                                        plugin_runner, )
             errors.append(error)
             return errors
         for key in data_schema:
             schema_meta = data_schema.get(key)
             if schema_meta.get('required'):
                 # Ensure the required item is present in result_data
-                if not key in result_data:
+                if key not in result_data:
                     error = "Plugin '{0} - {1}()' is missing required key '{2}{3}' in the output data.".format(plugin_id,
                                                                                                                plugin_runner,
                                                                                                                data_tree, key)

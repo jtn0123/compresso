@@ -31,17 +31,12 @@
 """
 
 import json
-import os
 import time
-import tornado.web
-import tornado.log
-import tornado.routing
 
 from unmanic import config
 from unmanic.webserver.api_v1.base_api_handler import BaseApiHandler
 
-from unmanic.libs import history, task, common
-from unmanic.webserver.helpers import completed_tasks
+from unmanic.libs import history
 
 
 class ApiHistoryHandler(BaseApiHandler):

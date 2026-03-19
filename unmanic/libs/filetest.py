@@ -32,11 +32,10 @@
 import os
 import queue
 import threading
-import time
 from copy import deepcopy
 
 from unmanic import config
-from unmanic.libs import history, common
+from unmanic.libs import history
 from unmanic.libs.logs import UnmanicLogging
 from unmanic.libs.plugins import PluginsHandler
 
@@ -212,7 +211,7 @@ class FileTesterThread(threading.Thread):
                 self._set_testing_state(False)
                 self.event.wait(2)
                 continue
-            except Exception as e:
+            except Exception:
                 self.logger.exception("Exception in fetching library scan result for path %s:", self.name)
                 self._set_testing_state(False)
                 continue
@@ -242,7 +241,7 @@ class FileTesterThread(threading.Thread):
 
             except UnicodeEncodeError:
                 self.logger.warning("File contains Unicode characters that cannot be processed. Ignoring.")
-            except Exception as e:
+            except Exception:
                 self.logger.exception("Exception testing file path in %s. Ignoring.", self.name)
             finally:
                 self._set_testing_state(False)

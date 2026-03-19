@@ -59,7 +59,7 @@ class PluginSettings(object):
 
     """
     The library ID that we are fetching settings for.
-    
+
     """
     library_id = None
 

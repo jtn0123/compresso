@@ -30,7 +30,6 @@
 
 """
 import json
-import re
 import sys
 import traceback
 from json import JSONDecodeError
@@ -42,7 +41,6 @@ import tornado.web
 import tornado.log
 import tornado.routing
 from marshmallow import Schema, exceptions
-from tornado.ioloop import IOLoop
 
 from tornado.web import RequestHandler
 

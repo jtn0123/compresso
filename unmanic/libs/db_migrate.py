@@ -29,12 +29,11 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
-import importlib
 import inspect
 import os
 import sys
 
-from peewee import Model, SqliteDatabase, Field
+from peewee import SqliteDatabase, Field
 from peewee_migrate import Migrator, Router
 
 from unmanic.libs.logs import UnmanicLogging

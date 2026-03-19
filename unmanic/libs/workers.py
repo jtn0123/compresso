@@ -1020,7 +1020,7 @@ class Worker(threading.Thread):
 
             # Get the final output and the exit status
             if not self.redundant_flag.is_set():
-                communicate = sub_proc.communicate()[0]
+                sub_proc.communicate()
 
             # If the process is still running, kill it
             self.worker_subprocess_monitor.terminate_proc()

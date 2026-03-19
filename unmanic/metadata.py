@@ -45,7 +45,7 @@ def read_version_string(version_type='long'):
         with open(version_file) as json_file:
             data = json.load(json_file)
         return data[version_type]
-    except:
+    except Exception:
         return 'UNKNOWN.VERSION'
 
 

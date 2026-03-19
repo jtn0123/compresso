@@ -43,11 +43,9 @@ from requests_toolbelt import MultipartEncoder
 
 from unmanic import config
 from unmanic.libs import common, session, task
-from unmanic.libs.frontend_push_messages import FrontendPushMessages
 from unmanic.libs.library import Library
 from unmanic.libs.logs import UnmanicLogging
 from unmanic.libs.plugins import PluginsHandler
-from unmanic.libs.session import Session
 from unmanic.libs.singleton import SingletonType
 from unmanic.libs.task import TaskDataStore
 
@@ -1345,7 +1343,7 @@ class RemoteTaskManager(threading.Thread):
         library_id = self.current_task.get_task_library_id()
         try:
             library = Library(library_id)
-        except Exception as e:
+        except Exception:
             self._log("Unable to fetch library config for ID {}".format(library_id), level='exception')
             self.__write_failure_to_worker_log()
             return False

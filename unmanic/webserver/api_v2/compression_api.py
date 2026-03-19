@@ -13,7 +13,6 @@ import tornado.log
 from unmanic.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from unmanic.webserver.api_v2.schema.compression_schemas import (
     RequestCompressionStatsSchema,
-    RequestCompressionSummarySchema,
     CompressionStatsSchema,
     CompressionSummarySchema,
     PendingEstimateSchema,

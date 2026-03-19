@@ -3,23 +3,23 @@
 
 """
     unmanic.history.py
- 
+
     Written by:               Josh.5 <jsunnex@gmail.com>
     Date:                     23 Jun 2019, (10:42 AM)
- 
+
     Copyright:
            Copyright (C) Josh Sunnex - All Rights Reserved
- 
+
            Permission is hereby granted, free of charge, to any person obtaining a copy
            of this software and associated documentation files (the "Software"), to deal
            in the Software without restriction, including without limitation the rights
            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
            copies of the Software, and to permit persons to whom the Software is
            furnished to do so, subject to the following conditions:
-  
+
            The above copyright notice and this permission notice shall be included in all
            copies or substantial portions of the Software.
-  
+
            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
            EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
            MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -30,11 +30,9 @@
 
 """
 
-import os
 import json
 
 from unmanic import config
-from unmanic.libs import common
 from unmanic.libs.logs import UnmanicLogging
 from peewee import fn
 from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, CompressionStats
@@ -222,7 +220,7 @@ class History(object):
             for historic_task_id in query:
                 try:
                     historic_task_id.delete_instance(recursive=True)
-                except Exception as e:
+                except Exception:
                     # Catch delete exceptions
                     self.logger.exception("An error occurred while deleting historic task ID: %s.", historic_task_id)
                     return False

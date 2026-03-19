@@ -30,7 +30,6 @@
 
 """
 import json
-import tornado.log
 
 from unmanic.libs import session
 from unmanic.libs.uiserver import UnmanicDataQueues

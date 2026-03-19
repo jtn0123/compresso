@@ -36,8 +36,7 @@ from unmanic.libs import session
 from unmanic.libs.notifications import Notifications
 from unmanic.libs.uiserver import UnmanicDataQueues
 from unmanic.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from unmanic.webserver.api_v2.schema.schemas import RequestNotificationsDataSchema, RequestTableUpdateByIdList, \
-    RequestTableUpdateByUuidList
+from unmanic.webserver.api_v2.schema.schemas import RequestNotificationsDataSchema, RequestTableUpdateByUuidList
 
 
 class ApiNotificationsHandler(BaseApiHandler):

@@ -372,7 +372,7 @@ class UnmanicFileMetadata:
                 cls._task_cache.pop(task_id, None)
                 return 0
 
-            task_entry = cls._ensure_task_cache_entry(task_id)
+            cls._ensure_task_cache_entry(task_id)
             staged_scoped = cls._normalize_scoped_staged(staged)
             source_staged = staged_scoped.get('source', {})
             destination_staged = staged_scoped.get('destination', {})

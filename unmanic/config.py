@@ -281,7 +281,7 @@ class Config(object, metaclass=SingletonType):
         if save_settings:
             try:
                 self.__write_settings_to_file()
-            except Exception as e:
+            except Exception:
                 logger.exception("Failed to write settings to file: %s", str(self.get_config_as_dict()))
 
     def set_bulk_config_items(self, items, save_settings=True):

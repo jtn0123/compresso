@@ -3,23 +3,23 @@
 
 """
     unmanic.cli.py
- 
+
     Written by:               Josh.5 <jsunnex@gmail.com>
     Date:                     21 Sep 2019, (2:31 PM)
- 
+
     Copyright:
            Copyright (C) Josh Sunnex - All Rights Reserved
- 
+
            Permission is hereby granted, free of charge, to any person obtaining a copy
            of this software and associated documentation files (the "Software"), to deal
            in the Software without restriction, including without limitation the rights
            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
            copies of the Software, and to permit persons to whom the Software is
            furnished to do so, subject to the following conditions:
-  
+
            The above copyright notice and this permission notice shall be included in all
            copies or substantial portions of the Software.
-  
+
            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
            EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
            MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -93,7 +93,7 @@ def ffprobe_file(vid_file_path):
     :param vid_file_path: The absolute (full) path of the video file, string.
     :return:
     """
-    if type(vid_file_path) != str:
+    if not isinstance(vid_file_path, str):
         raise Exception('Give ffprobe a full file path of the video')
 
     params = [

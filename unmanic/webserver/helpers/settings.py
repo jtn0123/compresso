@@ -29,7 +29,6 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
-from unmanic import config
 from unmanic.libs.library import Library
 from unmanic.libs.logs import UnmanicLogging
 from unmanic.libs.unplugins import PluginExecutor
@@ -129,8 +128,8 @@ def save_worker_group_config(data):
     """
     Save a complete worker group configuration
 
-    NOTE: 
-        If the worker group is updated in the future with new options, then be sure to apply the save logic to 
+    NOTE:
+        If the worker group is updated in the future with new options, then be sure to apply the save logic to
         both the create and update methods
 
     :param data:

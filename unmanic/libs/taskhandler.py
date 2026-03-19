@@ -32,7 +32,6 @@
 import os
 import queue
 import threading
-import time
 
 from peewee import OperationalError
 

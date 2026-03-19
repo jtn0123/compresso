@@ -152,7 +152,7 @@ class LibraryScannerManager(threading.Thread):
             no_libraries_configured = False
             try:
                 library = Library(lib_info['id'])
-            except Exception as e:
+            except Exception:
                 self.logger.exception("Unable to fetch library config for ID %s", lib_info['id'])
                 continue
             # Check if the library is configured for remote files only

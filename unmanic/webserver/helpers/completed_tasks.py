@@ -30,10 +30,9 @@
 
 """
 import os
-import time
-from datetime import date, datetime
+from datetime import datetime
 
-from unmanic.libs import common, history, task
+from unmanic.libs import history, task
 from unmanic.libs.unmodels import FileMetadataPaths
 
 
@@ -203,7 +202,6 @@ def add_historic_tasks_to_pending_tasks_list(historic_task_ids, library_id=None)
     # Get total count
     records_by_id = history_logging.get_current_path_of_historic_tasks_by_id(id_list=historic_task_ids)
     for record in records_by_id:
-        record_errors = []
         # Fetch the abspath name
         abspath = os.path.abspath(record.get("abspath"))
 

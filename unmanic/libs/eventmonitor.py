@@ -32,7 +32,6 @@
 import os
 import queue
 import threading
-import time
 
 from unmanic import config
 from unmanic.libs.library import Library
@@ -149,7 +148,7 @@ class EventMonitorManager(threading.Thread):
             for lib_info in Library.get_all_libraries():
                 try:
                     library = Library(lib_info['id'])
-                except Exception as e:
+                except Exception:
                     self.logger.exception("Unable to fetch library config for ID %s", lib_info['id'])
                     continue
                 # Check if the library is configured for remote files only
@@ -202,7 +201,7 @@ class EventMonitorManager(threading.Thread):
                 self.event.wait(.2)
                 try:
                     library = Library(lib_info['id'])
-                except Exception as e:
+                except Exception:
                     self.logger.exception("Unable to fetch library config for ID %s", lib_info['id'])
                     continue
                 # Check if the library is configured for remote files only
@@ -271,7 +270,7 @@ class EventMonitorManager(threading.Thread):
                 self.__add_path_to_queue(pathname, library_id, priority_score)
         except UnicodeEncodeError:
             self.logger.warning("File contains Unicode characters that cannot be processed. Ignoring.")
-        except Exception as e:
+        except Exception:
             self.logger.exception("Exception testing file path in %s. Ignoring.", self.name)
 
     def __add_path_to_queue(self, pathname, library_id, priority_score):

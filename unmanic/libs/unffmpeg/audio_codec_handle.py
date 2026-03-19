@@ -99,7 +99,7 @@ class AudioCodecHandle(object):
         try:
             audio_tag = ''.join([i for i in stream['tags']['title'] if not i.isdigit()]).rstrip(
                 '.') + 'Stereo'
-        except:
+        except Exception:
             audio_tag = 'Stereo'
 
         # Map a duplicated stream

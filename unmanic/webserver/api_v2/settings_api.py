@@ -45,7 +45,6 @@ from unmanic.webserver.api_v2.schema.schemas import RequestDatabaseItemByIdSchem
     SettingsRemoteInstallationDataSchema, \
     SettingsRemoteInstallationLinkConfigSchema, SettingsSystemConfigSchema, \
     RequestSettingsRemoteInstallationAddressValidationSchema, SettingsWorkerGroupConfigSchema, WorkerGroupsListSchema
-from unmanic.webserver.helpers import plugins
 
 
 class ApiSettingsHandler(BaseApiHandler):

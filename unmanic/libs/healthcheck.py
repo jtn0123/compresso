@@ -106,7 +106,7 @@ class HealthCheckManager:
                 return False, '; '.join(error_lines[:5])
 
             if stderr:
-                error_lines = [l for l in stderr.split('\n') if l.strip()]
+                error_lines = [line for line in stderr.split('\n') if line.strip()]
                 error_count = len(error_lines)
                 if error_count > 10:
                     return False, "Decode produced {} errors: {}".format(error_count, '; '.join(error_lines[:3]))

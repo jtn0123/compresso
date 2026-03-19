@@ -30,7 +30,6 @@
 
 """
 
-import tornado.log
 from tornado.ioloop import IOLoop
 
 from unmanic.libs import session

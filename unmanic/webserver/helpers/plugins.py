@@ -437,7 +437,6 @@ def update_plugin_settings(plugin_id, settings, library_id=None):
     settings_to_save = {}
     for s in settings:
         key = s.get('key')
-        key_id = s.get('key_id')
         input_type = s.get('input_type')
 
         # Skip section headers

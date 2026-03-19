@@ -36,7 +36,7 @@ import queue
 import time
 from datetime import datetime, timedelta
 
-from unmanic.libs import common, installation_link
+from unmanic.libs import installation_link
 from unmanic.libs.frontend_push_messages import FrontendPushMessages
 from unmanic.libs.library import Library
 from unmanic.libs.logs import UnmanicLogging
@@ -110,7 +110,7 @@ class Foreman(threading.Thread):
         for library in Library.get_all_libraries():
             try:
                 library_config = Library(library.get('id'))
-            except Exception as e:
+            except Exception:
                 self.logger.exception('Unable to fetch library config for ID', library.get('id'))
                 continue
             # Get list of enabled plugins with their settings

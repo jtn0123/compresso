@@ -822,7 +822,7 @@ class UnmanicLogging:
             if self._configured:
                 return
             # Get logger for this class
-            init_logger = logging.getLogger(f"Unmanic.UnmanicLogging")
+            init_logger = logging.getLogger("Unmanic.UnmanicLogging")
 
             # Default formatter
             formatter = logging.Formatter(
