@@ -15,7 +15,7 @@ import os
 import pytest
 import tempfile
 
-from unmanic.libs.unmodels.lib import Database
+from compresso.libs.unmodels.lib import Database
 
 
 class TestPaywallRemoval(object):
@@ -34,7 +34,7 @@ class TestPaywallRemoval(object):
         Creates an in-memory SQLite database and the tables required
         by the classes under test.
         """
-        config_path = tempfile.mkdtemp(prefix='unmanic_tests_')
+        config_path = tempfile.mkdtemp(prefix='compresso_tests_')
 
         app_dir = os.path.dirname(os.path.abspath(__file__))
         database_settings = {
@@ -44,7 +44,7 @@ class TestPaywallRemoval(object):
         }
         self.db_connection = Database.select_database(database_settings)
 
-        from unmanic.libs.unmodels import (
+        from compresso.libs.unmodels import (
             CompletedTasks, Installation, Libraries, Tags,
             Plugins, EnabledPlugins, LibraryPluginFlow,
         )
@@ -53,12 +53,12 @@ class TestPaywallRemoval(object):
             Plugins, EnabledPlugins, LibraryPluginFlow,
         ])
 
-        from unmanic import config
+        from compresso import config
         self.settings = config.Config(config_path=config_path)
 
         # Clear Session singleton so it picks up our in-memory DB
-        from unmanic.libs.singleton import SingletonType
-        from unmanic.libs.session import Session
+        from compresso.libs.singleton import SingletonType
+        from compresso.libs.session import Session
         SingletonType._instances.pop(Session, None)
 
     def teardown_class(self):
@@ -71,7 +71,7 @@ class TestPaywallRemoval(object):
     @pytest.mark.unittest
     def test_library_within_library_count_limits_returns_true(self):
         """Library.within_library_count_limits() must always return True."""
-        from unmanic.libs.library import Library
+        from compresso.libs.library import Library
         assert Library.within_library_count_limits() is True
 
     # ------------------------------------------------------------------
@@ -81,9 +81,9 @@ class TestPaywallRemoval(object):
     @pytest.mark.unittest
     def test_links_within_enabled_link_limits_returns_true(self):
         """Links.within_enabled_link_limits() must always return True."""
-        from unmanic.libs.installation_link import Links
+        from compresso.libs.installation_link import Links
         # Clear any singleton cache so we get a fresh Links instance
-        from unmanic.libs.singleton import SingletonType
+        from compresso.libs.singleton import SingletonType
         SingletonType._instances.pop(Links, None)
 
         links = Links()
@@ -96,27 +96,27 @@ class TestPaywallRemoval(object):
     @pytest.mark.unittest
     def test_session_level_is_100(self):
         """Session.level should be 100, meaning all features unlocked."""
-        from unmanic.libs.session import Session
+        from compresso.libs.session import Session
         assert Session.level == 100
 
     @pytest.mark.unittest
     def test_session_instance_supporter_level_is_100(self):
         """An instantiated Session should report supporter level 100."""
-        from unmanic.libs.session import Session
+        from compresso.libs.session import Session
         s = Session()
         assert s.get_supporter_level() == 100
 
     @pytest.mark.unittest
     def test_session_library_count_is_high(self):
         """Session.library_count should be effectively unlimited."""
-        from unmanic.libs.session import Session
+        from compresso.libs.session import Session
         s = Session()
         assert s.library_count >= 999
 
     @pytest.mark.unittest
     def test_session_link_count_is_high(self):
         """Session.link_count should be effectively unlimited."""
-        from unmanic.libs.session import Session
+        from compresso.libs.session import Session
         s = Session()
         assert s.link_count >= 999
 
@@ -136,7 +136,7 @@ class TestPaywallRemoval(object):
         get_supporter_level() is not called to block settings.
         """
         import inspect
-        from unmanic.libs.unplugins.executor import PluginExecutor
+        from compresso.libs.unplugins.executor import PluginExecutor
 
         source = inspect.getsource(PluginExecutor.save_plugin_settings)
         # The old paywall code called get_supporter_level() and compared

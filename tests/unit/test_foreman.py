@@ -4,7 +4,7 @@
 """
     tests.unit.test_foreman.py
 
-    Unit tests for bug fixes in unmanic.libs.foreman.Foreman.
+    Unit tests for bug fixes in compresso.libs.foreman.Foreman.
 """
 
 import pytest
@@ -13,12 +13,12 @@ from unittest.mock import patch, MagicMock
 
 def _make_foreman():
     """Create a Foreman instance with mocked dependencies."""
-    with patch('unmanic.libs.foreman.WorkerGroup'), \
-         patch('unmanic.libs.foreman.installation_link'), \
-         patch('unmanic.libs.foreman.PluginsHandler'), \
-         patch('unmanic.libs.foreman.UnmanicLogging'), \
-         patch('unmanic.libs.foreman.Foreman.configuration_changed', return_value=False):
-        from unmanic.libs.foreman import Foreman
+    with patch('compresso.libs.foreman.WorkerGroup'), \
+         patch('compresso.libs.foreman.installation_link'), \
+         patch('compresso.libs.foreman.PluginsHandler'), \
+         patch('compresso.libs.foreman.CompressoLogging'), \
+         patch('compresso.libs.foreman.Foreman.configuration_changed', return_value=False):
+        from compresso.libs.foreman import Foreman
         settings = MagicMock()
         settings.get_remote_installations.return_value = []
         data_queues = {}
@@ -80,7 +80,7 @@ class TestFetchAvailableRemoteInstallation:
 @pytest.mark.unittest
 class TestInitRemoteTaskManagerThread:
 
-    @patch('unmanic.libs.foreman.installation_link')
+    @patch('compresso.libs.foreman.installation_link')
     def test_returns_false_when_no_remote_available(self, mock_link):
         """Bug 1.1: should not KeyError when no remote is available."""
         foreman = _make_foreman()
@@ -88,7 +88,7 @@ class TestInitRemoteTaskManagerThread:
         result = foreman.init_remote_task_manager_thread()
         assert result is False
 
-    @patch('unmanic.libs.foreman.installation_link')
+    @patch('compresso.libs.foreman.installation_link')
     def test_removes_installation_from_available_after_init(self, mock_link):
         mock_thread = MagicMock()
         mock_link.RemoteTaskManager.return_value = mock_thread
@@ -154,8 +154,8 @@ class TestTerminateUnlinkedRemoteTaskManagerThreads:
 @pytest.mark.unittest
 class TestManageEventSchedules:
 
-    @patch('unmanic.libs.foreman.WorkerGroup')
-    @patch('unmanic.libs.foreman.datetime')
+    @patch('compresso.libs.foreman.WorkerGroup')
+    @patch('compresso.libs.foreman.datetime')
     def test_no_double_today_call(self, mock_datetime, mock_wg):
         """Bug 1.3: datetime.today() should be called once, not chained."""
         mock_today = MagicMock()

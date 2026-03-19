@@ -3,15 +3,15 @@
 #
 # This compose file is only good for automated testing.
 #
-# docker compose -f ./docker/docker-compose-test.yml exec --workdir=/app unmanic-testenv pytest --log-cli-level=INFO
+# docker compose -f ./docker/docker-compose-test.yml exec --workdir=/app compresso-testenv pytest --log-cli-level=INFO
 #
 
 version: "2"
 
 services:
-  unmanic-testenv:
-    container_name: unmanic-testenv
-    image: josh5/unmanic:latest
+  compresso-testenv:
+    container_name: compresso-testenv
+    image: jtn0123/compresso:latest
     ports:
       - 8888:8888
     # user: "1000:1000"
@@ -25,7 +25,7 @@ services:
       - RUN_FULL_SCAN_ON_START=false
       - TZ=Pacific/Auckland
     volumes:
-      - ../tests/tmp/cache:/tmp/unmanic
+      - ../tests/tmp/cache:/tmp/compresso
       - ../tests/tmp/library:/library
       - ../tests:/app/tests
       - ../:/app

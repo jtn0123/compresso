@@ -33,9 +33,9 @@ class TestPreviewManager(object):
         Initialise a Config so that PreviewManager.__init__ can call
         config.Config().
         """
-        config_path = tempfile.mkdtemp(prefix='unmanic_tests_')
+        config_path = tempfile.mkdtemp(prefix='compresso_tests_')
 
-        from unmanic import config
+        from compresso import config
         self.settings = config.Config(config_path=config_path)
 
     def teardown_class(self):
@@ -43,7 +43,7 @@ class TestPreviewManager(object):
 
     def _make_manager(self):
         """Create a fresh PreviewManager and reset its class-level state."""
-        from unmanic.libs.preview import PreviewManager
+        from compresso.libs.preview import PreviewManager
         mgr = PreviewManager()
         # Reset shared state between tests
         mgr._jobs = {}
@@ -115,7 +115,7 @@ class TestPreviewManager(object):
 
         try:
             # Patch threading.Thread so we don't actually spawn ffmpeg
-            with patch('unmanic.libs.preview.threading.Thread') as mock_thread:
+            with patch('compresso.libs.preview.threading.Thread') as mock_thread:
                 mock_thread_instance = MagicMock()
                 mock_thread.return_value = mock_thread_instance
 
@@ -136,7 +136,7 @@ class TestPreviewManager(object):
     @pytest.mark.unittest
     def test_max_duration_constant_is_30(self):
         """PreviewManager.MAX_DURATION should be 30."""
-        from unmanic.libs.preview import PreviewManager
+        from compresso.libs.preview import PreviewManager
         assert PreviewManager.MAX_DURATION == 30
 
     # ------------------------------------------------------------------
@@ -280,7 +280,7 @@ class TestPreviewManager(object):
     # ------------------------------------------------------------------
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_get_video_codec_success(self, mock_run):
         """_get_video_codec returns codec name on success."""
         mock_run.return_value = MagicMock(returncode=0, stdout='hevc\n')
@@ -289,7 +289,7 @@ class TestPreviewManager(object):
         assert result == 'hevc'
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_get_video_codec_failure(self, mock_run):
         """_get_video_codec returns empty string on failure."""
         mock_run.side_effect = OSError("ffprobe not found")
@@ -302,7 +302,7 @@ class TestPreviewManager(object):
     # ------------------------------------------------------------------
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.plugins.PluginsHandler')
+    @patch('compresso.libs.plugins.PluginsHandler')
     def test_run_plugin_pipeline_no_plugins_returns_false(self, mock_ph_class):
         """Empty plugin list returns False."""
         mock_ph = MagicMock()
@@ -313,8 +313,8 @@ class TestPreviewManager(object):
         assert result is False
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
-    @patch('unmanic.libs.plugins.PluginsHandler')
+    @patch('compresso.libs.preview.subprocess.run')
+    @patch('compresso.libs.plugins.PluginsHandler')
     def test_run_plugin_pipeline_success(self, mock_ph_class, mock_run):
         """Plugin sets exec_command, subprocess runs, returns True."""
         import shutil as _shutil
@@ -365,10 +365,10 @@ class TestPreviewManager(object):
     # ------------------------------------------------------------------
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.PreviewManager.compute_quality_metrics')
-    @patch('unmanic.libs.preview.PreviewManager._get_video_codec')
-    @patch('unmanic.libs.preview.PreviewManager._run_plugin_pipeline')
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.PreviewManager.compute_quality_metrics')
+    @patch('compresso.libs.preview.PreviewManager._get_video_codec')
+    @patch('compresso.libs.preview.PreviewManager._run_plugin_pipeline')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_generate_preview_falls_back_on_pipeline_failure(
         self, mock_run, mock_pipeline, mock_codec, mock_metrics
     ):
@@ -385,7 +385,7 @@ class TestPreviewManager(object):
             tmp_path = f.name
 
         try:
-            with patch('unmanic.libs.preview.threading.Thread') as mock_thread:
+            with patch('compresso.libs.preview.threading.Thread') as mock_thread:
                 mock_thread_instance = MagicMock()
                 mock_thread.return_value = mock_thread_instance
 
@@ -421,10 +421,10 @@ class TestPreviewManager(object):
             os.unlink(tmp_path)
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.PreviewManager.compute_quality_metrics')
-    @patch('unmanic.libs.preview.PreviewManager._get_video_codec')
-    @patch('unmanic.libs.preview.PreviewManager._run_plugin_pipeline')
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.PreviewManager.compute_quality_metrics')
+    @patch('compresso.libs.preview.PreviewManager._get_video_codec')
+    @patch('compresso.libs.preview.PreviewManager._run_plugin_pipeline')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_generate_preview_uses_pipeline_when_available(
         self, mock_run, mock_pipeline, mock_codec, mock_metrics
     ):
@@ -440,7 +440,7 @@ class TestPreviewManager(object):
             tmp_path = f.name
 
         try:
-            with patch('unmanic.libs.preview.threading.Thread') as mock_thread:
+            with patch('compresso.libs.preview.threading.Thread') as mock_thread:
                 mock_thread_instance = MagicMock()
                 mock_thread.return_value = mock_thread_instance
 
@@ -481,15 +481,15 @@ class TestPreviewQualityMetrics(object):
     """
 
     def setup_class(self):
-        config_path = tempfile.mkdtemp(prefix='unmanic_tests_quality_')
-        from unmanic import config
+        config_path = tempfile.mkdtemp(prefix='compresso_tests_quality_')
+        from compresso import config
         self.settings = config.Config(config_path=config_path)
 
     def teardown_class(self):
         pass
 
     def _make_manager(self):
-        from unmanic.libs.preview import PreviewManager
+        from compresso.libs.preview import PreviewManager
         mgr = PreviewManager()
         mgr._jobs = {}
         mgr._current_job = None
@@ -500,7 +500,7 @@ class TestPreviewQualityMetrics(object):
     # ------------------------------------------------------------------
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_ssim_only_vmaf_fails(self, mock_run):
         """SSIM succeeds, VMAF raises → ssim_score set, vmaf_score None."""
         ssim_result = MagicMock(returncode=0, stderr='[Parsed_ssim_0] SSIM All:0.9812 (17.26)')
@@ -512,7 +512,7 @@ class TestPreviewQualityMetrics(object):
         assert vmaf is None
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_vmaf_only_ssim_fails(self, mock_run):
         """SSIM raises, VMAF succeeds → vmaf_score set, ssim_score None."""
         vmaf_result = MagicMock(returncode=0, stderr='VMAF score: 95.32')
@@ -524,7 +524,7 @@ class TestPreviewQualityMetrics(object):
         assert ssim is None
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_both_succeed(self, mock_run):
         """Both SSIM and VMAF succeed → both scores set."""
         ssim_result = MagicMock(returncode=0, stderr='All:0.9500 (13.01)')
@@ -537,7 +537,7 @@ class TestPreviewQualityMetrics(object):
         assert vmaf == pytest.approx(88.50)
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_alternate_vmaf_pattern(self, mock_run):
         """Alternate vmaf_score pattern is parsed."""
         ssim_result = MagicMock(returncode=0, stderr='no ssim match here')
@@ -550,7 +550,7 @@ class TestPreviewQualityMetrics(object):
         assert ssim is None
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_both_fail(self, mock_run):
         """Both raise OSError → (None, None)."""
         mock_run.side_effect = [OSError("ssim fail"), OSError("vmaf fail")]
@@ -561,7 +561,7 @@ class TestPreviewQualityMetrics(object):
         assert ssim is None
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_ssim_success_no_regex_match(self, mock_run):
         """SSIM returncode=0 but no regex match → ssim_score is None."""
         ssim_result = MagicMock(returncode=0, stderr='no useful output')
@@ -574,7 +574,7 @@ class TestPreviewQualityMetrics(object):
         assert vmaf is None
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_vmaf_success_no_regex_match(self, mock_run):
         """VMAF returncode=0 but no regex match → vmaf_score is None."""
         ssim_result = MagicMock(returncode=0, stderr='All:0.9700')
@@ -610,7 +610,7 @@ class TestPreviewQualityMetrics(object):
         assert result['ssim_score'] == 0.9812
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_ssim_command_uses_stream_mapping(self, mock_run):
         """SSIM ffmpeg command includes [0:v][1:v]ssim filter."""
         ssim_result = MagicMock(returncode=0, stderr='All:0.9500')
@@ -625,7 +625,7 @@ class TestPreviewQualityMetrics(object):
         assert '[0:v][1:v]ssim' in ssim_call_args[lavfi_idx + 1]
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_vmaf_command_uses_stream_mapping(self, mock_run):
         """VMAF ffmpeg command includes [0:v][1:v]libvmaf filter."""
         ssim_result = MagicMock(returncode=0, stderr='All:0.9500')
@@ -640,7 +640,7 @@ class TestPreviewQualityMetrics(object):
         assert '[0:v][1:v]libvmaf' in vmaf_call_args[lavfi_idx + 1]
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_integer_ssim_score_parsed(self, mock_run):
         """Integer SSIM score 'All:1' → ssim_score=1.0."""
         ssim_result = MagicMock(returncode=0, stderr='All:1')
@@ -652,7 +652,7 @@ class TestPreviewQualityMetrics(object):
         assert ssim == pytest.approx(1.0)
 
     @pytest.mark.unittest
-    @patch('unmanic.libs.preview.subprocess.run')
+    @patch('compresso.libs.preview.subprocess.run')
     def test_integer_vmaf_score_parsed(self, mock_run):
         """Integer VMAF score 'VMAF score: 100' → vmaf_score=100.0."""
         ssim_result = MagicMock(returncode=0, stderr='no match')
@@ -722,12 +722,12 @@ class TestPreviewJobTimeout(object):
     """Tests for preview job timeout (Phase 3B)."""
 
     def setup_class(self):
-        config_path = tempfile.mkdtemp(prefix='unmanic_tests_timeout_')
-        from unmanic import config
+        config_path = tempfile.mkdtemp(prefix='compresso_tests_timeout_')
+        from compresso import config
         self.settings = config.Config(config_path=config_path)
 
     def _make_manager(self):
-        from unmanic.libs.preview import PreviewManager
+        from compresso.libs.preview import PreviewManager
         mgr = PreviewManager()
         mgr._jobs = {}
         mgr._current_job = None
@@ -735,7 +735,7 @@ class TestPreviewJobTimeout(object):
 
     @pytest.mark.unittest
     def test_max_job_timeout_constant(self):
-        from unmanic.libs.preview import PreviewManager
+        from compresso.libs.preview import PreviewManager
         assert PreviewManager.MAX_JOB_TIMEOUT == 600
 
     @pytest.mark.unittest

@@ -59,7 +59,7 @@ if [[ -f /config/startup.sh ]]; then
     source /config/startup.sh
 fi
 
-for plugin_script in /config/.unmanic/plugins/*/init.d/*.sh; do
+for plugin_script in /config/.compresso/plugins/*/init.d/*.sh; do
 
     if [[ -e "${plugin_script}" ]]; then
 

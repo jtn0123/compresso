@@ -4,7 +4,7 @@
 """
     tests.unit.test_common.py
 
-    Unit tests for unmanic.libs.common utility functions.
+    Unit tests for compresso.libs.common utility functions.
 """
 
 import json
@@ -12,7 +12,7 @@ import os
 import pytest
 from unittest.mock import patch
 
-from unmanic.libs import common
+from compresso.libs import common
 
 
 @pytest.mark.unittest

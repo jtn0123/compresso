@@ -17,7 +17,7 @@ import os
 import tempfile
 import pytest
 
-from unmanic.libs.unmodels.lib import Database
+from compresso.libs.unmodels.lib import Database
 
 
 @pytest.mark.unittest
@@ -30,7 +30,7 @@ class TestCompressionDistributions(object):
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='unmanic_tests_dist_')
+        self.config_path = tempfile.mkdtemp(prefix='compresso_tests_dist_')
         self.db_file = os.path.join(self.config_path, 'test_distributions.db')
         database_settings = {
             "TYPE": "SQLITE",
@@ -39,25 +39,25 @@ class TestCompressionDistributions(object):
         }
         self.db_connection = Database.select_database(database_settings)
 
-        from unmanic.libs.unmodels import CompletedTasks
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         self.db_connection.create_tables([CompletedTasks, CompressionStats])
         self.db_connection.execute_sql('SELECT 1')
 
-        from unmanic import config
+        from compresso import config
         self.settings = config.Config(config_path=self.config_path)
 
     def teardown_class(self):
         pass
 
     def setup_method(self):
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
     def _create_completed_task(self, label='test_file.mkv', finish_time=None):
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels import CompletedTasks
         return CompletedTasks.create(
             task_label=label,
             abspath='/media/' + label,
@@ -71,7 +71,7 @@ class TestCompressionDistributions(object):
                       source_codec='hevc', dest_codec='h264',
                       resolution='1920x1080', library_id=1,
                       source_container='', destination_container=''):
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         return CompressionStats.create(
             completedtask=task,
             source_size=source_size,
@@ -89,7 +89,7 @@ class TestCompressionDistributions(object):
     # ------------------------------------------------------------------
 
     def test_source_codecs_grouped_correctly(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='c1.mkv')
         t2 = self._create_completed_task(label='c2.mkv')
         t3 = self._create_completed_task(label='c3.mkv')
@@ -104,7 +104,7 @@ class TestCompressionDistributions(object):
         assert source['h264'] == 1
 
     def test_destination_codecs_grouped_correctly(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='d1.mkv')
         t2 = self._create_completed_task(label='d2.mkv')
         t3 = self._create_completed_task(label='d3.mkv')
@@ -119,7 +119,7 @@ class TestCompressionDistributions(object):
         assert dest['hevc'] == 1
 
     def test_codec_distribution_library_filter(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='cf1.mkv')
         t2 = self._create_completed_task(label='cf2.mkv')
         self._create_stats(t1, source_codec='hevc', library_id=1)
@@ -132,7 +132,7 @@ class TestCompressionDistributions(object):
         assert 'h264' not in codecs
 
     def test_empty_codecs_excluded(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='ec.mkv')
         self._create_stats(t1, source_codec='', dest_codec='h264')
 
@@ -146,7 +146,7 @@ class TestCompressionDistributions(object):
     # ------------------------------------------------------------------
 
     def test_resolution_groups_correctly(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='r1.mkv')
         t2 = self._create_completed_task(label='r2.mkv')
         t3 = self._create_completed_task(label='r3.mkv')
@@ -161,7 +161,7 @@ class TestCompressionDistributions(object):
         assert res_map['3840x2160'] == 1
 
     def test_resolution_library_filter(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='rf1.mkv')
         t2 = self._create_completed_task(label='rf2.mkv')
         self._create_stats(t1, resolution='1920x1080', library_id=1)
@@ -173,7 +173,7 @@ class TestCompressionDistributions(object):
         assert result[0]['resolution'] == '1920x1080'
 
     def test_empty_resolutions_excluded(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='er.mkv')
         self._create_stats(t1, resolution='')
 
@@ -186,7 +186,7 @@ class TestCompressionDistributions(object):
     # ------------------------------------------------------------------
 
     def test_source_containers_grouped_correctly(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='sc1.mkv')
         t2 = self._create_completed_task(label='sc2.mkv')
         t3 = self._create_completed_task(label='sc3.mkv')
@@ -201,7 +201,7 @@ class TestCompressionDistributions(object):
         assert src['avi'] == 1
 
     def test_destination_containers_grouped_correctly(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='dc1.mkv')
         t2 = self._create_completed_task(label='dc2.mkv')
         t3 = self._create_completed_task(label='dc3.mkv')
@@ -216,7 +216,7 @@ class TestCompressionDistributions(object):
         assert dest['mkv'] == 1
 
     def test_container_distribution_library_filter(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='clf1.mkv')
         t2 = self._create_completed_task(label='clf2.mkv')
         self._create_stats(t1, source_container='mkv', library_id=1)
@@ -229,7 +229,7 @@ class TestCompressionDistributions(object):
         assert 'avi' not in containers
 
     def test_empty_containers_excluded(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         t1 = self._create_completed_task(label='ec2.mkv')
         self._create_stats(t1, source_container='', destination_container='')
 
@@ -243,7 +243,7 @@ class TestCompressionDistributions(object):
     # ------------------------------------------------------------------
 
     def test_space_saved_day_interval(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         day1 = datetime.datetime(2024, 1, 15, 10, 0, 0)
         day2 = datetime.datetime(2024, 1, 16, 14, 0, 0)
 
@@ -260,7 +260,7 @@ class TestCompressionDistributions(object):
         assert '2024-01-16' in dates
 
     def test_space_saved_week_interval(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         # Week 2 and Week 4 of 2024
         week2 = datetime.datetime(2024, 1, 10, 10, 0, 0)
         week4 = datetime.datetime(2024, 1, 24, 14, 0, 0)
@@ -278,7 +278,7 @@ class TestCompressionDistributions(object):
             assert r['date'].startswith('2024-W')
 
     def test_space_saved_month_interval(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         jan = datetime.datetime(2024, 1, 15, 10, 0, 0)
         feb = datetime.datetime(2024, 2, 15, 14, 0, 0)
 
@@ -295,7 +295,7 @@ class TestCompressionDistributions(object):
         assert '2024-02' in dates
 
     def test_space_saved_library_filter(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         day = datetime.datetime(2024, 1, 15, 10, 0, 0)
 
         t1 = self._create_completed_task(label='lib1.mkv', finish_time=day)
@@ -313,7 +313,7 @@ class TestCompressionDistributions(object):
     # ------------------------------------------------------------------
 
     def test_container_fields_saved_correctly(self):
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         t1 = self._create_completed_task(label='cont.mkv')
         self._create_stats(t1, source_container='mkv', destination_container='mp4')
 

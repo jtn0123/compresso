@@ -29,7 +29,7 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
         if self.handler_class is None:
             return
         # Reset the rate limiter singleton between tests
-        import unmanic.webserver.api_v2.rate_limiter as rl_module
+        import compresso.webserver.api_v2.rate_limiter as rl_module
         rl_module._rate_limiter = None
         super().setUp()
 
@@ -45,7 +45,7 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
         if self.handler_class is None:
             raise NotImplementedError("Subclass must set handler_class")
         return tornado.web.Application([
-            (r"/unmanic/api/v2/(.*)", self.handler_class),
+            (r"/compresso/api/v2/(.*)", self.handler_class),
         ])
 
     def post_json(self, path, body=None):
@@ -53,7 +53,7 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
         if body is None:
             body = {}
         response = self.fetch(
-            '/unmanic/api/v2' + path,
+            '/compresso/api/v2' + path,
             method='POST',
             body=json.dumps(body),
             headers={'Content-Type': 'application/json'},
@@ -62,7 +62,7 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
 
     def get_json(self, path):
         """GET from the API and return the response."""
-        response = self.fetch('/unmanic/api/v2' + path, method='GET')
+        response = self.fetch('/compresso/api/v2' + path, method='GET')
         return response
 
     def parse_response(self, response):

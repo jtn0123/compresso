@@ -49,5 +49,5 @@ class TestSwaggerSpecGeneration:
 
     def test_schema_modules_importable(self):
         """Verify our schema modules can be imported."""
-        from unmanic.webserver.api_v2.schema import schemas
+        from compresso.webserver.api_v2.schema import schemas
         assert hasattr(schemas, 'RequestTableDataSchema')

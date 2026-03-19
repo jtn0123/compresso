@@ -49,7 +49,7 @@ jobs:
           close-issue-message: >
             This issue was related to documentation and not the core Unmanic project.
             Please open issues against the documentation repo at
-            https://github.com/Unmanic/unmanic-documentation and not against one of the core projects.
+            https://github.com/jtn0123/compresso and not against one of the core projects.
           days-before-stale: 0
           days-before-close: 0
           only-issue-labels: "invalid:documentation"

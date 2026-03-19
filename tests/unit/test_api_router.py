@@ -9,7 +9,7 @@ import tornado.testing
 import tornado.web
 from unittest.mock import MagicMock, patch
 
-from unmanic.webserver.api_request_router import APIRequestRouter
+from compresso.webserver.api_request_router import APIRequestRouter
 
 
 class ApiRouterTestBase(tornado.testing.AsyncHTTPTestCase):
@@ -22,7 +22,7 @@ class ApiRouterTestBase(tornado.testing.AsyncHTTPTestCase):
         app = tornado.web.Application([])
         app.add_handlers(r'.*', [
             (
-                tornado.routing.PathMatches(r"/unmanic/api/.*"),
+                tornado.routing.PathMatches(r"/compresso/api/.*"),
                 APIRequestRouter(app),
             ),
         ])
@@ -36,14 +36,14 @@ class ApiRouterTestBase(tornado.testing.AsyncHTTPTestCase):
 class TestApiRouter(ApiRouterTestBase):
     __test__ = True
 
-    @patch('unmanic.libs.session.Session')
+    @patch('compresso.libs.session.Session')
     def test_version_route_resolves_through_router(self, _mock_session):
-        response = self.fetch('/unmanic/api/v2/version/read', method='GET')
+        response = self.fetch('/compresso/api/v2/version/read', method='GET')
         assert response.code == 200
         data = self.parse_response(response)
         assert 'version' in data
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_startup_readiness')
+    @patch('compresso.webserver.helpers.healthcheck.get_startup_readiness')
     def test_readiness_route_resolves_through_router(self, mock_readiness):
         mock_readiness.return_value = {
             'ready': True,
@@ -58,15 +58,15 @@ class TestApiRouter(ApiRouterTestBase):
             'errors': [],
         }
 
-        response = self.fetch('/unmanic/api/v2/healthcheck/readiness', method='GET')
+        response = self.fetch('/compresso/api/v2/healthcheck/readiness', method='GET')
         assert response.code == 200
         data = self.parse_response(response)
         assert data['ready'] is True
 
-    @patch('unmanic.webserver.api_v2.history_api.completed_tasks.prepare_filtered_completed_tasks')
-    @patch('unmanic.webserver.api_v2.history_api.session.Session')
-    @patch('unmanic.webserver.api_v2.history_api.config.Config')
-    @patch('unmanic.webserver.api_v2.history_api.UnmanicDataQueues')
+    @patch('compresso.webserver.api_v2.history_api.completed_tasks.prepare_filtered_completed_tasks')
+    @patch('compresso.webserver.api_v2.history_api.session.Session')
+    @patch('compresso.webserver.api_v2.history_api.config.Config')
+    @patch('compresso.webserver.api_v2.history_api.CompressoDataQueues')
     def test_history_route_resolves_through_router(
             self,
             mock_data_queues,
@@ -74,7 +74,7 @@ class TestApiRouter(ApiRouterTestBase):
             _mock_session,
             mock_prepare,
     ):
-        mock_data_queues.return_value.get_unmanic_data_queues.return_value = {}
+        mock_data_queues.return_value.get_compresso_data_queues.return_value = {}
         mock_config.return_value = MagicMock()
         mock_prepare.return_value = {
             'recordsTotal': 1,
@@ -87,7 +87,7 @@ class TestApiRouter(ApiRouterTestBase):
         }
 
         response = self.fetch(
-            '/unmanic/api/v2/history/tasks',
+            '/compresso/api/v2/history/tasks',
             method='POST',
             body=json.dumps({'start': 0, 'length': 10}),
             headers={'Content-Type': 'application/json'},
@@ -99,5 +99,5 @@ class TestApiRouter(ApiRouterTestBase):
         assert len(data['results']) == 1
 
     def test_unknown_route_returns_404(self):
-        response = self.fetch('/unmanic/api/v2/does-not-exist/foo', method='GET')
+        response = self.fetch('/compresso/api/v2/does-not-exist/foo', method='GET')
         assert response.code == 404

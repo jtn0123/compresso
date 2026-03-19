@@ -17,7 +17,7 @@ import pytest
 class TestForwardJSONFormatter:
 
     def test_formats_as_valid_json(self):
-        from unmanic.libs.logs import ForwardJSONFormatter
+        from compresso.libs.logs import ForwardJSONFormatter
         formatter = ForwardJSONFormatter()
         record = logging.LogRecord(
             name='test', level=logging.INFO, pathname='test.py',
@@ -28,7 +28,7 @@ class TestForwardJSONFormatter:
         assert 'message' in parsed or 'msg' in parsed or 'test' in output.lower() or isinstance(parsed, dict)
 
     def test_includes_extra_fields_at_debug_level(self):
-        from unmanic.libs.logs import ForwardJSONFormatter
+        from compresso.libs.logs import ForwardJSONFormatter
         formatter = ForwardJSONFormatter()
         record = logging.LogRecord(
             name='test', level=logging.DEBUG, pathname='test.py',
@@ -45,29 +45,29 @@ class TestForwardJSONFormatter:
 class TestCustomLogLevels:
 
     def test_metric_level_exists(self):
-        from unmanic.libs.logs import UnmanicLogging
-        assert UnmanicLogging.METRIC == 9
+        from compresso.libs.logs import CompressoLogging
+        assert CompressoLogging.METRIC == 9
         # Ensure the level name is registered
         assert logging.getLevelName(9) == 'METRIC'
 
     def test_data_level_exists(self):
-        from unmanic.libs.logs import UnmanicLogging
-        assert UnmanicLogging.DATA == 8
+        from compresso.libs.logs import CompressoLogging
+        assert CompressoLogging.DATA == 8
         assert logging.getLevelName(8) == 'DATA'
 
 
 @pytest.mark.unittest
-class TestUnmanicLogging:
+class TestCompressoLogging:
 
     def test_get_logger_returns_logger(self):
-        from unmanic.libs.logs import UnmanicLogging
-        logger = UnmanicLogging.get_logger(name='test_module')
+        from compresso.libs.logs import CompressoLogging
+        logger = CompressoLogging.get_logger(name='test_module')
         assert logger is not None
         assert hasattr(logger, 'info')
         assert hasattr(logger, 'debug')
 
     def test_get_logger_same_name_returns_same_logger(self):
-        from unmanic.libs.logs import UnmanicLogging
-        logger1 = UnmanicLogging.get_logger(name='same_name_test')
-        logger2 = UnmanicLogging.get_logger(name='same_name_test')
+        from compresso.libs.logs import CompressoLogging
+        logger1 = CompressoLogging.get_logger(name='same_name_test')
+        logger2 = CompressoLogging.get_logger(name='same_name_test')
         assert logger1 is logger2

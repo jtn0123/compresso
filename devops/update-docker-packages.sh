@@ -4,12 +4,12 @@ __script_path=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd );
 __project_root=$(realpath ${__script_path}/..);
 
 function docker_env {
-    docker pull josh5/unmanic:latest
+    docker pull jtn0123/compresso:latest
     docker run --rm -ti \
         --workdir=/app \
         --entrypoint='' \
         -v "${__project_root}/":"/app/" \
-        josh5/unmanic:latest \
+        jtn0123/compresso:latest \
         ./devops/update-docker-packages.sh --print
 }
 

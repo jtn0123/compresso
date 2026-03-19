@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    unmanic.setup.py
+    compresso.setup.py
  
     Written by:               Josh.5 <jsunnex@gmail.com>
     Date:                     04 May 2020, (10:47 AM)
@@ -47,7 +47,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 import versioninfo
 
 project_root_dir = os.path.dirname(os.path.realpath(__file__))
-src_dir = 'unmanic'
+src_dir = 'compresso'
 
 module_name = versioninfo.name()
 module_version = versioninfo.version()
@@ -121,7 +121,7 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
         shutil.rmtree(public_asset_path, ignore_errors=True)
         shutil.rmtree(frontend_path, ignore_errors=True)
 
-        with tempfile.TemporaryDirectory(prefix='unmanic-frontend-build-') as temp_dir:
+        with tempfile.TemporaryDirectory(prefix='compresso-frontend-build-') as temp_dir:
             staged_frontend_path = os.path.join(temp_dir, 'frontend')
             shutil.copytree(
                 source_frontend_path,
@@ -164,7 +164,7 @@ class CleanCommand(Command):
     def run():
         shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'build')), ignore_errors=True)
         shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'dist')), ignore_errors=True)
-        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'unmanic.egg-info')), ignore_errors=True)
+        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'compresso.egg-info')), ignore_errors=True)
         for pyc_file in glob.glob(os.path.join(os.path.dirname(__file__), '*.pyc')):
             try:
                 os.remove(pyc_file)

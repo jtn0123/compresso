@@ -12,12 +12,12 @@ if [[ ! -x $(command -v pw_migrate) ]]; then
     exit 1;
 fi
 
-DATABASE_FILE=$(realpath "${HOME}/.unmanic/config/unmanic.db");
-TEST_DATABASE_FILE=$(realpath "${SCRIPT_DIR}/../tests/tmp/config/.unmanic/config/unmanic.db");
+DATABASE_FILE=$(realpath "${HOME}/.compresso/config/compresso.db");
+TEST_DATABASE_FILE=$(realpath "${SCRIPT_DIR}/../tests/tmp/config/.compresso/config/compresso.db");
 if [[ -f ${TEST_DATABASE_FILE} ]]; then
     DATABASE_FILE=${TEST_DATABASE_FILE}
 fi
-MIGRATIONS_PATH=$(realpath "${SCRIPT_DIR}/../unmanic/migrations");
+MIGRATIONS_PATH=$(realpath "${SCRIPT_DIR}/../compresso/migrations");
 NAME=$(echo ${@} | awk '{print tolower($0)}' | tr ' ' '_');
 
 

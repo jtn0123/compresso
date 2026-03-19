@@ -4,7 +4,7 @@
 """
     tests.unit.test_fileinfo.py
 
-    Unit tests for unmanic.webserver.helpers.fileinfo pure functions.
+    Unit tests for compresso.webserver.helpers.fileinfo pure functions.
     No DB, no subprocess mocking needed.
 
 """
@@ -12,7 +12,7 @@
 import pytest
 from unittest.mock import patch
 
-from unmanic.webserver.helpers.fileinfo import format_probe_data, _is_hdr
+from compresso.webserver.helpers.fileinfo import format_probe_data, _is_hdr
 
 
 # ------------------------------------------------------------------
@@ -289,14 +289,14 @@ class TestTagsSafety(object):
 class TestProbeAndFormat(object):
     """Tests for probe_and_format()."""
 
-    @patch('unmanic.webserver.helpers.fileinfo.probe_file', return_value=None)
+    @patch('compresso.webserver.helpers.fileinfo.probe_file', return_value=None)
     def test_probe_failure_returns_none(self, mock_probe):
         """probe_and_format returns None when probe_file returns None."""
-        from unmanic.webserver.helpers.fileinfo import probe_and_format
+        from compresso.webserver.helpers.fileinfo import probe_and_format
         result = probe_and_format('/nonexistent/file.mkv')
         assert result is None
 
-    @patch('unmanic.webserver.helpers.fileinfo.probe_file')
+    @patch('compresso.webserver.helpers.fileinfo.probe_file')
     def test_probe_success_returns_formatted(self, mock_probe):
         """probe_and_format returns formatted result with expected keys."""
         mock_probe.return_value = {
@@ -315,7 +315,7 @@ class TestProbeAndFormat(object):
                 'nb_streams': '1',
             },
         }
-        from unmanic.webserver.helpers.fileinfo import probe_and_format
+        from compresso.webserver.helpers.fileinfo import probe_and_format
         result = probe_and_format('/test/file.mkv')
         assert result is not None
         assert 'video_streams' in result

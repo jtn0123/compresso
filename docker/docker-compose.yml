@@ -1,16 +1,16 @@
-# Canonical production docker-compose for Unmanic fork.
+# Canonical production docker-compose for Compresso fork.
 # For the full deployment guide and large-library checklist, see:
 #   docs/FORK_DEPLOYMENT.md
 #
 # After starting, wait for the readiness endpoint before enabling workflows:
-#   curl http://localhost:8888/unmanic/api/v2/healthcheck/readiness
+#   curl http://localhost:8888/compresso/api/v2/healthcheck/readiness
 #
 # For GPU-accelerated transcoding, see the nvidia and vaapi compose templates
 # in this directory.
 
 services:
-  unmanic:
-    image: josh5/unmanic:latest
+  compresso:
+    image: jtn0123/compresso:latest
     ports:
       - "8888:8888"
     environment:
@@ -20,10 +20,10 @@ services:
     volumes:
       # Persistent application state, database, settings, and logs.
       - /path/to/config:/config
-      # Media library root. Unmanic reads from and (depending on plugins) writes back here.
+      # Media library root. Compresso reads from and (depending on plugins) writes back here.
       - /path/to/library:/library
       # Transcode and processing cache. Use fast local storage with headroom for
       # multiple in-flight jobs. This is not just scratch space — it is part of
       # the normal processing pipeline.
-      - /path/to/cache:/tmp/unmanic
+      - /path/to/cache:/tmp/compresso
     restart: unless-stopped

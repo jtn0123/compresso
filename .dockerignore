@@ -8,9 +8,9 @@
 README.md
 build
 .venv
-unmanic/webserver/frontend/node_modules
-unmanic/webserver/frontend/dist
-unmanic/webserver/frontend/.quasar
+compresso/webserver/frontend/node_modules
+compresso/webserver/frontend/dist
+compresso/webserver/frontend/.quasar
 
 dev_environment
 config

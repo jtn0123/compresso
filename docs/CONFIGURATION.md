@@ -9,7 +9,7 @@
 | `TZ` | System default | Container timezone (e.g. `America/New_York`) |
 | `DEBUGGING` | unset | Set to `true` to enable dev mode (`--dev` flag) |
 | `UNMANIC_SQLITE_MAINTENANCE` | `basic` | SQLite maintenance mode: `basic`, `full`, or `off` |
-| `UNMANIC_DB_PATH` | `/config/.unmanic/config/unmanic.db` | Path to the SQLite database |
+| `UNMANIC_DB_PATH` | `/config/.compresso/config/compresso.db` | Path to the SQLite database |
 | `UNMANIC_RUN_COMMAND` | unset | Custom run command template (use `{cmd}` as placeholder) |
 | `USE_CUSTOM_SUPPORT_API` | unset | `test` or `dev` to override the support API URL |
 
@@ -19,7 +19,7 @@
 |------|---------|
 | `/config` | Persistent configuration and database storage |
 | `/library` | Media library root — source files to process |
-| `/tmp/unmanic` | Temporary working directory for in-progress tasks |
+| `/tmp/compresso` | Temporary working directory for in-progress tasks |
 
 ## Port Mapping
 
@@ -32,7 +32,7 @@
 The container includes a built-in `HEALTHCHECK` that polls the readiness endpoint:
 
 ```
-GET http://127.0.0.1:8888/unmanic/api/v2/healthcheck/readiness
+GET http://127.0.0.1:8888/compresso/api/v2/healthcheck/readiness
 ```
 
 - Interval: 30s
@@ -68,9 +68,9 @@ environment:
 
 ```yaml
 services:
-  unmanic:
-    image: ghcr.io/jtn0123/unmanic:latest
-    container_name: unmanic
+  compresso:
+    image: ghcr.io/jtn0123/compresso:latest
+    container_name: compresso
     restart: unless-stopped
     ports:
       - "8888:8888"
@@ -81,7 +81,7 @@ services:
     volumes:
       - ./config:/config
       - /path/to/media:/library
-      - /tmp/unmanic:/tmp/unmanic
+      - /tmp/compresso:/tmp/compresso
     # For VAAPI hardware acceleration, uncomment:
     # devices:
     #   - /dev/dri:/dev/dri

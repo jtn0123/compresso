@@ -44,8 +44,8 @@ CACHE_PATH="$PROJECT_BASE/dev_environment/cache"
 EXT_PORT=8888
 IMAGE_TAG="staging"
 DOCKER_PARAMS=()
-CONTAINER_NAME="unmanic-dev"
-CONFIG_LABEL="com.unmanic.run_config"
+CONTAINER_NAME="compresso-dev"
+CONFIG_LABEL="com.compresso.run_config"
 CPUS=""
 MEMORY=""
 FORCE_RECREATE="false"
@@ -186,7 +186,7 @@ CONFIG_PATH="$PROJECT_BASE/dev_environment/config"
 if [[ -n $CONFIG_PREFIX ]]; then
     CONFIG_PATH="$PROJECT_BASE/dev_environment/config-$CONFIG_PREFIX"
 fi
-IMAGE_ID="$($DOCKER_CMD image inspect -f '{{.Id}}' "josh5/unmanic:$IMAGE_TAG" 2>/dev/null || true)"
+IMAGE_ID="$($DOCKER_CMD image inspect -f '{{.Id}}' "jtn0123/compresso:$IMAGE_TAG" 2>/dev/null || true)"
 config_string="debug=$DEBUG;use_custom_support_api=$USE_CUSTOM_SUPPORT_API;hw=${HW:-};cpus=$CPUS;memory=$MEMORY;cache=$CACHE_PATH;config_path=$CONFIG_PATH;port=$EXT_PORT;tag=$IMAGE_TAG;image_id=$IMAGE_ID;puid=$PUID;pgid=$PGID"
 if [[ -n $RUN_COMMAND ]]; then
     config_string="${config_string};run_cmd=$RUN_COMMAND"
@@ -212,11 +212,11 @@ start_container() {
         -v "$PROJECT_BASE":/app:Z \
         -v "$CONFIG_PATH":/config:Z \
         -v "$PROJECT_BASE/dev_environment/library":/library:Z \
-        -v "$CACHE_PATH":/tmp/unmanic:Z \
-        -v "$CACHE_PATH/remote_library":/tmp/unmanic/remote_library:Z \
+        -v "$CACHE_PATH":/tmp/compresso:Z \
+        -v "$CACHE_PATH/remote_library":/tmp/compresso/remote_library:Z \
         -v /run/user/"$PUID":/run/user:ro,Z \
         "${DOCKER_PARAMS[@]}" \
-        josh5/unmanic:"$IMAGE_TAG")
+        jtn0123/compresso:"$IMAGE_TAG")
     echo "Started container: ${container_id}"
     sleep 1
     if ! container_running; then
@@ -233,7 +233,7 @@ print_access_info() {
         mapped_port="$EXT_PORT"
     fi
     echo "Container name: $CONTAINER_NAME"
-    echo "Access Unmanic at http://localhost:${mapped_port}"
+    echo "Access Compresso at http://localhost:${mapped_port}"
 }
 
 ensure_dist_artifacts() {
@@ -242,7 +242,7 @@ ensure_dist_artifacts() {
         return 0
     fi
 
-    echo "--- Building Unmanic package artifacts (dist/) ---"
+    echo "--- Building Compresso package artifacts (dist/) ---"
     venv_python="$PROJECT_BASE/venv/bin/python3"
     if [[ ! -x "$venv_python" ]]; then
         echo "--- Creating venv at $PROJECT_BASE/venv ---"
@@ -254,7 +254,7 @@ ensure_dist_artifacts() {
     "$venv_python" -m pip install -U -r "$PROJECT_BASE/requirements.txt" -r "$PROJECT_BASE/requirements-dev.txt"
 
     rm -rf "$PROJECT_BASE/build"
-    rm -f "$PROJECT_BASE"/dist/unmanic-*
+    rm -f "$PROJECT_BASE"/dist/compresso-*
     git submodule update --init --recursive
     "$venv_python" -m build --no-isolation --skip-dependency-check --wheel
     "$venv_python" -m build --no-isolation --skip-dependency-check --sdist
@@ -298,10 +298,10 @@ run)
     ;;
 build)
     ensure_dist_artifacts
-    $DOCKER_CMD build -f "$PROJECT_BASE/docker/Dockerfile" -t josh5/unmanic:"$IMAGE_TAG" "$PROJECT_BASE"
+    $DOCKER_CMD build -f "$PROJECT_BASE/docker/Dockerfile" -t jtn0123/compresso:"$IMAGE_TAG" "$PROJECT_BASE"
     ;;
 pull)
-    $DOCKER_CMD pull josh5/unmanic:"$IMAGE_TAG"
+    $DOCKER_CMD pull jtn0123/compresso:"$IMAGE_TAG"
     ;;
 stop)
     if container_exists; then

@@ -1,7 +1,7 @@
 ################
 # SSL/TLS enabled Docker Compose file for testing
 #
-# This compose file runs Unmanic with HTTPS enabled using local test certificates.
+# This compose file runs Compresso with HTTPS enabled using local test certificates.
 #
 # Usage from project root:
 #   docker-compose -f docker/docker-compose-ssl.yml up
@@ -10,9 +10,9 @@
 version: '2'
 
 services:
-  unmanic-ssl-test:
-    container_name: unmanic-ssl-test
-    image: unmanic-ssl:test
+  compresso-ssl-test:
+    container_name: compresso-ssl-test
+    image: compresso-ssl:test
     ports:
       - 8888:8888
     environment:
@@ -20,15 +20,15 @@ services:
       - PGID=1000
       # SSL/TLS Configuration
       - ssl_enabled=true
-      - ssl_certfilepath=/etc/ssl/unmanic/cert.pem
-      - ssl_keyfilepath=/etc/ssl/unmanic/key.pem
-      # Standard Unmanic Configuration
+      - ssl_certfilepath=/etc/ssl/compresso/cert.pem
+      - ssl_keyfilepath=/etc/ssl/compresso/key.pem
+      # Standard Compresso Configuration
       - DEBUGGING=true
       - TZ=America/Edmonton
     volumes:
       # Config and data directories
       - ../dev_environment/config:/config
-      - ../dev_environment/cache:/tmp/unmanic
+      - ../dev_environment/cache:/tmp/compresso
       - ../dev_environment/library:/library
       # SSL test certificates
       # Commands to generate: 
@@ -38,5 +38,5 @@ services:
       #   -out /path/to/test-cert.pem \
       #   -days 10950 -nodes \
       #   -subj "/C=XX/ST=Test/L=Test/O=Test/CN=localhost"
-      - ./test-cert.pem:/etc/ssl/unmanic/cert.pem:ro
-      - ./test-key.pem:/etc/ssl/unmanic/key.pem:ro
+      - ./test-cert.pem:/etc/ssl/compresso/cert.pem:ro
+      - ./test-key.pem:/etc/ssl/compresso/key.pem:ro

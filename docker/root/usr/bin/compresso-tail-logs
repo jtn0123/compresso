@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+compresso_dev_logs_dir=${config_dir}/.compresso/logs
+
+args="-f"
+if [[ ! -z "${@}" ]]; then
+    args="${args} ${@}"
+fi
+
+echo "tail ${args} /config/.compresso/logs/compresso.log | grcat /.grc.conf.compresso.logs"
+tail ${args} /config/.compresso/logs/compresso.log | grcat /.grc.conf.compresso.logs

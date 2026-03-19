@@ -11,7 +11,7 @@
 import pytest
 from unittest.mock import patch
 
-from unmanic.webserver.api_v2.rate_limiter import RateLimiter
+from compresso.webserver.api_v2.rate_limiter import RateLimiter
 
 
 @pytest.mark.unittest
@@ -52,10 +52,10 @@ class TestRateLimiter(object):
 
     def test_expensive_endpoint_identified(self):
         limiter = self._make_limiter()
-        assert limiter.is_expensive('/unmanic/api/v2/preview/create') is True
-        assert limiter.is_expensive('/unmanic/api/v2/healthcheck/scan') is True
-        assert limiter.is_expensive('/unmanic/api/v2/healthcheck/scan-library') is True
-        assert limiter.is_expensive('/unmanic/api/v2/healthcheck/summary') is False
+        assert limiter.is_expensive('/compresso/api/v2/preview/create') is True
+        assert limiter.is_expensive('/compresso/api/v2/healthcheck/scan') is True
+        assert limiter.is_expensive('/compresso/api/v2/healthcheck/scan-library') is True
+        assert limiter.is_expensive('/compresso/api/v2/healthcheck/summary') is False
 
     def test_normal_endpoint_not_affected_by_expensive_limit(self):
         limiter = self._make_limiter()
@@ -66,7 +66,7 @@ class TestRateLimiter(object):
         allowed, _, _ = limiter.check_rate_limit('1.2.3.4', '/healthcheck/summary')
         assert allowed is True
 
-    @patch('unmanic.webserver.api_v2.rate_limiter.time.time')
+    @patch('compresso.webserver.api_v2.rate_limiter.time.time')
     def test_window_slides_old_requests_expire(self, mock_time):
         limiter = self._make_limiter()
         # First request at t=0
@@ -87,7 +87,7 @@ class TestRateLimiter(object):
         _, _, reset_time = limiter.check_rate_limit('1.2.3.4', '/healthcheck/summary')
         assert reset_time > 0
 
-    @patch('unmanic.webserver.api_v2.rate_limiter.time.time')
+    @patch('compresso.webserver.api_v2.rate_limiter.time.time')
     def test_stale_ips_cleaned_up(self, mock_time):
         """IPs with no requests in the last 5 minutes should be removed."""
         limiter = self._make_limiter()
@@ -101,7 +101,7 @@ class TestRateLimiter(object):
         limiter._cleanup_stale_ips()
         assert 'stale.ip' not in limiter._requests
 
-    @patch('unmanic.webserver.api_v2.rate_limiter.time.time')
+    @patch('compresso.webserver.api_v2.rate_limiter.time.time')
     def test_cleanup_counter_triggers(self, mock_time):
         """Cleanup should run every 100th request."""
         limiter = self._make_limiter()

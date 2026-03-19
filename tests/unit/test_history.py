@@ -4,7 +4,7 @@
 """
     tests.unit.test_history.py
 
-    Unit tests for the History class from unmanic/libs/history.py:
+    Unit tests for the History class from compresso/libs/history.py:
     - get_historic_task_list
     - get_total_historic_task_list_count
     - get_historic_task_list_filtered_and_sorted
@@ -26,7 +26,7 @@ import pytest
 import tempfile
 import datetime
 
-from unmanic.libs.unmodels.lib import Database
+from compresso.libs.unmodels.lib import Database
 
 
 @pytest.mark.unittest
@@ -45,7 +45,7 @@ class TestHistory(object):
 
         Creates an in-memory SQLite database and the required tables.
         """
-        self.config_path = tempfile.mkdtemp(prefix='unmanic_tests_')
+        self.config_path = tempfile.mkdtemp(prefix='compresso_tests_')
         self.db_file = os.path.join(self.config_path, 'test_history.db')
 
         database_settings = {
@@ -55,33 +55,33 @@ class TestHistory(object):
         }
         self.db_connection = Database.select_database(database_settings)
 
-        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.unmodels.compressionstats import CompressionStats
 
         self.db_connection.create_tables([CompletedTasks, CompletedTasksCommandLogs, CompressionStats])
         self.db_connection.execute_sql('SELECT 1')
 
-        from unmanic import config
+        from compresso import config
         self.settings = config.Config(config_path=self.config_path)
 
     def teardown_class(self):
         pass
 
     def setup_method(self):
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
         CompressionStats.delete().execute()
         CompletedTasksCommandLogs.delete().execute()
         CompletedTasks.delete().execute()
         self.db_connection.execute_sql('SELECT 1')
 
     def _make_history(self):
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         return History()
 
     def _create_task(self, label='test_file.mkv', abspath=None, success=True,
                      start_time=None, finish_time=None, worker='worker-0'):
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels import CompletedTasks
         now = datetime.datetime.now()
         return CompletedTasks.create(
             task_label=label,
@@ -93,7 +93,7 @@ class TestHistory(object):
         )
 
     def _create_command_log(self, task, dump='ffmpeg output log'):
-        from unmanic.libs.unmodels import CompletedTasksCommandLogs
+        from compresso.libs.unmodels import CompletedTasksCommandLogs
         return CompletedTasksCommandLogs.create(
             completedtask_id=task,
             dump=dump,
@@ -103,7 +103,7 @@ class TestHistory(object):
                       source_codec='hevc', dest_codec='h264',
                       resolution='1920x1080', library_id=1,
                       source_container='mkv', dest_container='mp4'):
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         return CompressionStats.create(
             completedtask=task,
             source_size=source_size,
@@ -392,7 +392,7 @@ class TestHistory(object):
         self._create_command_log(task, dump='log data here')
         self.db_connection.execute_sql('SELECT 1')
 
-        from unmanic.libs.unmodels import CompletedTasksCommandLogs
+        from compresso.libs.unmodels import CompletedTasksCommandLogs
         assert CompletedTasksCommandLogs.select().count() == 1
 
         history = self._make_history()
@@ -418,7 +418,7 @@ class TestHistory(object):
         result = history.delete_historic_task_command_logs(id_list=[t1.id])
         assert result is True
 
-        from unmanic.libs.unmodels import CompletedTasksCommandLogs
+        from compresso.libs.unmodels import CompletedTasksCommandLogs
         remaining = list(CompletedTasksCommandLogs.select().dicts())
         assert len(remaining) == 1
 

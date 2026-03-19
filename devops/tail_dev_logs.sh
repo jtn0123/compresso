@@ -33,7 +33,7 @@
 SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd );
 
 config_dir=${SCRIPT_PATH}/../dev_environment/config
-unmanic_dev_logs_dir=${config_dir}/.unmanic/logs
+compresso_dev_logs_dir=${config_dir}/.compresso/logs
 
 
 if ! command -v grcat &> /dev/null; then
@@ -47,12 +47,12 @@ if ! command -v grcat &> /dev/null; then
 fi
 
 # Parse args for what logs to tail and what filters to apply
-log_dir="${unmanic_dev_logs_dir}"
-logfiles="unmanic.log"
+log_dir="${compresso_dev_logs_dir}"
+logfiles="compresso.log"
 for ARG in ${@}; do
     case ${ARG} in
         --local)
-            log_dir="${HOME}/.unmanic/logs";
+            log_dir="${HOME}/.compresso/logs";
             ;;
         --tornado)
             logfiles="${logfiles} tornado.log";
@@ -70,11 +70,11 @@ done
 
 if [[ -z ${filters} ]]; then
     pushd "${log_dir}" || exit 1
-    tail -fn10 ${logfiles} | grcat ${SCRIPT_PATH}/../docker/root/.grc.conf.unmanic.logs
+    tail -fn10 ${logfiles} | grcat ${SCRIPT_PATH}/../docker/root/.grc.conf.compresso.logs
     popd &> /dev/null || exit 1
 else
     pushd "${log_dir}" || exit 1
     echo "Filter logs with '${filters}'"
-    tail -fn10 ${logfiles} | stdbuf -o0 grep -v "${filters}" | grcat ${SCRIPT_PATH}/../docker/root/.grc.conf.unmanic.logs
+    tail -fn10 ${logfiles} | stdbuf -o0 grep -v "${filters}" | grcat ${SCRIPT_PATH}/../docker/root/.grc.conf.compresso.logs
     popd &> /dev/null || exit 1
 fi

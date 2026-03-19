@@ -1,8 +1,8 @@
-# Unmanic Docker Image
+# Compresso Docker Image
 
 
 ### Building the Source
-Before building the image, you need to have built the unmanic python package:
+Before building the image, you need to have built the compresso python package:
 ```bash
 rm -rf ./build ./dist
 python3 -m pip install -r requirements.txt -r requirements-dev.txt
@@ -19,7 +19,7 @@ The Python build performs a clean frontend install from the committed lockfile a
 ### Building the image
 Simply run this command from the root of the project:
 ```bash
-docker build -f ./docker/Dockerfile -t josh5/unmanic:staging .
+docker build -f ./docker/Dockerfile -t jtn0123/compresso:staging .
 ```
 
 A canonical production [`docker-compose.yml`](docker-compose.yml) is included in this directory as a starting point.

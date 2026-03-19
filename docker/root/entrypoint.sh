@@ -36,7 +36,7 @@ run_init_scripts() {
 }
 
 sqlite_maintenance() {
-    local db_path="${UNMANIC_DB_PATH:-/config/.unmanic/config/unmanic.db}"
+    local db_path="${UNMANIC_DB_PATH:-/config/.compresso/config/compresso.db}"
     local maintenance_mode="${UNMANIC_SQLITE_MAINTENANCE:-basic}"
 
     if [[ "${maintenance_mode}" == "off" ]]; then
@@ -70,11 +70,11 @@ sqlite_maintenance() {
 ensure_runtime_paths() {
     mkdir -p \
         /config \
-        /config/.unmanic \
-        /tmp/unmanic
+        /config/.compresso \
+        /tmp/compresso
 
     if [[ "${EUID}" -eq 0 ]]; then
-        chown -R "${PUID:-1000}:${PGID:-1000}" /config /tmp/unmanic || true
+        chown -R "${PUID:-1000}:${PGID:-1000}" /config /tmp/compresso || true
     fi
 }
 
@@ -96,7 +96,7 @@ activate_venv() {
 }
 
 update_source_symlink() {
-    if [[ ! -e /app/unmanic/service.py ]]; then
+    if [[ ! -e /app/compresso/service.py ]]; then
         return
     fi
 
@@ -105,15 +105,15 @@ update_source_symlink() {
         return
     fi
 
-    log "Update container to running Unmanic from source"
+    log "Update container to running Compresso from source"
     local venv="${VIRTUAL_ENV:-/opt/venv}"
     local python_version=$("${venv}/bin/python3" --version 2>&1 | grep -oP 'Python \K\d+\.\d+')
-    local target="${venv}/lib/python${python_version:?}/site-packages/unmanic"
+    local target="${venv}/lib/python${python_version:?}/site-packages/compresso"
     if [[ -e "${target}" && ! -L "${target}" ]]; then
-        log "Move container unmanic install"
+        log "Move container compresso install"
         mv "${target}" "${target}-installed"
     fi
-    ln -sf /app/unmanic "${target}"
+    ln -sf /app/compresso "${target}"
     log "Source symlink set: ${target} -> $(readlink -f "${target}")"
 }
 
@@ -140,24 +140,24 @@ main() {
 
     update_source_symlink
 
-    if [[ "$1" == "/usr/bin/unmanic" || "$1" == "unmanic" ]]; then
-        unmanic_params=()
+    if [[ "$1" == "/usr/bin/compresso" || "$1" == "compresso" ]]; then
+        compresso_params=()
         if [[ "${DEBUGGING:-}" == 'true' ]]; then
-            unmanic_params+=(--dev)
+            compresso_params+=(--dev)
         fi
         case "${USE_CUSTOM_SUPPORT_API:-}" in
         test)
-            unmanic_params+=(--dev-api=https://support-api.test.streamingtech.co.nz)
+            compresso_params+=(--dev-api=https://support-api.test.streamingtech.co.nz)
             ;;
         dev)
-            unmanic_params+=(--dev-api=http://api.unmanic.localhost)
+            compresso_params+=(--dev-api=http://api.compresso.localhost)
             ;;
         esac
-        unmanic_cmd=("$1" "${unmanic_params[@]}" "${@:2}")
+        compresso_cmd=("$1" "${compresso_params[@]}" "${@:2}")
         if [[ -n "${UNMANIC_RUN_COMMAND:-}" ]]; then
-            unmanic_cmd_str=$(printf '%q ' "${unmanic_cmd[@]}")
-            unmanic_cmd_str=${unmanic_cmd_str% }
-            run_cmd="${UNMANIC_RUN_COMMAND//\{cmd\}/${unmanic_cmd_str}}"
+            compresso_cmd_str=$(printf '%q ' "${compresso_cmd[@]}")
+            compresso_cmd_str=${compresso_cmd_str% }
+            run_cmd="${UNMANIC_RUN_COMMAND//\{cmd\}/${compresso_cmd_str}}"
             log "Using custom run command: ${run_cmd}"
             if [[ "${EUID}" -eq 0 ]]; then
                 if command -v gosu >/dev/null 2>&1; then
@@ -169,7 +169,7 @@ main() {
             fi
             exec /bin/bash -lc "${run_cmd}"
         fi
-        set -- "${unmanic_cmd[@]}"
+        set -- "${compresso_cmd[@]}"
     fi
 
     log "Starting: $*"

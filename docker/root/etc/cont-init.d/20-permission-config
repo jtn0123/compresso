@@ -3,8 +3,8 @@
 ensure_paths() {
     mkdir -p \
         /app \
-        /config/.unmanic \
-        /tmp/unmanic
+        /config/.compresso \
+        /tmp/compresso
 }
 
 PUID=${PUID:-1000}
@@ -15,17 +15,17 @@ permissions_config() {
     echo "**** (permission-config) Setting permissions ****"
     chown -R ${PUID}:${PGID} \
         /app \
-        /config/.unmanic \
-        /tmp/unmanic || true
+        /config/.compresso \
+        /tmp/compresso || true
     chmod -R a+w \
         /app \
-        /config/.unmanic \
-        /tmp/unmanic || true
+        /config/.compresso \
+        /tmp/compresso || true
 }
 
 set_permissions_for_hardware_video_group() {
     # Taken from https://github.com/linuxserver/docker-ffmpeg/blob/master/root/ffmpegwrapper.sh
-    # This is required in order to run Unmanic as a non-root user and give it permission to
+    # This is required in order to run Compresso as a non-root user and give it permission to
     #   access the hardware decoders/encoders
     echo "**** (permission-config) Adding run user to video group ****"
     FILES=$(find /dev/dri -type c -print 2>/dev/null || true)

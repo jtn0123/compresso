@@ -1,4 +1,4 @@
-# Contributing to Unmanic
+# Contributing to Compresso
 
 The following is a set of guidelines for contributing to the project,
 definitely not rules. Use your best judgment, and feel free to suggest changes.
@@ -37,7 +37,7 @@ development environment.
 ### Opening Pull Requests
 
 Code contributions are very welcome. However, please understand that by opening a pull 
-requests you hand over copyright ownership of that work to the Unmanic project and the
+requests you hand over copyright ownership of that work to the Compresso project and the
 project owner.
 Your contribution becomes licensed under the same license as the project and ownership
 is handed over to the project owner. 
@@ -53,7 +53,7 @@ All new python file contributions must contain the following header:
 # -*- coding: utf-8 -*-
 
 """
-    unmanic.{{FILE_NAME}}
+    compresso.{{FILE_NAME}}
  
     Written by:               {{YOUR_NAME}} <{{YOUR_EMAIL}}>
     Date:                     {{DAY_NAME}} {{MONTH}} {{DAY_NUMBER}} {{YEAR}}, ({{TIME}} {{AM_PM}})
@@ -82,10 +82,10 @@ All new python file contributions must contain the following header:
 """
 ```
 
-By adding this header you agree to relinquish copyright control to the Unmanic project
+By adding this header you agree to relinquish copyright control to the Compresso project
 and its owner.
 
 Only submissions that conform to this will be merged into the mainline project. This ensures
-that Unmanic as a project is free to grow following any path that opens up at the discretion
+that Compresso as a project is free to grow following any path that opens up at the discretion
 of the project's owner.
 

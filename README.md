@@ -1,16 +1,16 @@
-# Unmanic Fork — Deployment-Hardened Library Optimiser
+# COMPRESSO — Media Library Optimizer
 
-![UNMANIC - Library Optimiser](https://github.com/unmanic/unmanic/raw/master/logo.png)
+Compresso is a media library optimizer with approval workflow, compression dashboard, A/B preview, and health checks. Originally forked from [Josh5/Unmanic](https://github.com/Unmanic/unmanic), it has diverged significantly with new features and deployment hardening.
 
-This is a fork of [Josh5/Unmanic](https://github.com/Unmanic/unmanic) focused on reproducible builds, CI validation, Docker runtime smoke testing, and large-library guardrails. The goal is a single-checkout build that an operator can deploy confidently against a large media library without surprises. All upstream functionality is preserved; the changes are in build hygiene, operational safety, and deployment tooling.
+### Key Features
 
-### What Changed from Upstream
-
+- **Approval workflow** — review and approve/reject compression tasks before they modify your library
+- **Compression dashboard** — track compression ratios, space savings, and processing stats
+- **A/B preview** — compare source vs. encoded output before committing changes
+- **Health checks** — readiness endpoint at `/compresso/api/v2/healthcheck/readiness`
+- **Large-library safe defaults** — conservative worker cap, explicit cache path
 - Frontend vendored in-repo (no submodule/recursive clone required)
 - Node.js 24 build baseline, validated in CI
-- CI validates frontend lint/build, Python wheel, and Docker runtime smoke test
-- Readiness endpoint at `/unmanic/api/v2/healthcheck/readiness`
-- Large-library safe defaults (conservative worker cap, explicit cache path)
 - SQLite maintenance on container startup
 - Structured log markers for startup/worker/post-processing failures
 
@@ -19,66 +19,13 @@ This is a fork of [Josh5/Unmanic](https://github.com/Unmanic/unmanic) focused on
 - **Docker (recommended)** — see [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`docs/FORK_DEPLOYMENT.md`](docs/FORK_DEPLOYMENT.md)
 - **Source** — see [Install and Run](#install-and-run) below
 
-### Fork Status
-
-- Builds from a single repo checkout (no submodules)
-- CI validates frontend, wheel, and Docker runtime smoke test
-- Readiness endpoint available at `/unmanic/api/v2/healthcheck/readiness`
-- Stage on a canary media subset before full-library rollout
-
 ---
-
-[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/unmanic/unmanic?color=009dc7&label=latest%20release&logo=github&logoColor=%23403d3d&style=flat-square)](https://github.com/unmanic/unmanic/releases)
-[![GitHub issues](https://img.shields.io/github/issues-raw/unmanic/unmanic?color=009dc7&logo=github&logoColor=%23403d3d&style=flat-square)](https://github.com/unmanic/unmanic/issues?q=is%3Aopen+is%3Aissue)
-[![GitHub closed issues](https://img.shields.io/github/issues-closed-raw/unmanic/unmanic?color=009dc7&logo=github&logoColor=%23403d3d&style=flat-square)](https://github.com/unmanic/unmanic/issues?q=is%3Aissue+is%3Aclosed)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr-raw/unmanic/unmanic?color=009dc7&logo=github&logoColor=%23403d3d&style=flat-square)](https://github.com/unmanic/unmanic/pulls?q=is%3Aopen+is%3Apr)
-[![GitHub closed pull requests](https://img.shields.io/github/issues-pr-closed-raw/unmanic/unmanic?color=009dc7&logo=github&logoColor=%23403d3d&style=flat-square)](https://github.com/unmanic/unmanic/pulls?q=is%3Apr+is%3Aclosed)
-
-[![Docker Stars](https://img.shields.io/docker/stars/josh5/unmanic?color=009dc7&logo=docker&logoColor=%23403d3d&style=for-the-badge)](https://hub.docker.com/r/josh5/unmanic)
-[![Docker Pulls](https://img.shields.io/docker/pulls/josh5/unmanic?color=009dc7&logo=docker&logoColor=%23403d3d&style=for-the-badge)](https://hub.docker.com/r/josh5/unmanic)
-[![Docker Image Size (tag)](https://img.shields.io/docker/image-size/josh5/unmanic/latest?color=009dc7&label=docker%20image%20size&logo=docker&logoColor=%23403d3d&style=for-the-badge)](https://hub.docker.com/r/josh5/unmanic)
-
-[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Unmanic/unmanic/python_lint_and_run_unit_tests.yml?branch=master&style=flat-square&logo=github&logoColor=403d3d&label=Unit%20Tests)](https://github.com/Unmanic/unmanic/actions/workflows/python_lint_and_run_unit_tests.yml?query=branch%3Amaster)
-[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Unmanic/unmanic/integration_test_and_build_all_packages_ci.yml?branch=master&style=flat-square&logo=github&logoColor=403d3d&label=Package%20Build)](https://github.com/Unmanic/unmanic/actions/workflows/integration_test_and_build_all_packages_ci.yml?query=branch%3Amaster)
-
-[![GitHub license](https://img.shields.io/github/license/unmanic/unmanic?color=009dc7&style=flat-square)]()
-
----
-
-Unmanic is a simple tool for optimising your file library. You can use it to convert your files into a single, uniform format, manage file movements based on timestamps, or execute custom commands against a file based on its file size.
-
-Simply configure Unmanic pointing it at your library and let it automatically manage that library for you.
-
-Unmanic provides you with the following main functions:
-
-- A scheduler built in to scan your whole library for files that do not conform to your configured file presets. Files found requiring processing are then queued.
-- A file/directory monitor. When a file is modified, or a new file is added in your library, Unmanic is able to again test that against your configured file presets. Like the first function, if this file requires processing, it is added to a queue for processing.
-- A handler to manage running multiple file manipulation tasks at a time.
-- A Web UI to easily configure, manage and monitor the progress of your library optimisation.
-
-You choose how you want your library to be.
-
-Some examples of how you may use Unmanic:
-
-- Transcode video or audio files into a uniform format using FFmpeg.
-- Identify (and remove if desired) commercials in DVR recordings shortly after they have completed being recorded.
-- Move files from one location to another after a configured period of time.
-- Automatically execute FileBot rename files in your library as they are added.
-- Compress files older than a specified age.
-- Run any custom command against files matching a certain extension or above a configured file size.
 
 ### Table Of Contents
-
-[What Changed from Upstream](#what-changed-from-upstream)
-
-[Fork Status](#fork-status)
 
 [Dependencies](#dependencies)
 
 [Screen-shots](#screen-shots)
-  * [Dashboard](#dashboard)
-  * [File metrics](#file-metrics)
-  * [Installed plugins](#installed-plugins)
 
 [Install and Run](#install-and-run)
 
@@ -90,7 +37,7 @@ Some examples of how you may use Unmanic:
  - Python 3.x ([Install](https://www.python.org/downloads/))
  - To install requirements run 'python3 -m pip install -r requirements.txt' from the project root
 
-Since Unmanic can be used for running any commands, you will need to ensure that the required dependencies for those commands are also installed on your system.
+Since Compresso can be used for running any commands, you will need to ensure that the required dependencies for those commands are also installed on your system.
 
 ## Screen-shots
 
@@ -103,8 +50,6 @@ Since Unmanic can be used for running any commands, you will need to ensure that
 
 ## Install and Run
 
-For up-to-date installation instructions, follow the [Unmanic documentation](https://docs.unmanic.app/docs/).
-
 To run from source:
 
 1) Install Python 3 and Node.js 24.x.
@@ -114,7 +59,7 @@ To run from source:
     ```
 3) Optionally run the frontend validation steps used in CI:
     ```bash
-    cd unmanic/webserver/frontend
+    cd compresso/webserver/frontend
     npm ci
     npm run lint
     npm run build:publish
@@ -126,21 +71,29 @@ To run from source:
     python3 -m build --no-isolation --skip-dependency-check --wheel
     python3 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
     ```
-5) Run Unmanic:
+5) Run Compresso:
     ```bash
-    unmanic
+    compresso
     ```
 6) Open your web browser and navigate to http://localhost:8888/
 
-Node.js 24 is the supported frontend build baseline for this fork. Node 22 may still work, but CI and release validation now use Node 24.
+Node.js 24 is the supported frontend build baseline. Node 22 may still work, but CI and release validation now use Node 24.
 
 The Python package build performs its own clean frontend install from the committed lockfile, so a pre-existing `node_modules` directory is not required.
 
 For a production-focused source or Docker workflow, including a deployment checklist for large libraries, see [docs/FORK_DEPLOYMENT.md](./docs/FORK_DEPLOYMENT.md).
 
+### Configuration
+
+Compresso stores its configuration in `~/.compresso/`:
+- `~/.compresso/config/` — settings.json and database
+- `~/.compresso/logs/` — application logs
+- `~/.compresso/plugins/` — installed plugins
+- `~/.compresso/userdata/` — user data
+
 ## License and Contribution
 
-This projected is licensed under the GPL version 3. 
+This projected is licensed under the GPL version 3.
 
 Copyright (C) Josh Sunnex - All Rights Reserved
 
@@ -150,13 +103,11 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
- 
+
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
 This project contains libraries imported from external authors.
 Please refer to the source of these libraries for more information on their respective licenses.
-
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md) to learn how to contribute to Unmanic.
 
 ---

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    unmanic.conftest.py
+    compresso.conftest.py
 
     Written by:               Josh.5 <jsunnex@gmail.com>
     Date:                     05 May 2020, (7:09 AM)

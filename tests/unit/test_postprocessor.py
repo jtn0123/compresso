@@ -4,7 +4,7 @@
 """
     tests.unit.test_postprocessor.py
 
-    Unit tests for unmanic.libs.postprocessor.PostProcessor.
+    Unit tests for compresso.libs.postprocessor.PostProcessor.
 
 """
 
@@ -18,12 +18,12 @@ from unittest.mock import patch, MagicMock
 
 def _make_postprocessor(abort_immediately=False):
     """Create a PostProcessor with mocked dependencies."""
-    with patch('unmanic.libs.postprocessor.config.Config'), \
-         patch('unmanic.libs.postprocessor.UnmanicLogging') as mock_logging:
+    with patch('compresso.libs.postprocessor.config.Config'), \
+         patch('compresso.libs.postprocessor.CompressoLogging') as mock_logging:
         mock_logger = MagicMock()
         mock_logging.get_logger.return_value = mock_logger
 
-        from unmanic.libs.postprocessor import PostProcessor
+        from compresso.libs.postprocessor import PostProcessor
 
         data_queues = {}
         task_queue = MagicMock()
@@ -42,8 +42,8 @@ def _make_postprocessor(abort_immediately=False):
 class TestSystemConfigurationIsValid(object):
     """Tests for PostProcessor.system_configuration_is_valid()."""
 
-    @patch('unmanic.libs.postprocessor.Library.within_library_count_limits', return_value=True)
-    @patch('unmanic.libs.postprocessor.PluginsHandler')
+    @patch('compresso.libs.postprocessor.Library.within_library_count_limits', return_value=True)
+    @patch('compresso.libs.postprocessor.PluginsHandler')
     def test_valid_when_no_incompatible_plugins_and_within_limits(self, mock_ph_class, mock_limits):
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = []
@@ -52,8 +52,8 @@ class TestSystemConfigurationIsValid(object):
         pp = _make_postprocessor()
         assert pp.system_configuration_is_valid() is True
 
-    @patch('unmanic.libs.postprocessor.Library.within_library_count_limits', return_value=True)
-    @patch('unmanic.libs.postprocessor.PluginsHandler')
+    @patch('compresso.libs.postprocessor.Library.within_library_count_limits', return_value=True)
+    @patch('compresso.libs.postprocessor.PluginsHandler')
     def test_invalid_when_incompatible_plugins(self, mock_ph_class, mock_limits):
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = ['bad_plugin']
@@ -62,8 +62,8 @@ class TestSystemConfigurationIsValid(object):
         pp = _make_postprocessor()
         assert pp.system_configuration_is_valid() is False
 
-    @patch('unmanic.libs.postprocessor.Library.within_library_count_limits', return_value=False)
-    @patch('unmanic.libs.postprocessor.PluginsHandler')
+    @patch('compresso.libs.postprocessor.Library.within_library_count_limits', return_value=False)
+    @patch('compresso.libs.postprocessor.PluginsHandler')
     def test_invalid_when_outside_library_limits(self, mock_ph_class, mock_limits):
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = []
@@ -82,7 +82,7 @@ class TestCopyFile(object):
     """Tests for PostProcessor.__copy_file() using real temp files."""
 
     def setup_method(self):
-        self.tmpdir = tempfile.mkdtemp(prefix='unmanic_test_copy_')
+        self.tmpdir = tempfile.mkdtemp(prefix='compresso_test_copy_')
 
     def teardown_method(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
@@ -145,8 +145,8 @@ class TestCopyFile(object):
 class TestCleanupCacheFiles(object):
     """Tests for PostProcessor.__cleanup_cache_files()."""
 
-    def test_removes_directory_with_unmanic_file_conversion_in_path(self):
-        tmpdir = tempfile.mkdtemp(prefix='unmanic_file_conversion_test_')
+    def test_removes_directory_with_compresso_file_conversion_in_path(self):
+        tmpdir = tempfile.mkdtemp(prefix='compresso_file_conversion_test_')
         cache_file = os.path.join(tmpdir, 'output.mkv')
         with open(cache_file, 'w') as f:
             f.write('test')
@@ -175,12 +175,12 @@ class TestCleanupCacheFiles(object):
 class TestWriteHistoryLog(object):
     """Tests for PostProcessor.write_history_log()."""
 
-    @patch('unmanic.libs.postprocessor.PluginsHandler')
-    @patch('unmanic.libs.postprocessor.extract_media_metadata', return_value={})
-    @patch('unmanic.libs.postprocessor.os.path.exists', return_value=False)
-    @patch('unmanic.libs.postprocessor.os.path.getsize', return_value=0)
-    @patch('unmanic.libs.postprocessor.UnmanicLogging')
-    @patch('unmanic.libs.postprocessor.history.History')
+    @patch('compresso.libs.postprocessor.PluginsHandler')
+    @patch('compresso.libs.postprocessor.extract_media_metadata', return_value={})
+    @patch('compresso.libs.postprocessor.os.path.exists', return_value=False)
+    @patch('compresso.libs.postprocessor.os.path.getsize', return_value=0)
+    @patch('compresso.libs.postprocessor.CompressoLogging')
+    @patch('compresso.libs.postprocessor.history.History')
     def test_successful_task_saves_history(self, mock_history_class, mock_logging_class,
                                             mock_getsize, mock_exists, mock_extract, mock_ph):
         pp = _make_postprocessor()
@@ -216,12 +216,12 @@ class TestWriteHistoryLog(object):
         assert call_args['task_label'] == 'test.mkv'
         assert call_args['task_success'] is True
 
-    @patch('unmanic.libs.postprocessor.PluginsHandler')
-    @patch('unmanic.libs.postprocessor.extract_media_metadata', return_value={})
-    @patch('unmanic.libs.postprocessor.os.path.exists', return_value=False)
-    @patch('unmanic.libs.postprocessor.UnmanicLogging')
-    @patch('unmanic.libs.postprocessor.Notifications')
-    @patch('unmanic.libs.postprocessor.history.History')
+    @patch('compresso.libs.postprocessor.PluginsHandler')
+    @patch('compresso.libs.postprocessor.extract_media_metadata', return_value={})
+    @patch('compresso.libs.postprocessor.os.path.exists', return_value=False)
+    @patch('compresso.libs.postprocessor.CompressoLogging')
+    @patch('compresso.libs.postprocessor.Notifications')
+    @patch('compresso.libs.postprocessor.history.History')
     def test_failed_task_creates_notification(self, mock_history_class, mock_notif_class,
                                                mock_logging_class, mock_exists, mock_extract, mock_ph):
         pp = _make_postprocessor()
@@ -266,7 +266,7 @@ class TestWriteHistoryLog(object):
 class TestCommitTaskMetadata(object):
     """Tests for PostProcessor.commit_task_metadata()."""
 
-    @patch('unmanic.libs.postprocessor.UnmanicFileMetadata')
+    @patch('compresso.libs.postprocessor.CompressoFileMetadata')
     def test_commits_metadata(self, mock_meta_class):
         pp = _make_postprocessor()
 
@@ -298,7 +298,7 @@ class TestCommitTaskMetadata(object):
 class TestLogCompletedTaskData(object):
     """Tests for PostProcessor._log_completed_task_data()."""
 
-    @patch('unmanic.libs.postprocessor.UnmanicLogging')
+    @patch('compresso.libs.postprocessor.CompressoLogging')
     def test_logs_success_status(self, mock_logging_class):
         pp = _make_postprocessor()
         mock_task = MagicMock()
@@ -320,7 +320,7 @@ class TestLogCompletedTaskData(object):
         call_kwargs = mock_logging_class.data.call_args
         assert call_kwargs[1]['status'] == 'success'
 
-    @patch('unmanic.libs.postprocessor.UnmanicLogging')
+    @patch('compresso.libs.postprocessor.CompressoLogging')
     def test_logs_failed_status(self, mock_logging_class):
         pp = _make_postprocessor()
         mock_task = MagicMock()
@@ -350,8 +350,8 @@ class TestLogCompletedTaskData(object):
 class TestDumpHistoryLog(object):
     """Tests for PostProcessor.dump_history_log()."""
 
-    @patch('unmanic.libs.postprocessor.common.json_dump_to_file')
-    @patch('unmanic.libs.postprocessor.TaskDataStore.export_task_state', return_value={})
+    @patch('compresso.libs.postprocessor.common.json_dump_to_file')
+    @patch('compresso.libs.postprocessor.TaskDataStore.export_task_state', return_value={})
     def test_dumps_to_file(self, mock_export, mock_json_dump):
         pp = _make_postprocessor()
 
@@ -378,8 +378,8 @@ class TestDumpHistoryLog(object):
         assert call_args[0]['task_label'] == 'remote.mkv'
         assert 'data.json' in call_args[1]
 
-    @patch('unmanic.libs.postprocessor.common.json_dump_to_file')
-    @patch('unmanic.libs.postprocessor.TaskDataStore.export_task_state', return_value={})
+    @patch('compresso.libs.postprocessor.common.json_dump_to_file')
+    @patch('compresso.libs.postprocessor.TaskDataStore.export_task_state', return_value={})
     def test_raises_on_failure(self, mock_export, mock_json_dump):
         pp = _make_postprocessor()
 

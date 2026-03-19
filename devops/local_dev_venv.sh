@@ -9,11 +9,11 @@
 # Modified By: Josh.5 (jsunnex@gmail.com)
 ###
 #
-# After running this script you can run unmanic with the following commands:
+# After running this script you can run compresso with the following commands:
 #
 #   source venv/bin/activate
 #   export HOME_DIR="${PWD}/dev_environment"
-#   unmanic
+#   compresso
 #
 
 script_path=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -32,7 +32,7 @@ fi
 # Active the venv
 source venv/bin/activate
 
-# Install all Unmanic requirements
+# Install all Compresso requirements
 python3 -m pip install -r requirements.txt
 python3 -m pip install -r requirements-dev.txt
 

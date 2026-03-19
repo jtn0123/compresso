@@ -6,10 +6,10 @@ import tempfile
 
 import pytest
 
-from unmanic import config
-from unmanic.libs.singleton import SingletonType
-from unmanic.libs.startup import StartupState
-from unmanic.service import RootService
+from compresso import config
+from compresso.libs.singleton import SingletonType
+from compresso.libs.startup import StartupState
+from compresso.service import RootService
 
 
 class DummyThread(object):
@@ -43,7 +43,7 @@ def append_dummy_thread(service, name):
 
 @pytest.mark.integrationtest
 def test_root_service_can_start_and_stop_twice_with_temp_paths(monkeypatch):
-    base_dir = tempfile.mkdtemp(prefix='unmanic_tests_service_')
+    base_dir = tempfile.mkdtemp(prefix='compresso_tests_service_')
     config_dir = os.path.join(base_dir, 'config')
     cache_dir = os.path.join(base_dir, 'cache')
     library_dir = os.path.join(base_dir, 'library')
@@ -98,7 +98,7 @@ def test_root_service_can_start_and_stop_twice_with_temp_paths(monkeypatch):
     def fake_resource_logger(self):
         return append_dummy_thread(self, 'RootServiceResourceLogger')
 
-    monkeypatch.setattr(RootService, 'initial_register_unmanic', fake_register)
+    monkeypatch.setattr(RootService, 'initial_register_compresso', fake_register)
     monkeypatch.setattr(RootService, 'start_post_processor', fake_post_processor)
     monkeypatch.setattr(RootService, 'start_foreman', fake_foreman)
     monkeypatch.setattr(RootService, 'start_handler', fake_handler)
@@ -130,7 +130,7 @@ def test_root_service_can_start_and_stop_twice_with_temp_paths(monkeypatch):
 
 @pytest.mark.integrationtest
 def test_root_service_readiness_fails_when_ui_server_never_becomes_ready(monkeypatch):
-    base_dir = tempfile.mkdtemp(prefix='unmanic_tests_service_')
+    base_dir = tempfile.mkdtemp(prefix='compresso_tests_service_')
     config_dir = os.path.join(base_dir, 'config')
     cache_dir = os.path.join(base_dir, 'cache')
     library_dir = os.path.join(base_dir, 'library')
@@ -144,7 +144,7 @@ def test_root_service_readiness_fails_when_ui_server_never_becomes_ready(monkeyp
     settings.set_config_item('library_path', library_dir, save_settings=False)
     settings.set_config_item('startup_readiness_timeout_seconds', 1, save_settings=False)
 
-    monkeypatch.setattr(RootService, 'initial_register_unmanic', lambda self: None)
+    monkeypatch.setattr(RootService, 'initial_register_compresso', lambda self: None)
     monkeypatch.setattr(RootService, 'start_post_processor', lambda self, data_queues, task_queue: append_dummy_thread(self, 'PostProcessor'))
     monkeypatch.setattr(RootService, 'start_foreman', lambda self, data_queues, settings, task_queue: append_dummy_thread(self, 'Foreman'))
     monkeypatch.setattr(RootService, 'start_handler', lambda self, data_queues, task_queue: append_dummy_thread(self, 'TaskHandler'))

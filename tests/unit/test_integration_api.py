@@ -16,11 +16,11 @@ from unittest.mock import patch
 class TestHealthcheckWorkflow:
     """Test the full healthcheck workflow through helpers."""
 
-    @patch('unmanic.webserver.helpers.healthcheck.HealthCheckManager')
-    @patch('unmanic.webserver.helpers.healthcheck.StartupState')
+    @patch('compresso.webserver.helpers.healthcheck.HealthCheckManager')
+    @patch('compresso.webserver.helpers.healthcheck.StartupState')
     def test_full_healthcheck_lifecycle(self, mock_startup, mock_mgr_cls):
         """Test scan → progress → cancel → summary workflow."""
-        from unmanic.webserver.helpers import healthcheck
+        from compresso.webserver.helpers import healthcheck
 
         # Start a scan
         mock_mgr_cls.return_value.schedule_library_scan.return_value = True
@@ -55,7 +55,7 @@ class TestSettingsHelperWorkflow:
 
     def test_settings_module_importable(self):
         """Verify settings module can be imported."""
-        from unmanic.webserver.helpers import settings
+        from compresso.webserver.helpers import settings
         assert settings is not None
 
 
@@ -65,7 +65,7 @@ class TestWorkerHelperWorkflow:
 
     def test_workers_module_importable(self):
         """Verify workers helper module loads without error."""
-        from unmanic.webserver.helpers import workers
+        from compresso.webserver.helpers import workers
         assert workers is not None
 
 
@@ -73,15 +73,15 @@ class TestWorkerHelperWorkflow:
 class TestFileTestWorkflow:
     """End-to-end test of file testing with multiple checks."""
 
-    @patch('unmanic.libs.filetest.config.Config')
-    @patch('unmanic.libs.filetest.UnmanicLogging')
-    @patch('unmanic.libs.filetest.PluginsHandler')
-    @patch('unmanic.libs.filetest.history.History')
+    @patch('compresso.libs.filetest.config.Config')
+    @patch('compresso.libs.filetest.CompressoLogging')
+    @patch('compresso.libs.filetest.PluginsHandler')
+    @patch('compresso.libs.filetest.history.History')
     def test_file_passes_all_checks(self, mock_history, mock_ph, mock_logging, mock_config):
         """File not in ignore, not failed in history, plugins say add it."""
         mock_ph.return_value.get_enabled_plugin_modules_by_type.return_value = []
 
-        from unmanic.libs.filetest import FileTest
+        from compresso.libs.filetest import FileTest
         ft = FileTest(library_id=1)
 
         # No failed history
@@ -93,10 +93,10 @@ class TestFileTestWorkflow:
         assert result is None
         assert issues == []
 
-    @patch('unmanic.libs.filetest.config.Config')
-    @patch('unmanic.libs.filetest.UnmanicLogging')
-    @patch('unmanic.libs.filetest.PluginsHandler')
-    @patch('unmanic.libs.filetest.history.History')
+    @patch('compresso.libs.filetest.config.Config')
+    @patch('compresso.libs.filetest.CompressoLogging')
+    @patch('compresso.libs.filetest.PluginsHandler')
+    @patch('compresso.libs.filetest.history.History')
     def test_file_rejected_by_history(self, mock_history, mock_ph, mock_logging, mock_config):
         """File that previously failed should be rejected."""
         mock_ph.return_value.get_enabled_plugin_modules_by_type.return_value = []
@@ -104,7 +104,7 @@ class TestFileTestWorkflow:
             {'abspath': '/media/failed_video.mp4'}
         ]
 
-        from unmanic.libs.filetest import FileTest
+        from compresso.libs.filetest import FileTest
         ft = FileTest(library_id=1)
 
         result, issues, _, _ = ft.should_file_be_added_to_task_list('/media/failed_video.mp4')

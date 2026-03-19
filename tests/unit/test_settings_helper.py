@@ -4,14 +4,14 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from unmanic.webserver.helpers import settings
+from compresso.webserver.helpers import settings
 
 
 @pytest.mark.unittest
-@patch('unmanic.webserver.helpers.settings.PluginExecutor')
-@patch('unmanic.webserver.helpers.settings.plugins')
-@patch('unmanic.webserver.helpers.settings.Library')
-@patch('unmanic.webserver.helpers.settings.logger')
+@patch('compresso.webserver.helpers.settings.PluginExecutor')
+@patch('compresso.webserver.helpers.settings.plugins')
+@patch('compresso.webserver.helpers.settings.Library')
+@patch('compresso.webserver.helpers.settings.logger')
 def test_save_library_config_warns_when_plugins_and_library_automation_are_enabled(
         mock_logger,
         mock_library_class,

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    unmanic.versioninfo.py
+    compresso.versioninfo.py
  
     Written by:               Josh.5 <jsunnex@gmail.com>
     Date:                     04 May 2020, (10:52 AM)
@@ -35,7 +35,7 @@ import os
 import subprocess
 import sys
 
-import unmanic.metadata as version_info
+import compresso.metadata as version_info
 
 DESCRIPTION = "TEST"
 

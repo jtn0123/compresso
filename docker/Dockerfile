@@ -189,12 +189,12 @@ RUN \
 COPY /requirements.txt /tmp/requirements.txt
 
 
-# Install Unmanic python dependencies.
+# Install Compresso python dependencies.
 RUN \
     echo "**** Configure APT ****" \
         && export DEBIAN_FRONTEND=noninteractive \
     && \
-    echo "**** Install Unmanic application dependencies ****" \
+    echo "**** Install Compresso application dependencies ****" \
         && sleep 2 \
         && \
         echo "**** Update sources ****" \
@@ -232,29 +232,29 @@ RUN \
         && mkdir -p \
             /app \
             /config \
-            /tmp/unmanic \
+            /tmp/compresso \
         && chown 1000:1000 \
             /app \
             /config \
-            /tmp/unmanic
+            /tmp/compresso
 ENV HOME_DIR="/config"
 
 
-# Install pre-built Unmanic wheel
+# Install pre-built Compresso wheel
 # Must first run `python3 ./setup.py bdist_wheel` on host to build package
 COPY /dist/ /src/
 ENV VIRTUAL_ENV=/opt/venv
 RUN \
-    echo "**** Install Unmanic ****" \
+    echo "**** Install Compresso ****" \
         && sleep 2 \
         && \
-        echo "**** Install unmanic from pre-built wheel ****" \
+        echo "**** Install compresso from pre-built wheel ****" \
             && ls -l /src/ \
             && WHEEL_PATH="$(ls -1 /src/*.whl | sort | tail -n 1)" \
             && echo "Installing ${WHEEL_PATH}" \
             && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir "${WHEEL_PATH}" \
         && \
-        echo "**** Make default paths for unmanic library ****" \
+        echo "**** Make default paths for compresso library ****" \
             && mkdir -p /library
 
 
@@ -262,11 +262,11 @@ RUN \
 COPY /docker/root /
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/usr/bin/unmanic"]
+CMD ["/usr/bin/compresso"]
 
 # Health check using the readiness endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -fsSL http://127.0.0.1:8888/unmanic/api/v2/healthcheck/readiness || exit 1
+  CMD curl -fsSL http://127.0.0.1:8888/compresso/api/v2/healthcheck/readiness || exit 1
 
-# Unmanic runs on port 8888
+# Compresso runs on port 8888
 EXPOSE 8888/tcp

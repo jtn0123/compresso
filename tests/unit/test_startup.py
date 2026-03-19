@@ -7,9 +7,9 @@ import tempfile
 
 import pytest
 
-from unmanic import config
-from unmanic.libs.singleton import SingletonType
-from unmanic.libs.startup import StartupState, validate_startup_environment
+from compresso import config
+from compresso.libs.singleton import SingletonType
+from compresso.libs.startup import StartupState, validate_startup_environment
 
 
 def reset_singletons():
@@ -20,7 +20,7 @@ def reset_singletons():
 @pytest.mark.unittest
 def test_safe_defaults_enabled_by_default():
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='unmanic_tests_config_')
+    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
 
     settings = config.Config(config_path=config_path)
 
@@ -32,7 +32,7 @@ def test_safe_defaults_enabled_by_default():
 @pytest.mark.unittest
 def test_safe_defaults_can_be_disabled_from_config_file():
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='unmanic_tests_config_')
+    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
     with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
         json.dump({
             'large_library_safe_defaults': False,
@@ -48,7 +48,7 @@ def test_safe_defaults_can_be_disabled_from_config_file():
 @pytest.mark.unittest
 def test_settings_file_overrides_environment_but_constructor_args_override_both(monkeypatch):
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='unmanic_tests_config_')
+    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
     with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
         json.dump({
             'ui_port': 9001,
@@ -66,7 +66,7 @@ def test_settings_file_overrides_environment_but_constructor_args_override_both(
 @pytest.mark.unittest
 def test_safe_defaults_only_fill_unset_values():
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='unmanic_tests_config_')
+    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
     with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
         json.dump({
             'number_of_workers': 6,
@@ -82,7 +82,7 @@ def test_safe_defaults_only_fill_unset_values():
 @pytest.mark.unittest
 def test_validate_startup_environment_rejects_missing_library():
     reset_singletons()
-    base_dir = tempfile.mkdtemp(prefix='unmanic_tests_startup_')
+    base_dir = tempfile.mkdtemp(prefix='compresso_tests_startup_')
     config_dir = os.path.join(base_dir, 'config')
     cache_dir = os.path.join(base_dir, 'cache')
     missing_library = os.path.join(base_dir, 'library')
@@ -98,7 +98,7 @@ def test_validate_startup_environment_rejects_missing_library():
 @pytest.mark.unittest
 def test_validate_startup_environment_rejects_invalid_cache_path():
     reset_singletons()
-    base_dir = tempfile.mkdtemp(prefix='unmanic_tests_startup_')
+    base_dir = tempfile.mkdtemp(prefix='compresso_tests_startup_')
     config_dir = os.path.join(base_dir, 'config')
     library_dir = os.path.join(base_dir, 'library')
     os.makedirs(library_dir, exist_ok=True)

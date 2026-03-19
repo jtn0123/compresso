@@ -13,16 +13,16 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from tests.unit.api_test_base import ApiTestBase
-from unmanic.webserver.api_v2.history_api import ApiHistoryHandler
+from compresso.webserver.api_v2.history_api import ApiHistoryHandler
 
-COMPLETED_TASKS = 'unmanic.webserver.helpers.completed_tasks'
+COMPLETED_TASKS = 'compresso.webserver.helpers.completed_tasks'
 
 
 def _mock_initialize(self, **kwargs):
     """Stub out ApiHistoryHandler.initialize to avoid loading real config/session."""
     self.session = MagicMock()
     self.params = kwargs.get("params")
-    self.unmanic_data_queues = {}
+    self.compresso_data_queues = {}
     self.config = MagicMock()
 
 
@@ -139,7 +139,7 @@ class TestHistoryApiDeleteTasks(ApiTestBase):
     @patch(COMPLETED_TASKS + '.remove_completed_tasks', return_value=True)
     def test_delete_tasks_success(self, mock_remove):
         resp = self.fetch(
-            '/unmanic/api/v2/history/tasks',
+            '/compresso/api/v2/history/tasks',
             method='DELETE',
             body=json.dumps({'id_list': [1, 2]}),
             headers={'Content-Type': 'application/json'},
@@ -151,7 +151,7 @@ class TestHistoryApiDeleteTasks(ApiTestBase):
     @patch(COMPLETED_TASKS + '.remove_completed_tasks', return_value=False)
     def test_delete_tasks_failure(self, mock_remove):
         resp = self.fetch(
-            '/unmanic/api/v2/history/tasks',
+            '/compresso/api/v2/history/tasks',
             method='DELETE',
             body=json.dumps({'id_list': [1]}),
             headers={'Content-Type': 'application/json'},
@@ -161,7 +161,7 @@ class TestHistoryApiDeleteTasks(ApiTestBase):
 
     def test_delete_tasks_empty_list(self):
         resp = self.fetch(
-            '/unmanic/api/v2/history/tasks',
+            '/compresso/api/v2/history/tasks',
             method='DELETE',
             body=json.dumps({'id_list': []}),
             headers={'Content-Type': 'application/json'},

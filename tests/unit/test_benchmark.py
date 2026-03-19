@@ -18,7 +18,7 @@ try:
 except ImportError:
     HAS_BENCHMARK = False
 
-from unmanic.libs import common
+from compresso.libs import common
 
 
 @pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")

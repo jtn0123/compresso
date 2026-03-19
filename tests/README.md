@@ -87,17 +87,17 @@ docker-compose -f docker/docker-compose-test.yml up --force-recreate
 Wait for the container to start, then run:
 
 ```
-docker exec --workdir=/app unmanic-testenv pycodestyle ./
+docker exec --workdir=/app compresso-testenv pycodestyle ./
 ```
 
 and
 
 ```
-docker exec --workdir=/app unmanic-testenv pytest --log-cli-level=INFO
+docker exec --workdir=/app compresso-testenv pytest --log-cli-level=INFO
 ```
 
 When developing, if you wish to run only a single test, run:
 
 ```
-docker exec --workdir=/app unmanic-testenv pytest --log-cli-level=INFO --maxfail 1 -s tests/test_<TEST NAME>.py
+docker exec --workdir=/app compresso-testenv pytest --log-cli-level=INFO --maxfail 1 -s tests/test_<TEST NAME>.py
 ```

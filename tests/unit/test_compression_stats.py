@@ -18,7 +18,7 @@ import pytest
 import tempfile
 import datetime
 
-from unmanic.libs.unmodels.lib import Database
+from compresso.libs.unmodels.lib import Database
 
 
 class TestCompressionStats(object):
@@ -37,7 +37,7 @@ class TestCompressionStats(object):
         Creates an in-memory SQLite database and the required tables
         (CompletedTasks and CompressionStats).
         """
-        self.config_path = tempfile.mkdtemp(prefix='unmanic_tests_')
+        self.config_path = tempfile.mkdtemp(prefix='compresso_tests_')
         self.db_file = os.path.join(self.config_path, 'test_compression.db')
 
         database_settings = {
@@ -47,15 +47,15 @@ class TestCompressionStats(object):
         }
         self.db_connection = Database.select_database(database_settings)
 
-        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.unmodels.compressionstats import CompressionStats
 
         self.db_connection.create_tables([CompletedTasks, CompletedTasksCommandLogs, CompressionStats])
 
         # Force sync after table creation
         self.db_connection.execute_sql('SELECT 1')
 
-        from unmanic import config
+        from compresso import config
         self.settings = config.Config(config_path=self.config_path)
 
     def teardown_class(self):
@@ -63,7 +63,7 @@ class TestCompressionStats(object):
 
     def _create_completed_task(self, label='test_file.mkv', success=True):
         """Helper to create a CompletedTasks row and return it."""
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels import CompletedTasks
         return CompletedTasks.create(
             task_label=label,
             abspath='/media/' + label,
@@ -77,7 +77,7 @@ class TestCompressionStats(object):
                       source_codec='hevc', dest_codec='h264',
                       resolution='1920x1080', library_id=1):
         """Helper to create a CompressionStats row."""
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         return CompressionStats.create(
             completedtask=task,
             source_size=source_size,
@@ -95,7 +95,7 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_create_compression_stats_entry(self):
         """A CompressionStats row can be created and read back."""
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels.compressionstats import CompressionStats
 
         task = self._create_completed_task(label='creation_test.mkv')
         stats = self._create_stats(task, source_size=1000000, dest_size=500000)
@@ -113,11 +113,11 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_get_library_compression_summary_returns_correct_aggregates(self):
         """Summary should aggregate source/dest sizes and compute avg_ratio."""
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
 
         # Clear existing data
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -140,9 +140,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_summary_with_library_filter(self):
         """Summary filtered by library_id returns only that library's data."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -161,9 +161,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_summary_multiple_libraries_per_library_breakdown(self):
         """Summary without filter returns per_library breakdown for each library."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -197,9 +197,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_get_compression_stats_for_task_returns_correct_data(self):
         """Stats for a single task should return the correct dict."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -225,7 +225,7 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_get_compression_stats_for_nonexistent_task_returns_none(self):
         """Stats for a task that does not exist should return None."""
-        from unmanic.libs.history import History
+        from compresso.libs.history import History
         history = History()
         result = history.get_compression_stats_for_task(999999)
         assert result is None
@@ -237,9 +237,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_get_compression_stats_paginated_returns_correct_results(self):
         """Paginated stats should return the expected structure."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -262,9 +262,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_get_compression_stats_paginated_offset(self):
         """Pagination with an offset should skip initial rows."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -282,9 +282,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_get_compression_stats_paginated_library_filter(self):
         """Paginated stats filtered by library_id should only return matching rows."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -306,9 +306,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_paginated_result_contains_expected_fields(self):
         """Each paginated result row should have the required keys."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -338,9 +338,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_invalid_order_column_falls_back_to_finish_time(self):
         """An invalid order column should not crash; results still returned."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -357,9 +357,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_valid_order_column_source_size(self):
         """Ordering by source_size asc should return smallest first."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -382,9 +382,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_compression_stats_ratio_calculation(self):
         """source=1000, dest=250 → ratio=0.25, space_saved=750."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -399,9 +399,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_compression_stats_zero_source_size(self):
         """source=0 → ratio=0, no division error."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -421,9 +421,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_stats_recorded_with_zero_source_size(self):
         """save_task_history with source_size=0 and task_success=True should still create a CompressionStats row."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -465,9 +465,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_negative_space_saved(self):
         """When dest > source (file grew), space_saved should be negative."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
         CompressionStats.delete().execute()
         CompletedTasksCommandLogs.delete().execute()
         CompletedTasks.delete().execute()
@@ -483,9 +483,9 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_summary_with_negative_space_saved(self):
         """Summary should handle files that grew in size."""
-        from unmanic.libs.history import History
-        from unmanic.libs.unmodels.compressionstats import CompressionStats
-        from unmanic.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.history import History
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
         CompressionStats.delete().execute()
         CompletedTasksCommandLogs.delete().execute()
         CompletedTasks.delete().execute()

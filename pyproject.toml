@@ -16,7 +16,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 relative_files = true
-source = ["unmanic"]
+source = ["compresso"]
 omit = ["*/tests/*", "*/test_*", "*/webserver/frontend/*"]
 
 [tool.coverage.report]
@@ -28,7 +28,7 @@ line-length = 127
 target-version = "py38"
 exclude = [
     "venv", ".venv", ".idea", "dev_environment", "dist", "build",
-    "unmanic/webserver/frontend",
+    "compresso/webserver/frontend",
 ]
 
 [tool.ruff.lint]
@@ -50,7 +50,7 @@ warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
 exclude = [
-    "unmanic/webserver/frontend",
+    "compresso/webserver/frontend",
     "venv",
     ".venv",
     "dist",

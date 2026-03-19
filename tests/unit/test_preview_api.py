@@ -12,9 +12,9 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from tests.unit.api_test_base import ApiTestBase
-from unmanic.webserver.api_v2.preview_api import ApiPreviewHandler
+from compresso.webserver.api_v2.preview_api import ApiPreviewHandler
 
-VALIDATE_LIB = 'unmanic.webserver.helpers.healthcheck.validate_library_exists'
+VALIDATE_LIB = 'compresso.webserver.helpers.healthcheck.validate_library_exists'
 
 
 @pytest.mark.unittest
@@ -23,9 +23,9 @@ class TestPreviewApiCreate(ApiTestBase):
     handler_class = ApiPreviewHandler
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
-    @patch('unmanic.libs.unmodels.Libraries')
-    @patch('unmanic.config.Config')
+    @patch('compresso.webserver.api_v2.preview_api.PreviewManager')
+    @patch('compresso.libs.unmodels.Libraries')
+    @patch('compresso.config.Config')
     def test_create_preview_success(self, mock_config_class, mock_libs, mock_pm_class, _mock_validate):
         # Mock allowed roots to include the source path
         mock_lib = MagicMock()
@@ -49,7 +49,7 @@ class TestPreviewApiCreate(ApiTestBase):
         assert data['job_id'] == 'abc123'
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
+    @patch('compresso.webserver.api_v2.preview_api.PreviewManager')
     def test_create_preview_value_error(self, mock_pm_class, _mock_validate):
         mock_pm = MagicMock()
         mock_pm.create_preview.side_effect = ValueError("Source file does not exist")
@@ -60,7 +60,7 @@ class TestPreviewApiCreate(ApiTestBase):
         assert resp.code == 400
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
+    @patch('compresso.webserver.api_v2.preview_api.PreviewManager')
     def test_create_preview_runtime_error(self, mock_pm_class, _mock_validate):
         mock_pm = MagicMock()
         mock_pm.create_preview.side_effect = RuntimeError("Already running")
@@ -88,15 +88,15 @@ class TestPreviewApiStatus(ApiTestBase):
     __test__ = True
     handler_class = ApiPreviewHandler
 
-    @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
+    @patch('compresso.webserver.api_v2.preview_api.PreviewManager')
     def test_get_status_success(self, mock_pm_class):
         mock_pm = MagicMock()
         mock_pm.get_job_status.return_value = {
             'job_id': 'abc123',
             'status': 'ready',
             'error': None,
-            'source_url': '/unmanic/preview/abc123/source_web.mp4',
-            'encoded_url': '/unmanic/preview/abc123/encoded.mp4',
+            'source_url': '/compresso/preview/abc123/source_web.mp4',
+            'encoded_url': '/compresso/preview/abc123/encoded.mp4',
             'source_size': 5000,
             'encoded_size': 3000,
             'source_codec': 'hevc',
@@ -110,8 +110,8 @@ class TestPreviewApiStatus(ApiTestBase):
         data = self.parse_response(resp)
         assert data['status'] == 'ready'
         assert data['job_id'] == 'abc123'
-        assert data['source_url'] == '/unmanic/preview/abc123/source_web.mp4'
-        assert data['encoded_url'] == '/unmanic/preview/abc123/encoded.mp4'
+        assert data['source_url'] == '/compresso/preview/abc123/source_web.mp4'
+        assert data['encoded_url'] == '/compresso/preview/abc123/encoded.mp4'
         assert data['source_size'] == 5000
         assert data['encoded_size'] == 3000
         assert data['source_codec'] == 'hevc'
@@ -119,7 +119,7 @@ class TestPreviewApiStatus(ApiTestBase):
         assert data['vmaf_score'] == 92.5
         assert data['ssim_score'] == 0.98
 
-    @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
+    @patch('compresso.webserver.api_v2.preview_api.PreviewManager')
     def test_get_status_not_found(self, mock_pm_class):
         mock_pm = MagicMock()
         mock_pm.get_job_status.return_value = None
@@ -137,7 +137,7 @@ class TestPreviewApiCleanup(ApiTestBase):
     __test__ = True
     handler_class = ApiPreviewHandler
 
-    @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
+    @patch('compresso.webserver.api_v2.preview_api.PreviewManager')
     def test_cleanup_success(self, mock_pm_class):
         mock_pm = MagicMock()
         mock_pm_class.return_value = mock_pm
@@ -155,9 +155,9 @@ class TestPreviewApiPathValidation(ApiTestBase):
     handler_class = ApiPreviewHandler
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.api_v2.preview_api.PreviewManager')
-    @patch('unmanic.libs.unmodels.Libraries')
-    @patch('unmanic.config.Config')
+    @patch('compresso.webserver.api_v2.preview_api.PreviewManager')
+    @patch('compresso.libs.unmodels.Libraries')
+    @patch('compresso.config.Config')
     def test_create_preview_path_outside_library_rejected(self, mock_config_class, mock_libs,
                                                            mock_pm_class, _mock_validate):
         """source_path outside allowed roots should return 400."""
@@ -167,7 +167,7 @@ class TestPreviewApiPathValidation(ApiTestBase):
         mock_libs.select.return_value = [mock_lib]
 
         mock_cfg = MagicMock()
-        mock_cfg.get_cache_path.return_value = '/tmp/unmanic_cache'
+        mock_cfg.get_cache_path.return_value = '/tmp/compresso_cache'
         mock_config_class.return_value = mock_cfg
 
         resp = self.post_json('/preview/create', {

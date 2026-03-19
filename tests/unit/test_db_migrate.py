@@ -4,7 +4,7 @@
 """
     tests.unit.test_db_migrate.py
 
-    Unit tests for unmanic.libs.db_migrate.Migrations.
+    Unit tests for compresso.libs.db_migrate.Migrations.
     Tests schema creation, auto-sync of columns/indexes, and migration execution.
 """
 
@@ -20,7 +20,7 @@ class TestMigrationsInit:
 
     def test_creates_db_directory_if_missing(self, tmp_path):
         db_dir = tmp_path / "subdir"
-        db_file = str(db_dir / "unmanic.db")
+        db_file = str(db_dir / "compresso.db")
         migrations_dir = str(tmp_path / "migrations")
         os.makedirs(migrations_dir, exist_ok=True)
         config = {
@@ -29,8 +29,8 @@ class TestMigrationsInit:
             'MIGRATIONS_DIR': migrations_dir,
             'MIGRATIONS_HISTORY_VERSION': 'v1',
         }
-        with patch('unmanic.libs.db_migrate.UnmanicLogging'):
-            from unmanic.libs.db_migrate import Migrations
+        with patch('compresso.libs.db_migrate.CompressoLogging'):
+            from compresso.libs.db_migrate import Migrations
             m = Migrations(config)
         assert os.path.isdir(str(db_dir))
         assert m.database is not None
@@ -40,8 +40,8 @@ class TestMigrationsInit:
             'TYPE': 'POSTGRES',
             'FILE': str(tmp_path / "db.sqlite"),
         }
-        with patch('unmanic.libs.db_migrate.UnmanicLogging'):
-            from unmanic.libs.db_migrate import Migrations
+        with patch('compresso.libs.db_migrate.CompressoLogging'):
+            from compresso.libs.db_migrate import Migrations
             m = Migrations(config)
         assert m.database is None
 
@@ -59,12 +59,12 @@ class TestMigrationsUpdateSchema:
             'MIGRATIONS_DIR': migrations_dir,
             'MIGRATIONS_HISTORY_VERSION': 'v1',
         }
-        with patch('unmanic.libs.db_migrate.UnmanicLogging'):
-            from unmanic.libs.db_migrate import Migrations
+        with patch('compresso.libs.db_migrate.CompressoLogging'):
+            from compresso.libs.db_migrate import Migrations
             m = Migrations(config)
         return m
 
-    @patch('unmanic.libs.db_migrate.inspect')
+    @patch('compresso.libs.db_migrate.inspect')
     def test_update_schema_creates_tables(self, mock_inspect, tmp_path):
         """Test that update_schema creates tables for discovered models."""
         m = self._make_migrations(tmp_path)
@@ -86,7 +86,7 @@ class TestMigrationsUpdateSchema:
         tables = m.database.get_tables()
         assert 'test_model' in tables
 
-    @patch('unmanic.libs.db_migrate.inspect')
+    @patch('compresso.libs.db_migrate.inspect')
     def test_update_schema_runs_migrations(self, mock_inspect, tmp_path):
         """Test that update_schema calls the migration router."""
         m = self._make_migrations(tmp_path)

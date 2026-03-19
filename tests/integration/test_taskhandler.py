@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    unmanic.test_taskhandler.py
+    compresso.test_taskhandler.py
 
     Written by:               Josh.5 <jsunnex@gmail.com>
     Date:                     08 May 2020, (12:28 PM)
@@ -37,8 +37,8 @@ import threading
 from unittest.mock import patch, MagicMock
 
 from tests.support_.test_data import data_queues, mock_jobqueue_class
-from unmanic.libs.taskhandler import TaskHandler
-from unmanic.libs.unmodels.tasks import Tasks
+from compresso.libs.taskhandler import TaskHandler
+from compresso.libs.unmodels.tasks import Tasks
 
 
 class TestClass(object):
@@ -67,7 +67,7 @@ class TestClass(object):
         self.task_handler = None
 
         # Create temp config path
-        config_path = tempfile.mkdtemp(prefix='unmanic_tests_')
+        config_path = tempfile.mkdtemp(prefix='compresso_tests_')
 
         # Create connection to a test DB (use temp file, not :memory:, for sqliteq compatibility)
         self.db_file = os.path.join(config_path, 'test_taskhandler.db')
@@ -76,7 +76,7 @@ class TestClass(object):
             "FILE":           self.db_file,
             "MIGRATIONS_DIR": os.path.join(config_path, 'migrations'),
         }
-        from unmanic.libs.unmodels.lib import Database
+        from compresso.libs.unmodels.lib import Database
         self.db_connection = Database.select_database(database_settings)
 
         # Create required tables
@@ -84,7 +84,7 @@ class TestClass(object):
         time.sleep(0.5)
 
         # import config
-        from unmanic import config
+        from compresso import config
         self.settings = config.Config(config_path=config_path)
         self.settings.set_config_item('debugging', True, save_settings=False)
 
@@ -133,7 +133,7 @@ class TestClass(object):
         assert not self.task_handler.is_alive()
 
     @pytest.mark.integrationtest
-    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    @patch('compresso.libs.taskhandler.PluginsHandler')
     def test_task_handler_can_process_scheduled_tasks_queue(self, mock_plugin_handler):
         """Scheduled tasks queue items (dicts) are added to the Tasks DB table."""
         mock_plugin_handler.return_value = MagicMock()
@@ -164,7 +164,7 @@ class TestClass(object):
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    @patch('compresso.libs.taskhandler.PluginsHandler')
     def test_task_handler_can_process_inotify_tasks_queue(self, mock_plugin_handler):
         """Inotify tasks queue items (dicts) are added to the Tasks DB table."""
         mock_plugin_handler.return_value = MagicMock()
@@ -195,7 +195,7 @@ class TestClass(object):
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    @patch('compresso.libs.taskhandler.PluginsHandler')
     def test_task_handler_skips_duplicate_scheduled_tasks(self, mock_plugin_handler):
         mock_plugin_handler.return_value = MagicMock()
 
@@ -224,7 +224,7 @@ class TestClass(object):
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    @patch('compresso.libs.taskhandler.PluginsHandler')
     def test_task_handler_skips_duplicate_inotify_tasks(self, mock_plugin_handler):
         mock_plugin_handler.return_value = MagicMock()
 
@@ -253,7 +253,7 @@ class TestClass(object):
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('unmanic.libs.taskhandler.PluginsHandler')
+    @patch('compresso.libs.taskhandler.PluginsHandler')
     def test_task_handler_restart_preserves_dedupe_and_accepts_new_work(self, mock_plugin_handler):
         mock_plugin_handler.return_value = MagicMock()
 

@@ -13,9 +13,9 @@ import pytest
 from unittest.mock import patch
 
 from tests.unit.api_test_base import ApiTestBase
-from unmanic.webserver.api_v2.healthcheck_api import ApiHealthcheckHandler
+from compresso.webserver.api_v2.healthcheck_api import ApiHealthcheckHandler
 
-VALIDATE_LIB = 'unmanic.webserver.helpers.healthcheck.validate_library_exists'
+VALIDATE_LIB = 'compresso.webserver.helpers.healthcheck.validate_library_exists'
 
 
 @pytest.mark.unittest
@@ -24,7 +24,7 @@ class TestHealthcheckApiScan(ApiTestBase):
     handler_class = ApiHealthcheckHandler
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.helpers.healthcheck.check_single_file')
+    @patch('compresso.webserver.helpers.healthcheck.check_single_file')
     def test_scan_file_success(self, mock_check, _mock_validate):
         mock_check.return_value = {
             'abspath': '/test/file.mkv',
@@ -42,7 +42,7 @@ class TestHealthcheckApiScan(ApiTestBase):
 
     def test_scan_file_invalid_json(self):
         resp = self.fetch(
-            '/unmanic/api/v2/healthcheck/scan',
+            '/compresso/api/v2/healthcheck/scan',
             method='POST',
             body='not json',
             headers={'Content-Type': 'application/json'},
@@ -54,7 +54,7 @@ class TestHealthcheckApiScan(ApiTestBase):
         assert resp.code == 400
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.helpers.healthcheck.check_single_file')
+    @patch('compresso.webserver.helpers.healthcheck.check_single_file')
     def test_scan_file_internal_error(self, mock_check, _mock_validate):
         mock_check.side_effect = Exception("Database error")
         resp = self.post_json('/healthcheck/scan', {'file_path': '/test/file.mkv'})
@@ -72,7 +72,7 @@ class TestHealthcheckApiScanLibrary(ApiTestBase):
     handler_class = ApiHealthcheckHandler
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.helpers.healthcheck.scan_library')
+    @patch('compresso.webserver.helpers.healthcheck.scan_library')
     def test_scan_library_started(self, mock_scan, _mock_validate):
         mock_scan.return_value = True
         resp = self.post_json('/healthcheck/scan-library', {'library_id': 1})
@@ -81,7 +81,7 @@ class TestHealthcheckApiScanLibrary(ApiTestBase):
         assert data['started'] is True
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch('unmanic.webserver.helpers.healthcheck.scan_library')
+    @patch('compresso.webserver.helpers.healthcheck.scan_library')
     def test_scan_library_already_running(self, mock_scan, _mock_validate):
         mock_scan.return_value = False
         resp = self.post_json('/healthcheck/scan-library', {'library_id': 1})
@@ -104,8 +104,8 @@ class TestHealthcheckApiSummary(ApiTestBase):
     __test__ = True
     handler_class = ApiHealthcheckHandler
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_scan_progress')
-    @patch('unmanic.webserver.helpers.healthcheck.get_health_summary')
+    @patch('compresso.webserver.helpers.healthcheck.get_scan_progress')
+    @patch('compresso.webserver.helpers.healthcheck.get_health_summary')
     def test_get_summary_success(self, mock_summary, mock_progress):
         mock_summary.return_value = {
             'healthy': 10, 'corrupted': 2, 'warning': 1,
@@ -117,8 +117,8 @@ class TestHealthcheckApiSummary(ApiTestBase):
         data = self.parse_response(resp)
         assert data['total'] == 18
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_scan_progress')
-    @patch('unmanic.webserver.helpers.healthcheck.get_health_summary')
+    @patch('compresso.webserver.helpers.healthcheck.get_scan_progress')
+    @patch('compresso.webserver.helpers.healthcheck.get_health_summary')
     def test_get_summary_with_library_filter(self, mock_summary, mock_progress):
         mock_summary.return_value = {
             'healthy': 5, 'corrupted': 0, 'warning': 0,
@@ -135,7 +135,7 @@ class TestHealthcheckApiStatus(ApiTestBase):
     __test__ = True
     handler_class = ApiHealthcheckHandler
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_health_statuses_paginated')
+    @patch('compresso.webserver.helpers.healthcheck.get_health_statuses_paginated')
     def test_get_status_list_success(self, mock_paginated):
         mock_paginated.return_value = {
             'recordsTotal': 5,
@@ -151,7 +151,7 @@ class TestHealthcheckApiStatus(ApiTestBase):
 
     def test_get_status_list_invalid_json(self):
         resp = self.fetch(
-            '/unmanic/api/v2/healthcheck/status',
+            '/compresso/api/v2/healthcheck/status',
             method='POST',
             body='{{bad',
             headers={'Content-Type': 'application/json'},
@@ -164,7 +164,7 @@ class TestHealthcheckApiCancelScan(ApiTestBase):
     __test__ = True
     handler_class = ApiHealthcheckHandler
 
-    @patch('unmanic.webserver.helpers.healthcheck.cancel_scan')
+    @patch('compresso.webserver.helpers.healthcheck.cancel_scan')
     def test_cancel_scan_success(self, mock_cancel):
         mock_cancel.return_value = True
         resp = self.post_json('/healthcheck/cancel-scan', {})
@@ -172,7 +172,7 @@ class TestHealthcheckApiCancelScan(ApiTestBase):
         data = self.parse_response(resp)
         assert 'cancellation requested' in data['message']
 
-    @patch('unmanic.webserver.helpers.healthcheck.cancel_scan')
+    @patch('compresso.webserver.helpers.healthcheck.cancel_scan')
     def test_cancel_scan_not_running(self, mock_cancel):
         mock_cancel.return_value = False
         resp = self.post_json('/healthcheck/cancel-scan', {})
@@ -186,7 +186,7 @@ class TestHealthcheckApiWorkers(ApiTestBase):
     __test__ = True
     handler_class = ApiHealthcheckHandler
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_scan_workers')
+    @patch('compresso.webserver.helpers.healthcheck.get_scan_workers')
     def test_get_workers_success(self, mock_workers):
         mock_workers.return_value = {
             'worker_count': 4, 'scanning': False, 'progress': {},
@@ -196,8 +196,8 @@ class TestHealthcheckApiWorkers(ApiTestBase):
         data = self.parse_response(resp)
         assert data['worker_count'] == 4
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_scan_workers')
-    @patch('unmanic.webserver.helpers.healthcheck.set_scan_workers')
+    @patch('compresso.webserver.helpers.healthcheck.get_scan_workers')
+    @patch('compresso.webserver.helpers.healthcheck.set_scan_workers')
     def test_set_workers_success(self, mock_set, mock_get):
         mock_set.return_value = 8
         mock_get.return_value = {
@@ -218,7 +218,7 @@ class TestHealthcheckApiReadiness(ApiTestBase):
     __test__ = True
     handler_class = ApiHealthcheckHandler
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_startup_readiness')
+    @patch('compresso.webserver.helpers.healthcheck.get_startup_readiness')
     def test_get_readiness_success(self, mock_readiness):
         mock_readiness.return_value = {
             'ready': True,
@@ -239,7 +239,7 @@ class TestHealthcheckApiReadiness(ApiTestBase):
         assert data['success'] is True
         assert data['ready'] is True
 
-    @patch('unmanic.webserver.helpers.healthcheck.get_startup_readiness')
+    @patch('compresso.webserver.helpers.healthcheck.get_startup_readiness')
     def test_get_readiness_not_ready(self, mock_readiness):
         mock_readiness.return_value = {
             'ready': False,

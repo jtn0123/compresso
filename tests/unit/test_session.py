@@ -12,7 +12,7 @@ import os
 import pytest
 import tempfile
 
-from unmanic.libs.unmodels.lib import Database
+from compresso.libs.unmodels.lib import Database
 
 
 class TestSession(object):
@@ -31,7 +31,7 @@ class TestSession(object):
         Creates an in-memory SQLite database and initialises
         the required tables so that Session can fetch installation data.
         """
-        config_path = tempfile.mkdtemp(prefix='unmanic_tests_')
+        config_path = tempfile.mkdtemp(prefix='compresso_tests_')
 
         app_dir = os.path.dirname(os.path.abspath(__file__))
         database_settings = {
@@ -42,15 +42,15 @@ class TestSession(object):
         self.db_connection = Database.select_database(database_settings)
 
         # Create the Installation table (needed by Session.__fetch_installation_data)
-        from unmanic.libs.unmodels import Installation
+        from compresso.libs.unmodels import Installation
         self.db_connection.create_tables([Installation])
 
-        from unmanic import config
+        from compresso import config
         self.settings = config.Config(config_path=config_path)
 
         # Clear singleton cache so each test class gets a fresh Session
-        from unmanic.libs.singleton import SingletonType
-        from unmanic.libs.session import Session
+        from compresso.libs.singleton import SingletonType
+        from compresso.libs.session import Session
         SingletonType._instances.pop(Session, None)
 
     def teardown_class(self):
@@ -58,7 +58,7 @@ class TestSession(object):
 
     def _make_session(self):
         """Create a fresh Session instance (singleton-cleared in setup_class)."""
-        from unmanic.libs.session import Session
+        from compresso.libs.session import Session
         return Session()
 
     # ------------------------------------------------------------------
@@ -68,7 +68,7 @@ class TestSession(object):
     @pytest.mark.unittest
     def test_default_level_is_100(self):
         """Session.level should be 100 by default (all features unlocked)."""
-        from unmanic.libs.session import Session
+        from compresso.libs.session import Session
         assert Session.level == 100
 
     @pytest.mark.unittest
@@ -81,14 +81,14 @@ class TestSession(object):
     # ------------------------------------------------------------------
 
     @pytest.mark.unittest
-    def test_register_unmanic_returns_true(self):
+    def test_register_compresso_returns_true(self):
         s = self._make_session()
-        assert s.register_unmanic() is True
+        assert s.register_compresso() is True
 
     @pytest.mark.unittest
-    def test_register_unmanic_with_force_returns_true(self):
+    def test_register_compresso_with_force_returns_true(self):
         s = self._make_session()
-        assert s.register_unmanic(force=True) is True
+        assert s.register_compresso(force=True) is True
 
     @pytest.mark.unittest
     def test_auth_user_account_returns_true(self):

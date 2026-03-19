@@ -8,30 +8,30 @@ include requirements.txt
 include requirements-dev.txt
 
 # Include python source files
-recursive-include unmanic *.py
+recursive-include compresso *.py
 include versioninfo.py
-include unmanic/version
-recursive-include unmanic/migrations_v1 *.md
-recursive-include unmanic/webserver/docs *.json *.yaml *.md
-recursive-include unmanic/webserver/templates *.html
+include compresso/version
+recursive-include compresso/migrations_v1 *.md
+recursive-include compresso/webserver/docs *.json *.yaml *.md
+recursive-include compresso/webserver/templates *.html
 
 # Include vendored frontend source as build input for source distributions
-graft unmanic/webserver/frontend/src
-graft unmanic/webserver/frontend/public
-graft unmanic/webserver/frontend/scripts
-include unmanic/webserver/frontend/.editorconfig
-include unmanic/webserver/frontend/.env.example
-include unmanic/webserver/frontend/.eslintignore
-include unmanic/webserver/frontend/.eslintrc.js
-include unmanic/webserver/frontend/LICENSE
-include unmanic/webserver/frontend/README.md
-include unmanic/webserver/frontend/AGENTS.md
-include unmanic/webserver/frontend/babel.config.js
-include unmanic/webserver/frontend/jsconfig.json
-include unmanic/webserver/frontend/package-lock.json
-include unmanic/webserver/frontend/package.json
-include unmanic/webserver/frontend/postcss.config.cjs
-include unmanic/webserver/frontend/quasar.conf.js
+graft compresso/webserver/frontend/src
+graft compresso/webserver/frontend/public
+graft compresso/webserver/frontend/scripts
+include compresso/webserver/frontend/.editorconfig
+include compresso/webserver/frontend/.env.example
+include compresso/webserver/frontend/.eslintignore
+include compresso/webserver/frontend/.eslintrc.js
+include compresso/webserver/frontend/LICENSE
+include compresso/webserver/frontend/README.md
+include compresso/webserver/frontend/AGENTS.md
+include compresso/webserver/frontend/babel.config.js
+include compresso/webserver/frontend/jsconfig.json
+include compresso/webserver/frontend/package-lock.json
+include compresso/webserver/frontend/package.json
+include compresso/webserver/frontend/postcss.config.cjs
+include compresso/webserver/frontend/quasar.conf.js
 
 # Prune local-only frontend install artifacts from source distributions
-prune unmanic/webserver/frontend/node_modules
+prune compresso/webserver/frontend/node_modules

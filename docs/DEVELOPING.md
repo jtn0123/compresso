@@ -1,4 +1,4 @@
-# Unmanic development
+# Compresso development
 
 The development environment can be configured in 2 ways:
 
@@ -68,28 +68,28 @@ This creates an egg symlink to the project directory for development.
 To later uninstall the development symlink:
 
 ```
-python3 -m pip uninstall unmanic
+python3 -m pip uninstall compresso
 ```
 
-You should now be able to run unmanic from the commandline:
+You should now be able to run compresso from the commandline:
 ```
 # In develop mode this should return "UNKNOWN"
-unmanic --version
+compresso --version
 ```
 
 
 
 ## Building the Frontend
 
-The Unmanic frontend lives in `unmanic/webserver/frontend/` (vendored, no submodules).
+The Compresso frontend lives in `compresso/webserver/frontend/` (vendored, no submodules).
 
 ```
-cd unmanic/webserver/frontend
+cd compresso/webserver/frontend
 npm ci
 npm run build:publish
 ```
 
-The built assets are output to `unmanic/webserver/public/`.
+The built assets are output to `compresso/webserver/public/`.
 
 ## Profiling and testing
 
@@ -101,28 +101,28 @@ Use a clean profile config prefix and enable profiling with `--profiling`.
 ./devops/run_docker.sh --force-recreate --config-prefix=profiling --profiling
 ```
 
-Wait for the container logs to show Unmanic is running before opening the UI:
+Wait for the container logs to show Compresso is running before opening the UI:
 
 ```
 ./devops/run_docker.sh logs --tail 200
 ```
 
 The profile output is written to the host path:
-`dev_environment/config-profiling/unmanic-yappi.pstat`
+`dev_environment/config-profiling/compresso-yappi.pstat`
 
 To summarize the results:
 
 ```
 python - <<'PY'
 import pstats
-p = pstats.Stats('dev_environment/config-profiling/unmanic-yappi.pstat')
+p = pstats.Stats('dev_environment/config-profiling/compresso-yappi.pstat')
 p.strip_dirs().sort_stats('tottime').print_stats(40)
 PY
 ```
 
 ### Profiling (Chrome DevTools)
 
-Open Unmanic in Chrome at `http://localhost:8888`, then open DevTools:
+Open Compresso in Chrome at `http://localhost:8888`, then open DevTools:
 
 1. Performance tab: record 10-30 seconds while idle.
 2. Network tab: check for repeated polling/websocket traffic.

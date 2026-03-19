@@ -75,7 +75,7 @@ done
 docker run -ti --rm \
     -p 8888:8888 \
     -v ${PROJECT_BASE}/:/app \
-    -v ${TEMP_ENV}/cache:/tmp/unmanic \
+    -v ${TEMP_ENV}/cache:/tmp/compresso \
     -v ${TEMP_ENV}/library:/library \
     -v ${TEMP_ENV}/config:/config \
     -e PUID=${PUID} \
