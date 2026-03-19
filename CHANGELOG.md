@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/jtn0123/compresso/compare/v1.1.0...v1.2.0) (2026-03-19)
+
+
+### Features
+
+* add clear logs button to Application Logs dialog ([568ca26](https://github.com/jtn0123/compresso/commit/568ca261bb096df79186af644f5879030bb78b1b))
+
 # [1.1.0](https://github.com/jtn0123/compresso/compare/v1.0.0...v1.1.0) (2026-03-19)
 
 
