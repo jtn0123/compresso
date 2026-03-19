@@ -98,68 +98,138 @@ class PostProcessor(threading.Thread):
                 self.event.wait(2)
                 continue
 
+            # Process completed transcodes (status='processed')
             while not self.abort_flag.is_set() and not self.task_queue.task_list_processed_is_empty():
                 self.event.wait(.2)
                 self.current_task = self.task_queue.get_next_processed_tasks()
                 if self.current_task:
+                    self._handle_processed_task()
 
-                    # Execute event plugin runners
-                    plugin_handler = PluginsHandler()
-                    plugin_handler.run_event_plugins_for_plugin_type('events.postprocessor_started', {
-                        'library_id':  self.current_task.get_task_library_id(),
-                        'task_id':     self.current_task.get_task_id(),
-                        'task_type':   self.current_task.get_task_type(),
-                        'cache_path':  self.current_task.get_cache_path(),
-                        'source_data': self.current_task.get_source_data(),
-                    })
-
-                    try:
-                        self._log("Post-processing task - {}".format(self.current_task.get_source_abspath()))
-                    except Exception as e:
-                        self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
-                    if self.current_task.get_task_type() == 'local':
-                        try:
-                            # Post processes the converted file (return it to original directory etc.)
-                            self.post_process_file()
-                        except Exception as e:
-                            self._log("Exception in post-processing local task file",
-                                      message2=str(e), level="exception")
-                        try:
-                            # Write source and destination data to historic log
-                            self.write_history_log()
-                        except Exception as e:
-                            self._log("Exception in writing history log", message2=str(e), level="exception")
-                        try:
-                            # Commit task metadata to database after all plugin runners
-                            self.commit_task_metadata()
-                        except Exception as e:
-                            self._log("Exception in committing task metadata", message2=str(e), level="exception")
-                        try:
-                            # Remove file from task queue
-                            self.current_task.delete()
-                        except Exception as e:
-                            self._log("Exception in removing task from task list", message2=str(e), level="exception")
-                    else:
-                        try:
-                            # Post processes the remote converted file (return it to original directory etc.)
-                            self.post_process_remote_file()
-                        except Exception as e:
-                            self._log("Exception in post-processing remote task file",
-                                      message2=str(e), level="exception")
-                        try:
-                            # Write source and destination data to historic log
-                            self.dump_history_log()
-                        except Exception as e:
-                            self._log("Exception in dumping history log for remote task",
-                                      message2=str(e), level="exception")
-                        try:
-                            # Update the task status to 'complete'
-                            self.current_task.set_status('complete')
-                        except Exception as e:
-                            self._log("Exception in marking remote task as complete",
-                                      message2=str(e), level="exception")
+            # Process approved tasks (status='approved') — finalize file replacement
+            while not self.abort_flag.is_set() and not self.task_queue.task_list_approved_is_empty():
+                self.event.wait(.2)
+                self.current_task = self.task_queue.get_next_approved_tasks()
+                if self.current_task:
+                    self._handle_approved_task()
 
         self._log("Leaving PostProcessor Monitor loop...")
+
+    def _handle_processed_task(self):
+        """Handle a task that just finished transcoding (status='processed')."""
+        # Execute event plugin runners
+        plugin_handler = PluginsHandler()
+        plugin_handler.run_event_plugins_for_plugin_type('events.postprocessor_started', {
+            'library_id':  self.current_task.get_task_library_id(),
+            'task_id':     self.current_task.get_task_id(),
+            'task_type':   self.current_task.get_task_type(),
+            'cache_path':  self.current_task.get_cache_path(),
+            'source_data': self.current_task.get_source_data(),
+        })
+
+        try:
+            self._log("Post-processing task - {}".format(self.current_task.get_source_abspath()))
+        except Exception as e:
+            self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
+
+        if self.current_task.get_task_type() == 'local':
+            # Check if approval workflow is enabled
+            if self.settings.get_approval_required() and self.current_task.task.success:
+                self._stage_for_approval()
+            else:
+                self._finalize_local_task()
+        else:
+            self._finalize_remote_task()
+
+    def _handle_approved_task(self):
+        """Handle a task that was approved by the user — finalize file replacement from staging."""
+        try:
+            self._log("Finalizing approved task - {}".format(self.current_task.get_source_abspath()))
+        except Exception as e:
+            self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
+
+        self._finalize_local_task()
+
+    def _stage_for_approval(self):
+        """
+        Stage the transcoded file for user review instead of replacing the original.
+        Copies the cache file to the staging directory and sets status to 'awaiting_approval'.
+        """
+        try:
+            cache_path = self.current_task.get_cache_path()
+            staging_dir = self.settings.get_staging_path()
+            task_id = self.current_task.get_task_id()
+
+            # Create a per-task staging subdirectory
+            task_staging_dir = os.path.join(staging_dir, "task_{}".format(task_id))
+            os.makedirs(task_staging_dir, exist_ok=True)
+
+            # Copy cache file to staging
+            staged_filename = os.path.basename(cache_path)
+            staged_path = os.path.join(task_staging_dir, staged_filename)
+            shutil.copy2(cache_path, staged_path)
+
+            self._log("Staged transcoded file for approval: {} -> {}".format(cache_path, staged_path))
+
+            # Set the task status to awaiting_approval (keeps cache and task alive)
+            self.current_task.set_status('awaiting_approval')
+
+        except Exception as e:
+            self._log("Exception in staging file for approval", message2=str(e), level="exception")
+            # Fall back to normal processing on staging failure
+            self._finalize_local_task()
+
+    def _finalize_local_task(self):
+        """Run the standard local task postprocessing: file move, history, metadata, cleanup."""
+        try:
+            self.post_process_file()
+        except Exception as e:
+            self._log("Exception in post-processing local task file",
+                      message2=str(e), level="exception")
+        try:
+            self.write_history_log()
+        except Exception as e:
+            self._log("Exception in writing history log", message2=str(e), level="exception")
+        try:
+            self.commit_task_metadata()
+        except Exception as e:
+            self._log("Exception in committing task metadata", message2=str(e), level="exception")
+        try:
+            # Clean up the staging directory for this task if it exists
+            self._cleanup_staging_files()
+            # Remove file from task queue
+            self.current_task.delete()
+        except Exception as e:
+            self._log("Exception in removing task from task list", message2=str(e), level="exception")
+
+    def _finalize_remote_task(self):
+        """Run the standard remote task postprocessing."""
+        try:
+            self.post_process_remote_file()
+        except Exception as e:
+            self._log("Exception in post-processing remote task file",
+                      message2=str(e), level="exception")
+        try:
+            self.dump_history_log()
+        except Exception as e:
+            self._log("Exception in dumping history log for remote task",
+                      message2=str(e), level="exception")
+        try:
+            self.current_task.set_status('complete')
+        except Exception as e:
+            self._log("Exception in marking remote task as complete",
+                      message2=str(e), level="exception")
+
+    def _cleanup_staging_files(self):
+        """Remove the staging directory for the current task if it exists."""
+        try:
+            task_id = self.current_task.get_task_id()
+            staging_dir = self.settings.get_staging_path()
+            task_staging_dir = os.path.join(staging_dir, "task_{}".format(task_id))
+            if os.path.exists(task_staging_dir):
+                self._log("Removing staging directory '{}'".format(task_staging_dir))
+                shutil.rmtree(task_staging_dir)
+        except Exception as e:
+            self._log("Exception while cleaning up staging files", message2=str(e), level="warning")
 
     def system_configuration_is_valid(self):
         """

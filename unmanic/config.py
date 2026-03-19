@@ -106,6 +106,10 @@ class Config(object, metaclass=SingletonType):
         self.number_of_workers = None
         self.worker_event_schedules = None
 
+        # Approval workflow settings
+        self.approval_required = False
+        self.staging_path = os.path.join(home_directory, '.unmanic', 'staging')
+
         # Fork-specific deployment hardening defaults
         self.large_library_safe_defaults = True
         self.startup_readiness_timeout_seconds = 30
@@ -610,6 +614,19 @@ class Config(object, metaclass=SingletonType):
         :return:
         """
         return max(1, int(self.default_worker_cap))
+
+    def get_approval_required(self):
+        if isinstance(self.approval_required, str):
+            return self.approval_required.lower() in ('true', '1', 'yes', 'on')
+        return bool(self.approval_required)
+
+    def get_staging_path(self):
+        return self.staging_path
+
+    def set_staging_path(self, staging_path):
+        if staging_path == "":
+            staging_path = os.path.join(common.get_home_dir(), '.unmanic', 'staging')
+        self.staging_path = staging_path
 
     def get_remote_installations(self):
         """

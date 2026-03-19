@@ -271,7 +271,7 @@ class Task(object):
         :param status:
         :return:
         """
-        allowed = ['pending', 'in_progress', 'processed', 'complete']
+        allowed = ['pending', 'in_progress', 'processed', 'awaiting_approval', 'approved', 'complete']
         if status not in allowed:
             raise Exception('Unable to set status to "{}". Status must be one of [{}].'.format(status, ', '.join(allowed)))
         if not self.task:

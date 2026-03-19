@@ -112,6 +112,18 @@ const routes = [
     }
   },
   {
+    name: 'approval',
+    path: '/ui/approval',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      { path: '', component: () => import('pages/ApprovalQueue.vue') }
+    ],
+    meta: {
+      showHome: true,
+      showMainNavDrawer: true,
+    }
+  },
+  {
     name: 'preview',
     path: '/ui/preview',
     component: () => import('layouts/MainLayout.vue'),

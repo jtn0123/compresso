@@ -45,7 +45,7 @@ class Tasks(BaseModel):
     priority = BigIntegerField(null=True, index=True)
     type = TextField(null=False, default='local', index=True)  # (local, remote)
     library_id = IntegerField(null=False, default=1, index=True)
-    status = TextField(null=False, index=True)  # (pending, in_progress, processed)
+    status = TextField(null=False, index=True)  # (pending, in_progress, processed, awaiting_approval, approved, complete)
     success = BooleanField(null=True)
     start_time = DateTimeField(null=True, default=datetime.datetime.now)
     finish_time = DateTimeField(null=True, default=datetime.datetime.now)

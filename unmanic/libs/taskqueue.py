@@ -220,6 +220,19 @@ class TaskQueue(object):
             return list(results)
         return []
 
+    def list_awaiting_approval_tasks(self, limit=None):
+        """
+        Returns a list of 'awaiting_approval' tasks
+        Can limit to <limit> results
+
+        :param limit:
+        :return:
+        """
+        results = build_tasks_query_full_task_list('awaiting_approval', self.sort_by, self.sort_order, limit)
+        if results:
+            return list(results)
+        return []
+
     """
     Get first task in task list based on status pending, in_progress or processed
     """
@@ -242,6 +255,11 @@ class TaskQueue(object):
     def get_next_processed_tasks(self):
         # Fetch Task item matching the filters specified
         task_item = fetch_next_task_filtered('processed', sort_by=self.sort_by, sort_order=self.sort_order)
+        return task_item
+
+    def get_next_approved_tasks(self):
+        """Fetch the next task that has been approved (status='approved') for postprocessor to finalize."""
+        task_item = fetch_next_task_filtered('approved', sort_by=self.sort_by, sort_order=self.sort_order)
         return task_item
 
     def requeue_tasks_at_bottom(self, task_id):
@@ -273,6 +291,20 @@ class TaskQueue(object):
         # Fetch only on result in order to know that there are any at all
         pending_query_count = build_tasks_count_query('processed')
         if pending_query_count > 0:
+            return False
+        return True
+
+    @staticmethod
+    def task_list_awaiting_approval_is_empty():
+        count = build_tasks_count_query('awaiting_approval')
+        if count > 0:
+            return False
+        return True
+
+    @staticmethod
+    def task_list_approved_is_empty():
+        count = build_tasks_count_query('approved')
+        if count > 0:
             return False
         return True
 

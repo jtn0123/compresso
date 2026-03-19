@@ -33,6 +33,7 @@
 from __future__ import absolute_import
 import warnings
 
+from .approval_api import ApiApprovalHandler
 from .compression_api import ApiCompressionHandler
 from .docs_api import ApiDocsHandler
 from .fileinfo_api import ApiFileinfoHandler
@@ -53,6 +54,7 @@ from .workers_api import ApiWorkersHandler
 __author__ = 'Josh.5 (jsunnex@gmail.com)'
 
 __all__ = (
+    'ApiApprovalHandler',
     'ApiCompressionHandler',
     'ApiDocsHandler',
     'ApiFileinfoHandler',

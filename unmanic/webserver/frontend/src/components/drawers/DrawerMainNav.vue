@@ -61,6 +61,24 @@
           </q-item-section>
         </q-item>
         <!--END COMPRESSION DASHBOARD SELECT-->
+        <!--START APPROVAL QUEUE SELECT-->
+        <q-item
+          clickable
+          to="/ui/approval"
+          v-ripple>
+          <q-item-section avatar>
+            <q-icon name="fact_check"/>
+          </q-item-section>
+          <q-item-section>
+            Approval Queue
+            <q-badge
+              v-if="approvalCount > 0"
+              color="orange"
+              floating
+              :label="approvalCount"/>
+          </q-item-section>
+        </q-item>
+        <!--END APPROVAL QUEUE SELECT-->
         <!--START PREVIEW COMPARE SELECT-->
         <q-item
           clickable
@@ -186,7 +204,8 @@
 import DrawerUserProfileHeader from "components/drawers/partials/DrawerUserProfileHeader.vue";
 import LanguageSwitch from "components/LanguageSwitch";
 import ThemeSwitch from "components/ThemeSwitch";
-import { ref } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
+import axios from "axios";
 import FooterData from "components/FooterData";
 import PrivacyPolicyDialog from "components/docs/PrivacyPolicyDialog.vue";
 import HelpSupportDialog from "components/docs/HelpSupportDialog.vue";
@@ -207,6 +226,8 @@ export default {
     const privacyPolicyDialogRef = ref(null);
     const helpSupportDialogRef = ref(null);
     const applicationLogsDialogRef = ref(null);
+    const approvalCount = ref(0);
+    let approvalInterval = null;
 
     function showPrivacyPolicyDialog() {
       if (privacyPolicyDialogRef.value) {
@@ -226,6 +247,26 @@ export default {
       }
     }
 
+    async function fetchApprovalCount() {
+      try {
+        const res = await axios.get('/unmanic/api/v2/approval/count');
+        approvalCount.value = res.data.count || 0;
+      } catch (e) {
+        // Silently ignore — endpoint may not exist if approval is disabled
+      }
+    }
+
+    onMounted(() => {
+      fetchApprovalCount();
+      approvalInterval = setInterval(fetchApprovalCount, 15000);
+    });
+
+    onUnmounted(() => {
+      if (approvalInterval) {
+        clearInterval(approvalInterval);
+      }
+    });
+
     return {
       showPrivacyPolicyDialog,
       showHelpSupportDialog,
@@ -233,6 +274,7 @@ export default {
       privacyPolicyDialogRef,
       helpSupportDialogRef,
       applicationLogsDialogRef,
+      approvalCount,
     }
   },
 }
