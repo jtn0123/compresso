@@ -1,3 +1,14 @@
+# 1.0.0 (2026-03-19)
+
+
+### Bug Fixes
+
+* address bugs in foreman and filetest modules ([da88248](https://github.com/jtn0123/unmanic/commit/da882483db80c3e4552138f64b9bb9dc16536c22))
+* **deploy:** add Docker HEALTHCHECK, fix metadata URL and Node version ([5af89dc](https://github.com/jtn0123/unmanic/commit/5af89dcc323dd7bfcead7080a5863a6aa93e55f9))
+* **deps:** pin all dependencies to exact versions ([1d49416](https://github.com/jtn0123/unmanic/commit/1d49416f3b117ec5d0f0b7a76f07a87159746b30))
+* **deps:** pin loose dependencies ([37bc028](https://github.com/jtn0123/unmanic/commit/37bc0285574b2fe6222b8008f04a7f2a77a3ca17))
+* **test:** fix pytest discovery and add coverage tracking ([2f68b7b](https://github.com/jtn0123/unmanic/commit/2f68b7b69205dd541865322aed8f089f84c77fbf))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
