@@ -41,7 +41,7 @@ export default {
             datasets: [{
               label: 'Files',
               data: props.resolutions.map(r => r.count),
-              backgroundColor: '#009fdd',
+              backgroundColor: '#e8a525',
             }],
           },
           options: {

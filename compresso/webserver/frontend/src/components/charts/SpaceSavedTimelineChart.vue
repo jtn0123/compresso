@@ -58,8 +58,8 @@ export default {
             datasets: [{
               label: 'Space Saved',
               data: props.data.map(d => d.space_saved),
-              borderColor: '#002e5c',
-              backgroundColor: 'rgba(0, 46, 92, 0.1)',
+              borderColor: '#1a6b4a',
+              backgroundColor: 'rgba(26, 107, 74, 0.1)',
               fill: true,
               tension: 0.3,
             }],

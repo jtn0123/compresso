@@ -268,6 +268,6 @@ export default {
 
 <style scoped>
 .footer-gradient {
-  background: linear-gradient(to top, #002e5c, rgba(0, 46, 92, 0.7)) !important;
+  background: linear-gradient(to top, #13291f, rgba(19, 41, 31, 0.7)) !important;
 }
 </style>

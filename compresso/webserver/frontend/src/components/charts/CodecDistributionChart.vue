@@ -25,8 +25,8 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 
 const CHART_COLORS = [
-  '#002e5c', '#009fdd', '#f2c037', '#e74c3c', '#2ecc71',
-  '#9b59b6', '#e67e22', '#1abc9c', '#34495e', '#95a5a6',
+  '#1a6b4a', '#e8a525', '#7c5cbf', '#d43545', '#2e9e5a',
+  '#3a8fd4', '#e67e22', '#1abc9c', '#34495e', '#95a5a6',
 ];
 
 export default {

@@ -192,8 +192,8 @@ module.exports = configure(function (ctx) {
         description: `Media library optimizer with approval workflow and compression dashboard`,
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#ffffff',
-        theme_color: '#027be3',
+        background_color: '#f8faf9',
+        theme_color: '#1a6b4a',
         icons: [
           {
             src: 'icons/icon-128x128.png',

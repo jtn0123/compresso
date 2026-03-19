@@ -3,29 +3,29 @@
 @import '../../node_modules/xbbcode-parser/xbbcode.css';
 
 :root {
-  --compresso-grey-1: #fafafa;
-  --compresso-grey-2: #f5f5f5;
-  --compresso-grey-3: #eeeeee;
-  --compresso-grey-4: #e0e0e0;
-  --compresso-grey-5: #bdbdbd;
-  --compresso-grey-6: #9e9e9e;
-  --compresso-grey-7: #757575;
-  --compresso-grey-8: #616161;
-  --compresso-grey-9: #424242;
-  --compresso-grey-10: #212121;
+  --compresso-grey-1: #f8faf9;
+  --compresso-grey-2: #f0f3f1;
+  --compresso-grey-3: #e4e8e6;
+  --compresso-grey-4: #d1d7d4;
+  --compresso-grey-5: #adb5b0;
+  --compresso-grey-6: #8a928c;
+  --compresso-grey-7: #636b66;
+  --compresso-grey-8: #4a524d;
+  --compresso-grey-9: #333a36;
+  --compresso-grey-10: #1c2320;
 }
 
 .body--dark {
-  --compresso-grey-1: #212121;
-  --compresso-grey-2: #424242;
-  --compresso-grey-3: #616161;
-  --compresso-grey-4: #757575;
-  --compresso-grey-5: #9e9e9e;
-  --compresso-grey-6: #bdbdbd;
-  --compresso-grey-7: #e0e0e0;
-  --compresso-grey-8: #eeeeee;
-  --compresso-grey-9: #f5f5f5;
-  --compresso-grey-10: #fafafa;
+  --compresso-grey-1: #1c2320;
+  --compresso-grey-2: #333a36;
+  --compresso-grey-3: #4a524d;
+  --compresso-grey-4: #636b66;
+  --compresso-grey-5: #8a928c;
+  --compresso-grey-6: #adb5b0;
+  --compresso-grey-7: #d1d7d4;
+  --compresso-grey-8: #e4e8e6;
+  --compresso-grey-9: #f0f3f1;
+  --compresso-grey-10: #f8faf9;
 }
 
 .text-grey-1 { color: var(--compresso-grey-1) !important; }
@@ -40,50 +40,51 @@
 .text-grey-10 { color: var(--compresso-grey-10) !important; }
 
 .border-hover {
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid transparent;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .border-hover:hover {
-  border: 1px solid rgba(0, 0, 0, 0.24);
-  transition: border-color 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(26, 107, 74, 0.18);
+  box-shadow: 0 1px 4px rgba(26, 107, 74, 0.08);
 }
 
 .header-background {
-  background: $header !important
+  background: linear-gradient(135deg, $header 0%, #1a3d2d 100%) !important;
 }
 .footer-background {
-  background: $header !important
+  background: $header !important;
 }
 .bg-card-head {
-  background: var(--q-card-head) !important
+  background: var(--q-card-head) !important;
 }
 
 .compresso-dropdown-menu {
   min-width: 100px;
-  border: 1px solid color-mix(in srgb, var(--q-secondary), transparent 30%);
-  border-radius: 0 0 3px 3px;
-  box-shadow: 2px 2px 10px rgba(189, 189, 189, 0.9);
+  border: 1px solid color-mix(in srgb, var(--q-secondary), transparent 50%);
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .body--dark .compresso-dropdown-menu {
-  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 .nested-card {
-  border: 1px solid color-mix(in srgb, var(--compresso-grey-2), transparent 60%);
-  border-radius: 4px;
-  box-shadow: 2px 2px 10px rgba(189, 189, 189, 0.3);
+  border: 1px solid color-mix(in srgb, var(--compresso-grey-3), transparent 40%);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .body--dark .nested-card {
-  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {

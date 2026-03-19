@@ -46,10 +46,11 @@
           icon="home">
         </q-btn>
 
-        <q-toolbar-title shrink>
-          <q-avatar rounded size="2rem" font-size="82px" class="q-mr-lg">
+        <q-toolbar-title shrink class="row items-center no-wrap">
+          <q-avatar rounded size="2rem" font-size="82px" class="q-mr-sm">
             <img src="~assets/compresso-logo-white.png">
           </q-avatar>
+          <span class="brand-wordmark gt-xs">Compresso</span>
         </q-toolbar-title>
 
         <div class="gt-xs">
@@ -243,6 +244,12 @@ export default {
 }
 </script>
 
-<style>
-
+<style scoped>
+.brand-wordmark {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
 </style>

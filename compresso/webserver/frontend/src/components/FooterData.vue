@@ -1,31 +1,23 @@
 <template>
   <div class="lt-md">
-    <p class="text-subtitle1 q-mb-none">
-      &copy; 2018-{{ new Date().getFullYear() }} by
-      <a class="footer-link" target="_blank" href="https://github.com/Josh5">Josh Sunnex</a>
-    </p>
-    <p class="text-subtitle1">
-      {{ $t('components.footer.version') }}:
-      <a class="footer-link"
-         target="_blank"
-         href="https://github.com/jtn0123/compresso/releases">{{ compressoVersion }}</a>
+    <p class="text-subtitle2 q-mb-none footer-text">
+      Compresso v{{ compressoVersion }}
     </p>
   </div>
   <div class="gt-sm">
-    <div class="row q-mt-lg">
+    <div class="row q-mt-lg items-center">
       <div class="col q-ml-lg">
-        <p class="text-subtitle1">
-          &copy; 2018-{{ new Date().getFullYear() }} by
-          <a class="footer-link" target="_blank" href="https://github.com/Josh5">Josh Sunnex</a>
+        <p class="text-subtitle2 footer-text">
+          <a class="footer-link" target="_blank"
+             href="https://github.com/jtn0123/compresso">Compresso</a>
+          &mdash; Media Library Optimizer
         </p>
       </div>
-      <div
-        class="col-auto q-mr-lg">
-        <p class="text-subtitle1">
-          {{ $t('components.footer.version') }}:
+      <div class="col-auto q-mr-lg">
+        <p class="text-subtitle2 footer-text">
           <a class="footer-link"
              target="_blank"
-             href="https://github.com/jtn0123/compresso/releases">{{ compressoVersion }}</a>
+             href="https://github.com/jtn0123/compresso/releases">v{{ compressoVersion }}</a>
         </p>
       </div>
     </div>
@@ -60,6 +52,16 @@ export default {
 <style>
 a.footer-link {
   color: inherit;
-  text-decoration: inherit;
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+a.footer-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.footer-text {
+  opacity: 0.75;
+  font-weight: 400;
 }
 </style>

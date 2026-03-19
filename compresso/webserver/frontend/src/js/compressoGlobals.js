@@ -24,15 +24,15 @@ export const getCompressoApiUrl = function (api_version, api_endpoint) {
 
 export const setTheme = function (mode) {
   if (mode === 'dark') {
-    setCssVar('primary', '#007eb4');
-    setCssVar('secondary', '#0080b7');
-    setCssVar('warning', '#b5902a');
-    document.body.style.setProperty('--q-card-head', '#212121');
+    setCssVar('primary', '#22916a');
+    setCssVar('secondary', '#d4952a');
+    setCssVar('warning', '#d4952a');
+    document.body.style.setProperty('--q-card-head', '#1e1e22');
   } else {
-    setCssVar('primary', '#002e5c');
-    setCssVar('secondary', '#009fdd');
-    setCssVar('warning', '#f2c037');
-    document.body.style.setProperty('--q-card-head', '#f5f5f5');
+    setCssVar('primary', '#1a6b4a');
+    setCssVar('secondary', '#e8a525');
+    setCssVar('warning', '#e8a525');
+    document.body.style.setProperty('--q-card-head', '#f4f6f5');
   }
 }
 
