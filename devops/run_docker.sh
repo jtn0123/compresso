@@ -207,7 +207,7 @@ start_container() {
         -e DEBUGGING="$DEBUG" \
         -e USE_CUSTOM_SUPPORT_API="$USE_CUSTOM_SUPPORT_API" \
         -e COMPRESSO_RUN_COMMAND="$RUN_COMMAND" \
-        -e PROFILE_UNMANIC="$ENABLE_PROFILING" \
+        -e PROFILE_COMPRESSO="$ENABLE_PROFILING" \
         -p "$EXT_PORT":8888 \
         -v "$PROJECT_BASE":/app:Z \
         -v "$CONFIG_PATH":/config:Z \

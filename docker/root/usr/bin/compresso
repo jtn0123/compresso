@@ -10,7 +10,7 @@ if [[ ! -x "${TARGET_BIN}" ]]; then
     TARGET_BIN="$(command -v compresso || true)"
 fi
 
-PROFILE_UNMANIC=${PROFILE_UNMANIC:-false}
+PROFILE_COMPRESSO=${PROFILE_COMPRESSO:-false}
 PROFILE_DURATION=${PROFILE_DURATION:-}
 PROFILE_OUTPUT=${PROFILE_OUTPUT:-/config/compresso-yappi.pstat}
 
@@ -86,7 +86,7 @@ PY
 
 if [[ "${EUID}" -eq 0 ]]; then
     if command -v gosu >/dev/null 2>&1; then
-        if [[ "${PROFILE_UNMANIC}" == "true" ]]; then
+        if [[ "${PROFILE_COMPRESSO}" == "true" ]]; then
             profile_script="/tmp/compresso_profile.py"
             write_profile_script "${profile_script}"
             exec gosu "${RUN_USER}" \
@@ -99,7 +99,7 @@ if [[ "${EUID}" -eq 0 ]]; then
     exit 1
 fi
 
-if [[ "${PROFILE_UNMANIC}" == "true" ]]; then
+if [[ "${PROFILE_COMPRESSO}" == "true" ]]; then
     profile_script="/tmp/compresso_profile.py"
     write_profile_script "${profile_script}"
     exec "${VIRTUAL_ENV:-/opt/venv}/bin/python" "${profile_script}" "${@}"

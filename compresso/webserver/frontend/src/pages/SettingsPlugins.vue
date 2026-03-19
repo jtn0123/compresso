@@ -53,7 +53,7 @@ export default {
       compressoWSHandler.close();
     }
 
-    // END UNMANIC WS HANDLE
+    // END COMPRESSO WS HANDLE
 
     onMounted(() => {
       // Start the websocket
