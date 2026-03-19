@@ -52,9 +52,27 @@ jobs:
         pip install ruff
         # Fatal: syntax errors and undefined names (blocking)
         ruff check --select E9,F63,F7,F82 unmanic/
-        # Full lint (advisory, non-blocking for now)
-        ruff check --exit-zero unmanic/
+        # Full lint (blocking — all rules enforced)
+        ruff check unmanic/
+
+    - name: Type check with mypy
+      if: matrix.python-version == '3.12'
+      run: |
+        mypy unmanic/ --ignore-missing-imports --no-error-summary 2>&1 || true
 
     - name: Test with pytest
       run: |
-        pytest tests/unit -q --cov=unmanic --cov-report=term-missing
+        pytest tests/unit -q --cov=unmanic --cov-report=term-missing --cov-report=xml:coverage.xml
+
+    - name: Upload coverage report
+      if: matrix.python-version == '3.12' && github.event_name == 'push'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.xml
+        retention-days: 30
+
+    - name: Coverage summary
+      if: matrix.python-version == '3.12'
+      run: |
+        python -m coverage report --format=total 2>/dev/null || python -m coverage report | tail -1

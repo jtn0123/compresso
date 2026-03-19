@@ -413,6 +413,16 @@ jobs:
           curl -fsSL -o /tmp/unmanic-root.html http://127.0.0.1:8888/
           grep -q STARTUP_SUMMARY "${tmp_root}/config/.unmanic/logs/unmanic.log"
 
+      - name: Scan Docker image with Trivy
+        if: success()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: unmanic-smoke:ci
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
   build_pypi:
     name: Publish package to PyPI
     needs: py_build
