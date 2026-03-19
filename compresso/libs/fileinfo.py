@@ -33,6 +33,10 @@
 import os
 import re
 
+from compresso.libs.logs import CompressoLogging
+
+logger = CompressoLogging.get_logger('fileinfo')
+
 """
 
 An object to represent file_info (Filebot pattern to keep filename history)
@@ -59,26 +63,22 @@ class FileInfo(object):
     def load(self):
         if os.path.exists(self.path):
             try:
-                f = open(self.path)
-                self.entries = []
-                for line in f:
-                    m = re.search('(.+)="(.+)"', line)
-                    if m.group(1) is not None and m.group(2) is not None:
-                        self.entries.append(Entry(m.group(1), m.group(2)))
+                with open(self.path) as f:
+                    self.entries = []
+                    for line in f:
+                        m = re.search('(.+)="(.+)"', line)
+                        if m and m.group(1) is not None and m.group(2) is not None:
+                            self.entries.append(Entry(m.group(1), m.group(2)))
             except IOError:
-                print("File not accessible")
-            finally:
-                f.close()
+                logger.warning("File not accessible: %s", self.path)
 
     def save(self):
         try:
-            f = open(self.path, "w")
-            for entry in self.entries:
-                f.write('%s="%s"\n' % (entry.newname, entry.originalname))
+            with open(self.path, "w") as f:
+                for entry in self.entries:
+                    f.write('%s="%s"\n' % (entry.newname, entry.originalname))
         except IOError:
-            print("File not accessible")
-        finally:
-            f.close()
+            logger.warning("File not accessible: %s", self.path)
 
     def _find_oldest_name(self, filename):
         for entry in self.entries:

@@ -38,6 +38,10 @@ import string
 import shutil
 import xxhash
 
+from compresso.libs.logs import CompressoLogging
+
+logger = CompressoLogging.get_logger('common')
+
 
 def get_home_dir():
     # Attempt to get the HOME_DIR environment variable
@@ -185,16 +189,16 @@ def clean_files_in_cache_dir(cache_directory):
             root_bn = os.path.basename(root)
             if root_bn.startswith("compresso_file_conversion-"):
                 try:
-                    print("Clearing cache path - {}".format(root))
+                    logger.info("Clearing cache path - %s", root)
                     shutil.rmtree(root)
                 except Exception as e:
-                    print("Exception while clearing cache path - {}".format(str(e)))
+                    logger.error("Exception while clearing cache path - %s", str(e))
             elif root_bn.startswith("compresso_remote_pending_library-"):
                 try:
-                    print("Clearing remote library cache path - {}".format(root))
+                    logger.info("Clearing remote library cache path - %s", root)
                     shutil.rmtree(root)
                 except Exception as e:
-                    print("Exception while clearing remote library cache path - {}".format(str(e)))
+                    logger.error("Exception while clearing remote library cache path - %s", str(e))
 
 
 def random_string(string_length=5):

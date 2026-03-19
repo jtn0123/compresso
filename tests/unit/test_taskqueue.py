@@ -12,6 +12,7 @@
 """
 
 import os
+import shutil
 import tempfile
 
 import pytest
@@ -50,7 +51,10 @@ class TestTaskQueue:
         )
 
     def teardown_class(self):
-        pass
+        if self.db_connection:
+            self.db_connection.close()
+        if os.path.exists(self.config_path):
+            shutil.rmtree(self.config_path, ignore_errors=True)
 
     def setup_method(self):
         Tasks.delete().execute()
@@ -123,6 +127,103 @@ class TestTaskQueue:
         desc_results = list(build_tasks_query_full_task_list('pending', sort_by=Tasks.id, sort_order='desc'))
         assert asc_results[0]['id'] < asc_results[-1]['id']
         assert desc_results[0]['id'] > desc_results[-1]['id']
+
+    @pytest.mark.unittest
+    def test_list_in_progress_tasks_empty(self):
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            tq = TaskQueue(data_queues={})
+            result = tq.list_in_progress_tasks()
+            assert result == []
+
+    @pytest.mark.unittest
+    def test_list_in_progress_tasks_returns_in_progress_only(self):
+        self._create_task('/media/ip1.mkv', status='in_progress')
+        self._create_task('/media/ip2.mkv', status='pending')
+        self._create_task('/media/ip3.mkv', status='in_progress')
+
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            tq = TaskQueue(data_queues={})
+            result = tq.list_in_progress_tasks()
+            assert len(result) == 2
+            for item in result:
+                assert item['status'] == 'in_progress'
+
+    @pytest.mark.unittest
+    def test_list_processed_tasks_empty(self):
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            tq = TaskQueue(data_queues={})
+            result = tq.list_processed_tasks()
+            assert result == []
+
+    @pytest.mark.unittest
+    def test_list_processed_tasks_returns_processed_only(self):
+        self._create_task('/media/proc1.mkv', status='processed')
+        self._create_task('/media/proc2.mkv', status='pending')
+
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            tq = TaskQueue(data_queues={})
+            result = tq.list_processed_tasks()
+            assert len(result) == 1
+            assert result[0]['status'] == 'processed'
+
+    @pytest.mark.unittest
+    def test_list_awaiting_approval_tasks_empty(self):
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            tq = TaskQueue(data_queues={})
+            result = tq.list_awaiting_approval_tasks()
+            assert result == []
+
+    @pytest.mark.unittest
+    def test_list_awaiting_approval_tasks_returns_correct_status(self):
+        self._create_task('/media/aa1.mkv', status='awaiting_approval')
+        self._create_task('/media/aa2.mkv', status='pending')
+
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            tq = TaskQueue(data_queues={})
+            result = tq.list_awaiting_approval_tasks()
+            assert len(result) == 1
+            assert result[0]['status'] == 'awaiting_approval'
+
+    @pytest.mark.unittest
+    def test_task_list_in_progress_is_empty(self):
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            assert TaskQueue.task_list_in_progress_is_empty() is True
+            self._create_task('/media/ip.mkv', status='in_progress')
+            assert TaskQueue.task_list_in_progress_is_empty() is False
+
+    @pytest.mark.unittest
+    def test_task_list_processed_is_empty(self):
+        with patch('compresso.libs.taskqueue.CompressoLogging.get_logger'):
+            from compresso.libs.taskqueue import TaskQueue
+            assert TaskQueue.task_list_processed_is_empty() is True
+            self._create_task('/media/proc.mkv', status='processed')
+            assert TaskQueue.task_list_processed_is_empty() is False
+
+    @pytest.mark.unittest
+    def test_build_tasks_count_query_returns_zero_for_no_tasks(self):
+        from compresso.libs.taskqueue import build_tasks_count_query
+        count = build_tasks_count_query('pending')
+        assert count == 0
+
+    @pytest.mark.unittest
+    def test_build_tasks_count_query_returns_one_for_existing(self):
+        self._create_task('/media/count.mkv', status='pending')
+        from compresso.libs.taskqueue import build_tasks_count_query
+        count = build_tasks_count_query('pending')
+        assert count == 1
+
+    @pytest.mark.unittest
+    def test_fetch_next_task_filtered_returns_false_when_empty(self):
+        from compresso.libs.taskqueue import fetch_next_task_filtered
+        result = fetch_next_task_filtered('pending', sort_by=Tasks.id, sort_order='asc')
+        assert result is False
 
     @pytest.mark.unittest
     def test_build_tasks_query_library_filter(self):

@@ -128,10 +128,9 @@ class Migrations(object):
         try:
             with self.database.transaction():
                 for model in all_models:
-                    self.migrator.create_table(model)
+                    self.migrator.create_model(model)
                 self.migrator()
         except Exception:
-            self.database.rollback()
             self.logger.exception("Initialising tables failed")
             raise
 

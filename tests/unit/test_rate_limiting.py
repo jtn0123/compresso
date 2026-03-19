@@ -101,6 +101,66 @@ class TestRateLimiter(object):
         limiter._cleanup_stale_ips()
         assert 'stale.ip' not in limiter._requests
 
+    def test_exactly_at_limit_last_request_allowed(self):
+        limiter = self._make_limiter()
+        # Make 59 requests (0-58)
+        for _ in range(59):
+            allowed, _, _ = limiter.check_rate_limit('1.2.3.4', '/healthcheck/summary')
+            assert allowed is True
+        # 60th request should still be allowed (count was 59 before this)
+        allowed, remaining, _ = limiter.check_rate_limit('1.2.3.4', '/healthcheck/summary')
+        assert allowed is True
+        assert remaining == 0
+        # 61st should be rejected
+        allowed, _, _ = limiter.check_rate_limit('1.2.3.4', '/healthcheck/summary')
+        assert allowed is False
+
+    def test_expensive_at_exact_limit(self):
+        limiter = self._make_limiter()
+        # Make 4 requests
+        for _ in range(4):
+            allowed, _, _ = limiter.check_rate_limit('1.2.3.4', '/preview/create')
+            assert allowed is True
+        # 5th should be allowed
+        allowed, remaining, _ = limiter.check_rate_limit('1.2.3.4', '/preview/create')
+        assert allowed is True
+        assert remaining == 0
+        # 6th should be rejected
+        allowed, _, _ = limiter.check_rate_limit('1.2.3.4', '/preview/create')
+        assert allowed is False
+
+    def test_remaining_count_decrements_correctly(self):
+        limiter = self._make_limiter()
+        for i in range(5):
+            allowed, remaining, _ = limiter.check_rate_limit('1.2.3.4', '/healthcheck/summary')
+            assert allowed is True
+            assert remaining == 59 - i
+
+    def test_expensive_and_normal_counts_are_separate(self):
+        limiter = self._make_limiter()
+        # Exhaust expensive limit
+        for _ in range(5):
+            limiter.check_rate_limit('1.2.3.4', '/preview/create')
+        allowed, _, _ = limiter.check_rate_limit('1.2.3.4', '/preview/create')
+        assert allowed is False
+        # Normal endpoint should still have capacity (but counts all 5 expensive requests too)
+        allowed, remaining, _ = limiter.check_rate_limit('1.2.3.4', '/healthcheck/summary')
+        assert allowed is True
+        # 60 limit - 5 expensive requests already counted - 1 for this request = 54
+        assert remaining == 54
+
+    def test_get_rate_limiter_singleton_returns_same_instance(self):
+        import compresso.webserver.api_v2.rate_limiter as rl_module
+        original = rl_module._rate_limiter
+        try:
+            rl_module._rate_limiter = None
+            from compresso.webserver.api_v2.rate_limiter import get_rate_limiter
+            a = get_rate_limiter()
+            b = get_rate_limiter()
+            assert a is b
+        finally:
+            rl_module._rate_limiter = original
+
     @patch('compresso.webserver.api_v2.rate_limiter.time.time')
     def test_cleanup_counter_triggers(self, mock_time):
         """Cleanup should run every 100th request."""
