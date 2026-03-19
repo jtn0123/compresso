@@ -264,5 +264,9 @@ COPY /docker/root /
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/usr/bin/unmanic"]
 
+# Health check using the readiness endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -fsSL http://127.0.0.1:8888/unmanic/api/v2/healthcheck/readiness || exit 1
+
 # Unmanic runs on port 8888
 EXPOSE 8888/tcp

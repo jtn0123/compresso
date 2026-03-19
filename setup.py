@@ -112,7 +112,7 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
 
         npm_bin = shutil.which("npm")
         if not npm_bin:
-            raise RuntimeError("npm is required to build the vendored frontend. Install Node.js 22 and retry.")
+            raise RuntimeError("npm is required to build the vendored frontend. Install Node.js 24 and retry.")
         if not os.path.exists(os.path.join(source_frontend_path, 'package-lock.json')):
             raise RuntimeError("Frontend package-lock.json is missing. Restore the vendored frontend lockfile.")
 
