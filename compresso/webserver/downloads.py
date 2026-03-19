@@ -35,6 +35,7 @@ import time
 import urllib.parse
 import uuid
 
+import tornado.log
 from tornado import iostream, web
 
 from compresso.libs.singleton import SingletonType
@@ -106,17 +107,17 @@ class DownloadsHandler(web.RequestHandler):
             for lib in Libraries.select(Libraries.path):
                 if lib.path:
                     allowed_roots.add(os.path.realpath(lib.path))
-        except Exception:
-            pass
+        except Exception as e:
+            tornado.log.app_log.error("Failed to load library paths for path validation: %s", e)
         try:
             from compresso import config
             cache_path = config.Config().get_cache_path()
             if cache_path:
                 allowed_roots.add(os.path.realpath(cache_path))
-        except Exception:
-            pass
+        except Exception as e:
+            tornado.log.app_log.error("Failed to load cache path for path validation: %s", e)
 
-        if allowed_roots and not any(abspath.startswith(root + os.sep) or abspath == root for root in allowed_roots):
+        if not allowed_roots or not any(abspath.startswith(root + os.sep) or abspath == root for root in allowed_roots):
             self.write_error(403)
             return
 

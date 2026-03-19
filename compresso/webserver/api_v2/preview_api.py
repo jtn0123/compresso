@@ -77,16 +77,16 @@ class ApiPreviewHandler(BaseApiHandler):
                     for lib in Libraries.select(Libraries.path):
                         if lib.path:
                             allowed_roots.add(os.path.realpath(lib.path))
-                except Exception:
-                    pass
+                except Exception as e:
+                    tornado.log.app_log.error("Failed to load library paths for path validation: %s", e)
                 try:
                     from compresso import config
                     cache_path = config.Config().get_cache_path()
                     if cache_path:
                         allowed_roots.add(os.path.realpath(cache_path))
-                except Exception:
-                    pass
-                if allowed_roots and not any(real_path.startswith(root + os.sep) or real_path == root for root in allowed_roots):
+                except Exception as e:
+                    tornado.log.app_log.error("Failed to load cache path for path validation: %s", e)
+                if not allowed_roots or not any(real_path.startswith(root + os.sep) or real_path == root for root in allowed_roots):
                     raise ValueError("Source path is not within an allowed directory")
 
             preview_manager = PreviewManager()
