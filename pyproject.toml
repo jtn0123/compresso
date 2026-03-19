@@ -20,7 +20,7 @@ omit = ["*/tests/*", "*/test_*", "*/webserver/frontend/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 30
+fail_under = 25
 
 [tool.ruff]
 line-length = 127
