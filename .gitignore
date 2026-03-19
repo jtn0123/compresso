@@ -11,11 +11,23 @@ tests/.vstats_file
 /temp
 /tmp
 
+# Test / coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.pytest_cache/
+
+# Type checking
+.mypy_cache/
+
 # Files needed for development only
 venv/**
+.venv/**
 
 # Files created during the build process
 .eggs/**
 build/**
 dist/**
 unmanic.egg-info/**
+*.egg
