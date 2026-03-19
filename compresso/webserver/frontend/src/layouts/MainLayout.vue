@@ -18,24 +18,6 @@
           :icon="leftMainNavDrawerOpen ? 'menu_open' : 'menu'"
           @click="toggleMainNavDrawer"/>
 
-        <!--SHOW SETTINGS MENU BUTTON-->
-        <q-btn
-          v-if="$route.meta.showSettingsDrawer"
-          dense
-          flat
-          round
-          :icon="leftSettingsDrawerOpen ? 'menu_open' : 'menu'"
-          @click="toggleSettingsDrawer"/>
-
-        <!--SHOW DATA PANELS MENU BUTTON-->
-        <q-btn
-          v-if="$route.meta.showDataPanelsDrawer"
-          dense
-          flat
-          round
-          :icon="leftDataPanelsDrawerOpen ? 'menu_open' : 'menu'"
-          @click="toggleDataPanelsDrawer"/>
-
         <!--SHOW HOME BUTTON-->
         <q-btn
           v-if="$route.meta.showHome"
@@ -93,22 +75,6 @@
       <DrawerMainNav/>
     </q-drawer>
 
-    <q-drawer
-      v-if="$route.meta.showSettingsDrawer"
-      v-model="leftSettingsDrawerOpen"
-      side="left"
-      :behavior="$q.screen.lt.md ? 'mobile' : 'desktop'">
-      <DrawerSettingsNav/>
-    </q-drawer>
-
-    <q-drawer
-      v-if="$route.meta.showDataPanelsDrawer"
-      v-model="leftDataPanelsDrawerOpen"
-      side="left"
-      :behavior="$q.screen.lt.md ? 'mobile' : 'desktop'">
-      <DrawerDataPanelsNav/>
-    </q-drawer>
-
     <!-- TODO: Enable notifications for mobile -->
     <q-drawer
       v-if="!$q.platform.is.mobile"
@@ -151,9 +117,7 @@
 <script>
 import { onMounted, onUnmounted, ref } from 'vue';
 import DrawerMainNav from "components/drawers/DrawerMainNav";
-import DrawerSettingsNav from "components/drawers/DrawerSettingsNav";
 import { useQuasar } from "quasar";
-import DrawerDataPanelsNav from "components/drawers/DrawerDataPanelsNav";
 import ThemeSwitch from "components/ThemeSwitch";
 import DrawerNotifications from "components/drawers/DrawerNotifications";
 import SharedLinkDropdown from "components/SharedLinkDropdown";
@@ -161,10 +125,8 @@ import compressoGlobals from "src/js/compressoGlobals";
 
 export default {
   components: {
-    DrawerDataPanelsNav,
     DrawerMainNav,
     DrawerNotifications,
-    DrawerSettingsNav,
     ThemeSwitch,
     SharedLinkDropdown
   },
@@ -174,28 +136,13 @@ export default {
     let reloadInterval = null;
 
     const leftMainNavDrawerOpen = ref(false)
-    const leftSettingsDrawerOpen = ref(false)
-    const leftDataPanelsDrawerOpen = ref(false)
     const rightNotificationsDrawerOpen = ref(false)
 
     const notificationsCount = ref(null)
     const compressoVersion = ref('')
 
-    if (!$q.screen.lt.md) {
-      leftSettingsDrawerOpen.value = true;
-      leftDataPanelsDrawerOpen.value = true;
-    }
-
     function toggleMainNavDrawer() {
       leftMainNavDrawerOpen.value = !leftMainNavDrawerOpen.value
-    }
-
-    function toggleSettingsDrawer() {
-      leftSettingsDrawerOpen.value = !leftSettingsDrawerOpen.value
-    }
-
-    function toggleDataPanelsDrawer() {
-      leftDataPanelsDrawerOpen.value = !leftDataPanelsDrawerOpen.value
     }
 
     function toggleNotificationsDrawer() {
@@ -229,12 +176,8 @@ export default {
 
     return {
       leftMainNavDrawerOpen,
-      leftSettingsDrawerOpen,
-      leftDataPanelsDrawerOpen,
       rightNotificationsDrawerOpen,
       toggleMainNavDrawer,
-      toggleSettingsDrawer,
-      toggleDataPanelsDrawer,
       toggleNotificationsDrawer,
 
       notificationsCount,

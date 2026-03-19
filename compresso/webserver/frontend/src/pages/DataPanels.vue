@@ -16,6 +16,10 @@
           <q-icon size="2em" name="priority_high"/>
         </div>
 
+        <div class="text-caption text-grey q-mt-md" style="max-width: 400px; margin: 0 auto;">
+          {{ $t('pages.dataPanels.bannerText') }}
+        </div>
+
         <div class="full-width row flex-center text-negative absolute-center">
           <q-icon
             size="512px"
@@ -45,13 +49,10 @@ export default {
     };
   },
   created() {
-    console.debug('Component has been created!');
     //window.addEventListener('message', this.resizeIframe);
     if (typeof this.$route.query !== 'undefined' && typeof this.$route.query.pluginId !== 'undefined') {
-      console.debug("Initial update using query in uri - " + this.$route.query.pluginId)
       this.setPageFromParams(this.$route.query.pluginId);
     } else {
-      console.debug("Fetching enabled panel plugins list and setting the first result as current window")
       this.setPageAsFirstEnabledPanel();
     }
   },
@@ -59,7 +60,6 @@ export default {
     setPageFromParams(pluginId) {
       if (typeof pluginId !== 'undefined') {
         let theme = LocalStorage.getItem('theme');
-        console.debug('setting iframe url to "/compresso/panel/' + pluginId + '/?theme=' + theme + '"')
         this.iframeSrc = '/compresso/panel/' + pluginId + '/?theme=' + theme;
       }
     },
@@ -87,7 +87,6 @@ export default {
   watch: {
     $route(to, from) {
       if (typeof to.query !== 'undefined') {
-        console.debug("Detected change in route with query in uri - " + to.query.pluginId)
         this.setPageFromParams(to.query.pluginId);
       }
     }

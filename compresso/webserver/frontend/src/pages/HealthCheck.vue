@@ -1,14 +1,18 @@
 <template>
   <q-page padding>
     <div class="q-pa-md">
-      <div class="text-h5 q-mb-md">Health Check</div>
+      <div class="text-h5 q-mb-md">{{ $t('pages.healthCheck.title') }}</div>
+
+      <AdmonitionBanner type="tip" class="q-mb-md">
+        {{ $t('pages.healthCheck.bannerText') }}
+      </AdmonitionBanner>
 
       <!-- Summary Cards -->
       <div class="row q-col-gutter-md q-mb-lg">
         <div class="col-6 col-sm">
           <q-card class="bg-positive text-white">
             <q-card-section>
-              <div class="text-caption">Healthy</div>
+              <div class="text-caption">{{ $t('pages.healthCheck.summaryHealthy') }}</div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.healthy }}</template>
@@ -19,7 +23,7 @@
         <div class="col-6 col-sm">
           <q-card class="bg-warning text-white">
             <q-card-section>
-              <div class="text-caption">Warning</div>
+              <div class="text-caption">{{ $t('pages.healthCheck.summaryWarning') }}</div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.warning }}</template>
@@ -30,7 +34,7 @@
         <div class="col-6 col-sm">
           <q-card class="bg-negative text-white">
             <q-card-section>
-              <div class="text-caption">Corrupted</div>
+              <div class="text-caption">{{ $t('pages.healthCheck.summaryCorrupted') }}</div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.corrupted }}</template>
@@ -41,7 +45,7 @@
         <div class="col-6 col-sm">
           <q-card class="bg-grey text-white">
             <q-card-section>
-              <div class="text-caption">Unchecked</div>
+              <div class="text-caption">{{ $t('pages.healthCheck.summaryUnchecked') }}</div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.unchecked }}</template>
@@ -52,7 +56,7 @@
         <div class="col-6 col-sm">
           <q-card class="bg-info text-white">
             <q-card-section>
-              <div class="text-caption">Total</div>
+              <div class="text-caption">{{ $t('pages.healthCheck.summaryTotal') }}</div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.total }}</template>
@@ -65,13 +69,13 @@
       <!-- Scan Controls -->
       <q-card class="q-mb-lg">
         <q-card-section>
-          <div class="text-h6 q-mb-md">Scan Controls</div>
+          <div class="text-h6 q-mb-md">{{ $t('pages.healthCheck.scanControls') }}</div>
           <div class="row q-col-gutter-md items-end">
             <div class="col-12 col-sm-4">
               <q-select
                 v-model="selectedLibraryId"
                 :options="libraryOptions"
-                label="Library"
+                :label="$t('pages.healthCheck.libraryLabel')"
                 outlined
                 dense
                 emit-value
@@ -81,8 +85,8 @@
             <div class="col-12 col-sm-3">
               <q-select
                 v-model="scanMode"
-                :options="[{label: 'Quick (ffprobe)', value: 'quick'}, {label: 'Thorough (full decode)', value: 'thorough'}]"
-                label="Mode"
+                :options="scanModeOptions"
+                :label="$t('pages.healthCheck.modeLabel')"
                 outlined
                 dense
                 emit-value
@@ -92,7 +96,7 @@
             <div class="col-12 col-sm-5">
               <q-btn
                 color="primary"
-                label="Scan Library"
+                :label="$t('pages.healthCheck.scanLibrary')"
                 :loading="scanning"
                 :disable="scanning"
                 @click="scanLibrary"
@@ -101,7 +105,7 @@
               <q-btn
                 v-if="scanning"
                 color="negative"
-                label="Cancel Scan"
+                :label="$t('pages.healthCheck.cancelScan')"
                 outline
                 @click="cancelScan"
               />
@@ -111,7 +115,7 @@
           <!-- Worker Controls -->
           <div class="row q-col-gutter-md items-center q-mt-sm">
             <div class="col-auto">
-              <span class="text-subtitle2">Workers:</span>
+              <span class="text-subtitle2">{{ $t('pages.healthCheck.workersLabel') }}</span>
             </div>
             <div class="col-auto">
               <q-btn
@@ -158,18 +162,18 @@
             <div class="row q-col-gutter-md q-mb-sm">
               <div class="col-auto">
                 <span class="text-caption">
-                  Speed: {{ scanProgress.files_per_second || 0 }} files/sec
+                  {{ $t('pages.healthCheck.speedLabel') }} {{ scanProgress.files_per_second || 0 }} {{ $t('pages.healthCheck.filesPerSec') }}
                 </span>
               </div>
               <div class="col-auto">
                 <span class="text-caption">
-                  ETA: {{ formatEta(scanProgress.eta_seconds) }}
+                  {{ $t('pages.healthCheck.etaLabel') }} {{ formatEta(scanProgress.eta_seconds) }}
                 </span>
               </div>
             </div>
             <!-- Per-worker status -->
             <div v-if="scanProgress.workers && Object.keys(scanProgress.workers).length > 0" class="q-mt-sm">
-              <div class="text-caption q-mb-xs">Worker Status:</div>
+              <div class="text-caption q-mb-xs">{{ $t('pages.healthCheck.workerStatusLabel') }}</div>
               <div v-for="(worker, wid) in scanProgress.workers" :key="wid" class="row items-center q-mb-xs">
                 <q-icon
                   :name="worker.status === 'checking' ? 'circle' : 'circle'"
@@ -178,9 +182,9 @@
                   class="q-mr-sm"
                 />
                 <span class="text-caption">
-                  Worker {{ wid }}:
+                  {{ $t('pages.healthCheck.workerIdLabel', { id: wid }) }}
                   <span v-if="worker.status === 'checking'">{{ truncateFilename(worker.current_file) }}</span>
-                  <span v-else class="text-grey">idle</span>
+                  <span v-else class="text-grey">{{ $t('pages.healthCheck.workerIdle') }}</span>
                 </span>
               </div>
             </div>
@@ -191,8 +195,8 @@
             <div class="col-12 col-sm-8">
               <q-input
                 v-model="singleFilePath"
-                label="Check Single File"
-                placeholder="/path/to/video.mkv"
+                :label="$t('pages.healthCheck.checkSingleFile')"
+                :placeholder="$t('pages.healthCheck.singleFilePlaceholder')"
                 outlined
                 dense
               />
@@ -200,7 +204,7 @@
             <div class="col-12 col-sm-4">
               <q-btn
                 color="secondary"
-                label="Check File"
+                :label="$t('pages.healthCheck.checkFileButton')"
                 :disable="!singleFilePath"
                 @click="checkSingleFile"
               />
@@ -220,7 +224,7 @@
       <!-- Status Table -->
       <q-card>
         <q-card-section>
-          <div class="text-h6">File Status</div>
+          <div class="text-h6">{{ $t('pages.healthCheck.fileStatus') }}</div>
         </q-card-section>
         <q-card-section>
           <div class="row q-col-gutter-md q-mb-md">
@@ -228,7 +232,7 @@
               <q-input
                 v-model="searchValue"
                 debounce="500"
-                placeholder="Search files..."
+                :placeholder="$t('pages.healthCheck.searchPlaceholder')"
                 dense
                 outlined
                 @update:model-value="loadStatuses"
@@ -241,8 +245,8 @@
             <div class="col-12 col-sm-3">
               <q-select
                 v-model="statusFilter"
-                :options="[{label: 'All', value: null}, {label: 'Healthy', value: 'healthy'}, {label: 'Warning', value: 'warning'}, {label: 'Corrupted', value: 'corrupted'}, {label: 'Unchecked', value: 'unchecked'}]"
-                label="Status Filter"
+                :options="statusFilterOptions"
+                :label="$t('pages.healthCheck.statusFilterLabel')"
                 dense
                 outlined
                 emit-value
@@ -262,7 +266,7 @@
             :loading="loadingStatuses"
             :pagination="pagination"
             @request="onTableRequest"
-            no-data-label="No files match your filters"
+            :no-data-label="$t('pages.healthCheck.noFilesMatch')"
           >
             <template v-slot:body-cell-status="props">
               <q-td :props="props">
@@ -305,17 +309,20 @@
 </template>
 
 <script>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useQuasar } from 'quasar';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import FileInfoDialog from 'components/fileinfo/FileInfoDialog.vue';
+import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
 
 export default {
   name: 'HealthCheck',
-  components: { FileInfoDialog },
+  components: { FileInfoDialog, AdmonitionBanner },
   setup() {
     const $q = useQuasar();
+    const { t } = useI18n();
     const loadingSummary = ref(true);
     const summary = ref({ healthy: 0, warning: 0, corrupted: 0, unchecked: 0, checking: 0, total: 0 });
     const scanning = ref(false);
@@ -342,15 +349,28 @@ export default {
       descending: true,
     });
 
-    const statusColumns = [
-      { name: 'abspath', label: 'File Path', field: 'abspath', align: 'left', sortable: true },
-      { name: 'status', label: 'Status', field: 'status', align: 'center', sortable: true },
-      { name: 'check_mode', label: 'Mode', field: 'check_mode', align: 'center' },
-      { name: 'error_detail', label: 'Error Detail', field: 'error_detail', align: 'left' },
-      { name: 'last_checked', label: 'Last Checked', field: 'last_checked', align: 'left', sortable: true },
-      { name: 'error_count', label: 'Errors', field: 'error_count', align: 'center' },
-      { name: 'actions', label: 'Actions', field: 'actions', align: 'center' },
-    ];
+    const statusColumns = computed(() => [
+      { name: 'abspath', label: t('pages.healthCheck.columnFilePath'), field: 'abspath', align: 'left', sortable: true },
+      { name: 'status', label: t('pages.healthCheck.columnStatus'), field: 'status', align: 'center', sortable: true },
+      { name: 'check_mode', label: t('pages.healthCheck.columnMode'), field: 'check_mode', align: 'center' },
+      { name: 'error_detail', label: t('pages.healthCheck.columnErrorDetail'), field: 'error_detail', align: 'left' },
+      { name: 'last_checked', label: t('pages.healthCheck.columnLastChecked'), field: 'last_checked', align: 'left', sortable: true },
+      { name: 'error_count', label: t('pages.healthCheck.columnErrors'), field: 'error_count', align: 'center' },
+      { name: 'actions', label: t('pages.healthCheck.columnActions'), field: 'actions', align: 'center' },
+    ]);
+
+    const scanModeOptions = computed(() => [
+      { label: t('pages.healthCheck.modeQuick'), value: 'quick' },
+      { label: t('pages.healthCheck.modeThorough'), value: 'thorough' },
+    ]);
+
+    const statusFilterOptions = computed(() => [
+      { label: t('pages.healthCheck.filterAll'), value: null },
+      { label: t('pages.healthCheck.filterHealthy'), value: 'healthy' },
+      { label: t('pages.healthCheck.filterWarning'), value: 'warning' },
+      { label: t('pages.healthCheck.filterCorrupted'), value: 'corrupted' },
+      { label: t('pages.healthCheck.filterUnchecked'), value: 'unchecked' },
+    ]);
 
     function getStatusColor(status) {
       if (status === 'healthy') return 'positive';
@@ -378,7 +398,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading health summary:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load health summary' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadSummary') });
       } finally {
         loadingSummary.value = false;
       }
@@ -398,7 +418,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading worker info:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load worker info' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadWorkerInfo') });
       }
     }
 
@@ -414,7 +434,7 @@ export default {
         }
       } catch (error) {
         console.error('Error setting worker count:', error);
-        $q.notify({ type: 'negative', message: 'Failed to update worker count' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedUpdateWorkerCount') });
       }
     }
 
@@ -454,7 +474,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading health statuses:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load health statuses' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadStatuses') });
       } finally {
         loadingStatuses.value = false;
       }
@@ -462,8 +482,8 @@ export default {
 
     function scanLibrary() {
       $q.dialog({
-        title: 'Start Library Scan?',
-        message: 'This will scan all media files in the selected library. On large libraries this may take a long time.',
+        title: t('pages.healthCheck.startScanTitle'),
+        message: t('pages.healthCheck.startScanMessage'),
         cancel: true,
         persistent: false,
       }).onOk(async () => {
@@ -476,14 +496,14 @@ export default {
             scanning.value = response.data.started;
             if (response.data.started) {
               startPolling();
-              $q.notify({ type: 'positive', message: 'Library scan started' });
+              $q.notify({ type: 'positive', message: t('pages.healthCheck.scanStarted') });
             } else {
-              $q.notify({ type: 'warning', message: response.data.message || 'A scan is already in progress' });
+              $q.notify({ type: 'warning', message: response.data.message || t('pages.healthCheck.scanAlreadyInProgress') });
             }
           }
         } catch (error) {
           console.error('Error starting library scan:', error);
-          $q.notify({ type: 'negative', message: 'Failed to start library scan' });
+          $q.notify({ type: 'negative', message: t('pages.healthCheck.failedStartScan') });
         }
       });
     }
@@ -491,10 +511,10 @@ export default {
     async function cancelScan() {
       try {
         await axios.post(getCompressoApiUrl('v2', 'healthcheck/cancel-scan'));
-        $q.notify({ type: 'info', message: 'Scan cancellation requested' });
+        $q.notify({ type: 'info', message: t('pages.healthCheck.scanCancelRequested') });
       } catch (error) {
         console.error('Error cancelling scan:', error);
-        $q.notify({ type: 'negative', message: 'Failed to cancel scan' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedCancelScan') });
       }
     }
 
@@ -513,7 +533,7 @@ export default {
         }
       } catch (error) {
         console.error('Error checking file:', error);
-        $q.notify({ type: 'negative', message: 'Failed to check file' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedCheckFile') });
       }
     }
 
@@ -529,7 +549,7 @@ export default {
         await loadStatuses();
       } catch (error) {
         console.error('Error re-checking file:', error);
-        $q.notify({ type: 'negative', message: 'Failed to re-check file' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedRecheckFile') });
       } finally {
         row._checking = false;
       }
@@ -597,7 +617,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading libraries:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load libraries' });
+        $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadLibraries') });
       }
     }
 
@@ -635,6 +655,8 @@ export default {
       loadingSummary,
       pagination,
       statusColumns,
+      scanModeOptions,
+      statusFilterOptions,
       fileInfoDialogRef,
       getStatusColor,
       loadStatuses,

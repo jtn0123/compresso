@@ -2,11 +2,11 @@
   <q-page padding>
     <div class="q-pa-md">
       <div class="row items-center q-mb-md">
-        <div class="text-h5 col">Compression Dashboard</div>
+        <div class="text-h5 col">{{ $t('pages.compressionDashboard.title') }}</div>
         <q-select
           v-model="selectedLibraryId"
           :options="libraryOptions"
-          label="Library Filter"
+          :label="$t('pages.compressionDashboard.libraryFilter')"
           outlined
           dense
           emit-value
@@ -21,7 +21,7 @@
         <div class="col-12 col-sm-6 col-md-3">
           <q-card class="bg-primary text-white">
             <q-card-section>
-              <div class="text-caption">Total Space Saved</div>
+              <div class="text-caption">{{ $t('pages.compressionDashboard.totalSpaceSaved') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipSpaceSaved') }}</q-tooltip></div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="60px" />
                 <template v-else>{{ formatBytes(summary.space_saved) }}</template>
@@ -32,7 +32,7 @@
         <div class="col-12 col-sm-6 col-md-3">
           <q-card class="bg-secondary text-white">
             <q-card-section>
-              <div class="text-caption">Files Processed</div>
+              <div class="text-caption">{{ $t('pages.compressionDashboard.filesProcessed') }}</div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.file_count }}</template>
@@ -43,7 +43,7 @@
         <div class="col-12 col-sm-6 col-md-3">
           <q-card class="bg-accent text-white">
             <q-card-section>
-              <div class="text-caption">Avg Compression Ratio</div>
+              <div class="text-caption">{{ $t('pages.compressionDashboard.avgCompressionRatio') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipRatio') }}</q-tooltip></div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="50px" />
                 <template v-else>{{ (summary.avg_ratio * 100).toFixed(1) }}%</template>
@@ -54,13 +54,13 @@
         <div class="col-12 col-sm-6 col-md-3">
           <q-card class="bg-info text-white">
             <q-card-section>
-              <div class="text-caption">Pending Estimate</div>
+              <div class="text-caption">{{ $t('pages.compressionDashboard.pendingEstimate') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipPendingEstimate') }}</q-tooltip></div>
               <div class="text-h5">
                 <q-skeleton v-if="loadingSummary" type="text" width="60px" />
                 <template v-else>{{ formatBytes(pendingEstimate.estimated_savings) }}</template>
               </div>
               <div class="text-caption">
-                <template v-if="!loadingSummary">{{ pendingEstimate.pending_count }} files</template>
+                <template v-if="!loadingSummary">{{ $t('pages.compressionDashboard.filesCount', { count: pendingEstimate.pending_count }) }}</template>
               </div>
             </q-card-section>
           </q-card>
@@ -77,7 +77,7 @@
             :loading="chartsLoading"
           />
           <q-card v-else>
-            <q-card-section class="text-center text-grey">No codec data yet</q-card-section>
+            <q-card-section class="text-center text-grey">{{ $t('pages.compressionDashboard.noCodecData') }}</q-card-section>
           </q-card>
         </div>
         <div class="col-12 col-md-6">
@@ -87,7 +87,7 @@
             :loading="chartsLoading"
           />
           <q-card v-else>
-            <q-card-section class="text-center text-grey">No resolution data yet</q-card-section>
+            <q-card-section class="text-center text-grey">{{ $t('pages.compressionDashboard.noResolutionData') }}</q-card-section>
           </q-card>
         </div>
       </div>
@@ -100,14 +100,14 @@
           @interval-change="onIntervalChange"
         />
         <q-card v-else>
-          <q-card-section class="text-center text-grey">No timeline data yet</q-card-section>
+          <q-card-section class="text-center text-grey">{{ $t('pages.compressionDashboard.noTimelineData') }}</q-card-section>
         </q-card>
       </div>
 
       <!-- Per-Library Breakdown -->
       <q-card class="q-mb-lg" v-if="summary.per_library && summary.per_library.length > 0">
         <q-card-section>
-          <div class="text-h6">Per-Library Breakdown</div>
+          <div class="text-h6">{{ $t('pages.compressionDashboard.perLibraryBreakdown') }}</div>
         </q-card-section>
         <q-table
           :rows="summary.per_library"
@@ -123,13 +123,13 @@
       <!-- Per-File Table -->
       <q-card>
         <q-card-section>
-          <div class="text-h6">Per-File Compression Stats</div>
+          <div class="text-h6">{{ $t('pages.compressionDashboard.perFileStats') }}</div>
         </q-card-section>
         <q-card-section>
           <q-input
             v-model="searchValue"
             debounce="500"
-            placeholder="Search files..."
+            :placeholder="$t('pages.compressionDashboard.searchFiles')"
             dense
             outlined
             class="q-mb-md"
@@ -176,6 +176,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import { formatBytes } from 'src/js/formatUtils';
@@ -192,9 +193,10 @@ export default {
   },
   setup() {
     const $q = useQuasar();
+    const { t } = useI18n();
     const loadingSummary = ref(true);
     const selectedLibraryId = ref(null);
-    const libraryOptions = ref([{ label: 'All Libraries', value: null }]);
+    const libraryOptions = ref([{ label: t('pages.compressionDashboard.allLibraries'), value: null }]);
 
     const summary = ref({
       total_source_size: 0,
@@ -231,24 +233,24 @@ export default {
     });
 
     const libraryColumns = [
-      { name: 'library_id', label: 'Library ID', field: 'library_id', align: 'left', sortable: true },
-      { name: 'file_count', label: 'Files', field: 'file_count', align: 'right', sortable: true },
-      { name: 'total_source_size', label: 'Original Size', field: 'total_source_size', align: 'right', format: (v) => formatBytes(v) },
-      { name: 'total_destination_size', label: 'New Size', field: 'total_destination_size', align: 'right', format: (v) => formatBytes(v) },
-      { name: 'space_saved', label: 'Space Saved', field: 'space_saved', align: 'right', format: (v) => formatBytes(v) },
-      { name: 'avg_ratio', label: 'Avg Ratio', field: 'avg_ratio', align: 'right', format: (v) => (v * 100).toFixed(1) + '%' },
+      { name: 'library_id', label: t('pages.compressionDashboard.columnLibraryId'), field: 'library_id', align: 'left', sortable: true },
+      { name: 'file_count', label: t('pages.compressionDashboard.columnFiles'), field: 'file_count', align: 'right', sortable: true },
+      { name: 'total_source_size', label: t('pages.compressionDashboard.columnOriginalSize'), field: 'total_source_size', align: 'right', format: (v) => formatBytes(v) },
+      { name: 'total_destination_size', label: t('pages.compressionDashboard.columnNewSize'), field: 'total_destination_size', align: 'right', format: (v) => formatBytes(v) },
+      { name: 'space_saved', label: t('pages.compressionDashboard.columnSpaceSaved'), field: 'space_saved', align: 'right', format: (v) => formatBytes(v) },
+      { name: 'avg_ratio', label: t('pages.compressionDashboard.columnAvgRatio'), field: 'avg_ratio', align: 'right', format: (v) => (v * 100).toFixed(1) + '%' },
     ];
 
     const fileColumns = [
-      { name: 'task_label', label: 'File', field: 'task_label', align: 'left', sortable: true },
-      { name: 'source_size', label: 'Original', field: 'source_size', align: 'right', sortable: true, format: (v) => formatBytes(v) },
-      { name: 'destination_size', label: 'New Size', field: 'destination_size', align: 'right', sortable: true, format: (v) => formatBytes(v) },
-      { name: 'ratio', label: 'Ratio', field: 'ratio', align: 'center', sortable: true },
-      { name: 'space_saved', label: 'Saved', field: 'space_saved', align: 'right', sortable: true },
-      { name: 'source_codec', label: 'Source Codec', field: 'source_codec', align: 'left' },
-      { name: 'destination_codec', label: 'Dest Codec', field: 'destination_codec', align: 'left' },
-      { name: 'library_id', label: 'Library', field: 'library_id', align: 'center' },
-      { name: 'finish_time', label: 'Date', field: 'finish_time', align: 'left', sortable: true },
+      { name: 'task_label', label: t('pages.compressionDashboard.columnFile'), field: 'task_label', align: 'left', sortable: true },
+      { name: 'source_size', label: t('pages.compressionDashboard.columnOriginal'), field: 'source_size', align: 'right', sortable: true, format: (v) => formatBytes(v) },
+      { name: 'destination_size', label: t('pages.compressionDashboard.columnNewSize'), field: 'destination_size', align: 'right', sortable: true, format: (v) => formatBytes(v) },
+      { name: 'ratio', label: t('pages.compressionDashboard.columnRatio'), field: 'ratio', align: 'center', sortable: true },
+      { name: 'space_saved', label: t('pages.compressionDashboard.columnSaved'), field: 'space_saved', align: 'right', sortable: true },
+      { name: 'source_codec', label: t('pages.compressionDashboard.columnSourceCodec'), field: 'source_codec', align: 'left' },
+      { name: 'destination_codec', label: t('pages.compressionDashboard.columnDestCodec'), field: 'destination_codec', align: 'left' },
+      { name: 'library_id', label: t('pages.compressionDashboard.columnLibrary'), field: 'library_id', align: 'center' },
+      { name: 'finish_time', label: t('pages.compressionDashboard.columnDate'), field: 'finish_time', align: 'left', sortable: true },
     ];
 
     function buildLibraryParam() {
@@ -263,7 +265,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading compression summary:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load compression summary' });
+        $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingSummary') });
       } finally {
         loadingSummary.value = false;
       }
@@ -277,7 +279,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading pending estimate:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load pending estimate' });
+        $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingPendingEstimate') });
       }
     }
 
@@ -318,7 +320,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading compression stats:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load compression stats' });
+        $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingStats') });
       } finally {
         loading.value = false;
       }
@@ -348,7 +350,7 @@ export default {
         const response = await axios.get(getCompressoApiUrl('v2', 'settings/read'));
         if (response.data && response.data.settings) {
           const libs = response.data.settings.libraries || [];
-          libraryOptions.value = [{ label: 'All Libraries', value: null }];
+          libraryOptions.value = [{ label: t('pages.compressionDashboard.allLibraries'), value: null }];
           libs.forEach(lib => {
             libraryOptions.value.push({
               label: lib.name || `Library ${lib.id}`,
@@ -358,7 +360,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading libraries:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load libraries' });
+        $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingLibraries') });
       }
     }
 

@@ -23,30 +23,55 @@
         </q-item>
         <!--END DASHBOARD SELECT-->
         <!--START SETTINGS SELECT-->
-        <q-item
-          clickable
-          to="/ui/settings-library"
-          v-ripple>
-          <q-item-section avatar>
-            <q-icon name="settings"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.settings') }}
-          </q-item-section>
-        </q-item>
+        <q-expansion-item
+          icon="settings"
+          :label="$t('navigation.settings')"
+          :default-opened="isSettingsRoute"
+          :header-class="isSettingsRoute ? 'text-primary text-weight-bold' : ''"
+        >
+          <q-item clickable to="/ui/settings-library" v-ripple :active="$route.path === '/ui/settings-library'" dense class="q-pl-xl">
+            <q-item-section avatar><q-icon name="account_tree" size="sm"/></q-item-section>
+            <q-item-section>{{ $t('navigation.library') }}</q-item-section>
+          </q-item>
+          <q-item clickable to="/ui/settings-workers" v-ripple :active="$route.path === '/ui/settings-workers'" dense class="q-pl-xl">
+            <q-item-section avatar><q-icon name="engineering" size="sm"/></q-item-section>
+            <q-item-section>{{ $t('navigation.workers') }}</q-item-section>
+          </q-item>
+          <q-item clickable to="/ui/settings-plugins" v-ripple :active="$route.path === '/ui/settings-plugins'" dense class="q-pl-xl">
+            <q-item-section avatar><q-icon name="extension" size="sm"/></q-item-section>
+            <q-item-section>{{ $t('navigation.plugins') }}</q-item-section>
+          </q-item>
+          <q-item clickable to="/ui/settings-link" v-ripple :active="$route.path === '/ui/settings-link'" dense class="q-pl-xl">
+            <q-item-section avatar><q-icon name="link" size="sm"/></q-item-section>
+            <q-item-section>{{ $t('navigation.link') }}</q-item-section>
+          </q-item>
+        </q-expansion-item>
         <!--END SETTINGS SELECT-->
         <!--START DATA PANELS SELECT-->
-        <q-item
-          clickable
-          to="/ui/data-panels"
-          v-ripple>
-          <q-item-section avatar>
-            <q-icon name="insights"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.dataPanels') }}
-          </q-item-section>
-        </q-item>
+        <q-expansion-item
+          icon="insights"
+          :label="$t('navigation.dataPanels')"
+          :default-opened="isDataPanelsRoute"
+          :header-class="isDataPanelsRoute ? 'text-primary text-weight-bold' : ''"
+        >
+          <q-item clickable to="/ui/data-panels" v-ripple :active="$route.path === '/ui/data-panels' && !$route.query.pluginId" dense class="q-pl-xl">
+            <q-item-section avatar><q-icon name="insights" size="sm"/></q-item-section>
+            <q-item-section>{{ $t('navigation.dataPanels') }}</q-item-section>
+          </q-item>
+          <q-item
+            v-for="panel in availableDataPanels"
+            :key="panel.id"
+            clickable
+            @click="$router.push('/ui/data-panels?pluginId=' + panel.id)"
+            v-ripple
+            :active="$route.query.pluginId === panel.id"
+            dense
+            class="q-pl-xl"
+          >
+            <q-item-section avatar><q-icon name="bar_chart" size="sm"/></q-item-section>
+            <q-item-section>{{ panel.label }}</q-item-section>
+          </q-item>
+        </q-expansion-item>
         <!--END DATA PANELS SELECT-->
         <!--START COMPRESSION DASHBOARD SELECT-->
         <q-item
@@ -57,7 +82,7 @@
             <q-icon name="compress"/>
           </q-item-section>
           <q-item-section>
-            Compression
+            {{ $t('navigation.compression') }}
           </q-item-section>
         </q-item>
         <!--END COMPRESSION DASHBOARD SELECT-->
@@ -70,7 +95,7 @@
             <q-icon name="fact_check"/>
           </q-item-section>
           <q-item-section>
-            Approval Queue
+            {{ $t('navigation.approvalQueue') }}
             <q-badge
               v-if="approvalCount > 0"
               color="orange"
@@ -88,7 +113,7 @@
             <q-icon name="compare"/>
           </q-item-section>
           <q-item-section>
-            A/B Preview
+            {{ $t('navigation.abPreview') }}
           </q-item-section>
         </q-item>
         <!--END PREVIEW COMPARE SELECT-->
@@ -101,7 +126,7 @@
             <q-icon name="health_and_safety"/>
           </q-item-section>
           <q-item-section>
-            Health Check
+            {{ $t('navigation.healthCheck') }}
           </q-item-section>
         </q-item>
         <!--END HEALTH CHECK SELECT-->
@@ -191,8 +216,10 @@
 
 import DrawerUserProfileHeader from "components/drawers/partials/DrawerUserProfileHeader.vue";
 import ThemeSwitch from "components/ThemeSwitch";
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRoute } from "vue-router";
 import axios from "axios";
+import { getCompressoApiUrl } from "src/js/compressoGlobals";
 import FooterData from "components/FooterData";
 import PrivacyPolicyDialog from "components/docs/PrivacyPolicyDialog.vue";
 import HelpSupportDialog from "components/docs/HelpSupportDialog.vue";
@@ -209,11 +236,28 @@ export default {
     PrivacyPolicyDialog,
   },
   setup() {
+    const route = useRoute();
     const privacyPolicyDialogRef = ref(null);
     const helpSupportDialogRef = ref(null);
     const applicationLogsDialogRef = ref(null);
     const approvalCount = ref(0);
+    const availableDataPanels = ref([]);
     let approvalInterval = null;
+
+    const isSettingsRoute = computed(() => route.path.startsWith('/ui/settings'));
+    const isDataPanelsRoute = computed(() => route.path === '/ui/data-panels');
+
+    async function fetchDataPanelList() {
+      try {
+        const response = await axios.get(getCompressoApiUrl('v2', 'plugins/panels/enabled'));
+        availableDataPanels.value = (response.data.results || []).map(p => ({
+          id: p.plugin_id,
+          label: p.name,
+        }));
+      } catch {
+        // Silently ignore
+      }
+    }
 
     function showPrivacyPolicyDialog() {
       if (privacyPolicyDialogRef.value) {
@@ -244,6 +288,7 @@ export default {
 
     onMounted(() => {
       fetchApprovalCount();
+      fetchDataPanelList();
       approvalInterval = setInterval(fetchApprovalCount, 15000);
     });
 
@@ -261,6 +306,9 @@ export default {
       helpSupportDialogRef,
       applicationLogsDialogRef,
       approvalCount,
+      availableDataPanels,
+      isSettingsRoute,
+      isDataPanelsRoute,
     }
   },
 }

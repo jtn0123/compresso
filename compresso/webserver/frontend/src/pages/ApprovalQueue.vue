@@ -4,23 +4,23 @@
     <!-- Header -->
     <div class="row items-center q-mb-md">
       <div class="col">
-        <div class="text-h5">Approval Queue</div>
+        <div class="text-h5">{{ $t('pages.approvalQueue.title') }}</div>
         <div class="text-caption text-grey">
-          Review transcoded files before replacing originals
+          {{ $t('pages.approvalQueue.caption') }}
         </div>
       </div>
       <div class="col-auto q-gutter-sm">
         <q-btn
           color="positive"
           icon="check_circle"
-          label="Approve Selected"
+          :label="$t('pages.approvalQueue.approveSelected')"
           :disable="selectedIds.length === 0"
           :loading="approving"
           @click="approveSelected"/>
         <q-btn
           color="negative"
           icon="cancel"
-          label="Reject Selected"
+          :label="$t('pages.approvalQueue.rejectSelected')"
           :disable="selectedIds.length === 0"
           @click="showRejectDialog = true"/>
         <q-btn
@@ -30,11 +30,15 @@
       </div>
     </div>
 
+    <AdmonitionBanner type="note" class="q-mb-md">
+      {{ $t('pages.approvalQueue.bannerText') }}
+    </AdmonitionBanner>
+
     <!-- New items banner -->
     <q-banner v-if="newItemCount > 0" class="bg-info text-white q-mb-md" rounded dense>
-      {{ newItemCount }} new item(s) arrived
+      {{ $t('pages.approvalQueue.newItemsArrived', { count: newItemCount }) }}
       <template v-slot:action>
-        <q-btn flat label="Refresh" @click="acknowledgeNewItems"/>
+        <q-btn flat :label="$t('pages.approvalQueue.refresh')" @click="acknowledgeNewItems"/>
       </template>
     </q-banner>
 
@@ -43,10 +47,10 @@
       <div class="col-12 col-sm-6 col-md-3">
         <q-card class="bg-primary text-white">
           <q-card-section>
-            <div class="text-caption">Awaiting Review</div>
+            <div class="text-caption">{{ $t('pages.approvalQueue.awaitingReview') }}</div>
             <div class="text-h5">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="40px" />
-              <template v-else>{{ pagination.rowsNumber }} files</template>
+              <template v-else>{{ $t('pages.approvalQueue.filesCount', { count: pagination.rowsNumber }) }}</template>
             </div>
           </q-card-section>
         </q-card>
@@ -54,31 +58,31 @@
       <div class="col-12 col-sm-6 col-md-3">
         <q-card class="bg-positive text-white">
           <q-card-section>
-            <div class="text-caption">Space to Save</div>
+            <div class="text-caption">{{ $t('pages.approvalQueue.spaceToSave') }}</div>
             <div class="text-h5">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="60px" />
               <template v-else>{{ formatSize(totalSpaceSaved) }}</template>
             </div>
-            <div class="text-caption" v-if="!loading || tasks.length > 0">if all approved</div>
+            <div class="text-caption" v-if="!loading || tasks.length > 0">{{ $t('pages.approvalQueue.ifAllApproved') }}</div>
           </q-card-section>
         </q-card>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <q-card class="bg-accent text-white">
           <q-card-section>
-            <div class="text-caption">Avg Savings</div>
+            <div class="text-caption">{{ $t('pages.approvalQueue.avgSavings') }}</div>
             <div class="text-h5">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="50px" />
               <template v-else>{{ avgSavingsPercent }}%</template>
             </div>
-            <div class="text-caption" v-if="!loading || tasks.length > 0">per file</div>
+            <div class="text-caption" v-if="!loading || tasks.length > 0">{{ $t('pages.approvalQueue.perFile') }}</div>
           </q-card-section>
         </q-card>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <q-card class="bg-info text-white">
           <q-card-section>
-            <div class="text-caption">Largest File</div>
+            <div class="text-caption">{{ $t('pages.approvalQueue.largestFile') }}</div>
             <div class="text-h5 ellipsis" style="max-width: 200px">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="80px" />
               <template v-else>{{ largestFileName }}</template>
@@ -183,13 +187,13 @@
           <q-td key="actions" :props="props" class="text-center">
             <template v-if="$q.screen.gt.xs">
               <q-btn flat dense color="positive" icon="check" size="sm" @click.stop="approveSingle(props.row.id)">
-                <q-tooltip>Approve</q-tooltip>
+                <q-tooltip>{{ $t('pages.approvalQueue.tooltipApprove') }}</q-tooltip>
               </q-btn>
               <q-btn flat dense color="negative" icon="close" size="sm" @click.stop="rejectSingle(props.row.id)">
-                <q-tooltip>Reject</q-tooltip>
+                <q-tooltip>{{ $t('pages.approvalQueue.tooltipReject') }}</q-tooltip>
               </q-btn>
               <q-btn flat dense color="info" icon="info" size="sm" @click.stop="showDetail(props.row.id)">
-                <q-tooltip>Details</q-tooltip>
+                <q-tooltip>{{ $t('pages.approvalQueue.tooltipDetails') }}</q-tooltip>
               </q-btn>
             </template>
             <template v-else>
@@ -198,15 +202,15 @@
                   <q-list dense>
                     <q-item clickable v-close-popup @click="approveSingle(props.row.id)">
                       <q-item-section avatar><q-icon name="check" color="positive"/></q-item-section>
-                      <q-item-section>Approve</q-item-section>
+                      <q-item-section>{{ $t('pages.approvalQueue.tooltipApprove') }}</q-item-section>
                     </q-item>
                     <q-item clickable v-close-popup @click="rejectSingle(props.row.id)">
                       <q-item-section avatar><q-icon name="close" color="negative"/></q-item-section>
-                      <q-item-section>Reject</q-item-section>
+                      <q-item-section>{{ $t('pages.approvalQueue.tooltipReject') }}</q-item-section>
                     </q-item>
                     <q-item clickable v-close-popup @click="showDetail(props.row.id)">
                       <q-item-section avatar><q-icon name="info" color="info"/></q-item-section>
-                      <q-item-section>Details</q-item-section>
+                      <q-item-section>{{ $t('pages.approvalQueue.tooltipDetails') }}</q-item-section>
                     </q-item>
                   </q-list>
                 </q-menu>
@@ -221,29 +225,28 @@
         <div class="full-width column items-center q-pa-lg text-grey">
           <q-icon name="check_circle_outline" size="3rem" class="q-mb-sm"/>
           <template v-if="approvalEnabled === true">
-            <div class="text-h6">All clear — nothing to review</div>
+            <div class="text-h6">{{ $t('pages.approvalQueue.allClear') }}</div>
             <div class="text-caption">
-              When approval mode is on, transcoded files appear here for your
-              review before replacing the originals.
+              {{ $t('pages.approvalQueue.allClearCaption') }}
             </div>
           </template>
           <template v-else-if="approvalEnabled === false">
-            <div class="text-h6">Approval mode is off</div>
+            <div class="text-h6">{{ $t('pages.approvalQueue.approvalModeOff') }}</div>
             <div class="text-caption q-mb-sm">
-              Files are replaced automatically after transcoding.
+              {{ $t('pages.approvalQueue.filesReplacedAutomatically') }}
             </div>
             <q-btn
               flat
               color="primary"
-              label="Enable in Library Settings"
+              :label="$t('pages.approvalQueue.enableInLibrarySettings')"
               icon="settings"
               to="/ui/settings-library"
             />
           </template>
           <template v-else>
-            <div class="text-h6">No tasks awaiting approval</div>
+            <div class="text-h6">{{ $t('pages.approvalQueue.noTasksAwaiting') }}</div>
             <div class="text-caption">
-              Transcoded files will appear here when approval mode is enabled
+              {{ $t('pages.approvalQueue.transcodedFilesWillAppear') }}
             </div>
           </template>
         </div>
@@ -267,12 +270,12 @@
 
         <q-card-section v-if="detailData">
           <!-- Section 1: What Changed -->
-          <div class="text-subtitle2 q-mb-sm">What Changed</div>
+          <div class="text-subtitle2 q-mb-sm">{{ $t('pages.approvalQueue.whatChanged') }}</div>
           <div class="row q-col-gutter-md q-mb-md">
             <div class="col-12 col-sm-6">
               <q-card flat bordered class="bg-grey-2">
                 <q-card-section class="q-pa-sm">
-                  <div class="text-caption text-weight-bold">Original</div>
+                  <div class="text-caption text-weight-bold">{{ $t('pages.approvalQueue.original') }}</div>
                   <div class="row q-gutter-xs q-mt-xs">
                     <q-badge v-if="detailData.source_codec" color="grey-7">{{ detailData.source_codec }}</q-badge>
                     <q-badge v-if="detailData.source_resolution" color="grey-7">{{ detailData.source_resolution }}</q-badge>
@@ -285,7 +288,7 @@
             <div class="col-12 col-sm-6">
               <q-card flat bordered class="bg-grey-2">
                 <q-card-section class="q-pa-sm">
-                  <div class="text-caption text-weight-bold">Transcoded</div>
+                  <div class="text-caption text-weight-bold">{{ $t('pages.approvalQueue.transcoded') }}</div>
                   <div class="row q-gutter-xs q-mt-xs">
                     <q-badge v-if="detailData.staged_codec" color="grey-7">{{ detailData.staged_codec }}</q-badge>
                     <q-badge v-if="detailData.staged_resolution" color="grey-7">{{ detailData.staged_resolution }}</q-badge>
@@ -302,20 +305,20 @@
               v-if="detailData.size_delta < 0"
               class="text-h6 text-positive"
             >
-              Space saved: {{ formatSize(Math.abs(detailData.size_delta)) }} ({{ detailSavingsPercent }}%)
+              {{ $t('pages.approvalQueue.spaceSavedDetail', { size: formatSize(Math.abs(detailData.size_delta)), percent: detailSavingsPercent }) }}
             </span>
             <span
               v-else-if="detailData.size_delta > 0"
               class="text-h6 text-negative"
             >
-              File got bigger by {{ formatSize(detailData.size_delta) }} ({{ detailSavingsPercent }}%)
+              {{ $t('pages.approvalQueue.fileBiggerBy', { size: formatSize(detailData.size_delta), percent: detailSavingsPercent }) }}
             </span>
-            <span v-else class="text-h6 text-grey">No size change</span>
+            <span v-else class="text-h6 text-grey">{{ $t('pages.approvalQueue.noSizeChange') }}</span>
           </div>
 
           <!-- Section 2: Processing Info (collapsed) -->
           <q-expansion-item
-            label="Processing Info"
+            :label="$t('pages.approvalQueue.processingInfo')"
             icon="schedule"
             header-class="text-subtitle2"
             default-closed
@@ -325,22 +328,22 @@
               <q-card-section class="q-pa-sm">
                 <div class="row q-gutter-md">
                   <div class="col">
-                    <div class="text-caption">Start Time</div>
+                    <div class="text-caption">{{ $t('pages.approvalQueue.startTime') }}</div>
                     <div>{{ detailData.start_time }}</div>
                   </div>
                   <div class="col">
-                    <div class="text-caption">Finish Time</div>
+                    <div class="text-caption">{{ $t('pages.approvalQueue.finishTime') }}</div>
                     <div>{{ detailData.finish_time }}</div>
                   </div>
                 </div>
                 <div class="row q-gutter-md q-mt-sm">
                   <div class="col">
-                    <div class="text-caption">Size Ratio</div>
+                    <div class="text-caption">{{ $t('pages.approvalQueue.sizeRatio') }}</div>
                     <div>{{ detailData.size_ratio }}x</div>
                   </div>
                 </div>
                 <div v-if="detailData.log" class="q-mt-md">
-                  <q-expansion-item label="Processing Log (last 20 lines)" dense default-closed>
+                  <q-expansion-item :label="$t('pages.approvalQueue.processingLog')" dense default-closed>
                     <pre class="text-caption" style="max-height: 200px; overflow-y: auto; white-space: pre-wrap">{{ logTail }}</pre>
                   </q-expansion-item>
                 </div>
@@ -354,16 +357,16 @@
               v-if="!previewActive && !previewLoading"
               color="info"
               icon="compare"
-              label="Compare Quality"
+              :label="$t('pages.approvalQueue.compareQuality')"
               outline
               @click="startPreview"
             />
             <div class="text-caption text-grey q-mt-xs" v-if="!previewActive && !previewLoading">
-              Creates a 10-second preview clip using your pipeline settings so you can see the quality difference.
+              {{ $t('pages.approvalQueue.previewCaption') }}
             </div>
             <div v-if="previewLoading" class="q-pa-md text-center">
               <q-spinner color="primary" size="2em" class="q-mr-sm"/>
-              Generating preview... {{ previewStatus }}
+              {{ $t('pages.approvalQueue.generatingPreview', { status: previewStatus }) }}
             </div>
             <div v-if="previewActive && previewData">
               <VideoCompare
@@ -392,19 +395,19 @@
           <q-btn
             color="positive"
             icon="check_circle"
-            label="Approve"
+            :label="$t('pages.approvalQueue.approve')"
             :loading="approving"
             class="col"
             @click="approveFromDetail"/>
           <q-btn
             color="negative"
             icon="cancel"
-            label="Reject"
+            :label="$t('pages.approvalQueue.reject')"
             class="col"
             @click="rejectFromDetail"/>
           <q-btn
             flat
-            label="Close"
+            :label="$t('pages.approvalQueue.close')"
             class="col-auto"
             @click="closeDetail"/>
         </q-card-actions>
@@ -415,25 +418,22 @@
     <q-dialog v-model="showRejectDialog">
       <q-card style="min-width: 400px">
         <q-card-section>
-          <div class="text-h6">Reject {{ rejectTargetIds.length || selectedIds.length }} file(s)?</div>
+          <div class="text-h6">{{ $t('pages.approvalQueue.rejectTitle', { count: rejectTargetIds.length || selectedIds.length }) }}</div>
         </q-card-section>
         <q-card-section>
-          <div class="text-subtitle2 q-mb-sm">What happens to rejected files?</div>
+          <div class="text-subtitle2 q-mb-sm">{{ $t('pages.approvalQueue.whatHappensToRejected') }}</div>
           <q-option-group
             v-model="rejectAction"
-            :options="[
-              { label: 'Discard — delete the transcoded file, keep the original untouched', value: 'discard' },
-              { label: 'Requeue — put it back in the queue to try again with current settings', value: 'requeue' },
-            ]"
+            :options="rejectOptions"
             type="radio"
           />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Cancel" v-close-popup/>
+          <q-btn flat :label="$t('pages.approvalQueue.cancel')" v-close-popup/>
           <q-btn
             flat
             color="negative"
-            label="Reject"
+            :label="$t('pages.approvalQueue.reject')"
             :loading="rejecting"
             @click="confirmReject"/>
         </q-card-actions>
@@ -446,15 +446,18 @@
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useQuasar } from 'quasar';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import VideoCompare from 'components/preview/VideoCompare.vue';
+import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
 
 export default {
   name: 'ApprovalQueue',
-  components: { VideoCompare },
+  components: { VideoCompare, AdmonitionBanner },
   setup() {
     const $q = useQuasar();
+    const { t: $t } = useI18n();
     const tasks = ref([]);
     const selected = ref([]);
     const loading = ref(false);
@@ -485,21 +488,21 @@ export default {
       rowsNumber: 0,
     });
 
-    const columns = [
-      { name: 'abspath', label: 'File', field: 'abspath', align: 'left', sortable: false },
-      { name: 'codec', label: 'Codec', field: 'source_codec', align: 'left', sortable: false },
-      { name: 'source_size', label: 'Original', field: 'source_size', align: 'right', sortable: false },
-      { name: 'staged_size', label: 'New', field: 'staged_size', align: 'right', sortable: false },
-      { name: 'size_delta', label: 'Change', field: 'size_delta', align: 'center', sortable: false },
-      { name: 'savings', label: 'Space Saved', field: 'source_size', align: 'center', sortable: false },
-      { name: 'finish_time', label: 'Completed', field: 'finish_time', align: 'left', sortable: false },
-      { name: 'actions', label: 'Actions', field: 'id', align: 'center', sortable: false },
-    ];
+    const columns = computed(() => [
+      { name: 'abspath', label: $t('pages.approvalQueue.columnFile'), field: 'abspath', align: 'left', sortable: false },
+      { name: 'codec', label: $t('pages.approvalQueue.columnCodec'), field: 'source_codec', align: 'left', sortable: false },
+      { name: 'source_size', label: $t('pages.approvalQueue.columnOriginal'), field: 'source_size', align: 'right', sortable: false },
+      { name: 'staged_size', label: $t('pages.approvalQueue.columnNew'), field: 'staged_size', align: 'right', sortable: false },
+      { name: 'size_delta', label: $t('pages.approvalQueue.columnChange'), field: 'size_delta', align: 'center', sortable: false },
+      { name: 'savings', label: $t('pages.approvalQueue.columnSpaceSaved'), field: 'source_size', align: 'center', sortable: false },
+      { name: 'finish_time', label: $t('pages.approvalQueue.columnCompleted'), field: 'finish_time', align: 'left', sortable: false },
+      { name: 'actions', label: $t('pages.approvalQueue.columnActions'), field: 'id', align: 'center', sortable: false },
+    ]);
 
     const selectedIds = computed(() => selected.value.map(s => s.id));
 
     const visibleColumns = computed(() => {
-      const all = columns.map(c => c.name);
+      const all = columns.value.map(c => c.name);
       if ($q.screen.lt.md) {
         return all.filter(n => n !== 'finish_time');
       }
@@ -517,6 +520,11 @@ export default {
       const pct = ((detailData.value.source_size - detailData.value.staged_size) / detailData.value.source_size) * 100;
       return Math.abs(pct).toFixed(1);
     });
+
+    const rejectOptions = computed(() => [
+      { label: $t('pages.approvalQueue.discardOption'), value: 'discard' },
+      { label: $t('pages.approvalQueue.requeueOption'), value: 'requeue' },
+    ]);
 
     // Summary card computations (use allTasks so they reflect the full queue, not just current page)
     const totalSpaceSaved = computed(() => {
@@ -554,7 +562,7 @@ export default {
           largest = t;
         }
       }
-      return formatSize(Math.abs(largest.size_delta || 0)) + ' saved';
+      return formatSize(Math.abs(largest.size_delta || 0)) + ' ' + $t('pages.approvalQueue.saved');
     });
 
     function fileName(abspath) {
@@ -657,7 +665,7 @@ export default {
         // Restore selection
         selected.value = newTasks.filter(t => selectedIdSet.has(t.id));
       } catch (e) {
-        $q.notify({ type: 'negative', message: 'Failed to fetch approval tasks', timeout: 3000, position: 'top' });
+        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToFetchTasks'), timeout: 3000, position: 'top' });
       } finally {
         loading.value = false;
       }
@@ -684,11 +692,11 @@ export default {
       approving.value = true;
       try {
         await axios.post(getCompressoApiUrl('v2', 'approval/approve'), { id_list: ids });
-        $q.notify({ type: 'positive', message: `Approved ${ids.length} file(s)`, timeout: 3000, position: 'top' });
+        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.approvedCount', { count: ids.length }), timeout: 3000, position: 'top' });
         selected.value = [];
         await fetchTasks();
       } catch (e) {
-        $q.notify({ type: 'negative', message: 'Failed to approve — please try again', timeout: 3000, position: 'top' });
+        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToApprove'), timeout: 3000, position: 'top' });
       } finally {
         approving.value = false;
       }
@@ -708,13 +716,13 @@ export default {
           id_list: ids,
           requeue: rejectAction.value === 'requeue',
         });
-        $q.notify({ type: 'positive', message: `Rejected ${ids.length} file(s)`, timeout: 3000, position: 'top' });
+        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.rejectedCount', { count: ids.length }), timeout: 3000, position: 'top' });
         selected.value = [];
         rejectTargetIds.value = [];
         showRejectDialog.value = false;
         await fetchTasks();
       } catch (e) {
-        $q.notify({ type: 'negative', message: 'Failed to reject — please try again', timeout: 3000, position: 'top' });
+        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToReject'), timeout: 3000, position: 'top' });
       } finally {
         rejecting.value = false;
       }
@@ -730,7 +738,7 @@ export default {
         const res = await axios.post(getCompressoApiUrl('v2', 'approval/detail'), { id: id });
         detailData.value = res.data;
       } catch (e) {
-        $q.notify({ type: 'negative', message: 'Failed to fetch task detail', timeout: 3000, position: 'top' });
+        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToFetchDetail'), timeout: 3000, position: 'top' });
         showDetailDialog.value = false;
       }
     }
@@ -774,7 +782,7 @@ export default {
         pollPreviewStatus();
       } catch (e) {
         previewLoading.value = false;
-        $q.notify({ type: 'negative', message: 'Failed to create preview', timeout: 3000, position: 'top' });
+        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToCreatePreview'), timeout: 3000, position: 'top' });
       }
     }
 
@@ -794,7 +802,7 @@ export default {
             clearInterval(previewPollInterval);
             previewPollInterval = null;
             previewLoading.value = false;
-            $q.notify({ type: 'negative', message: 'Preview generation failed: ' + (res.data.error || ''), timeout: 3000, position: 'top' });
+            $q.notify({ type: 'negative', message: $t('pages.approvalQueue.previewFailed', { error: res.data.error || '' }), timeout: 3000, position: 'top' });
           }
         } catch {
           clearInterval(previewPollInterval);
@@ -854,6 +862,7 @@ export default {
       detailData,
       rejectAction,
       rejectTargetIds,
+      rejectOptions,
       logTail,
       detailSavingsPercent,
       approvalEnabled,

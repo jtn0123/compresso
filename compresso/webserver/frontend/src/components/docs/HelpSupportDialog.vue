@@ -5,6 +5,73 @@
     @hide="onDialogHide"
   >
     <div class="q-pa-none">
+      <!-- About Section -->
+      <div class="q-pa-md q-mb-md">
+        <h5 class="q-mb-sm q-mt-none">{{ $t('about.title') }}</h5>
+        <p class="text-body2 q-mb-sm">{{ $t('about.description') }}</p>
+        <q-list dense class="q-mb-sm">
+          <q-item dense class="q-pa-none">
+            <q-item-section avatar style="min-width: 24px">
+              <q-icon name="check_circle" color="positive" size="16px" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-caption">{{ $t('about.features.approval') }}</q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-item dense class="q-pa-none">
+            <q-item-section avatar style="min-width: 24px">
+              <q-icon name="check_circle" color="positive" size="16px" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-caption">{{ $t('about.features.compression') }}</q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-item dense class="q-pa-none">
+            <q-item-section avatar style="min-width: 24px">
+              <q-icon name="check_circle" color="positive" size="16px" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-caption">{{ $t('about.features.preview') }}</q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-item dense class="q-pa-none">
+            <q-item-section avatar style="min-width: 24px">
+              <q-icon name="check_circle" color="positive" size="16px" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-caption">{{ $t('about.features.healthCheck') }}</q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-item dense class="q-pa-none">
+            <q-item-section avatar style="min-width: 24px">
+              <q-icon name="check_circle" color="positive" size="16px" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-caption">{{ $t('about.features.links') }}</q-item-label>
+            </q-item-section>
+          </q-item>
+          <q-item dense class="q-pa-none">
+            <q-item-section avatar style="min-width: 24px">
+              <q-icon name="check_circle" color="positive" size="16px" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-caption">{{ $t('about.features.plugins') }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </q-list>
+        <div class="row items-center q-gutter-sm">
+          <span class="text-caption text-grey" v-if="appVersion">{{ $t('components.settings.support.appVersion') }}: {{ appVersion }}</span>
+          <q-btn
+            flat
+            dense
+            size="sm"
+            icon="fab fa-github"
+            :label="$t('about.githubLink')"
+            @click="openExternalURL($t('about.githubUrl'))"
+          />
+        </div>
+      </div>
+      <q-separator class="q-mb-md" />
       <div class="row">
         <div class="col q-ma-sm">
           <div class="row">

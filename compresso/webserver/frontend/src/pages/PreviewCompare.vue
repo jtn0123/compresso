@@ -1,28 +1,32 @@
 <template>
   <q-page padding>
     <div class="q-pa-md">
-      <div class="text-h5 q-mb-md">A/B Preview Comparison</div>
+      <div class="text-h5 q-mb-md">{{ $t('pages.previewCompare.title') }}</div>
+
+      <AdmonitionBanner type="tip" class="q-mb-md">
+        {{ $t('pages.previewCompare.bannerText') }}
+      </AdmonitionBanner>
 
       <!-- Preview Setup -->
       <q-card class="q-mb-lg" v-if="!previewReady">
         <q-card-section>
-          <div class="text-h6">Generate Preview</div>
-          <p class="text-caption">Select a file and time range to compare encoding quality side-by-side.</p>
+          <div class="text-h6">{{ $t('pages.previewCompare.generatePreview') }}</div>
+          <p class="text-caption">{{ $t('pages.previewCompare.generateDescription') }}</p>
         </q-card-section>
         <q-card-section>
           <q-input
             v-model="sourcePath"
-            label="Source File Path"
+            :label="$t('pages.previewCompare.sourceFilePath')"
             outlined
             dense
             class="q-mb-md"
-            placeholder="/path/to/video.mkv"
+            :placeholder="$t('pages.previewCompare.sourceFilePlaceholder')"
           />
           <div class="row q-col-gutter-md q-mb-md">
             <div class="col-12 col-sm-4">
               <q-input
                 v-model.number="startTime"
-                label="Start Time (seconds)"
+                :label="$t('pages.previewCompare.startTimeLabel')"
                 type="number"
                 outlined
                 dense
@@ -32,7 +36,7 @@
             <div class="col-12 col-sm-4">
               <q-input
                 v-model.number="duration"
-                label="Duration (seconds)"
+                :label="$t('pages.previewCompare.durationLabel')"
                 type="number"
                 outlined
                 dense
@@ -44,7 +48,7 @@
               <q-select
                 v-model="libraryId"
                 :options="libraryOptions"
-                label="Library"
+                :label="$t('pages.previewCompare.libraryLabel')"
                 outlined
                 dense
                 emit-value
@@ -54,7 +58,7 @@
           </div>
           <q-btn
             color="primary"
-            label="Generate Preview"
+            :label="$t('pages.previewCompare.generatePreview')"
             :loading="generating"
             :disable="!sourcePath || generating"
             @click="generatePreview"
@@ -70,18 +74,18 @@
             class="q-mb-sm"
           />
           <div v-if="jobStatus === 'running'" class="text-caption">
-            Generating preview... This may take a moment.
+            {{ $t('pages.previewCompare.generatingMessage') }}
             <q-btn
               flat
               dense
               color="negative"
-              label="Cancel"
+              :label="$t('pages.previewCompare.cancelButton')"
               class="q-ml-md"
               @click="cancelPreview"
             />
           </div>
           <div v-if="jobStatus === 'failed'" class="text-negative">
-            Preview generation failed: {{ jobError }}
+            {{ $t('pages.previewCompare.generationFailed') }} {{ jobError }}
           </div>
         </q-card-section>
       </q-card>
@@ -91,7 +95,7 @@
         <q-btn
           flat
           icon="arrow_back"
-          label="New Preview"
+          :label="$t('pages.previewCompare.newPreview')"
           class="q-mb-md"
           @click="resetPreview"
         />
@@ -115,15 +119,18 @@
 <script>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useQuasar } from 'quasar';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import VideoCompare from 'components/preview/VideoCompare.vue';
+import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
 
 export default {
   name: 'PreviewCompare',
-  components: { VideoCompare },
+  components: { VideoCompare, AdmonitionBanner },
   setup() {
     const $q = useQuasar();
+    const { t } = useI18n();
     const sourcePath = ref('');
     const startTime = ref(0);
     const duration = ref(10);
@@ -161,7 +168,7 @@ export default {
         }
       } catch (error) {
         console.error('Error loading libraries:', error);
-        $q.notify({ type: 'negative', message: 'Failed to load libraries' });
+        $q.notify({ type: 'negative', message: t('pages.previewCompare.failedLoadLibraries') });
       }
     }
 
@@ -185,12 +192,12 @@ export default {
           startPolling();
         } else {
           jobStatus.value = 'failed';
-          jobError.value = 'No job ID returned';
+          jobError.value = t('pages.previewCompare.noJobId');
         }
       } catch (error) {
         jobStatus.value = 'failed';
         jobError.value = error.response?.data?.error || error.message;
-        $q.notify({ type: 'negative', message: 'Failed to generate preview: ' + (error.response?.data?.error || error.message) });
+        $q.notify({ type: 'negative', message: t('pages.previewCompare.failedGenerate') + (error.response?.data?.error || error.message) });
       } finally {
         generating.value = false;
       }
@@ -226,7 +233,7 @@ export default {
           }
         } catch (error) {
           console.error('Error polling preview status:', error);
-          $q.notify({ type: 'negative', message: 'Failed to check preview status' });
+          $q.notify({ type: 'negative', message: t('pages.previewCompare.failedCheckStatus') });
         }
       }, 2000);
     }
@@ -253,7 +260,7 @@ export default {
       jobStatus.value = '';
       jobError.value = '';
       generating.value = false;
-      $q.notify({ type: 'info', message: 'Preview generation cancelled' });
+      $q.notify({ type: 'info', message: t('pages.previewCompare.previewCancelled') });
     }
 
     async function resetPreview() {
@@ -265,7 +272,7 @@ export default {
           });
         } catch (error) {
           console.error('Error cleaning up preview:', error);
-          $q.notify({ type: 'negative', message: 'Failed to clean up preview' });
+          $q.notify({ type: 'negative', message: t('pages.previewCompare.failedCleanup') });
         }
       }
 

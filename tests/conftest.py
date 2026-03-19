@@ -30,6 +30,22 @@
 
 """
 
+import logging
+import os
+import shutil
+import tempfile
+
+import pytest
+from unittest.mock import patch
+
+from compresso.libs.unmodels.lib import Database
+from compresso.libs.unmodels import Libraries, Tags
+from compresso.libs.unmodels.tasks import Tasks
+from compresso.libs.unmodels.workergroups import WorkerGroups, WorkerGroupTags
+from compresso.libs.unmodels.workerschedules import WorkerSchedules
+
+LibraryTags = Libraries.tags.get_through_model()
+
 
 def pytest_configure(config):
     """
@@ -40,3 +56,40 @@ def pytest_configure(config):
     """
     config.addinivalue_line("markers", "unittest: Unit tests.")
     config.addinivalue_line("markers", "integrationtest: Integration test.")
+
+
+@pytest.fixture
+def tmp_config():
+    path = tempfile.mkdtemp(prefix='compresso_test_')
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
+
+
+@pytest.fixture
+def mock_logging():
+    logger = logging.getLogger('compresso_test')
+    with patch('compresso.libs.logs.CompressoLogging.get_logger', return_value=logger):
+        yield logger
+
+
+@pytest.fixture
+def in_memory_db(tmp_config):
+    db_file = os.path.join(tmp_config, 'test.db')
+    database_settings = {
+        "TYPE": "SQLITE",
+        "FILE": db_file,
+        "MIGRATIONS_DIR": os.path.join(tmp_config, 'migrations'),
+    }
+    db_connection = Database.select_database(database_settings)
+    db_connection.create_tables([
+        Tasks,
+        Libraries,
+        LibraryTags,
+        Tags,
+        WorkerGroups,
+        WorkerGroupTags,
+        WorkerSchedules,
+    ])
+    db_connection.execute_sql('SELECT 1')
+    yield db_connection
+    db_connection.close()

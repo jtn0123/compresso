@@ -40,7 +40,7 @@ const routes = [
     ],
     meta: {
       showHome: true,
-      showDataPanelsDrawer: true,
+      showMainNavDrawer: true,
     }
   },
   {
@@ -51,7 +51,7 @@ const routes = [
     ],
     meta: {
       showHome: true,
-      showSettingsDrawer: true,
+      showMainNavDrawer: true,
     }
   },
   {
@@ -62,7 +62,7 @@ const routes = [
     ],
     meta: {
       showHome: true,
-      showSettingsDrawer: true,
+      showMainNavDrawer: true,
     }
   },
   {
@@ -73,7 +73,7 @@ const routes = [
     ],
     meta: {
       showHome: true,
-      showSettingsDrawer: true,
+      showMainNavDrawer: true,
     }
   },
   {
@@ -84,7 +84,7 @@ const routes = [
     ],
     meta: {
       showHome: true,
-      showSettingsDrawer: true,
+      showMainNavDrawer: true,
     }
   },
   {

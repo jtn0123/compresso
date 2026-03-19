@@ -4,15 +4,30 @@ Compresso is a media library optimizer with approval workflow, compression dashb
 
 ### Key Features
 
-- **Approval workflow** — review and approve/reject compression tasks before they modify your library
-- **Compression dashboard** — track compression ratios, space savings, and processing stats
-- **A/B preview** — compare source vs. encoded output before committing changes
-- **Health checks** — readiness endpoint at `/compresso/api/v2/healthcheck/readiness`
+- **Approval workflow** — transcoded files are held for review before replacing originals. Compare original vs. compressed file size and quality, then approve to replace or reject to keep the original untouched.
+- **Compression dashboard** — monitor per-library breakdowns, codec distribution charts, space-saved timelines, and pending compression estimates. Track compression ratios, space savings, and processing stats at a glance.
+- **A/B preview** — side-by-side video comparison of source vs. encoded output with VMAF/SSIM quality scores, so you can verify quality before committing changes.
+- **Health checks** — library-wide scanning with quick and thorough modes, per-file status tracking, and a readiness endpoint at `/compresso/api/v2/healthcheck/readiness`.
+- **Multi-machine links** — distribute processing across multiple Compresso instances with automatic task routing, file transfer, and worker coordination.
+- **Plugin system** — extend Compresso with community plugins for file testing, processing, and post-processing workflows.
 - **Large-library safe defaults** — conservative worker cap, explicit cache path
 - Frontend vendored in-repo (no submodule/recursive clone required)
 - Node.js 24 build baseline, validated in CI
 - SQLite maintenance on container startup
 - Structured log markers for startup/worker/post-processing failures
+
+### Quick Start (Docker)
+
+```bash
+docker run -d \
+  --name compresso \
+  -p 8888:8888 \
+  -v /path/to/media:/library \
+  -v compresso-config:/config \
+  ghcr.io/jtn0123/compresso:latest
+```
+
+Then open http://localhost:8888 in your browser.
 
 ### Supported Deploy Paths
 
@@ -83,6 +98,10 @@ The Python package build performs its own clean frontend install from the commit
 
 For a production-focused source or Docker workflow, including a deployment checklist for large libraries, see [docs/FORK_DEPLOYMENT.md](./docs/FORK_DEPLOYMENT.md).
 
+### Architecture
+
+Compresso is built with Python/Tornado on the backend and Vue.js/Quasar on the frontend. Task state and history are stored in SQLite. Media processing is handled by configurable worker groups that execute plugin-defined commands (typically FFmpeg). The plugin system supports three hook points: library management (file testing), worker processing, and post-processing. Multiple Compresso instances can be linked for distributed processing.
+
 ### Configuration
 
 Compresso stores its configuration in `~/.compresso/`:
@@ -90,6 +109,20 @@ Compresso stores its configuration in `~/.compresso/`:
 - `~/.compresso/logs/` — application logs
 - `~/.compresso/plugins/` — installed plugins
 - `~/.compresso/userdata/` — user data
+
+## Troubleshooting
+
+**Port already in use**
+If port 8888 is taken, specify a different port: `compresso --port 9999` or set `PORT=9999` in your Docker environment.
+
+**FFmpeg not found**
+Compresso plugins that use FFmpeg require it to be installed and on the system PATH. Install via your package manager: `apt install ffmpeg` (Debian/Ubuntu), `brew install ffmpeg` (macOS), or include it in your Docker image.
+
+**Library permission errors**
+Ensure the Compresso process (or Docker container) has read/write access to your media library path. For Docker, verify your volume mount permissions.
+
+**Database locked errors**
+SQLite can report "database is locked" under heavy concurrent access. Compresso runs maintenance on startup to mitigate this. If persistent, reduce worker count or ensure only one Compresso instance accesses the config directory.
 
 ## License and Contribution
 
