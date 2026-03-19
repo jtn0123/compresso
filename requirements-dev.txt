@@ -1,10 +1,12 @@
 ruff>=0.9.0
 pytest>=8.3.5
 pytest-cov>=6.0
+pytest-benchmark>=5.1.0
 wheel>=0.45.1
 setuptools>=75.8.0
 build>=1.2.2.post1
 yappi>=1.6.0            # Thread-aware profiler for dev profiling
+mypy>=1.13.0            # Gradual type checking
 
 # API schema exporting
 apispec>=6.8.1

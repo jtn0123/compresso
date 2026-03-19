@@ -13,7 +13,7 @@ import shutil
 import tempfile
 import threading
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 
 def _make_postprocessor(abort_immediately=False):

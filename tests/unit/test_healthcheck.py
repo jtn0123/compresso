@@ -287,7 +287,7 @@ class TestHealthCheckCheckFile(object):
     def test_repeated_failures_increment_error_count(self, mock_quick):
         self._seed_row('/test/errors.mkv')
         mgr = self._make_manager()
-        result1 = mgr.check_file('/test/errors.mkv', library_id=1, mode='quick')
+        mgr.check_file('/test/errors.mkv', library_id=1, mode='quick')
         self.db_connection.execute_sql('SELECT 1')
         result2 = mgr.check_file('/test/errors.mkv', library_id=1, mode='quick')
         assert result2['error_count'] == 2

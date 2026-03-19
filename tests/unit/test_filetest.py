@@ -7,7 +7,6 @@
     Unit tests for unmanic.libs.filetest.FileTest.
 """
 
-import os
 import pytest
 from unittest.mock import patch, MagicMock
 

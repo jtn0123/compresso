@@ -8,8 +8,7 @@
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
-from datetime import datetime
+from unittest.mock import patch, MagicMock
 
 
 def _make_foreman():
