@@ -217,7 +217,7 @@ class TestTaskQueue:
         self._create_task('/media/count.mkv', status='pending')
         from compresso.libs.taskqueue import build_tasks_count_query
         count = build_tasks_count_query('pending')
-        assert count >= 1
+        assert count == 1
 
     @pytest.mark.unittest
     def test_fetch_next_task_filtered_returns_false_when_empty(self):

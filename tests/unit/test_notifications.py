@@ -29,9 +29,9 @@ def _make_valid_item(**overrides):
 
 
 def _fresh_notifications():
-    """Get a fresh Notifications instance by clearing the singleton cache."""
-    SingletonType._instances.clear()
+    """Get a fresh Notifications instance by clearing its singleton cache entry."""
     from compresso.libs.notifications import Notifications
+    SingletonType._instances.pop(Notifications, None)
     return Notifications()
 
 

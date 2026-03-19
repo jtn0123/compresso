@@ -67,7 +67,7 @@ class FileInfo(object):
                     self.entries = []
                     for line in f:
                         m = re.search('(.+)="(.+)"', line)
-                        if m.group(1) is not None and m.group(2) is not None:
+                        if m and m.group(1) is not None and m.group(2) is not None:
                             self.entries.append(Entry(m.group(1), m.group(2)))
             except IOError:
                 logger.warning("File not accessible: %s", self.path)
