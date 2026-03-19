@@ -11,8 +11,9 @@ import json
 import os
 import tempfile
 
+import shutil
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels import Libraries, Tags, EnabledPlugins, LibraryPluginFlow, Plugins
@@ -42,6 +43,11 @@ class TestLibraryInit:
             WorkerGroups, WorkerGroupTags, WorkerSchedules,
             Plugins, EnabledPlugins, LibraryPluginFlow,
         ])
+
+    def teardown_class(self):
+        if self.db_connection:
+            self.db_connection.close()
+        shutil.rmtree(self.config_path, ignore_errors=True)
 
     def setup_method(self):
         Tasks.delete().execute()
@@ -514,7 +520,7 @@ class TestLibraryCreate:
         }
         lib = Library.create(data)
         # ID should be auto-assigned, not 999
-        assert lib.get_id() != 999 or lib.get_name() == 'new_lib'
+        assert lib.get_id() != 999
 
     def test_create_returns_library_instance(self):
         from compresso.libs.library import Library

@@ -120,8 +120,15 @@ class TestMetadataCachePruning:
 
     def setup_method(self):
         from compresso.libs.metadata import CompressoFileMetadata
+        self._orig_path_cache = CompressoFileMetadata._path_cache
+        self._orig_last_prune = CompressoFileMetadata._last_prune
         CompressoFileMetadata._path_cache = OrderedDict()
         CompressoFileMetadata._last_prune = 0
+
+    def teardown_method(self):
+        from compresso.libs.metadata import CompressoFileMetadata
+        CompressoFileMetadata._path_cache = self._orig_path_cache
+        CompressoFileMetadata._last_prune = self._orig_last_prune
 
     def test_prune_removes_expired_entries(self):
         from compresso.libs.metadata import CompressoFileMetadata
@@ -147,8 +154,9 @@ class TestMetadataCachePruning:
         from compresso.libs.metadata import CompressoFileMetadata
         now = time.time()
         max_size = CompressoFileMetadata.CACHE_MAX_ENTRIES
+        overflow = 10
         # Add more entries than the max
-        for i in range(max_size + 10):
+        for i in range(max_size + overflow):
             CompressoFileMetadata._path_cache[f'/path/{i}'] = {
                 'data': {},
                 'fingerprint': str(i),
@@ -156,7 +164,11 @@ class TestMetadataCachePruning:
                 'last_accessed': now,
             }
         CompressoFileMetadata._prune_path_cache(now)
-        assert len(CompressoFileMetadata._path_cache) <= max_size
+        assert len(CompressoFileMetadata._path_cache) == max_size
+        # Oldest entries (0..overflow-1) should be evicted, newest should remain
+        for i in range(overflow):
+            assert f'/path/{i}' not in CompressoFileMetadata._path_cache
+        assert f'/path/{max_size + overflow - 1}' in CompressoFileMetadata._path_cache
 
     def test_get_cached_updates_lru_order(self):
         from compresso.libs.metadata import CompressoFileMetadata
@@ -210,3 +222,9 @@ class TestMetadataContextBinding:
             CompressoFileMetadata.clear_context()
             with pytest.raises(RuntimeError, match="context not bound"):
                 CompressoFileMetadata._get_context()
+
+    def test_bind_runner_context_wrong_process_raises(self):
+        from compresso.libs.metadata import CompressoFileMetadata
+        with patch.object(CompressoFileMetadata, '_main_pid', -1):
+            with pytest.raises(RuntimeError, match="only available in the main process"):
+                CompressoFileMetadata.bind_runner_context(plugin_id='test_plug')

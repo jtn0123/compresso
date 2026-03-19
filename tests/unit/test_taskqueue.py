@@ -12,6 +12,7 @@
 """
 
 import os
+import shutil
 import tempfile
 
 import pytest
@@ -50,7 +51,10 @@ class TestTaskQueue:
         )
 
     def teardown_class(self):
-        pass
+        if self.db_connection:
+            self.db_connection.close()
+        if os.path.exists(self.config_path):
+            shutil.rmtree(self.config_path, ignore_errors=True)
 
     def setup_method(self):
         Tasks.delete().execute()

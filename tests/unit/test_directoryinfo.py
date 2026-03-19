@@ -103,6 +103,18 @@ class TestCompressoDirectoryInfoINIMigration:
         assert info.get('sect_a', 'k1') == 'v1'
         assert info.get('sect_b', 'k2') == 'v2'
 
+    def test_ini_migration_persists_as_json(self, tmp_config):
+        ini_content = "[section1]\nkey1 = value1\n"
+        with open(os.path.join(tmp_config, '.compresso'), 'w') as f:
+            f.write(ini_content)
+        info = CompressoDirectoryInfo(tmp_config)
+        info.save()
+        # Verify the file is now valid JSON
+        with open(os.path.join(tmp_config, '.compresso'), 'r') as f:
+            data = json.load(f)
+        assert isinstance(data, dict)
+        assert data.get('section1', {}).get('key1') == 'value1'
+
 
 @pytest.mark.unittest
 class TestCompressoDirectoryInfoJSONMigration:

@@ -89,8 +89,7 @@ class TestPrepareFilteredCompletedTasks:
 
         # Verify task_success=True was passed in at least one call
         calls = mock_hist.get_historic_task_list_filtered_and_sorted.call_args_list
-        task_success_values = [c.kwargs.get('task_success') for c in calls if 'task_success' in c.kwargs]
-        assert True in task_success_values
+        assert any(c.kwargs.get('task_success') is True for c in calls)
 
     @patch('compresso.webserver.helpers.completed_tasks.FileMetadataPaths')
     @patch('compresso.webserver.helpers.completed_tasks.history')
@@ -108,8 +107,7 @@ class TestPrepareFilteredCompletedTasks:
         prepare_filtered_completed_tasks({'status': 'failed'})
 
         calls = mock_hist.get_historic_task_list_filtered_and_sorted.call_args_list
-        task_success_values = [c.kwargs.get('task_success') for c in calls if 'task_success' in c.kwargs]
-        assert False in task_success_values
+        assert any(c.kwargs.get('task_success') is False for c in calls)
 
 
 @pytest.mark.unittest

@@ -47,12 +47,9 @@ class TestNotificationsValidation:
             self.notif.add(item)
 
     def test_add_raises_on_missing_icon_key(self):
-        item = {'type': 'info', 'label': 'x', 'message': 'x', 'navigation': {}}
-        del item['label']
-        # missing 'label' but has type+icon — but actually missing icon here
-        item2 = {'type': 'info', 'message': 'x', 'navigation': {}}
+        item = {'type': 'info', 'message': 'x', 'navigation': {}}
         with pytest.raises(Exception, match="Missing key: 'icon'"):
-            self.notif.add(item2)
+            self.notif.add(item)
 
     def test_add_raises_on_missing_label_key(self):
         item = {'type': 'info', 'icon': 'x', 'message': 'x', 'navigation': {}}
