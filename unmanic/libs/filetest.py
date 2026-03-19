@@ -100,7 +100,10 @@ class FileTest(object):
             # Read the file and check for any entry with this file name
             with open(unmanic_ignore_file) as f:
                 for line in f:
-                    if basename in line:
+                    entry = line.strip()
+                    if not entry or entry.startswith('#'):
+                        continue
+                    if basename == entry:
                         return True
         return False
 

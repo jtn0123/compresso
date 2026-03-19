@@ -202,7 +202,7 @@ class Foreman(threading.Thread):
         :return:
         """
         days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-        day_of_week = datetime.today().today().weekday()
+        day_of_week = datetime.today().weekday()
         time_now = datetime.today().strftime('%H:%M')
 
         # Only run once a minute
@@ -307,11 +307,12 @@ class Foreman(threading.Thread):
     def init_remote_task_manager_thread(self, library_name=None):
         # Fetch the installation ID and info
         installation_id, installation_info = self.fetch_available_remote_installation(library_name=library_name)
-        del self.available_remote_managers[installation_id]
 
         # Ensure a worker was assigned
         if not installation_info:
             return False
+
+        del self.available_remote_managers[installation_id]
 
         # Startup a thread
         thread = installation_link.RemoteTaskManager(installation_id,
@@ -380,7 +381,7 @@ class Foreman(threading.Thread):
                 continue
             # Ensure the configured address has not changed
             configured_address = configured_uuids.get(thread_assigned_uuid)
-            if thread_assigned_address not in configured_address:
+            if thread_assigned_address != configured_address:
                 self.mark_remote_task_manager_thread_as_redundant(thread)
                 self.logger.info(term_log_msg.format('address', thread_assigned_address))
                 continue
