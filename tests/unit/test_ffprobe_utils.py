@@ -192,6 +192,67 @@ class TestExtractMediaMetadata(object):
         assert result['codec'] == ''
 
     @patch('compresso.libs.ffprobe_utils.probe_file')
+    def test_resolution_1440p(self, mock_probe):
+        """Height=1440 maps to 1440p."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'height': 1440}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['resolution'] == '1440p'
+
+    @patch('compresso.libs.ffprobe_utils.probe_file')
+    def test_resolution_boundary_2159(self, mock_probe):
+        """Height=2159 is below 4K threshold, maps to 1440p."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'height': 2159}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['resolution'] == '1440p'
+
+    @patch('compresso.libs.ffprobe_utils.probe_file')
+    def test_resolution_boundary_1079(self, mock_probe):
+        """Height=1079 is below 1080p threshold, maps to 720p."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'height': 1079}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['resolution'] == '720p'
+
+    @patch('compresso.libs.ffprobe_utils.probe_file')
+    def test_height_zero_gives_empty_resolution(self, mock_probe):
+        """Height=0 in stream results in empty resolution."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'height': 0}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['resolution'] == ''
+
+    @patch('compresso.libs.ffprobe_utils.probe_file')
+    def test_height_none_gives_empty_resolution(self, mock_probe):
+        """Height=None in stream results in empty resolution."""
+        mock_probe.return_value = {
+            'streams': [{'codec_type': 'video', 'codec_name': 'h264', 'height': None}],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['resolution'] == ''
+
+    @patch('compresso.libs.ffprobe_utils.probe_file')
+    def test_empty_streams_returns_empty(self, mock_probe):
+        """Empty streams list returns empty codec and resolution."""
+        mock_probe.return_value = {
+            'streams': [],
+            'format': {},
+        }
+        result = self._call('/test/file.mkv')
+        assert result['codec'] == ''
+        assert result['resolution'] == ''
+
+    @patch('compresso.libs.ffprobe_utils.probe_file')
     def test_first_video_stream_used(self, mock_probe):
         """Multiple video streams → first one's codec used."""
         mock_probe.return_value = {

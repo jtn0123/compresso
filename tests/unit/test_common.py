@@ -153,6 +153,44 @@ class TestGetFileChecksum:
 
 
 @pytest.mark.unittest
+class TestMakeTimestampHumanReadable:
+
+    def test_recent_past_shows_seconds_ago(self):
+        import time
+        ts = time.time() - 5
+        result = common.make_timestamp_human_readable(ts)
+        assert 'ago' in result
+        assert 'second' in result
+
+    def test_one_day_ago(self):
+        import time
+        ts = time.time() - 86400
+        result = common.make_timestamp_human_readable(ts)
+        assert '1 day' in result
+        assert 'ago' in result
+
+    def test_multiple_days_ago(self):
+        import time
+        ts = time.time() - (2 * 86400)
+        result = common.make_timestamp_human_readable(ts)
+        assert 'days' in result
+        assert 'ago' in result
+
+    def test_future_timestamp_shows_in_prefix(self):
+        import time
+        ts = time.time() + 3600
+        result = common.make_timestamp_human_readable(ts)
+        assert result.startswith('in ')
+
+    def test_one_year_ago(self):
+        import time
+        ts = time.time() - (365 * 86400)
+        result = common.make_timestamp_human_readable(ts)
+        assert '1 year' in result
+        assert 'ago' in result
+
+
+@pytest.mark.unittest
 class TestGetFileFingerprint:
 
     def test_full_xxhash_small_file(self, tmp_path):
@@ -168,3 +206,27 @@ class TestGetFileFingerprint:
         f.write_bytes(b"test content")
         fingerprint, algo = common.get_file_fingerprint(str(f), algo="nonexistent")
         assert isinstance(fingerprint, str)
+
+    def test_full_sha256_consistency(self, tmp_path):
+        f = tmp_path / "sha.bin"
+        f.write_bytes(b"consistent content for sha256 test")
+        fp1, algo1 = common.get_file_fingerprint(str(f), algo="full_sha256_v1")
+        fp2, algo2 = common.get_file_fingerprint(str(f), algo="full_sha256_v1")
+        assert fp1 == fp2
+        assert algo1 == "full_sha256_v1"
+
+    def test_different_content_different_fingerprint(self, tmp_path):
+        f1 = tmp_path / "file1.bin"
+        f2 = tmp_path / "file2.bin"
+        f1.write_bytes(b"content A")
+        f2.write_bytes(b"content B")
+        fp1, _ = common.get_file_fingerprint(str(f1))
+        fp2, _ = common.get_file_fingerprint(str(f2))
+        assert fp1 != fp2
+
+    def test_sampled_xxhash_falls_back_to_full_for_small_file(self, tmp_path):
+        f = tmp_path / "small_sampled.bin"
+        f.write_bytes(b"small file for sampled xxhash test")
+        fingerprint, algo = common.get_file_fingerprint(str(f), algo="sampled_xxhash_v1")
+        # Small file (< 100MB) should fall back to full_xxhash_v1
+        assert algo == "full_xxhash_v1"
