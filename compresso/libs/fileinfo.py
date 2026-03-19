@@ -33,6 +33,10 @@
 import os
 import re
 
+from compresso.libs.logs import CompressoLogging
+
+logger = CompressoLogging.get_logger('fileinfo')
+
 """
 
 An object to represent file_info (Filebot pattern to keep filename history)
@@ -66,7 +70,7 @@ class FileInfo(object):
                     if m.group(1) is not None and m.group(2) is not None:
                         self.entries.append(Entry(m.group(1), m.group(2)))
             except IOError:
-                print("File not accessible")
+                logger.warning("File not accessible: %s", self.path)
             finally:
                 f.close()
 
@@ -76,7 +80,7 @@ class FileInfo(object):
             for entry in self.entries:
                 f.write('%s="%s"\n' % (entry.newname, entry.originalname))
         except IOError:
-            print("File not accessible")
+            logger.warning("File not accessible: %s", self.path)
         finally:
             f.close()
 
