@@ -81,21 +81,15 @@ unmanic --version
 
 ## Building the Frontend
 
-The Unmanic frontend UI exists in a submodule.
-
-Start by pulling the latest changes
+The Unmanic frontend lives in `unmanic/webserver/frontend/` (vendored, no submodules).
 
 ```
-git submodule update --init --recursive 
+cd unmanic/webserver/frontend
+npm ci
+npm run build:publish
 ```
 
-Once you have done this, run the frontend_install.sh script.
-
-```
-devops/frontend_install.sh
-```
-
-This will install the NPM modules and build the frontend package. The end result will be located in `unmanic/webserver/public`
+The built assets are output to `unmanic/webserver/public/`.
 
 ## Profiling and testing
 
