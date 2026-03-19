@@ -1,0 +1,45 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unittest: Unit tests.",
+    "integrationtest: Integration tests.",
+]
+filterwarnings = [
+    "ignore:.*invalid escape sequence.*:DeprecationWarning",
+    "ignore:The `ordered` `class Meta` option is deprecated.*:marshmallow.warnings.RemovedInMarshmallow4Warning",
+    "ignore:Passing field metadata as keyword arguments is deprecated.*:marshmallow.warnings.RemovedInMarshmallow4Warning",
+]
+
+[tool.coverage.run]
+relative_files = true
+source = ["unmanic"]
+omit = ["*/tests/*", "*/test_*", "*/webserver/frontend/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 30
+
+[tool.ruff]
+line-length = 127
+target-version = "py38"
+exclude = [
+    "venv", ".idea", "dev_environment", "dist", "build",
+    "unmanic/webserver/frontend",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E722",  # bare except — matches current flake8 config
+    "E241",  # multiple spaces before operator
+    "F401",  # unused imports
+    "F403",  # wildcard imports
+    "F405",  # undefined from wildcard
+    "F841",  # unused local variable
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
