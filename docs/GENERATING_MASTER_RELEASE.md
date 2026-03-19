@@ -1,61 +1,37 @@
-# Releasing staging into master
+# Releasing to Master
 
-If you are only merging changes into `master` without performing a release, just run through steps 1 and 2.
+Releases are fully automated via [semantic-release](https://github.com/semantic-release/semantic-release).
+When commits land on `master`, the release workflow determines whether a new version is needed
+based on [Conventional Commits](https://www.conventionalcommits.org/) prefixes.
 
-If you are just going to release what is currently in the master branch, then skip to [Step 3](#step-3).
+## How it works
 
-## Step 1: Compare commit history
-Compare the `staging` and `master` branch commit history:
-https://github.com/Unmanic/unmanic/compare/master...staging
+1. **Push/merge to `master`** triggers `.github/workflows/release.yml`.
+2. **semantic-release** analyzes commit messages since the last tag:
+   - `fix:` → patch bump (0.4.0 → 0.4.1)
+   - `feat:` → minor bump (0.4.0 → 0.5.0)
+   - `feat!:` or `BREAKING CHANGE:` → major bump (0.4.0 → 1.0.0)
+3. If a release is warranted:
+   - `CHANGELOG.md` and `VERSION` are updated and committed.
+   - A git tag and GitHub Release are created.
+4. The new tag triggers the existing **Build All Packages CI** workflow, which handles
+   PyPI and Docker publishing.
 
+## Commit message format
 
-## Step 2: Rebase merge into master
-Perform a rebase merge from `staging` into `master` on the checked out repo. Push this change to the official repo's `master` branch.
+All commits to `master` should follow Conventional Commits:
 
-> [!IMPORTANT]  
-> If you are going to generate a tagged release, cancel the `Build All Packages CI` GitHub action for this push. This will be run again once we generate the release in the steps below. If you are not generating a release, let this action run.
+```
+<type>(<optional scope>): <description>
 
+[optional body]
 
-## Step 3: Compare commit history since last release
-Compare the `master` branch commit history since the last release:
-https://github.com/Unmanic/unmanic/compare/0.2.7...master
+[optional footer(s)]
+```
 
-While here, draft a changelog for the next release.
+Common types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `perf`.
 
+## Manual steps
 
-## Step 4: Create a GitHub release
-Create a release in GitHub with these rules.
-- The release should target the `master` branch.
-- The release should tag the target when created. Use the format: `X.X.X`
-- The release header should follow this template:
-    ```
-    [RELEASE] vX.X.X
-    ```
-- The release body should follow this template:
-    ```
-    - [NOTE] Add release notes here.
-
-
-    ## Service
-    - [NEW] This is a new feature added to the main service.
-        - This is a bullet point to the above mentioned feature. 
-    - [FIX] This is a fix for the main service.
-        - This is a bullet point to the above mentioned fix. 
-    - [IMPR] This is an improvement to an existing feature in the main service.
-        - This is a bullet point to the above mentioned improvement. 
-
-    ## Plugin executor
-    - [NEW] ...
-    - [FIX] ...
-    - [IMPR] ...
-
-    ## Docker
-    - [NEW] ...
-    - [FIX] ...
-    - [IMPR] ...
-
-    ## Front-end
-    - [NEW] ...
-    - [FIX] ...
-    - [IMPR] ...
-    ```
+None required for normal releases. If you need to force a specific version or skip a
+release, consult the [semantic-release documentation](https://semantic-release.gitbook.io/).

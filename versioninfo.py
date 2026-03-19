@@ -49,6 +49,11 @@ def version():
         git_version_info = get_git_version_info()
         return git_version_info['short']
     else:
+        # Try VERSION file first, fall back to metadata
+        version_file = os.path.join(get_base_dir(), "VERSION")
+        if os.path.isfile(version_file):
+            with open(version_file, 'r') as f:
+                return f.read().strip()
         return str(version_info.__version__)
 
 
@@ -57,6 +62,10 @@ def full_version():
         git_version_info = get_git_version_info()
         return git_version_info['long']
     else:
+        version_file = os.path.join(get_base_dir(), "VERSION")
+        if os.path.isfile(version_file):
+            with open(version_file, 'r') as f:
+                return f.read().strip()
         return str(version_info.__version__)
 
 
@@ -113,22 +122,24 @@ def dev_status():
 
 def changes():
     """
-    Extract part of changelog pertaining to version.
+    Extract the most recent changelog section from CHANGELOG.md.
 
     :return:
     """
-    _version = version_info.__version__
-    with io.open(os.path.join(get_base_dir(), "CHANGES.txt"), 'r', encoding='utf8') as f:
+    changelog_path = os.path.join(get_base_dir(), "CHANGELOG.md")
+    if not os.path.isfile(changelog_path):
+        return ''
+    with io.open(changelog_path, 'r', encoding='utf8') as f:
         lines = []
+        in_section = False
         for line in f:
-            if line.startswith('====='):
-                if len(lines) > 1:
+            if line.startswith('## '):
+                if in_section:
                     break
-            if lines:
+                in_section = True
+            if in_section:
                 lines.append(line)
-            elif line.startswith(_version):
-                lines.append(line)
-    return ''.join(lines[:-1])
+    return ''.join(lines)
 
 
 def get_base_dir():
