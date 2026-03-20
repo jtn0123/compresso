@@ -16,17 +16,17 @@ class RequestHealthCheckScanSchema(BaseSchema):
     """Schema for scanning a single file"""
     file_path = fields.Str(
         required=True,
-        description="Absolute path to the file to check",
+        metadata={'description': "Absolute path to the file to check"},
     )
     library_id = fields.Int(
         required=False,
         load_default=1,
-        description="Library ID",
+        metadata={'description': "Library ID"},
     )
     mode = fields.Str(
         required=False,
         load_default='quick',
-        description="Check mode: 'quick' or 'thorough'",
+        metadata={'description': "Check mode: 'quick' or 'thorough'"},
         validate=validate.OneOf(['quick', 'thorough']),
     )
 
@@ -35,12 +35,12 @@ class RequestHealthCheckLibraryScanSchema(BaseSchema):
     """Schema for scanning an entire library"""
     library_id = fields.Int(
         required=True,
-        description="Library ID to scan",
+        metadata={'description': "Library ID to scan"},
     )
     mode = fields.Str(
         required=False,
         load_default='quick',
-        description="Check mode: 'quick' or 'thorough'",
+        metadata={'description': "Check mode: 'quick' or 'thorough'"},
         validate=validate.OneOf(['quick', 'thorough']),
     )
 
@@ -50,12 +50,12 @@ class RequestHealthCheckStatusSchema(RequestTableDataSchema):
     library_id = fields.Int(
         required=False,
         allow_none=True,
-        description="Optional library ID filter",
+        metadata={'description': "Optional library ID filter"},
     )
     status_filter = fields.Str(
         required=False,
         allow_none=True,
-        description="Optional status filter: healthy, corrupted, warning, unchecked, checking",
+        metadata={'description': "Optional status filter: healthy, corrupted, warning, unchecked, checking"},
         validate=validate.OneOf(['healthy', 'corrupted', 'warning', 'unchecked', 'checking']),
     )
 
@@ -99,7 +99,7 @@ class RequestHealthCheckWorkersSchema(BaseSchema):
     """Schema for setting worker count"""
     worker_count = fields.Int(
         required=True,
-        description="Number of concurrent scan workers (1-16)",
+        metadata={'description': "Number of concurrent scan workers (1-16)"},
         validate=validate.Range(min=1, max=16),
     )
 

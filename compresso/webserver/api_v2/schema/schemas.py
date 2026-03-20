@@ -42,30 +42,27 @@ class BaseSchema(Schema):
 class BaseSuccessSchema(BaseSchema):
     success = fields.Boolean(
         required=True,
-        description='This is always "True" when a request succeeds',
-        example=True,
+        metadata={'description': 'This is always "True" when a request succeeds', 'example': True},
     )
 
 
 class BaseErrorSchema(BaseSchema):
     error = fields.Str(
         required=True,
-        description="Return status code and reason",
+        metadata={'description': "Return status code and reason"},
     )
     messages = fields.Dict(
         required=True,
-        description="Attached request body validation errors",
-        example={"name": ["The thing that went wrong."]},
+        metadata={'description': "Attached request body validation errors", 'example': {"name": ["The thing that went wrong."]}},
     )
     traceback = fields.List(
         cls_or_instance=fields.Str,
         required=False,
-        description="Attached exception traceback (if developer mode is enabled)",
-        example=[
+        metadata={'description': "Attached exception traceback (if developer mode is enabled)", 'example': [
             "Traceback (most recent call last):\n",
             "...",
             "json.decoder.JSONDecodeError: Expecting value: line 3 column 14 (char 45)\n"
-        ],
+        ]},
     )
 
 
@@ -73,8 +70,7 @@ class BadRequestSchema(BaseErrorSchema):
     """STATUS_ERROR_EXTERNAL = 400"""
     error = fields.Str(
         required=True,
-        description="Return status code and reason",
-        example="400: Failed request schema validation",
+        metadata={'description': "Return status code and reason", 'example': "400: Failed request schema validation"},
     )
 
 
@@ -82,8 +78,7 @@ class BadEndpointSchema(BaseSchema):
     """STATUS_ERROR_ENDPOINT_NOT_FOUND = 404"""
     error = fields.Str(
         required=True,
-        description="Return status code and reason",
-        example="404: Endpoint not found",
+        metadata={'description': "Return status code and reason", 'example': "404: Endpoint not found"},
     )
 
 
@@ -91,8 +86,7 @@ class BadMethodSchema(BaseSchema):
     """STATUS_ERROR_METHOD_NOT_ALLOWED = 405"""
     error = fields.Str(
         required=True,
-        description="Return status code and reason",
-        example="405: Method 'GET' not allowed",
+        metadata={'description': "Return status code and reason", 'example': "405: Method 'GET' not allowed"},
     )
 
 
@@ -100,8 +94,7 @@ class InternalErrorSchema(BaseErrorSchema):
     """STATUS_ERROR_INTERNAL = 500"""
     error = fields.Str(
         required=True,
-        description="Return status code and reason",
-        example="500: Caught exception message",
+        metadata={'description': "Return status code and reason", 'example': "500: Caught exception message"},
     )
 
 
@@ -113,50 +106,42 @@ class RequestTableDataSchema(BaseSchema):
 
     start = fields.Int(
         required=False,
-        description="Start row number to select from",
-        example=0,
+        metadata={'description': "Start row number to select from", 'example': 0},
         load_default=0,
     )
     length = fields.Int(
         required=False,
-        description="Number of rows to select",
-        example=10,
+        metadata={'description': "Number of rows to select", 'example': 10},
         load_default=10,
     )
     search_value = fields.Str(
         required=False,
-        description="String to filter search results by",
-        example="items with this text in the value",
+        metadata={'description': "String to filter search results by", 'example': "items with this text in the value"},
         load_default="",
     )
     status = fields.Str(
         required=False,
-        description="Filter on the status",
-        example="all",
+        metadata={'description': "Filter on the status", 'example': "all"},
         load_default="all",
     )
     after = fields.DateTime(
         required=False,
-        description="Filter entries since datetime",
-        example="2022-04-07 01:45",
+        metadata={'description': "Filter entries since datetime", 'example': "2022-04-07 01:45"},
         allow_none=True,
     )
     before = fields.DateTime(
         required=False,
-        description="Filter entries prior to datetime",
-        example="2022-04-07 01:55",
+        metadata={'description': "Filter entries prior to datetime", 'example': "2022-04-07 01:55"},
         allow_none=True,
     )
     order_by = fields.Str(
         required=False,
-        description="Column to order results by",
-        example="finish_time",
+        metadata={'description': "Column to order results by", 'example': "finish_time"},
         load_default="",
     )
     order_direction = fields.Str(
         required=False,
-        description="Order direction ('asc' or 'desc')",
-        example="desc",
+        metadata={'description': "Order direction ('asc' or 'desc')", 'example': "desc"},
         validate=validate.OneOf(["asc", "desc"]),
     )
 
@@ -167,8 +152,7 @@ class RequestTableUpdateByIdList(BaseSchema):
     id_list = fields.List(
         cls_or_instance=fields.Int,
         required=True,
-        description="List of table IDs",
-        example=[],
+        metadata={'description': "List of table IDs", 'example': []},
         validate=validate.Length(min=1),
     )
 
@@ -179,8 +163,7 @@ class RequestTableUpdateByUuidList(BaseSchema):
     uuid_list = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="List of table UUIDs",
-        example=[],
+        metadata={'description': "List of table UUIDs", 'example': []},
         validate=validate.Length(min=1),
     )
 
@@ -190,20 +173,17 @@ class TableRecordsSuccessSchema(BaseSchema):
 
     recordsTotal = fields.Int(
         required=False,
-        description="Total number of records in this table",
-        example=329,
+        metadata={'description': "Total number of records in this table", 'example': 329},
     )
     recordsFiltered = fields.Int(
         required=False,
-        description="Total number of records after filters have been applied",
-        example=10,
+        metadata={'description': "Total number of records after filters have been applied", 'example': 10},
         load_default=10,
     )
     results = fields.List(
         cls_or_instance=fields.Raw,
         required=False,
-        description="Results",
-        example=[],
+        metadata={'description': "Results", 'example': []},
     )
 
 
@@ -212,8 +192,7 @@ class RequestDatabaseItemByIdSchema(BaseSchema):
 
     id = fields.Int(
         required=True,
-        description="The ID of the table item",
-        example=1,
+        metadata={'description': "The ID of the table item", 'example': 1},
     )
 
 
@@ -226,12 +205,11 @@ class DocumentContentSuccessSchema(BaseSchema):
     content = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="Document contents read line-by-line into a list",
-        example=[
+        metadata={'description': "Document contents read line-by-line into a list", 'example': [
             "First line\n",
             "Second line\n",
             "\n",
-        ],
+        ]},
         validate=validate.Length(min=1),
     )
 
@@ -243,11 +221,11 @@ class RequestDirectoryListingDataSchema(BaseSchema):
     """Schema for requesting a directory content listing"""
 
     current_path = fields.Str(
-        example="/",
+        metadata={'example': "/"},
         load_default="/",
     )
     list_type = fields.Str(
-        example="directories",
+        metadata={'example': "directories"},
         load_default="all",
     )
 
@@ -258,8 +236,7 @@ class DirectoryListingResultsSchema(BaseSchema):
     directories = fields.List(
         cls_or_instance=fields.Dict,
         required=True,
-        description="A list of directories in the given path",
-        example=[
+        metadata={'description': "A list of directories in the given path", 'example': [
             {
                 'value': "home",
                 'label': "/home",
@@ -268,14 +245,13 @@ class DirectoryListingResultsSchema(BaseSchema):
                 'value': "tmp",
                 'label': "/tmp",
             },
-        ],
+        ]},
         validate=validate.Length(min=0),
     )
     files = fields.List(
         cls_or_instance=fields.Dict,
         required=True,
-        description="A list of files in the given path",
-        example=[
+        metadata={'description': "A list of files in the given path", 'example': [
             {
                 'value': "file1.txt",
                 'label': "/file1.txt",
@@ -284,7 +260,7 @@ class DirectoryListingResultsSchema(BaseSchema):
                 'value': "file2.txt",
                 'label': "/file2.txt",
             },
-        ],
+        ]},
         validate=validate.Length(min=0),
     )
 
@@ -296,7 +272,7 @@ class RequestHistoryTableDataSchema(RequestTableDataSchema):
     """Schema for requesting completed tasks from the table"""
 
     order_by = fields.Str(
-        example="finish_time",
+        metadata={'example': "finish_time"},
         load_default="finish_time",
     )
 
@@ -306,28 +282,23 @@ class CompletedTasksTableResultsSchema(BaseSchema):
 
     id = fields.Int(
         required=True,
-        description="Item ID",
-        example=1,
+        metadata={'description': "Item ID", 'example': 1},
     )
     task_label = fields.Str(
         required=True,
-        description="Item label",
-        example="example.mp4",
+        metadata={'description': "Item label", 'example': "example.mp4"},
     )
     task_success = fields.Boolean(
         required=True,
-        description="Item success status",
-        example=True,
+        metadata={'description': "Item success status", 'example': True},
     )
     finish_time = fields.Int(
         required=True,
-        description="Item finish time",
-        example=1627392616.6400812,
+        metadata={'description': "Item finish time", 'example': 1627392616.6400812},
     )
     has_metadata = fields.Boolean(
         required=True,
-        description="Item has linked file metadata",
-        example=False,
+        metadata={'description': "Item has linked file metadata", 'example': False},
     )
 
 
@@ -336,18 +307,16 @@ class CompletedTasksSchema(TableRecordsSuccessSchema):
 
     successCount = fields.Int(
         required=True,
-        description="Total count of times with a success status in the results list",
-        example=337,
+        metadata={'description': "Total count of times with a success status in the results list", 'example': 337},
     )
     failedCount = fields.Int(
         required=True,
-        description="Total count of times with a failed status in the results list",
-        example=2,
+        metadata={'description': "Total count of times with a failed status in the results list", 'example': 2},
     )
     results = fields.Nested(
         CompletedTasksTableResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -358,8 +327,7 @@ class CompletedTasksLogRequestSchema(BaseSchema):
 
     task_id = fields.Int(
         required=True,
-        description="The ID of the task",
-        example=1,
+        metadata={'description': "The ID of the task", 'example': 1},
     )
 
 
@@ -368,14 +336,12 @@ class CompletedTasksLogSchema(BaseSchema):
 
     command_log = fields.Str(
         required=True,
-        description="Long string...",
-        example='Long string...',
+        metadata={'description': "Long string...", 'example': 'Long string...'},
     )
     command_log_lines = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="The long string broken up into an array of lines",
-        example=[
+        metadata={'description': "The long string broken up into an array of lines", 'example': [
             "",
             "<b>RUNNER: </b>",
             "Video Encoder H264 - libx264 [Pass #1]",
@@ -383,7 +349,7 @@ class CompletedTasksLogSchema(BaseSchema):
             "<b>COMMAND:</b>",
             "",
             "...",
-        ],
+        ]},
     )
 
 
@@ -392,8 +358,7 @@ class RequestMetadataByTaskSchema(BaseSchema):
 
     task_id = fields.Int(
         required=True,
-        description="The ID of the completed task",
-        example=1,
+        metadata={'description': "The ID of the completed task", 'example': 1},
     )
 
 
@@ -403,20 +368,17 @@ class RequestMetadataSearchSchema(BaseSchema):
     path = fields.Str(
         required=False,
         allow_none=True,
-        description="Absolute path to search for metadata",
-        example="/mnt/user/Movies/Example.mkv",
+        metadata={'description': "Absolute path to search for metadata", 'example': "/mnt/user/Movies/Example.mkv"},
     )
     offset = fields.Int(
         required=False,
         allow_none=True,
-        description="Pagination offset",
-        example=0,
+        metadata={'description': "Pagination offset", 'example': 0},
     )
     limit = fields.Int(
         required=False,
         allow_none=True,
-        description="Pagination limit",
-        example=50,
+        metadata={'description': "Pagination limit", 'example': 50},
     )
 
 
@@ -425,32 +387,27 @@ class MetadataEntrySchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        description="File fingerprint",
-        example="abc123",
+        metadata={'description': "File fingerprint", 'example': "abc123"},
     )
     fingerprint_algo = fields.Str(
         required=True,
-        description="Fingerprint algorithm identifier",
-        example="sampled_sha256_v1",
+        metadata={'description': "Fingerprint algorithm identifier", 'example': "sampled_sha256_v1"},
     )
     metadata_json = fields.Dict(
         required=True,
-        description="Metadata blob keyed by plugin ID",
-        example={
+        metadata={'description': "Metadata blob keyed by plugin ID", 'example': {
             "example_plugin": {"status": "ignored"},
-        },
+        }},
     )
     last_task_id = fields.Int(
         required=False,
         allow_none=True,
-        description="Most recent completed task ID that wrote metadata",
-        example=42,
+        metadata={'description': "Most recent completed task ID that wrote metadata", 'example': 42},
     )
     paths = fields.List(
         fields.Dict(),
         required=False,
-        description="Associated file paths for this fingerprint",
-        example=[{"path": "/mnt/user/Movies/Example.mkv", "path_type": "destination"}],
+        metadata={'description': "Associated file paths for this fingerprint", 'example': [{"path": "/mnt/user/Movies/Example.mkv", "path_type": "destination"}]},
     )
 
 
@@ -460,14 +417,13 @@ class MetadataSearchResultsSchema(BaseSchema):
     results = fields.Nested(
         MetadataEntrySchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
     total_count = fields.Int(
         required=True,
-        description="Total number of matching records",
-        example=120,
+        metadata={'description': "Total number of matching records", 'example': 120},
     )
 
 
@@ -476,18 +432,15 @@ class RequestMetadataUpdateSchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        description="File fingerprint",
-        example="abc123",
+        metadata={'description': "File fingerprint", 'example': "abc123"},
     )
     plugin_id = fields.Str(
         required=True,
-        description="Plugin identifier",
-        example="mover2",
+        metadata={'description': "Plugin identifier", 'example': "mover2"},
     )
     json_blob = fields.Dict(
         required=True,
-        description="Plugin metadata dict to merge",
-        example={"status": "ignored"},
+        metadata={'description': "Plugin metadata dict to merge", 'example': {"status": "ignored"}},
     )
 
 
@@ -496,8 +449,7 @@ class RequestMetadataByFingerprintSchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        description="File fingerprint",
-        example="abc123",
+        metadata={'description': "File fingerprint", 'example': "abc123"},
     )
 
 
@@ -506,14 +458,12 @@ class RequestMetadataDeleteSchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        description="File fingerprint",
-        example="abc123",
+        metadata={'description': "File fingerprint", 'example': "abc123"},
     )
     plugin_id = fields.Str(
         required=False,
         allow_none=True,
-        description="Plugin identifier to delete (omit to delete all)",
-        example="mover2",
+        metadata={'description': "Plugin identifier to delete (omit to delete all)", 'example': "mover2"},
     )
 
 
@@ -524,45 +474,39 @@ class RequestCompletedTasksBulkActionSchema(BaseSchema):
         required=False,
         load_default="explicit",
         validate=validate.OneOf(["explicit", "all_filtered"]),
-        example="explicit",
+        metadata={'example': "explicit"},
     )
     id_list = fields.List(
         cls_or_instance=fields.Int,
         required=False,
-        description="List of table IDs",
-        example=[],
+        metadata={'description': "List of table IDs", 'example': []},
         validate=validate.Length(min=1),
     )
     exclude_ids = fields.List(
         cls_or_instance=fields.Int,
         required=False,
-        description="List of table IDs to exclude when using a filtered selection",
-        example=[],
+        metadata={'description': "List of table IDs to exclude when using a filtered selection", 'example': []},
         load_default=[],
         validate=validate.Length(min=0),
     )
     search_value = fields.Str(
         required=False,
-        description="String to filter search results by",
-        example="items with this text in the value",
+        metadata={'description': "String to filter search results by", 'example': "items with this text in the value"},
         load_default="",
     )
     status = fields.Str(
         required=False,
-        description="Filter on the status",
-        example="all",
+        metadata={'description': "Filter on the status", 'example': "all"},
         load_default="all",
     )
     after = fields.DateTime(
         required=False,
-        description="Filter entries since datetime",
-        example="2022-04-07 01:45",
+        metadata={'description': "Filter entries since datetime", 'example': "2022-04-07 01:45"},
         allow_none=True,
     )
     before = fields.DateTime(
         required=False,
-        description="Filter entries prior to datetime",
-        example="2022-04-07 01:55",
+        metadata={'description': "Filter entries prior to datetime", 'example': "2022-04-07 01:55"},
         allow_none=True,
     )
 
@@ -573,7 +517,7 @@ class RequestAddCompletedToPendingTasksSchema(RequestCompletedTasksBulkActionSch
     library_id = fields.Int(
         required=False,
         load_default=0,
-        example=1,
+        metadata={'example': 1},
     )
 
 
@@ -585,33 +529,27 @@ class NotificationDataSchema(BaseSchema):
 
     uuid = fields.Str(
         required=True,
-        description="Unique ID for this notification",
-        example="updateAvailable",
+        metadata={'description': "Unique ID for this notification", 'example': "updateAvailable"},
     )
     type = fields.Str(
         required=True,
-        description="The type of notification",
-        example="info",
+        metadata={'description': "The type of notification", 'example': "info"},
     )
     icon = fields.Str(
         required=True,
-        description="The icon to display with the notification",
-        example="update",
+        metadata={'description': "The icon to display with the notification", 'example': "update"},
     )
     label = fields.Str(
         required=True,
-        description="The label of the notification. Can be a I18n key or a string",
-        example="updateAvailableLabel",
+        metadata={'description': "The label of the notification. Can be a I18n key or a string", 'example': "updateAvailableLabel"},
     )
     message = fields.Str(
         required=True,
-        description="The message of the notification. Can be a I18n key or a string",
-        example="updateAvailableMessage",
+        metadata={'description': "The message of the notification. Can be a I18n key or a string", 'example': "updateAvailableMessage"},
     )
     navigation = fields.Dict(
         required=True,
-        description="The navigation links of the notification",
-        example={'url': "https://github.com/jtn0123/compresso"},
+        metadata={'description': "The navigation links of the notification", 'example': {'url': "https://github.com/jtn0123/compresso"}},
     )
 
 
@@ -621,7 +559,7 @@ class RequestNotificationsDataSchema(BaseSchema):
     notifications = fields.Nested(
         NotificationDataSchema,
         required=True,
-        description="List of notifications",
+        metadata={'description': "List of notifications"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -634,14 +572,13 @@ class RequestPendingTableDataSchema(RequestTableDataSchema):
     """Schema for requesting pending tasks from the table"""
 
     order_by = fields.Str(
-        example="priority",
+        metadata={'example': "priority"},
         load_default="priority",
     )
     library_ids = fields.List(
         cls_or_instance=fields.Int,
         required=False,
-        description="Filter pending tasks by library IDs",
-        example=[1, 3],
+        metadata={'description': "Filter pending tasks by library IDs", 'example': [1, 3]},
         load_default=[],
         validate=validate.Length(min=0),
     )
@@ -654,34 +591,30 @@ class RequestPendingTasksBulkActionSchema(BaseSchema):
         required=False,
         load_default="explicit",
         validate=validate.OneOf(["explicit", "all_filtered"]),
-        example="explicit",
+        metadata={'example': "explicit"},
     )
     id_list = fields.List(
         cls_or_instance=fields.Int,
         required=False,
-        description="List of table IDs",
-        example=[],
+        metadata={'description': "List of table IDs", 'example': []},
         validate=validate.Length(min=1),
     )
     exclude_ids = fields.List(
         cls_or_instance=fields.Int,
         required=False,
-        description="List of table IDs to exclude when using a filtered selection",
-        example=[],
+        metadata={'description': "List of table IDs to exclude when using a filtered selection", 'example': []},
         load_default=[],
         validate=validate.Length(min=0),
     )
     search_value = fields.Str(
         required=False,
-        description="String to filter search results by",
-        example="items with this text in the value",
+        metadata={'description': "String to filter search results by", 'example': "items with this text in the value"},
         load_default="",
     )
     library_ids = fields.List(
         cls_or_instance=fields.Int,
         required=False,
-        description="Filter pending tasks by library IDs",
-        example=[1, 3],
+        metadata={'description': "Filter pending tasks by library IDs", 'example': [1, 3]},
         load_default=[],
         validate=validate.Length(min=0),
     )
@@ -692,43 +625,35 @@ class PendingTasksTableResultsSchema(BaseSchema):
 
     id = fields.Int(
         required=True,
-        description="Item ID",
-        example=1,
+        metadata={'description': "Item ID", 'example': 1},
     )
     abspath = fields.Str(
         required=True,
-        description="File absolute path",
-        example="example.mp4",
+        metadata={'description': "File absolute path", 'example': "example.mp4"},
     )
     priority = fields.Int(
         required=True,
-        description="The current priority (higher is greater)",
-        example=100,
+        metadata={'description': "The current priority (higher is greater)", 'example': 100},
     )
     type = fields.Str(
         required=True,
-        description="The type of the pending task - local or remote",
-        example="local",
+        metadata={'description': "The type of the pending task - local or remote", 'example': "local"},
     )
     status = fields.Str(
         required=True,
-        description="The current status of the pending task",
-        example="pending",
+        metadata={'description': "The current status of the pending task", 'example': "pending"},
     )
     checksum = fields.Str(
         required=False,
-        description="The uploaded file md5 checksum",
-        example="5425ab3df5cdbad2e1099bb4cb963a4f",
+        metadata={'description': "The uploaded file md5 checksum", 'example': "5425ab3df5cdbad2e1099bb4cb963a4f"},
     )
     library_id = fields.Int(
         required=False,
-        description="The ID of the library for which this task was created",
-        example=1,
+        metadata={'description': "The ID of the library for which this task was created", 'example': 1},
     )
     library_name = fields.Str(
         required=False,
-        description="The name of the library for which this task was created",
-        example="Default",
+        metadata={'description': "The name of the library for which this task was created", 'example': "Default"},
     )
 
 
@@ -738,7 +663,7 @@ class PendingTasksSchema(TableRecordsSuccessSchema):
     results = fields.Nested(
         PendingTasksTableResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -749,8 +674,7 @@ class RequestPendingTasksReorderSchema(RequestPendingTasksBulkActionSchema):
 
     position = fields.Str(
         required=True,
-        description="Position to move given list of items to ('top' or 'bottom')",
-        example="top",
+        metadata={'description': "Position to move given list of items to ('top' or 'bottom')", 'example': "top"},
         validate=validate.OneOf(["top", "bottom"]),
     )
 
@@ -760,28 +684,23 @@ class RequestPendingTaskCreateSchema(BaseSchema):
 
     path = fields.Str(
         required=True,
-        description="The absolute path to a file",
-        example="/library/TEST_FILE.mkv",
+        metadata={'description': "The absolute path to a file", 'example': "/library/TEST_FILE.mkv"},
     )
     library_id = fields.Int(
         required=False,
-        description="The ID of the library to append this task to",
-        example=1,
+        metadata={'description': "The ID of the library to append this task to", 'example': 1},
     )
     library_name = fields.Str(
         required=False,
-        description="The name of the library to append this task to",
-        example='Default',
+        metadata={'description': "The name of the library to append this task to", 'example': 'Default'},
     )
     type = fields.Str(
         required=False,
-        description="The type of pending task to create (local/remote)",
-        example='local',
+        metadata={'description': "The type of pending task to create (local/remote)", 'example': 'local'},
     )
     priority_score = fields.Int(
         required=False,
-        description="Apply a priority score to the created task to either increase or decrease its position in the queue",
-        example=1000,
+        metadata={'description': "Apply a priority score to the created task to either increase or decrease its position in the queue", 'example': 1000},
     )
 
 
@@ -790,18 +709,15 @@ class RequestPendingTaskTestSchema(BaseSchema):
 
     path = fields.Str(
         required=True,
-        description="The path to a file (absolute or relative to the selected library)",
-        example="/library/TEST_FILE.mkv",
+        metadata={'description': "The path to a file (absolute or relative to the selected library)", 'example': "/library/TEST_FILE.mkv"},
     )
     library_id = fields.Int(
         required=False,
-        description="The ID of the library to use for plugin configuration",
-        example=1,
+        metadata={'description': "The ID of the library to use for plugin configuration", 'example': 1},
     )
     library_name = fields.Str(
         required=False,
-        description="The name of the library to use for plugin configuration",
-        example='Default',
+        metadata={'description': "The name of the library to use for plugin configuration", 'example': 'Default'},
     )
 
 
@@ -810,39 +726,33 @@ class PendingTaskTestResultSchema(BaseSchema):
 
     path = fields.Str(
         required=True,
-        description="The absolute path to the tested file",
-        example="/library/TEST_FILE.mkv",
+        metadata={'description': "The absolute path to the tested file", 'example': "/library/TEST_FILE.mkv"},
     )
     library_id = fields.Int(
         required=True,
-        description="The library ID used to run the file tests",
-        example=1,
+        metadata={'description': "The library ID used to run the file tests", 'example': 1},
     )
     library_name = fields.Str(
         required=True,
-        description="The library name used to run the file tests",
-        example="Default",
+        metadata={'description': "The library name used to run the file tests", 'example': "Default"},
     )
     add_file_to_pending_tasks = fields.Boolean(
         required=False,
         allow_none=True,
-        description="Final decision after file tests (true: plugin requested queueing, false: plugin rejected, null: no plugin decided)",
-        example=True,
+        metadata={'description': "Final decision after file tests (true: plugin requested queueing, false: plugin rejected, null: no plugin decided)", 'example': True},
     )
     issues = fields.List(
         fields.Dict(),
         required=False,
-        description="Any issues that prevented the file from being queued",
-        example=[],
+        metadata={'description': "Any issues that prevented the file from being queued", 'example': []},
     )
     decision_plugin = fields.Dict(
         required=False,
         allow_none=True,
-        description="The plugin that set add_file_to_pending_tasks (null if no plugin decided)",
-        example={
+        metadata={'description': "The plugin that set add_file_to_pending_tasks (null if no plugin decided)", 'example': {
             "plugin_id": "example_library_management_file_test",
             "plugin_name": "Example Library Test",
-        },
+        }},
     )
 
 
@@ -851,8 +761,7 @@ class TaskDownloadLinkSchema(BaseSchema):
 
     link_id = fields.Str(
         required=True,
-        description="The ID used to download the file /compresso/downloads/{link_id}",
-        example="2960645c-a4e2-4b05-8866-7bd469ee9ef8",
+        metadata={'description': "The ID used to download the file /compresso/downloads/{link_id}", 'example': "2960645c-a4e2-4b05-8866-7bd469ee9ef8"},
     )
 
 
@@ -861,7 +770,7 @@ class RequestPendingTasksLibraryUpdateSchema(RequestTableUpdateByIdList):
 
     library_name = fields.Str(
         required=True,
-        example='Default',
+        metadata={'example': 'Default'},
     )
 
 
@@ -872,7 +781,7 @@ class RequestPluginsTableDataSchema(RequestTableDataSchema):
     """Schema for requesting plugins from the table"""
 
     order_by = fields.Str(
-        example="name",
+        metadata={'example': "name"},
         load_default="name",
     )
 
@@ -880,13 +789,11 @@ class RequestPluginsTableDataSchema(RequestTableDataSchema):
 class PluginStatusSchema(BaseSchema):
     installed = fields.Boolean(
         required=False,
-        description="Is the plugin installed",
-        example=True,
+        metadata={'description': "Is the plugin installed", 'example': True},
     )
     update_available = fields.Boolean(
         required=False,
-        description="Does the plugin have an update available",
-        example=True,
+        metadata={'description': "Does the plugin have an update available", 'example': True},
     )
 
 
@@ -895,12 +802,11 @@ class RequestPluginsByIdSchema(BaseSchema):
 
     plugin_id = fields.Str(
         required=True,
-        example="encoder_video_hevc_vaapi",
+        metadata={'example': "encoder_video_hevc_vaapi"},
     )
     repo_id = fields.Str(
         required=False,
-        description="The ID of the repository that this plugin is in",
-        example="158899500680826593283708490873332175078",
+        metadata={'description': "The ID of the repository that this plugin is in", 'example': "158899500680826593283708490873332175078"},
     )
 
 
@@ -909,53 +815,44 @@ class PluginsMetadataResultsSchema(BaseSchema):
 
     plugin_id = fields.Str(
         required=True,
-        description="The plugin ID",
-        example="encoder_video_h264_nvenc",
+        metadata={'description': "The plugin ID", 'example': "encoder_video_h264_nvenc"},
     )
     name = fields.Str(
         required=True,
-        description="The plugin name",
-        example="Video Encoder H264 - h264_nvenc",
+        metadata={'description': "The plugin name", 'example': "Video Encoder H264 - h264_nvenc"},
     )
     author = fields.Str(
         required=True,
-        description="The plugin author",
-        example="encoder_video_h264_nvenc",
+        metadata={'description': "The plugin author", 'example': "encoder_video_h264_nvenc"},
     )
     description = fields.Str(
         required=True,
-        description="The plugin description",
-        example="Ensure all video streams are encoded with the H264 codec using the h264_nvenc encoder.",
+        metadata={'description': "The plugin description", 'example': "Ensure all video streams are encoded with the H264 codec using the h264_nvenc encoder."},
     )
     version = fields.Str(
         required=True,
-        description="The plugin version",
-        example="Josh.5",
+        metadata={'description': "The plugin version", 'example': "Josh.5"},
     )
     icon = fields.Str(
         required=True,
-        description="The plugin icon",
-        example="https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png",
+        metadata={'description': "The plugin icon", 'example': "https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png"},
     )
     tags = fields.Str(
         required=True,
-        description="The plugin tags",
-        example="video,encoder,ffmpeg,worker,nvenc,nvdec,nvidia",
+        metadata={'description': "The plugin tags", 'example': "video,encoder,ffmpeg,worker,nvenc,nvdec,nvidia"},
     )
     status = fields.Nested(
         PluginStatusSchema,
         required=True,
-        description="The plugin status",
+        metadata={'description': "The plugin status"},
     )
     changelog = fields.Str(
         required=False,
-        description="The plugin changelog",
-        example="[b][color=56adda]0.0.1[/color][/b]• initial version",
+        metadata={'description': "The plugin changelog", 'example': "[b][color=56adda]0.0.1[/color][/b]• initial version"},
     )
     has_config = fields.Boolean(
         required=False,
-        description="The plugin has the ability to be configured",
-        example=True,
+        metadata={'description': "The plugin has the ability to be configured", 'example': True},
     )
 
 
@@ -964,8 +861,7 @@ class PluginsTableResultsSchema(PluginsMetadataResultsSchema):
 
     id = fields.Int(
         required=True,
-        description="Item table ID",
-        example=1,
+        metadata={'description': "Item table ID", 'example': 1},
     )
 
 
@@ -975,7 +871,7 @@ class PluginsDataSchema(TableRecordsSuccessSchema):
     results = fields.Nested(
         PluginsTableResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -987,12 +883,12 @@ class RequestPluginsInfoSchema(RequestPluginsByIdSchema):
     prefer_local = fields.Boolean(
         required=False,
         load_default=True,
-        example=True,
+        metadata={'example': True},
     )
     library_id = fields.Int(
         required=False,
         load_default=0,
-        example=1,
+        metadata={'example': 1},
     )
 
 
@@ -1001,46 +897,38 @@ class PluginsConfigInputItemSchema(BaseSchema):
 
     key_id = fields.Str(
         required=True,
-        description="The config input base64 encoded key (used for linking keys containing spaces, etc.)",
-        example="c8f122656ed2acabde9b57101a4c8ec7",
+        metadata={'description': "The config input base64 encoded key (used for linking keys containing spaces, etc.)", 'example': "c8f122656ed2acabde9b57101a4c8ec7"},
     )
     key = fields.Str(
         required=True,
-        description="The config input key or name",
-        example="downmix_dts_hd_ma",
+        metadata={'description': "The config input key or name", 'example': "downmix_dts_hd_ma"},
     )
     value = fields.Raw(
         required=True,
-        description="The current value of this config input",
-        example=False,
+        metadata={'description': "The current value of this config input", 'example': False},
     )
     input_type = fields.Str(
         required=True,
-        description="The config input type",
-        example="checkbox",
+        metadata={'description': "The config input type", 'example': "checkbox"},
     )
     label = fields.Str(
         required=True,
-        description="The label used to define this config input",
-        example="Downmix DTS-HD Master Audio (max 5.1 channels)?",
+        metadata={'description': "The label used to define this config input", 'example': "Downmix DTS-HD Master Audio (max 5.1 channels)?"},
     )
     description = fields.Str(
         required=True,
-        description="Description of input field",
-        example="Will automatically downmix DTS-HD Master Audio to 5.1 channels ",
+        metadata={'description': "Description of input field", 'example': "Will automatically downmix DTS-HD Master Audio to 5.1 channels "},
         allow_none=True,
     )
     tooltip = fields.Str(
         required=True,
-        description="Description of input field",
-        example="Will automatically downmix DTS-HD Master Audio to 5.1 channels ",
+        metadata={'description': "Description of input field", 'example': "Will automatically downmix DTS-HD Master Audio to 5.1 channels "},
         allow_none=True,
     )
     select_options = fields.List(
         cls_or_instance=fields.Dict,
         required=True,
-        description="Additional options if the input_type is set to 'select'",
-        example=[
+        metadata={'description': "Additional options if the input_type is set to 'select'", 'example': [
             {
                 'value': "first",
                 'label': "First Option",
@@ -1049,26 +937,23 @@ class PluginsConfigInputItemSchema(BaseSchema):
                 'value': "second",
                 'label': "Second Option",
             },
-        ],
+        ]},
     )
     slider_options = fields.Dict(
         required=True,
-        description="Additional options if the input_type is set to 'slider'",
-        example={
+        metadata={'description': "Additional options if the input_type is set to 'slider'", 'example': {
             "min":    1,
             "max":    8,
             "suffix": "M"
-        },
+        }},
     )
     display = fields.Str(
         required=True,
-        description="Should the setting input be displayed (visible, hidden)",
-        example="visible",
+        metadata={'description': "Should the setting input be displayed (visible, hidden)", 'example': "visible"},
     )
     sub_setting = fields.Boolean(
         required=True,
-        description="Should the setting be a nested sub-setting field",
-        example=False,
+        metadata={'description': "Should the setting be a nested sub-setting field", 'example': False},
     )
 
 
@@ -1079,7 +964,7 @@ class PluginsInfoResultsSchema(PluginsMetadataResultsSchema):
         PluginsConfigInputItemSchema,
         required=False,
         many=True,
-        description="The plugin settings",
+        metadata={'description': "The plugin settings"},
     )
 
 
@@ -1088,18 +973,18 @@ class RequestPluginsSettingsSaveSchema(BaseSchema):
 
     plugin_id = fields.Str(
         required=True,
-        example="encoder_video_hevc_vaapi",
+        metadata={'example': "encoder_video_hevc_vaapi"},
     )
     settings = fields.Nested(
         PluginsConfigInputItemSchema,
         required=True,
         many=True,
-        description="The plugin settings",
+        metadata={'description': "The plugin settings"},
     )
     library_id = fields.Int(
         required=False,
         load_default=0,
-        example=1,
+        metadata={'example': 1},
     )
 
 
@@ -1108,12 +993,12 @@ class RequestPluginsSettingsResetSchema(BaseSchema):
 
     plugin_id = fields.Str(
         required=True,
-        example="encoder_video_hevc_vaapi",
+        metadata={'example': "encoder_video_hevc_vaapi"},
     )
     library_id = fields.Int(
         required=False,
         load_default=0,
-        example=1,
+        metadata={'example': 1},
     )
 
 
@@ -1122,23 +1007,19 @@ class PluginsMetadataInstallableResultsSchema(PluginsMetadataResultsSchema):
 
     package_url = fields.Str(
         required=False,
-        description="The plugin package download URL",
-        example="https://raw.githubusercontent.com/Compresso/compresso-plugins/repo/plugin_id/plugin_id-1.0.0.zip",
+        metadata={'description': "The plugin package download URL", 'example': "https://raw.githubusercontent.com/Compresso/compresso-plugins/repo/plugin_id/plugin_id-1.0.0.zip"},
     )
     changelog_url = fields.Str(
         required=False,
-        description="The plugin package download URL",
-        example="https://raw.githubusercontent.com/Compresso/compresso-plugins/repo/plugin_id/changelog.md",
+        metadata={'description': "The plugin package download URL", 'example': "https://raw.githubusercontent.com/Compresso/compresso-plugins/repo/plugin_id/changelog.md"},
     )
     repo_name = fields.Str(
         required=False,
-        description="The name of the repository that this plugin is in",
-        example="Official Repo",
+        metadata={'description': "The name of the repository that this plugin is in", 'example': "Official Repo"},
     )
     repo_id = fields.Str(
         required=False,
-        description="The ID of the repository that this plugin is in",
-        example="158899500680826593283708490873332175078",
+        metadata={'description': "The ID of the repository that this plugin is in", 'example': "158899500680826593283708490873332175078"},
     )
 
 
@@ -1148,7 +1029,7 @@ class PluginsInstallableResultsSchema(BaseSchema):
     plugins = fields.Nested(
         PluginsMetadataInstallableResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -1160,13 +1041,12 @@ class PluginTypesResultsSchema(BaseSchema):
     results = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="List of Plugin Type IDs supported by this installation",
-        example=[
+        metadata={'description': "List of Plugin Type IDs supported by this installation", 'example': [
             "library_management.file_test",
             "postprocessor.file_move",
             "postprocessor.task_result",
             "worker.process"
-        ],
+        ]},
     )
 
 
@@ -1175,12 +1055,12 @@ class RequestPluginsFlowByPluginTypeSchema(BaseSchema):
 
     plugin_type = fields.Str(
         required=True,
-        example="library_management.file_test",
+        metadata={'example': "library_management.file_test"},
     )
     library_id = fields.Int(
         required=False,
         load_default=1,
-        example=1,
+        metadata={'example': 1},
     )
 
 
@@ -1189,33 +1069,27 @@ class PluginFlowDataResultsSchema(BaseSchema):
 
     plugin_id = fields.Str(
         required=True,
-        description="The plugin ID",
-        example="encoder_video_h264_nvenc",
+        metadata={'description': "The plugin ID", 'example': "encoder_video_h264_nvenc"},
     )
     name = fields.Str(
         required=True,
-        description="The plugin name",
-        example="Video Encoder H264 - h264_nvenc",
+        metadata={'description': "The plugin name", 'example': "Video Encoder H264 - h264_nvenc"},
     )
     author = fields.Str(
         required=True,
-        description="The plugin author",
-        example="encoder_video_h264_nvenc",
+        metadata={'description': "The plugin author", 'example': "encoder_video_h264_nvenc"},
     )
     description = fields.Str(
         required=True,
-        description="The plugin description",
-        example="Ensure all video streams are encoded with the H264 codec using the h264_nvenc encoder.",
+        metadata={'description': "The plugin description", 'example': "Ensure all video streams are encoded with the H264 codec using the h264_nvenc encoder."},
     )
     version = fields.Str(
         required=True,
-        description="The plugin version",
-        example="Josh.5",
+        metadata={'description': "The plugin version", 'example': "Josh.5"},
     )
     icon = fields.Str(
         required=True,
-        description="The plugin icon",
-        example="https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png",
+        metadata={'description': "The plugin icon", 'example': "https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png"},
     )
 
 
@@ -1225,7 +1099,7 @@ class PluginFlowResultsSchema(BaseSchema):
     results = fields.Nested(
         PluginFlowDataResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -1237,14 +1111,14 @@ class RequestSavingPluginsFlowByPluginTypeSchema(RequestPluginsFlowByPluginTypeS
     plugin_flow = fields.Nested(
         PluginFlowDataResultsSchema,
         required=True,
-        description="Saved flow",
+        metadata={'description': "Saved flow"},
         many=True,
         validate=validate.Length(min=1),
     )
     library_id = fields.Int(
         required=False,
         load_default=1,
-        example=1,
+        metadata={'example': 1},
     )
 
 
@@ -1253,28 +1127,23 @@ class PluginReposMetadataResultsSchema(BaseSchema):
 
     id = fields.Str(
         required=True,
-        description="The plugin repo ID",
-        example="repository.josh5",
+        metadata={'description': "The plugin repo ID", 'example': "repository.josh5"},
     )
     name = fields.Str(
         required=True,
-        description="The plugin repo name",
-        example="Josh.5 Development Plugins for Compresso",
+        metadata={'description': "The plugin repo name", 'example': "Josh.5 Development Plugins for Compresso"},
     )
     icon = fields.Str(
         required=True,
-        description="The plugin repo icon",
-        example="https://raw.githubusercontent.com/Josh5/compresso-plugins/master/icon.png",
+        metadata={'description': "The plugin repo icon", 'example': "https://raw.githubusercontent.com/Josh5/compresso-plugins/master/icon.png"},
     )
     path = fields.Str(
         required=True,
-        description="The plugin repo URL path",
-        example="https://raw.githubusercontent.com/Josh5/compresso-plugins/repo/repo.json",
+        metadata={'description': "The plugin repo URL path", 'example': "https://raw.githubusercontent.com/Josh5/compresso-plugins/repo/repo.json"},
     )
     repo_html_url = fields.Str(
         required=False,
-        description="The plugin repo HTML URL (e.g. GitHub repository page)",
-        example="https://github.com/Josh5/compresso-plugins",
+        metadata={'description': "The plugin repo HTML URL (e.g. GitHub repository page)", 'example': "https://github.com/Josh5/compresso-plugins"},
     )
 
 
@@ -1284,10 +1153,9 @@ class RequestUpdatePluginReposListSchema(BaseSchema):
     repos_list = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="A list of repost to save",
-        example=[
+        metadata={'description': "A list of repost to save", 'example': [
             'https://raw.githubusercontent.com/Josh5/compresso-plugins/repo/repo.json',
-        ],
+        ]},
         validate=validate.Length(min=0),
     )
 
@@ -1298,7 +1166,7 @@ class PluginReposListResultsSchema(BaseSchema):
     repos = fields.Nested(
         PluginReposMetadataResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -1310,7 +1178,7 @@ class PluginsDataPanelTypesDataSchema(BaseSchema):
     results = fields.Nested(
         PluginFlowDataResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -1324,33 +1192,27 @@ class SessionStateSuccessSchema(BaseSchema):
 
     level = fields.Int(
         required=True,
-        description="User level",
-        example=0,
+        metadata={'description': "User level", 'example': 0},
     )
     picture_uri = fields.Str(
         required=False,
-        description="User picture",
-        example="https://c8.patreon.com/2/200/561356054",
+        metadata={'description': "User picture", 'example': "https://c8.patreon.com/2/200/561356054"},
     )
     name = fields.Str(
         required=False,
-        description="User name",
-        example="ExampleUsername123",
+        metadata={'description': "User name", 'example': "ExampleUsername123"},
     )
     email = fields.Str(
         required=False,
-        description="User email",
-        example="example@gmail.com",
+        metadata={'description': "User email", 'example': "example@gmail.com"},
     )
     created = fields.Float(
         required=False,
-        description="Session time created",
-        example=1627793093.676484,
+        metadata={'description': "Session time created", 'example': 1627793093.676484},
     )
     uuid = fields.Str(
         required=True,
-        description="Installation uuid",
-        example="b429fcc7-9ce1-bcb3-2b8a-b094747f226e",
+        metadata={'description': "Installation uuid", 'example': "b429fcc7-9ce1-bcb3-2b8a-b094747f226e"},
     )
 
 
@@ -1359,28 +1221,23 @@ class SessionAuthCodeSchema(BaseSchema):
 
     user_code = fields.Str(
         required=True,
-        description="The user code",
-        example="123456",
+        metadata={'description': "The user code", 'example': "123456"},
     )
     device_code = fields.Str(
         required=True,
-        description="A device code",
-        example="6f6867e0006f7240c9a85703a521f1705873630355f68ebbcf251a07b080172b",
+        metadata={'description': "A device code", 'example': "6f6867e0006f7240c9a85703a521f1705873630355f68ebbcf251a07b080172b"},
     )
     verification_uri = fields.Str(
         required=True,
-        description="The verification URI to submit the code manually",
-        example="/support-auth-api/link",
+        metadata={'description': "The verification URI to submit the code manually", 'example': "/support-auth-api/link"},
     )
     verification_uri_complete = fields.Str(
         required=True,
-        description="User email",
-        example="/support-auth-api/v2/app_auth/link_with_user_code/123456",
+        metadata={'description': "User email", 'example': "/support-auth-api/v2/app_auth/link_with_user_code/123456"},
     )
     expires_in = fields.Int(
         required=True,
-        description="The time until the user_code expires",
-        example=120,
+        metadata={'description': "The time until the user_code expires", 'example': 120},
     )
 
 
@@ -1392,8 +1249,7 @@ class SettingsReadAndWriteSchema(BaseSchema):
 
     settings = fields.Dict(
         required=True,
-        description="The current settings, including fork-specific deployment defaults such as safe startup behavior and worker caps",
-        example={
+        metadata={'description': "The current settings, including fork-specific deployment defaults such as safe startup behavior and worker caps", 'example': {
             "ui_port":                    8888,
             "debugging":                  False,
             "log_buffer_retention":       0,
@@ -1406,7 +1262,7 @@ class SettingsReadAndWriteSchema(BaseSchema):
             "large_library_safe_defaults": True,
             "startup_readiness_timeout_seconds": 30,
             "default_worker_cap":         2
-        },
+        }},
     )
 
 
@@ -1415,8 +1271,7 @@ class SettingsSystemConfigSchema(BaseSchema):
 
     configuration = fields.Dict(
         required=True,
-        description="The current system configuration",
-        example={},
+        metadata={'description': "The current system configuration", 'example': {}},
     )
 
 
@@ -1425,23 +1280,19 @@ class WorkerEventScheduleResultsSchema(BaseSchema):
 
     repetition = fields.Str(
         required=True,
-        description="",
-        example="daily",
+        metadata={'description': "", 'example': "daily"},
     )
     schedule_task = fields.Str(
         required=True,
-        description="The type of task. ['count', 'pause', 'resume']",
-        example="count",
+        metadata={'description': "The type of task. ['count', 'pause', 'resume']", 'example': "count"},
     )
     schedule_time = fields.Str(
         required=True,
-        description="",
-        example="The time when the task should be executed on",
+        metadata={'description': "", 'example': "The time when the task should be executed on"},
     )
     schedule_worker_count = fields.Int(
         required=False,
-        description="The worker count to set (only valid if schedule_task is count)",
-        example=4,
+        metadata={'description': "The worker count to set (only valid if schedule_task is count)", 'example': 4},
     )
 
 
@@ -1450,37 +1301,32 @@ class SettingsWorkerGroupConfigSchema(BaseSchema):
 
     id = fields.Int(
         required=True,
-        description="",
-        example=1,
+        metadata={'description': "", 'example': 1},
         allow_none=True,
     )
     locked = fields.Boolean(
         required=True,
-        description="If the worker group is locked and cannot be deleted",
-        example=False,
+        metadata={'description': "If the worker group is locked and cannot be deleted", 'example': False},
     )
     name = fields.Str(
         required=True,
-        description="The name of the worker group",
-        example="Default Group",
+        metadata={'description': "The name of the worker group", 'example': "Default Group"},
     )
     number_of_workers = fields.Int(
         required=True,
-        description="The number of workers in this group",
-        example=3,
+        metadata={'description': "The number of workers in this group", 'example': 3},
     )
     worker_event_schedules = fields.Nested(
         WorkerEventScheduleResultsSchema,
         required=True,
-        description="Any scheduled evenets for this worker group",
+        metadata={'description': "Any scheduled evenets for this worker group"},
         many=True,
         validate=validate.Length(min=0),
     )
     tags = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="A list of tags associated with this worker",
-        example=['GPU', 'priority'],
+        metadata={'description': "A list of tags associated with this worker", 'example': ['GPU', 'priority']},
     )
 
 
@@ -1490,7 +1336,7 @@ class WorkerGroupsListSchema(BaseSchema):
     worker_groups = fields.Nested(
         SettingsWorkerGroupConfigSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
@@ -1501,25 +1347,21 @@ class RequestSettingsRemoteInstallationAddressValidationSchema(BaseSchema):
 
     address = fields.Str(
         required=True,
-        description="The address of the remote installation",
-        example="192.168.1.2:8888",
+        metadata={'description': "The address of the remote installation", 'example': "192.168.1.2:8888"},
     )
     auth = fields.Str(
         required=False,
-        description="Authentication type",
-        example="Basic",
+        metadata={'description': "Authentication type", 'example': "Basic"},
         allow_none=True,
     )
     username = fields.Str(
         required=False,
-        description="An optional username",
-        example="foo",
+        metadata={'description': "An optional username", 'example': "foo"},
         allow_none=True,
     )
     password = fields.Str(
         required=False,
-        description="An optional password",
-        example="bar",
+        metadata={'description': "An optional password", 'example': "bar"},
         allow_none=True,
     )
 
@@ -1529,8 +1371,7 @@ class SettingsRemoteInstallationDataSchema(BaseSchema):
 
     installation = fields.Dict(
         required=True,
-        description="The data from the remote installation",
-        example={},
+        metadata={'description': "The data from the remote installation", 'example': {}},
     )
 
 
@@ -1539,8 +1380,7 @@ class RequestRemoteInstallationLinkConfigSchema(BaseSchema):
 
     uuid = fields.Str(
         required=True,
-        description="The uuid of the remote installation",
-        example="7cd35429-76ab-4a29-8649-8c91236b5f8b",
+        metadata={'description': "The uuid of the remote installation", 'example': "7cd35429-76ab-4a29-8649-8c91236b5f8b"},
     )
 
 
@@ -1549,8 +1389,7 @@ class SettingsRemoteInstallationLinkConfigSchema(BaseSchema):
 
     link_config = fields.Dict(
         required=True,
-        description="The configuration for the remote installation link",
-        example={
+        metadata={'description': "The configuration for the remote installation link", 'example': {
             "address":                         "10.0.0.2:8888",
             "auth":                            "None",
             "username":                        "",
@@ -1566,12 +1405,11 @@ class SettingsRemoteInstallationLinkConfigSchema(BaseSchema):
             "preloading_count":                2,
             "enable_checksum_validation":      False,
             "enable_config_missing_libraries": False,
-        },
+        }},
     )
     distributed_worker_count_target = fields.Int(
         required=False,
-        description="The target count of workers to be distributed across any configured linked installations",
-        example=4,
+        metadata={'description': "The target count of workers to be distributed across any configured linked installations", 'example': 4},
     )
 
 
@@ -1580,44 +1418,36 @@ class LibraryResultsSchema(BaseSchema):
 
     id = fields.Int(
         required=True,
-        description="",
-        example=1,
+        metadata={'description': "", 'example': 1},
     )
     name = fields.Str(
         required=True,
-        description="The name of the library",
-        example="Default",
+        metadata={'description': "The name of the library", 'example': "Default"},
     )
     path = fields.Str(
         required=True,
-        description="The library path",
-        example="/library",
+        metadata={'description': "The library path", 'example': "/library"},
     )
     locked = fields.Boolean(
         required=True,
-        description="If the library is locked and cannot be deleted",
-        example=False,
+        metadata={'description': "If the library is locked and cannot be deleted", 'example': False},
     )
     enable_remote_only = fields.Boolean(
         required=True,
-        description="If the library is configured for remote files only",
-        example=False,
+        metadata={'description': "If the library is configured for remote files only", 'example': False},
     )
     enable_scanner = fields.Boolean(
         required=True,
-        description="If the library is configured to execute library scans",
-        example=False,
+        metadata={'description': "If the library is configured to execute library scans", 'example': False},
     )
     enable_inotify = fields.Boolean(
         required=True,
-        description="If the library is configured to monitor for file changes",
-        example=False,
+        metadata={'description': "If the library is configured to monitor for file changes", 'example': False},
     )
     tags = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="A list of tags associated with this library",
-        example=['GPU', 'priority'],
+        metadata={'description': "A list of tags associated with this library", 'example': ['GPU', 'priority']},
     )
 
 
@@ -1627,7 +1457,7 @@ class SettingsLibrariesListSchema(BaseSchema):
     libraries = fields.Nested(
         LibraryResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=1),
     )
@@ -1638,8 +1468,7 @@ class RequestLibraryByIdSchema(BaseSchema):
 
     id = fields.Int(
         required=True,
-        description="The ID of the library",
-        example=1,
+        metadata={'description': "The ID of the library", 'example': 1},
     )
 
 
@@ -1648,8 +1477,7 @@ class SettingsLibraryConfigReadAndWriteSchema(BaseSchema):
 
     library_config = fields.Dict(
         required=True,
-        description="The library configuration",
-        example={
+        metadata={'description': "The library configuration", 'example': {
             "id":             1,
             "name":           "Default",
             "path":           "/library",
@@ -1657,13 +1485,12 @@ class SettingsLibraryConfigReadAndWriteSchema(BaseSchema):
             "enable_inotify": False,
             "priority_score": 0,
             "tags":           [],
-        },
+        }},
     )
 
     plugins = fields.Dict(
         required=False,
-        description="The library's enabled plugins",
-        example={
+        metadata={'description': "The library's enabled plugins", 'example': {
             "enabled_plugins": [
                 {
                     "library_id":  1,
@@ -1673,7 +1500,7 @@ class SettingsLibraryConfigReadAndWriteSchema(BaseSchema):
                     "icon":        "https://raw.githubusercontent.com/Josh5/compresso.plugin.notify_plex/master/icon.png"
                 }
             ]
-        },
+        }},
     )
 
 
@@ -1682,8 +1509,7 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
 
     plugins = fields.Dict(
         required=True,
-        description="The library's enabled plugins",
-        example={
+        metadata={'description': "The library's enabled plugins", 'example': {
             "enabled_plugins": [
                 {
                     "library_id":  1,
@@ -1717,13 +1543,12 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
                 "postprocessor.file_move":      [],
                 "postprocessor.task_result":    []
             }
-        },
+        }},
     )
 
     library_config = fields.Dict(
         required=False,
-        description="The library configuration",
-        example={
+        metadata={'description': "The library configuration", 'example': {
             "id":             1,
             "name":           "Default",
             "path":           "/library",
@@ -1731,7 +1556,7 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
             "enable_inotify": False,
             "priority_score": 0,
             "tags":           [],
-        },
+        }},
     )
 
 
@@ -1740,7 +1565,7 @@ class SettingsLibraryPluginConfigImportSchema(SettingsLibraryPluginConfigExportS
 
     library_id = fields.Int(
         required=True,
-        example=1,
+        metadata={'example': 1},
     )
 
 
@@ -1752,8 +1577,7 @@ class VersionReadSuccessSchema(BaseSchema):
 
     version = fields.Str(
         required=True,
-        description="Application version",
-        example="1.0.0",
+        metadata={'description': "Application version", 'example': "1.0.0"},
     )
 
 
@@ -1765,7 +1589,7 @@ class RequestWorkerByIdSchema(BaseSchema):
 
     worker_id = fields.Str(
         required=True,
-        example="1",
+        metadata={'example': "1"},
     )
 
 
@@ -1774,63 +1598,53 @@ class WorkerStatusResultsSchema(BaseSchema):
 
     id = fields.Str(
         required=True,
-        description="",
-        example="W0",
+        metadata={'description': "", 'example': "W0"},
     )
     name = fields.Str(
         required=True,
-        description="",
-        example="Worker-W0",
+        metadata={'description': "", 'example': "Worker-W0"},
     )
     idle = fields.Boolean(
         required=True,
-        description="Flag - is worker idle",
-        example=True,
+        metadata={'description': "Flag - is worker idle", 'example': True},
     )
     paused = fields.Boolean(
         required=True,
-        description="Flag - is worker paused",
-        example=False,
+        metadata={'description': "Flag - is worker paused", 'example': False},
     )
     start_time = fields.Str(
         required=True,
-        description="The time when this worker started processing a task",
-        example="1635746377.0021548",
+        metadata={'description': "The time when this worker started processing a task", 'example': "1635746377.0021548"},
         allow_none=True,
     )
     current_file = fields.Str(
         required=True,
-        description="The basename of the file currently being processed",
-        example="file.mp4",
+        metadata={'description': "The basename of the file currently being processed", 'example': "file.mp4"},
     )
     current_task = fields.Int(
         required=True,
-        description="The Task ID",
-        example=1,
+        metadata={'description': "The Task ID", 'example': 1},
         allow_none=True,
     )
     current_command = fields.Str(
         required=True,
-        description="The command currently being executed",
-        example="ffmpeg ....",
+        metadata={'description': "The command currently being executed", 'example': "ffmpeg ...."},
         allow_none=True,
     )
     worker_log_tail = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        description="The log lines produced by the worker",
-        example=[
+        metadata={'description': "The log lines produced by the worker", 'example': [
             "\n\nRUNNER: \nRemux Video Files [Pass #1]\n\n",
             "\nExecuting plugin runner... Please wait",
             "\nRunner did not request to execute a command",
             "\n\nNo Plugin requested to run commands for this file '/tmp/compresso/compresso_remote_pending_library-1635746225.3336523/file.mp4'"
-        ],
+        ]},
         validate=validate.Length(min=0),
     )
     runners_info = fields.Dict(
         required=True,
-        description="The status of the plugin runner currently processing the file",
-        example={
+        metadata={'description': "The status of the plugin runner currently processing the file", 'example': {
             "video_remuxer": {
                 "plugin_id":   "video_remuxer",
                 "status":      "complete",
@@ -1841,16 +1655,15 @@ class WorkerStatusResultsSchema(BaseSchema):
                 "description": "Remux a video file to the configured container",
                 "success":     True
             }
-        },
+        }},
     )
     subprocess = fields.Dict(
         required=True,
-        description="The status of the process currently being executed",
-        example={
+        metadata={'description': "The status of the process currently being executed", 'example': {
             "pid":     140408939493120,
             "percent": "None",
             "elapsed": "None"
-        },
+        }},
     )
 
 
@@ -1860,7 +1673,7 @@ class WorkerStatusSuccessSchema(BaseSchema):
     workers_status = fields.Nested(
         WorkerStatusResultsSchema,
         required=True,
-        description="Results",
+        metadata={'description': "Results"},
         many=True,
         validate=validate.Length(min=0),
     )
