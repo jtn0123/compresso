@@ -1153,7 +1153,7 @@ class RequestUpdatePluginReposListSchema(BaseSchema):
     repos_list = fields.List(
         cls_or_instance=fields.Str,
         required=True,
-        metadata={'description': "A list of repost to save", 'example': [
+        metadata={'description': "A list of repos to save", 'example': [
             'https://raw.githubusercontent.com/Josh5/compresso-plugins/repo/repo.json',
         ]},
         validate=validate.Length(min=0),
@@ -1288,7 +1288,7 @@ class WorkerEventScheduleResultsSchema(BaseSchema):
     )
     schedule_time = fields.Str(
         required=True,
-        metadata={'description': "", 'example': "The time when the task should be executed on"},
+        metadata={'description': "The time when the task should be executed", 'example': "09:30"},
     )
     schedule_worker_count = fields.Int(
         required=False,
@@ -1319,7 +1319,7 @@ class SettingsWorkerGroupConfigSchema(BaseSchema):
     worker_event_schedules = fields.Nested(
         WorkerEventScheduleResultsSchema,
         required=True,
-        metadata={'description': "Any scheduled evenets for this worker group"},
+        metadata={'description': "Any scheduled events for this worker group"},
         many=True,
         validate=validate.Length(min=0),
     )

@@ -119,7 +119,7 @@ class ApiUploadHandler(BaseApiHandler):
                 self.meta['filename'] = split_chunk[1].split(b'=')[-1].replace(b'"', b'').decode()
                 # Sanitize filename to prevent path traversal
                 self.meta['filename'] = os.path.basename(self.meta['filename'])
-                if not self.meta['filename']:
+                if not self.meta['filename'] or self.meta['filename'] in {".", ".."}:
                     raise ValueError("Invalid filename in upload")
 
                 if frontend_messages:
@@ -143,8 +143,11 @@ class ApiUploadHandler(BaseApiHandler):
         return receiver
 
     def on_finish(self):
-        if hasattr(self, 'fp') and self.fp and not self.fp.closed:
-            self.fp.close()
+        try:
+            if hasattr(self, 'fp') and self.fp and not self.fp.closed:
+                self.fp.close()
+        finally:
+            super().on_finish()
 
     async def upload_file_to_pending_tasks(self):
         """
