@@ -10,7 +10,7 @@
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 from tests.unit.api_test_base import ApiTestBase
@@ -66,8 +66,23 @@ class TestSessionApiState(ApiTestBase):
 
     def test_get_session_state_exception(self):
         def _mock_init_error(self, **kwargs):
-            _mock_initialize(self, **kwargs)
-            type(self.session).level = property(lambda s: (_ for _ in ()).throw(Exception("error")))
+            class BrokenSession:
+                created = 1700000000.0
+                picture_uri = 'https://example.com/pic.png'
+                name = 'TestUser'
+                email = 'test@example.com'
+                uuid = 'uuid-1234'
+                token_poll_task = None
+
+                @property
+                def level(self):
+                    raise Exception("error")
+
+            self.session = BrokenSession()
+            self.logger = MagicMock()
+            self.params = kwargs.get("params")
+            self.compresso_data_queues = {}
+
         with patch.object(ApiSessionHandler, 'initialize', _mock_init_error):
             resp = self.get_json('/session/state')
             assert resp.code == 500

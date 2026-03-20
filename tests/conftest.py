@@ -30,10 +30,14 @@
 
 """
 
+import gc
 import logging
 import os
 import shutil
+import sys
 import tempfile
+import threading
+import warnings
 
 import pytest
 from unittest.mock import patch
@@ -47,6 +51,39 @@ from compresso.libs.unmodels.workerschedules import WorkerSchedules
 LibraryTags = Libraries.tags.get_through_model()
 
 
+def _is_compresso_thread(thread):
+    module = getattr(thread.__class__, "__module__", "")
+    return module.startswith("compresso.")
+
+
+def _stop_thread_if_supported(thread):
+    if hasattr(thread, "stop"):
+        try:
+            thread.stop()
+        except Exception as exc:
+            warnings.warn("Failed to stop leaked thread {}: {}".format(thread.name, exc), RuntimeWarning)
+
+    redundant_flag = getattr(thread, "redundant_flag", None)
+    if redundant_flag is not None and hasattr(redundant_flag, "set"):
+        redundant_flag.set()
+
+    paused_flag = getattr(thread, "paused_flag", None)
+    if paused_flag is not None and hasattr(paused_flag, "clear"):
+        paused_flag.clear()
+
+    event = getattr(thread, "event", None)
+    if event is not None and hasattr(event, "set"):
+        try:
+            event.set()
+        except Exception:
+            pass
+
+    try:
+        thread.join(timeout=1)
+    except Exception as exc:
+        warnings.warn("Failed to join leaked thread {}: {}".format(thread.name, exc), RuntimeWarning)
+
+
 def pytest_configure(config):
     """
     Custom pytest markers to separate the tests
@@ -56,6 +93,41 @@ def pytest_configure(config):
     """
     config.addinivalue_line("markers", "unittest: Unit tests.")
     config.addinivalue_line("markers", "integrationtest: Integration test.")
+
+
+@pytest.fixture(autouse=sys.version_info >= (3, 13))
+def collect_cyclic_garbage():
+    """
+    Python 3.13 builds large cyclic graphs during long pytest runs in this
+    suite. Collecting after each test keeps memory bounded and avoids the
+    late-session GC stalls we were seeing around handler-heavy files.
+    """
+    yield
+    gc.collect()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_compresso_threads():
+    """
+    Ensure tests do not leak long-lived Compresso threads into later tests.
+    Those leaks are especially expensive in long Python 3.13 runs where they
+    keep large object graphs reachable and amplify GC pauses.
+    """
+    baseline = {thread.ident for thread in threading.enumerate()}
+    yield
+
+    for thread in list(threading.enumerate()):
+        if thread.ident in baseline:
+            continue
+        if thread is threading.main_thread():
+            continue
+        if not thread.is_alive():
+            continue
+        if not _is_compresso_thread(thread):
+            continue
+        _stop_thread_if_supported(thread)
+
+    gc.collect()
 
 
 @pytest.fixture

@@ -8,6 +8,7 @@
 
 """
 
+import gc
 import json
 
 import tornado.testing
@@ -36,7 +37,23 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
     def tearDown(self):
         if self.handler_class is None:
             return
-        super().tearDown()
+        try:
+            super().tearDown()
+        finally:
+            # Tornado closes these objects in its own teardown, but explicitly
+            # dropping the large references between handler tests keeps long
+            # pytest runs from accumulating request/IOLoop object graphs.
+            for attr in (
+                'http_client',
+                'http_server',
+                '_app',
+                'io_loop',
+                '_AsyncTestCase__failure',
+                '_AsyncTestCase__stop_args',
+            ):
+                if hasattr(self, attr):
+                    setattr(self, attr, None)
+            gc.collect()
 
     def runTest(self):
         pass

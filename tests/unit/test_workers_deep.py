@@ -9,13 +9,12 @@
     status reporting, and WorkerSubprocessMonitor run loop.
 """
 
-import os
 import queue
 import threading
 import time
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock, call
+from unittest.mock import patch, MagicMock, PropertyMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -93,15 +92,15 @@ class TestGetSubprocessStatsEdge:
 
     def test_returns_minimal_on_exception(self):
         monitor = _make_monitor()
-        # Force an exception by making subprocess_pid a property that raises
-        original_pid = monitor.subprocess_pid
-        type(monitor).subprocess_pid = PropertyMock(side_effect=Exception("boom"))
-        stats = monitor.get_subprocess_stats()
+        # Force an exception without leaking a mutated class attribute into
+        # later tests in the same long-running pytest process.
+        with patch.object(type(monitor), 'subprocess_pid', new_callable=PropertyMock, create=True) as mock_pid:
+            mock_pid.side_effect = Exception("boom")
+            stats = monitor.get_subprocess_stats()
+
         # Should return the fallback dict
         assert stats['pid'] == '0'
         assert stats['percent'] == '0'
-        # Restore
-        type(monitor).subprocess_pid = original_pid
 
 
 # ==================================================================
@@ -247,12 +246,12 @@ class TestDefaultProgressParserEdge:
 
     def test_float_truncated_to_int(self):
         monitor = _make_monitor()
-        result = monitor.default_progress_parser('99.9')
+        monitor.default_progress_parser('99.9')
         assert monitor.subprocess_percent == 99
 
     def test_negative_number(self):
         monitor = _make_monitor()
-        result = monitor.default_progress_parser('-5')
+        monitor.default_progress_parser('-5')
         assert monitor.subprocess_percent == -5
 
 
@@ -609,7 +608,6 @@ class TestWorkerRunLifecycle:
     def test_run_pauses_when_paused_flag_set(self):
         worker = _make_worker()
         call_count = [0]
-        original_wait = worker.event.wait
 
         def side_effect_wait(timeout=None):
             call_count[0] += 1

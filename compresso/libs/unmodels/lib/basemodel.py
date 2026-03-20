@@ -107,6 +107,20 @@ class Database:
 
     @staticmethod
     def select_database(config):
+        existing_database = getattr(db, 'obj', None)
+        if existing_database is not None:
+            try:
+                if hasattr(existing_database, 'is_stopped') and not existing_database.is_stopped():
+                    existing_database.stop()
+            except Exception:
+                pass
+
+            try:
+                if hasattr(existing_database, 'is_closed') and not existing_database.is_closed():
+                    existing_database.close()
+            except Exception:
+                pass
+
         # Based on configuration, use a different database.
         if config['TYPE'] == 'SQLITE':
             # use SqliteQueueDatabase
