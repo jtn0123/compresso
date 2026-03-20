@@ -30,6 +30,7 @@
 
 """
 
+import atexit
 import gc
 import logging
 import os
@@ -42,6 +43,7 @@ import warnings
 import pytest
 from unittest.mock import patch
 
+from compresso.libs.singleton import SingletonType
 from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels import Libraries, Tags
 from compresso.libs.unmodels.tasks import Tasks
@@ -126,6 +128,73 @@ def cleanup_compresso_threads():
         if not _is_compresso_thread(thread):
             continue
         _stop_thread_if_supported(thread)
+
+    gc.collect()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_registered_exit_hooks(monkeypatch):
+    """
+    Prevent tests from accumulating atexit/reload callbacks, especially from
+    PluginsCLI and Service setup paths that register fresh manager shutdown
+    hooks on each construction.
+    """
+    import tornado.autoreload
+
+    registered_callbacks = []
+    original_register = atexit.register
+    baseline_reload_hooks = list(tornado.autoreload._reload_hooks)
+
+    def tracked_register(func, *args, **kwargs):
+        original_register(func, *args, **kwargs)
+        registered_callbacks.append(func)
+        return func
+
+    monkeypatch.setattr(atexit, "register", tracked_register)
+    yield
+
+    for func in reversed(registered_callbacks):
+        try:
+            atexit.unregister(func)
+        except Exception as exc:
+            warnings.warn("Failed to unregister atexit callback {}: {}".format(func, exc), RuntimeWarning)
+
+    tornado.autoreload._reload_hooks[:] = baseline_reload_hooks
+
+
+@pytest.fixture(autouse=True)
+def reset_shared_runtime_state():
+    yield
+
+    SingletonType._instances = {}
+
+    try:
+        from compresso.libs.preview import PreviewManager
+        PreviewManager._jobs = {}
+        PreviewManager._current_job = None
+    except Exception:
+        pass
+
+    try:
+        from compresso.libs.task import TaskDataStore
+        TaskDataStore._runner_state = {}
+        TaskDataStore._task_state = {}
+        TaskDataStore._ctx = threading.local()
+    except Exception:
+        pass
+
+    try:
+        from compresso.webserver.api_v2 import rate_limiter as rl_module
+        rl_module._rate_limiter = None
+    except Exception:
+        pass
+
+    try:
+        from compresso.libs.unplugins import child_process
+        child_process.kill_all_plugin_processes()
+        child_process.set_shared_manager(None)
+    except Exception:
+        pass
 
     gc.collect()
 

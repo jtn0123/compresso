@@ -9,12 +9,11 @@
     testing, and run_from_args.
 """
 
-import json
-import os
 import sys
+import types
 
 import pytest
-from unittest.mock import patch, MagicMock, mock_open, call
+from unittest.mock import patch, MagicMock, Mock, mock_open
 
 from compresso.libs.singleton import SingletonType
 
@@ -28,17 +27,16 @@ def reset_singletons():
 
 @pytest.fixture(autouse=True)
 def mock_inquirer():
-    mock_inq = MagicMock()
-    mock_inq.List = MagicMock()
-    mock_inq.Text = MagicMock()
-    mock_inq.Checkbox = MagicMock()
+    mock_inq = types.ModuleType('inquirer')
+    mock_inq.List = Mock(side_effect=lambda *args, **kwargs: {'args': args, 'kwargs': kwargs})
+    mock_inq.Text = Mock(side_effect=lambda *args, **kwargs: {'args': args, 'kwargs': kwargs})
+    mock_inq.Checkbox = Mock(side_effect=lambda *args, **kwargs: {'args': args, 'kwargs': kwargs})
+    mock_inq.prompt = Mock(return_value=None)
     mod_key = 'compresso.libs.unplugins.pluginscli'
     with patch.dict(sys.modules, {'inquirer': mock_inq}):
-        if mod_key in sys.modules:
-            del sys.modules[mod_key]
+        sys.modules.pop(mod_key, None)
         yield mock_inq
-    if mod_key in sys.modules:
-        del sys.modules[mod_key]
+    sys.modules.pop(mod_key, None)
 
 
 def _import_pluginscli():
@@ -52,7 +50,7 @@ def _make_cli(pluginscli_mod, plugins_dir='/fake/plugins'):
          patch.object(pluginscli_mod, 'common') as mock_common, \
          patch.object(pluginscli_mod, 'set_shared_manager'), \
          patch.object(pluginscli_mod, 'kill_all_plugin_processes'), \
-         patch.object(pluginscli_mod, 'TaskDataStore') as mock_tds, \
+         patch.object(pluginscli_mod, 'TaskDataStore'), \
          patch('multiprocessing.Manager') as mock_mgr_cls:
         mock_config.Config.return_value = MagicMock()
         mock_common.get_home_dir.return_value = '/fake/home'
