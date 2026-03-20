@@ -684,5 +684,223 @@ class TestPrintTableEdge:
         assert 'AAAAA' in captured.out
 
 
+@pytest.mark.unittest
+class TestCollectNewPluginDetails:
+
+    def test_returns_none_for_invalid_input(self, capsys):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', return_value={'plugin_id': '', 'plugin_name': ''}):
+            details, selected = cli._collect_new_plugin_details()
+
+        assert details is None
+        assert selected is None
+        assert 'Invalid input' in capsys.readouterr().out
+
+    def test_returns_none_when_no_runners_selected(self, capsys):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', side_effect=[
+            {'plugin_id': 'My Plugin', 'plugin_name': 'My Plugin'},
+            {'selected_plugins': []},
+        ]), patch.object(cli, '_get_plugin_type_choices', return_value=(
+            ['Worker'],
+            {'Worker': {'runner': 'on_worker_process', 'name': 'Worker'}},
+            {},
+        )):
+            details, selected = cli._collect_new_plugin_details()
+
+        assert details is None
+        assert selected is None
+        assert 'No plugin runner selected' in capsys.readouterr().out
+
+    def test_returns_normalized_details_and_selected_runners(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        expected_details = {'runner': 'on_worker_process', 'name': 'Worker'}
+        with patch.object(pluginscli.inquirer, 'prompt', side_effect=[
+            {'plugin_id': 'My Plugin!', 'plugin_name': 'My Plugin'},
+            {'selected_plugins': ['Worker']},
+        ]), patch.object(cli, '_get_plugin_type_choices', return_value=(
+            ['Worker'],
+            {'Worker': expected_details},
+            {},
+        )):
+            details, selected = cli._collect_new_plugin_details()
+
+        assert details == {'plugin_id': 'my_plugin_', 'plugin_name': 'My Plugin'}
+        assert selected == [expected_details]
+
+
+@pytest.mark.unittest
+class TestCreateNewPlugins:
+
+    def test_returns_when_no_plugin_details(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(cli, '_collect_new_plugin_details', return_value=(None, None)), \
+             patch.object(cli, 'create_new_plugin_files') as mock_create:
+            cli.create_new_plugins()
+
+        mock_create.assert_not_called()
+
+    def test_creates_new_plugin_files_when_details_exist(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        details = {'plugin_id': 'plugin_one', 'plugin_name': 'Plugin One'}
+        selected = [{'runner': 'on_worker_process'}]
+        with patch.object(cli, '_collect_new_plugin_details', return_value=(details, selected)), \
+             patch.object(cli, 'create_new_plugin_files') as mock_create:
+            cli.create_new_plugins()
+
+        mock_create.assert_called_once_with(details, selected)
+
+
+@pytest.mark.unittest
+class TestReloadPluginFromDisk:
+
+    def test_reload_plugin_success(self, capsys):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        plugin_result = {'plugin_id': 'plugin_one'}
+        with patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[plugin_result]), \
+             patch('builtins.open', mock_open(read_data='{}')), \
+             patch.object(pluginscli.json, 'load', return_value={'id': 'plugin_one'}), \
+             patch.object(pluginscli, 'PluginsHandler') as mock_ph_cls:
+            mock_ph_cls.version = 1
+            cli.reload_plugin_from_disk()
+
+        mock_ph_cls.write_plugin_data_to_db.assert_called_once()
+        mock_ph_cls.install_plugin_requirements.assert_called_once()
+        mock_ph_cls.install_npm_modules.assert_called_once()
+        assert "Reloading Plugin - 'plugin_one'" in capsys.readouterr().out
+
+    def test_reload_plugin_db_exception_prints_message(self, capsys):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        plugin_result = {'plugin_id': 'plugin_one'}
+        with patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[plugin_result]), \
+             patch('builtins.open', mock_open(read_data='{}')), \
+             patch.object(pluginscli.json, 'load', return_value={'id': 'plugin_one'}), \
+             patch.object(pluginscli, 'PluginsHandler') as mock_ph_cls:
+            mock_ph_cls.write_plugin_data_to_db.side_effect = Exception('db failed')
+            cli.reload_plugin_from_disk()
+
+        assert 'Exception while saving plugin info to DB' in capsys.readouterr().out
+
+
+@pytest.mark.unittest
+class TestRemovePluginInteractive:
+
+    def test_remove_plugin_returns_on_go_back(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', return_value={'cli_action': 'Go Back'}), \
+             patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[{'plugin_id': 'p1', 'id': 1}]), \
+             patch.object(cli, '_uninstall_plugin_by_db_table_id') as mock_uninstall:
+            cli.remove_plugin()
+
+        mock_uninstall.assert_not_called()
+
+    def test_remove_plugin_uninstalls_selected_plugin(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', return_value={'cli_action': 'p1'}), \
+             patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[{'plugin_id': 'p1', 'id': 42}]), \
+             patch.object(cli, '_uninstall_plugin_by_db_table_id') as mock_uninstall:
+            cli.remove_plugin()
+
+        mock_uninstall.assert_called_once_with(42)
+
+
+@pytest.mark.unittest
+class TestPluginsMenuFlow:
+
+    def test_test_plugins_configures_testdata_then_returns(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', side_effect=[
+            {'selected_plugin': 'Configure Testdata'},
+            {'selected_plugin': 'Go Back'},
+        ]), patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[{'plugin_id': 'p1'}]), \
+             patch.object(cli, 'configure_test_data') as mock_configure, \
+             patch.object(cli, 'test_installed_plugins') as mock_test:
+            cli.test_plugins()
+
+        mock_configure.assert_called_once()
+        mock_test.assert_not_called()
+
+    def test_test_plugins_runs_all_plugins(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', side_effect=[
+            {'selected_plugin': 'Test All Plugins'},
+            {'selected_plugin': 'Go Back'},
+        ]), patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[{'plugin_id': 'p1'}]), \
+             patch.object(cli, 'test_installed_plugins') as mock_test:
+            cli.test_plugins()
+
+        mock_test.assert_called_once_with()
+
+    def test_test_plugins_runs_selected_plugin(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', side_effect=[
+            {'selected_plugin': 'p1'},
+            {'selected_plugin': 'Go Back'},
+        ]), patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[{'plugin_id': 'p1'}]), \
+             patch.object(cli, 'test_installed_plugins') as mock_test:
+            cli.test_plugins()
+
+        mock_test.assert_called_once_with(plugin_id='p1')
+
+
+@pytest.mark.unittest
+class TestConfigureAndInstallTestData:
+
+    def test_configure_test_data_updates_modifiers(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', return_value={'selected_file': 'sample.mp4'}), \
+             patch.object(pluginscli.os, 'walk', return_value=[('/tmp', [], ['sample.mp4'])]):
+            cli.configure_test_data()
+
+        assert cli.test_data_modifiers['{test_file_in}'] == 'sample.mp4'
+        assert cli.test_data_modifiers['{test_file_out}'] == 'sample-WORKING-1.mp4'
+
+    def test_install_test_data_downloads_and_copies_files(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        response.iter_content.return_value = [b'data']
+        with patch.object(pluginscli.os.path, 'exists', return_value=False), \
+             patch.object(pluginscli.os, 'makedirs') as mock_makedirs, \
+             patch.object(pluginscli.requests, 'get', return_value=response) as mock_get, \
+             patch('builtins.open', mock_open()), \
+             patch.object(pluginscli.shutil, 'copyfile') as mock_copy:
+            cli.install_test_data()
+
+        assert mock_makedirs.call_count == 2
+        assert mock_get.call_count == 5
+        assert mock_copy.call_count == 5
+
+
+@pytest.mark.unittest
+class TestPluginsCLIRunLoop:
+
+    def test_run_calls_main_before_exit(self):
+        pluginscli = _import_pluginscli()
+        cli = _make_cli(pluginscli)
+        with patch.object(pluginscli.inquirer, 'prompt', side_effect=[
+            {'cli_action': 'List all installed plugins'},
+            {'cli_action': 'Exit'},
+        ]), patch.object(cli, 'main') as mock_main:
+            cli.run()
+
+        mock_main.assert_called_once_with('List all installed plugins')
+
+
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

@@ -9,13 +9,8 @@
     signal handlers, stop_threads, start_threads order, and startup readiness.
 """
 
-import argparse
-import os
-import queue
 import signal
-import threading
-import time
-from unittest.mock import patch, MagicMock, call, PropertyMock
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -194,7 +189,7 @@ class TestStartThreadMethods:
         mock_handler_cls.return_value = mock_handler
         data_queues = {}
         task_queue = MagicMock()
-        result = service.start_handler(data_queues, task_queue)
+        service.start_handler(data_queues, task_queue)
         mock_handler.start.assert_called_once()
         assert len(service.threads) == 1
         assert service.threads[0]['name'] == 'TaskHandler'
@@ -205,7 +200,7 @@ class TestStartThreadMethods:
         mock_pp = MagicMock()
         mock_pp.is_alive.return_value = True
         mock_pp_cls.return_value = mock_pp
-        result = service.start_post_processor({}, MagicMock())
+        service.start_post_processor({}, MagicMock())
         mock_pp.start.assert_called_once()
         assert service.threads[0]['name'] == 'PostProcessor'
 
@@ -215,7 +210,7 @@ class TestStartThreadMethods:
         mock_foreman = MagicMock()
         mock_foreman.is_alive.return_value = True
         mock_foreman_cls.return_value = mock_foreman
-        result = service.start_foreman({}, MagicMock(), MagicMock())
+        service.start_foreman({}, MagicMock(), MagicMock())
         mock_foreman.start.assert_called_once()
         assert service.threads[0]['name'] == 'Foreman'
 
@@ -225,7 +220,7 @@ class TestStartThreadMethods:
         mock_scanner = MagicMock()
         mock_scanner.is_alive.return_value = True
         mock_scanner_cls.return_value = mock_scanner
-        result = service.start_library_scanner_manager({})
+        service.start_library_scanner_manager({})
         mock_scanner.start.assert_called_once()
         assert service.threads[0]['name'] == 'LibraryScannerManager'
 
@@ -235,7 +230,7 @@ class TestStartThreadMethods:
         mock_stm = MagicMock()
         mock_stm.is_alive.return_value = True
         mock_stm_cls.return_value = mock_stm
-        result = service.start_scheduled_tasks_manager()
+        service.start_scheduled_tasks_manager()
         mock_stm.start.assert_called_once()
         assert service.threads[0]['name'] == 'ScheduledTasksManager'
 
@@ -244,7 +239,7 @@ class TestStartThreadMethods:
         service = self._make_service()
         mock_ui = MagicMock()
         mock_ui_cls.return_value = mock_ui
-        result = service.start_ui_server({}, MagicMock())
+        service.start_ui_server({}, MagicMock())
         mock_ui.start.assert_called_once()
         assert service.threads[0]['name'] == 'UIServer'
 
@@ -268,7 +263,7 @@ class TestStartInotifyWatchManager:
         mock_emm = MagicMock()
         mock_emm.is_alive.return_value = True
         mock_emm_cls.return_value = mock_emm
-        result = service.start_inotify_watch_manager({}, MagicMock())
+        service.start_inotify_watch_manager({}, MagicMock())
         mock_emm.start.assert_called_once()
         assert service.threads[0]['name'] == 'EventMonitorManager'
 
@@ -316,7 +311,7 @@ class TestWaitForStartupReadiness:
 
     def _make_service(self):
         with patch('compresso.service.CompressoLogging') as mock_log, \
-             patch('compresso.service.startup.StartupState') as mock_startup:
+             patch('compresso.service.startup.StartupState'):
             mock_log.get_logger.return_value = MagicMock()
             mock_log.metric = MagicMock()
             from compresso.service import RootService
@@ -377,7 +372,7 @@ class TestStartThreadsOrchestration:
         mock_settings.get_cache_path.return_value = '/tmp/cache'
         with patch.object(service, 'initial_register_compresso'), \
              patch.object(service, 'start_post_processor', return_value=MagicMock()), \
-             patch.object(service, 'start_foreman', return_value=MagicMock()) as mock_foreman, \
+             patch.object(service, 'start_foreman', return_value=MagicMock()), \
              patch.object(service, 'start_handler', return_value=MagicMock()), \
              patch.object(service, 'start_library_scanner_manager', return_value=MagicMock()), \
              patch.object(service, 'start_inotify_watch_manager', return_value=MagicMock()), \
@@ -395,6 +390,114 @@ class TestStartThreadsOrchestration:
         mock_settings.get_cache_path.return_value = '/tmp/cache'
         with pytest.raises(Exception, match="fail"):
             service.start_threads(mock_settings)
+
+
+@pytest.mark.unittest
+class TestRootServiceRun:
+
+    def _make_service(self):
+        with patch('compresso.service.CompressoLogging') as mock_log, \
+             patch('compresso.service.startup.StartupState') as mock_startup_cls:
+            mock_log.get_logger.return_value = MagicMock()
+            mock_log.metric = MagicMock()
+            mock_startup_cls.return_value = MagicMock()
+            from compresso.service import RootService
+            service = RootService()
+        return service
+
+    def test_run_happy_path_initializes_manager_and_stops_cleanly(self):
+        service = self._make_service()
+        mock_manager = MagicMock()
+        mock_manager.dict.side_effect = [MagicMock(), MagicMock()]
+        mock_db = MagicMock()
+        mock_db.is_stopped.side_effect = [False, True]
+        mock_settings = MagicMock()
+        mock_settings.get_config_path.return_value = '/tmp/config'
+
+        with patch('multiprocessing.Manager', return_value=mock_manager), \
+             patch('atexit.register') as mock_register, \
+             patch('tornado.autoreload.add_reload_hook') as mock_reload_hook, \
+             patch('compresso.service.config.Config', return_value=mock_settings), \
+             patch('compresso.service.startup.validate_startup_environment') as mock_validate, \
+             patch('compresso.service.init_db', return_value=mock_db), \
+             patch('compresso.libs.unplugins.child_process.set_shared_manager') as mock_set_manager, \
+             patch.object(service, 'start_threads') as mock_start_threads, \
+             patch.object(service, 'wait_for_startup_readiness') as mock_wait_ready, \
+             patch.object(service, 'log_startup_summary') as mock_log_summary, \
+             patch.object(service, 'stop_threads') as mock_stop_threads, \
+             patch('compresso.service.signal.signal') as mock_signal, \
+             patch('compresso.service.signal.pause', side_effect=lambda: service.stop()), \
+             patch('compresso.service.time.sleep') as mock_sleep, \
+             patch('compresso.service.os.name', 'posix'):
+            service.run()
+
+        assert mock_register.call_count == 2
+        assert mock_reload_hook.call_count == 2
+        mock_set_manager.assert_called_once_with(mock_manager)
+        mock_validate.assert_called_once_with(mock_settings)
+        mock_start_threads.assert_called_once_with(mock_settings)
+        mock_wait_ready.assert_called_once_with(mock_settings)
+        mock_log_summary.assert_called_once_with(mock_settings)
+        mock_stop_threads.assert_called_once_with()
+        mock_db.stop.assert_called_once_with()
+        assert mock_signal.call_count == 2
+        mock_sleep.assert_any_call(.5)
+        service.startup_state.reset.assert_called_once_with()
+
+    def test_run_marks_config_failure_and_raises(self):
+        service = self._make_service()
+        mock_manager = MagicMock()
+        mock_manager.dict.side_effect = [MagicMock(), MagicMock()]
+
+        with patch('multiprocessing.Manager', return_value=mock_manager), \
+             patch('atexit.register'), \
+             patch('tornado.autoreload.add_reload_hook'), \
+             patch('compresso.service.config.Config', side_effect=Exception('bad config')), \
+             patch('compresso.libs.unplugins.child_process.set_shared_manager'):
+            with pytest.raises(Exception, match='bad config'):
+                service.run()
+
+        service.startup_state.mark_error.assert_called_once()
+
+    def test_run_marks_startup_validation_failure(self):
+        service = self._make_service()
+        mock_manager = MagicMock()
+        mock_manager.dict.side_effect = [MagicMock(), MagicMock()]
+        mock_settings = MagicMock()
+        mock_settings.get_config_path.return_value = '/tmp/config'
+
+        with patch('multiprocessing.Manager', return_value=mock_manager), \
+             patch('atexit.register'), \
+             patch('tornado.autoreload.add_reload_hook'), \
+             patch('compresso.service.config.Config', return_value=mock_settings), \
+             patch('compresso.service.startup.validate_startup_environment', side_effect=Exception('bad env')), \
+             patch('compresso.libs.unplugins.child_process.set_shared_manager'):
+            with pytest.raises(Exception, match='bad env'):
+                service.run()
+
+        service.startup_state.mark_error.assert_called_once()
+
+    def test_run_marks_threading_failure(self):
+        service = self._make_service()
+        service.startup_state.snapshot.return_value = {'errors': []}
+        mock_manager = MagicMock()
+        mock_manager.dict.side_effect = [MagicMock(), MagicMock()]
+        mock_settings = MagicMock()
+        mock_settings.get_config_path.return_value = '/tmp/config'
+        mock_db = MagicMock()
+
+        with patch('multiprocessing.Manager', return_value=mock_manager), \
+             patch('atexit.register'), \
+             patch('tornado.autoreload.add_reload_hook'), \
+             patch('compresso.service.config.Config', return_value=mock_settings), \
+             patch('compresso.service.startup.validate_startup_environment'), \
+             patch('compresso.service.init_db', return_value=mock_db), \
+             patch('compresso.libs.unplugins.child_process.set_shared_manager'), \
+             patch.object(service, 'start_threads', side_effect=Exception('thread failure')):
+            with pytest.raises(Exception, match='thread failure'):
+                service.run()
+
+        service.startup_state.mark_error.assert_called_once()
 
 
 @pytest.mark.unittest
@@ -430,6 +533,27 @@ class TestMainArgParser:
             from compresso.service import main
             main()
             mock_cli.run.assert_called_once()
+
+    @patch('compresso.service.time.sleep')
+    @patch('compresso.service.config.Config')
+    @patch('compresso.service.init_db')
+    def test_main_manage_plugins_runs_from_args_and_waits_for_db_stop(self, mock_init_db, mock_config, mock_sleep):
+        mock_settings = MagicMock()
+        mock_settings.get_config_path.return_value = '/tmp/config'
+        mock_config.return_value = mock_settings
+        mock_db = MagicMock()
+        mock_db.is_stopped.side_effect = [False, True]
+        mock_init_db.return_value = mock_db
+        mock_cli = MagicMock()
+        mock_cli_mod = MagicMock()
+        mock_cli_mod.PluginsCLI.return_value = mock_cli
+        with patch('sys.argv', ['compresso', '--manage-plugins', '--test-plugins']), \
+             patch.dict('sys.modules', {'compresso.libs.unplugins.pluginscli': mock_cli_mod}):
+            from compresso.service import main
+            main()
+
+        mock_cli.run_from_args.assert_called_once()
+        mock_sleep.assert_called_once_with(.2)
 
 
 @pytest.mark.unittest
