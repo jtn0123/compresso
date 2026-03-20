@@ -10,8 +10,6 @@ markers = [
 ]
 filterwarnings = [
     "ignore:.*invalid escape sequence.*:DeprecationWarning",
-    "ignore:The `ordered` `class Meta` option is deprecated.*:marshmallow.warnings.RemovedInMarshmallow4Warning",
-    "ignore:Passing field metadata as keyword arguments is deprecated.*:marshmallow.warnings.RemovedInMarshmallow4Warning",
 ]
 
 [tool.coverage.run]

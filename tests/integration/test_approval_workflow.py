@@ -25,6 +25,11 @@ skip_if_no_fixture = pytest.mark.skipif(
     reason="Test fixture tests/fixtures/sample_30s.mp4 not found"
 )
 
+skip_if_no_ffprobe = pytest.mark.skipif(
+    shutil.which('ffprobe') is None,
+    reason="ffprobe executable is required for metadata integration tests"
+)
+
 
 def _make_postprocessor():
     """Create a PostProcessor with mocked dependencies."""
@@ -183,6 +188,7 @@ class TestMediaMetadataIntegration:
     """Integration tests for ffprobe metadata extraction with a real file."""
 
     @skip_if_no_fixture
+    @skip_if_no_ffprobe
     def test_extract_metadata_from_fixture(self):
         """extract_media_metadata should return codec and resolution for the fixture."""
         from compresso.libs.ffprobe_utils import extract_media_metadata

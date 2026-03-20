@@ -244,3 +244,40 @@ class TestColumnWithDefault:
 
         columns = [c.name for c in m.database.get_columns('test_default_col')]
         assert 'count' in columns
+
+
+@pytest.mark.unittest
+class TestAddColumnCompatibility:
+
+    def test_prefers_add_fields_when_available(self, tmp_path):
+        m = _make_migrations(tmp_path)
+        m.migrator = MagicMock()
+        m.migrator.add_fields = MagicMock()
+        m.migrator.add_columns = MagicMock()
+
+        field = CharField(null=True, default=None)
+        m._Migrations__add_column_to_model(MagicMock(), 'extra', field)
+
+        m.migrator.add_fields.assert_called_once()
+        m.migrator.add_columns.assert_not_called()
+
+    def test_falls_back_to_add_columns(self, tmp_path):
+        m = _make_migrations(tmp_path)
+        m.migrator = MagicMock()
+        m.migrator.add_fields = None
+        m.migrator.add_columns = MagicMock()
+
+        field = CharField(null=True, default=None)
+        m._Migrations__add_column_to_model(MagicMock(), 'extra', field)
+
+        m.migrator.add_columns.assert_called_once()
+
+    def test_raises_when_no_supported_api_exists(self, tmp_path):
+        m = _make_migrations(tmp_path)
+        m.migrator = MagicMock()
+        m.migrator.add_fields = None
+        m.migrator.add_columns = None
+
+        field = CharField(null=True, default=None)
+        with pytest.raises(AttributeError, match="expected add_fields or add_columns"):
+            m._Migrations__add_column_to_model(MagicMock(), 'extra', field)
