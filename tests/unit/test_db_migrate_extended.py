@@ -16,6 +16,7 @@ from unittest.mock import patch, MagicMock
 
 from peewee import CharField, IntegerField
 
+from compresso.libs.db_migrate import _apply_add_column
 from compresso.libs.singleton import SingletonType
 
 
@@ -256,7 +257,7 @@ class TestAddColumnCompatibility:
         m.migrator.add_columns = MagicMock()
 
         field = CharField(null=True, default=None)
-        m._Migrations__add_column_to_model(MagicMock(), 'extra', field)
+        _apply_add_column(m.migrator, MagicMock(), 'extra', field)
 
         m.migrator.add_fields.assert_called_once()
         m.migrator.add_columns.assert_not_called()
@@ -268,7 +269,7 @@ class TestAddColumnCompatibility:
         m.migrator.add_columns = MagicMock()
 
         field = CharField(null=True, default=None)
-        m._Migrations__add_column_to_model(MagicMock(), 'extra', field)
+        _apply_add_column(m.migrator, MagicMock(), 'extra', field)
 
         m.migrator.add_columns.assert_called_once()
 
@@ -280,4 +281,4 @@ class TestAddColumnCompatibility:
 
         field = CharField(null=True, default=None)
         with pytest.raises(AttributeError, match="expected add_fields or add_columns"):
-            m._Migrations__add_column_to_model(MagicMock(), 'extra', field)
+            _apply_add_column(m.migrator, MagicMock(), 'extra', field)
