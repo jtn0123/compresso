@@ -394,7 +394,9 @@ class PluginsHandler(object, metaclass=SingletonType):
         :param abspath:
         :return:
         """
-        # TODO: Ensure that this is a zip file
+        if not zipfile.is_zipfile(abspath):
+            self.logger.error("Plugin install failed - not a valid zip file: %s", abspath)
+            return False
         try:
             plugin_info = self.install_plugin(abspath)
 

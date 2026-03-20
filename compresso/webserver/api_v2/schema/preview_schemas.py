@@ -16,23 +16,23 @@ class RequestPreviewCreateSchema(BaseSchema):
     """Schema for creating a preview job"""
     source_path = fields.Str(
         required=True,
-        description="Absolute path to the source media file",
+        metadata={'description': "Absolute path to the source media file"},
     )
     start_time = fields.Float(
         required=False,
-        description="Start time in seconds",
+        metadata={'description': "Start time in seconds"},
         load_default=0,
         validate=validate.Range(min=0),
     )
     duration = fields.Float(
         required=False,
-        description="Duration in seconds (max 30)",
+        metadata={'description': "Duration in seconds (max 30)"},
         load_default=10,
         validate=validate.Range(min=0.1, max=30),
     )
     library_id = fields.Int(
         required=False,
-        description="Library ID to use for pipeline config",
+        metadata={'description': "Library ID to use for pipeline config"},
         load_default=1,
     )
 
@@ -46,7 +46,7 @@ class RequestPreviewStatusSchema(BaseSchema):
     """Schema for checking preview status"""
     job_id = fields.Str(
         required=True,
-        description="The preview job ID",
+        metadata={'description': "The preview job ID"},
     )
 
 
@@ -70,5 +70,5 @@ class RequestPreviewCleanupSchema(BaseSchema):
     """Schema for cleaning up a preview job"""
     job_id = fields.Str(
         required=True,
-        description="The preview job ID to clean up",
+        metadata={'description': "The preview job ID to clean up"},
     )

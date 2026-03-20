@@ -16,7 +16,7 @@ class RequestFileInfoProbeSchema(BaseSchema):
     """Schema for probing a file by path"""
     file_path = fields.Str(
         required=True,
-        description="Absolute path to the media file to probe",
+        metadata={'description': "Absolute path to the media file to probe"},
     )
 
 
@@ -24,7 +24,7 @@ class RequestFileInfoTaskSchema(BaseSchema):
     """Schema for probing a file from a task"""
     task_id = fields.Int(
         required=True,
-        description="Completed task ID to probe",
+        metadata={'description': "Completed task ID to probe"},
     )
 
 

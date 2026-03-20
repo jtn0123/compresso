@@ -245,7 +245,8 @@ class PostProcessor(threading.Thread):
                 try:
                     meta = extract_media_metadata(self.current_task.get_cache_path())
                     codec = meta.get('codec', 'transcoded')
-                except Exception:
+                except Exception as e:
+                    self._log("Failed to extract codec from cache path", message2=str(e), level="warning")
                     codec = 'transcoded'
                 new_path = "{}.{}{}".format(base, codec, ext)
                 counter = 1

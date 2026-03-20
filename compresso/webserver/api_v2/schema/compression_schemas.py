@@ -16,7 +16,7 @@ class RequestCompressionStatsSchema(RequestTableDataSchema):
     """Schema for requesting paginated compression stats"""
     library_id = fields.Int(
         required=False,
-        description="Optional library ID to filter by",
+        metadata={'description': "Optional library ID to filter by"},
         allow_none=True,
     )
 
@@ -25,7 +25,7 @@ class RequestCompressionSummarySchema(BaseSchema):
     """Schema for requesting compression summary"""
     library_id = fields.Int(
         required=False,
-        description="Optional library ID to filter by",
+        metadata={'description': "Optional library ID to filter by"},
         allow_none=True,
     )
 
@@ -107,7 +107,10 @@ class TimelineSchema(BaseSuccessSchema):
 
 class LibraryAnalysisRequestSchema(BaseSchema):
     """Schema for library analysis request"""
-    library_id = fields.Int(required=True, description="Library ID to analyze")
+    library_id = fields.Int(
+        required=True,
+        metadata={'description': "Library ID to analyze"},
+    )
 
 
 class LibraryAnalysisStatusSchema(BaseSuccessSchema):

@@ -31,6 +31,7 @@
 """
 import json
 import os
+import sys
 
 
 def read_version_string(version_type='long'):
@@ -45,7 +46,8 @@ def read_version_string(version_type='long'):
         with open(version_file) as json_file:
             data = json.load(json_file)
         return data[version_type]
-    except Exception:
+    except Exception as e:
+        print("WARNING: Failed to read version file: {}".format(e), file=sys.stderr)
         return 'UNKNOWN.VERSION'
 
 

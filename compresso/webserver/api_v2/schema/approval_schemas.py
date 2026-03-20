@@ -15,24 +15,24 @@ class RequestApprovalTasksSchema(BaseSchema):
     """Schema for listing tasks awaiting approval"""
     start = fields.Int(
         load_default=0,
-        description="Pagination offset",
+        metadata={'description': "Pagination offset"},
     )
     length = fields.Int(
         load_default=10,
-        description="Number of records to return",
+        metadata={'description': "Number of records to return"},
     )
     search_value = fields.Str(
         load_default="",
-        description="Filter by file path substring",
+        metadata={'description': "Filter by file path substring"},
     )
     library_ids = fields.List(
         fields.Int(),
         load_default=[],
-        description="Filter by library IDs",
+        metadata={'description': "Filter by library IDs"},
     )
     include_library = fields.Boolean(
         load_default=False,
-        description="Include library name in results",
+        metadata={'description': "Include library name in results"},
     )
 
 
@@ -68,7 +68,7 @@ class RequestApprovalActionSchema(BaseSchema):
     id_list = fields.List(
         fields.Int(),
         required=True,
-        description="List of task IDs to approve or reject",
+        metadata={'description': "List of task IDs to approve or reject"},
         validate=validate.Length(min=1),
     )
 
@@ -78,12 +78,12 @@ class RequestRejectActionSchema(BaseSchema):
     id_list = fields.List(
         fields.Int(),
         required=True,
-        description="List of task IDs to reject",
+        metadata={'description': "List of task IDs to reject"},
         validate=validate.Length(min=1),
     )
     requeue = fields.Boolean(
         load_default=False,
-        description="If true, requeue the tasks as pending instead of deleting them",
+        metadata={'description': "If true, requeue the tasks as pending instead of deleting them"},
     )
 
 
@@ -91,7 +91,7 @@ class RequestApprovalDetailSchema(BaseSchema):
     """Schema for getting detail of a single approval task"""
     id = fields.Int(
         required=True,
-        description="Task ID to get details for",
+        metadata={'description': "Task ID to get details for"},
     )
 
 
