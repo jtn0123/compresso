@@ -1,5 +1,12 @@
 import { Notify } from 'quasar'
+import { ref } from 'vue'
 import $compresso from './compressoGlobals'
+
+/**
+ * Reactive WebSocket connection state shared across all consumers.
+ * Values: 'connected', 'connecting', 'disconnected'
+ */
+export const wsConnectionState = ref('disconnected')
 
 /**
  * Function for handle default WS connection to the Compresso service.
@@ -73,6 +80,7 @@ export const CompressoWebsocketHandler = function ($t) {
         }
 
         // Open WS connection
+        wsConnectionState.value = 'connecting'
         $compresso.ws = new WebSocket(new_uri);
       }
     }
@@ -80,10 +88,12 @@ export const CompressoWebsocketHandler = function ($t) {
     function reconnectWS() {
       // Set ws as null so that it needs to be recreated
       $compresso.ws = null;
+      wsConnectionState.value = 'disconnected'
       // Empty all websocket event listeners
       $compresso.websocketEventListeners = {};
       connectionTimer = setTimeout(() => {
         console.debug('Attempting reconnect to Compresso server...');
+        wsConnectionState.value = 'connecting'
         initWebsocket();
       }, 4000);
     }
@@ -232,6 +242,7 @@ export const CompressoWebsocketHandler = function ($t) {
       // Add event listener to request frontend messages from server
       addWebsocketEventListener('open', 'start_frontend_messages', function (evt) {
         clearTimeout(connectionTimer);
+        wsConnectionState.value = 'connected'
         $compresso.ws.send(JSON.stringify({ command: 'start_frontend_messages', params: {} }));
       });
 
@@ -324,6 +335,7 @@ export const CompressoWebsocketHandler = function ($t) {
       $compresso.ws.close();
       // Set ws as null so that it needs to be recreated
       $compresso.ws = null;
+      wsConnectionState.value = 'disconnected'
       // Empty all websocket event listeners
       $compresso.websocketEventListeners = {};
     }

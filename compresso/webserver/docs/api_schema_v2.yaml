@@ -11,6 +11,413 @@ components:
       type: http
       scheme: basic
   schemas:
+    RequestApprovalTasks:
+      type: object
+      properties:
+        start:
+          type: integer
+          default: 0
+          description: Pagination offset
+        length:
+          type: integer
+          default: 10
+          description: Number of records to return
+        search_value:
+          type: string
+          default: ''
+          description: Filter by file path substring
+        library_ids:
+          type: array
+          default: []
+          description: Filter by library IDs
+          items:
+            type: integer
+        include_library:
+          type: boolean
+          default: false
+          description: Include library name in results
+      additionalProperties: false
+    ApprovalTaskItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        abspath:
+          type: string
+        priority:
+          type: integer
+        type:
+          type: string
+        status:
+          type: string
+        source_size:
+          type: integer
+        staged_size:
+          type: integer
+        staged_path:
+          type: string
+        size_delta:
+          type: integer
+        finish_time:
+          type: string
+        source_codec:
+          type: string
+          default: ''
+        source_resolution:
+          type: string
+          default: ''
+        staged_codec:
+          type: string
+          default: ''
+        staged_resolution:
+          type: string
+          default: ''
+        library_id:
+          type: integer
+          default: null
+          nullable: true
+        library_name:
+          type: string
+          default: null
+          nullable: true
+      additionalProperties: false
+    ApprovalTasksResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        recordsTotal:
+          type: integer
+        recordsFiltered:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalTaskItem'
+      required:
+      - success
+      additionalProperties: false
+    RequestApprovalAction:
+      type: object
+      properties:
+        id_list:
+          type: array
+          minItems: 1
+          description: List of task IDs to approve or reject
+          items:
+            type: integer
+      required:
+      - id_list
+      additionalProperties: false
+    BaseSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+      required:
+      - success
+      additionalProperties: false
+    RequestRejectAction:
+      type: object
+      properties:
+        id_list:
+          type: array
+          minItems: 1
+          description: List of task IDs to reject
+          items:
+            type: integer
+        requeue:
+          type: boolean
+          default: false
+          description: If true, requeue the tasks as pending instead of deleting them
+      required:
+      - id_list
+      additionalProperties: false
+    RequestApprovalDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Task ID to get details for
+      required:
+      - id
+      additionalProperties: false
+    ApprovalDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        id:
+          type: integer
+        abspath:
+          type: string
+        source_size:
+          type: integer
+        staged_size:
+          type: integer
+        staged_path:
+          type: string
+        size_delta:
+          type: integer
+        size_ratio:
+          type: number
+        cache_path:
+          type: string
+        start_time:
+          type: string
+        finish_time:
+          type: string
+        log:
+          type: string
+        library_id:
+          type: integer
+        source_codec:
+          type: string
+          default: ''
+        source_resolution:
+          type: string
+          default: ''
+        source_container:
+          type: string
+          default: ''
+        staged_codec:
+          type: string
+          default: ''
+        staged_resolution:
+          type: string
+          default: ''
+        staged_container:
+          type: string
+          default: ''
+      additionalProperties: false
+    ApprovalCountResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        count:
+          type: integer
+      required:
+      - success
+      additionalProperties: false
+    RequestCompressionStats:
+      type: object
+      properties:
+        start:
+          type: integer
+          default: 0
+          description: Start row number to select from
+          example: 0
+        length:
+          type: integer
+          default: 10
+          description: Number of rows to select
+          example: 10
+        search_value:
+          type: string
+          default: ''
+          description: String to filter search results by
+          example: items with this text in the value
+        status:
+          type: string
+          default: all
+          description: Filter on the status
+          example: all
+        after:
+          type: string
+          format: date-time
+          description: Filter entries since datetime
+          example: 2022-04-07 01:45
+          nullable: true
+        before:
+          type: string
+          format: date-time
+          description: Filter entries prior to datetime
+          example: 2022-04-07 01:55
+          nullable: true
+        order_by:
+          type: string
+          default: ''
+          description: Column to order results by
+          example: finish_time
+        order_direction:
+          type: string
+          enum:
+          - asc
+          - desc
+          description: Order direction ('asc' or 'desc')
+          example: desc
+        library_id:
+          type: integer
+          description: Optional library ID to filter by
+          nullable: true
+      additionalProperties: false
+    CompressionStats:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        recordsTotal:
+          type: integer
+        recordsFiltered:
+          type: integer
+        results:
+          type: array
+          items: {}
+      required:
+      - success
+      additionalProperties: false
+    CompressionSummary:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        total_source_size:
+          type: integer
+        total_destination_size:
+          type: integer
+        file_count:
+          type: integer
+        avg_ratio:
+          type: number
+        space_saved:
+          type: integer
+        per_library:
+          type: array
+          items: {}
+      required:
+      - success
+      additionalProperties: false
+    PendingEstimate:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        pending_count:
+          type: integer
+        total_pending_size:
+          type: integer
+        estimated_output_size:
+          type: integer
+        estimated_savings:
+          type: integer
+        avg_ratio_used:
+          type: number
+      required:
+      - success
+      additionalProperties: false
+    CodecDistribution:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        source_codecs:
+          type: array
+          items: {}
+        destination_codecs:
+          type: array
+          items: {}
+      required:
+      - success
+      additionalProperties: false
+    ResolutionDistribution:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        resolutions:
+          type: array
+          items: {}
+      required:
+      - success
+      additionalProperties: false
+    ContainerDistribution:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        source_containers:
+          type: array
+          items: {}
+        destination_containers:
+          type: array
+          items: {}
+      required:
+      - success
+      additionalProperties: false
+    Timeline:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        data:
+          type: array
+          items: {}
+      required:
+      - success
+      additionalProperties: false
+    LibraryAnalysisRequest:
+      type: object
+      properties:
+        library_id:
+          type: integer
+          description: Library ID to analyze
+      required:
+      - library_id
+      additionalProperties: false
+    LibraryAnalysisStatus:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        status:
+          type: string
+        progress: {}
+        version:
+          type: integer
+        results:
+          nullable: true
+      required:
+      - success
+      additionalProperties: false
+    OptimizationProgress:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        total_files:
+          type: integer
+        processed_files:
+          type: integer
+        percent:
+          type: number
+      required:
+      - success
+      additionalProperties: false
     DocumentContentSuccess:
       type: object
       properties:
@@ -106,6 +513,379 @@ components:
       required:
       - error
       - messages
+      additionalProperties: false
+    RequestFileInfoProbe:
+      type: object
+      properties:
+        file_path:
+          type: string
+          description: Absolute path to the media file to probe
+      required:
+      - file_path
+      additionalProperties: false
+    FileInfoResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        video_streams:
+          type: array
+          items: {}
+        audio_streams:
+          type: array
+          items: {}
+        subtitle_streams:
+          type: array
+          items: {}
+        format: {}
+      required:
+      - success
+      additionalProperties: false
+    RequestFileInfoTask:
+      type: object
+      properties:
+        task_id:
+          type: integer
+          description: Completed task ID to probe
+      required:
+      - task_id
+      additionalProperties: false
+    RequestHealthCheckScan:
+      type: object
+      properties:
+        file_path:
+          type: string
+          description: Absolute path to the file to check
+        library_id:
+          type: integer
+          default: 1
+          description: Library ID
+        mode:
+          type: string
+          default: quick
+          enum:
+          - quick
+          - thorough
+          description: 'Check mode: ''quick'' or ''thorough'''
+      required:
+      - file_path
+      additionalProperties: false
+    HealthCheckScanResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        abspath:
+          type: string
+        status:
+          type: string
+        check_mode:
+          type: string
+        error_detail:
+          type: string
+        last_checked:
+          type: string
+        error_count:
+          type: integer
+      required:
+      - success
+      additionalProperties: false
+    RequestHealthCheckLibraryScan:
+      type: object
+      properties:
+        library_id:
+          type: integer
+          description: Library ID to scan
+        mode:
+          type: string
+          default: quick
+          enum:
+          - quick
+          - thorough
+          description: 'Check mode: ''quick'' or ''thorough'''
+      required:
+      - library_id
+      additionalProperties: false
+    HealthCheckLibraryScanResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        started:
+          type: boolean
+        message:
+          type: string
+      required:
+      - success
+      additionalProperties: false
+    HealthCheckSummaryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        healthy:
+          type: integer
+        corrupted:
+          type: integer
+        warning:
+          type: integer
+        unchecked:
+          type: integer
+        checking:
+          type: integer
+        total:
+          type: integer
+        scanning:
+          type: boolean
+        scan_progress: {}
+      required:
+      - success
+      additionalProperties: false
+    RequestHealthCheckStatus:
+      type: object
+      properties:
+        start:
+          type: integer
+          default: 0
+          description: Start row number to select from
+          example: 0
+        length:
+          type: integer
+          default: 10
+          description: Number of rows to select
+          example: 10
+        search_value:
+          type: string
+          default: ''
+          description: String to filter search results by
+          example: items with this text in the value
+        status:
+          type: string
+          default: all
+          description: Filter on the status
+          example: all
+        after:
+          type: string
+          format: date-time
+          description: Filter entries since datetime
+          example: 2022-04-07 01:45
+          nullable: true
+        before:
+          type: string
+          format: date-time
+          description: Filter entries prior to datetime
+          example: 2022-04-07 01:55
+          nullable: true
+        order_by:
+          type: string
+          default: ''
+          description: Column to order results by
+          example: finish_time
+        order_direction:
+          type: string
+          enum:
+          - asc
+          - desc
+          description: Order direction ('asc' or 'desc')
+          example: desc
+        library_id:
+          type: integer
+          description: Optional library ID filter
+          nullable: true
+        status_filter:
+          type: string
+          enum:
+          - healthy
+          - corrupted
+          - warning
+          - unchecked
+          - checking
+          - null
+          description: 'Optional status filter: healthy, corrupted, warning, unchecked,
+            checking'
+          nullable: true
+      additionalProperties: false
+    HealthCheckStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        recordsTotal:
+          type: integer
+        recordsFiltered:
+          type: integer
+        results:
+          type: array
+          items: {}
+      required:
+      - success
+      additionalProperties: false
+    HealthCheckWorkersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        worker_count:
+          type: integer
+        scanning:
+          type: boolean
+        scan_progress: {}
+      required:
+      - success
+      additionalProperties: false
+    RequestHealthCheckWorkers:
+      type: object
+      properties:
+        worker_count:
+          type: integer
+          minimum: 1
+          maximum: 16
+          description: Number of concurrent scan workers (1-16)
+      required:
+      - worker_count
+      additionalProperties: false
+    HealthCheckReadinessError:
+      type: object
+      properties:
+        stage:
+          type: string
+        message:
+          type: string
+      additionalProperties: false
+    HealthCheckReadinessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        ready:
+          type: boolean
+        stages:
+          type: object
+          additionalProperties:
+            type: boolean
+        details:
+          type: object
+          additionalProperties: {}
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthCheckReadinessError'
+      required:
+      - success
+      additionalProperties: false
+    RequestPreviewCreate:
+      type: object
+      properties:
+        source_path:
+          type: string
+          description: Absolute path to the source media file
+        start_time:
+          type: number
+          default: 0.0
+          minimum: 0.0
+          description: Start time in seconds
+        duration:
+          type: number
+          default: 10.0
+          minimum: 0.1
+          maximum: 30.0
+          description: Duration in seconds (max 30)
+        library_id:
+          type: integer
+          default: 1
+          description: Library ID to use for pipeline config
+      required:
+      - source_path
+      additionalProperties: false
+    PreviewCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        job_id:
+          type: string
+      required:
+      - success
+      additionalProperties: false
+    RequestPreviewStatus:
+      type: object
+      properties:
+        job_id:
+          type: string
+          description: The preview job ID
+      required:
+      - job_id
+      additionalProperties: false
+    PreviewStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: This is always "True" when a request succeeds
+          example: true
+        job_id:
+          type: string
+        status:
+          type: string
+        error:
+          type: string
+          nullable: true
+        source_url:
+          type: string
+          default: ''
+        encoded_url:
+          type: string
+          default: ''
+        source_size:
+          type: integer
+          default: 0
+        encoded_size:
+          type: integer
+          default: 0
+        source_codec:
+          type: string
+          default: ''
+        encoded_codec:
+          type: string
+          default: ''
+        vmaf_score:
+          type: number
+          default: null
+          nullable: true
+        ssim_score:
+          type: number
+          default: null
+          nullable: true
+        encoded_by_pipeline:
+          type: boolean
+          default: false
+      required:
+      - success
+      additionalProperties: false
+    RequestPreviewCleanup:
+      type: object
+      properties:
+        job_id:
+          type: string
+          description: The preview job ID to clean up
+      required:
+      - job_id
       additionalProperties: false
     RequestDirectoryListingData:
       type: object
@@ -270,16 +1050,6 @@ components:
             type: integer
       required:
       - id_list
-      additionalProperties: false
-    BaseSuccess:
-      type: object
-      properties:
-        success:
-          type: boolean
-          description: This is always "True" when a request succeeds
-          example: true
-      required:
-      - success
       additionalProperties: false
     RequestAddCompletedToPendingTasks:
       type: object
@@ -838,7 +1608,7 @@ components:
         icon:
           type: string
           description: The plugin icon
-          example: https://raw.githubusercontent.com/Josh5/unmanic-plugins/master/source/encoder_video_h264_nvenc/icon.png
+          example: https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png
         tags:
           type: string
           description: The plugin tags
@@ -1012,7 +1782,7 @@ components:
         icon:
           type: string
           description: The plugin icon
-          example: https://raw.githubusercontent.com/Josh5/unmanic-plugins/master/source/encoder_video_h264_nvenc/icon.png
+          example: https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png
         tags:
           type: string
           description: The plugin tags
@@ -1103,7 +1873,7 @@ components:
         icon:
           type: string
           description: The plugin icon
-          example: https://raw.githubusercontent.com/Josh5/unmanic-plugins/master/source/encoder_video_h264_nvenc/icon.png
+          example: https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png
         tags:
           type: string
           description: The plugin tags
@@ -1123,11 +1893,11 @@ components:
         package_url:
           type: string
           description: The plugin package download URL
-          example: https://raw.githubusercontent.com/Unmanic/unmanic-plugins/repo/plugin_id/plugin_id-1.0.0.zip
+          example: https://raw.githubusercontent.com/Compresso/compresso-plugins/repo/plugin_id/plugin_id-1.0.0.zip
         changelog_url:
           type: string
           description: The plugin package download URL
-          example: https://raw.githubusercontent.com/Unmanic/unmanic-plugins/repo/plugin_id/changelog.md
+          example: https://raw.githubusercontent.com/Compresso/compresso-plugins/repo/plugin_id/changelog.md
         repo_name:
           type: string
           description: The name of the repository that this plugin is in
@@ -1227,7 +1997,7 @@ components:
         icon:
           type: string
           description: The plugin icon
-          example: https://raw.githubusercontent.com/Josh5/unmanic-plugins/master/source/encoder_video_h264_nvenc/icon.png
+          example: https://raw.githubusercontent.com/Josh5/compresso-plugins/master/source/encoder_video_h264_nvenc/icon.png
       required:
       - author
       - description
@@ -1262,9 +2032,9 @@ components:
         repos_list:
           type: array
           minItems: 0
-          description: A list of repost to save
+          description: A list of repos to save
           example:
-          - https://raw.githubusercontent.com/Josh5/unmanic-plugins/repo/repo.json
+          - https://raw.githubusercontent.com/Josh5/compresso-plugins/repo/repo.json
           items:
             type: string
       required:
@@ -1284,15 +2054,15 @@ components:
         icon:
           type: string
           description: The plugin repo icon
-          example: https://raw.githubusercontent.com/Josh5/unmanic-plugins/master/icon.png
+          example: https://raw.githubusercontent.com/Josh5/compresso-plugins/master/icon.png
         path:
           type: string
           description: The plugin repo URL path
-          example: https://raw.githubusercontent.com/Josh5/unmanic-plugins/repo/repo.json
+          example: https://raw.githubusercontent.com/Josh5/compresso-plugins/repo/repo.json
         repo_html_url:
           type: string
           description: The plugin repo HTML URL (e.g. GitHub repository page)
-          example: https://github.com/Josh5/unmanic-plugins
+          example: https://github.com/Josh5/compresso-plugins
       required:
       - icon
       - id
@@ -1374,7 +2144,7 @@ components:
           description: User email
           example: /support-auth-api/v2/app_auth/link_with_user_code/123456
         expires_in:
-          type: number
+          type: integer
           description: The time until the user_code expires
           example: 120
       required:
@@ -1389,7 +2159,8 @@ components:
       properties:
         settings:
           type: object
-          description: The current settings
+          description: The current settings, including fork-specific deployment defaults
+            such as safe startup behavior and worker caps
           example:
             ui_port: 8888
             debugging: false
@@ -1400,6 +2171,9 @@ components:
             follow_symlinks: true
             run_full_scan_on_start: false
             cache_path: /tmp/compresso
+            large_library_safe_defaults: true
+            startup_readiness_timeout_seconds: 30
+            default_worker_cap: 2
           additionalProperties: {}
       required:
       - settings
@@ -1464,8 +2238,8 @@ components:
           example: count
         schedule_time:
           type: string
-          description: ''
-          example: The time when the task should be executed on
+          description: The time when the task should be executed
+          example: 09:30
         schedule_worker_count:
           type: integer
           description: The worker count to set (only valid if schedule_task is count)
@@ -1497,10 +2271,18 @@ components:
           example: 3
         worker_event_schedules:
           minItems: 0
-          description: Any scheduled evenets for this worker group
+          description: Any scheduled events for this worker group
           type: array
           items:
             $ref: '#/components/schemas/WorkerEventScheduleResults'
+        worker_type:
+          type: string
+          default: cpu
+          enum:
+          - cpu
+          - gpu
+          description: The worker type for this group (cpu or gpu)
+          example: cpu
         tags:
           type: array
           description: A list of tags associated with this worker
@@ -1611,6 +2393,36 @@ components:
           type: boolean
           description: If the library is configured to monitor for file changes
           example: false
+        target_codecs:
+          type: string
+          default: ''
+          description: Comma-separated list of target codecs
+          example: ''
+        skip_codecs:
+          type: string
+          default: ''
+          description: Comma-separated list of codecs to skip
+          example: ''
+        size_guardrail_enabled:
+          type: boolean
+          default: false
+          description: If size guardrails are enabled for this library
+          example: false
+        size_guardrail_min_pct:
+          type: integer
+          default: 20
+          description: Minimum size percentage guardrail
+          example: 20
+        size_guardrail_max_pct:
+          type: integer
+          default: 80
+          description: Maximum size percentage guardrail
+          example: 80
+        replacement_policy:
+          type: string
+          default: ''
+          description: Per-library replacement policy
+          example: ''
         tags:
           type: array
           description: A list of tags associated with this library
@@ -1675,7 +2487,7 @@ components:
               plugin_id: notify_plex
               name: Notify Plex
               description: Notify Plex on completion of a task.
-              icon: https://raw.githubusercontent.com/Josh5/unmanic.plugin.notify_plex/master/icon.png
+              icon: https://raw.githubusercontent.com/Josh5/compresso.plugin.notify_plex/master/icon.png
           additionalProperties: {}
       required:
       - library_config
@@ -1693,7 +2505,7 @@ components:
               name: Audio Encoder AC3
               description: Ensure all audio streams are encoded with the AC3 codec
                 using the native FFmpeg ac3 encoder.
-              icon: https://raw.githubusercontent.com/Josh5/unmanic.plugin.encoder_audio_ac3/master/icon.png
+              icon: https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png
             plugin_flow:
               library_management.file_test:
               - plugin_id: encoder_audio_ac3
@@ -1702,7 +2514,7 @@ components:
                 description: Ensure all audio streams are encoded with the AC3 codec
                   using the native FFmpeg ac3 encoder.
                 version: 0.0.2
-                icon: https://raw.githubusercontent.com/Josh5/unmanic.plugin.encoder_audio_ac3/master/icon.png
+                icon: https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png
               worker.process:
               - plugin_id: encoder_audio_ac3
                 name: Audio Encoder AC3
@@ -1710,7 +2522,7 @@ components:
                 description: Ensure all audio streams are encoded with the AC3 codec
                   using the native FFmpeg ac3 encoder.
                 version: 0.0.2
-                icon: https://raw.githubusercontent.com/Josh5/unmanic.plugin.encoder_audio_ac3/master/icon.png
+                icon: https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png
               postprocessor.file_move: []
               postprocessor.task_result: []
           additionalProperties: {}
@@ -1748,6 +2560,143 @@ components:
       required:
       - library_id
       - plugins
+      additionalProperties: false
+    SystemStatusCpu:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Number of CPU cores
+          example: 8
+        percent:
+          type: number
+          description: Current CPU usage percentage
+          example: 42.5
+        brand:
+          type: string
+          description: CPU brand string
+          example: Apple M2 Pro
+      required:
+      - brand
+      - count
+      - percent
+      additionalProperties: false
+    SystemStatusMemory:
+      type: object
+      properties:
+        total_gb:
+          type: number
+          description: Total RAM in GB
+          example: 32.0
+        used_gb:
+          type: number
+          description: Used RAM in GB
+          example: 18.4
+        percent:
+          type: number
+          description: RAM usage percentage
+          example: 57.5
+      required:
+      - percent
+      - total_gb
+      - used_gb
+      additionalProperties: false
+    SystemStatusDisk:
+      type: object
+      properties:
+        total_gb:
+          type: number
+          description: Total disk in GB
+          example: 1000.0
+        used_gb:
+          type: number
+          description: Used disk in GB
+          example: 650.0
+        percent:
+          type: number
+          description: Disk usage percentage
+          example: 65.0
+        path:
+          type: string
+          description: Disk mount path
+          example: /
+      required:
+      - path
+      - percent
+      - total_gb
+      - used_gb
+      additionalProperties: false
+    SystemStatusGpu:
+      type: object
+      properties:
+        type:
+          type: string
+          description: GPU type
+          example: nvidia
+        name:
+          type: string
+          description: GPU name
+          example: RTX 3080
+        memory_total_mb:
+          type: integer
+          description: GPU memory in MB
+          example: 10240
+        driver_version:
+          type: string
+          description: GPU driver version
+          example: 535.129.03
+      required:
+      - driver_version
+      - memory_total_mb
+      - name
+      - type
+      additionalProperties: false
+    SystemStatusPlatform:
+      type: object
+      properties:
+        system:
+          type: string
+          description: Operating system
+          example: Linux
+        node:
+          type: string
+          description: Hostname
+          example: media-server
+        release:
+          type: string
+          description: Kernel release
+          example: 6.1.0
+      required:
+      - node
+      - release
+      - system
+      additionalProperties: false
+    SystemStatusSuccess:
+      type: object
+      properties:
+        cpu:
+          $ref: '#/components/schemas/SystemStatusCpu'
+        memory:
+          $ref: '#/components/schemas/SystemStatusMemory'
+        disk:
+          $ref: '#/components/schemas/SystemStatusDisk'
+        gpus:
+          type: array
+          items:
+            $ref: '#/components/schemas/SystemStatusGpu'
+        platform:
+          $ref: '#/components/schemas/SystemStatusPlatform'
+        uptime_seconds:
+          type: integer
+          description: System uptime in seconds
+          example: 86400
+      required:
+      - cpu
+      - disk
+      - gpus
+      - memory
+      - platform
+      - uptime_seconds
       additionalProperties: false
     VersionReadSuccess:
       type: object
@@ -1834,7 +2783,7 @@ components:
               name: Remux Video Files
               author: Josh.5
               version: 0.0.5
-              icon: https://raw.githubusercontent.com/Josh5/unmanic.plugin.video_remuxer/master/icon.png
+              icon: https://raw.githubusercontent.com/Josh5/compresso.plugin.video_remuxer/master/icon.png
               description: Remux a video file to the configured container
               success: true
           additionalProperties: {}
@@ -1874,6 +2823,206 @@ components:
 security:
 - BasicAuth: []
 paths:
+  /approval/tasks:
+    post:
+      description: List tasks awaiting approval with pagination and filtering.
+      requestBody:
+        description: Pagination and filter parameters.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestApprovalTasks'
+      responses:
+        '200':
+          description: Paginated list of tasks awaiting approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalTasksResponse'
+  /approval/approve:
+    post:
+      description: Approve one or more tasks. Approved tasks will have their transcoded
+        files replace the originals.
+      requestBody:
+        description: List of task IDs to approve.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestApprovalAction'
+      responses:
+        '200':
+          description: Success response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseSuccess'
+  /approval/reject:
+    post:
+      description: Reject one or more tasks. Staged and cache files are cleaned up.
+        Optionally requeue the tasks instead of deleting them.
+      requestBody:
+        description: List of task IDs to reject, with optional requeue flag.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestRejectAction'
+      responses:
+        '200':
+          description: Success response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseSuccess'
+  /approval/detail:
+    post:
+      description: Get detailed comparison data for a single task awaiting approval.
+      requestBody:
+        description: Task ID to inspect.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestApprovalDetail'
+      responses:
+        '200':
+          description: Detailed task data including source/staged file comparison.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalDetailResponse'
+  /approval/count:
+    get:
+      description: Get the count of tasks awaiting approval.
+      responses:
+        '200':
+          description: Count of tasks awaiting approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalCountResponse'
+  /compression/stats:
+    post:
+      description: Returns paginated per-file compression statistics.
+      requestBody:
+        description: Pagination and filter parameters.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestCompressionStats'
+      responses:
+        '200':
+          description: Returns paginated compression stats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompressionStats'
+  /compression/summary:
+    get:
+      description: Returns library-wide compression summary statistics.
+      responses:
+        '200':
+          description: Returns compression summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompressionSummary'
+  /compression/pending-estimate:
+    get:
+      description: Returns estimated savings for pending queue based on historical
+        compression ratio.
+      responses:
+        '200':
+          description: Returns pending estimate data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingEstimate'
+  /compression/codec-distribution:
+    get:
+      description: Returns codec distribution data for charts.
+      responses:
+        '200':
+          description: Returns codec distribution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodecDistribution'
+  /compression/resolution-distribution:
+    get:
+      description: Returns resolution distribution data for charts.
+      responses:
+        '200':
+          description: Returns resolution distribution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolutionDistribution'
+  /compression/container-distribution:
+    get:
+      description: Returns container distribution data for charts.
+      responses:
+        '200':
+          description: Returns container distribution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContainerDistribution'
+  /compression/timeline:
+    get:
+      description: Returns space saved over time for charting.
+      responses:
+        '200':
+          description: Returns timeline data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timeline'
+  /compression/library-analysis:
+    post:
+      description: Triggers a background analysis of a library's media files.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryAnalysisRequest'
+      responses:
+        '200':
+          description: Analysis started or already running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAnalysisStatus'
+  /compression/library-analysis/status:
+    post:
+      description: Returns analysis progress and cached results for a library.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryAnalysisRequest'
+      responses:
+        '200':
+          description: Returns analysis status and results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAnalysisStatus'
+  /compression/optimization-progress:
+    get:
+      description: Returns library optimization progress (processed vs total files).
+      responses:
+        '200':
+          description: Returns optimization progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OptimizationProgress'
   /docs/privacypolicy:
     get:
       description: Returns the privacy policy.
@@ -1943,6 +3092,198 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InternalError'
+  /fileinfo/probe:
+    post:
+      description: Probe an arbitrary file path and return stream/format info.
+      requestBody:
+        description: File path to probe.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestFileInfoProbe'
+      responses:
+        '200':
+          description: Returns file info.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+  /fileinfo/task:
+    post:
+      description: Probe the file from a completed task by task ID.
+      requestBody:
+        description: Task ID.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestFileInfoTask'
+      responses:
+        '200':
+          description: Returns file info.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfoResponse'
+  /healthcheck/scan:
+    post:
+      description: Run a health check on a single file.
+      requestBody:
+        description: File path and check mode.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestHealthCheckScan'
+      responses:
+        '200':
+          description: Returns health check result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckScanResponse'
+  /healthcheck/scan-library:
+    post:
+      description: Start a background health scan of all files in a library.
+      requestBody:
+        description: Library ID and check mode.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestHealthCheckLibraryScan'
+      responses:
+        '200':
+          description: Returns scan start status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckLibraryScanResponse'
+  /healthcheck/summary:
+    get:
+      description: Get aggregate health status counts.
+      responses:
+        '200':
+          description: Returns health summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckSummaryResponse'
+  /healthcheck/status:
+    post:
+      description: Get paginated health status records.
+      requestBody:
+        description: Pagination and filter parameters.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestHealthCheckStatus'
+      responses:
+        '200':
+          description: Returns paginated health status list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckStatusResponse'
+  /healthcheck/cancel-scan:
+    post:
+      description: Cancel the currently running library scan.
+      responses:
+        '200':
+          description: Returns cancellation status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckLibraryScanResponse'
+  /healthcheck/workers:
+    get:
+      description: Get current worker count and scan status.
+      responses:
+        '200':
+          description: Returns worker count and scan progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckWorkersResponse'
+    post:
+      description: Set the number of concurrent scan workers.
+      requestBody:
+        description: Worker count.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestHealthCheckWorkers'
+      responses:
+        '200':
+          description: Returns updated worker count.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckWorkersResponse'
+  /healthcheck/readiness:
+    get:
+      description: Get deployment readiness status for startup-critical services.
+      responses:
+        '200':
+          description: Returns readiness state when the service is ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckReadinessResponse'
+  /preview/create:
+    post:
+      description: Create a new A/B preview comparison job.
+      requestBody:
+        description: Source file path, time range, and library ID.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPreviewCreate'
+      responses:
+        '200':
+          description: Returns the job ID for the new preview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewCreateResponse'
+  /preview/status:
+    post:
+      description: Get the status of a preview job.
+      requestBody:
+        description: The job ID to check.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPreviewStatus'
+      responses:
+        '200':
+          description: Returns preview status, URLs, and size info.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewStatusResponse'
+  /preview/cleanup:
+    post:
+      description: Clean up a preview job and its files.
+      requestBody:
+        description: The job ID to clean up.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPreviewCleanup'
+      responses:
+        '200':
+          description: Success response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseSuccess'
   /filebrowser/list:
     post:
       description: Returns a list of files and/or subdirectories in a given directory.
@@ -4152,6 +5493,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BaseSuccess'
+        '400':
+          description: Bad request; Check `messages` for any validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '404':
+          description: Bad request; Requested endpoint not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadEndpoint'
+        '405':
+          description: Bad request; Requested method is not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadMethod'
+        '500':
+          description: Internal error; Check `error` for exception
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalError'
+  /system/status:
+    get:
+      description: Returns system-level metrics including CPU, memory, disk, GPU,
+        and platform info.
+      responses:
+        '200':
+          description: 'Sample response: Returns system status metrics.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatusSuccess'
         '400':
           description: Bad request; Check `messages` for any validation errors
           content:

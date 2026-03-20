@@ -5,6 +5,13 @@
         <div class="col">
           <div class="text-h8 text-primary">
             {{ displayLabel }}
+            <q-badge
+              v-if="workerType"
+              :color="workerType === 'gpu' ? 'green' : 'blue'"
+              :label="workerType === 'gpu' ? $t('workers.gpuLabel') : $t('workers.cpuLabel')"
+              class="q-ml-xs"
+            />
+            <q-tooltip v-if="label.length > 50" class="bg-white text-primary">{{ label }}</q-tooltip>
           </div>
         </div>
 
@@ -68,13 +75,27 @@
       </q-card-section>
     </div>
 
-    <q-card-section class="q-pt-sm">
+    <q-card-section v-if="!idle" class="q-pt-sm">
       <div class="row">
         <div class="column q-ml-sm">ETC:</div>
         <div class="column q-ml-lg">{{ etc }}</div>
         <q-tooltip class="bg-white text-primary">{{ $t('tooltips.etc') }}</q-tooltip>
       </div>
     </q-card-section>
+
+    <!-- Mini CPU/RAM gauges -->
+    <div v-if="!idle" class="q-px-md q-pb-sm">
+      <div class="row items-center q-gutter-xs">
+        <span class="text-caption text-grey">{{ $t('workers.cpuLabel') }}</span>
+        <q-linear-progress :value="cpuValue" size="6px" class="col" color="secondary" track-color="grey-5" />
+        <span class="text-caption" :style="{color: cpuColor}">{{ cpuDisplay }}%</span>
+      </div>
+      <div class="row items-center q-gutter-xs q-mt-xs">
+        <span class="text-caption text-grey">{{ $t('workers.memLabel') }}</span>
+        <q-linear-progress :value="memValue" size="6px" class="col" color="secondary" track-color="grey-5" />
+        <span class="text-caption" :style="{color: memColor}">{{ memDisplay }}%</span>
+      </div>
+    </div>
 
     <WorkerMoreDetailsDialog
       ref="workerDetailsDialogRef"
@@ -87,10 +108,12 @@
 import { computed, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
+import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import WorkerMoreDetailsDialog from 'components/dashboard/workers/WorkerMoreDetailsDialog.vue'
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
+const { clampPercent, formatPercent, gradientColor } = useWorkerGauges()
 
 const props = defineProps({
   id: {
@@ -180,10 +203,21 @@ const props = defineProps({
   paused: {
     type: Boolean,
     default: false
+  },
+  workerType: {
+    type: String,
+    default: ''
   }
 })
 
 const workerDetailsDialogRef = ref(null)
+
+const cpuValue = computed(() => clampPercent(Number(props.subprocess?.cpu_percent || 0)) / 100)
+const memValue = computed(() => clampPercent(Number(props.subprocess?.mem_percent || 0)) / 100)
+const cpuDisplay = computed(() => formatPercent(clampPercent(Number(props.subprocess?.cpu_percent || 0))))
+const memDisplay = computed(() => formatPercent(clampPercent(Number(props.subprocess?.mem_percent || 0))))
+const cpuColor = computed(() => gradientColor(clampPercent(Number(props.subprocess?.cpu_percent || 0))))
+const memColor = computed(() => gradientColor(clampPercent(Number(props.subprocess?.mem_percent || 0))))
 
 const displayLabel = computed(() => {
   if (props.label.length < 50) {

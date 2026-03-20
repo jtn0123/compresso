@@ -87,6 +87,7 @@ class WorkerGroup(object):
                 'locked':                 False,
                 'name':                   generate_random_worker_group_name(),
                 'number_of_workers':      0,
+                'worker_type':            'cpu',
                 'tags':                   [],
                 'worker_event_schedules': [],
             }
@@ -113,6 +114,7 @@ class WorkerGroup(object):
                 'locked':                 group.locked,
                 'name':                   group.name,
                 'number_of_workers':      group.number_of_workers,
+                'worker_type':            group.worker_type,
                 'worker_event_schedules': [],
                 'tags':                   [],
             }
@@ -149,6 +151,7 @@ class WorkerGroup(object):
             'locked':            data.get('locked'),
             'name':              data.get('name'),
             'number_of_workers': data.get('number_of_workers'),
+            'worker_type':       data.get('worker_type', 'cpu'),
         }
         worker_group_id = WorkerGroups.create(**worker_group_data)
 
@@ -201,6 +204,21 @@ class WorkerGroup(object):
 
     def set_number_of_workers(self, value):
         self.model.number_of_workers = value
+
+    def get_worker_type(self):
+        """
+        Returns the worker type ('cpu' or 'gpu') for this group.
+
+        Note: This is currently an organizational/display label only.
+        Task routing is determined by tags, not worker_type.
+        Future versions may use this for hardware-aware scheduling.
+        """
+        return self.model.worker_type
+
+    def set_worker_type(self, value):
+        if value not in ('cpu', 'gpu'):
+            raise ValueError("worker_type must be 'cpu' or 'gpu'")
+        self.model.worker_type = value
 
     def get_tags(self):
         return_value = []

@@ -29,6 +29,9 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import glob
+import subprocess
+
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
@@ -53,6 +56,55 @@ class System(object, metaclass=SingletonType):
             self.python_version = "{0}.{1}.{2}.{3}.{4}".format(*sys.version_info)
         return self.python_version
 
+    def __detect_gpus(self):
+        """
+        Detect available GPUs on the system.
+        Returns a list of GPU info dicts.
+
+        :return:
+        """
+        gpus = []
+
+        # NVIDIA detection via nvidia-smi
+        try:
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=index,name,memory.total,driver_version', '--format=csv,noheader,nounits'],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split('\n'):
+                    if not line.strip():
+                        continue
+                    parts = [p.strip() for p in line.split(',')]
+                    if len(parts) >= 4:
+                        gpus.append({
+                            'type': 'nvidia',
+                            'hwaccel': 'nvenc',
+                            'index': int(parts[0]),
+                            'name': parts[1],
+                            'memory_total_mb': int(float(parts[2])),
+                            'driver_version': parts[3],
+                        })
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+            self.logger.debug('NVIDIA GPU detection skipped: %s', str(e))
+
+        # VAAPI detection via /dev/dri/render* devices
+        try:
+            render_devices = sorted(glob.glob('/dev/dri/render*'))
+            for i, device_path in enumerate(render_devices):
+                gpus.append({
+                    'type': 'vaapi',
+                    'hwaccel': 'vaapi',
+                    'index': i,
+                    'name': device_path,
+                    'memory_total_mb': 0,
+                    'driver_version': '',
+                })
+        except Exception as e:
+            self.logger.debug('VAAPI GPU detection skipped: %s', str(e))
+
+        return gpus
+
     def __get_devices_info(self):
         """
         Return a dictionary of device information
@@ -63,7 +115,7 @@ class System(object, metaclass=SingletonType):
         if not self.devices:
             self.devices = {
                 "cpu_info": cpuinfo.get_cpu_info(),
-                "gpu_info": [],
+                "gpu_info": self.__detect_gpus(),
             }
         return self.devices
 

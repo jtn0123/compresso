@@ -63,6 +63,31 @@
               />
             </div>
 
+            <div class="q-pb-sm">
+              <div class="text-caption text-grey q-mb-xs">{{ t('workers.workerType') }}</div>
+              <q-btn-toggle
+                v-model="workerType"
+                toggle-color="primary"
+                :options="[
+                  { label: t('workers.workerTypeCpu'), value: 'cpu' },
+                  { label: t('workers.workerTypeGpu'), value: 'gpu' }
+                ]"
+              />
+              <div v-if="workerType === 'gpu' && detectedGpus.length > 0" class="q-mt-sm">
+                <q-chip
+                  v-for="(gpu, idx) in detectedGpus"
+                  :key="idx"
+                  dense
+                  color="green-2"
+                  text-color="dark"
+                  :label="gpu.name + (gpu.memory_total_mb ? ' (' + gpu.memory_total_mb + ' MB)' : '')"
+                />
+              </div>
+              <div v-if="workerType === 'gpu' && detectedGpus.length === 0" class="q-mt-sm text-caption text-warning">
+                {{ t('workers.noGpuDetected') }}
+              </div>
+            </div>
+
             <div class="q-gutter-sm">
               <q-skeleton v-if="workerCount === null" type="QInput"/>
               <q-input
@@ -228,10 +253,12 @@ const originalSnapshot = ref(null)
 const currentID = ref(null)
 const locked = ref(false)
 const name = ref(null)
+const workerType = ref('cpu')
 const workerCount = ref(null)
 const newTag = ref('')
 const tags = ref(null)
 const schedules = ref(null)
+const detectedGpus = ref([])
 
 const saveAction = computed(() => {
   const hasChanges = isDirty.value
@@ -262,6 +289,7 @@ const currentSnapshot = computed(() => {
   return JSON.stringify({
     locked: locked.value,
     name: name.value,
+    workerType: workerType.value,
     workerCount: workerCount.value,
     tags: [...tags.value],
     schedules: scheduleSnapshot
@@ -289,6 +317,7 @@ const resetState = () => {
   currentID.value = null
   locked.value = false
   name.value = null
+  workerType.value = 'cpu'
   workerCount.value = null
   newTag.value = ''
   tags.value = null
@@ -307,6 +336,7 @@ const fetchWorkerGroupConfig = (workerGroupId) => {
     currentID.value = 0
     locked.value = false
     name.value = ''
+    workerType.value = 'cpu'
     workerCount.value = 1
     tags.value = []
     schedules.value = []
@@ -322,6 +352,7 @@ const fetchWorkerGroupConfig = (workerGroupId) => {
     currentID.value = response.data.id
     locked.value = response.data.locked
     name.value = response.data.name
+    workerType.value = response.data.worker_type || 'cpu'
     workerCount.value = response.data.number_of_workers
     tags.value = response.data.tags
     const workerEventSchedules = response.data.worker_event_schedules.map((schedule) => ({
@@ -348,6 +379,7 @@ const saveWorkerGroupConfig = async () => {
     id: currentID.value,
     locked: locked.value,
     name: name.value,
+    worker_type: workerType.value,
     number_of_workers: workerCount.value,
     worker_event_schedules: workerEventSchedule,
     tags: tags.value,
@@ -423,6 +455,15 @@ const deleteSchedule = (index) => {
   schedules.value = schedules.value.filter((_, scheduleIndex) => scheduleIndex !== index)
 }
 
+const fetchDetectedGpus = async () => {
+  try {
+    const response = await axios.get(getCompressoApiUrl('v2', 'settings/configuration'))
+    detectedGpus.value = response.data?.devices?.gpu_info || []
+  } catch (_e) {
+    detectedGpus.value = []
+  }
+}
+
 const show = () => {
   if (!dialogRef.value) {
     return
@@ -430,6 +471,7 @@ const show = () => {
   isOpen.value = true
   resetState()
   fetchWorkerGroupConfig(props.workerGroupId)
+  fetchDetectedGpus()
   dialogRef.value.show()
 }
 

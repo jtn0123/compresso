@@ -45,6 +45,11 @@
                       <q-item-label caption lines="1">
                         <span class="text-weight-bold">{{ $t('components.settings.workers.workerCount') }}:</span>
                         {{ workerGroup.workerCount }}
+                        <q-badge
+                          class="q-ml-sm"
+                          :color="workerGroup.workerType === 'gpu' ? 'green' : 'blue'"
+                          :label="workerGroup.workerType === 'gpu' ? 'GPU' : 'CPU'"
+                        />
                       </q-item-label>
                       <q-item-label caption lines="1">
                         <span class="text-weight-bold">{{ $t('components.settings.common.tags') }}:</span>
@@ -269,6 +274,7 @@ export default {
           workerGroupsList[workerGroupsList.length] = {
             id: workerGroup.id,
             name: workerGroup.name,
+            workerType: workerGroup.worker_type || 'cpu',
             workerCount: workerGroup.number_of_workers,
             tags: workerGroup.tags,
             locked: workerGroup.locked,

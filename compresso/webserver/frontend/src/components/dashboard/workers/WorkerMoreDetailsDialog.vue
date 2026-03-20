@@ -93,12 +93,14 @@
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useMobile } from 'src/composables/useMobile'
+import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import WorkerProgressStatusCard from 'components/dashboard/workers/partials/WorkerProgressStatusCard.vue'
 import WorkerProgressLogCard from 'components/dashboard/workers/partials/WorkerProgressLogCard.vue'
 
 const $q = useQuasar()
 const { isMobile } = useMobile()
+const { clampPercent, formatPercent, gradientColor } = useWorkerGauges()
 
 const props = defineProps({
   id: {
@@ -194,32 +196,6 @@ const props = defineProps({
 const emit = defineEmits(['hide'])
 
 const dialogRef = ref(null)
-const clampPercent = (value) => {
-  if (!Number.isFinite(value)) {
-    return 0
-  }
-  return Math.max(0, Math.min(100, value))
-}
-
-const formatPercent = (value) => {
-  return Number(parseFloat(value.toFixed(2)))
-}
-
-const gradientColor = (percent) => {
-  const clamped = clampPercent(percent)
-  const isDark = $q.dark.isActive
-  const secondary = isDark
-    ? { r: 64, g: 200, b: 255 }
-    : { r: 0, g: 120, b: 180 }
-  const red = isDark
-    ? { r: 255, g: 90, b: 90 }
-    : { r: 180, g: 20, b: 20 }
-  const ratio = clamped / 100
-  const r = Math.round(secondary.r + (red.r - secondary.r) * ratio)
-  const g = Math.round(secondary.g + (red.g - secondary.g) * ratio)
-  const b = Math.round(secondary.b + (red.b - secondary.b) * ratio)
-  return `rgb(${r}, ${g}, ${b})`
-}
 
 const cpuPercentValue = computed(() => {
   const value = clampPercent(Number(props.subprocess?.cpu_percent || 0))

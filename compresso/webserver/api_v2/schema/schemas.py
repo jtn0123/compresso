@@ -1450,6 +1450,36 @@ class LibraryResultsSchema(BaseSchema):
         required=True,
         metadata={'description': "If the library is configured to monitor for file changes", 'example': False},
     )
+    target_codecs = fields.Str(
+        required=False,
+        load_default='',
+        metadata={'description': "Comma-separated list of target codecs", 'example': ''},
+    )
+    skip_codecs = fields.Str(
+        required=False,
+        load_default='',
+        metadata={'description': "Comma-separated list of codecs to skip", 'example': ''},
+    )
+    size_guardrail_enabled = fields.Boolean(
+        required=False,
+        load_default=False,
+        metadata={'description': "If size guardrails are enabled for this library", 'example': False},
+    )
+    size_guardrail_min_pct = fields.Int(
+        required=False,
+        load_default=20,
+        metadata={'description': "Minimum size percentage guardrail", 'example': 20},
+    )
+    size_guardrail_max_pct = fields.Int(
+        required=False,
+        load_default=80,
+        metadata={'description': "Maximum size percentage guardrail", 'example': 80},
+    )
+    replacement_policy = fields.Str(
+        required=False,
+        load_default='',
+        metadata={'description': "Per-library replacement policy", 'example': ''},
+    )
     tags = fields.List(
         cls_or_instance=fields.Str,
         required=True,

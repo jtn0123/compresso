@@ -921,5 +921,9 @@
     "lastAnalyzed": "Last analyzed",
     "estimatesLive": "Estimates update as files are processed",
     "optimizationProgress": "Optimized"
+  },
+  "dashboard": {
+    "ofTotal": "of",
+    "remaining": "Remaining"
   }
 }

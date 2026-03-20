@@ -30,9 +30,11 @@
 
 """
 import json
+import subprocess
 import time
 import uuid
 
+import psutil
 import tornado.web
 import tornado.locks
 import tornado.ioloop
@@ -55,6 +57,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
     sending_worker_info = False
     sending_pending_tasks_info = False
     sending_completed_tasks_info = False
+    sending_system_status = False
     close_event = False
 
     def __init__(self, *args, **kwargs):
@@ -128,6 +131,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         self.stop_pending_tasks_info()
         self.stop_completed_tasks_info()
         self.stop_system_logs()
+        self.stop_system_status()
 
     def on_remote_message(self, message):
         if message is None:
@@ -277,6 +281,32 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         :rtype:
         """
         self.sending_completed_tasks_info = False
+
+    def start_system_status(self, params=None):
+        """
+        WS Command - start_system_status
+        Start sending system resource metrics (CPU, RAM, disk) to the frontend.
+
+        :param params:
+        :type params:
+        :return:
+        :rtype:
+        """
+        if not self.sending_system_status:
+            self.sending_system_status = True
+            tornado.ioloop.IOLoop.current().spawn_callback(self.async_system_status)
+
+    def stop_system_status(self, params=None):
+        """
+        WS Command - stop_system_status
+        Stop sending system resource metrics to the frontend.
+
+        :param params:
+        :type params:
+        :return:
+        :rtype:
+        """
+        self.sending_system_status = False
 
     def dismiss_message(self, params=None):
         """
@@ -438,3 +468,53 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
             # Sleep for X seconds
             await gen.sleep(3)
+
+    def _get_gpu_utilization(self):
+        gpus = []
+        try:
+            result = subprocess.run(
+                ['nvidia-smi',
+                 '--query-gpu=index,utilization.gpu,memory.used,memory.total,temperature.gpu',
+                 '--format=csv,noheader,nounits'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split('\n'):
+                    if not line.strip():
+                        continue
+                    parts = [p.strip() for p in line.split(',')]
+                    if len(parts) >= 5:
+                        gpus.append({
+                            'index': int(parts[0]),
+                            'utilization_percent': float(parts[1]),
+                            'memory_used_mb': int(float(parts[2])),
+                            'memory_total_mb': int(float(parts[3])),
+                            'temperature_c': int(float(parts[4])),
+                        })
+        except Exception:
+            pass
+        return gpus
+
+    async def async_system_status(self):
+        while self.sending_system_status:
+            mem = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+
+            await self.send(
+                {
+                    'success':   True,
+                    'server_id': self.server_id,
+                    'type':      'system_status',
+                    'data':      {
+                        'cpu_percent':    psutil.cpu_percent(interval=0),
+                        'memory_percent': mem.percent,
+                        'memory_used_gb': round(mem.used / (1024 ** 3), 1),
+                        'disk_percent':   disk.percent,
+                        'disk_used_gb':   round(disk.used / (1024 ** 3), 1),
+                        'gpus':           self._get_gpu_utilization(),
+                    },
+                }
+            )
+
+            # Sleep for 5 seconds
+            await gen.sleep(5)

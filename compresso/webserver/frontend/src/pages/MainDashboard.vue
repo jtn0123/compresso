@@ -1,136 +1,125 @@
 <template>
   <q-page padding>
-    <!-- content -->
-
     <div class="row q-col-gutter-md">
+
+      <!-- Row 1: System Status Bar -->
       <div class="col-12">
-        <q-card flat bordered>
-          <q-card-section class="bg-card-head">
+        <SystemStatusBar :systemInfo="systemInfo" :liveMetrics="liveMetrics" />
+      </div>
 
-            <div class="row items-center no-wrap">
-              <div class="col">
-                <div class="text-h6 text-primary">
-                  <q-icon name="fas fa-spinner"/>
-                  {{ $t('headers.workers') }}
-                </div>
-              </div>
-
-              <div class="col-auto">
-                <q-btn-dropdown
-                  class="q-ml-sm"
-                  outline
-                  content-class="compresso-dropdown-menu"
-                  :color="Object.keys(workerProgressList).length === 0 ? 'grey-7' : 'secondary'"
-                  :disable-main-btn="Object.keys(workerProgressList).length === 0"
-                  :label="$t('navigation.options')">
-                  <q-list>
-
-                    <q-item
-                      clickable
-                      @click="pauseAllWorkers()"
-                      v-close-popup>
-                      <q-item-section>
-                        <q-item-label>
-                          <q-icon name="pause"/>
-                          {{ $t('components.workers.pauseAllWorkers') }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                    <q-item
-                      clickable
-                      @click="resumeAllWorkers()"
-                      v-close-popup>
-                      <q-item-section>
-                        <q-item-label>
-                          <q-icon name="play_arrow"/>
-                          {{ $t('components.workers.resumeAllWorkers') }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-
-                    <q-separator/>
-
-                    <q-item
-                      clickable
-                      @click="terminateAllWorkers()"
-                      v-close-popup>
-                      <q-item-section>
-                        <q-item-label>
-                          <q-icon name="fas fa-skull-crossbones"/>
-                          {{ $t('components.workers.terminateAllWorkers') }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-
-                  </q-list>
-                </q-btn-dropdown>
-              </div>
-            </div>
-          </q-card-section>
-
+      <!-- Row 2: Hero section -->
+      <!-- Left: Donut + Stats -->
+      <div class="col-12 col-md-5 col-lg-4">
+        <q-card flat bordered class="full-height">
           <q-card-section>
-
-            <!-- START WORKERS PROGRESS-->
-            <div class="row">
-
-              <div
-                v-if="Object.keys(workerProgressList).length === 0"
-                class="full-width row flex-center text-accent q-gutter-sm">
-                <q-item-label>{{ $t('components.workers.listEmpty') }}</q-item-label>
-              </div>
-              <WorkerProgressCard
-                v-for="(workerProgress, index) in workerProgressList"
-                :key="index"
-                v-bind="workerProgress"
-              />
-
-            </div>
-            <!-- END WORKERS PROGRESS-->
-
+            <LibraryDonutChart
+              :totalFiles="optimizationData.totalFiles"
+              :processedFiles="optimizationData.processedFiles"
+              :percent="optimizationData.percent"
+              :loading="optimizationData.loading"
+            />
           </q-card-section>
-
+          <q-separator />
+          <q-card-section class="q-pa-sm">
+            <CompactStatsGrid />
+          </q-card-section>
         </q-card>
       </div>
 
-      <div class="col-12 col-md-6">
-        <PendingTasks v-bind="pendingTasksData"/>
+      <!-- Right: Workers -->
+      <div class="col-12 col-md-7 col-lg-8">
+        <WorkersPanel
+          :workerProgressList="workerProgressList"
+          @pause-all="pauseAllWorkers"
+          @resume-all="resumeAllWorkers"
+          @terminate-all="terminateAllWorkers"
+        />
+
+        <!-- Stale data warning -->
+        <div v-if="workersStale" class="q-mt-sm">
+          <q-banner dense class="bg-warning text-dark text-caption" rounded>
+            <template v-slot:avatar>
+              <q-icon name="warning" color="dark" />
+            </template>
+            {{ $t('common.dataStale') }}
+          </q-banner>
+        </div>
       </div>
 
+      <!-- Row 3: Tasks -->
       <div class="col-12 col-md-6">
-        <CompletedTasks v-bind="completedTasksData"/>
+        <PendingTasks v-bind="pendingTasksData" />
+      </div>
+      <div class="col-12 col-md-6">
+        <CompletedTasks v-bind="completedTasksData" />
+      </div>
+
+      <!-- Row 4: Bottom panels -->
+      <div class="col-12 col-md-6">
+        <LinkedNodesPanel />
+      </div>
+      <div class="col-12 col-md-6">
+        <HealthCheckPanel />
       </div>
 
     </div>
 
-    <ReleaseNotesDialog/>
-
+    <ReleaseNotesDialog />
   </q-page>
 </template>
 
 <script>
-import WorkerProgressCard from 'components/dashboard/workers/WorkerProgressCard.vue'
+import SystemStatusBar from 'components/dashboard/SystemStatusBar.vue'
+import LibraryDonutChart from 'components/charts/LibraryDonutChart.vue'
+import CompactStatsGrid from 'components/dashboard/CompactStatsGrid.vue'
+import WorkersPanel from 'components/dashboard/workers/WorkersPanel.vue'
+import LinkedNodesPanel from 'components/dashboard/LinkedNodesPanel.vue'
+import HealthCheckPanel from 'components/dashboard/HealthCheckPanel.vue'
 import PendingTasks from 'components/dashboard/pending/PendingTasksDashboardSection.vue'
-import CompletedTasks from "components/dashboard/completed/CompletedTasksDashboardSection.vue";
-import dateTools from "src/js/dateTools";
-import { useQuasar } from "quasar";
-import { onMounted, onUnmounted, ref } from 'vue';
-import { useI18n } from "vue-i18n";
-import { CompressoWebsocketHandler } from "src/js/compressoWebsocket";
-import axios from "axios";
-import { getCompressoApiUrl } from "src/js/compressoGlobals";
-import ReleaseNotesDialog from "components/docs/ReleaseNotesDialog.vue";
+import CompletedTasks from "components/dashboard/completed/CompletedTasksDashboardSection.vue"
+import dateTools from "src/js/dateTools"
+import { useQuasar } from "quasar"
+import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from "vue-i18n"
+import { CompressoWebsocketHandler } from "src/js/compressoWebsocket"
+import axios from "axios"
+import { getCompressoApiUrl } from "src/js/compressoGlobals"
+import ReleaseNotesDialog from "components/docs/ReleaseNotesDialog.vue"
+import { useWorkerGauges } from "src/composables/useWorkerGauges"
+import { useSystemStatus } from "src/composables/useSystemStatus"
 
 export default {
   name: 'MainDashboard',
-  components: { ReleaseNotesDialog, CompletedTasks, WorkerProgressCard, PendingTasks }, setup() {
+  components: {
+    ReleaseNotesDialog,
+    CompletedTasks,
+    SystemStatusBar,
+    LibraryDonutChart,
+    CompactStatsGrid,
+    WorkersPanel,
+    LinkedNodesPanel,
+    HealthCheckPanel,
+    PendingTasks
+  },
+  setup() {
     const { t: $t } = useI18n();
     const $q = useQuasar();
+    const { generateGroupColour } = useWorkerGauges();
+    const { systemInfo, liveMetrics, fetchSystemInfo, startLiveMetrics, updateLiveMetrics } = useSystemStatus();
+    const lastWorkersUpdate = ref(null);
+    const workersStale = ref(false);
     const workerProgressList = ref([]);
     const pendingTasksData = ref({
       taskList: []
     });
     const completedTasksData = ref({
       taskList: []
+    });
+    const optimizationData = ref({
+      totalFiles: 0,
+      processedFiles: 0,
+      percent: 0,
+      loading: true
     });
 
     let ws = null;
@@ -144,21 +133,6 @@ export default {
         return (parseInt(time_elapsed) / parseInt(percent_completed) * percent_to_go)
       }
 
-      // Credit:
-      //    https://stackoverflow.com/questions/3426404/create-a-hexadecimal-colour-based-on-a-string-with-javascript
-      function generateBackgroundColour(name) {
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-          hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        let colour = '#';
-        for (let i = 0; i < 3; i++) {
-          let value = (hash >> (i * 8)) & 0xFF;
-          colour += ('00' + value.toString(16)).substr(-2);
-        }
-        return colour;
-      }
-
       let workerData = {}
       for (let i = 0; i < data.length; i++) {
         let worker = data[i];
@@ -168,16 +142,16 @@ export default {
         if (worker.name in workerGroupColours) {
           workerGroupColour = workerGroupColours[worker.name];
         } else {
-          workerGroupColours[worker.name] = generateBackgroundColour(worker.name);
+          workerGroupColours[worker.name] = generateGroupColour(worker.name);
           workerGroupColour = workerGroupColours[worker.name];
         }
 
         // Set 'idle' status as defaults
         workerData['worker-' + worker.id] = {
           indeterminate: false,
-          id: worker.id,        // Eg. '1'
+          id: worker.id,
           label: worker.name,
-          name: worker.name,    // Eg. 'Worker-1'
+          name: worker.name,
           color: 'warning',
           progress: 100,
           progressText: '-',
@@ -192,6 +166,7 @@ export default {
           idle: worker.idle,
           paused: worker.paused,
           workerGroupColour: workerGroupColour,
+          workerType: '',
           currentFile: '',
           currentTask: null,
           runnersInfo: {},
@@ -202,25 +177,17 @@ export default {
         workerData['worker-' + worker.id].runnersInfo = worker.runners_info || {};
         workerData['worker-' + worker.id].subprocess = worker.subprocess || {};
 
-        // If the worker is paused, the setup initially paused style.
-        // NOTE: It is possible to have a worker that is 'paused' but not 'idle'.
-        //    Therefore, this may be modified further below
         if (worker.paused) {
-          // Set 'paused' defaults
           workerData['worker-' + worker.id].label = worker.name;
           workerData['worker-' + worker.id].color = 'negative';
           workerData['worker-' + worker.id].progressText = '...';
           workerData['worker-' + worker.id].state = $t('components.workers.state.paused');
         }
         if (!worker.idle) {
-          // Set the label
           workerData['worker-' + worker.id].label = worker.name + ': ' + worker.current_file;
-          // Set the progress graph colour
           workerData['worker-' + worker.id].color = 'secondary';
-          // Set the worker state
           workerData['worker-' + worker.id].state = $t('components.workers.state.processing');
 
-          // Set the current runner this worker is executing
           let currentRunner = $t('components.workers.currentRunner.indeterminate');
           if (typeof worker.runners_info === 'object' && worker.runners_info !== null) {
             for (const [runnerKey, runnerValue] of Object.entries(worker.runners_info)) {
@@ -231,15 +198,10 @@ export default {
           }
           workerData['worker-' + worker.id].currentRunner = currentRunner;
 
-          // Set the start and total processing time
           const processingDuration = (new Date() - new Date(worker.start_time * 1000)) / 1000;
           workerData['worker-' + worker.id].startTime = dateTools.printDateTimeString(worker.start_time);
           workerData['worker-' + worker.id].timeSinceStart = dateTools.printSecondsAsDuration(processingDuration);
-
-          // Set the current command
           workerData['worker-' + worker.id].currentCommand = worker.current_command;
-
-          // Set the worker log file
           workerData['worker-' + worker.id].workerLog = worker.worker_log_tail;
 
           const percentValue = Number(worker.subprocess?.percent);
@@ -248,18 +210,14 @@ export default {
           const hasElapsed = Number.isFinite(elapsedValue) && elapsedValue >= 0;
           const canEstimate = hasPercent && percentValue > 0 && hasElapsed;
 
-          // Set progress if progress is given
           if (hasPercent) {
-            // Set the progress graph
             workerData['worker-' + worker.id].progress = percentValue;
             workerData['worker-' + worker.id].progressText = worker.subprocess.percent + '%';
           } else {
-            // Set progress as 'indeterminate' if no progress is given
             workerData['worker-' + worker.id].indeterminate = true;
             workerData['worker-' + worker.id].progressText = '...';
           }
 
-          // Set the elapsed and ETC only when values are valid
           if (canEstimate) {
             workerData['worker-' + worker.id].elapsed = dateTools.printSecondsAsDuration(elapsedValue);
             const etcDuration = calculateEtc(percentValue, elapsedValue);
@@ -269,7 +227,6 @@ export default {
             workerData['worker-' + worker.id].etc = '...';
           }
 
-          // If the worker is paused mid task, then flick it over to paused statue formatting
           if (worker.paused) {
             workerData['worker-' + worker.id].indeterminate = true;
             workerData['worker-' + worker.id].color = 'negative';
@@ -319,32 +276,35 @@ export default {
         ws.send(JSON.stringify({ command: 'start_workers_info', params: {} }));
         ws.send(JSON.stringify({ command: 'start_pending_tasks_info', params: {} }));
         ws.send(JSON.stringify({ command: 'start_completed_tasks_info', params: {} }));
+        startLiveMetrics(ws);
       });
 
       compressoWSHandler.addEventListener('message', 'handle_dashboard_messages', function (evt) {
         if (typeof evt.data === 'string') {
           let jsonData = JSON.parse(evt.data);
           if (jsonData.success) {
-            // Ensure the server is still running the same instance...
             if (serverId === null) {
               serverId = jsonData.server_id;
             } else {
               if (jsonData.server_id !== serverId) {
-                // Reload the whole page. Some things may have changed
                 console.debug('Compresso server has restarted. Reloading page...');
                 location.reload();
               }
             }
-            // Parse data type and update the dashboard
             switch (jsonData.type) {
               case 'workers_info':
                 updateWorkerProgressCharts(jsonData.data);
+                lastWorkersUpdate.value = Date.now();
+                workersStale.value = false;
                 break;
               case 'pending_tasks':
                 updatePendingTasksList(jsonData.data);
                 break;
               case 'completed_tasks':
                 updateCompletedTasksList(jsonData.data);
+                break;
+              case 'system_status':
+                updateLiveMetrics(jsonData.data);
                 break;
             }
           } else {
@@ -360,20 +320,46 @@ export default {
       compressoWSHandler.close();
     }
 
+    async function fetchOptimizationProgress() {
+      try {
+        const response = await axios.get(getCompressoApiUrl('v2', 'compression/optimization-progress'));
+        optimizationData.value = {
+          totalFiles: response.data.total || 0,
+          processedFiles: response.data.processed || 0,
+          percent: response.data.percent || 0,
+          loading: false
+        };
+      } catch (_e) {
+        optimizationData.value.loading = false;
+      }
+    }
+
+    let staleCheckInterval = null;
+
     onMounted(() => {
-      // Start the websocket
       initDashboardWebsocket();
+      fetchSystemInfo();
+      fetchOptimizationProgress();
+      staleCheckInterval = setInterval(() => {
+        if (lastWorkersUpdate.value && (Date.now() - lastWorkersUpdate.value) > 10000) {
+          workersStale.value = true;
+        }
+      }, 2000);
     })
 
     onUnmounted(() => {
-      // Close the websocket
       closeDashboardWebsocket();
+      if (staleCheckInterval) clearInterval(staleCheckInterval);
     })
 
     return {
       workerProgressList,
       pendingTasksData,
-      completedTasksData
+      completedTasksData,
+      systemInfo,
+      liveMetrics,
+      workersStale,
+      optimizationData,
     }
   },
   methods: {
@@ -455,7 +441,6 @@ export default {
         if (workerData.idle) {
           this.terminateWorker(workerData.id);
         } else {
-          // If the worker is not idle, prompt to confirm the termination
           this.$q.dialog({
             title: this.$t('headers.confirm') + ' - ' + workerData.name,
             message: this.$t('components.workers.terminateWorkerWarning'),
