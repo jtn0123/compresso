@@ -53,10 +53,13 @@ security:
 """
 
 
-def find_all_handlers():
+def find_all_handlers(
+        handlers_provider=list_all_handlers,
+        module_loader=importlib.import_module,
+):
     return_list = []
-    for handler in list_all_handlers():
-        endpoint_handler = getattr(importlib.import_module("compresso.webserver.api_v2"), handler)
+    for handler in handlers_provider():
+        endpoint_handler = getattr(module_loader("compresso.webserver.api_v2"), handler)
         for route in endpoint_handler.routes:
             path_pattern = route.get('path_pattern')
             return_list.append(

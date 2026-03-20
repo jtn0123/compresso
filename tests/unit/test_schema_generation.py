@@ -95,17 +95,13 @@ class TestFindAllHandlers:
 
         mock_module = MagicMock()
         setattr(mock_module, 'MockHandler', mock_handler)
-        mock_importlib = MagicMock()
-        mock_importlib.import_module.return_value = mock_module
+        mock_module_loader = MagicMock(return_value=mock_module)
+        mock_handlers_provider = MagicMock(return_value=['MockHandler'])
 
-        with patch.dict(
-            find_all_handlers.__globals__,
-            {
-                'list_all_handlers': MagicMock(return_value=['MockHandler']),
-                'importlib': mock_importlib,
-            },
-        ):
-            result = find_all_handlers()
+        result = find_all_handlers(
+            handlers_provider=mock_handlers_provider,
+            module_loader=mock_module_loader,
+        )
 
         assert len(result) == 2
         assert result[0][0] == r'/test/route'
