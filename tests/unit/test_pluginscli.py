@@ -8,10 +8,10 @@
 """
 
 import os
-import re
 import sys
+import types
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 
 from compresso.libs.singleton import SingletonType
 
@@ -26,19 +26,18 @@ def reset_singletons():
 @pytest.fixture(autouse=True)
 def mock_inquirer():
     """Mock the inquirer module which may not be installed in test env."""
-    mock_inq = MagicMock()
-    mock_inq.List = MagicMock()
-    mock_inq.Text = MagicMock()
-    mock_inq.Checkbox = MagicMock()
+    mock_inq = types.ModuleType('inquirer')
+    mock_inq.List = Mock(side_effect=lambda *args, **kwargs: {'args': args, 'kwargs': kwargs})
+    mock_inq.Text = Mock(side_effect=lambda *args, **kwargs: {'args': args, 'kwargs': kwargs})
+    mock_inq.Checkbox = Mock(side_effect=lambda *args, **kwargs: {'args': args, 'kwargs': kwargs})
+    mock_inq.prompt = Mock(return_value=None)
+    mod_key = 'compresso.libs.unplugins.pluginscli'
     with patch.dict(sys.modules, {'inquirer': mock_inq}):
         # Force re-import of pluginscli if it was cached without inquirer
-        mod_key = 'compresso.libs.unplugins.pluginscli'
-        if mod_key in sys.modules:
-            del sys.modules[mod_key]
+        sys.modules.pop(mod_key, None)
         yield mock_inq
     # Clean up cached module after test
-    if mod_key in sys.modules:
-        del sys.modules[mod_key]
+    sys.modules.pop(mod_key, None)
 
 
 def _import_pluginscli():
@@ -91,7 +90,7 @@ class TestPluginsCLIInit:
              patch.object(pluginscli, 'common') as mock_common, \
              patch.object(pluginscli, 'set_shared_manager') as mock_set_mgr, \
              patch.object(pluginscli, 'kill_all_plugin_processes'), \
-             patch.object(pluginscli, 'TaskDataStore') as mock_tds, \
+             patch.object(pluginscli, 'TaskDataStore'), \
              patch('multiprocessing.Manager') as mock_mgr_cls:
             mock_config.Config.return_value = MagicMock()
             mock_common.get_home_dir.return_value = '/fake/home'
@@ -112,7 +111,7 @@ class TestPluginsCLIInit:
              patch.object(pluginscli, 'common') as mock_common, \
              patch.object(pluginscli, 'set_shared_manager'), \
              patch.object(pluginscli, 'kill_all_plugin_processes'), \
-             patch.object(pluginscli, 'TaskDataStore') as mock_tds, \
+             patch.object(pluginscli, 'TaskDataStore'), \
              patch('multiprocessing.Manager') as mock_mgr_cls:
             mock_config.Config.return_value = MagicMock()
             mock_common.get_home_dir.return_value = '/fake/home'
@@ -206,7 +205,7 @@ class TestGetPluginTypeChoices:
              patch.object(pluginscli, 'common') as mock_common, \
              patch.object(pluginscli, 'set_shared_manager'), \
              patch.object(pluginscli, 'kill_all_plugin_processes'), \
-             patch.object(pluginscli, 'TaskDataStore') as mock_tds, \
+             patch.object(pluginscli, 'TaskDataStore'), \
              patch('multiprocessing.Manager') as mock_mgr_cls, \
              patch.object(pluginscli, 'plugin_types') as mock_pt:
             mock_config.Config.return_value = MagicMock()

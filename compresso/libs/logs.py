@@ -888,7 +888,7 @@ class CompressoLogging:
             f'{key}="{value}"' if " " in str(value) else f"{key}={value}"
             for key, value in log_record.items() if value
         )
-        instance._logger.log(instance.METRIC, log_message, extra=log_record)
+        instance._emit_structured_log(instance.METRIC, log_message, log_record)
 
     @staticmethod
     def data(data_primary_key: str, data_search_key: str = None, timestamp: datetime = None, **kwargs):
@@ -907,7 +907,24 @@ class CompressoLogging:
             **kwargs
         }
         log_message = "DATA STREAM"
-        instance._logger.log(instance.DATA, log_message, extra=log_record)
+        instance._emit_structured_log(instance.DATA, log_message, log_record)
+
+    def _emit_structured_log(self, level, message, extra):
+        """
+        Emit structured metric/data records even when their custom log levels
+        sit below the logger's normal application level.
+        """
+        record = self._logger.makeRecord(
+            self._logger.name,
+            level,
+            __file__,
+            0,
+            message,
+            args=(),
+            exc_info=None,
+            extra=extra,
+        )
+        self._logger.handle(record)
 
     @staticmethod
     def enable_debugging():
