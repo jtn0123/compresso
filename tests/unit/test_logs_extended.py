@@ -8,16 +8,12 @@
     and CompressoLogging custom methods.
 """
 
-import json
 import logging
-import os
-import tempfile
-import threading
 import time
 
 import pytest
-from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from datetime import datetime
+from unittest.mock import MagicMock
 
 from compresso.libs.singleton import SingletonType
 

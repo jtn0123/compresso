@@ -12,10 +12,8 @@
 import json
 import logging
 import os
-import time
 from datetime import datetime, timezone
-from queue import Queue, Empty
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 
 import pytest
 

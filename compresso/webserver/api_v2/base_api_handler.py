@@ -35,6 +35,8 @@ import traceback
 from json import JSONDecodeError
 from typing import (
     Any,
+    Dict,
+    List,
 )
 
 import tornado.web
@@ -56,9 +58,9 @@ class BaseApiError(Exception):
 
 class BaseApiHandler(RequestHandler):
     api_version = 2
-    routes = []
-    route = {}
-    error_messages = {}
+    routes: List[Dict[str, Any]] = []
+    route: Dict[str, Any] = {}
+    error_messages: Dict[str, Any] = {}
 
     """
     Valid API return status codes:
@@ -113,7 +115,10 @@ class BaseApiHandler(RequestHandler):
         except JSONDecodeError as e:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
             self.write_error()
-            raise BaseApiError("Expected request body to be JSON. Received '{}'".format(self.request.body))
+            received_body: Any = self.request.body
+            if isinstance(received_body, bytes):
+                received_body = received_body.decode('utf-8', errors='replace')
+            raise BaseApiError("Expected request body to be JSON. Received '{}'".format(received_body))
 
         request_validation_errors = schema.validate(json_data)
         if request_validation_errors:

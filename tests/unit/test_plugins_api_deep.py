@@ -8,7 +8,6 @@
     Covers: installable list, install by ID, plugin flow management, repo operations, panels.
 """
 
-import json
 
 import pytest
 from unittest.mock import patch, MagicMock

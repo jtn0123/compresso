@@ -9,13 +9,11 @@
     hand_task_to_workers, postprocessor_queue_full, and more.
 """
 
-import queue
 import threading
 import time
-from datetime import datetime, timedelta
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -319,7 +317,7 @@ class TestHandTaskToWorkersLocal:
         mock_item.get_task_id.return_value = 42
         mock_item.get_source_data.return_value = {}
 
-        with patch('compresso.libs.foreman.PluginsHandler') as mock_ph:
+        with patch('compresso.libs.foreman.PluginsHandler'):
             result = foreman.hand_task_to_workers(mock_item, local=True, worker_id='w-0')
 
         assert result is True

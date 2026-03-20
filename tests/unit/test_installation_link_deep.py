@@ -10,16 +10,13 @@
 """
 
 import json
-import os
 import queue
-import threading
-import time
 
 import pytest
 import requests
-from unittest.mock import patch, MagicMock, mock_open, PropertyMock, call
+from unittest.mock import patch, MagicMock, mock_open
 
-from compresso.libs.installation_link import RequestHandler, Links, RemoteTaskManager
+from compresso.libs.installation_link import Links, RemoteTaskManager
 from compresso.libs.singleton import SingletonType
 
 
@@ -759,7 +756,7 @@ class TestRemoteTaskManagerRun:
         event = MagicMock()
         info = {'address': '10.0.0.1', 'uuid': 'uuid-1'}
         with patch('compresso.libs.installation_link.Links'), \
-             patch('compresso.libs.installation_link.CompressoLogging.get_logger') as mock_logger:
+             patch('compresso.libs.installation_link.CompressoLogging.get_logger'):
             mgr = RemoteTaskManager('t-1', 'RTM-1', info, pending_q, complete_q, event)
             mgr._log = MagicMock()
             mgr.run()

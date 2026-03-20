@@ -9,13 +9,10 @@
     get_default_cache_path, clean_files_in_cache_dir, tail, touch.
 """
 
-import io
 import os
-import shutil
-import tempfile
 
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
 
 from compresso.libs import common
 

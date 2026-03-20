@@ -98,7 +98,7 @@ class TestGetEnabledPluginDataPanels:
         mock_handler.get_enabled_plugin_modules_by_type.return_value = []
         with patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_handler):
             from compresso.webserver.helpers.plugins import get_enabled_plugin_data_panels
-            result = get_enabled_plugin_data_panels()
+            get_enabled_plugin_data_panels()
         mock_handler.get_enabled_plugin_modules_by_type.assert_called_with('frontend.panel')
 
 
@@ -110,7 +110,7 @@ class TestExecDataPanelsRunner:
         mock_handler.exec_plugin_runner.return_value = True
         with patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_handler):
             from compresso.webserver.helpers.plugins import exec_data_panels_plugin_runner
-            result = exec_data_panels_plugin_runner({}, 'p1')
+            exec_data_panels_plugin_runner({}, 'p1')
         mock_handler.exec_plugin_runner.assert_called_with({}, 'p1', 'frontend.panel')
 
 
@@ -122,7 +122,7 @@ class TestGetEnabledPluginApis:
         mock_handler.get_enabled_plugin_modules_by_type.return_value = []
         with patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_handler):
             from compresso.webserver.helpers.plugins import get_enabled_plugin_plugin_apis
-            result = get_enabled_plugin_plugin_apis()
+            get_enabled_plugin_plugin_apis()
         mock_handler.get_enabled_plugin_modules_by_type.assert_called_with('frontend.plugin_api')
 
 
@@ -134,7 +134,7 @@ class TestExecPluginApiRunner:
         mock_handler.exec_plugin_runner.return_value = True
         with patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_handler):
             from compresso.webserver.helpers.plugins import exec_plugin_api_plugin_runner
-            result = exec_plugin_api_plugin_runner({}, 'p1')
+            exec_plugin_api_plugin_runner({}, 'p1')
         mock_handler.exec_plugin_runner.assert_called_with({}, 'p1', 'frontend.plugin_api')
 
 
@@ -318,7 +318,7 @@ class TestUpdatePluginSettings:
         with patch('compresso.webserver.helpers.plugins.prepare_plugin_info_and_settings', return_value=plugin_data):
             with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
                 from compresso.webserver.helpers.plugins import update_plugin_settings
-                result = update_plugin_settings('test_plugin', [
+                update_plugin_settings('test_plugin', [
                     {'key': 'enabled', 'input_type': 'checkbox', 'value': 'true'},
                 ])
         saved = mock_pe.save_plugin_settings.call_args[0][1]

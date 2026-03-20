@@ -8,7 +8,6 @@
 """
 
 import json
-import os
 import pytest
 from unittest.mock import patch, MagicMock, mock_open
 
@@ -219,7 +218,7 @@ class TestResetSettingsToDefaults:
             instance = cls()
             with patch.object(instance, 'get_plugin_directory', return_value='/fake/plugin'), \
                  patch.object(instance, 'get_profile_directory', return_value='/fake/profile'), \
-                 patch('os.path.exists', side_effect=[True, True, False]) as mock_exists, \
+                 patch('os.path.exists', side_effect=[True, True, False]), \
                  patch('os.path.basename', return_value='settings.json'), \
                  patch('os.remove') as mock_remove:
                 result = instance.reset_settings_to_defaults()

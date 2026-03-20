@@ -11,7 +11,7 @@ import json
 import time
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock, PropertyMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -333,6 +333,24 @@ class TestSend:
         await handler.send({'test': True})
         handler.write_message.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_send_stops_senders_when_socket_closes_mid_write(self):
+        handler = _make_handler()
+        handler.ws_connection = MagicMock()
+        handler.write_message = AsyncMock(side_effect=Exception())
+        handler.stop_frontend_messages = MagicMock()
+        handler.stop_workers_info = MagicMock()
+        handler.stop_pending_tasks_info = MagicMock()
+        handler.stop_completed_tasks_info = MagicMock()
+        handler.stop_system_logs = MagicMock()
+        handler.stop_system_status = MagicMock()
+
+        with patch(f'{WS_MOD}.tornado.websocket.WebSocketClosedError', Exception):
+            await handler.send({'test': True})
+
+        handler.stop_frontend_messages.assert_called_once()
+        handler.stop_workers_info.assert_called_once()
+
 
 # ------------------------------------------------------------------
 # TestGetGpuUtilization
@@ -468,6 +486,51 @@ class TestAsyncLoops:
             handler.send.assert_called_once()
             call_data = handler.send.call_args[0][0]
             assert call_data['type'] == 'workers_info'
+
+    @pytest.mark.asyncio
+    async def test_async_workers_info_skips_duplicate_payloads(self):
+        handler = _make_handler()
+        handler.sending_worker_info = True
+        handler.send = AsyncMock()
+        handler.foreman.get_all_worker_status.return_value = [{'id': 'w1', 'name': 'CPU-Worker-1'}]
+
+        sleep_calls = {'count': 0}
+
+        with patch(f'{WS_MOD}.gen.sleep', new_callable=AsyncMock) as mock_sleep:
+            async def stop_after_second(*args):
+                sleep_calls['count'] += 1
+                if sleep_calls['count'] >= 2:
+                    handler.sending_worker_info = False
+
+            mock_sleep.side_effect = stop_after_second
+
+            await handler.async_workers_info()
+
+            handler.send.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_async_workers_info_refreshes_on_changed_payload(self):
+        handler = _make_handler()
+        handler.sending_worker_info = True
+        handler.send = AsyncMock()
+        handler.foreman.get_all_worker_status.side_effect = [
+            [{'id': 'w1', 'name': 'CPU-Worker-1', 'idle': True}],
+            [{'id': 'w1', 'name': 'CPU-Worker-1', 'idle': False}],
+        ]
+
+        sleep_calls = {'count': 0}
+
+        with patch(f'{WS_MOD}.gen.sleep', new_callable=AsyncMock) as mock_sleep:
+            async def stop_after_second(*args):
+                sleep_calls['count'] += 1
+                if sleep_calls['count'] >= 2:
+                    handler.sending_worker_info = False
+
+            mock_sleep.side_effect = stop_after_second
+
+            await handler.async_workers_info()
+
+            assert handler.send.call_count == 2
 
     @pytest.mark.asyncio
     async def test_async_pending_tasks_info_sends_data(self):

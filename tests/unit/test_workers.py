@@ -13,7 +13,7 @@ import threading
 import time
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 

@@ -186,7 +186,7 @@ class TestAudioCodecHandle:
         probe = {"streams": [_probe_audio("aac", index=0, channels=2)]}
         handle = AudioCodecHandle(probe)
         handle.enable_audio_stream_stereo_cloning = True
-        result = handle.args()
+        handle.args()
         assert handle.audio_tracks_count == 1
 
     def test_copy_stream_method(self):

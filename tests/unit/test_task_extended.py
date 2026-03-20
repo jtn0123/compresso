@@ -10,7 +10,6 @@
 """
 
 import json
-import os
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -194,7 +193,7 @@ class TestReorderTasks:
         from compresso.libs.unmodels.tasks import Tasks
         Tasks.delete().execute()
         t1 = Tasks.create(abspath='/a.mkv', status='pending', library_id=1, priority=1)
-        t2 = Tasks.create(abspath='/b.mkv', status='pending', library_id=1, priority=2)
+        Tasks.create(abspath='/b.mkv', status='pending', library_id=1, priority=2)
         t = Task()
         result = t.reorder_tasks([t1.id], "top")
         assert result >= 0

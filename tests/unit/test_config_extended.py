@@ -13,7 +13,7 @@ import json
 import os
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from compresso.libs.singleton import SingletonType
 
@@ -98,7 +98,7 @@ class TestSetConfigItem:
 
     def test_set_config_item_with_setter(self, tmp_path):
         c = _make_config(tmp_path)
-        with patch('compresso.config.CompressoLogging') as mock_log:
+        with patch('compresso.config.CompressoLogging'):
             c.set_config_item('debugging', True, save_settings=False)
         assert c.debugging is True
 
@@ -228,7 +228,7 @@ class TestPathGetters:
 
     def test_set_cache_path_empty_resets(self, tmp_path):
         c = _make_config(tmp_path)
-        original = c.get_cache_path()
+        c.get_cache_path()
         c.set_cache_path("")
         assert c.get_cache_path() != ""
 

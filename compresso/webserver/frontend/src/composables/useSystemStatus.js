@@ -48,14 +48,14 @@ export function useSystemStatus() {
   }
 
   function updateLiveMetrics(data) {
-    liveMetrics.value = {
+    Object.assign(liveMetrics.value, {
       cpu_percent: data.cpu_percent ?? liveMetrics.value.cpu_percent,
       memory_percent: data.memory_percent ?? liveMetrics.value.memory_percent,
       memory_used_gb: data.memory_used_gb ?? liveMetrics.value.memory_used_gb,
       disk_percent: data.disk_percent ?? liveMetrics.value.disk_percent,
       disk_used_gb: data.disk_used_gb ?? liveMetrics.value.disk_used_gb,
       gpus: data.gpus ?? liveMetrics.value.gpus,
-    }
+    })
   }
 
   return {

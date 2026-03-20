@@ -7,7 +7,6 @@
     Unit tests for compresso.libs.unplugins.child_process.
 """
 
-import threading
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -74,7 +73,7 @@ class TestKillAllPluginProcesses:
         mock_proc = MagicMock()
         mock_proc.children.return_value = []
 
-        with patch('compresso.libs.unplugins.child_process.psutil.Process', return_value=mock_proc) as mock_cls, \
+        with patch('compresso.libs.unplugins.child_process.psutil.Process', return_value=mock_proc), \
              patch('compresso.libs.unplugins.child_process.psutil.wait_procs', return_value=([], [])):
             kill_all_plugin_processes()
 

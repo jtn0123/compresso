@@ -12,9 +12,9 @@
 import os
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
-from peewee import Model, CharField, IntegerField, BooleanField, SqliteDatabase
+from peewee import CharField, IntegerField
 
 from compresso.libs.singleton import SingletonType
 
@@ -48,7 +48,6 @@ class TestUpdateSchemaColumnSync:
     @patch('compresso.libs.db_migrate.inspect')
     def test_adds_missing_nullable_column(self, mock_inspect, tmp_path):
         """Auto-sync should add a nullable column with a default."""
-        from compresso.libs.db_migrate import Migrations
         from compresso.libs.unmodels.lib import BaseModel
 
         m = _make_migrations(tmp_path)
@@ -86,7 +85,6 @@ class TestUpdateSchemaColumnSync:
     @patch('compresso.libs.db_migrate.inspect')
     def test_raises_for_non_null_without_default(self, mock_inspect, tmp_path):
         """Missing non-null columns without default should raise RuntimeError."""
-        from compresso.libs.db_migrate import Migrations
         from compresso.libs.unmodels.lib import BaseModel
 
         m = _make_migrations(tmp_path)
@@ -123,7 +121,6 @@ class TestUpdateSchemaIndexes:
     @patch('compresso.libs.db_migrate.inspect')
     def test_adds_missing_index(self, mock_inspect, tmp_path):
         """Auto-sync should add missing non-unique indexes."""
-        from compresso.libs.db_migrate import Migrations
         from compresso.libs.unmodels.lib import BaseModel
 
         m = _make_migrations(tmp_path)
@@ -150,7 +147,6 @@ class TestUpdateSchemaIndexes:
     @patch('compresso.libs.db_migrate.inspect')
     def test_skips_existing_index(self, mock_inspect, tmp_path):
         """Should not duplicate an existing index."""
-        from compresso.libs.db_migrate import Migrations
         from compresso.libs.unmodels.lib import BaseModel
 
         m = _make_migrations(tmp_path)

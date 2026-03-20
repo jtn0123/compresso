@@ -51,13 +51,14 @@ jobs:
       run: |
         pip install ruff
         # Fatal: syntax errors and undefined names (blocking)
-        ruff check --select E9,F63,F7,F82 compresso/
+        ruff check --select E9,F63,F7,F82 compresso/ tests/
         # Full lint (blocking — all rules enforced)
-        ruff check compresso/
+        ruff check compresso/ tests/
 
     - name: Type check with mypy
       if: matrix.python-version == '3.12'
       run: |
+        mypy compresso/webserver/websocket.py compresso/webserver/api_v2/base_api_handler.py compresso/webserver/api_v2/system_api.py compresso/libs/system.py --ignore-missing-imports --follow-imports=silent --no-error-summary
         mypy compresso/ --ignore-missing-imports --no-error-summary 2>&1 || true
 
     - name: Test with pytest

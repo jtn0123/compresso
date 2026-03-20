@@ -65,7 +65,7 @@ class TestTaskStatusTransitions:
 
 def _make_postprocessor():
     """Create a PostProcessor with mocked dependencies."""
-    with patch('compresso.libs.postprocessor.config.Config') as mock_config_class, \
+    with patch('compresso.libs.postprocessor.config.Config'), \
          patch('compresso.libs.postprocessor.CompressoLogging') as mock_logging:
         mock_logger = MagicMock()
         mock_logging.get_logger.return_value = mock_logger
@@ -270,7 +270,7 @@ class TestApprovalHelpers:
 
         mock_task_module.Task.set_tasks_status.return_value = 1
 
-        result = reject_tasks([5], requeue=True)
+        reject_tasks([5], requeue=True)
         mock_task_module.Task.set_tasks_status.assert_called_once_with([5], 'pending')
 
 

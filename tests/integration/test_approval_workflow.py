@@ -29,7 +29,7 @@ skip_if_no_fixture = pytest.mark.skipif(
 def _make_postprocessor():
     """Create a PostProcessor with mocked dependencies."""
     import threading
-    with patch('compresso.libs.postprocessor.config.Config') as mock_config_class, \
+    with patch('compresso.libs.postprocessor.config.Config'), \
          patch('compresso.libs.postprocessor.CompressoLogging') as mock_logging:
         mock_logger = MagicMock()
         mock_logging.get_logger.return_value = mock_logger
@@ -109,7 +109,7 @@ class TestApprovalWorkflowIntegration:
 
         # Set up: original in library, staged file in staging dir
         original = self._copy_fixture_to_library('movie.mp4')
-        original_size = os.path.getsize(original)
+        os.path.getsize(original)
 
         task_staging_dir = os.path.join(self.staging_dir, 'task_200')
         os.makedirs(task_staging_dir)

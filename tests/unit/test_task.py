@@ -7,7 +7,6 @@
     Unit tests for prepare_file_destination_data() and Task class methods.
 """
 
-import os
 import pytest
 from unittest.mock import MagicMock, patch
 

@@ -22,7 +22,7 @@ import threading
 from datetime import datetime, timedelta
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -292,7 +292,7 @@ class TestManageEventSchedulesExtended:
         foreman = _make_foreman()
         foreman.last_schedule_run = '08:00'
         foreman.run_task = MagicMock()
-        with patch('compresso.libs.foreman.WorkerGroup') as mock_wg_cls, \
+        with patch('compresso.libs.foreman.WorkerGroup'), \
              patch('compresso.libs.foreman.datetime') as mock_dt:
             mock_today = MagicMock()
             mock_today.strftime.return_value = '08:00'

@@ -9,8 +9,6 @@
     __data_schema_test_data, run_data_schema_tests.
 """
 
-import json
-import inspect
 
 import pytest
 from unittest.mock import patch, MagicMock

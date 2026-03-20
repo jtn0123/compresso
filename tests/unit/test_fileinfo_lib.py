@@ -7,7 +7,6 @@
     Unit tests for FileInfo and Entry classes in compresso/libs/fileinfo.py.
 """
 
-import os
 
 import pytest
 

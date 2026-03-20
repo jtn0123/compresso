@@ -8,7 +8,6 @@
     covering get_all_libraries, save, export, tags, enabled_plugins, plugin_flow.
 """
 
-import json
 import os
 import shutil
 import tempfile

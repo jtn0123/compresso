@@ -9,7 +9,6 @@
     upload_and_install_plugin, on_finish.
 """
 
-import os
 
 import pytest
 from unittest.mock import patch, MagicMock, mock_open
@@ -67,7 +66,7 @@ class TestUploadApiGetReceiver:
         content_type = b'Content-Type: video/mp4'
         chunk = boundary + b'\r\n' + header_line + b'\r\n' + content_type + b'\r\n\r\nFILEDATA'
 
-        with patch('builtins.open', mock_open()) as m:
+        with patch('builtins.open', mock_open()):
             receiver(chunk)
 
         assert handler.meta['filename'] == 'test.mp4'

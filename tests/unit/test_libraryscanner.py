@@ -9,10 +9,9 @@
     and thread management.
 """
 
-import os
 import queue
 import threading
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 import pytest
 

@@ -47,7 +47,7 @@ class TestGetCompressionStatsPaginated:
         mock_instance.get_compression_stats_paginated.return_value = {'results': []}
 
         params = {'start': 5, 'length': 20, 'search_value': 'test', 'library_id': 2, 'order': {'column': 'size', 'dir': 'asc'}}
-        result = get_compression_stats_paginated(params)
+        get_compression_stats_paginated(params)
         mock_instance.get_compression_stats_paginated.assert_called_once_with(
             start=5, length=20, search_value='test', library_id=2, order={'column': 'size', 'dir': 'asc'}
         )
@@ -75,7 +75,7 @@ class TestDistributionWrappers:
         mock_history_mod.History.return_value = mock_instance
         mock_instance.get_codec_distribution.return_value = [{'codec': 'hevc', 'count': 5}]
 
-        result = get_codec_distribution(library_id=1)
+        get_codec_distribution(library_id=1)
         mock_instance.get_codec_distribution.assert_called_once_with(library_id=1)
 
     @patch('compresso.webserver.helpers.compression_stats.history')

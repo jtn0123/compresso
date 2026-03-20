@@ -19,9 +19,8 @@
 import time
 
 import pytest
-import requests
 from requests.auth import HTTPBasicAuth
-from unittest.mock import patch, MagicMock, mock_open, call
+from unittest.mock import patch, MagicMock, mock_open
 
 from compresso.libs.installation_link import RequestHandler, Links
 from compresso.libs.singleton import SingletonType

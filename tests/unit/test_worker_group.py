@@ -15,7 +15,6 @@ import os
 import tempfile
 
 import pytest
-from unittest.mock import patch
 
 from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels import Tags

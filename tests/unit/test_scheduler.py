@@ -9,9 +9,7 @@
 """
 
 import threading
-import time
-from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock, PropertyMock, call
+from unittest.mock import patch, MagicMock
 
 import pytest
 

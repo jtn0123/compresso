@@ -14,7 +14,7 @@ import os
 import zipfile
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -291,7 +291,7 @@ class TestInstallPluginById:
             with patch.object(handler, 'download_and_install_plugin', return_value=True):
                 with patch.object(handler, 'write_plugin_data_to_db', return_value=True):
                     with patch.object(handler, 'get_plugin_path', return_value=str(tmp_path / 'plugins' / 'test_plugin')):
-                        with patch('compresso.libs.plugins.PluginExecutor') as mock_pe:
+                        with patch('compresso.libs.plugins.PluginExecutor'):
                             result = handler.install_plugin_by_id("test_plugin")
         assert result is True
 
@@ -339,7 +339,7 @@ class TestInstallPluginFromPath:
         with patch.object(handler, 'install_plugin', return_value=info):
             with patch.object(handler, 'write_plugin_data_to_db', return_value=True):
                 with patch.object(handler, 'get_plugin_path', return_value=str(tmp_path / 'plugins' / 'zip_plugin')):
-                    with patch('compresso.libs.plugins.PluginExecutor') as mock_pe:
+                    with patch('compresso.libs.plugins.PluginExecutor'):
                         result = handler.install_plugin_from_path_on_disk(str(zip_path))
         assert result is True
 

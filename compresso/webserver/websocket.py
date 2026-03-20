@@ -33,6 +33,7 @@ import json
 import subprocess
 import time
 import uuid
+from typing import Any, Dict
 
 import psutil
 import tornado.web
@@ -50,6 +51,23 @@ from compresso.webserver.proxy import resolve_proxy_target
 
 
 class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
+    STREAM_POLL_INTERVALS = {
+        'frontend_message': 0.5,
+        'system_logs': 1,
+        'workers_info': 0.5,
+        'pending_tasks': 3,
+        'completed_tasks': 3,
+        'system_status': 5,
+    }
+    STREAM_FORCE_REFRESH_INTERVALS = {
+        'frontend_message': 3,
+        'system_logs': 5,
+        'workers_info': 2,
+        'pending_tasks': 10,
+        'completed_tasks': 10,
+        'system_status': 15,
+    }
+
     name = None
     config = None
     sending_frontend_message = False
@@ -58,7 +76,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
     sending_pending_tasks_info = False
     sending_completed_tasks_info = False
     sending_system_status = False
-    close_event = False
+    close_event = None
 
     def __init__(self, *args, **kwargs):
         self.name = 'CompressoWebsocketHandler'
@@ -69,6 +87,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         self.data_queues = udq.get_compresso_data_queues()
         self.foreman = urt.get_compresso_running_thread('foreman')
         self.session = session.Session()
+        self._stream_state: Dict[str, Dict[str, Any]] = {}
         super().__init__(*args, **kwargs)
 
     async def open(self):
@@ -126,12 +145,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 self.remote_ws.close()
             return
 
-        self.stop_frontend_messages()
-        self.stop_workers_info()
-        self.stop_pending_tasks_info()
-        self.stop_completed_tasks_info()
-        self.stop_system_logs()
-        self.stop_system_status()
+        self._stop_all_senders()
 
     def on_remote_message(self, message):
         if message is None:
@@ -326,64 +340,124 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
     async def send(self, message):
         if self.ws_connection:
-            await self.write_message(message)
+            try:
+                await self.write_message(message)
+                return True
+            except tornado.websocket.WebSocketClosedError:
+                self._stop_all_senders()
+        return False
+
+    def _stop_all_senders(self):
+        self.stop_frontend_messages()
+        self.stop_workers_info()
+        self.stop_pending_tasks_info()
+        self.stop_completed_tasks_info()
+        self.stop_system_logs()
+        self.stop_system_status()
+
+    def _stream_is_active(self, enabled: bool) -> bool:
+        return enabled and not (self.close_event and self.close_event.is_set())
+
+    @staticmethod
+    def _normalize_stream_data(stream_name: str, data: Any) -> Any:
+        if stream_name == 'frontend_message' and isinstance(data, list):
+            return sorted(data, key=lambda item: str(item.get('id', '')))
+        if stream_name == 'workers_info' and isinstance(data, list):
+            return sorted(data, key=lambda item: (str(item.get('name', '')), str(item.get('id', ''))))
+        return data
+
+    def _should_send_stream(self, stream_name: str, payload: Any) -> Dict[str, Any]:
+        normalized_payload = self._normalize_stream_data(stream_name, payload)
+        serialized_payload = json.dumps(normalized_payload, sort_keys=True, default=str)
+        payload_bytes = len(serialized_payload.encode('utf-8'))
+        now = time.time()
+        state = self._stream_state.setdefault(
+            stream_name,
+            {
+                'last_payload': None,
+                'last_sent_at': 0.0,
+                'sequence': 0,
+                'skipped_duplicates': 0,
+            },
+        )
+
+        should_send = (
+            state['last_payload'] is None
+            or state['last_payload'] != serialized_payload
+            or (now - state['last_sent_at']) >= self.STREAM_FORCE_REFRESH_INTERVALS.get(stream_name, 5)
+        )
+
+        if not should_send:
+            state['skipped_duplicates'] += 1
+            return {
+                'should_send': False,
+                'normalized_payload': normalized_payload,
+                'payload_bytes': payload_bytes,
+            }
+
+        state['last_payload'] = serialized_payload
+        state['last_sent_at'] = now
+        state['sequence'] += 1
+        return {
+            'should_send': True,
+            'normalized_payload': normalized_payload,
+            'payload_bytes': payload_bytes,
+            'sequence': state['sequence'],
+            'sent_at': now,
+            'skipped_duplicates': state['skipped_duplicates'],
+        }
+
+    async def _send_stream_message(self, stream_name: str, payload: Any):
+        stream_state = self._should_send_stream(stream_name, payload)
+        if not stream_state['should_send']:
+            return False
+
+        await self.send(
+            {
+                'success': True,
+                'server_id': self.server_id,
+                'type': stream_name,
+                'data': stream_state['normalized_payload'],
+                'meta': {
+                    'sequence': stream_state['sequence'],
+                    'sent_at': stream_state['sent_at'],
+                    'payload_bytes': stream_state['payload_bytes'],
+                    'skipped_duplicates': stream_state['skipped_duplicates'],
+                },
+            }
+        )
+        return True
 
     async def async_frontend_message(self):
-        while self.sending_frontend_message:
+        while self._stream_is_active(self.sending_frontend_message):
             frontend_messages = FrontendPushMessages()
             frontend_message_items = frontend_messages.read_all_items()
-            # Send message to client
-            await self.send(
-                {
-                    'success':   True,
-                    'server_id': self.server_id,
-                    'type':      'frontend_message',
-                    'data':      frontend_message_items,
-                }
-            )
+            await self._send_stream_message('frontend_message', frontend_message_items)
 
-            # Sleep for X seconds
-            await gen.sleep(.2)
+            await gen.sleep(self.STREAM_POLL_INTERVALS['frontend_message'])
 
     async def async_system_logs(self):
-        while self.sending_system_logs:
+        while self._stream_is_active(self.sending_system_logs):
             system_logs = self.config.read_system_logs(lines=1000)
 
-            # Send message to client
-            await self.send(
+            await self._send_stream_message(
+                'system_logs',
                 {
-                    'success':   True,
-                    'server_id': self.server_id,
-                    'type':      'system_logs',
-                    'data':      {
-                        "logs_path":   self.config.get_log_path(),
-                        'system_logs': system_logs,
-                    },
-                }
+                    "logs_path": self.config.get_log_path(),
+                    'system_logs': system_logs,
+                },
             )
 
-            # Sleep for X seconds
-            await gen.sleep(1)
+            await gen.sleep(self.STREAM_POLL_INTERVALS['system_logs'])
 
     async def async_workers_info(self):
-        while self.sending_worker_info:
+        while self._stream_is_active(self.sending_worker_info):
             workers_info = self.foreman.get_all_worker_status()
-
-            # Send message to client
-            await self.send(
-                {
-                    'success':   True,
-                    'server_id': self.server_id,
-                    'type':      'workers_info',
-                    'data':      workers_info,
-                }
-            )
-
-            # Sleep for X seconds
-            await gen.sleep(.2)
+            await self._send_stream_message('workers_info', workers_info)
+            await gen.sleep(self.STREAM_POLL_INTERVALS['workers_info'])
 
     async def async_pending_tasks_info(self):
-        while self.sending_pending_tasks_info:
+        while self._stream_is_active(self.sending_pending_tasks_info):
             results = []
             params = {
                 'start':        '0',
@@ -407,23 +481,17 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     }
                 )
 
-            # Send message to client
-            await self.send(
+            await self._send_stream_message(
+                'pending_tasks',
                 {
-                    'success':   True,
-                    'server_id': self.server_id,
-                    'type':      'pending_tasks',
-                    'data':      {
-                        'results': results
-                    },
-                }
+                    'results': results
+                },
             )
 
-            # Sleep for X seconds
-            await gen.sleep(3)
+            await gen.sleep(self.STREAM_POLL_INTERVALS['pending_tasks'])
 
     async def async_completed_tasks_info(self):
-        while self.sending_completed_tasks_info:
+        while self._stream_is_active(self.sending_completed_tasks_info):
             results = []
             params = {
                 'start':        '0',
@@ -454,20 +522,14 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     }
                 )
 
-            # Send message to client
-            await self.send(
+            await self._send_stream_message(
+                'completed_tasks',
                 {
-                    'success':   True,
-                    'server_id': self.server_id,
-                    'type':      'completed_tasks',
-                    'data':      {
-                        'results': results
-                    },
-                }
+                    'results': results
+                },
             )
 
-            # Sleep for X seconds
-            await gen.sleep(3)
+            await gen.sleep(self.STREAM_POLL_INTERVALS['completed_tasks'])
 
     def _get_gpu_utilization(self):
         gpus = []
@@ -496,25 +558,20 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         return gpus
 
     async def async_system_status(self):
-        while self.sending_system_status:
+        while self._stream_is_active(self.sending_system_status):
             mem = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
 
-            await self.send(
+            await self._send_stream_message(
+                'system_status',
                 {
-                    'success':   True,
-                    'server_id': self.server_id,
-                    'type':      'system_status',
-                    'data':      {
-                        'cpu_percent':    psutil.cpu_percent(interval=0),
-                        'memory_percent': mem.percent,
-                        'memory_used_gb': round(mem.used / (1024 ** 3), 1),
-                        'disk_percent':   disk.percent,
-                        'disk_used_gb':   round(disk.used / (1024 ** 3), 1),
-                        'gpus':           self._get_gpu_utilization(),
-                    },
-                }
+                    'cpu_percent':    psutil.cpu_percent(interval=0),
+                    'memory_percent': mem.percent,
+                    'memory_used_gb': round(mem.used / (1024 ** 3), 1),
+                    'disk_percent':   disk.percent,
+                    'disk_used_gb':   round(disk.used / (1024 ** 3), 1),
+                    'gpus':           self._get_gpu_utilization(),
+                },
             )
 
-            # Sleep for 5 seconds
-            await gen.sleep(5)
+            await gen.sleep(self.STREAM_POLL_INTERVALS['system_status'])

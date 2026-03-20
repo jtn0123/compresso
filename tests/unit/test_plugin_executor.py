@@ -8,7 +8,6 @@
 """
 
 import os
-import sys
 import pytest
 from unittest.mock import patch, MagicMock, mock_open
 
@@ -137,8 +136,8 @@ class TestExecutePluginRunner:
 
         with patch.object(executor, '_PluginExecutor__load_plugin_module', return_value=mock_module), \
              patch.object(executor, 'get_plugin_type_meta', return_value=mock_type_meta), \
-             patch('compresso.libs.unplugins.executor.TaskDataStore') as mock_tds, \
-             patch('compresso.libs.unplugins.executor.CompressoFileMetadata') as mock_meta:
+             patch('compresso.libs.unplugins.executor.TaskDataStore'), \
+             patch('compresso.libs.unplugins.executor.CompressoFileMetadata'):
             data = {'path': '/test/file.mkv'}
             result = executor.execute_plugin_runner(data, 'test_plugin', 'worker.process')
             assert result is True
@@ -173,8 +172,8 @@ class TestExecutePluginRunner:
 
         with patch.object(executor, '_PluginExecutor__load_plugin_module', return_value=mock_module), \
              patch.object(executor, 'get_plugin_type_meta', return_value=mock_type_meta), \
-             patch('compresso.libs.unplugins.executor.TaskDataStore') as mock_tds, \
-             patch('compresso.libs.unplugins.executor.CompressoFileMetadata') as mock_meta:
+             patch('compresso.libs.unplugins.executor.TaskDataStore'), \
+             patch('compresso.libs.unplugins.executor.CompressoFileMetadata'):
             data = {'path': '/test/file.mkv'}
             result = executor.execute_plugin_runner(data, 'test_plugin', 'worker.process')
             assert result is False

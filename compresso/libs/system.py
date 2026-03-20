@@ -31,16 +31,17 @@
 """
 import glob
 import subprocess
+from typing import Any, Dict
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
 
 class System(object, metaclass=SingletonType):
-    devices = {}
-    ffmpeg = {}
-    platform = {}
-    python_version = {}
+    devices: Dict[str, Any] = {}
+    ffmpeg: Dict[str, Any] = {}
+    platform: Dict[str, Any] = {}
+    python_version: str = ""
 
     def __init__(self, *args, **kwargs):
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)

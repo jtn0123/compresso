@@ -8,9 +8,8 @@
 """
 
 import hashlib
-import os
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -29,8 +28,8 @@ def mock_deps():
          patch('compresso.libs.plugins.CompressoLogging') as mock_logging, \
          patch('compresso.libs.plugins.common') as mock_common, \
          patch('compresso.libs.plugins.Session') as mock_session, \
-         patch('compresso.libs.plugins.FrontendPushMessages') as mock_fpm, \
-         patch('compresso.libs.plugins.Library') as mock_lib, \
+         patch('compresso.libs.plugins.FrontendPushMessages'), \
+         patch('compresso.libs.plugins.Library'), \
          patch('compresso.libs.plugins.PluginRepos') as mock_repos, \
          patch('compresso.libs.plugins.Plugins') as mock_plugins, \
          patch('compresso.libs.plugins.EnabledPlugins') as mock_ep, \
@@ -207,7 +206,7 @@ class TestFetchRemoteRepoData:
         ]
         mock_deps['session'].return_value = mock_session_inst
 
-        result = handler.fetch_remote_repo_data('default')
+        handler.fetch_remote_repo_data('default')
         mock_session_inst.register_compresso.assert_called_once()
 
 

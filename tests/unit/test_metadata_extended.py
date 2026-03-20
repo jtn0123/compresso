@@ -15,12 +15,11 @@ import os
 import threading
 import time
 from collections import OrderedDict
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from compresso.libs.singleton import SingletonType
-from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.libs.unmodels.filemetadata import FileMetadata
 from compresso.libs.unmodels.filemetadatapaths import FileMetadataPaths
@@ -39,7 +38,6 @@ def metadata_db(in_memory_db):
     """Extend the shared in_memory_db fixture with metadata-specific tables."""
     in_memory_db.create_tables([FileMetadata, FileMetadataPaths, TaskMetadata])
     # Force sync: wait for the queue-based writer to process table creation
-    import time
     time.sleep(0.1)
     in_memory_db.execute_sql('SELECT 1')
     yield in_memory_db

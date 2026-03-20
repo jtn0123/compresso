@@ -9,10 +9,8 @@
     UIServer configuration, route setup, and server lifecycle.
 """
 
-import os
 import queue
-import threading
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -76,8 +74,8 @@ def _make_uiserver(developer=False):
     """Create a UIServer with mocked dependencies."""
     with patch('compresso.libs.uiserver.config.Config') as mock_config, \
          patch('compresso.libs.uiserver.CompressoLogging') as mock_log, \
-         patch('compresso.libs.uiserver.CompressoDataQueues') as mock_udq, \
-         patch('compresso.libs.uiserver.CompressoRunningThreads') as mock_urt, \
+         patch('compresso.libs.uiserver.CompressoDataQueues'), \
+         patch('compresso.libs.uiserver.CompressoRunningThreads'), \
          patch('compresso.libs.uiserver.common'):
         mock_settings = MagicMock()
         mock_settings.get_log_path.return_value = ''
@@ -224,7 +222,7 @@ class TestUIServerMakeWebApp:
              patch.dict('sys.modules', {'compresso.webserver.api_v2.schema.swagger': MagicMock(generate_swagger_file=mock_gen)}):
             mock_app = MagicMock()
             mock_app_cls.return_value = mock_app
-            result = server.make_web_app()
+            server.make_web_app()
             mock_gen.assert_called_once()
 
 
