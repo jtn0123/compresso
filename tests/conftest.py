@@ -53,6 +53,14 @@ from compresso.libs.unmodels.workerschedules import WorkerSchedules
 LibraryTags = Libraries.tags.get_through_model()
 
 
+def requires_binary(binary_name):
+    """Return a skip marker requiring an executable to be available on PATH."""
+    return pytest.mark.skipif(
+        shutil.which(binary_name) is None,
+        reason="Requires '{}' executable in PATH.".format(binary_name),
+    )
+
+
 def _is_compresso_thread(thread):
     module = getattr(thread.__class__, "__module__", "")
     return module.startswith("compresso.")

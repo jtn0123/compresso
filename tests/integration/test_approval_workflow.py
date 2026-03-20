@@ -18,6 +18,8 @@ import tempfile
 import pytest
 from unittest.mock import patch, MagicMock
 
+from tests.conftest import requires_binary
+
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), '..', 'fixtures', 'sample_30s.mp4')
 
 skip_if_no_fixture = pytest.mark.skipif(
@@ -25,10 +27,7 @@ skip_if_no_fixture = pytest.mark.skipif(
     reason="Test fixture tests/fixtures/sample_30s.mp4 not found"
 )
 
-skip_if_no_ffprobe = pytest.mark.skipif(
-    shutil.which('ffprobe') is None,
-    reason="ffprobe executable is required for metadata integration tests"
-)
+skip_if_no_ffprobe = requires_binary('ffprobe')
 
 
 def _make_postprocessor():
