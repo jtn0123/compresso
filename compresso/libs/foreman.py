@@ -159,6 +159,7 @@ class Foreman(threading.Thread):
         #   and having the workers pickup a job mid configuration.
         if self.configuration_changed():
             # Generate a frontend message and falsify validation
+            self.logger.warning("Plugin configuration changed — stopping all workers until config stabilises")
             frontend_messages.add(
                 {
                     'id':      'pluginSettingsChangeWorkersStopped',

@@ -854,6 +854,10 @@ class PluginsHandler(object, metaclass=SingletonType):
                     if self.version in plugin_info.get('compatibility', []):
                         continue
 
+                self._log(
+                    "Incompatible plugin detected: {} ({})".format(record.get('name'), record.get('plugin_id')),
+                    level="warning"
+                )
                 incompatible_list.append(
                     {
                         'plugin_id': record.get('plugin_id'),
