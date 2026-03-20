@@ -82,6 +82,28 @@ class Migrations(object):
         """
         self.router.run()
 
+    def __add_column_to_model(self, model, field_name, field):
+        """
+        Add a field/column for a model using whichever migrator API is available.
+
+        peewee-migrate versions have exposed both `add_fields` and `add_columns`
+        across releases. We prefer `add_fields` when present and fall back to
+        `add_columns` for compatibility with older variants.
+        """
+        add_fields = getattr(self.migrator, 'add_fields', None)
+        if callable(add_fields):
+            add_fields(model, **{field_name: field})
+            return
+
+        add_columns = getattr(self.migrator, 'add_columns', None)
+        if callable(add_columns):
+            add_columns(model, **{field_name: field})
+            return
+
+        raise AttributeError(
+            "Migrator does not support adding columns (expected add_fields or add_columns)."
+        )
+
     def update_schema(self):
         """
         Bring the database schema up-to-date at application startup.
@@ -169,10 +191,9 @@ class Migrations(object):
                             self.logger.info("Adding missing column")
                             try:
                                 with self.database.transaction():
-                                    self.migrator.add_columns(model, **{field.name: field})
+                                    self.__add_column_to_model(model, field.name, field)
                                     self.migrator()
                             except Exception:
-                                self.database.rollback()
                                 self.logger.exception("Update failed")
                                 raise
 

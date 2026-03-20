@@ -84,9 +84,7 @@ class TestCompressoSpecPlugin:
 class TestFindAllHandlers:
 
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
-    @patch('compresso.webserver.api_v2.schema.swagger.importlib')
-    @patch('compresso.webserver.api_v2.schema.swagger.list_all_handlers')
-    def test_returns_handler_route_tuples(self, mock_list_handlers, mock_importlib):
+    def test_returns_handler_route_tuples(self):
         from compresso.webserver.api_v2.schema.swagger import find_all_handlers
 
         mock_handler = MagicMock()
@@ -94,13 +92,21 @@ class TestFindAllHandlers:
             {'path_pattern': r'/test/route', 'supported_methods': ['GET'], 'call_method': 'get_test'},
             {'path_pattern': r'/test/other', 'supported_methods': ['POST'], 'call_method': 'post_test'},
         ]
-        mock_list_handlers.return_value = ['MockHandler']
 
         mock_module = MagicMock()
         setattr(mock_module, 'MockHandler', mock_handler)
+        mock_importlib = MagicMock()
         mock_importlib.import_module.return_value = mock_module
 
-        result = find_all_handlers()
+        with patch.dict(
+            find_all_handlers.__globals__,
+            {
+                'list_all_handlers': MagicMock(return_value=['MockHandler']),
+                'importlib': mock_importlib,
+            },
+        ):
+            result = find_all_handlers()
+
         assert len(result) == 2
         assert result[0][0] == r'/test/route'
         assert result[1][0] == r'/test/other'
