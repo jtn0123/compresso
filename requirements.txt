@@ -1,21 +1,21 @@
 # Required
-schedule==1.2.2
-tornado==6.5.5
+schedule>=1.2.2
+tornado>=6.5.5
 marshmallow>=4.2.2
 peewee>=4.0.2
-peewee_migrate==1.15.0
-psutil==7.2.2
-requests==2.32.5
-requests_toolbelt==1.0.0
-py-cpuinfo==9.0.0
-JSON-log-formatter==1.1.1
-xxhash==3.6.0
+peewee_migrate>=1.15.0
+psutil>=7.2.2
+requests>=2.32.5
+requests_toolbelt>=1.0.0
+py-cpuinfo>=9.0.0
+JSON-log-formatter>=1.1.1
+xxhash>=3.6.0
 
 # Optional requirements
-watchdog==6.0.0
+watchdog>=6.0.0
 
 # Required for CLI only
-inquirer==3.4.1
+inquirer>=3.4.1
 
 # Required for hosting the API docs
-swagger-ui-py==25.7.1
+swagger-ui-py>=25.7.1

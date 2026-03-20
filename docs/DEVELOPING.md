@@ -54,7 +54,14 @@ source ./venv/bin/activate
 Then install the dependencies into that venv
 ```
 python3 -m pip install --upgrade pip
-python3 -m pip install --upgrade -r ./requirements.txt -r ./requirements-dev.txt
+python3 -m pip install --upgrade -r ./requirements.txt -c ./constraints.txt
+python3 -m pip install --upgrade -r ./requirements-dev.txt -c ./constraints-dev.txt
+```
+
+
+To intentionally refresh lock files after dependency changes:
+```
+./scripts/update_constraints.sh
 ```
 
 Then install the module:

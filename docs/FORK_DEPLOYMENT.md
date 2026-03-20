@@ -10,7 +10,8 @@ The vendored frontend is a build input, not a distributed runtime payload. Relea
 
 ```bash
 rm -rf build dist
-python3 -m pip install -r requirements.txt -r requirements-dev.txt
+python3 -m pip install -r requirements.txt -c constraints.txt
+python3 -m pip install -r requirements-dev.txt -c constraints-dev.txt
 python3 -m build --no-isolation --skip-dependency-check --wheel
 python3 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
 compresso
@@ -30,7 +31,8 @@ cd ../../..
 
 ```bash
 rm -rf build dist
-python3 -m pip install -r requirements.txt -r requirements-dev.txt
+python3 -m pip install -r requirements.txt -c constraints.txt
+python3 -m pip install -r requirements-dev.txt -c constraints-dev.txt
 python3 -m build --no-isolation --skip-dependency-check --wheel
 python3 -m build --no-isolation --skip-dependency-check --sdist
 docker build -f ./docker/Dockerfile -t josh5/compresso:staging .

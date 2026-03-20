@@ -50,7 +50,7 @@ Then open http://localhost:8888 in your browser.
 ## Dependencies
 
  - Python 3.x ([Install](https://www.python.org/downloads/))
- - To install requirements run 'python3 -m pip install -r requirements.txt' from the project root
+ - Install runtime dependencies with `python3 -m pip install -r requirements.txt -c constraints.txt` from the project root
 
 Since Compresso can be used for running any commands, you will need to ensure that the required dependencies for those commands are also installed on your system.
 
@@ -70,7 +70,8 @@ To run from source:
 1) Install Python 3 and Node.js 24.x.
 2) Install Python build dependencies:
     ```
-    python3 -m pip install -r requirements.txt -r requirements-dev.txt
+    python3 -m pip install -r requirements.txt -c constraints.txt
+    python3 -m pip install -r requirements-dev.txt -c constraints-dev.txt
     ```
 3) Optionally run the frontend validation steps used in CI:
     ```bash
