@@ -148,6 +148,7 @@ RUN \
         && apt-get update \
         && apt-get install -y \
             nodejs \
+        && npm update -g minimatch tar \
     && \
     echo "**** Install exiftool for $(uname -m) ****" \
         && apt-get install -y \
