@@ -2,7 +2,7 @@ import { Notify } from 'quasar'
 import { ref } from 'vue'
 import $compresso from './compressoGlobals'
 
-function escapeHtml(str) {
+export function escapeHtml(str) {
   if (!str) return ''
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#039;')
