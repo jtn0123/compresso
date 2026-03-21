@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/jtn0123/compresso/compare/v1.2.0...v1.2.1) (2026-03-21)
+
+
+### Performance Improvements
+
+* CI speedup with test sharding, native multi-arch Docker, and base image ([3734b30](https://github.com/jtn0123/compresso/commit/3734b309589efb3ea542fc7840a14212541da622))
+
 # [1.2.0](https://github.com/jtn0123/compresso/compare/v1.1.0...v1.2.0) (2026-03-19)
 
 
