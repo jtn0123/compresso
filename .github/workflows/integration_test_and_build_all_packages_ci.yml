@@ -322,7 +322,11 @@ jobs:
           echo "docker_build_date:${BUILD_DATE:?}" 
           echo "docker_build_date=${BUILD_DATE:?}" >> $GITHUB_OUTPUT
 
-          echo "docker_platforms=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
+          if [[ ${GITHUB_REF} == refs/heads/master || ${GITHUB_REF} == refs/tags/* ]]; then
+            echo "docker_platforms=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
+          else
+            echo "docker_platforms=linux/amd64" >> $GITHUB_OUTPUT
+          fi
 
       # ---
       - name: Log into GHCR registry

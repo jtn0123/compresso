@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:25.04
 LABEL maintainer="Josh.5 <jsunnex@gmail.com>"
 
 # Env variables
@@ -200,21 +200,19 @@ RUN \
         echo "**** Update sources ****" \
             && apt-get update \
         && \
-        echo "**** Install Python 3.13 from deadsnakes PPA ****" \
+        echo "**** Install python ****" \
             && apt-get install -y --no-install-recommends \
                 grc \
                 gcc \
-                software-properties-common \
+                python3 \
+                python3-dev \
+                python3-pip \
+                python3-venv \
+                python3-setuptools \
                 unzip \
-            && add-apt-repository -y ppa:deadsnakes/ppa \
-            && apt-get update \
-            && apt-get install -y --no-install-recommends \
-                python3.13 \
-                python3.13-dev \
-                python3.13-venv \
         && \
         echo "**** Create virtual environment ****" \
-            && python3.13 -m venv /opt/venv \
+            && python3 -m venv /opt/venv \
         && \
         echo "**** Install pip packages into virtualenv ****" \
             && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt \

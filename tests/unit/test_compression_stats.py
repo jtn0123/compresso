@@ -226,8 +226,11 @@ class TestCompressionStats(object):
     def test_get_compression_stats_for_nonexistent_task_returns_none(self):
         """Stats for a task that does not exist should return None."""
         from compresso.libs.history import History
-        history = History()
-        result = history.get_compression_stats_for_task(999999)
+        from compresso.libs.unmodels.compressionstats import CompressionStats
+        from unittest.mock import patch
+        with patch.object(CompressionStats, 'get', side_effect=CompressionStats.DoesNotExist):
+            history = History()
+            result = history.get_compression_stats_for_task(999999)
         assert result is None
 
     # ------------------------------------------------------------------
