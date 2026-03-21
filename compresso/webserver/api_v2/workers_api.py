@@ -143,6 +143,8 @@ class ApiWorkersHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -195,6 +197,8 @@ class ApiWorkersHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -256,6 +260,8 @@ class ApiWorkersHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -308,6 +314,8 @@ class ApiWorkersHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -369,6 +377,8 @@ class ApiWorkersHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -421,6 +431,8 @@ class ApiWorkersHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -476,6 +488,8 @@ class ApiWorkersHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))

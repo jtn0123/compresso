@@ -914,5 +914,51 @@ class TestUpdateAllRemoteInstallationLinks:
         assert result[0]['available'] is False
 
 
+# ==================================================================
+# Links.remote_api_post_file — file handle leak fix
+# ==================================================================
+
+@pytest.mark.unittest
+class TestRemoteApiPostFileHandleLeak:
+
+    def test_file_handle_closed_on_success(self, tmp_path):
+        links = _create_links()
+        test_file = tmp_path / 'test.mkv'
+        test_file.write_bytes(b'fake video data')
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'id': 1}
+        mock_fh = MagicMock()
+
+        with patch('compresso.libs.installation_link.RequestHandler') as MockRH, \
+             patch('compresso.libs.installation_link.MultipartEncoder'), \
+             patch('builtins.open', return_value=mock_fh):
+            MockRH.return_value.post.return_value = mock_response
+            links.remote_api_post_file(
+                {'address': 'http://host:8888', 'auth': '', 'username': '', 'password': ''},
+                str(test_file),
+                '/api/upload'
+            )
+            mock_fh.close.assert_called_once()
+
+    def test_file_handle_closed_on_post_exception(self, tmp_path):
+        links = _create_links()
+        test_file = tmp_path / 'test.mkv'
+        test_file.write_bytes(b'fake video data')
+        mock_fh = MagicMock()
+
+        with patch('compresso.libs.installation_link.RequestHandler') as MockRH, \
+             patch('compresso.libs.installation_link.MultipartEncoder'), \
+             patch('builtins.open', return_value=mock_fh):
+            MockRH.return_value.post.side_effect = Exception("connection error")
+            with pytest.raises(Exception, match="connection error"):
+                links.remote_api_post_file(
+                    {'address': 'http://host:8888', 'auth': '', 'username': '', 'password': ''},
+                    str(test_file),
+                    '/api/upload'
+                )
+            mock_fh.close.assert_called_once()
+
+
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

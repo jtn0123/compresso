@@ -457,6 +457,38 @@ class TestInstallNpmModules:
 
 
 @pytest.mark.unittest
+class TestSubprocessTimeouts:
+
+    def test_pip_install_handles_timeout(self, tmp_path):
+        import subprocess
+        from compresso.libs.plugins import PluginsHandler
+        req_file = tmp_path / 'requirements.txt'
+        req_file.write_text('some-package')
+        with patch('subprocess.call', side_effect=subprocess.TimeoutExpired('pip', 300)), \
+             patch('shutil.rmtree'), patch('os.makedirs'):
+            # Should not raise — timeout is caught and logged
+            PluginsHandler.install_plugin_requirements(str(tmp_path))
+
+    def test_npm_install_handles_timeout(self, tmp_path):
+        import subprocess
+        from compresso.libs.plugins import PluginsHandler
+        pkg = tmp_path / 'package.json'
+        pkg.write_text('{"name": "test"}')
+        with patch('subprocess.call', side_effect=subprocess.TimeoutExpired('npm', 300)):
+            # Should not raise — timeout is caught and logged
+            PluginsHandler.install_npm_modules(str(tmp_path))
+
+    def test_pip_install_passes_timeout_param(self, tmp_path):
+        from compresso.libs.plugins import PluginsHandler
+        req_file = tmp_path / 'requirements.txt'
+        req_file.write_text('some-package')
+        with patch('subprocess.call') as mock_call, \
+             patch('shutil.rmtree'), patch('os.makedirs'):
+            PluginsHandler.install_plugin_requirements(str(tmp_path))
+        assert mock_call.call_args.kwargs.get('timeout') == 300
+
+
+@pytest.mark.unittest
 class TestPluginVersion:
 
     def test_plugin_handler_version_is_2(self):

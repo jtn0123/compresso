@@ -130,7 +130,7 @@ class ApiUploadHandler(BaseApiHandler):
                                 'type':    'status',
                                 'code':    'receivingRemoteFile',
                                 'message': self.meta['filename'],
-                                'timeout': 0
+                                'timeout': 10000
                             }
                         )
 
@@ -249,6 +249,8 @@ class ApiUploadHandler(BaseApiHandler):
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
             if self.frontend_messages:
                 self.frontend_messages.remove_item('receivingRemoteFile')
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             if self.frontend_messages:
@@ -330,6 +332,8 @@ class ApiUploadHandler(BaseApiHandler):
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
             if self.frontend_messages:
                 self.frontend_messages.remove_item('receivingRemoteFile')
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             if self.frontend_messages:

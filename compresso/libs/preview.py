@@ -489,8 +489,8 @@ class PreviewManager:
                         if (now - mtime) > self.CLEANUP_AGE:
                             shutil.rmtree(entry_path, ignore_errors=True)
                             self.logger.info("Preview: Cleaned up orphaned directory %s", entry)
-                    except OSError:
-                        pass
+                    except OSError as e:
+                        self.logger.debug("Failed to clean up preview directory %s: %s", entry, e)
 
         if expired_ids:
             self.logger.info("Preview: Cleaned up %d expired preview jobs", len(expired_ids))

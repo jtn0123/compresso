@@ -45,9 +45,7 @@
           <ThemeSwitch/>
         </div>
 
-        <!-- TODO: Enable notifications for mobile -->
         <div
-          v-if="!$q.platform.is.mobile"
           class="q-gutter-sm row items-center no-wrap">
           <q-btn
             dense
@@ -75,12 +73,10 @@
       <DrawerMainNav/>
     </q-drawer>
 
-    <!-- TODO: Enable notifications for mobile -->
     <q-drawer
-      v-if="!$q.platform.is.mobile"
       v-model="rightNotificationsDrawerOpen"
       side="right"
-      :width="650"
+      :width="$q.screen.lt.md ? $q.screen.width : 650"
       :overlay="$route.meta.showMainNavDrawer"
       bordered
       :behavior="$q.screen.lt.md ? 'mobile' : 'desktop'">

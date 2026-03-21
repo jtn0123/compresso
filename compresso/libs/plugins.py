@@ -32,6 +32,7 @@
 import base64
 import hashlib
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -519,19 +520,29 @@ class PluginsHandler(object, metaclass=SingletonType):
             shutil.rmtree(install_target)
         # Recreate the site-packages directory
         os.makedirs(install_target, exist_ok=True)
-        subprocess.call([
-            sys.executable, '-m', 'pip', 'install', '--upgrade',
-            '-r', requirements_file,
-            '--target={}'.format(install_target)
-        ])
+        try:
+            subprocess.call([
+                sys.executable, '-m', 'pip', 'install', '--upgrade',
+                '-r', requirements_file,
+                '--target={}'.format(install_target)
+            ], timeout=300)
+        except subprocess.TimeoutExpired:
+            logging.getLogger("Compresso.PluginsHandler").error(
+                "Timed out installing pip requirements for plugin at %s", requirements_file
+            )
 
     @staticmethod
     def install_npm_modules(plugin_path):
         package_file = os.path.join(plugin_path, 'package.json')
         if not os.path.exists(package_file):
             return
-        subprocess.call(['npm', 'install'], cwd=plugin_path)
-        subprocess.call(['npm', 'run', 'build'], cwd=plugin_path)
+        try:
+            subprocess.call(['npm', 'install'], cwd=plugin_path, timeout=300)
+            subprocess.call(['npm', 'run', 'build'], cwd=plugin_path, timeout=300)
+        except subprocess.TimeoutExpired:
+            logging.getLogger("Compresso.PluginsHandler").error(
+                "Timed out running npm install/build for plugin at %s", plugin_path
+            )
 
     @staticmethod
     def write_plugin_data_to_db(plugin, plugin_directory):
@@ -745,17 +756,6 @@ class PluginsHandler(object, metaclass=SingletonType):
         :return:
         """
         pass
-        # Save the plugin flow
-        flow_dict = {
-            'plugin_id':   plugin_info.id,
-            'library_id':  library_id,
-            'plugin_name': plugin_info.plugin_id,
-            'plugin_type': plugin_type,
-            'position':    priority,
-        }
-        plugin_flow = LibraryPluginFlow.create(**flow_dict)
-
-        return plugin_flow
 
     def get_enabled_plugin_modules_by_type(self, plugin_type, library_id=None):
         """

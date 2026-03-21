@@ -223,6 +223,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -272,14 +274,9 @@ class ApiPluginsHandler(BaseApiHandler):
                         schema:
                             InternalErrorSchema
         """
-        try:
-            raise Exception('Endpoint is deprecated. Plugins are now enabled by assigning them to a library')
-        except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
-            return
-        except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+        self.set_status(410, reason='Endpoint is deprecated. Plugins are now enabled by assigning them to a library')
+        self.write_error()
+        return
 
     async def disable_plugins(self):
         """
@@ -294,45 +291,16 @@ class ApiPluginsHandler(BaseApiHandler):
                     schema:
                         RequestTableUpdateByIdList
         responses:
-            200:
-                description: 'Successful request; Returns success status'
-                content:
-                    application/json:
-                        schema:
-                            BaseSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
+            410:
+                description: 'Endpoint is deprecated'
                 content:
                     application/json:
                         schema:
                             InternalErrorSchema
         """
-        try:
-            raise Exception('Endpoint is deprecated. Plugins are now enabled by assigning them to a library')
-        except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
-            return
-        except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+        self.set_status(410, reason='Endpoint is deprecated. Plugins are now enabled by assigning them to a library')
+        self.write_error()
+        return
 
     async def update_plugins(self):
         """
@@ -390,6 +358,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -451,6 +421,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -530,6 +502,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -595,6 +569,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -659,6 +635,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -714,6 +692,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -775,6 +755,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -829,6 +811,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -893,6 +877,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -956,6 +942,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -1017,6 +1005,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -1072,6 +1062,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -1124,6 +1116,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -1188,6 +1182,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -1257,6 +1253,8 @@ class ApiPluginsHandler(BaseApiHandler):
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))

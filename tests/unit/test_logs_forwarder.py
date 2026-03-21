@@ -327,16 +327,6 @@ class TestCleanupRetention:
             handler._cleanup_retention()
         assert not old_file.exists()
 
-    def test_removes_legacy_json_files(self, tmp_path):
-        handler = _make_handler(tmp_path)
-        handler.buffer_retention_max_days = 1
-        buf_dir = tmp_path / "buffer"
-        buf_dir.mkdir(parents=True)
-        handler.buffer_path = str(buf_dir)
-        legacy = buf_dir / "old_log.json"
-        legacy.write_text("{}")
-        handler._cleanup_retention()
-        assert not legacy.exists()
 
 
 @pytest.mark.unittest

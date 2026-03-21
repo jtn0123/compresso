@@ -252,8 +252,12 @@ class Links(object, metaclass=SingletonType):
         #           files = {"fileName": (os.path.basename(path), f, 'text/plain')}
         #           res = requests.post(url, files=files)
         #   ```
-        m = MultipartEncoder(fields={'fileName': (os.path.basename(path), open(path, 'rb'), 'text/plain')})
-        res = request_handler.post(url, data=m, headers={'Content-Type': m.content_type})
+        fh = open(path, 'rb')
+        try:
+            m = MultipartEncoder(fields={'fileName': (os.path.basename(path), fh, 'text/plain')})
+            res = request_handler.post(url, data=m, headers={'Content-Type': m.content_type})
+        finally:
+            fh.close()
         if res.status_code == 200:
             return res.json()
         elif res.status_code in [400, 404, 405, 500]:

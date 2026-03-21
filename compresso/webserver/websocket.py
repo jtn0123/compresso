@@ -553,8 +553,8 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                             'memory_total_mb': int(float(parts[3])),
                             'temperature_c': int(float(parts[4])),
                         })
-        except Exception:
-            pass
+        except Exception as e:
+            tornado.log.app_log.warning("GPU monitoring unavailable: %s", e)
         return gpus
 
     async def async_system_status(self):
