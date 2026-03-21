@@ -15,8 +15,6 @@
 #
 
 
-version: '2.4'
-
 services:
   compresso:
     container_name: compresso

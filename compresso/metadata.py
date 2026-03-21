@@ -30,8 +30,8 @@
 
 """
 import json
+import logging
 import os
-import sys
 
 
 def read_version_string(version_type='long'):
@@ -47,7 +47,7 @@ def read_version_string(version_type='long'):
             data = json.load(json_file)
         return data[version_type]
     except Exception as e:
-        print("WARNING: Failed to read version file: {}".format(e), file=sys.stderr)
+        logging.getLogger(__name__).warning("Failed to read version file: %s", e)
         return 'UNKNOWN.VERSION'
 
 

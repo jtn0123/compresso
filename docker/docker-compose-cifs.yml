@@ -12,10 +12,9 @@
 #     <PATH_TO_LIBRARY>        -  Path in remote machine to be mounted as your library 
 #     <USERNAME>               -  Remote mount username
 #     <PASSWORD>               -  Remote mount password
+#     <TZ>                     -  Your time zone, eg - America/New_York
 #
 
-
-version: '1'
 
 services:
   compresso:
@@ -26,6 +25,7 @@ services:
     environment:
       - PUID=<PUID>
       - PGID=<PGID>
+      - TZ=<TZ>
     volumes:
       - <PATH_TO_CONFIG>:/config
       - cifs_mount:/library

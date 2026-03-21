@@ -307,6 +307,40 @@ class TestLogBufferRetention:
 
 
 @pytest.mark.unittest
+class TestReadSystemLogs:
+
+    def test_reads_log_file_with_context_manager(self, tmp_path):
+        c = _make_config(tmp_path)
+        log_dir = tmp_path / '.compresso' / 'logs'
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = log_dir / 'compresso.log'
+        log_file.write_text("line1\nline2\nline3\nline4\nline5\n")
+        c.log_path = str(log_dir)
+        result = c.read_system_logs()
+        assert result == ['line1', 'line2', 'line3', 'line4', 'line5']
+
+    def test_reads_limited_lines(self, tmp_path):
+        c = _make_config(tmp_path)
+        log_dir = tmp_path / '.compresso' / 'logs'
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = log_dir / 'compresso.log'
+        log_file.write_text("line1\nline2\nline3\nline4\nline5\n")
+        c.log_path = str(log_dir)
+        result = c.read_system_logs(lines=2)
+        assert result == ['line4', 'line5']
+
+    def test_reads_empty_log_file(self, tmp_path):
+        c = _make_config(tmp_path)
+        log_dir = tmp_path / '.compresso' / 'logs'
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = log_dir / 'compresso.log'
+        log_file.write_text("")
+        c.log_path = str(log_dir)
+        result = c.read_system_logs()
+        assert result == []
+
+
+@pytest.mark.unittest
 class TestConstructorArgs:
 
     def test_port_override(self, tmp_path):

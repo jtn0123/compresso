@@ -219,14 +219,38 @@ export default {
       // Close the websocket
       closeCompressoWebsocket();
     })
+
+  },
+  beforeRouteLeave(to, from, next) {
+    if (this.hasUnsavedChanges) {
+      this.$q.dialog({
+        title: this.$t('headers.confirm'),
+        message: this.$t('components.settings.common.unsavedChanges'),
+        cancel: this.$t('navigation.cancel'),
+        ok: this.$t('navigation.yes'),
+        persistent: true
+      }).onOk(() => {
+        next()
+      }).onCancel(() => {
+        next(false)
+      })
+    } else {
+      next()
+    }
   },
   data() {
     return {
       workerGroups: ref(null),
       cachePath: ref(null),
+      originalCachePath: ref(null),
       activeWorkerGroupId: ref(0),
       selectDirectoryInitialPath: ref(''),
       selectDirectoryListType: ref('directories'),
+    }
+  },
+  computed: {
+    hasUnsavedChanges() {
+      return this.originalCachePath !== null && this.cachePath !== this.originalCachePath
     }
   },
   methods: {
@@ -252,6 +276,7 @@ export default {
       }).then((response) => {
         // Set the cache path value
         this.cachePath = response.data.settings.cache_path
+        this.originalCachePath = response.data.settings.cache_path
       }).catch(() => {
         this.$q.notify({
           color: 'negative',
@@ -350,6 +375,7 @@ export default {
         data: data
       }).then((response) => {
         // Save success, show feedback
+        this.originalCachePath = this.cachePath
         this.fetchSettings();
         this.$q.notify({
           color: 'positive',

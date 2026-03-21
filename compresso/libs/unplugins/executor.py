@@ -331,7 +331,7 @@ class PluginExecutor(object):
             if kwargs and not has_required_positional_after_data():
                 runner(data, **kwargs)
             else:
-                # Backward compatibility: positional helpers (legacy; will be removed in a future release)
+                # TODO(v2.0): Remove backward compatibility for legacy positional helper args
                 self.logger.warning(
                     "Plugin '%s' runner '%s' is using legacy positional helper args. "
                     "Please update to keyword args (task_data_store, file_metadata).",

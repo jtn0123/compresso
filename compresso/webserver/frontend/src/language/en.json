@@ -349,7 +349,9 @@
         "enableDistributedWorkerCount": "Enable distributed worker count for this link",
         "linkDistributedWorkersStatusLabel": "Distributed workers",
         "workerTarget": "Worker target",
-        "linkExplainer": "Connect multiple Compresso instances to share tasks and distribute processing across machines."
+        "linkExplainer": "Connect multiple Compresso instances to share tasks and distribute processing across machines.",
+        "addressMustStartWithHttp": "Address must start with http:// or https://",
+        "invalidPublicAddress": "Invalid public address. Must start with http:// or https://"
       },
       "support": {
         "logs": "Logs",

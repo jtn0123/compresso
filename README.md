@@ -24,7 +24,7 @@ docker run -d \
   -p 8888:8888 \
   -v /path/to/media:/library \
   -v compresso-config:/config \
-  ghcr.io/jtn0123/compresso:latest
+  jtn0123/compresso:latest
 ```
 
 Then open http://localhost:8888 in your browser.
@@ -113,7 +113,7 @@ Compresso stores its configuration in `~/.compresso/`:
 ## Troubleshooting
 
 **Port already in use**
-If port 8888 is taken, specify a different port: `compresso --port 9999` or set `PORT=9999` in your Docker environment.
+If port 8888 is taken, specify a different port: `compresso --port 9999`. In Docker, set `PORT=9999` in your container environment.
 
 **FFmpeg not found**
 Compresso plugins that use FFmpeg require it to be installed and on the system PATH. Install via your package manager: `apt install ffmpeg` (Debian/Ubuntu), `brew install ffmpeg` (macOS), or include it in your Docker image.

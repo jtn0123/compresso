@@ -49,7 +49,7 @@
               :label="$t('components.settings.link.address')"
               :placeholder="address"
               :rules="[
-                val => validateAddress(val) || 'Address must start with http:// or https://'
+                val => validateAddress(val) || t('components.settings.link.addressMustStartWithHttp')
               ]"
             />
           </div>

@@ -240,7 +240,7 @@ class PluginType(object):
             if kwargs:
                 plugin_runner_function(test_data_copy, **kwargs)
             else:
-                # Backward compatibility: positional helpers (legacy; will be removed in a future release)
+                # TODO(v2.0): Remove backward compatibility for legacy positional helper args
                 self.logger.warning(
                     "Plugin '%s' runner '%s' is using legacy positional helper args. "
                     "Please update to keyword args (task_data_store, file_metadata).",

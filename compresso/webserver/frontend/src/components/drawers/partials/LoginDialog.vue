@@ -136,12 +136,11 @@ function startCountdown(expiresIn) {
           method: 'get',
           url: getCompressoApiUrl('v2', 'session/state')
         }).then((response) => {
-          console.log(response.data.level)
           if (response.data && response.data.level && response.data.level > 0) {
             if (response.data.level !== 9) {
               location.reload();
             } else {
-              console.log("Detected Trial Session. Ignoring.")
+              console.debug("Detected Trial Session. Ignoring.")
             }
           }
         }).catch(() => {

@@ -88,6 +88,7 @@ class ApiFileinfoHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -153,5 +154,6 @@ class ApiFileinfoHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

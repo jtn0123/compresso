@@ -75,8 +75,8 @@ class PluginSettings(object):
     def __get_plugin_settings_file(self, force_library_settings=False):
         plugin_directory = self.get_plugin_directory()
         profile_directory = self.get_profile_directory()
-        # Temp code to migrate settings to userdata
-        # TODO: Remove after initial release
+        # Legacy migration: move settings.json from plugin dir to profile dir
+        # TODO(v2.0): Remove this migration shim
         if not os.path.exists(os.path.join(profile_directory, 'settings.json')):
             if os.path.exists(os.path.join(plugin_directory, 'settings.json')):
                 import shutil

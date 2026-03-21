@@ -12,6 +12,8 @@
 import pytest
 from unittest.mock import patch
 
+import tornado.log
+
 from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.healthcheck_api import ApiHealthcheckHandler
 
@@ -259,3 +261,21 @@ class TestHealthcheckApiReadiness(ApiTestBase):
         data = self.parse_response(resp)
         assert data['success'] is False
         assert data['ready'] is False
+
+
+@pytest.mark.unittest
+class TestHealthcheckApiExceptionLogging(ApiTestBase):
+    """Verify unhandled exceptions in API handlers are logged via app_log.exception."""
+    __test__ = True
+    handler_class = ApiHealthcheckHandler
+
+    @patch(VALIDATE_LIB, return_value=True)
+    @patch('compresso.webserver.helpers.healthcheck.check_single_file')
+    @patch.object(tornado.log.app_log, 'exception')
+    def test_unhandled_exception_is_logged(self, mock_log_exception, mock_check, _mock_validate):
+        mock_check.side_effect = RuntimeError("unexpected failure")
+        resp = self.post_json('/healthcheck/scan', {'file_path': '/test/file.mkv'})
+        assert resp.code == 500
+        mock_log_exception.assert_called_once()
+        log_msg = str(mock_log_exception.call_args)
+        assert 'Unhandled error' in log_msg

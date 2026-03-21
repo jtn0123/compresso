@@ -145,6 +145,9 @@ main() {
         if [[ "${DEBUGGING:-}" == 'true' ]]; then
             compresso_params+=(--dev)
         fi
+        if [[ -n "${PORT:-}" ]]; then
+            compresso_params+=(--port="${PORT}")
+        fi
         case "${USE_CUSTOM_SUPPORT_API:-}" in
         test)
             compresso_params+=(--dev-api=https://support-api.test.streamingtech.co.nz)

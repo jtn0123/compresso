@@ -38,7 +38,7 @@
                   :label="$t('components.settings.link.installationPublicAddress')"
                   :placeholder="installationPublicAddress"
                   :rules="[
-                    val => !val || val.toLowerCase().startsWith('http') || 'Address must start with http:// or https://'
+                    val => !val || val.toLowerCase().startsWith('http') || $t('components.settings.link.addressMustStartWithHttp')
                   ]"
                 >
                 </q-input>
@@ -421,7 +421,7 @@ export default {
         this.$q.notify({
           color: 'negative',
           position: 'top',
-          message: 'Invalid public address. Must start with http:// or https://',
+          message: this.$t('components.settings.link.invalidPublicAddress'),
           icon: 'report_problem'
         })
         return
@@ -465,8 +465,8 @@ export default {
         axios({
           method: 'post',
           url: getCompressoApiUrl('v2', 'session/reload'),
-        }).catch(() => {
-          // Ignore error
+        }).catch((err) => {
+          console.error('Failed to reload session:', err)
         })
       }).catch(() => {
         this.$q.notify({

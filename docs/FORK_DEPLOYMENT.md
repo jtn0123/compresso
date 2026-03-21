@@ -2,7 +2,7 @@
 
 This fork is intended to build from a single repository checkout. The frontend is vendored at `compresso/webserver/frontend`, and clean builds are validated with Node.js 24.
 
-Config precedence for this fork is: built-in defaults, then environment variables, then `settings.json`, then explicit CLI or constructor arguments, and finally the large-library safe-default layer only for still-unset values. In practice, explicit operator configuration wins over the fork safety profile.
+Config precedence for this fork is: built-in defaults, then environment variables, then `settings.json`, then explicit CLI or constructor arguments. The large-library safe-default layer applies last but only fills values that remain unset after all other sources — it never overrides explicit operator configuration.
 
 The vendored frontend is a build input, not a distributed runtime payload. Release artifacts ship the published `compresso/webserver/public` assets, not the frontend source tree.
 
