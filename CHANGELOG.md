@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/jtn0123/compresso/compare/v1.2.2...v1.2.3) (2026-03-21)
+
+
+### Bug Fixes
+
+* application polish pass — security, bugs, UX, and documentation ([#32](https://github.com/jtn0123/compresso/issues/32)) ([bfe2172](https://github.com/jtn0123/compresso/commit/bfe2172e2b1106df7fc88d579a2b7e4c891bdab4))
+
 ## [1.2.2](https://github.com/jtn0123/compresso/compare/v1.2.1...v1.2.2) (2026-03-21)
 
 
