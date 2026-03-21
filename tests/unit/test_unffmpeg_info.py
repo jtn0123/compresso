@@ -367,9 +367,28 @@ class TestGetAllSupportedCodecs:
         assert "hevc" in result
 
     @patch("compresso.libs.unffmpeg.info.cli.ffmpeg_available_encoders")
+    @patch("compresso.libs.unffmpeg.info.subtitle_codecs.get_all_subtitle_codecs")
+    def test_get_all_supported_codecs_of_type_subtitle(self, mock_get_codecs, mock_enc):
+        """Verify subtitle codec type calls subtitle_codecs, not audio_codecs."""
+        mock_enc.return_value = ENCODER_OUTPUT
+        mock_get_codecs.return_value = {
+            "srt": {
+                "name": "srt",
+                "encoders": ["srt"],
+                "default_encoder": "srt",
+                "description": "SubRip subtitle",
+            },
+        }
+        info = Info()
+        result = info.get_all_supported_codecs_of_type("subtitle")
+        mock_get_codecs.assert_called_once()
+        assert "srt" in result
+
+    @patch("compresso.libs.unffmpeg.info.cli.ffmpeg_available_encoders")
     @patch("compresso.libs.unffmpeg.info.video_codecs.get_all_video_codecs")
+    @patch("compresso.libs.unffmpeg.info.subtitle_codecs.get_all_subtitle_codecs")
     @patch("compresso.libs.unffmpeg.info.audio_codecs.get_all_audio_codecs")
-    def test_get_all_supported_codecs_combines_audio_and_video(self, mock_audio, mock_video, mock_enc):
+    def test_get_all_supported_codecs_combines_audio_video_and_subtitle(self, mock_audio, mock_subtitle, mock_video, mock_enc):
         mock_enc.return_value = ENCODER_OUTPUT
         mock_video.return_value = {
             "h264": {
@@ -387,6 +406,14 @@ class TestGetAllSupportedCodecs:
                 "description": "AAC",
             },
         }
+        mock_subtitle.return_value = {
+            "srt": {
+                "name": "srt",
+                "encoders": ["srt"],
+                "default_encoder": "srt",
+                "description": "SubRip subtitle",
+            },
+        }
         info = Info()
         result = info.get_all_supported_codecs()
         assert "audio" in result
@@ -394,4 +421,4 @@ class TestGetAllSupportedCodecs:
         assert "subtitle" in result
         assert "aac" in result["audio"]
         assert "h264" in result["video"]
-        assert result["subtitle"] == {}
+        assert "srt" in result["subtitle"]

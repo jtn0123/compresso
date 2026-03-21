@@ -71,7 +71,6 @@
                           <span class="text-weight-medium q-ml-sm">{{ element.name }}</span>
                         </q-item-label>
                         <q-item-label caption lines="1" class="text-left q-ml-sm">
-                          <!--TODO: Limit length of description-->
                           {{ element.description }}
                         </q-item-label>
                         <q-tooltip
@@ -119,7 +118,7 @@ import { getCompressoApiUrl } from "src/js/compressoGlobals";
 import draggable from "vuedraggable";
 import { ref } from "vue";
 
-// TODO: Watch for updates to enabled plugins and reload list
+// Plugin flow list refreshes when the parent dialog is opened
 export default {
   name: 'LibraryConfigurePluginFlowList',
   components: {

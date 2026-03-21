@@ -372,7 +372,7 @@ class PluginsCLI(object):
             plugin_info['plugin_id'] = plugin_info.get('id')
             PluginsHandler.write_plugin_data_to_db(plugin_info, new_plugin_path)
         except Exception as e:
-            print("Exception while saving plugin info to DB. - {}".format(str(e)))
+            self.logger.error("Exception while saving plugin info to DB. - %s", e)
             return
 
         print("Plugin created - '{}'".format((plugin_details.get('plugin_id'))))
@@ -423,7 +423,7 @@ class PluginsCLI(object):
                 plugin_info['plugin_id'] = plugin_info.get('id')
                 PluginsHandler.write_plugin_data_to_db(plugin_info, plugin_path)
             except Exception as e:
-                print("Exception while saving plugin info to DB. - {}".format(str(e)))
+                self.logger.error("Exception while saving plugin info to DB. - %s", e)
                 return
 
             PluginsHandler.install_plugin_requirements(plugin_path)
@@ -605,7 +605,7 @@ class PluginsCLI(object):
         test_files = []
         for (dir_path, dir_names, file_names) in os.walk(dev_library_directory):
             test_files.extend(file_names)
-        print(test_files)
+        self.logger.debug("Available test files: %s", test_files)
 
         # Update test file
         print()

@@ -281,7 +281,7 @@ CONTAINERS = [
     (Mp4, 'mp4', 'MP4 (MPEG-4 Part 14)', True,
      ['mov_text', 'srt', 'ass', 'ssa', 'dvbsub', 'dvdsub']),
     (Matroska, 'mkv', 'Matroska', True,
-     ['srt', 'ass', 'ssa', 'subrip', 'dvbsub', 'dvdsub', 'dvd_subtitle']),
+     ['ass', 'dvbsub', 'dvd_subtitle', 'dvdsub', 'srt', 'ssa', 'subrip']),
     (Avi, 'avi', 'AVI (Audio Video Interleaved)', True, ['xsub']),
     (Mov, 'mov', 'QuickTime / MOV', True, ['mov_text']),
     (Flv, 'flv', 'FLV (Flash Video)', False, []),

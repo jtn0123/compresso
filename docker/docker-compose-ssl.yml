@@ -4,10 +4,9 @@
 # This compose file runs Compresso with HTTPS enabled using local test certificates.
 #
 # Usage from project root:
-#   docker-compose -f docker/docker-compose-ssl.yml up
+#   docker compose -f docker/docker-compose-ssl.yml up
 #
 
-version: '2'
 
 services:
   compresso-ssl-test:

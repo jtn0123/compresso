@@ -111,13 +111,13 @@
 </template>
 
 <script>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import DrawerMainNav from "components/drawers/DrawerMainNav";
 import { useQuasar } from "quasar";
 import ThemeSwitch from "components/ThemeSwitch";
 import DrawerNotifications from "components/drawers/DrawerNotifications";
 import SharedLinkDropdown from "components/SharedLinkDropdown";
-import compressoGlobals from "src/js/compressoGlobals";
+import compressoGlobals, { notificationsCount } from "src/js/compressoGlobals";
 
 export default {
   components: {
@@ -129,12 +129,9 @@ export default {
   setup() {
     const $q = useQuasar();
 
-    let reloadInterval = null;
-
     const leftMainNavDrawerOpen = ref(false)
     const rightNotificationsDrawerOpen = ref(false)
 
-    const notificationsCount = ref(null)
     const compressoVersion = ref('')
 
     function toggleMainNavDrawer() {
@@ -145,29 +142,11 @@ export default {
       rightNotificationsDrawerOpen.value = !rightNotificationsDrawerOpen.value
     }
 
-    function getNotificationsCount() {
-      let notificationsList = compressoGlobals.getCompressoNotifications();
-      notificationsCount.value = notificationsList.length;
-    }
-
     onMounted(() => {
       // Fetch version
       compressoGlobals.getCompressoVersion().then((version) => {
         compressoVersion.value = version;
       })
-      // If the reloadInterval has not yet been set
-      if (reloadInterval === null) {
-        // Set the interval to refresh every second
-        reloadInterval = setInterval(() => {
-          getNotificationsCount();
-        }, 1000);
-      }
-    })
-
-    onUnmounted(() => {
-      if (reloadInterval !== null) {
-        clearInterval(reloadInterval);
-      }
     })
 
     return {

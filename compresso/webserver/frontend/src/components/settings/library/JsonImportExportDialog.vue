@@ -68,7 +68,6 @@ const isDirty = computed(() => {
     return false
   }
   if (!importString.value || importString.value.trim().length === 0) {
-    console.log(importString.value)
     return false
   }
   return true

@@ -45,6 +45,14 @@ except ImportError:
 
 logger = CompressoLogging.get_logger(name="Config")
 
+# Default configuration constants
+DEFAULT_UI_PORT = 8888
+DEFAULT_SCAN_INTERVAL_MINUTES = 1440  # 24 hours
+DEFAULT_CONCURRENT_FILE_TESTERS = 2
+DEFAULT_MAX_TASK_AGE_DAYS = 91  # ~3 months
+DEFAULT_READINESS_TIMEOUT_SECONDS = 30
+DEFAULT_WORKER_CAP = 2
+
 
 class Config(object, metaclass=SingletonType):
     app_version = ''
@@ -53,7 +61,7 @@ class Config(object, metaclass=SingletonType):
 
     def __init__(self, config_path=None, **kwargs):
         # Set the default UI Port
-        self.ui_port = 8888
+        self.ui_port = DEFAULT_UI_PORT
         self.ui_address = ''
 
         # SSL/TLS settings
@@ -82,14 +90,14 @@ class Config(object, metaclass=SingletonType):
         # Library Settings:
         self.library_path = common.get_default_library_path()
         self.enable_library_scanner = False
-        self.schedule_full_scan_minutes = 1440
+        self.schedule_full_scan_minutes = DEFAULT_SCAN_INTERVAL_MINUTES
         self.follow_symlinks = True
-        self.concurrent_file_testers = 2
+        self.concurrent_file_testers = DEFAULT_CONCURRENT_FILE_TESTERS
         self.run_full_scan_on_start = False
         self.clear_pending_tasks_on_restart = True
         self.auto_manage_completed_tasks = False
         self.compress_completed_tasks_logs = False
-        self.max_age_of_completed_tasks = 91
+        self.max_age_of_completed_tasks = DEFAULT_MAX_TASK_AGE_DAYS
         self.always_keep_failed_tasks = True
 
         # Worker settings
@@ -102,7 +110,7 @@ class Config(object, metaclass=SingletonType):
         self.distributed_worker_count_target = 0
 
         # Legacy config
-        # TODO: Remove this before next major version bump
+        # TODO(v2.0): Remove legacy number_of_workers and worker_event_schedules fields
         self.number_of_workers = None
         self.worker_event_schedules = None
 
@@ -112,8 +120,8 @@ class Config(object, metaclass=SingletonType):
 
         # Fork-specific deployment hardening defaults
         self.large_library_safe_defaults = True
-        self.startup_readiness_timeout_seconds = 30
-        self.default_worker_cap = 2
+        self.startup_readiness_timeout_seconds = DEFAULT_READINESS_TIMEOUT_SECONDS
+        self.default_worker_cap = DEFAULT_WORKER_CAP
 
         # Import env variables and override all previous settings.
         self.__import_settings_from_env()
@@ -319,15 +327,12 @@ class Config(object, metaclass=SingletonType):
         :param lines:
         :return:
         """
-        log_lines = []
         log_file = os.path.join(self.log_path, 'compresso.log')
-        line_count = 0
-        for line in reversed(list(open(log_file))):
-            log_lines.insert(0, line.rstrip())
-            line_count += 1
-            if line_count == lines:
-                break
-        return log_lines
+        with open(log_file) as f:
+            all_lines = f.readlines()
+        if lines is not None:
+            all_lines = all_lines[-lines:]
+        return [line.rstrip() for line in all_lines]
 
     def get_ui_port(self):
         """

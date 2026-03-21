@@ -31,6 +31,7 @@
 """
 
 from . import audio_codecs
+from . import subtitle_codecs
 from . import video_codecs
 from .lib import cli
 
@@ -246,7 +247,7 @@ class Info(object):
         if codec_type == 'audio':
             codec_dict = audio_codecs.get_all_audio_codecs()
         elif codec_type == 'subtitle':
-            codec_dict = audio_codecs.get_all_audio_codecs()
+            codec_dict = subtitle_codecs.get_all_subtitle_codecs()
         elif codec_type == 'video':
             codec_dict = video_codecs.get_all_video_codecs()
         # Iterate through the list of codecs.
@@ -285,12 +286,12 @@ class Info(object):
 
     def get_all_supported_codecs(self):
         supported_audio_codecs = self.get_all_supported_codecs_of_type('audio')
-        # TODO: Subtitles
+        supported_subtitle_codecs = self.get_all_supported_codecs_of_type('subtitle')
         supported_video_codecs = self.get_all_supported_codecs_of_type('video')
 
         # Combine dictionaries into one and return
         return {
             'audio':    supported_audio_codecs,
-            'subtitle': {},
+            'subtitle': supported_subtitle_codecs,
             'video':    supported_video_codecs
         }

@@ -357,7 +357,6 @@ export default {
         // Set platform data
         if (typeof configuration.platform !== 'undefined' && configuration.platform.length > 0) {
           let platform = configuration.platform.join(' ');
-          console.log(platform)
           this.platform = platform;
         }
 

@@ -12,6 +12,8 @@
 | `COMPRESSO_DB_PATH` | `/config/.compresso/config/compresso.db` | Path to the SQLite database |
 | `COMPRESSO_RUN_COMMAND` | unset | Custom run command template (use `{cmd}` as placeholder) |
 | `USE_CUSTOM_SUPPORT_API` | unset | `test` or `dev` to override the support API URL |
+| `PORT` | `8888` | Override the web UI / API port (forwarded to `--port` CLI arg) |
+| `HOME_DIR` | `~` (source), `/config` (Docker) | Override the home directory used to resolve `~/.compresso/` paths |
 
 ## Volume Mounts
 
@@ -69,7 +71,7 @@ environment:
 ```yaml
 services:
   compresso:
-    image: ghcr.io/jtn0123/compresso:latest
+    image: jtn0123/compresso:latest
     container_name: compresso
     restart: unless-stopped
     ports:

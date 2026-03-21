@@ -2,6 +2,12 @@ import { Notify } from 'quasar'
 import { ref } from 'vue'
 import $compresso from './compressoGlobals'
 
+function escapeHtml(str) {
+  if (!str) return ''
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+}
+
 /**
  * Reactive WebSocket connection state shared across all consumers.
  * Values: 'connected', 'connecting', 'disconnected'
@@ -105,7 +111,7 @@ export const CompressoWebsocketHandler = function ($t) {
         connectionCheckInterval = setInterval(() => {
           if (typeof $compresso.ws !== 'undefined' && $compresso.ws !== null) {
             if ($compresso.ws.readyState === WebSocket.OPEN) {
-              console.log("Websocket has reconnected. Clearing warning.")
+              console.debug("Websocket has reconnected. Clearing warning.")
               clearConnectionWarning()
               clearConnectionWarning = null
               clearInterval(connectionCheckInterval)
@@ -181,7 +187,7 @@ export const CompressoWebsocketHandler = function ($t) {
       }
       // If the message is not empty, concatenate it to the end of the notification string
       if (message) {
-        notificationString = notificationString + '<br>' + message;
+        notificationString = notificationString + '<br>' + escapeHtml(message);
       } else {
         // Check if a preset message is available
         let messageStringId = 'notifications.serverMessages.' + code + 'Message'
@@ -229,7 +235,7 @@ export const CompressoWebsocketHandler = function ($t) {
         }
         // If the message is not empty, concatenate it to the end of the notification string
         if (message) {
-          notificationString = notificationString + ' - ' + message;
+          notificationString = notificationString + ' - ' + escapeHtml(message);
         }
 
         // Format notification based on message type

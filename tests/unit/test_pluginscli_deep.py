@@ -434,16 +434,17 @@ class TestCreateNewPluginFiles:
     @patch('builtins.open', mock_open())
     @patch('os.path.exists', return_value=False)
     @patch('os.makedirs')
-    def test_handles_db_exception(self, mock_mkdirs, mock_exists, mock_touch, mock_ph_cls, capsys):
+    def test_handles_db_exception(self, mock_mkdirs, mock_exists, mock_touch, mock_ph_cls):
         pluginscli = _import_pluginscli()
         cli = _make_cli(pluginscli)
         mock_ph_cls.version = 1
         mock_ph_cls.write_plugin_data_to_db.side_effect = Exception("DB error")
         details = {'plugin_id': 'test_plugin', 'plugin_name': 'Test Plugin'}
         type_details = [{'runner': 'on_worker_process', 'runner_docstring': 'Process'}]
-        cli.create_new_plugin_files(details, type_details)
-        captured = capsys.readouterr()
-        assert 'Exception' in captured.out
+        with patch.object(cli.logger, 'error') as mock_log_error:
+            cli.create_new_plugin_files(details, type_details)
+            mock_log_error.assert_called_once()
+            assert 'DB error' in str(mock_log_error.call_args)
 
 
 # ==================================================================
@@ -775,18 +776,20 @@ class TestReloadPluginFromDisk:
         mock_ph_cls.install_npm_modules.assert_called_once()
         assert "Reloading Plugin - 'plugin_one'" in capsys.readouterr().out
 
-    def test_reload_plugin_db_exception_prints_message(self, capsys):
+    def test_reload_plugin_db_exception_prints_message(self):
         pluginscli = _import_pluginscli()
         cli = _make_cli(pluginscli)
         plugin_result = {'plugin_id': 'plugin_one'}
         with patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[plugin_result]), \
              patch('builtins.open', mock_open(read_data='{}')), \
              patch.object(pluginscli.json, 'load', return_value={'id': 'plugin_one'}), \
-             patch.object(pluginscli, 'PluginsHandler') as mock_ph_cls:
+             patch.object(pluginscli, 'PluginsHandler') as mock_ph_cls, \
+             patch.object(cli.logger, 'error') as mock_log_error:
             mock_ph_cls.write_plugin_data_to_db.side_effect = Exception('db failed')
             cli.reload_plugin_from_disk()
 
-        assert 'Exception while saving plugin info to DB' in capsys.readouterr().out
+        mock_log_error.assert_called_once()
+        assert 'db failed' in str(mock_log_error.call_args)
 
 
 @pytest.mark.unittest

@@ -30,6 +30,7 @@
 
 """
 
+import tornado.log
 from tornado.ioloop import IOLoop
 
 from compresso.libs import session
@@ -141,6 +142,7 @@ class ApiSessionHandler(BaseApiHandler):
             self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
             return
         except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -193,6 +195,7 @@ class ApiSessionHandler(BaseApiHandler):
             self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
             return
         except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -245,6 +248,7 @@ class ApiSessionHandler(BaseApiHandler):
             self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
             return
         except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -326,6 +330,7 @@ class ApiSessionHandler(BaseApiHandler):
             return
 
         except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -388,5 +393,6 @@ class ApiSessionHandler(BaseApiHandler):
             self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
             return
         except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

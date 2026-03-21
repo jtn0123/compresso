@@ -1,5 +1,12 @@
 import axios from "axios";
+import { ref } from 'vue'
 import { Notify, setCssVar } from 'quasar'
+
+/**
+ * Reactive notification count shared across all consumers.
+ * Updated automatically when notifications are fetched or dismissed.
+ */
+export const notificationsCount = ref(0)
 
 let $compresso = {};
 
@@ -152,6 +159,7 @@ export default {
           }
         }
         $compresso.notificationsList = notifications;
+        notificationsCount.value = notifications.length
         resolve($compresso.notificationsList)
       }).catch(() => {
         console.error("Failed to retrieve server notifications")
