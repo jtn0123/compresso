@@ -176,8 +176,8 @@ class CompressoFileMetadata:
         try:
             task = Tasks.get_by_id(task_id)
             entry['source_path'] = task.abspath
-        except Exception as e:
-            cls._logger.debug("Could not load source path for task %s: %s", task_id, e)
+        except Tasks.DoesNotExist:
+            cls._logger.debug("Task %s not found while loading source path", task_id)
             entry['source_path'] = None
         return entry['source_path']
 

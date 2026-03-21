@@ -77,7 +77,7 @@ class ForwardJSONFormatter(JSONFormatter):
             try:
                 ts_float = float(ts_str)
                 extra['time'] = datetime.fromtimestamp(ts_float, tz=timezone.utc).isoformat()
-            except (ValueError, TypeError, OverflowError):
+            except (ValueError, TypeError, OverflowError, OSError):
                 pass  # Ignore this. The default formatter will add a "time" record
         if 'time' not in extra:
             extra['time'] = datetime.now(tz=timezone.utc)

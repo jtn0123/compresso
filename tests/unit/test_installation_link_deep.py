@@ -936,8 +936,8 @@ class TestRemoteApiPostFileHandleLeak:
             MockRH.return_value.post.return_value = mock_response
             links.remote_api_post_file(
                 {'address': 'http://host:8888', 'auth': '', 'username': '', 'password': ''},
-                str(test_file),
-                '/api/upload'
+                '/api/upload',
+                str(test_file)
             )
             mock_fh.close.assert_called_once()
 
@@ -954,8 +954,8 @@ class TestRemoteApiPostFileHandleLeak:
             with pytest.raises(Exception, match="connection error"):
                 links.remote_api_post_file(
                     {'address': 'http://host:8888', 'auth': '', 'username': '', 'password': ''},
-                    str(test_file),
-                    '/api/upload'
+                    '/api/upload',
+                    str(test_file)
                 )
             mock_fh.close.assert_called_once()
 

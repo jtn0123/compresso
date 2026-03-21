@@ -478,6 +478,14 @@ class TestSubprocessTimeouts:
             # Should not raise — timeout is caught and logged
             PluginsHandler.install_npm_modules(str(tmp_path))
 
+    def test_npm_install_passes_timeout_param(self, tmp_path):
+        from compresso.libs.plugins import PluginsHandler
+        pkg = tmp_path / 'package.json'
+        pkg.write_text('{"name": "test"}')
+        with patch('subprocess.call') as mock_call:
+            PluginsHandler.install_npm_modules(str(tmp_path))
+        assert [call.kwargs.get('timeout') for call in mock_call.call_args_list] == [300, 300]
+
     def test_pip_install_passes_timeout_param(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
         req_file = tmp_path / 'requirements.txt'

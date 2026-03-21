@@ -538,10 +538,16 @@ class PluginsHandler(object, metaclass=SingletonType):
             return
         try:
             subprocess.call(['npm', 'install'], cwd=plugin_path, timeout=300)
+        except subprocess.TimeoutExpired:
+            logging.getLogger("Compresso.PluginsHandler").error(
+                "Timed out running npm install for plugin at %s", plugin_path
+            )
+            return
+        try:
             subprocess.call(['npm', 'run', 'build'], cwd=plugin_path, timeout=300)
         except subprocess.TimeoutExpired:
             logging.getLogger("Compresso.PluginsHandler").error(
-                "Timed out running npm install/build for plugin at %s", plugin_path
+                "Timed out running npm build for plugin at %s", plugin_path
             )
 
     @staticmethod
