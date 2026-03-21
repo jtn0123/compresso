@@ -87,11 +87,11 @@ class TestPluginsApiDeprecated(ApiTestBase):
 
     def test_enable_plugins_deprecated(self):
         resp = self.post_json('/plugins/enable', {'id_list': [1]})
-        assert resp.code == 500
+        assert resp.code == 410
 
     def test_disable_plugins_deprecated(self):
         resp = self.post_json('/plugins/disable', {'id_list': [1]})
-        assert resp.code == 500
+        assert resp.code == 410
 
 
 @pytest.mark.unittest

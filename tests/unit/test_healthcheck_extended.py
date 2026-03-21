@@ -371,3 +371,19 @@ class TestGetFileLock:
         lock1 = mgr._get_file_lock('/test/file1.mkv')
         lock2 = mgr._get_file_lock('/test/file2.mkv')
         assert lock1 is not lock2
+
+    @patch('compresso.libs.logs.CompressoLogging.get_logger')
+    def test_file_lock_cleaned_up_after_check_file(self, mock_get_logger):
+        """Verify that per-file locks are removed after check_file completes to prevent memory leaks."""
+        mock_get_logger.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        filepath = '/test/cleanup_test.mkv'
+
+        with patch.object(mgr, 'quick_check', return_value=(True, '')), \
+             patch('compresso.libs.healthcheck.HealthStatus') as MockHS:
+            mock_health = MagicMock()
+            MockHS.get_or_create.return_value = (mock_health, True)
+            mgr.check_file(filepath, library_id=1, mode='quick')
+
+        # Lock should have been cleaned up
+        assert filepath not in HealthCheckManager._file_locks

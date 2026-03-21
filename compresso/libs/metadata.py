@@ -96,7 +96,8 @@ class CompressoFileMetadata:
             return {}
         try:
             data = json.loads(raw_json)
-        except Exception:
+        except (json.JSONDecodeError, TypeError) as e:
+            cls._logger.debug("Failed to parse metadata JSON: %s", e)
             return {}
         if not isinstance(data, dict):
             return {}
@@ -175,7 +176,8 @@ class CompressoFileMetadata:
         try:
             task = Tasks.get_by_id(task_id)
             entry['source_path'] = task.abspath
-        except Exception:
+        except Tasks.DoesNotExist:
+            cls._logger.debug("Task %s not found while loading source path", task_id)
             entry['source_path'] = None
         return entry['source_path']
 
@@ -367,8 +369,8 @@ class CompressoFileMetadata:
             if not staged:
                 try:
                     TaskMetadata.delete().where(TaskMetadata.task == task_id).execute()
-                except Exception:
-                    pass
+                except Exception as e:
+                    cls._logger.debug("Could not clean up task metadata for task %s: %s", task_id, e)
                 cls._task_cache.pop(task_id, None)
                 return 0
 

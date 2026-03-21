@@ -167,7 +167,7 @@ class HealthCheckManager:
                 health.error_count = health.error_count + 1
             health.save()
 
-            return {
+            result = {
                 'abspath': filepath,
                 'status': health.status,
                 'check_mode': mode,
@@ -175,6 +175,12 @@ class HealthCheckManager:
                 'last_checked': str(health.last_checked),
                 'error_count': health.error_count,
             }
+
+        # Release the per-file lock to prevent unbounded growth
+        with HealthCheckManager._file_locks_lock:
+            HealthCheckManager._file_locks.pop(filepath, None)
+
+        return result
 
     def get_health_summary(self, library_id=None):
         """

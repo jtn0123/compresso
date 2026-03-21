@@ -147,8 +147,10 @@ class PostProcessor(threading.Thread):
                             if ratio_pct < min_pct or ratio_pct > max_pct:
                                 self._log("Size guardrail REJECTED: {:.1f}% (allowed {}-{}%)".format(
                                     ratio_pct, min_pct, max_pct))
-                                self.current_task.task.success = False
-                                self.current_task.task.save()
+                                db = self.current_task.task._meta.database
+                                with db.atomic():
+                                    self.current_task.task.success = False
+                                    self.current_task.task.save()
                 except Exception as e:
                     self._log("Exception in size guardrail check", message2=str(e), level="warning")
 
@@ -156,7 +158,8 @@ class PostProcessor(threading.Thread):
             try:
                 library = Library(self.current_task.get_task_library_id())
                 policy = library.get_replacement_policy()
-            except Exception:
+            except Exception as e:
+                self._log("Could not determine replacement policy for library", message2=str(e), level="warning")
                 policy = ''
             if not policy:
                 policy = 'approval_required' if self.settings.get_approval_required() else 'replace'

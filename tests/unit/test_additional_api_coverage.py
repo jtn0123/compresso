@@ -155,8 +155,8 @@ class TestFileinfoApiCoverage(ApiTestBase):
 
         asyncio.run(ApiFileinfoHandler.probe_file(handler))
 
-        handler.set_status.assert_not_called()
-        handler.write_error.assert_not_called()
+        handler.set_status.assert_called_once()
+        handler.write_error.assert_called_once()
 
     def test_probe_file_handles_generic_exception(self):
         handler = self._make_direct_handler('probe_file')
@@ -187,8 +187,8 @@ class TestFileinfoApiCoverage(ApiTestBase):
 
         asyncio.run(ApiFileinfoHandler.probe_task_file(handler))
 
-        handler.set_status.assert_not_called()
-        handler.write_error.assert_not_called()
+        handler.set_status.assert_called_once()
+        handler.write_error.assert_called_once()
 
     def test_probe_task_file_handles_generic_exception(self):
         handler = self._make_direct_handler('probe_task_file')
@@ -299,7 +299,7 @@ class TestNotificationsApiCoverage(ApiTestBase):
             mock_notifications.return_value.read_all_items.return_value = []
             asyncio.run(ApiNotificationsHandler.get_notifications(handler))
 
-        handler.set_status.assert_not_called()
+        handler.set_status.assert_called_once()
 
     def test_remove_notifications_handles_generic_exception(self):
         handler = self._make_direct_handler('remove_notifications')

@@ -77,7 +77,7 @@ class ForwardJSONFormatter(JSONFormatter):
             try:
                 ts_float = float(ts_str)
                 extra['time'] = datetime.fromtimestamp(ts_float, tz=timezone.utc).isoformat()
-            except Exception:
+            except (ValueError, TypeError, OverflowError, OSError):
                 pass  # Ignore this. The default formatter will add a "time" record
         if 'time' not in extra:
             extra['time'] = datetime.now(tz=timezone.utc)
@@ -453,19 +453,6 @@ class ForwardLogHandler(logging.Handler):
         if not self.buffer_retention_max_days or self.buffer_retention_max_days <= 0:
             return
         threshold = datetime.now(tz=timezone.utc) - timedelta(days=self.buffer_retention_max_days)
-
-        # TODO: remove legacy `.json` cleanup once all older buffer files are gone in the wild.
-        if os.path.isdir(self.buffer_path):
-            for legacy_name in os.listdir(self.buffer_path):
-                if not legacy_name.endswith(".json"):
-                    continue
-                if legacy_name == self.STATE_FILENAME:
-                    continue
-                legacy_path = os.path.join(self.buffer_path, legacy_name)
-                try:
-                    os.remove(legacy_path)
-                except FileNotFoundError:
-                    pass
 
         for file_path in self._list_buffer_files():
             filename = os.path.basename(file_path)

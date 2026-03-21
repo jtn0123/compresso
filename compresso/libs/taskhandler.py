@@ -47,14 +47,6 @@ class TaskHandler(threading.Thread):
     TaskHandler
 
     The TaskHandler reads all items in the queues and passes them to the appropriate locations in the application.
-        TODO:
-            - All tasks are added to the database tasks table (no key to historical tasks.
-                Row to be deleted once task is added to historical record)
-            - Task Handler to monitor idle workers rather than idle workers looking for tasks in the TaskQueue object.
-                - When a worker thread is idle, the TaskHandler needs to read a select query on the database and add that
-                    item to the TaskQueue
-            - Workers should request a job from the TaskHandler rather than reading the TaskQueue directly ??
-            -
     """
 
     def __init__(self, data_queues, task_queue, event):
@@ -112,8 +104,6 @@ class TaskHandler(threading.Thread):
                 pathname = item['pathname']
                 library_id = item['library_id']
                 priority_score = item.get('priority_score', 0)
-                # TODO: Ensure the file is not still being modified at this point.
-                #  If it is still being modified here, it is ok to wait for that to finish (should not matter much)
                 if self.add_path_to_task_queue(pathname, library_id, priority_score=priority_score):
                     self._log("Adding inotify job to queue", pathname, level='info')
                 else:
