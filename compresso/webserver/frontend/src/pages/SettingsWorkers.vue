@@ -187,6 +187,8 @@ import SelectDirectoryDialog from "components/ui/pickers/SelectDirectoryDialog.v
 import CompressoSettingsSubmitButton from "components/ui/buttons/CompressoSettingsSubmitButton.vue";
 import CompressoListAddButton from "components/ui/buttons/CompressoListAddButton.vue";
 
+import { checkUnsavedChanges } from "src/js/settingsUtils";
+
 export default {
   name: 'SettingsWorkers',
   components: { MobileSettingsQuickNav, WorkerGroupConfigDialog, SelectDirectoryDialog, CompressoSettingsSubmitButton, CompressoListAddButton },
@@ -250,7 +252,7 @@ export default {
   },
   computed: {
     hasUnsavedChanges() {
-      return this.originalCachePath !== null && this.cachePath !== this.originalCachePath
+      return checkUnsavedChanges(this.originalCachePath, this.cachePath)
     }
   },
   methods: {
