@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/jtn0123/compresso/compare/v1.2.1...v1.2.2) (2026-03-21)
+
+
+### Bug Fixes
+
+* patch minimatch and tar CVEs in Docker base image ([a2c52bb](https://github.com/jtn0123/compresso/commit/a2c52bb0fd4a70e54501a45454798f7b89256254))
+
 ## [1.2.1](https://github.com/jtn0123/compresso/compare/v1.2.0...v1.2.1) (2026-03-21)
 
 
