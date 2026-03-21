@@ -36,10 +36,10 @@ jobs:
           bash -c "tests/scripts_/download_test_files.sh"
 
       # Setup python environment
-      - name: Set up Python 3.8
+      - name: Set up Python 3.13
         uses: actions/setup-python@v6
         with:
-          python-version: "3.8"
+          python-version: "3.13"
 
       # Restore the python cache if it exists
       - name: Restore python cache
@@ -134,10 +134,10 @@ jobs:
           git tag --list
 
       # Setup python environment
-      - name: Set up Python 3.10
+      - name: Set up Python 3.13
         uses: actions/setup-python@v6
         with:
-          python-version: "3.10"
+          python-version: "3.13"
 
       # Restore the python cache if it exists
       - name: Restore python cache
