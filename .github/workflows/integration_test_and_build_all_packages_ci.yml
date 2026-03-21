@@ -213,58 +213,45 @@ jobs:
           name: compresso-py-dist-data-${{ steps.py_build_data.outputs.py_version }}
           path: dist/
 
-  build_docker:
-    name: Build Docker Image
+  # ---------------------------------------------------------------------------
+  # Docker: build each architecture natively (no QEMU emulation)
+  # ---------------------------------------------------------------------------
+  docker_prepare:
+    name: Prepare Docker metadata
     needs: py_build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      ghcr_image: ${{ steps.prepare.outputs.ghcr_image }}
+      docker_hub_image: ${{ steps.prepare.outputs.docker_hub_image }}
+      docker_tags: ${{ steps.prepare.outputs.docker_tags }}
+      docker_push: ${{ steps.prepare.outputs.docker_push }}
+      sha_short: ${{ steps.prepare.outputs.sha_short }}
+      service_name: ${{ steps.prepare.outputs.service_name }}
+      build_date: ${{ steps.prepare.outputs.docker_build_date }}
+      build_arm64: ${{ steps.prepare.outputs.build_arm64 }}
 
     steps:
-      # ---
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      # ---
       - name: Download Artifact
         uses: actions/download-artifact@v8
         with:
           path: ./artifacts/
 
-      # ---
-      - name: Restore python package distribution data
+      - name: Read version
         id: py_build_data
         run: |
-          rm -rf ./dist
-          mkdir -p ./dist
+          rm -rf ./dist && mkdir -p ./dist
           find ./artifacts/ -type f -name "*.whl" -exec cp {} ./dist/ \;
           find ./artifacts/ -type f -name "VERSION.txt" -exec cp {} ./dist/ \;
-          ls -l ./dist/
           PY_VERSION=$(cat ./dist/VERSION.txt)
           echo "py_version=${PY_VERSION}" >> $GITHUB_OUTPUT
 
-      # ---
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a #v4.0.0
-
-      # ---
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd #v4.0.0
-
-      # List available build platforms
-      - name: Available platforms
-        if: success()
-        run: echo ${{ steps.buildx.outputs.platforms }}
-
-      # Generate 'prepare' build arguments to be retrieved later on
       - name: Prepare
-        if: success()
         id: prepare
         run: |
-          echo "GITHUB_REF:${GITHUB_REF}"
-          echo "GITHUB_REPOSITORY:${GITHUB_REPOSITORY}"
           VERSION_TAG=${GITHUB_REF#refs/*/}
           SHA_SHORT="${GITHUB_SHA::7}"
           ORG=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
@@ -276,13 +263,16 @@ jobs:
           GHCR_IMAGE=ghcr.io/${ORG:?}/${SERVICE_NAME:?}
 
           DOCKER_TAGS=""
+          BUILD_ARM64="false"
           if [[ ${GITHUB_REF} == refs/heads/master ]]; then
             DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:latest,${GHCR_IMAGE}:latest,"
             if [[ -n ${PY_VERSION} ]]; then
               DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:${PY_VERSION},${GHCR_IMAGE}:${PY_VERSION},"
             fi
+            BUILD_ARM64="true"
           elif [[ ${GITHUB_REF} == refs/heads/staging ]]; then
             DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:staging,${GHCR_IMAGE}:staging,"
+            BUILD_ARM64="true"
           elif [[ ${GITHUB_REF} == refs/heads/dev-* ]]; then
             DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:${VERSION_TAG},${GHCR_IMAGE}:${VERSION_TAG},"
           elif [[ ${GITHUB_REF} == refs/tags/* ]]; then
@@ -291,9 +281,9 @@ jobs:
               DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:${VERSION},${GHCR_IMAGE}:${VERSION},"
               DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:latest,${GHCR_IMAGE}:latest,"
             fi
+            BUILD_ARM64="true"
           elif [[ ${GITHUB_REF} == refs/pull/* ]]; then
             PR_NUMBER=$(echo ${GITHUB_REF} | cut -d'/' -f3)
-            # For PR builds, only tag the GHCR image.
             DOCKER_TAGS="${GHCR_IMAGE}:pr-${PR_NUMBER},"
           fi
 
@@ -302,94 +292,64 @@ jobs:
             DOCKER_PUSH="false"
           fi
 
-          echo "docker_hub_image:${DOCKER_HUB_IMAGE:?}"
-          echo "docker_hub_image=${DOCKER_HUB_IMAGE:?}" >> $GITHUB_OUTPUT
-
-          echo "ghcr_image:${GHCR_IMAGE:?}"
-          echo "ghcr_image=${GHCR_IMAGE:?}" >> $GITHUB_OUTPUT
-
-          echo "sha_short:${SHA_SHORT:?}"
-          echo "sha_short=${SHA_SHORT:?}" >> $GITHUB_OUTPUT
-
-          echo "service_name:${SERVICE_NAME:?}"
-          echo "service_name=${SERVICE_NAME:?}" >> $GITHUB_OUTPUT
-
-          echo "docker_image:${DOCKER_HUB_IMAGE:?}"
-          echo "docker_image=${DOCKER_HUB_IMAGE:?}" >> $GITHUB_OUTPUT
-
-          echo "docker_tags:$(echo ${DOCKER_TAGS} | sed 's/,$//')"
+          echo "docker_hub_image=${DOCKER_HUB_IMAGE}" >> $GITHUB_OUTPUT
+          echo "ghcr_image=${GHCR_IMAGE}" >> $GITHUB_OUTPUT
+          echo "sha_short=${SHA_SHORT}" >> $GITHUB_OUTPUT
+          echo "service_name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
           echo "docker_tags=$(echo ${DOCKER_TAGS} | sed 's/,$//')" >> $GITHUB_OUTPUT
+          echo "docker_push=${DOCKER_PUSH}" >> $GITHUB_OUTPUT
+          echo "docker_build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+          echo "build_arm64=${BUILD_ARM64}" >> $GITHUB_OUTPUT
 
-          echo "docker_push:${DOCKER_PUSH:?}"
-          echo "docker_push=${DOCKER_PUSH:?}" >> $GITHUB_OUTPUT
+  build_docker_amd64:
+    name: Build Docker (amd64)
+    needs: docker_prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
-          echo "docker_build_date:${BUILD_DATE:?}" 
-          echo "docker_build_date=${BUILD_DATE:?}" >> $GITHUB_OUTPUT
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-          if [[ ${GITHUB_REF} == refs/heads/master || ${GITHUB_REF} == refs/tags/* ]]; then
-            echo "docker_platforms=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
-          else
-            echo "docker_platforms=linux/amd64" >> $GITHUB_OUTPUT
-          fi
+      - name: Download Artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: ./artifacts/
 
-      # ---
-      - name: Log into GHCR registry
+      - name: Restore dist
+        run: |
+          rm -rf ./dist && mkdir -p ./dist
+          find ./artifacts/ -type f -name "*.whl" -exec cp {} ./dist/ \;
+          find ./artifacts/ -type f -name "VERSION.txt" -exec cp {} ./dist/ \;
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+      - name: Log into GHCR
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ---
-      - name: Log into Docker Hub registry
-        if: success() && (startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/'))
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 #v4.0.0
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # ---
-      - name: Docker meta
-        if: success()
-        id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf #v6.0.0
-        with:
-          images: |
-            ${{ steps.prepare.outputs.docker_image }}
-          labels: |
-            maintainer=Josh.5
-            source.version=${{ steps.prepare.outputs.sha_short }}
-            source.project=Compresso
-            source.service=${{ steps.prepare.outputs.service_name }}
-            org.opencontainers.image.title=${{ steps.prepare.outputs.service_name }}
-            org.opencontainers.image.created=${{ steps.prepare.outputs.docker_build_date }}
-
-      # ---
-      - name: Build Image
-        if: success()
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 #v7.0.0
+      - name: Build and push amd64
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
         with:
           context: .
           file: docker/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          pull: "true"
-          push: ${{ steps.prepare.outputs.docker_push }}
-          tags: |
-            ${{ steps.prepare.outputs.docker_tags }}
-          labels: |
-            ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ steps.prepare.outputs.service_name }}-main
-          cache-to: type=gha,scope=${{ steps.prepare.outputs.service_name }}-main,mode=max
+          platforms: linux/amd64
+          push: true
+          tags: ${{ needs.docker_prepare.outputs.ghcr_image }}:build-amd64-${{ github.sha }}
+          cache-from: type=gha,scope=docker-amd64
+          cache-to: type=gha,scope=docker-amd64,mode=max
 
+      # Smoke test on the amd64 image
       - name: Build local smoke-test image
-        if: success()
-        run: |
-          mapfile -t wheels < <(find dist -maxdepth 1 -type f -name "*.whl" | sort)
-          test "${#wheels[@]}" -eq 1
-          docker build -f docker/Dockerfile -t compresso-smoke:ci .
+        run: docker build -f docker/Dockerfile -t compresso-smoke:ci .
 
       - name: Smoke test Docker runtime
-        if: success()
         run: |
           set -euo pipefail
           tmp_root=$(mktemp -d)
@@ -422,7 +382,6 @@ jobs:
           grep -q STARTUP_SUMMARY "${tmp_root}/config/.compresso/logs/compresso.log"
 
       - name: Scan Docker image with Trivy
-        if: success()
         uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: compresso-smoke:ci
@@ -430,6 +389,99 @@ jobs:
           exit-code: 0
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+
+  build_docker_arm64:
+    name: Build Docker (arm64)
+    needs: docker_prepare
+    if: needs.docker_prepare.outputs.build_arm64 == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: ./artifacts/
+
+      - name: Restore dist
+        run: |
+          rm -rf ./dist && mkdir -p ./dist
+          find ./artifacts/ -type f -name "*.whl" -exec cp {} ./dist/ \;
+          find ./artifacts/ -type f -name "VERSION.txt" -exec cp {} ./dist/ \;
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+      - name: Log into GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push arm64
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ needs.docker_prepare.outputs.ghcr_image }}:build-arm64-${{ github.sha }}
+          cache-from: type=gha,scope=docker-arm64
+          cache-to: type=gha,scope=docker-arm64,mode=max
+
+  docker_manifest:
+    name: Create Docker manifest
+    needs: [docker_prepare, build_docker_amd64, build_docker_arm64]
+    if: always() && needs.build_docker_amd64.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Log into GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log into Docker Hub
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Create and push manifests
+        run: |
+          set -euo pipefail
+          GHCR_IMAGE="${{ needs.docker_prepare.outputs.ghcr_image }}"
+          AMD64_IMG="${GHCR_IMAGE}:build-amd64-${{ github.sha }}"
+          ARM64_IMG="${GHCR_IMAGE}:build-arm64-${{ github.sha }}"
+          DOCKER_TAGS="${{ needs.docker_prepare.outputs.docker_tags }}"
+          DOCKER_PUSH="${{ needs.docker_prepare.outputs.docker_push }}"
+
+          # Determine which images are available
+          IMAGES="${AMD64_IMG}"
+          if [[ "${{ needs.build_docker_arm64.result }}" == "success" ]]; then
+            IMAGES="${IMAGES} ${ARM64_IMG}"
+          fi
+
+          # Create manifest for each tag
+          IFS=',' read -ra TAGS <<< "${DOCKER_TAGS}"
+          for TAG in "${TAGS[@]}"; do
+            TAG=$(echo "${TAG}" | xargs)  # trim whitespace
+            [[ -z "${TAG}" ]] && continue
+            echo "Creating manifest for ${TAG}"
+            docker buildx imagetools create -t "${TAG}" ${IMAGES}
+          done
 
   build_pypi:
     name: Publish package to PyPI
