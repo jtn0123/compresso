@@ -59,11 +59,7 @@ module_classifiers = [
     versioninfo.dev_status(),
     'Intended Audience :: End Users/Desktop',
     'Intended Audience :: Developers',
-    'Programming Language :: Python :: 3.8',
-    'Programming Language :: Python :: 3.9',
-    'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.11',
-    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
     'Operating System :: POSIX :: Linux',
     'Operating System :: Unix',
     'Topic :: Multimedia :: Video :: Conversion',
@@ -204,7 +200,8 @@ def requirements():
 
 def requirements_dev():
     with open(os.path.abspath(os.path.join(os.path.dirname(__file__), 'requirements-dev.txt'))) as f:
-        return f.read().splitlines()
+        return [line for line in f.read().splitlines()
+                if line.strip() and not line.strip().startswith(('-r', '#'))]
 
 
 def collect_runtime_package_data():
