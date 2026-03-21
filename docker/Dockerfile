@@ -109,8 +109,7 @@ ARG NODE_MAJOR="24"
 RUN \
     echo "**** Configure APT ****" \
         && export DEBIAN_FRONTEND=noninteractive \
-        && . /etc/os-release \
-        && JELLYFIN_CODENAME="${VERSION_CODENAME:-noble}" \
+        && JELLYFIN_CODENAME="noble" \
     && \
     echo "**** Install FFmpeg for $(uname -m) ****" \
         && sleep 2 \

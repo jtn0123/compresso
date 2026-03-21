@@ -9,6 +9,9 @@ on:
       - 'master'
       - 'staging'
 
+permissions:
+  contents: read
+
 jobs:
   py_lint:
     name: Lint & Type Check
