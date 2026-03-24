@@ -1,3 +1,15 @@
+# [1.4.0](https://github.com/jtn0123/compresso/compare/v1.3.1...v1.4.0) (2026-03-24)
+
+
+### Bug Fixes
+
+* mock compute_quality_scores in staging tests to prevent side effects ([7e63b3f](https://github.com/jtn0123/compresso/commit/7e63b3f5acaa115d8e198613e20e0370b5ebbe3b))
+
+
+### Features
+
+* toast notifications, postprocessor rollback, and VMAF/SSIM quality scores ([be389b8](https://github.com/jtn0123/compresso/commit/be389b8f28a9e7b1f3e5fcc546adc4e97f72f6b3)), closes [hi#impact](https://github.com/hi/issues/impact)
+
 ## [1.3.1](https://github.com/jtn0123/compresso/compare/v1.3.0...v1.3.1) (2026-03-24)
 
 
