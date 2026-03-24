@@ -101,6 +101,15 @@ def prepare_filtered_approval_tasks(params, include_library=False):
             item['staged_codec'] = ''
             item['staged_resolution'] = ''
 
+        # Add quality scores from the task record
+        try:
+            task_record = Tasks.get_by_id(task_id)
+            item['vmaf_score'] = task_record.vmaf_score
+            item['ssim_score'] = task_record.ssim_score
+        except Exception:
+            item['vmaf_score'] = None
+            item['ssim_score'] = None
+
         if include_library:
             library = Library(approval_task['library_id'])
             item['library_id'] = library.get_id()
@@ -143,6 +152,16 @@ def get_approval_task_detail(task_id):
     staged_path = staged_info.get('path', '')
     staged_meta = extract_media_metadata(staged_path) if staged_path else {}
 
+    # Fetch quality scores from the task record
+    vmaf_score = None
+    ssim_score = None
+    try:
+        task_record = Tasks.get_by_id(task_id)
+        vmaf_score = task_record.vmaf_score
+        ssim_score = task_record.ssim_score
+    except Exception:
+        pass
+
     return {
         'id':                task_id,
         'abspath':           task_data['abspath'],
@@ -163,6 +182,8 @@ def get_approval_task_detail(task_id):
         'staged_codec':      staged_meta.get('codec', ''),
         'staged_resolution': staged_meta.get('resolution', ''),
         'staged_container':  staged_meta.get('container', ''),
+        'vmaf_score':        vmaf_score,
+        'ssim_score':        ssim_score,
     }
 
 

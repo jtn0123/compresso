@@ -409,5 +409,146 @@ class TestHandleProcessedTaskRouting:
         pp._stage_for_approval.assert_not_called()
 
 
+# ------------------------------------------------------------------
+# TestApprovalQualityScores
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestApprovalQualityScores:
+    """Tests for quality score fields in approval helpers."""
+
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp(prefix='compresso_test_quality_')
+        self.staging_dir = os.path.join(self.tmpdir, 'staging')
+        os.makedirs(self.staging_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    @patch('compresso.webserver.helpers.approval.Tasks')
+    @patch('compresso.webserver.helpers.approval.extract_media_metadata', return_value={})
+    @patch('compresso.webserver.helpers.approval.config.Config')
+    @patch('compresso.webserver.helpers.approval.task')
+    def test_detail_includes_quality_scores(self, mock_task_module, mock_config_class,
+                                             mock_extract, mock_tasks_model):
+        """get_approval_task_detail should include vmaf_score and ssim_score."""
+        from compresso.webserver.helpers.approval import get_approval_task_detail
+
+        mock_config = MagicMock()
+        mock_config.get_staging_path.return_value = self.staging_dir
+        mock_config_class.return_value = mock_config
+
+        # Create staged file
+        task_dir = os.path.join(self.staging_dir, 'task_1')
+        os.makedirs(task_dir)
+        staged_file = os.path.join(task_dir, 'video.mkv')
+        with open(staged_file, 'wb') as f:
+            f.write(b'x' * 100)
+
+        # Mock task query
+        mock_task_handler = MagicMock()
+        task_data = {
+            'id': 1, 'abspath': '/test/video.mkv', 'source_size': 1000,
+            'cache_path': '/cache/video.mkv', 'success': True,
+            'start_time': '2024-01-01', 'finish_time': '2024-01-02',
+            'log': '', 'library_id': 1,
+        }
+        mock_task_handler.get_task_list_filtered_and_sorted.return_value = [task_data]
+        mock_task_module.Task.return_value = mock_task_handler
+
+        # Mock Tasks.get_by_id for quality scores
+        mock_record = MagicMock()
+        mock_record.vmaf_score = 91.5
+        mock_record.ssim_score = 0.972
+        mock_tasks_model.get_by_id.return_value = mock_record
+
+        result = get_approval_task_detail(1)
+        assert result is not None
+        assert result['vmaf_score'] == 91.5
+        assert result['ssim_score'] == 0.972
+
+    @patch('compresso.webserver.helpers.approval.Tasks')
+    @patch('compresso.webserver.helpers.approval.extract_media_metadata', return_value={})
+    @patch('compresso.webserver.helpers.approval.config.Config')
+    @patch('compresso.webserver.helpers.approval.task')
+    def test_detail_none_scores_when_not_computed(self, mock_task_module, mock_config_class,
+                                                    mock_extract, mock_tasks_model):
+        """Quality scores should be None when not computed."""
+        from compresso.webserver.helpers.approval import get_approval_task_detail
+
+        mock_config = MagicMock()
+        mock_config.get_staging_path.return_value = self.staging_dir
+        mock_config_class.return_value = mock_config
+
+        task_dir = os.path.join(self.staging_dir, 'task_2')
+        os.makedirs(task_dir)
+        with open(os.path.join(task_dir, 'video.mkv'), 'wb') as f:
+            f.write(b'x' * 100)
+
+        mock_task_handler = MagicMock()
+        task_data = {
+            'id': 2, 'abspath': '/test/video.mkv', 'source_size': 1000,
+            'cache_path': '/cache/video.mkv', 'success': True,
+            'start_time': '', 'finish_time': '', 'log': '', 'library_id': 1,
+        }
+        mock_task_handler.get_task_list_filtered_and_sorted.return_value = [task_data]
+        mock_task_module.Task.return_value = mock_task_handler
+
+        mock_record = MagicMock()
+        mock_record.vmaf_score = None
+        mock_record.ssim_score = None
+        mock_tasks_model.get_by_id.return_value = mock_record
+
+        result = get_approval_task_detail(2)
+        assert result is not None
+        assert result['vmaf_score'] is None
+        assert result['ssim_score'] is None
+
+    @patch('compresso.webserver.helpers.approval.Tasks')
+    @patch('compresso.webserver.helpers.approval.extract_media_metadata', return_value={})
+    @patch('compresso.webserver.helpers.approval.config.Config')
+    @patch('compresso.webserver.helpers.approval.task')
+    def test_list_includes_quality_scores(self, mock_task_module, mock_config_class,
+                                           mock_extract, mock_tasks_model):
+        """prepare_filtered_approval_tasks should include vmaf_score and ssim_score."""
+        from compresso.webserver.helpers.approval import prepare_filtered_approval_tasks
+
+        mock_config = MagicMock()
+        mock_config.get_staging_path.return_value = self.staging_dir
+        mock_config_class.return_value = mock_config
+
+        task_dir = os.path.join(self.staging_dir, 'task_10')
+        os.makedirs(task_dir)
+        with open(os.path.join(task_dir, 'video.mkv'), 'wb') as f:
+            f.write(b'x' * 200)
+
+        mock_task_handler = MagicMock()
+        mock_task_handler.get_total_task_list_count.return_value = 1
+        approval_query = MagicMock()
+        approval_query.count.return_value = 1
+        task_data = {
+            'id': 10, 'abspath': '/test/movie.mkv', 'priority': 100,
+            'type': 'local', 'status': 'awaiting_approval',
+            'source_size': 5000, 'finish_time': '2024-06-01', 'library_id': 1,
+        }
+        # First call returns count query, second returns data query
+        mock_task_handler.get_task_list_filtered_and_sorted.side_effect = [
+            approval_query,
+            [task_data],
+        ]
+        mock_task_module.Task.return_value = mock_task_handler
+
+        mock_record = MagicMock()
+        mock_record.vmaf_score = 85.0
+        mock_record.ssim_score = 0.940
+        mock_tasks_model.get_by_id.return_value = mock_record
+
+        result = prepare_filtered_approval_tasks({'start': 0, 'length': 10})
+        assert len(result['results']) == 1
+        item = result['results'][0]
+        assert item['vmaf_score'] == 85.0
+        assert item['ssim_score'] == 0.940
+
+
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

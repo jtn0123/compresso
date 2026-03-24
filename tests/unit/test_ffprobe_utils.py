@@ -267,5 +267,114 @@ class TestExtractMediaMetadata(object):
         assert result['resolution'] == '4K'
 
 
+@pytest.mark.unittest
+class TestComputeQualityScores(object):
+    """Tests for compute_quality_scores()."""
+
+    def _call(self, *args, **kwargs):
+        from compresso.libs.ffprobe_utils import compute_quality_scores
+        return compute_quality_scores(*args, **kwargs)
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_returns_both_scores_when_available(self, mock_run):
+        """Both VMAF and SSIM should be extracted from ffmpeg output."""
+        def side_effect(cmd, **kwargs):
+            if 'ssim' in ' '.join(cmd):
+                return MagicMock(
+                    returncode=0,
+                    stderr='[Parsed_ssim_0 @ 0x...] SSIM Y:0.950 U:0.980 V:0.975 All:0.968',
+                )
+            elif 'libvmaf' in ' '.join(cmd):
+                return MagicMock(
+                    returncode=0,
+                    stderr='[libvmaf @ 0x...] VMAF score: 92.5',
+                )
+            return MagicMock(returncode=1, stderr='')
+
+        mock_run.side_effect = side_effect
+        result = self._call('/source.mkv', '/encoded.mkv')
+        assert result['ssim_score'] == pytest.approx(0.968)
+        assert result['vmaf_score'] == pytest.approx(92.5)
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_returns_none_when_ffmpeg_fails(self, mock_run):
+        """Non-zero returncode results in None scores."""
+        mock_run.return_value = MagicMock(returncode=1, stderr='error')
+        result = self._call('/source.mkv', '/encoded.mkv')
+        assert result['vmaf_score'] is None
+        assert result['ssim_score'] is None
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_returns_none_on_timeout(self, mock_run):
+        """Timeouts result in None scores."""
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd='ffmpeg', timeout=120)
+        result = self._call('/source.mkv', '/encoded.mkv')
+        assert result['vmaf_score'] is None
+        assert result['ssim_score'] is None
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_ssim_without_vmaf(self, mock_run):
+        """SSIM available but VMAF fails (no libvmaf)."""
+        def side_effect(cmd, **kwargs):
+            if 'ssim' in ' '.join(cmd):
+                return MagicMock(
+                    returncode=0,
+                    stderr='SSIM Y:0.900 All:0.912',
+                )
+            # VMAF fails
+            return MagicMock(returncode=1, stderr='No such filter: libvmaf')
+
+        mock_run.side_effect = side_effect
+        result = self._call('/source.mkv', '/encoded.mkv')
+        assert result['ssim_score'] == pytest.approx(0.912)
+        assert result['vmaf_score'] is None
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_vmaf_alternative_format(self, mock_run):
+        """Supports vmaf_score: format (no 'VMAF score:')."""
+        def side_effect(cmd, **kwargs):
+            if 'ssim' in ' '.join(cmd):
+                return MagicMock(returncode=1, stderr='')
+            elif 'libvmaf' in ' '.join(cmd):
+                return MagicMock(
+                    returncode=0,
+                    stderr='vmaf_score: 88.3',
+                )
+            return MagicMock(returncode=1, stderr='')
+
+        mock_run.side_effect = side_effect
+        result = self._call('/source.mkv', '/encoded.mkv')
+        assert result['vmaf_score'] == pytest.approx(88.3)
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_duration_limit_passed_to_ffmpeg(self, mock_run):
+        """When duration_limit > 0, -t flag should be in ffmpeg command."""
+        mock_run.return_value = MagicMock(returncode=0, stderr='All:0.950')
+        self._call('/source.mkv', '/encoded.mkv', duration_limit=15)
+
+        # Check the first call (SSIM)
+        first_call_cmd = mock_run.call_args_list[0][0][0]
+        assert '-t' in first_call_cmd
+        t_idx = first_call_cmd.index('-t')
+        assert first_call_cmd[t_idx + 1] == '15'
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_no_duration_limit_omits_t_flag(self, mock_run):
+        """When duration_limit=0, -t flag should NOT be in ffmpeg command."""
+        mock_run.return_value = MagicMock(returncode=0, stderr='')
+        self._call('/source.mkv', '/encoded.mkv', duration_limit=0)
+
+        first_call_cmd = mock_run.call_args_list[0][0][0]
+        assert '-t' not in first_call_cmd
+
+    @patch('compresso.libs.ffprobe_utils.subprocess.run')
+    def test_generic_exception_returns_none(self, mock_run):
+        """Generic exception returns None for both scores."""
+        mock_run.side_effect = OSError("ffmpeg not found")
+        result = self._call('/source.mkv', '/encoded.mkv')
+        assert result['vmaf_score'] is None
+        assert result['ssim_score'] is None
+
+
 if __name__ == '__main__':
     pytest.main(['-s', '--log-cli-level=INFO', __file__])

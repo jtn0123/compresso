@@ -167,6 +167,15 @@
       "forwardLogHandlerErrorLabel": "Error Forwarding Logs"
     }
   },
+  "toasts": {
+    "taskCompleted": "Completed",
+    "taskFailed": "Failed",
+    "scanCompleted": "Library scan completed",
+    "approvalReady": "New file ready for approval",
+    "workerFailed": "Worker encountered an error",
+    "smaller": "smaller",
+    "unknownFile": "Unknown file"
+  },
   "headers": {
     "workers": "Workers",
     "pendingTasks": "Pending Tasks",
@@ -738,6 +747,7 @@
         "columnNew": "New",
         "columnChange": "Change",
         "columnSpaceSaved": "Space Saved",
+        "columnQuality": "Quality",
         "columnCompleted": "Completed",
         "columnActions": "Actions",
         "tooltipApprove": "Approve",
@@ -779,7 +789,14 @@
         "failedToFetchTasks": "Failed to fetch approval tasks",
         "failedToFetchDetail": "Failed to fetch task detail",
         "failedToCreatePreview": "Failed to create preview",
-        "previewFailed": "Preview generation failed: {error}"
+        "previewFailed": "Preview generation failed: {error}",
+        "qualityScores": "Quality Scores",
+        "qualityExcellent": "Excellent — visually identical to original",
+        "qualityGood": "Good — minor differences, generally acceptable",
+        "qualityPoor": "Poor — noticeable quality loss",
+        "ssimExplainer": "Structural similarity (100% = identical)",
+        "avgQuality": "Avg Quality",
+        "avgVmafSublabel": "avg VMAF across pending"
       },
       "compressionDashboard": {
         "title": "Compression Dashboard",

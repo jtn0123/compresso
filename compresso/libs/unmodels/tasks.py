@@ -52,3 +52,5 @@ class Tasks(BaseModel):
     processed_by_worker = TextField(null=True)
     log = TextField(null=False, default='')
     source_size = BigIntegerField(null=True, default=0)
+    vmaf_score = FloatField(null=True, default=None)
+    ssim_score = FloatField(null=True, default=None)

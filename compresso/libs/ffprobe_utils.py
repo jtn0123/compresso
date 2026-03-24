@@ -10,6 +10,7 @@
 """
 
 import json
+import re
 import subprocess
 
 from compresso.libs.logs import CompressoLogging
@@ -115,3 +116,58 @@ def extract_media_metadata(filepath):
             break
 
     return result
+
+
+def compute_quality_scores(source_path, encoded_path, duration_limit=30):
+    """
+    Compare source and encoded files using SSIM and VMAF quality metrics.
+    Limits comparison to the first `duration_limit` seconds for performance.
+
+    :param source_path: Path to the original/reference video
+    :param encoded_path: Path to the encoded/distorted video
+    :param duration_limit: Max seconds to compare (0 = full file)
+    :return: dict with 'vmaf_score' (float|None) and 'ssim_score' (float|None)
+    """
+    scores = {'vmaf_score': None, 'ssim_score': None}
+
+    time_limit_args = ['-t', str(duration_limit)] if duration_limit > 0 else []
+
+    # Try SSIM first (more widely available)
+    try:
+        ssim_cmd = (
+            ['ffmpeg', '-y']
+            + time_limit_args + ['-i', encoded_path]
+            + time_limit_args + ['-i', source_path]
+            + ['-lavfi', '[0:v][1:v]ssim', '-f', 'null', '-']
+        )
+        result = subprocess.run(ssim_cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0 and result.stderr:
+            match = re.search(r'All:(\d+(?:\.\d+)?)', result.stderr)
+            if match:
+                scores['ssim_score'] = float(match.group(1))
+    except subprocess.TimeoutExpired:
+        logger.debug("SSIM computation timed out for %s", encoded_path)
+    except Exception as e:
+        logger.debug("SSIM computation failed for %s: %s", encoded_path, str(e))
+
+    # Try VMAF (requires libvmaf filter in FFmpeg)
+    try:
+        vmaf_cmd = (
+            ['ffmpeg', '-y']
+            + time_limit_args + ['-i', encoded_path]
+            + time_limit_args + ['-i', source_path]
+            + ['-lavfi', '[0:v][1:v]libvmaf', '-f', 'null', '-']
+        )
+        result = subprocess.run(vmaf_cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0 and result.stderr:
+            match = re.search(r'VMAF score:\s*(\d+(?:\.\d+)?)', result.stderr)
+            if not match:
+                match = re.search(r'vmaf_score:\s*(\d+(?:\.\d+)?)', result.stderr)
+            if match:
+                scores['vmaf_score'] = float(match.group(1))
+    except subprocess.TimeoutExpired:
+        logger.debug("VMAF computation timed out for %s", encoded_path)
+    except Exception as e:
+        logger.debug("VMAF computation failed for %s (libvmaf may not be available): %s", encoded_path, str(e))
+
+    return scores
