@@ -1,7 +1,7 @@
 <template>
   <q-page padding>
     <div class="q-pa-md">
-      <div class="text-h5 q-mb-md">{{ $t('pages.previewCompare.title') }}</div>
+      <PageHeader :title="$t('pages.previewCompare.title')" />
 
       <AdmonitionBanner type="tip" class="q-mb-md">
         {{ $t('pages.previewCompare.bannerText') }}
@@ -124,10 +124,11 @@ import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import VideoCompare from 'components/preview/VideoCompare.vue';
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
+import PageHeader from 'components/ui/PageHeader.vue';
 
 export default {
   name: 'PreviewCompare',
-  components: { VideoCompare, AdmonitionBanner },
+  components: { VideoCompare, AdmonitionBanner, PageHeader },
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();

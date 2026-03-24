@@ -647,23 +647,34 @@ class PostProcessor(threading.Thread):
                 except Exception as e:
                     self._log("Could not extract destination metadata: {}".format(e), level='debug')
 
+        # Extract source duration for encoding speed context
+        source_duration_seconds = 0
+        try:
+            source_duration_seconds = float(source_meta.get('duration', 0))
+        except (TypeError, ValueError):
+            pass
+
         history_logging.save_task_history(
             {
-                'task_label':            task_dump.get('task_label', ''),
-                'abspath':               task_dump.get('abspath', ''),
-                'task_success':          task_dump.get('task_success', False),
-                'start_time':            task_dump.get('start_time', ''),
-                'finish_time':           task_dump.get('finish_time', ''),
-                'processed_by_worker':   task_dump.get('processed_by_worker', ''),
-                'log':                   task_dump.get('log', ''),
-                'source_size':           task_dump.get('source_size', 0),
-                'destination_size':      destination_size,
-                'library_id':            task_dump.get('library_id', 1),
-                'source_codec':          source_meta.get('codec', ''),
-                'destination_codec':     dest_meta.get('codec', ''),
-                'source_resolution':     source_meta.get('resolution', ''),
-                'source_container':      source_meta.get('container', ''),
-                'destination_container': dest_meta.get('container', ''),
+                'task_label':                task_dump.get('task_label', ''),
+                'abspath':                   task_dump.get('abspath', ''),
+                'task_success':              task_dump.get('task_success', False),
+                'start_time':                task_dump.get('start_time', ''),
+                'finish_time':               task_dump.get('finish_time', ''),
+                'processed_by_worker':       task_dump.get('processed_by_worker', ''),
+                'log':                       task_dump.get('log', ''),
+                'source_size':               task_dump.get('source_size', 0),
+                'destination_size':          destination_size,
+                'library_id':                task_dump.get('library_id', 1),
+                'source_codec':              source_meta.get('codec', ''),
+                'destination_codec':         dest_meta.get('codec', ''),
+                'source_resolution':         source_meta.get('resolution', ''),
+                'source_container':          source_meta.get('container', ''),
+                'destination_container':     dest_meta.get('container', ''),
+                'encoding_duration_seconds': task_dump.get('encoding_duration_seconds', 0),
+                'avg_encoding_fps':          task_dump.get('avg_encoding_fps', 0),
+                'source_duration_seconds':   source_duration_seconds,
+                'encoding_speed_ratio':      task_dump.get('encoding_speed_ratio', 0),
             }
         )
 

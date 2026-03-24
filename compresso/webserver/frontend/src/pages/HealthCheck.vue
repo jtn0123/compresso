@@ -1,7 +1,7 @@
 <template>
   <q-page padding>
     <div class="q-pa-md">
-      <div class="text-h5 q-mb-md">{{ $t('pages.healthCheck.title') }}</div>
+      <PageHeader :title="$t('pages.healthCheck.title')" />
 
       <AdmonitionBanner type="tip" class="q-mb-md">
         {{ $t('pages.healthCheck.bannerText') }}
@@ -10,10 +10,10 @@
       <!-- Summary Cards -->
       <div class="row q-col-gutter-md q-mb-lg">
         <div class="col-6 col-sm">
-          <q-card class="bg-positive text-white">
+          <q-card flat bordered class="stat-card stat-card--positive">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.healthCheck.summaryHealthy') }}</div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.healthCheck.summaryHealthy') }}</div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.healthy }}</template>
               </div>
@@ -21,10 +21,10 @@
           </q-card>
         </div>
         <div class="col-6 col-sm">
-          <q-card class="bg-warning text-white">
+          <q-card flat bordered class="stat-card stat-card--warning">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.healthCheck.summaryWarning') }}</div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.healthCheck.summaryWarning') }}</div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.warning }}</template>
               </div>
@@ -32,10 +32,10 @@
           </q-card>
         </div>
         <div class="col-6 col-sm">
-          <q-card class="bg-negative text-white">
+          <q-card flat bordered class="stat-card stat-card--negative">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.healthCheck.summaryCorrupted') }}</div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.healthCheck.summaryCorrupted') }}</div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.corrupted }}</template>
               </div>
@@ -43,10 +43,10 @@
           </q-card>
         </div>
         <div class="col-6 col-sm">
-          <q-card class="bg-grey text-white">
+          <q-card flat bordered class="stat-card stat-card--grey">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.healthCheck.summaryUnchecked') }}</div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.healthCheck.summaryUnchecked') }}</div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.unchecked }}</template>
               </div>
@@ -54,10 +54,10 @@
           </q-card>
         </div>
         <div class="col-6 col-sm">
-          <q-card class="bg-info text-white">
+          <q-card flat bordered class="stat-card stat-card--info">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.healthCheck.summaryTotal') }}</div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.healthCheck.summaryTotal') }}</div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.total }}</template>
               </div>
@@ -316,10 +316,11 @@ import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import FileInfoDialog from 'components/fileinfo/FileInfoDialog.vue';
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
+import PageHeader from 'components/ui/PageHeader.vue';
 
 export default {
   name: 'HealthCheck',
-  components: { FileInfoDialog, AdmonitionBanner },
+  components: { FileInfoDialog, AdmonitionBanner, PageHeader },
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();

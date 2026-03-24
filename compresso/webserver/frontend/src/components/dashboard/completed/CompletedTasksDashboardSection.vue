@@ -30,23 +30,11 @@
         <q-list
           separator>
 
-          <q-item v-if="!taskList">
+          <q-item v-if="!taskList || !taskList.length">
             <q-item-section>
-
-              <div class="full-width row flex-center text-accent q-gutter-sm">
-                <q-icon size="2em" name="sentiment_dissatisfied"/>
-                <q-item-label>{{ $t('headers.listEmpty') }}</q-item-label>
-                <q-icon size="2em" name="priority_high"/>
-              </div>
-            </q-item-section>
-          </q-item>
-          <q-item v-else-if="!taskList.length">
-            <q-item-section>
-
-              <div class="full-width row flex-center text-accent q-gutter-sm">
-                <q-icon size="2em" name="sentiment_dissatisfied"/>
-                <q-item-label>{{ $t('headers.listEmpty') }}</q-item-label>
-                <q-icon size="2em" name="priority_high"/>
+              <div class="empty-state">
+                <q-icon name="check_circle_outline" size="2em" class="empty-state-icon" />
+                <div class="empty-state-text">{{ $t('components.completedTasks.noCompletedTasks') }}</div>
               </div>
             </q-item-section>
           </q-item>
@@ -156,6 +144,8 @@ export default defineComponent({
 
 .completed-tasks-list-wrap {
   padding: 12px 8px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 @media (max-width: 600px) {

@@ -13,7 +13,8 @@
         <q-item
           clickable
           to="/ui/dashboard"
-          v-ripple>
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/dashboard' }">
           <q-item-section avatar>
             <q-icon name="dashboard"/>
           </q-item-section>
@@ -73,11 +74,13 @@
           </q-item>
         </q-expansion-item>
         <!--END DATA PANELS SELECT-->
+        <q-item-label header class="text-caption text-weight-medium" style="padding: 12px 16px 4px">{{ $t('navigation.tools') }}</q-item-label>
         <!--START COMPRESSION DASHBOARD SELECT-->
         <q-item
           clickable
           to="/ui/compression"
-          v-ripple>
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/compression' }">
           <q-item-section avatar>
             <q-icon name="compress"/>
           </q-item-section>
@@ -90,7 +93,8 @@
         <q-item
           clickable
           to="/ui/approval"
-          v-ripple>
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/approval' }">
           <q-item-section avatar>
             <q-icon name="fact_check"/>
           </q-item-section>
@@ -108,7 +112,8 @@
         <q-item
           clickable
           to="/ui/preview"
-          v-ripple>
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/preview' }">
           <q-item-section avatar>
             <q-icon name="compare"/>
           </q-item-section>
@@ -121,7 +126,8 @@
         <q-item
           clickable
           to="/ui/health"
-          v-ripple>
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/health' }">
           <q-item-section avatar>
             <q-icon name="health_and_safety"/>
           </q-item-section>
@@ -317,5 +323,14 @@ export default {
 <style scoped>
 .footer-gradient {
   background: linear-gradient(to top, #13291f, rgba(19, 41, 31, 0.7)) !important;
+}
+
+.nav-active {
+  border-left: 3px solid var(--q-primary);
+  background: rgba(26, 107, 74, 0.08);
+}
+
+.body--dark .nav-active {
+  background: rgba(34, 145, 106, 0.12);
 }
 </style>

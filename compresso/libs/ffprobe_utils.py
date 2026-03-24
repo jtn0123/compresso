@@ -73,6 +73,7 @@ def extract_media_metadata(filepath):
         'codec': '',
         'resolution': '',
         'container': '',
+        'duration': 0,
     }
 
     # Container from file extension
@@ -87,6 +88,12 @@ def extract_media_metadata(filepath):
         if hint:
             result['codec'] = '{} (estimated)'.format(hint)
         return result
+
+    # Extract duration from format level
+    try:
+        result['duration'] = float(probe_data.get('format', {}).get('duration', 0) or 0)
+    except (TypeError, ValueError):
+        pass
 
     # Find the first video stream
     for stream in probe_data.get('streams', []):

@@ -29,3 +29,7 @@ class CompressionStats(BaseModel):
     library_id = IntegerField(null=False, default=1, index=True)
     source_container = TextField(null=True, default='', index=True)
     destination_container = TextField(null=True, default='', index=True)
+    encoding_duration_seconds = FloatField(null=True, default=0)
+    avg_encoding_fps = FloatField(null=True, default=0)
+    source_duration_seconds = FloatField(null=True, default=0)
+    encoding_speed_ratio = FloatField(null=True, default=0)

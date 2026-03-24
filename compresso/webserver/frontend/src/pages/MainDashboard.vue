@@ -1,6 +1,6 @@
 <template>
   <q-page padding>
-    <div class="row q-col-gutter-md">
+    <div class="row q-col-gutter-lg">
 
       <!-- Row 1: System Status Bar -->
       <div class="col-12">

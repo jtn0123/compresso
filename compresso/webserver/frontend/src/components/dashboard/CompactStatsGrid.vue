@@ -170,9 +170,10 @@ onUnmounted(() => {
 <style scoped>
 .stat-cell {
   border-radius: 4px;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 .stat-cell:hover {
   background-color: rgba(var(--q-primary-rgb, 25, 118, 210), 0.08);
+  transform: translateY(-1px);
 }
 </style>

@@ -74,6 +74,7 @@
     "theme": "Theme",
     "installations": "Installations",
     "options": "Options",
+    "tools": "Tools",
     "documentation": "Documentation",
     "library": "Library",
     "workers": "Workers",
@@ -443,6 +444,7 @@
       }
     },
     "pendingTasks": {
+      "noPendingTasks": "No pending tasks",
       "rescanLibrary": "Rescan library now",
       "moveToTop": "Move selected to top",
       "moveToBottom": "Move selected to bottom",
@@ -481,6 +483,7 @@
       }
     },
     "completedTasks": {
+      "noCompletedTasks": "No completed tasks yet",
       "details": "Details",
       "metadata": "Metadata",
       "metadataTitle": "File Metadata",
@@ -780,6 +783,14 @@
       },
       "compressionDashboard": {
         "title": "Compression Dashboard",
+        "sectionDistribution": "Distribution",
+        "sectionTimeline": "Timeline",
+        "sectionAnalysis": "Analysis & Details",
+        "encodingSpeed": "Encoding Speed",
+        "encodingSpeedCaption": "Average encoding FPS and speed ratio over time",
+        "noSpeedData": "No encoding speed data available yet",
+        "avgFps": "Avg FPS",
+        "speedRatio": "Speed Ratio",
         "tooltipSpaceSaved": "Total disk space recovered by replacing originals with compressed versions.",
         "tooltipRatio": "Output size divided by input size. 50% means the file is half its original size.",
         "tooltipPendingEstimate": "Estimated savings if pending tasks complete at the current average compression ratio.",

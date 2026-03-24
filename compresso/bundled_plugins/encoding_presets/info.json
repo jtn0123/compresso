@@ -1,0 +1,11 @@
+{
+    "id": "encoding_presets",
+    "name": "Encoding Presets",
+    "author": "Compresso",
+    "version": "1.0.0",
+    "description": "Configure encoding quality settings: CRF/quality level, encoder preset speed, maximum bitrate cap, resolution scaling, and audio bitrate. Builds FFmpeg commands with your chosen parameters.",
+    "icon": "",
+    "compatibility": [2],
+    "tags": "encoding,ffmpeg,quality,presets,video,audio",
+    "bundled": true
+}

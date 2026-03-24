@@ -78,6 +78,12 @@ class WorkerSubprocessMonitor(threading.Thread):
         self.subprocess_rss_bytes = 0
         self.subprocess_vms_bytes = 0
 
+        # Encoding speed tracking
+        self.last_encoding_fps = 0
+        self.last_encoding_speed = 0
+        self._fps_samples = []
+        self._speed_samples = []
+
     def set_proc(self, pid):
         try:
             if pid != self.subprocess_pid:
@@ -259,6 +265,48 @@ class WorkerSubprocessMonitor(threading.Thread):
                 'cpu_percent': '0', 'mem_percent': '0',
                 'rss_bytes':   '0', 'vms_bytes': '0',
             }
+
+    def parse_ffmpeg_speed(self, line_text):
+        """Parse FFmpeg progress output for fps and speed values."""
+        try:
+            line = str(line_text).strip()
+            if 'fps=' not in line and 'speed=' not in line:
+                return
+            import re
+            fps_match = re.search(r'fps=\s*([\d.]+)', line)
+            if fps_match:
+                fps_val = float(fps_match.group(1))
+                if fps_val > 0:
+                    self.last_encoding_fps = fps_val
+                    self._fps_samples.append(fps_val)
+            speed_match = re.search(r'speed=\s*([\d.]+)x', line)
+            if speed_match:
+                speed_val = float(speed_match.group(1))
+                if speed_val > 0:
+                    self.last_encoding_speed = speed_val
+                    self._speed_samples.append(speed_val)
+        except Exception:
+            pass
+
+    def get_encoding_speed_stats(self):
+        """Return average encoding speed metrics collected during processing."""
+        avg_fps = 0
+        avg_speed = 0
+        if self._fps_samples:
+            avg_fps = sum(self._fps_samples) / len(self._fps_samples)
+        if self._speed_samples:
+            avg_speed = sum(self._speed_samples) / len(self._speed_samples)
+        return {
+            'avg_encoding_fps': round(avg_fps, 2),
+            'encoding_speed_ratio': round(avg_speed, 2),
+        }
+
+    def reset_encoding_speed_stats(self):
+        """Reset encoding speed tracking for a new task."""
+        self.last_encoding_fps = 0
+        self.last_encoding_speed = 0
+        self._fps_samples = []
+        self._speed_samples = []
 
     def set_subprocess_start_time(self, proc_start_time):
         try:
@@ -558,6 +606,23 @@ class Worker(threading.Thread):
         success = self.__exec_worker_runners_on_set_task()
         # Mark the task as either success or not
         self.current_task.set_success(success)
+
+        # Store encoding speed stats on the task for postprocessor
+        if self.worker_subprocess_monitor is not None:
+            speed_stats = self.worker_subprocess_monitor.get_encoding_speed_stats()
+            elapsed = self.worker_subprocess_monitor.get_subprocess_elapsed()
+            self.current_task.statistics['encoding_speed'] = {
+                'avg_encoding_fps': speed_stats.get('avg_encoding_fps', 0),
+                'encoding_speed_ratio': speed_stats.get('encoding_speed_ratio', 0),
+                'encoding_duration_seconds': elapsed,
+            }
+            self.worker_subprocess_monitor.reset_encoding_speed_stats()
+        else:
+            self.current_task.statistics['encoding_speed'] = {
+                'avg_encoding_fps': 0,
+                'encoding_speed_ratio': 0,
+                'encoding_duration_seconds': 0,
+            }
 
         # Mark task completion statistics
         self.__set_finish_task_stats()
@@ -1007,6 +1072,9 @@ class Worker(threading.Thread):
                 if line_text == '' and sub_proc.poll() is not None:
                     self.logger.debug("Subprocess task completed!")
                     break
+
+                # Parse encoding speed from FFmpeg output
+                self.worker_subprocess_monitor.parse_ffmpeg_speed(line_text)
 
                 # Parse the progress
                 try:

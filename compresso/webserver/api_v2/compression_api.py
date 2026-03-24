@@ -23,6 +23,7 @@ from compresso.webserver.api_v2.schema.compression_schemas import (
     LibraryAnalysisRequestSchema,
     LibraryAnalysisStatusSchema,
     OptimizationProgressSchema,
+    EncodingSpeedTimelineSchema,
 )
 from compresso.webserver.helpers import compression_stats
 from compresso.webserver.helpers.healthcheck import validate_library_exists
@@ -79,6 +80,11 @@ class ApiCompressionHandler(BaseApiHandler):
             "path_pattern":      r"/compression/optimization-progress",
             "supported_methods": ["GET"],
             "call_method":       "get_optimization_progress",
+        },
+        {
+            "path_pattern":      r"/compression/encoding-speed",
+            "supported_methods": ["GET"],
+            "call_method":       "get_encoding_speed_timeline",
         },
     ]
 
@@ -556,6 +562,48 @@ class ApiCompressionHandler(BaseApiHandler):
                 }
             )
             self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_encoding_speed_timeline(self):
+        """
+        Compression - encoding speed timeline
+        ---
+        description: Returns encoding speed data over time for charting.
+        responses:
+            200:
+                description: 'Returns encoding speed timeline data.'
+                content:
+                    application/json:
+                        schema:
+                            EncodingSpeedTimelineSchema
+        """
+        try:
+            library_id = self._parse_library_id_arg()
+            validate_library_exists(library_id)
+
+            data = compression_stats.get_encoding_speed_timeline(library_id=library_id)
+
+            response = self.build_response(
+                EncodingSpeedTimelineSchema(),
+                {
+                    "success": True,
+                    "data":    data,
+                }
+            )
+            self.write_success(response)
+            return
+        except ValueError as ve:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
+            self.write_error()
             return
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))

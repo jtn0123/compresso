@@ -31,3 +31,6 @@ build/**
 dist/**
 *.egg-info/**
 *.egg
+
+# Scratch / temp directories
+.codex_tmp/

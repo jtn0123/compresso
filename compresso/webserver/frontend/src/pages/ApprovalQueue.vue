@@ -2,14 +2,11 @@
   <q-page class="q-pa-md">
 
     <!-- Header -->
-    <div class="row items-center q-mb-md">
-      <div class="col">
-        <div class="text-h5">{{ $t('pages.approvalQueue.title') }}</div>
-        <div class="text-caption text-grey">
-          {{ $t('pages.approvalQueue.caption') }}
-        </div>
-      </div>
-      <div class="col-auto q-gutter-sm">
+    <PageHeader
+      :title="$t('pages.approvalQueue.title')"
+      :subtitle="$t('pages.approvalQueue.caption')"
+    >
+      <template #actions>
         <q-btn
           color="positive"
           icon="check_circle"
@@ -27,8 +24,8 @@
           flat
           icon="refresh"
           @click="fetchTasks"/>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <AdmonitionBanner type="note" class="q-mb-md">
       {{ $t('pages.approvalQueue.bannerText') }}
@@ -45,10 +42,10 @@
     <!-- Summary Cards -->
     <div class="row q-col-gutter-md q-mb-lg">
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-primary text-white">
+        <q-card flat bordered class="stat-card stat-card--primary">
           <q-card-section>
-            <div class="text-caption">{{ $t('pages.approvalQueue.awaitingReview') }}</div>
-            <div class="text-h5">
+            <div class="stat-label">{{ $t('pages.approvalQueue.awaitingReview') }}</div>
+            <div class="stat-value">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="40px" />
               <template v-else>{{ $t('pages.approvalQueue.filesCount', { count: pagination.rowsNumber }) }}</template>
             </div>
@@ -56,38 +53,38 @@
         </q-card>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-positive text-white">
+        <q-card flat bordered class="stat-card stat-card--positive">
           <q-card-section>
-            <div class="text-caption">{{ $t('pages.approvalQueue.spaceToSave') }}</div>
-            <div class="text-h5">
+            <div class="stat-label">{{ $t('pages.approvalQueue.spaceToSave') }}</div>
+            <div class="stat-value">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="60px" />
               <template v-else>{{ formatSize(totalSpaceSaved) }}</template>
             </div>
-            <div class="text-caption" v-if="!loading || tasks.length > 0">{{ $t('pages.approvalQueue.ifAllApproved') }}</div>
+            <div class="stat-sublabel" v-if="!loading || tasks.length > 0">{{ $t('pages.approvalQueue.ifAllApproved') }}</div>
           </q-card-section>
         </q-card>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-accent text-white">
+        <q-card flat bordered class="stat-card stat-card--accent">
           <q-card-section>
-            <div class="text-caption">{{ $t('pages.approvalQueue.avgSavings') }}</div>
-            <div class="text-h5">
+            <div class="stat-label">{{ $t('pages.approvalQueue.avgSavings') }}</div>
+            <div class="stat-value">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="50px" />
               <template v-else>{{ avgSavingsPercent }}%</template>
             </div>
-            <div class="text-caption" v-if="!loading || tasks.length > 0">{{ $t('pages.approvalQueue.perFile') }}</div>
+            <div class="stat-sublabel" v-if="!loading || tasks.length > 0">{{ $t('pages.approvalQueue.perFile') }}</div>
           </q-card-section>
         </q-card>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-info text-white">
+        <q-card flat bordered class="stat-card stat-card--info">
           <q-card-section>
-            <div class="text-caption">{{ $t('pages.approvalQueue.largestFile') }}</div>
-            <div class="text-h5 ellipsis" style="max-width: 200px">
+            <div class="stat-label">{{ $t('pages.approvalQueue.largestFile') }}</div>
+            <div class="stat-value ellipsis" style="max-width: 200px">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="80px" />
               <template v-else>{{ largestFileName }}</template>
             </div>
-            <div class="text-caption" v-if="!loading || tasks.length > 0">
+            <div class="stat-sublabel" v-if="!loading || tasks.length > 0">
               {{ largestFileSavings }}
             </div>
           </q-card-section>
@@ -451,10 +448,11 @@ import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import VideoCompare from 'components/preview/VideoCompare.vue';
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
+import PageHeader from 'components/ui/PageHeader.vue';
 
 export default {
   name: 'ApprovalQueue',
-  components: { VideoCompare, AdmonitionBanner },
+  components: { VideoCompare, AdmonitionBanner, PageHeader },
   setup() {
     const $q = useQuasar();
     const { t: $t } = useI18n();

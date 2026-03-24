@@ -278,6 +278,10 @@ class History(object):
                     library_id=task_data.get('library_id', 1),
                     source_container=task_data.get('source_container', ''),
                     destination_container=task_data.get('destination_container', ''),
+                    encoding_duration_seconds=task_data.get('encoding_duration_seconds', 0),
+                    avg_encoding_fps=task_data.get('avg_encoding_fps', 0),
+                    source_duration_seconds=task_data.get('source_duration_seconds', 0),
+                    encoding_speed_ratio=task_data.get('encoding_speed_ratio', 0),
                 )
         except Exception as error:
             self.logger.exception("Failed to save historic task entry to database. %s", error)
@@ -328,7 +332,9 @@ class History(object):
     def create_compression_stats_entry(historic_task, source_size=0, destination_size=0,
                                        source_codec='', destination_codec='',
                                        source_resolution='', library_id=1,
-                                       source_container='', destination_container=''):
+                                       source_container='', destination_container='',
+                                       encoding_duration_seconds=0, avg_encoding_fps=0,
+                                       source_duration_seconds=0, encoding_speed_ratio=0):
         """
         Create a compression stats entry for a completed task.
 
@@ -341,6 +347,10 @@ class History(object):
         :param library_id:
         :param source_container:
         :param destination_container:
+        :param encoding_duration_seconds:
+        :param avg_encoding_fps:
+        :param source_duration_seconds:
+        :param encoding_speed_ratio:
         :return:
         """
         CompressionStats.create(
@@ -353,6 +363,10 @@ class History(object):
             library_id=library_id,
             source_container=source_container or '',
             destination_container=destination_container or '',
+            encoding_duration_seconds=encoding_duration_seconds or 0,
+            avg_encoding_fps=avg_encoding_fps or 0,
+            source_duration_seconds=source_duration_seconds or 0,
+            encoding_speed_ratio=encoding_speed_ratio or 0,
         )
 
     def get_library_compression_summary(self, library_id=None):

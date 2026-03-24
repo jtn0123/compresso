@@ -84,26 +84,19 @@
     </q-drawer>
 
     <q-page-container>
-      <router-view/>
+      <router-view v-slot="{ Component }">
+        <transition name="page-fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </q-page-container>
 
     <q-footer
       class="footer-background text-white gt-sm">
-      <q-toolbar>
-        <q-toolbar-title>
-          <div class="gt-sm">
-            <div class="row q-mt-lg">
-              <div class="col q-ml-lg">
-              </div>
-              <div class="col-auto q-mr-lg">
-                <p class="text-subtitle1">
-                  Version:
-                  <span>{{ compressoVersion }}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </q-toolbar-title>
+      <q-toolbar style="min-height: 32px">
+        <q-space />
+        <span class="text-caption" style="opacity: 0.7">v{{ compressoVersion }}</span>
+        <q-space />
       </q-toolbar>
     </q-footer>
 
