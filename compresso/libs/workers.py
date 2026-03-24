@@ -608,14 +608,21 @@ class Worker(threading.Thread):
         self.current_task.set_success(success)
 
         # Store encoding speed stats on the task for postprocessor
-        speed_stats = self.worker_subprocess_monitor.get_encoding_speed_stats()
-        elapsed = self.worker_subprocess_monitor.get_subprocess_elapsed()
-        self.current_task.statistics['encoding_speed'] = {
-            'avg_encoding_fps': speed_stats.get('avg_encoding_fps', 0),
-            'encoding_speed_ratio': speed_stats.get('encoding_speed_ratio', 0),
-            'encoding_duration_seconds': elapsed,
-        }
-        self.worker_subprocess_monitor.reset_encoding_speed_stats()
+        if self.worker_subprocess_monitor is not None:
+            speed_stats = self.worker_subprocess_monitor.get_encoding_speed_stats()
+            elapsed = self.worker_subprocess_monitor.get_subprocess_elapsed()
+            self.current_task.statistics['encoding_speed'] = {
+                'avg_encoding_fps': speed_stats.get('avg_encoding_fps', 0),
+                'encoding_speed_ratio': speed_stats.get('encoding_speed_ratio', 0),
+                'encoding_duration_seconds': elapsed,
+            }
+            self.worker_subprocess_monitor.reset_encoding_speed_stats()
+        else:
+            self.current_task.statistics['encoding_speed'] = {
+                'avg_encoding_fps': 0,
+                'encoding_speed_ratio': 0,
+                'encoding_duration_seconds': 0,
+            }
 
         # Mark task completion statistics
         self.__set_finish_task_stats()
