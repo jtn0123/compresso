@@ -55,6 +55,49 @@ This prevents conflicting copy operations or deleting a file that is also being 
 """
 
 
+class FileOperationTracker:
+    """Track destructive file operations for rollback on failure."""
+
+    def __init__(self, logger):
+        self._logger = logger
+        self._backups = []  # list of (backup_path, original_path)
+
+    def safe_remove(self, filepath):
+        """Back up a file before removing it, enabling rollback."""
+        if not os.path.exists(filepath):
+            return
+        backup_path = filepath + '.compresso.bak'
+        try:
+            shutil.copy2(filepath, backup_path)
+            self._backups.append((backup_path, filepath))
+            os.remove(filepath)
+        except Exception as e:
+            self._logger.warning("FileOperationTracker: failed to back up '%s': %s", filepath, e)
+            raise
+
+    def commit(self):
+        """Remove all backups -- operations are finalized."""
+        for backup_path, _ in self._backups:
+            try:
+                if os.path.exists(backup_path):
+                    os.remove(backup_path)
+            except Exception as e:
+                self._logger.warning("FileOperationTracker: failed to remove backup '%s': %s", backup_path, e)
+        self._backups.clear()
+
+    def rollback(self):
+        """Restore all backed-up files to their original paths."""
+        for backup_path, original_path in reversed(self._backups):
+            try:
+                if os.path.exists(backup_path):
+                    shutil.move(backup_path, original_path)
+                    self._logger.info("FileOperationTracker: restored '%s' from backup", original_path)
+            except Exception as e:
+                self._logger.error("FileOperationTracker: FAILED to restore '%s' from backup '%s': %s",
+                                   original_path, backup_path, e)
+        self._backups.clear()
+
+
 class PostProcessError(Exception):
     def __init__(self, expected_var, result_var):
         Exception.__init__(self, "Errors found during post process checks. Expected {}, but instead found {}".format(
@@ -188,7 +231,8 @@ class PostProcessor(threading.Thread):
     def _stage_for_approval(self):
         """
         Stage the transcoded file for user review instead of replacing the original.
-        Copies the cache file to the staging directory and sets status to 'awaiting_approval'.
+        Copies the cache file to the staging directory, computes quality metrics,
+        and sets status to 'awaiting_approval'.
         """
         try:
             cache_path = self.current_task.get_cache_path()
@@ -205,6 +249,22 @@ class PostProcessor(threading.Thread):
             shutil.copy2(cache_path, staged_path)
 
             self._log("Staged transcoded file for approval: {} -> {}".format(cache_path, staged_path))
+
+            # Compute quality metrics (non-blocking, best-effort)
+            try:
+                from compresso.libs.ffprobe_utils import compute_quality_scores
+                source_path = self.current_task.get_source_abspath()
+                scores = compute_quality_scores(source_path, staged_path, duration_limit=30)
+                if scores:
+                    db = self.current_task.task._meta.database
+                    with db.atomic():
+                        self.current_task.task.vmaf_score = scores.get('vmaf_score')
+                        self.current_task.task.ssim_score = scores.get('ssim_score')
+                        self.current_task.task.save()
+                    self._log("Quality scores computed - VMAF: {}, SSIM: {}".format(
+                        scores.get('vmaf_score'), scores.get('ssim_score')), level='debug')
+            except Exception as e:
+                self._log("Quality metric computation failed (non-fatal)", message2=str(e), level="warning")
 
             # Set the task status to awaiting_approval (keeps cache and task alive)
             self.current_task.set_status('awaiting_approval')
@@ -319,6 +379,8 @@ class PostProcessor(threading.Thread):
         file_move_processes_success = True
         # Create a list for filling with destination paths
         destination_files = []
+        # Create a tracker for safe file operations with rollback support
+        tracker = FileOperationTracker(self.logger)
         if self.current_task.task.success:
             # Run a postprocess file movement on the cache file for each plugin that configures it
 
@@ -369,7 +431,8 @@ class PostProcessor(threading.Thread):
                     # Copy the file
                     file_in = os.path.abspath(data.get('file_in'))
                     file_out = os.path.abspath(data.get('file_out'))
-                    if not self.__copy_file(file_in, file_out, destination_files, plugin_module.get('plugin_id')):
+                    if not self.__copy_file(file_in, file_out, destination_files, plugin_module.get('plugin_id'),
+                                            tracker=tracker):
                         file_move_processes_success = False
                 else:
                     self._log("Plugin did not request a file copy ({})".format(
@@ -387,10 +450,10 @@ class PostProcessor(threading.Thread):
                     #   so if we did copy the file here, it would be a waste of time
                     if not data.get('remove_source_file'):
                         if not self.__copy_file(cache_path, destination_data.get('abspath'), destination_files, 'DEFAULT',
-                                                move=True):
+                                                move=True, tracker=tracker):
                             file_move_processes_success = False
                 elif not self.__copy_file(cache_path, destination_data.get('abspath'), destination_files, 'DEFAULT',
-                                          move=True):
+                                          move=True, tracker=tracker):
                     file_move_processes_success = False
 
             # Source file removal process
@@ -401,10 +464,21 @@ class PostProcessor(threading.Thread):
                     # Only carry out a source removal if the file exists and the final copy was also successful
                     if file_move_processes_success and os.path.exists(source_data.get('abspath')):
                         self._log("Removing source: {}".format(source_data.get('abspath')))
-                        os.remove(source_data.get('abspath'))
+                        try:
+                            tracker.safe_remove(source_data.get('abspath'))
+                        except Exception as e:
+                            self._log("Failed to safely remove source file", message2=str(e), level="error")
+                            file_move_processes_success = False
                     else:
                         self._log("Keeping source file '{}'. Not all postprocessor file movement functions completed.".format(
                             source_data.get('abspath')), level="warning")
+
+            # Commit or rollback tracked file operations
+            if file_move_processes_success:
+                tracker.commit()
+            else:
+                self._log("Rolling back all tracked file operations due to failures", level="warning")
+                tracker.rollback()
 
             # Log a final error if not all file moments were successful
             if not file_move_processes_success:
@@ -531,7 +605,7 @@ class PostProcessor(threading.Thread):
             except Exception as e:
                 self._log("Exception while clearing cache path '{}'".format(str(e)), level='error')
 
-    def __copy_file(self, file_in, file_out, destination_files, plugin_id, move=False):
+    def __copy_file(self, file_in, file_out, destination_files, plugin_id, move=False, tracker=None):
         if move:
             self._log("Move file triggered by ({}) {} --> {}".format(plugin_id, file_in, file_out))
         else:
@@ -567,7 +641,10 @@ class PostProcessor(threading.Thread):
             # Remove dest file if it already exists (required only for moves)
             if os.path.exists(file_out):
                 self._log("The file_out path already exists. Removing file '{}'".format(file_out), level="debug")
-                os.remove(file_out)
+                if tracker:
+                    tracker.safe_remove(file_out)
+                else:
+                    os.remove(file_out)
 
             # Move file from part to final destination
             self._log("Renaming file '{}' --> '{}'.".format(part_file_out, file_out), level='debug')
@@ -580,6 +657,9 @@ class PostProcessor(threading.Thread):
             self.logger.error("POSTPROCESS_FILE_COPY_FAILED source=%s dest=%s", file_in, file_out)
             self._log("Exception while copying file {} to {}:".format(file_in, file_out),
                       message2=str(e), level="exception")
+            if tracker:
+                self._log("Rolling back file operations due to copy failure", level="warning")
+                tracker.rollback()
             file_move_processes_success = False
 
         return file_move_processes_success

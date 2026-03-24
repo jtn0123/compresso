@@ -138,6 +138,187 @@ class TestCopyFile(object):
 
 
 # ------------------------------------------------------------------
+# TestFileOperationTracker
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestFileOperationTracker(object):
+    """Tests for the FileOperationTracker rollback helper."""
+
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp(prefix='compresso_test_tracker_')
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _make_file(self, name, content=b'test content'):
+        path = os.path.join(self.tmpdir, name)
+        with open(path, 'wb') as f:
+            f.write(content)
+        return path
+
+    def _make_tracker(self):
+        from compresso.libs.postprocessor import FileOperationTracker
+        import logging
+        logger = logging.getLogger('test_tracker')
+        return FileOperationTracker(logger)
+
+    def test_safe_remove_creates_backup_and_removes_file(self):
+        tracker = self._make_tracker()
+        path = self._make_file('original.mkv', b'important data')
+
+        tracker.safe_remove(path)
+
+        assert not os.path.exists(path)
+        assert os.path.exists(path + '.compresso.bak')
+
+    def test_commit_removes_backups(self):
+        tracker = self._make_tracker()
+        path = self._make_file('original.mkv', b'data')
+
+        tracker.safe_remove(path)
+        assert os.path.exists(path + '.compresso.bak')
+
+        tracker.commit()
+        assert not os.path.exists(path + '.compresso.bak')
+
+    def test_rollback_restores_files(self):
+        tracker = self._make_tracker()
+        content = b'very important data'
+        path = self._make_file('original.mkv', content)
+
+        tracker.safe_remove(path)
+        assert not os.path.exists(path)
+
+        tracker.rollback()
+        assert os.path.exists(path)
+        with open(path, 'rb') as f:
+            assert f.read() == content
+
+    def test_rollback_clears_backup_list(self):
+        tracker = self._make_tracker()
+        path = self._make_file('file.mkv', b'data')
+
+        tracker.safe_remove(path)
+        tracker.rollback()
+
+        # Rolling back again should be a no-op (list is cleared)
+        tracker.rollback()
+        assert os.path.exists(path)
+
+    def test_commit_clears_backup_list(self):
+        tracker = self._make_tracker()
+        path = self._make_file('file.mkv', b'data')
+
+        tracker.safe_remove(path)
+        tracker.commit()
+
+        # Committing again should be a no-op
+        tracker.commit()
+
+    def test_safe_remove_nonexistent_file_is_noop(self):
+        tracker = self._make_tracker()
+        path = os.path.join(self.tmpdir, 'nonexistent.mkv')
+
+        # Should not raise
+        tracker.safe_remove(path)
+
+    def test_multiple_files_rolled_back_in_reverse(self):
+        tracker = self._make_tracker()
+        a = self._make_file('a.mkv', b'aaa')
+        b = self._make_file('b.mkv', b'bbb')
+
+        tracker.safe_remove(a)
+        tracker.safe_remove(b)
+
+        assert not os.path.exists(a)
+        assert not os.path.exists(b)
+
+        tracker.rollback()
+
+        assert os.path.exists(a)
+        assert os.path.exists(b)
+        with open(a, 'rb') as f:
+            assert f.read() == b'aaa'
+        with open(b, 'rb') as f:
+            assert f.read() == b'bbb'
+
+    def test_multiple_files_committed(self):
+        tracker = self._make_tracker()
+        a = self._make_file('a.mkv', b'aaa')
+        b = self._make_file('b.mkv', b'bbb')
+
+        tracker.safe_remove(a)
+        tracker.safe_remove(b)
+        tracker.commit()
+
+        assert not os.path.exists(a)
+        assert not os.path.exists(b)
+        assert not os.path.exists(a + '.compresso.bak')
+        assert not os.path.exists(b + '.compresso.bak')
+
+
+# ------------------------------------------------------------------
+# TestCopyFileWithTracker
+# ------------------------------------------------------------------
+
+@pytest.mark.unittest
+class TestCopyFileWithTracker(object):
+    """Tests for PostProcessor.__copy_file() with tracker parameter."""
+
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp(prefix='compresso_test_copy_tracker_')
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _make_file(self, name, content=b'test content'):
+        path = os.path.join(self.tmpdir, name)
+        with open(path, 'wb') as f:
+            f.write(content)
+        return path
+
+    def _make_tracker(self):
+        from compresso.libs.postprocessor import FileOperationTracker
+        import logging
+        logger = logging.getLogger('test_tracker')
+        return FileOperationTracker(logger)
+
+    def test_copy_with_tracker_backs_up_destination(self):
+        """When tracker is provided and destination exists, it should be backed up."""
+        pp = _make_postprocessor()
+        tracker = self._make_tracker()
+
+        existing_content = b'original destination'
+        src = self._make_file('new_source.mkv', b'new data')
+        dst = self._make_file('dest.mkv', existing_content)
+        dest_files = []
+
+        result = pp._PostProcessor__copy_file(src, dst, dest_files, 'test', move=True, tracker=tracker)
+        assert result is True
+        assert os.path.exists(dst)
+        # Backup should exist until commit
+        assert os.path.exists(dst + '.compresso.bak')
+        with open(dst + '.compresso.bak', 'rb') as f:
+            assert f.read() == existing_content
+
+        tracker.commit()
+        assert not os.path.exists(dst + '.compresso.bak')
+
+    def test_copy_without_tracker_no_backup(self):
+        """When no tracker is provided, no backup should be created."""
+        pp = _make_postprocessor()
+
+        src = self._make_file('source.mkv', b'new data')
+        dst = self._make_file('dest.mkv', b'old data')
+        dest_files = []
+
+        result = pp._PostProcessor__copy_file(src, dst, dest_files, 'test', move=True)
+        assert result is True
+        assert not os.path.exists(dst + '.compresso.bak')
+
+
+# ------------------------------------------------------------------
 # TestCleanupCacheFiles
 # ------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { Notify, setCssVar } from 'quasar'
 
 /**
@@ -7,6 +7,68 @@ import { Notify, setCssVar } from 'quasar'
  * Updated automatically when notifications are fetched or dismissed.
  */
 export const notificationsCount = ref(0)
+
+/**
+ * Toast settings for real-time event notifications.
+ * Persisted to localStorage.
+ */
+const TOAST_SETTINGS_KEY = 'compresso-toast-settings'
+function loadToastSettings() {
+  try {
+    const stored = localStorage.getItem(TOAST_SETTINGS_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch { /* ignore parse errors */ }
+  return { enabled: true, verbosity: 'all' }
+}
+export const toastSettings = reactive(loadToastSettings())
+
+export function saveToastSettings() {
+  try {
+    localStorage.setItem(TOAST_SETTINGS_KEY, JSON.stringify({
+      enabled: toastSettings.enabled,
+      verbosity: toastSettings.verbosity,
+    }))
+  } catch { /* ignore storage errors */ }
+}
+
+const TOAST_ICON_MAP = {
+  success: 'check_circle',
+  error: 'error',
+  warning: 'warning',
+  info: 'info',
+}
+const TOAST_COLOR_MAP = {
+  success: 'positive',
+  error: 'negative',
+  warning: 'warning',
+  info: 'info',
+}
+
+/**
+ * Show a toast notification for real-time events.
+ *
+ * @param {'success'|'error'|'warning'|'info'} type
+ * @param {string} message
+ * @param {object} [options] - Additional Quasar Notify options
+ */
+export function showEventToast(type, message, options = {}) {
+  if (!toastSettings.enabled || toastSettings.verbosity === 'off') return
+  // In 'important' mode, only show errors and warnings
+  if (toastSettings.verbosity === 'important' && type !== 'error' && type !== 'warning') return
+
+  Notify.create({
+    type: undefined,
+    color: TOAST_COLOR_MAP[type] || 'info',
+    icon: TOAST_ICON_MAP[type] || 'info',
+    message: message,
+    position: 'bottom-right',
+    timeout: 4000,
+    actions: [
+      { icon: 'close', color: 'white', round: true, dense: true }
+    ],
+    ...options,
+  })
+}
 
 let $compresso = {};
 

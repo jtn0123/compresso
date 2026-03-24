@@ -79,13 +79,20 @@
       <div class="col-12 col-sm-6 col-md-3">
         <q-card flat bordered class="stat-card stat-card--info">
           <q-card-section>
-            <div class="stat-label">{{ $t('pages.approvalQueue.largestFile') }}</div>
+            <div class="stat-label">
+              {{ avgVmafScore !== null ? $t('pages.approvalQueue.avgQuality') : $t('pages.approvalQueue.largestFile') }}
+            </div>
             <div class="stat-value ellipsis" style="max-width: 200px">
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="80px" />
+              <template v-else-if="avgVmafScore !== null">
+                <q-badge :color="vmafColor(avgVmafScore)" class="text-body1">
+                  {{ avgVmafScore.toFixed(1) }}
+                </q-badge>
+              </template>
               <template v-else>{{ largestFileName }}</template>
             </div>
             <div class="stat-sublabel" v-if="!loading || tasks.length > 0">
-              {{ largestFileSavings }}
+              {{ avgVmafScore !== null ? $t('pages.approvalQueue.avgVmafSublabel') : largestFileSavings }}
             </div>
           </q-card-section>
         </q-card>
@@ -116,6 +123,7 @@
           <q-td><q-skeleton type="text" width="60px" /></q-td>
           <q-td><q-skeleton type="text" width="60px" /></q-td>
           <q-td><q-skeleton type="text" width="60px" /></q-td>
+          <q-td><q-skeleton type="text" width="50px" /></q-td>
           <q-td><q-skeleton type="text" width="50px" /></q-td>
           <q-td class="gt-sm"><q-skeleton type="text" width="80px" /></q-td>
           <q-td><q-skeleton type="text" width="80px" /></q-td>
@@ -175,6 +183,22 @@
               {{ savingsPercent(props.row) }}%
             </span>
             <span v-else>—</span>
+          </q-td>
+          <!-- Quality (VMAF) -->
+          <q-td key="quality" :props="props" class="text-center">
+            <q-badge
+              v-if="props.row.vmaf_score != null"
+              :color="vmafColor(props.row.vmaf_score)"
+              :label="props.row.vmaf_score.toFixed(1)"
+            >
+              <q-tooltip>
+                VMAF: {{ props.row.vmaf_score.toFixed(1) }}
+                <template v-if="props.row.ssim_score != null">
+                  <br/>SSIM: {{ (props.row.ssim_score * 100).toFixed(1) }}%
+                </template>
+              </q-tooltip>
+            </q-badge>
+            <span v-else class="text-grey text-caption">N/A</span>
           </q-td>
           <!-- Completed -->
           <q-td key="finish_time" :props="props">
@@ -313,7 +337,36 @@
             <span v-else class="text-h6 text-grey">{{ $t('pages.approvalQueue.noSizeChange') }}</span>
           </div>
 
-          <!-- Section 2: Processing Info (collapsed) -->
+          <!-- Section 2: Quality Scores -->
+          <div v-if="detailData.vmaf_score != null || detailData.ssim_score != null" class="q-mb-md">
+            <div class="text-subtitle2 q-mb-sm">{{ $t('pages.approvalQueue.qualityScores') }}</div>
+            <div class="row q-gutter-md">
+              <div v-if="detailData.vmaf_score != null" class="col-auto">
+                <q-badge
+                  :color="vmafColor(detailData.vmaf_score)"
+                  class="text-body2 q-pa-sm"
+                >
+                  VMAF: {{ detailData.vmaf_score.toFixed(1) }}
+                </q-badge>
+                <div class="text-caption text-grey q-mt-xs">
+                  {{ vmafLabel(detailData.vmaf_score) }}
+                </div>
+              </div>
+              <div v-if="detailData.ssim_score != null" class="col-auto">
+                <q-badge
+                  color="info"
+                  class="text-body2 q-pa-sm"
+                >
+                  SSIM: {{ (detailData.ssim_score * 100).toFixed(1) }}%
+                </q-badge>
+                <div class="text-caption text-grey q-mt-xs">
+                  {{ $t('pages.approvalQueue.ssimExplainer') }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Processing Info (collapsed) -->
           <q-expansion-item
             :label="$t('pages.approvalQueue.processingInfo')"
             icon="schedule"
@@ -348,7 +401,7 @@
             </q-card>
           </q-expansion-item>
 
-          <!-- Section 3: Quality Preview -->
+          <!-- Section 4: Quality Preview -->
           <div class="q-mb-md">
             <q-btn
               v-if="!previewActive && !previewLoading"
@@ -493,6 +546,7 @@ export default {
       { name: 'staged_size', label: $t('pages.approvalQueue.columnNew'), field: 'staged_size', align: 'right', sortable: false },
       { name: 'size_delta', label: $t('pages.approvalQueue.columnChange'), field: 'size_delta', align: 'center', sortable: false },
       { name: 'savings', label: $t('pages.approvalQueue.columnSpaceSaved'), field: 'source_size', align: 'center', sortable: false },
+      { name: 'quality', label: $t('pages.approvalQueue.columnQuality'), field: 'vmaf_score', align: 'center', sortable: false },
       { name: 'finish_time', label: $t('pages.approvalQueue.columnCompleted'), field: 'finish_time', align: 'left', sortable: false },
       { name: 'actions', label: $t('pages.approvalQueue.columnActions'), field: 'id', align: 'center', sortable: false },
     ]);
@@ -600,6 +654,27 @@ export default {
       if (row.source_size > 0 && ((row.source_size - row.staged_size) / row.source_size) > 0.2) return 'row-border-positive';
       return '';
     }
+
+    function vmafColor(score) {
+      if (score == null) return 'grey';
+      if (score >= 90) return 'positive';
+      if (score >= 70) return 'warning';
+      return 'negative';
+    }
+
+    function vmafLabel(score) {
+      if (score == null) return '';
+      if (score >= 90) return $t('pages.approvalQueue.qualityExcellent');
+      if (score >= 70) return $t('pages.approvalQueue.qualityGood');
+      return $t('pages.approvalQueue.qualityPoor');
+    }
+
+    const avgVmafScore = computed(() => {
+      const withVmaf = allTasks.value.filter(t => t.vmaf_score != null);
+      if (withVmaf.length === 0) return null;
+      const sum = withVmaf.reduce((acc, t) => acc + t.vmaf_score, 0);
+      return sum / withVmaf.length;
+    });
 
     async function fetchApprovalSetting() {
       try {
@@ -869,6 +944,9 @@ export default {
       avgSavingsPercent,
       largestFileName,
       largestFileSavings,
+      avgVmafScore,
+      vmafColor,
+      vmafLabel,
       previewActive,
       previewLoading,
       previewStatus,

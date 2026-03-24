@@ -1,6 +1,6 @@
 import { Notify } from 'quasar'
 import { ref } from 'vue'
-import $compresso from './compressoGlobals'
+import $compresso, { showEventToast } from './compressoGlobals'
 
 export function escapeHtml(str) {
   if (!str) return ''
@@ -30,6 +30,10 @@ export const CompressoWebsocketHandler = function ($t) {
   let serverId = null
   let connectionCheckInterval = null
   const ownedListenerKeys = new Set()
+
+  // Track seen completed task IDs to detect new completions and avoid re-toasting
+  const seenCompletedIds = new Set()
+  let connectionEstablishedAt = 0
 
   function ensureListenerRegistry() {
     if (typeof $compresso.websocketEventListeners === 'undefined') {
@@ -307,6 +311,7 @@ export const CompressoWebsocketHandler = function ($t) {
         clearTimeout(connectionTimer)
         connectionTimer = null
         wsConnectionState.value = 'connected'
+        connectionEstablishedAt = Date.now()
         if (clearConnectionWarning !== null) {
           clearConnectionWarning()
           clearConnectionWarning = null
@@ -337,6 +342,32 @@ export const CompressoWebsocketHandler = function ($t) {
             switch (jsonData.type) {
               case 'frontend_message':
                 displayMessages(jsonData.data)
+                break
+              case 'completed_tasks':
+                if (jsonData.data && Array.isArray(jsonData.data)) {
+                  const connectionAge = Date.now() - connectionEstablishedAt
+                  for (const task of jsonData.data) {
+                    if (task.id && !seenCompletedIds.has(task.id)) {
+                      seenCompletedIds.add(task.id)
+                      // Only toast if connected for >5s (skip initial load batch)
+                      if (connectionAge > 5000) {
+                        const filename = task.abspath ? task.abspath.split('/').pop() : $t('toasts.unknownFile')
+                        if (task.success) {
+                          const savings = task.source_size && task.source_size > 0
+                            ? ' (' + Math.round(((task.source_size - (task.destination_size || task.source_size)) / task.source_size) * 100) + '% ' + $t('toasts.smaller') + ')'
+                            : ''
+                          showEventToast('success', $t('toasts.taskCompleted') + ': ' + filename + savings)
+                        } else {
+                          showEventToast('error', $t('toasts.taskFailed') + ': ' + filename)
+                        }
+                      }
+                    }
+                  }
+                  // Cap set size to prevent unbounded memory growth
+                  if (seenCompletedIds.size > 500) {
+                    seenCompletedIds.clear()
+                  }
+                }
                 break
             }
           } else {

@@ -52,6 +52,8 @@ class ApprovalTaskItemSchema(BaseSchema):
     source_resolution = fields.Str(load_default='')
     staged_codec = fields.Str(load_default='')
     staged_resolution = fields.Str(load_default='')
+    vmaf_score = fields.Float(load_default=None, allow_none=True)
+    ssim_score = fields.Float(load_default=None, allow_none=True)
     library_id = fields.Int(load_default=None, allow_none=True)
     library_name = fields.Str(load_default=None, allow_none=True)
 
@@ -116,6 +118,8 @@ class ApprovalDetailResponseSchema(BaseSuccessSchema):
     staged_codec = fields.Str(load_default='')
     staged_resolution = fields.Str(load_default='')
     staged_container = fields.Str(load_default='')
+    vmaf_score = fields.Float(load_default=None, allow_none=True)
+    ssim_score = fields.Float(load_default=None, allow_none=True)
 
 
 class ApprovalCountResponseSchema(BaseSuccessSchema):

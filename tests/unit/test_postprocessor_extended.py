@@ -101,9 +101,10 @@ class TestPostProcessError:
 class TestStageForApproval:
     """Tests for PostProcessor._stage_for_approval()."""
 
+    @patch('compresso.libs.ffprobe_utils.compute_quality_scores', return_value={'vmaf_score': None, 'ssim_score': None})
     @patch(f'{PP_MOD}.shutil.copy2')
     @patch(f'{PP_MOD}.os.makedirs')
-    def test_stages_file_successfully(self, mock_makedirs, mock_copy2):
+    def test_stages_file_successfully(self, mock_makedirs, mock_copy2, mock_quality):
         pp = _make_postprocessor()
         pp.settings = MagicMock()
         pp.settings.get_staging_path.return_value = '/staging'
@@ -115,9 +116,10 @@ class TestStageForApproval:
         mock_copy2.assert_called_once()
         pp.current_task.set_status.assert_called_once_with('awaiting_approval')
 
+    @patch('compresso.libs.ffprobe_utils.compute_quality_scores', return_value={'vmaf_score': None, 'ssim_score': None})
     @patch(f'{PP_MOD}.shutil.copy2', side_effect=OSError("disk full"))
     @patch(f'{PP_MOD}.os.makedirs')
-    def test_falls_back_on_staging_failure(self, mock_makedirs, mock_copy2):
+    def test_falls_back_on_staging_failure(self, mock_makedirs, mock_copy2, mock_quality):
         pp = _make_postprocessor()
         pp.settings = MagicMock()
         pp.settings.get_staging_path.return_value = '/staging'
