@@ -141,18 +141,20 @@ describe('fetchLinks error', () => {
   it('resets availableLinks to [] on error', async () => {
     sharedLinksStore.availableLinks = [{ name: 'stale' }]
     axios.get.mockRejectedValueOnce(new Error('timeout'))
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await sharedLinksStore.fetchLinks()
 
     expect(sharedLinksStore.availableLinks).toEqual([])
+    spy.mockRestore()
   })
 
   it('does not crash or throw when the request fails', async () => {
     axios.get.mockRejectedValueOnce(new Error('boom'))
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await expect(sharedLinksStore.fetchLinks()).resolves.toBeUndefined()
+    spy.mockRestore()
   })
 })
 

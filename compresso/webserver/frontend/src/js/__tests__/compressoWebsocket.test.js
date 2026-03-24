@@ -5,21 +5,7 @@ vi.mock('quasar', () => ({
   Notify: { create: vi.fn() },
 }))
 
-// Mock compressoGlobals — the module uses `import $compresso from './compressoGlobals'`
-// The default export is an object with a `$compresso` property. The websocket module
-// accesses `$compresso.ws`, `$compresso.websocketEventListeners`, and `$compresso.frontendMessage`
-// directly off the default export (e.g. `$compresso.ws` where `$compresso` IS the default export).
-// Looking at the source: `import $compresso from './compressoGlobals'` then uses `$compresso.ws`
-// — so the named variable `$compresso` is the default export object from compressoGlobals,
-// which has a `$compresso` property itself. But in websocket.js the code does `$compresso.ws`,
-// meaning it accesses .ws on the default export. Let's check: compressoGlobals default export
-// has `{ $compresso, getCompressoVersion, ... }`. The websocket file imports it as `$compresso`
-// and then does `$compresso.ws`, `$compresso.websocketEventListeners`, `$compresso.frontendMessage`.
-// So in websocket.js, `$compresso` (the import) refers to the default export object, and
-// `$compresso.ws` means `defaultExport.ws`. But compressoGlobals default export has `$compresso`
-// as a property (the inner object). So websocket.js is actually accessing properties directly
-// on the default export — not the inner `$compresso` object.
-// We mock the default export as a plain object with ws, websocketEventListeners, frontendMessage.
+// Mock compressoGlobals default export with the properties accessed by compressoWebsocket.js
 vi.mock('../compressoGlobals', () => ({
   default: {
     ws: undefined,
@@ -147,7 +133,8 @@ describe('addEventListener / removeEventListener', () => {
     handler.addEventListener('message', 'test_listener', cb)
     handler.addEventListener('message', 'test_listener', cb)
     // Still only one entry
-    expect(Object.keys($compressoMock.websocketEventListeners).filter((k) => k === 'test_listener').length).toBe(1)
+    expect(Object.keys($compressoMock.websocketEventListeners)).toContain('test_listener')
+    expect(Object.keys($compressoMock.websocketEventListeners)).toHaveLength(1)
     expect($compressoMock.websocketEventListeners['test_listener'].callback).toBe(cb)
   })
 
