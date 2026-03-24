@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock quasar before importing
 const mockScreen = { lt: { md: false } }
@@ -14,6 +14,11 @@ vi.mock('quasar', () => ({
 import { useMobile } from '../useMobile'
 
 describe('useMobile', () => {
+  beforeEach(() => {
+    mockScreen.lt.md = false
+    mockPlatform.is.mobile = false
+  })
+
   it('returns an object with isMobile computed ref', () => {
     const { isMobile } = useMobile()
     expect(isMobile).toBeDefined()
@@ -26,8 +31,6 @@ describe('useMobile', () => {
 
     const { isMobile } = useMobile()
     expect(isMobile.value).toBe(true)
-
-    mockScreen.lt.md = false
   })
 
   it('returns true when platform is mobile', () => {
@@ -36,8 +39,6 @@ describe('useMobile', () => {
 
     const { isMobile } = useMobile()
     expect(isMobile.value).toBe(true)
-
-    mockPlatform.is.mobile = false
   })
 
   it('returns true when both screen is small and platform is mobile', () => {
@@ -46,9 +47,6 @@ describe('useMobile', () => {
 
     const { isMobile } = useMobile()
     expect(isMobile.value).toBe(true)
-
-    mockScreen.lt.md = false
-    mockPlatform.is.mobile = false
   })
 
   it('returns false when screen is large and platform is not mobile', () => {
