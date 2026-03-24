@@ -96,9 +96,11 @@ jobs:
         run: |
           GHCR_BASE="ghcr.io/${{ github.repository_owner }}/compresso-base"
           DATE_TAG="$(date -u +'%Y%m%d')"
+          RUN_TAG="${DATE_TAG}-${GITHUB_RUN_NUMBER}"
           docker buildx imagetools create \
             -t "${GHCR_BASE}:latest" \
             -t "${GHCR_BASE}:${DATE_TAG}" \
+            -t "${GHCR_BASE}:${RUN_TAG}" \
             "${GHCR_BASE}:amd64" \
             "${GHCR_BASE}:arm64"
 
