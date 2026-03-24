@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/jtn0123/compresso/compare/v1.3.0...v1.3.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* replace silent except-pass with diagnostic logging ([413fe3d](https://github.com/jtn0123/compresso/commit/413fe3d8d1e8c6e1f710a1da087b2104766d6649))
+
 # [1.3.0](https://github.com/jtn0123/compresso/compare/v1.2.3...v1.3.0) (2026-03-24)
 
 
