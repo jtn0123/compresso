@@ -17,7 +17,7 @@ import shutil
 import tempfile
 
 import pytest
-from unittest.mock import patch, MagicMock, mock_open, call
+from unittest.mock import patch, MagicMock
 
 from compresso.bundled_plugins import (
     install_bundled_plugins,
