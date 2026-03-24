@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/jtn0123/compresso/compare/v1.2.3...v1.3.0) (2026-03-24)
+
+
+### Features
+
+* encoding speed analytics, new codecs & UI polish ([#34](https://github.com/jtn0123/compresso/issues/34)) ([3bd4602](https://github.com/jtn0123/compresso/commit/3bd460273240770bad04d36a2206f1868494984f))
+
 ## [1.2.3](https://github.com/jtn0123/compresso/compare/v1.2.2...v1.2.3) (2026-03-21)
 
 
