@@ -449,8 +449,8 @@ class Links(object, metaclass=SingletonType):
                                                                       auth=local_config.get('auth'),
                                                                       username=local_config.get('username'),
                                                                       password=local_config.get('password'))
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.warning("Failed to validate remote installation at %s: %s", local_config.get('address'), e)
 
             # Generate updated configured values
             updated_config = self.__generate_default_config(local_config)

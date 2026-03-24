@@ -262,8 +262,8 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
         else:
             try:
                 os.remove(result.get('temp_path'))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to remove temp file %s: %s", result.get('temp_path'), e)
 
     return result
 

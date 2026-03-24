@@ -144,8 +144,8 @@ def _run_analysis(library_id, library_path, info):
                                 bitrate_mbps = float(bit_rate) / 1_000_000
                             else:
                                 bitrate_mbps = (file_size * 8) / duration / 1_000_000
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to probe bitrate for %s: %s", filepath, e)
 
                 key = (codec, resolution)
                 if key not in groups:

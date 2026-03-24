@@ -9,10 +9,13 @@
     and audio bitrate.
 """
 
+import logging
 import os
 import re
 
 from compresso.libs.unplugins.settings import PluginSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(PluginSettings):
@@ -211,8 +214,8 @@ def _build_ffmpeg_progress_parser(data):
         ]
         result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=30)
         duration = float(result.stdout.strip())
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to probe duration for progress tracking: %s", e)
 
     def parser(line_text, pid=None, proc_start_time=None, unset=False):
         if unset or duration <= 0:

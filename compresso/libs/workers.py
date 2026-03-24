@@ -285,8 +285,8 @@ class WorkerSubprocessMonitor(threading.Thread):
                 if speed_val > 0:
                     self.last_encoding_speed = speed_val
                     self._speed_samples.append(speed_val)
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.debug("Failed to parse FFmpeg speed output: %s", e)
 
     def get_encoding_speed_stats(self):
         """Return average encoding speed metrics collected during processing."""
