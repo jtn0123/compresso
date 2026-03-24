@@ -30,11 +30,15 @@
 
 """
 
+import logging
+
 from peewee import *
 from playhouse.sqliteq import SqliteQueueDatabase
 from datetime import datetime
 from base64 import b64decode
 from playhouse.shortcuts import model_to_dict
+
+logger = logging.getLogger(__name__)
 
 # Do not initialise the database until the model is called.
 
@@ -112,14 +116,14 @@ class Database:
             try:
                 if hasattr(existing_database, 'is_stopped') and not existing_database.is_stopped():
                     existing_database.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to stop existing database: %s", e)
 
             try:
                 if hasattr(existing_database, 'is_closed') and not existing_database.is_closed():
                     existing_database.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to close existing database: %s", e)
 
         # Based on configuration, use a different database.
         if config['TYPE'] == 'SQLITE':

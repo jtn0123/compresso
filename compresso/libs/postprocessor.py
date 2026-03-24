@@ -686,8 +686,8 @@ class PostProcessor(threading.Thread):
             if cache_entry:
                 cache_entry.version += 1
                 cache_entry.save()
-        except Exception:
-            pass  # Non-critical — don't break postprocessor for cache bump
+        except Exception as e:
+            self.logger.debug("Failed to bump analysis cache version: %s", e)
 
         # Execute event plugin runners
         plugin_handler = PluginsHandler()

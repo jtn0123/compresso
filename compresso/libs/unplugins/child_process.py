@@ -38,6 +38,8 @@ import psutil
 
 from compresso.libs.logs import CompressoLogging
 
+logger = CompressoLogging.get_logger(__name__)
+
 # Configure a global shared manager
 _shared_manager = None
 
@@ -78,13 +80,13 @@ def kill_all_plugin_processes():
             try:
                 # on Unix, unblock with SIGCONT
                 p.send_signal(signal.SIGCONT)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to send SIGCONT to PID %s: %s", p.pid, e)
             try:
                 # on all platforms psutil.resume() works if supported
                 p.resume()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to resume PID %s: %s", p.pid, e)
 
         # Attempt graceful shutdown
         for p in procs:
