@@ -95,6 +95,16 @@ jobs:
       - name: Create and push manifest
         run: |
           GHCR_BASE="ghcr.io/${{ github.repository_owner }}/compresso-base"
-          docker buildx imagetools create -t "${GHCR_BASE}:latest" \
+          DATE_TAG="$(date -u +'%Y%m%d')"
+          docker buildx imagetools create \
+            -t "${GHCR_BASE}:latest" \
+            -t "${GHCR_BASE}:${DATE_TAG}" \
             "${GHCR_BASE}:amd64" \
             "${GHCR_BASE}:arm64"
+
+      - name: Print new digest
+        run: |
+          # Print the new digest so it can be pinned in docker/Dockerfile
+          GHCR_BASE="ghcr.io/${{ github.repository_owner }}/compresso-base"
+          docker buildx imagetools inspect "${GHCR_BASE}:latest" \
+            | head -3

@@ -1,4 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/jtn0123/compresso-base:latest
+# Pin base image to a specific digest for reproducible builds.
+# To update: re-run the "Build Docker Base Image" workflow, then run
+#   docker buildx imagetools inspect ghcr.io/jtn0123/compresso-base:latest
+# and replace the digest below with the new value.
+ARG BASE_IMAGE=ghcr.io/jtn0123/compresso-base@sha256:342429cf3cae1a6955db4b84856b48ae08ec468e7235eb26b3ef7479083bd03c
 FROM ${BASE_IMAGE}
 
 # Install pre-built Compresso wheel
