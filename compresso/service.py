@@ -418,6 +418,13 @@ class RootService:
             self.startup_state.mark_error('db_ready', message)
             raise
 
+        # Install bundled plugins
+        try:
+            from compresso.bundled_plugins import install_bundled_plugins
+            install_bundled_plugins(settings.get_plugins_path())
+        except Exception as e:
+            self.logger.warning("STARTUP_BUNDLED_PLUGINS_FAILED error=%s", str(e))
+
         # Start all threads
         try:
             self.start_threads(settings)

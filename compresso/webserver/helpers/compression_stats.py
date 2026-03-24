@@ -66,6 +66,51 @@ def get_space_saved_over_time(library_id=None, interval='day'):
     return history_logging.get_space_saved_over_time(library_id=library_id, interval=interval)
 
 
+def get_encoding_speed_timeline(library_id=None):
+    """
+    Get encoding speed data over time for charting.
+
+    :param library_id: Optional library ID to filter by
+    :return: list of dicts with date, avg_fps, avg_speed_ratio, codec
+    """
+    from compresso.libs.unmodels import CompressionStats, CompletedTasks
+    from peewee import fn
+
+    query = (CompressionStats
+             .select(
+                 fn.DATE(CompletedTasks.finish_time).alias('date'),
+                 CompressionStats.destination_codec,
+                 fn.AVG(CompressionStats.avg_encoding_fps).alias('avg_fps'),
+                 fn.AVG(CompressionStats.encoding_speed_ratio).alias('avg_speed'),
+                 fn.AVG(CompressionStats.encoding_duration_seconds).alias('avg_duration'),
+                 fn.COUNT(CompressionStats.id).alias('count'),
+             )
+             .join(CompletedTasks)
+             .where(CompressionStats.avg_encoding_fps > 0)
+             )
+
+    if library_id is not None:
+        query = query.where(CompressionStats.library_id == library_id)
+
+    query = (query
+             .group_by(fn.DATE(CompletedTasks.finish_time), CompressionStats.destination_codec)
+             .order_by(fn.DATE(CompletedTasks.finish_time).desc())
+             .limit(200))
+
+    results = []
+    for row in query:
+        results.append({
+            'date': str(row.date) if hasattr(row, 'date') else '',
+            'codec': row.destination_codec or 'unknown',
+            'avg_fps': round(float(row.avg_fps or 0), 1),
+            'avg_speed_ratio': round(float(row.avg_speed or 0), 2),
+            'avg_duration': round(float(row.avg_duration or 0), 1),
+            'count': int(row.count or 0),
+        })
+
+    return results
+
+
 def get_pending_estimate():
     """
     Estimate potential space savings for pending tasks based on historical compression ratio.

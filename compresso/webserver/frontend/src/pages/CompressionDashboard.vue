@@ -1,28 +1,29 @@
 <template>
   <q-page padding>
     <div class="q-pa-md">
-      <div class="row items-center q-mb-md">
-        <div class="text-h5 col">{{ $t('pages.compressionDashboard.title') }}</div>
-        <q-select
-          v-model="selectedLibraryId"
-          :options="libraryOptions"
-          :label="$t('pages.compressionDashboard.libraryFilter')"
-          outlined
-          dense
-          emit-value
-          map-options
-          style="min-width: 200px"
-          @update:model-value="onLibraryChange"
-        />
-      </div>
+      <PageHeader :title="$t('pages.compressionDashboard.title')">
+        <template #actions>
+          <q-select
+            v-model="selectedLibraryId"
+            :options="libraryOptions"
+            :label="$t('pages.compressionDashboard.libraryFilter')"
+            outlined
+            dense
+            emit-value
+            map-options
+            style="min-width: 200px"
+            @update:model-value="onLibraryChange"
+          />
+        </template>
+      </PageHeader>
 
       <!-- Summary Cards -->
       <div class="row q-col-gutter-md q-mb-lg">
         <div class="col-12 col-sm-6 col-md-3">
-          <q-card class="bg-primary text-white">
+          <q-card flat bordered class="stat-card stat-card--primary">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.compressionDashboard.totalSpaceSaved') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipSpaceSaved') }}</q-tooltip></div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.compressionDashboard.totalSpaceSaved') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipSpaceSaved') }}</q-tooltip></div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="60px" />
                 <template v-else>{{ formatBytes(summary.space_saved) }}</template>
               </div>
@@ -30,10 +31,10 @@
           </q-card>
         </div>
         <div class="col-12 col-sm-6 col-md-3">
-          <q-card class="bg-secondary text-white">
+          <q-card flat bordered class="stat-card stat-card--secondary">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.compressionDashboard.filesProcessed') }}</div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.compressionDashboard.filesProcessed') }}</div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="40px" />
                 <template v-else>{{ summary.file_count }}</template>
               </div>
@@ -41,10 +42,10 @@
           </q-card>
         </div>
         <div class="col-12 col-sm-6 col-md-3">
-          <q-card class="bg-accent text-white">
+          <q-card flat bordered class="stat-card stat-card--accent">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.compressionDashboard.avgCompressionRatio') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipRatio') }}</q-tooltip></div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.compressionDashboard.avgCompressionRatio') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipRatio') }}</q-tooltip></div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="50px" />
                 <template v-else>{{ (summary.avg_ratio * 100).toFixed(1) }}%</template>
               </div>
@@ -52,14 +53,14 @@
           </q-card>
         </div>
         <div class="col-12 col-sm-6 col-md-3">
-          <q-card class="bg-info text-white">
+          <q-card flat bordered class="stat-card stat-card--info">
             <q-card-section>
-              <div class="text-caption">{{ $t('pages.compressionDashboard.pendingEstimate') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipPendingEstimate') }}</q-tooltip></div>
-              <div class="text-h5">
+              <div class="stat-label">{{ $t('pages.compressionDashboard.pendingEstimate') }}<q-tooltip>{{ $t('pages.compressionDashboard.tooltipPendingEstimate') }}</q-tooltip></div>
+              <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="60px" />
                 <template v-else>{{ formatBytes(pendingEstimate.estimated_savings) }}</template>
               </div>
-              <div class="text-caption">
+              <div class="stat-sublabel">
                 <template v-if="!loadingSummary">{{ $t('pages.compressionDashboard.filesCount', { count: pendingEstimate.pending_count }) }}</template>
               </div>
             </q-card-section>
@@ -68,6 +69,7 @@
       </div>
 
       <!-- Charts Section -->
+      <div class="text-overline text-grey-6 q-mb-sm q-mt-sm">{{ $t('pages.compressionDashboard.sectionDistribution') }}</div>
       <div class="row q-col-gutter-md q-mb-lg">
         <div class="col-12 col-md-6">
           <CodecDistributionChart
@@ -92,8 +94,10 @@
         </div>
       </div>
 
-      <div class="q-mb-lg">
-        <SpaceSavedTimelineChart
+      <div class="text-overline text-grey-6 q-mb-sm">{{ $t('pages.compressionDashboard.sectionTimeline') }}</div>
+      <div class="row q-col-gutter-md q-mb-lg">
+        <div class="col-12 col-md-6">
+          <SpaceSavedTimelineChart
           v-if="timelineData.length > 0 || chartsLoading"
           :data="timelineData"
           :loading="chartsLoading"
@@ -102,9 +106,17 @@
         <q-card v-else>
           <q-card-section class="text-center text-grey">{{ $t('pages.compressionDashboard.noTimelineData') }}</q-card-section>
         </q-card>
+        </div>
+        <div class="col-12 col-md-6">
+          <EncodingSpeedChart
+            :data="encodingSpeedData"
+            :loading="chartsLoading"
+          />
+        </div>
       </div>
 
       <!-- Library Analysis Section -->
+      <div class="text-overline text-grey-6 q-mb-sm">{{ $t('pages.compressionDashboard.sectionAnalysis') }}</div>
       <q-card class="q-mb-lg">
         <q-card-section>
           <div class="row items-center no-wrap">
@@ -274,6 +286,8 @@ import { formatBytes } from 'src/js/formatUtils';
 import CodecDistributionChart from 'components/charts/CodecDistributionChart.vue';
 import ResolutionDistributionChart from 'components/charts/ResolutionDistributionChart.vue';
 import SpaceSavedTimelineChart from 'components/charts/SpaceSavedTimelineChart.vue';
+import EncodingSpeedChart from 'components/charts/EncodingSpeedChart.vue';
+import PageHeader from 'components/ui/PageHeader.vue';
 
 export default {
   name: 'CompressionDashboard',
@@ -281,6 +295,8 @@ export default {
     CodecDistributionChart,
     ResolutionDistributionChart,
     SpaceSavedTimelineChart,
+    EncodingSpeedChart,
+    PageHeader,
   },
   setup() {
     const $q = useQuasar();
@@ -311,6 +327,7 @@ export default {
     const timelineData = ref([]);
     const timelineInterval = ref('day');
     const chartsLoading = ref(false);
+    const encodingSpeedData = ref([]);
 
     const analysisStatus = ref('none');
     const analysisProgress = ref({ checked: 0, total: 0 });
@@ -471,10 +488,12 @@ export default {
           axios.get(getCompressoApiUrl('v2', 'compression/codec-distribution') + param),
           axios.get(getCompressoApiUrl('v2', 'compression/resolution-distribution') + param),
           axios.get(getCompressoApiUrl('v2', 'compression/timeline') + param + (param ? '&' : '?') + 'interval=' + timelineInterval.value),
+          axios.get(getCompressoApiUrl('v2', 'compression/encoding-speed') + param),
         ]);
         if (results[0].status === 'fulfilled' && results[0].value.data) codecData.value = results[0].value.data;
         if (results[1].status === 'fulfilled' && results[1].value.data) resolutionData.value = results[1].value.data.resolutions || [];
         if (results[2].status === 'fulfilled' && results[2].value.data) timelineData.value = results[2].value.data.data || [];
+        if (results[3].status === 'fulfilled' && results[3].value.data) encodingSpeedData.value = results[3].value.data.data || [];
       } catch (error) {
         console.error('Error loading chart data:', error);
       } finally {
@@ -561,6 +580,7 @@ export default {
       codecData,
       resolutionData,
       timelineData,
+      encodingSpeedData,
       chartsLoading,
       statsResults,
       searchValue,

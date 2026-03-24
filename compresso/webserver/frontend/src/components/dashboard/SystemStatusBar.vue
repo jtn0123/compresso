@@ -1,5 +1,5 @@
 <template>
-  <q-card flat bordered>
+  <div class="system-status-bar">
     <q-card-section class="q-pa-sm">
       <div class="row items-center q-col-gutter-sm">
         <!-- CPU -->
@@ -122,7 +122,7 @@
         </div>
       </div>
     </q-card-section>
-  </q-card>
+  </div>
 </template>
 
 <script setup>
@@ -195,6 +195,17 @@ const connectionLabel = computed(() => {
 </script>
 
 <style scoped>
+.system-status-bar {
+  background: rgba(26, 107, 74, 0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(26, 107, 74, 0.1);
+}
+
+.body--dark .system-status-bar {
+  background: rgba(34, 145, 106, 0.08);
+  border-color: rgba(34, 145, 106, 0.15);
+}
+
 .pulse-animation {
   animation: pulse 1.5s ease-in-out infinite;
 }

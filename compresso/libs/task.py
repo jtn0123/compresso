@@ -186,17 +186,21 @@ class Task(object):
 
     def task_dump(self):
         # Generate a copy of this class as a dict
+        encoding_speed = self.statistics.get('encoding_speed', {})
         task_dict = {
-            'task_label':          self.get_source_basename(),
-            'abspath':             self.get_source_abspath(),
-            'task_success':        self.task.success,
-            'start_time':          self.task.start_time,
-            'finish_time':         self.task.finish_time,
-            'processed_by_worker': self.task.processed_by_worker,
-            'errors':              self.errors,
-            'log':                 self.task.log,
-            'source_size':         self.task.source_size or 0,
-            'library_id':         self.task.library_id,
+            'task_label':                self.get_source_basename(),
+            'abspath':                   self.get_source_abspath(),
+            'task_success':              self.task.success,
+            'start_time':                self.task.start_time,
+            'finish_time':               self.task.finish_time,
+            'processed_by_worker':       self.task.processed_by_worker,
+            'errors':                    self.errors,
+            'log':                       self.task.log,
+            'source_size':               self.task.source_size or 0,
+            'library_id':                self.task.library_id,
+            'avg_encoding_fps':          encoding_speed.get('avg_encoding_fps', 0),
+            'encoding_speed_ratio':      encoding_speed.get('encoding_speed_ratio', 0),
+            'encoding_duration_seconds': encoding_speed.get('encoding_duration_seconds', 0),
         }
         return task_dict
 

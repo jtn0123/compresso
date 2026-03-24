@@ -45,6 +45,10 @@ class CompressionStatsResultSchema(BaseSchema):
     library_id = fields.Int()
     ratio = fields.Float()
     space_saved = fields.Int()
+    encoding_duration_seconds = fields.Float()
+    avg_encoding_fps = fields.Float()
+    source_duration_seconds = fields.Float()
+    encoding_speed_ratio = fields.Float()
 
 
 class CompressionStatsSchema(BaseSuccessSchema):
@@ -126,3 +130,8 @@ class OptimizationProgressSchema(BaseSuccessSchema):
     total_files = fields.Int()
     processed_files = fields.Int()
     percent = fields.Float()
+
+
+class EncodingSpeedTimelineSchema(BaseSuccessSchema):
+    """Schema for encoding speed timeline response"""
+    data = fields.List(fields.Raw())
