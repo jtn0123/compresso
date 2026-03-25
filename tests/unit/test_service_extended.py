@@ -413,6 +413,7 @@ class TestRootServiceRun:
         mock_db.is_stopped.side_effect = [False, True]
         mock_settings = MagicMock()
         mock_settings.get_config_path.return_value = '/tmp/config'
+        mock_settings.get_plugins_path.return_value = '/tmp/fake_plugins'
 
         with patch('multiprocessing.Manager', return_value=mock_manager), \
              patch('atexit.register') as mock_register, \
@@ -484,6 +485,7 @@ class TestRootServiceRun:
         mock_manager.dict.side_effect = [MagicMock(), MagicMock()]
         mock_settings = MagicMock()
         mock_settings.get_config_path.return_value = '/tmp/config'
+        mock_settings.get_plugins_path.return_value = '/tmp/fake_plugins'
         mock_db = MagicMock()
 
         with patch('multiprocessing.Manager', return_value=mock_manager), \
