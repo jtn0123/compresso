@@ -169,8 +169,9 @@ export default {
         if (!res.data?.settings?.onboarding_completed) {
           showOnboarding.value = true
         }
-      }).catch(() => {
+      }).catch((err) => {
         // If we can't read settings, don't block the UI
+        console.warn('Failed to fetch settings for onboarding check:', err)
       })
     })
 

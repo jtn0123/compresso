@@ -258,7 +258,13 @@ class ScheduledTasksManager(threading.Thread):
                             task_id, task_obj.finish_time
                         )
                         task_obj.delete_instance()
-                        shutil.rmtree(entry.path)
+                        try:
+                            shutil.rmtree(entry.path)
+                        except OSError as e:
+                            self.logger.warning(
+                                "Failed to remove staging dir for task %s: %s",
+                                task_id, e
+                            )
                     # Still within expiry — leave it
                 else:
                     # Task exists but isn't awaiting approval — staging is orphaned
@@ -266,8 +272,20 @@ class ScheduledTasksManager(threading.Thread):
                         "Cleaning orphaned staging dir for task %s (status=%s)",
                         task_id, task_obj.status
                     )
-                    shutil.rmtree(entry.path)
+                    try:
+                        shutil.rmtree(entry.path)
+                    except OSError as e:
+                        self.logger.warning(
+                            "Failed to remove orphaned staging dir for task %s: %s",
+                            task_id, e
+                        )
             except Tasks.DoesNotExist:
                 # Task was already deleted — clean up orphaned staging
                 self.logger.info("Cleaning orphaned staging dir for deleted task %s", task_id)
-                shutil.rmtree(entry.path)
+                try:
+                    shutil.rmtree(entry.path)
+                except OSError as e:
+                    self.logger.warning(
+                        "Failed to remove orphaned staging dir for deleted task %s: %s",
+                        task_id, e
+                    )

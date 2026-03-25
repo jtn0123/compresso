@@ -58,7 +58,12 @@ def build_tasks_count_query(status):
     """
     # Fetch only on result in order to know that there are any at all
     # Filter by status
-    query = Tasks.select().where((Tasks.status == status)).limit(1)
+    query = Tasks.select().where((Tasks.status == status))
+    # Exclude deferred tasks that haven't reached their retry time yet
+    query = query.where(
+        (Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= datetime.datetime.now())
+    )
+    query = query.limit(1)
     return query.count()
 
 

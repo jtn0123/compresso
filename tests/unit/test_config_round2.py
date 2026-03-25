@@ -31,11 +31,11 @@ def _make_config(tmp_path, settings_data=None):
     config_path = str(tmp_path / 'config')
     os.makedirs(config_path, exist_ok=True)
 
-    if settings_data:
+    if settings_data is not None:
         with open(os.path.join(config_path, 'settings.json'), 'w') as f:
             json.dump(settings_data, f)
 
-    with patch.dict(os.environ, {}, clear=False):
+    with patch.dict(os.environ, {}, clear=True):
         with patch('compresso.config.common') as mock_common:
             mock_common.get_home_dir.return_value = str(tmp_path)
             mock_common.get_default_library_path.return_value = str(tmp_path / 'library')

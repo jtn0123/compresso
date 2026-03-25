@@ -964,6 +964,7 @@
     "title": "Keyboard Shortcuts",
     "navigation": "Navigation",
     "actions": "Actions",
+    "then": "then",
     "pressEscToClose": "Press Escape to close",
     "goToDashboard": "Go to Dashboard",
     "goToCompression": "Go to Compression",

@@ -34,6 +34,16 @@ def reset_singletons():
     SingletonType._instances = {}
 
 
+def _wait_for(predicate, timeout=2.0, interval=0.02):
+    """Poll until predicate() returns True or timeout is reached."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False
+
+
 @pytest.fixture
 def task_db(tmp_path):
     """Create a SQLite database with Tasks and Libraries tables."""
@@ -416,11 +426,10 @@ class TestDeferredFiltering:
             deferred_until=None,
             library_id=1,
         )
-        # Allow SqliteQueueDatabase to process
-        time.sleep(0.3)
+        # Wait for SqliteQueueDatabase to process writes
+        assert _wait_for(lambda: build_tasks_query('pending', sort_by=Tasks.id) is not None)
 
         result = build_tasks_query('pending', sort_by=Tasks.id)
-        assert result is not None
         assert result.abspath == '/tmp/test/ready.mkv'
 
     def test_build_tasks_query_includes_expired_deferred_tasks(self, task_db):
@@ -435,10 +444,9 @@ class TestDeferredFiltering:
             deferred_until=past,
             library_id=1,
         )
-        time.sleep(0.3)
+        assert _wait_for(lambda: build_tasks_query('pending', sort_by=Tasks.id) is not None)
 
         result = build_tasks_query('pending', sort_by=Tasks.id)
-        assert result is not None
         assert result.abspath == '/tmp/test/expired_deferred.mkv'
 
     def test_build_tasks_query_includes_null_deferred(self, task_db):
@@ -451,10 +459,9 @@ class TestDeferredFiltering:
             deferred_until=None,
             library_id=1,
         )
-        time.sleep(0.3)
+        assert _wait_for(lambda: build_tasks_query('pending', sort_by=Tasks.id) is not None)
 
         result = build_tasks_query('pending', sort_by=Tasks.id)
-        assert result is not None
         assert result.abspath == '/tmp/test/normal.mkv'
 
     def test_build_tasks_query_full_list_excludes_deferred(self, task_db):
@@ -476,7 +483,11 @@ class TestDeferredFiltering:
             deferred_until=None,
             library_id=1,
         )
-        time.sleep(0.3)
+        # Wait until the non-deferred task is visible in the full list
+        assert _wait_for(lambda: any(
+            r['abspath'] == '/tmp/test/ready_list.mkv'
+            for r in build_tasks_query_full_task_list('pending', sort_by=Tasks.id)
+        ))
 
         results = list(build_tasks_query_full_task_list('pending', sort_by=Tasks.id))
         abspaths = [r['abspath'] for r in results]
@@ -495,7 +506,8 @@ class TestDeferredFiltering:
             deferred_until=future,
             library_id=1,
         )
-        time.sleep(0.3)
+        # Wait until the task record exists in DB (even though deferred, verify write completed)
+        assert _wait_for(lambda: Tasks.select().where(Tasks.abspath == '/tmp/test/all_deferred.mkv').count() > 0)
 
         result = build_tasks_query('pending', sort_by=Tasks.id)
         assert result is None

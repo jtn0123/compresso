@@ -202,6 +202,25 @@ class TestGuardrailWritesToTaskLog:
 # TestPendingTasksRetryFields
 # ------------------------------------------------------------------
 
+def _call_helper_with_mock_tasks(task_records):
+    """Call prepare_filtered_pending_tasks with mocked task handler returning given records."""
+    mock_task_handler = MagicMock()
+    mock_task_handler.get_total_task_list_count.return_value = len(task_records)
+
+    # First call is for .count() (filtered count), second call returns iterable results
+    mock_count_result = MagicMock()
+    mock_count_result.count.return_value = len(task_records)
+    mock_task_handler.get_task_list_filtered_and_sorted.side_effect = [
+        mock_count_result,
+        task_records,
+    ]
+
+    with patch('compresso.webserver.helpers.pending_tasks.task') as mock_task_module:
+        mock_task_module.Task.return_value = mock_task_handler
+        from compresso.webserver.helpers.pending_tasks import prepare_filtered_pending_tasks
+        return prepare_filtered_pending_tasks({})
+
+
 @pytest.mark.unittest
 class TestPendingTasksRetryFields:
     """Verify that pending_tasks helper includes retry_count and deferred_until
@@ -209,7 +228,7 @@ class TestPendingTasksRetryFields:
 
     def test_includes_retry_count_when_nonzero(self):
         """Pending task result should include retry_count when > 0."""
-        task_data = {
+        result = _call_helper_with_mock_tasks([{
             'id': 1,
             'abspath': '/test/video.mkv',
             'priority': 100,
@@ -218,28 +237,15 @@ class TestPendingTasksRetryFields:
             'retry_count': 2,
             'deferred_until': '2025-03-24 15:30:00',
             'library_id': 1,
-        }
-
-        # Build item like prepare_filtered_pending_tasks does
-        item = {
-            'id':       task_data['id'],
-            'abspath':  task_data['abspath'],
-            'priority': task_data['priority'],
-            'type':     task_data['type'],
-            'status':   task_data['status'],
-        }
-        if task_data.get('retry_count'):
-            item['retry_count'] = task_data['retry_count']
-        if task_data.get('deferred_until'):
-            item['deferred_until'] = str(task_data['deferred_until'])
-
+        }])
+        item = result['results'][0]
         assert 'retry_count' in item
         assert item['retry_count'] == 2
         assert 'deferred_until' in item
 
     def test_omits_retry_count_when_zero(self):
         """Pending task result should NOT include retry_count when 0."""
-        task_data = {
+        result = _call_helper_with_mock_tasks([{
             'id': 1,
             'abspath': '/test/video.mkv',
             'priority': 100,
@@ -247,26 +253,15 @@ class TestPendingTasksRetryFields:
             'status': 'pending',
             'retry_count': 0,
             'deferred_until': None,
-        }
-
-        item = {
-            'id':       task_data['id'],
-            'abspath':  task_data['abspath'],
-            'priority': task_data['priority'],
-            'type':     task_data['type'],
-            'status':   task_data['status'],
-        }
-        if task_data.get('retry_count'):
-            item['retry_count'] = task_data['retry_count']
-        if task_data.get('deferred_until'):
-            item['deferred_until'] = str(task_data['deferred_until'])
-
+            'library_id': 1,
+        }])
+        item = result['results'][0]
         assert 'retry_count' not in item
         assert 'deferred_until' not in item
 
     def test_omits_retry_count_when_none(self):
         """Pending task result should NOT include retry_count when None."""
-        task_data = {
+        result = _call_helper_with_mock_tasks([{
             'id': 1,
             'abspath': '/test/video.mkv',
             'priority': 100,
@@ -274,19 +269,8 @@ class TestPendingTasksRetryFields:
             'status': 'pending',
             'retry_count': None,
             'deferred_until': None,
-        }
-
-        item = {
-            'id':       task_data['id'],
-            'abspath':  task_data['abspath'],
-            'priority': task_data['priority'],
-            'type':     task_data['type'],
-            'status':   task_data['status'],
-        }
-        if task_data.get('retry_count'):
-            item['retry_count'] = task_data['retry_count']
-        if task_data.get('deferred_until'):
-            item['deferred_until'] = str(task_data['deferred_until'])
-
+            'library_id': 1,
+        }])
+        item = result['results'][0]
         assert 'retry_count' not in item
         assert 'deferred_until' not in item
