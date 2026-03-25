@@ -29,7 +29,9 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import os
 import random
+import shutil
 import threading
 import time
 from datetime import datetime, timedelta
@@ -78,6 +80,8 @@ class ScheduledTasksManager(threading.Thread):
         self.manage_completed_tasks()
         # Run preview cleanup every hour
         self.scheduler.every(1).hours.do(self.cleanup_old_previews)
+        # Run staging directory cleanup every 6 hours
+        self.scheduler.every(6).hours.do(self.cleanup_expired_staging)
 
         # Loop every 2 seconds to check if a task is due to be run
         while not self.abort_flag.is_set():
@@ -220,3 +224,68 @@ class ScheduledTasksManager(threading.Thread):
             preview_manager.cleanup_old_previews()
         except Exception as e:
             self.logger.error("Failed to cleanup old previews: %s", e)
+
+    def cleanup_expired_staging(self):
+        """Remove staging directories for tasks that have expired or no longer exist."""
+        settings = config.Config()
+        expiry_days = settings.get_staging_expiry_days()
+        if not expiry_days or expiry_days <= 0:
+            return
+
+        staging_path = settings.get_staging_path()
+        if not os.path.exists(staging_path):
+            return
+
+        cutoff = datetime.now() - timedelta(days=int(expiry_days))
+
+        for entry in os.scandir(staging_path):
+            if not entry.is_dir() or not entry.name.startswith('task_'):
+                continue
+            try:
+                task_id = int(entry.name.split('_')[1])
+            except (ValueError, IndexError):
+                continue
+
+            # Check if the associated task still exists and is still awaiting approval
+            from compresso.libs.unmodels.tasks import Tasks
+            try:
+                task_obj = Tasks.get_by_id(task_id)
+                if task_obj.status == 'awaiting_approval':
+                    # Check age by finish_time
+                    if task_obj.finish_time and task_obj.finish_time < cutoff:
+                        self.logger.info(
+                            "Auto-rejecting expired staging task %s (finished %s)",
+                            task_id, task_obj.finish_time
+                        )
+                        task_obj.delete_instance()
+                        try:
+                            shutil.rmtree(entry.path)
+                        except OSError as e:
+                            self.logger.warning(
+                                "Failed to remove staging dir for task %s: %s",
+                                task_id, e
+                            )
+                    # Still within expiry — leave it
+                else:
+                    # Task exists but isn't awaiting approval — staging is orphaned
+                    self.logger.info(
+                        "Cleaning orphaned staging dir for task %s (status=%s)",
+                        task_id, task_obj.status
+                    )
+                    try:
+                        shutil.rmtree(entry.path)
+                    except OSError as e:
+                        self.logger.warning(
+                            "Failed to remove orphaned staging dir for task %s: %s",
+                            task_id, e
+                        )
+            except Tasks.DoesNotExist:
+                # Task was already deleted — clean up orphaned staging
+                self.logger.info("Cleaning orphaned staging dir for deleted task %s", task_id)
+                try:
+                    shutil.rmtree(entry.path)
+                except OSError as e:
+                    self.logger.warning(
+                        "Failed to remove orphaned staging dir for deleted task %s: %s",
+                        task_id, e
+                    )

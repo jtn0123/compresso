@@ -472,14 +472,18 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
             for task_result in task_list.get('results', []):
                 # Append the task to the results list
-                results.append(
-                    {
-                        'id':       task_result['id'],
-                        'label':    task_result['abspath'],
-                        'priority': task_result['priority'],
-                        'status':   task_result['status'],
-                    }
-                )
+                item = {
+                    'id':       task_result['id'],
+                    'label':    task_result['abspath'],
+                    'priority': task_result['priority'],
+                    'status':   task_result['status'],
+                }
+                # Include retry info when present
+                if task_result.get('retry_count'):
+                    item['retry_count'] = task_result['retry_count']
+                if task_result.get('deferred_until'):
+                    item['deferred_until'] = str(task_result['deferred_until'])
+                results.append(item)
 
             await self._send_stream_message(
                 'pending_tasks',

@@ -30,6 +30,8 @@
 
 """
 
+import datetime
+
 from compresso.libs import task
 from compresso.libs import common
 from compresso.libs.logs import CompressoLogging
@@ -56,7 +58,12 @@ def build_tasks_count_query(status):
     """
     # Fetch only on result in order to know that there are any at all
     # Filter by status
-    query = Tasks.select().where((Tasks.status == status)).limit(1)
+    query = Tasks.select().where((Tasks.status == status))
+    # Exclude deferred tasks that haven't reached their retry time yet
+    query = query.where(
+        (Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= datetime.datetime.now())
+    )
+    query = query.limit(1)
     return query.count()
 
 
@@ -75,6 +82,11 @@ def build_tasks_query(status, sort_by='id', sort_order='asc', local_only=False, 
     """
     # pick query based on sort params
     query = Tasks.select().where((Tasks.status == status))
+
+    # Exclude deferred tasks that haven't reached their retry time yet
+    query = query.where(
+        (Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= datetime.datetime.now())
+    )
 
     # Limit to one result
     if local_only:
@@ -114,6 +126,11 @@ def build_tasks_query_full_task_list(status, sort_by='id', sort_order='asc', lim
     :return:
     """
     query = Tasks.select(Tasks).where((Tasks.status == status))
+
+    # Exclude deferred tasks that haven't reached their retry time yet
+    query = query.where(
+        (Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= datetime.datetime.now())
+    )
 
     # Set the sort order
     if sort_order == 'asc':

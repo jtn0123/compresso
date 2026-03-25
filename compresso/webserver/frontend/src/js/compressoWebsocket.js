@@ -358,6 +358,7 @@ export const CompressoWebsocketHandler = function ($t) {
                             : ''
                           showEventToast('success', $t('toasts.taskCompleted') + ': ' + filename + savings)
                         } else {
+                          // Retry notifications are delivered via frontend_message (not completed_tasks)
                           showEventToast('error', $t('toasts.taskFailed') + ': ' + filename)
                         }
                       }

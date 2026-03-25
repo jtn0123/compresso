@@ -118,6 +118,15 @@ class Config(object, metaclass=SingletonType):
         self.approval_required = False
         self.staging_path = os.path.join(home_directory, '.compresso', 'staging')
 
+        # Task retry settings
+        self.default_max_retries = 3
+
+        # Staging auto-cleanup settings
+        self.staging_expiry_days = 7  # 0 = disabled
+
+        # Onboarding wizard
+        self.onboarding_completed = False
+
         # Fork-specific deployment hardening defaults
         self.large_library_safe_defaults = True
         self.startup_readiness_timeout_seconds = DEFAULT_READINESS_TIMEOUT_SECONDS
@@ -679,3 +688,47 @@ class Config(object, metaclass=SingletonType):
         :return:
         """
         return self.ssl_keyfilepath
+
+    def get_default_max_retries(self):
+        """
+        Get setting - default_max_retries
+
+        :return:
+        """
+        try:
+            return max(0, int(self.default_max_retries))
+        except (TypeError, ValueError):
+            return 3
+
+    def get_staging_expiry_days(self):
+        """
+        Get setting - staging_expiry_days
+        Returns 0 if disabled.
+
+        :return:
+        """
+        try:
+            return max(0, int(self.staging_expiry_days))
+        except (TypeError, ValueError):
+            return 7
+
+    def get_onboarding_completed(self):
+        """
+        Get setting - onboarding_completed
+
+        :return:
+        """
+        if isinstance(self.onboarding_completed, str):
+            return self.onboarding_completed.lower() in ('true', '1', 'yes', 'on')
+        return bool(self.onboarding_completed)
+
+    def set_onboarding_completed(self, value):
+        """
+        Set setting - onboarding_completed
+
+        :return:
+        """
+        if isinstance(value, str):
+            self.onboarding_completed = value.lower() in ('true', '1', 'yes', 'on')
+        else:
+            self.onboarding_completed = bool(value)
