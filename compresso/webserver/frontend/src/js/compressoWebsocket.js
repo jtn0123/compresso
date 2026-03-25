@@ -1,6 +1,9 @@
 import { Notify } from 'quasar'
 import { ref } from 'vue'
 import $compresso, { showEventToast } from './compressoGlobals'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('WebSocket')
 
 export function escapeHtml(str) {
   if (!str) return ''
@@ -102,7 +105,7 @@ export const CompressoWebsocketHandler = function ($t) {
         return;
       }
       if (clearConnectionWarning === null) {
-        console.debug("Display websocket disconnect warning")
+        log.debug("Display websocket disconnect warning")
         clearConnectionWarning = Notify.create({
           timeout: 0,
           spinner: true,
@@ -115,7 +118,7 @@ export const CompressoWebsocketHandler = function ($t) {
         connectionCheckInterval = setInterval(() => {
           if (typeof $compresso.ws !== 'undefined' && $compresso.ws !== null) {
             if ($compresso.ws.readyState === WebSocket.OPEN) {
-              console.debug("Websocket has reconnected. Clearing warning.")
+              log.debug("Websocket has reconnected. Clearing warning.")
               clearConnectionWarning()
               clearConnectionWarning = null
               clearInterval(connectionCheckInterval)
@@ -159,7 +162,7 @@ export const CompressoWebsocketHandler = function ($t) {
       $compresso.ws = null
       wsConnectionState.value = 'disconnected'
       connectionTimer = setTimeout(() => {
-        console.debug('Attempting reconnect to Compresso server...')
+        log.debug('Attempting reconnect to Compresso server...')
         wsConnectionState.value = 'connecting'
         initWebsocket()
       }, 4000)
@@ -302,7 +305,7 @@ export const CompressoWebsocketHandler = function ($t) {
 
     // Ensure the websocket is open
     if (typeof $compresso.ws === 'undefined' || $compresso.ws === null) {
-      console.debug("Starting connection to websocket server")
+      log.debug("Starting connection to websocket server")
       // Open WS connection
       openWS();
 
@@ -334,7 +337,7 @@ export const CompressoWebsocketHandler = function ($t) {
             } else {
               if (jsonData.server_id !== serverId) {
                 // Reload the whole page. Some things may have changed
-                console.debug('Compresso server has restarted. Reloading page...')
+                log.debug('Compresso server has restarted. Reloading page...')
                 location.reload()
               }
             }
@@ -372,16 +375,16 @@ export const CompressoWebsocketHandler = function ($t) {
                 break
             }
           } else {
-            console.error('WebSocket Error: Received contained errors - ', evt.data)
+            log.error('WebSocket Error: Received contained errors - ' + evt.data)
           }
         } else {
-          console.error('WebSocket Error: Received data was not a string - ', evt.data)
+          log.error('WebSocket Error: Received data was not a string - ' + evt.data)
         }
       })
 
       // Add event listener to handle an error in the websocket
       addWebsocketEventListener('error', 'websocket_error', function (evt) {
-        console.error('WebSocket Error: ', evt)
+        log.error('WebSocket Error: ' + evt)
         // Set a timeout before displaying disconnect warning.
         // Sometimes we get a disconnect just from a slow connection.
         setTimeout(() => {
@@ -432,7 +435,7 @@ export const CompressoWebsocketHandler = function ($t) {
     autoReconnectSocket = false
     removeOwnedListeners()
     if (typeof $compresso.ws !== 'undefined' && $compresso.ws !== null) {
-      console.debug("Closing connection to websocket server")
+      log.debug("Closing connection to websocket server")
       // Clear any connection check interval
       if (connectionCheckInterval) {
         clearInterval(connectionCheckInterval)

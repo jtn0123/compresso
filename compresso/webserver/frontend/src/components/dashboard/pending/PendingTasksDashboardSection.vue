@@ -8,6 +8,16 @@
             <q-icon name="fas fa-list-ul"/>
             {{ $t('headers.pendingTasks') }}
           </div>
+          <div v-if="queueEta && queueEta.formatted" class="text-caption text-grey q-mt-xs">
+            {{ $t('queueEta.estCompletion') }}: ~{{ queueEta.formatted }}
+            <q-icon
+              name="circle"
+              size="8px"
+              :color="queueEta.confidence === 'high' ? 'positive' : queueEta.confidence === 'medium' ? 'warning' : 'negative'"
+              class="q-ml-xs"
+            />
+            <q-tooltip>{{ $t('queueEta.confidence') }}: {{ queueEta.confidence }}</q-tooltip>
+          </div>
         </div>
 
         <div class="col-auto">
@@ -96,6 +106,10 @@ export default defineComponent({
     taskList: {
       type: Array,
       required: true
+    },
+    queueEta: {
+      type: Object,
+      default: null
     }
   },
   methods: {

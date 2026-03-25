@@ -66,14 +66,18 @@
 import { ref } from 'vue';
 import compressoGlobals from "src/js/compressoGlobals";
 import CompressoListActionButton from "components/ui/buttons/CompressoListActionButton.vue";
+import { createLogger } from "src/composables/useLogger";
 
 export default {
   name: 'DrawerNotifications',
   components: { CompressoListActionButton },
+  created() {
+    this._log = createLogger('Notifications');
+  },
   methods: {
     runNotificationAction: function (index) {
       if (this.notificationActionsDisabled) {
-        console.debug('Notification actions disabled');
+        this._log.debug('Notification actions disabled');
         return;
       }
       // Disable any other actions being triggered while this one is being run

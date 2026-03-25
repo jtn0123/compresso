@@ -721,8 +721,8 @@ class TestRemoteTaskManagerInit:
         complete_q = queue.Queue()
         event = MagicMock()
         info = {'address': '10.0.0.1', 'uuid': 'uuid-1'}
-        with patch('compresso.libs.installation_link.Links'), \
-             patch('compresso.libs.installation_link.CompressoLogging.get_logger'):
+        with patch('compresso.libs.remote_task_manager.Links'), \
+             patch('compresso.libs.remote_task_manager.CompressoLogging.get_logger'):
             mgr = RemoteTaskManager('thread-1', 'RTM-1', info, pending_q, complete_q, event)
         assert mgr.thread_id == 'thread-1'
         assert mgr.name == 'RTM-1'
@@ -735,8 +735,8 @@ class TestRemoteTaskManagerInit:
         complete_q = queue.Queue()
         event = MagicMock()
         info = {'address': '10.0.0.1', 'uuid': 'uuid-1'}
-        with patch('compresso.libs.installation_link.Links'), \
-             patch('compresso.libs.installation_link.CompressoLogging.get_logger'):
+        with patch('compresso.libs.remote_task_manager.Links'), \
+             patch('compresso.libs.remote_task_manager.CompressoLogging.get_logger'):
             mgr = RemoteTaskManager('thread-1', 'RTM-1', info, pending_q, complete_q, event)
         result = mgr.get_info()
         assert result['name'] == 'RTM-1'
@@ -755,8 +755,8 @@ class TestRemoteTaskManagerRun:
         complete_q = queue.Queue()
         event = MagicMock()
         info = {'address': '10.0.0.1', 'uuid': 'uuid-1'}
-        with patch('compresso.libs.installation_link.Links'), \
-             patch('compresso.libs.installation_link.CompressoLogging.get_logger'):
+        with patch('compresso.libs.remote_task_manager.Links'), \
+             patch('compresso.libs.remote_task_manager.CompressoLogging.get_logger'):
             mgr = RemoteTaskManager('t-1', 'RTM-1', info, pending_q, complete_q, event)
             mgr._log = MagicMock()
             mgr.run()
@@ -777,9 +777,9 @@ class TestRemoteTaskManagerTaskManagement:
         complete_q = queue.Queue()
         event = MagicMock()
         info = {'address': '10.0.0.1', 'uuid': 'uuid-1'}
-        with patch('compresso.libs.installation_link.Links'), \
-             patch('compresso.libs.installation_link.CompressoLogging.get_logger'), \
-             patch('compresso.libs.installation_link.PluginsHandler'):
+        with patch('compresso.libs.remote_task_manager.Links'), \
+             patch('compresso.libs.remote_task_manager.CompressoLogging.get_logger'), \
+             patch('compresso.libs.remote_task_manager.PluginsHandler'):
             mgr = RemoteTaskManager('t-1', 'RTM-1', info, pending_q, complete_q, event)
         return mgr
 
@@ -790,7 +790,7 @@ class TestRemoteTaskManagerTaskManagement:
         mock_task.get_task_id.return_value = 42
         mock_task.get_task_type.return_value = 'local'
         mock_task.get_source_data.return_value = {}
-        with patch('compresso.libs.installation_link.PluginsHandler'):
+        with patch('compresso.libs.remote_task_manager.PluginsHandler'):
             mgr._RemoteTaskManager__set_current_task(mock_task)
         assert mgr.current_task is mock_task
         assert mgr.worker_log == []
@@ -818,8 +818,8 @@ class TestRemoteTaskManagerStats:
         complete_q = queue.Queue()
         event = MagicMock()
         info = {'address': '10.0.0.1'}
-        with patch('compresso.libs.installation_link.Links'), \
-             patch('compresso.libs.installation_link.CompressoLogging.get_logger'):
+        with patch('compresso.libs.remote_task_manager.Links'), \
+             patch('compresso.libs.remote_task_manager.CompressoLogging.get_logger'):
             mgr = RemoteTaskManager('t-1', 'RTM-1', info, pending_q, complete_q, event)
         return mgr
 
@@ -850,8 +850,8 @@ class TestRemoteTaskManagerWriteFailure:
         complete_q = queue.Queue()
         event = MagicMock()
         info = {'address': '10.0.0.1'}
-        with patch('compresso.libs.installation_link.Links'), \
-             patch('compresso.libs.installation_link.CompressoLogging.get_logger'):
+        with patch('compresso.libs.remote_task_manager.Links'), \
+             patch('compresso.libs.remote_task_manager.CompressoLogging.get_logger'):
             mgr = RemoteTaskManager('t-1', 'RTM-1', info, pending_q, complete_q, event)
         mgr.worker_log = []
         mgr.current_task = MagicMock()

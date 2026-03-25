@@ -291,9 +291,9 @@
         v-bind:prevEnabled="true"
         v-bind:prevLabel="$t('navigation.plugins')"
         v-bind:prevPath="'/ui/settings-plugins'"
-        v-bind:nextEnabled="false"
-        v-bind:nextLabel="'none'"
-        v-bind:nextPath="'/ui/settings-plugins'"/>
+        v-bind:nextEnabled="true"
+        v-bind:nextLabel="$t('navigation.notifications')"
+        v-bind:nextPath="'/ui/settings-notifications'"/>
 
     </div>
   </q-page>
@@ -305,6 +305,7 @@ import { onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import axios from "axios";
 import { getCompressoApiUrl } from "src/js/compressoGlobals";
+import { createLogger } from "src/composables/useLogger";
 import RemoteInstallLinkDialog from "components/settings/link/RemoteInstallLinkDialog.vue";
 import MobileSettingsQuickNav from "components/MobileSettingsQuickNav";
 import AdmonitionBanner from "components/ui/AdmonitionBanner.vue";
@@ -326,6 +327,7 @@ export default {
   },
   setup() {
     const { t: $t } = useI18n();
+    const log = createLogger('SettingsLink');
 
     const addRemoteDialogRef = ref(null);
 
@@ -466,7 +468,7 @@ export default {
           method: 'post',
           url: getCompressoApiUrl('v2', 'session/reload'),
         }).catch((err) => {
-          console.error('Failed to reload session:', err)
+          log.error('Failed to reload session: ' + err)
         })
       }).catch(() => {
         this.$q.notify({

@@ -1,6 +1,9 @@
 import axios from "axios";
 import { ref, reactive } from 'vue'
 import { Notify, setCssVar } from 'quasar'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('Globals')
 
 /**
  * Reactive notification count shared across all consumers.
@@ -224,7 +227,7 @@ export default {
         notificationsCount.value = notifications.length
         resolve($compresso.notificationsList)
       }).catch(() => {
-        console.error("Failed to retrieve server notifications")
+        log.error("Failed to retrieve server notifications")
         resolve($compresso.notificationsList)
       });
     })
@@ -242,7 +245,7 @@ export default {
       }).then((response) => {
         resolve()
       }).catch(() => {
-        console.error("Failed to dismiss server notifications")
+        log.error("Failed to dismiss server notifications")
         resolve()
       });
     })

@@ -10,13 +10,17 @@ export default defineComponent({
   name: 'App',
   setup() {
     const $q = useQuasar();
-    let darkMode;
+
+    // Detect system preference if no stored theme
     let configuredTheme = LocalStorage.getItem('theme');
-    darkMode = false;
-    if (configuredTheme === 'dark') {
-      darkMode = true;
+    if (!configuredTheme) {
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      configuredTheme = prefersDark ? 'dark' : 'light';
+      LocalStorage.set('theme', configuredTheme);
     }
-    setTheme(configuredTheme)
+
+    const darkMode = configuredTheme === 'dark';
+    setTheme(configuredTheme);
     $q.dark.set(darkMode);
   }
 })

@@ -23,6 +23,7 @@
 
 <script>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { useQuasar } from 'quasar';
 
 const CHART_COLORS = [
   '#1a6b4a', '#e8a525', '#7c5cbf', '#d43545', '#2e9e5a',
@@ -37,6 +38,7 @@ export default {
     loading: { type: Boolean, default: false },
   },
   setup(props) {
+    const $q = useQuasar();
     const sourceChartRef = ref(null);
     const destChartRef = ref(null);
     let sourceChart = null;
@@ -51,6 +53,9 @@ export default {
       if (sourceChart) sourceChart.destroy();
       if (destChart) destChart.destroy();
 
+      const isDark = $q.dark.isActive;
+      const labelColor = isDark ? '#ccc' : '#666';
+
       if (sourceChartRef.value && props.sourceCodecs.length > 0) {
         sourceChart = new Chart(sourceChartRef.value, {
           type: 'doughnut',
@@ -64,7 +69,12 @@ export default {
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } },
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: labelColor },
+              },
+            },
           },
         });
       }
@@ -82,7 +92,12 @@ export default {
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } },
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: labelColor },
+              },
+            },
           },
         });
       }
@@ -91,6 +106,7 @@ export default {
     watch(() => [props.sourceCodecs, props.destinationCodecs], () => {
       if (!props.loading) renderCharts();
     }, { deep: true });
+    watch(() => $q.dark.isActive, renderCharts);
 
     onMounted(() => {
       if (!props.loading) renderCharts();

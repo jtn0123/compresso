@@ -28,6 +28,7 @@
 
 <script>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { useQuasar } from 'quasar';
 import { formatBytes } from 'src/js/formatUtils';
 
 export default {
@@ -38,6 +39,7 @@ export default {
   },
   emits: ['interval-change'],
   setup(props) {
+    const $q = useQuasar();
     const chartRef = ref(null);
     const interval = ref('day');
     let chart = null;
@@ -51,6 +53,11 @@ export default {
       if (chart) chart.destroy();
 
       if (chartRef.value && props.data.length > 0) {
+        const isDark = $q.dark.isActive;
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const labelColor = isDark ? '#ccc' : '#666';
+        const titleColor = isDark ? '#eee' : '#333';
+
         chart = new Chart(chartRef.value, {
           type: 'line',
           data: {
@@ -73,13 +80,23 @@ export default {
                   label: (ctx) => 'Saved: ' + formatBytes(ctx.parsed.y),
                 },
               },
+              legend: {
+                labels: { color: labelColor },
+              },
             },
             scales: {
+              x: {
+                ticks: { color: labelColor },
+                grid: { color: gridColor },
+              },
               y: {
                 beginAtZero: true,
                 ticks: {
                   callback: (val) => formatBytes(val),
+                  color: labelColor,
                 },
+                title: { display: false, color: titleColor },
+                grid: { color: gridColor },
               },
             },
           },
@@ -90,6 +107,7 @@ export default {
     watch(() => props.data, () => {
       if (!props.loading) renderChart();
     }, { deep: true });
+    watch(() => $q.dark.isActive, renderChart);
 
     onMounted(() => {
       if (!props.loading) renderChart();

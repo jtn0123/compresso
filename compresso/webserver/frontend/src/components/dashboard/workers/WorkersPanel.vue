@@ -123,6 +123,12 @@
             </template>
           </div>
 
+          <!-- Encoding stats -->
+          <div v-if="!worker.idle && !worker.paused && (worker.encodingFps || worker.encodingSpeed)" class="col-auto text-caption q-px-xs" style="min-width: 80px; text-align: right">
+            <span v-if="worker.encodingFps" class="text-blue-6">{{ worker.encodingFps }} {{ $t('workerStats.fps') }}</span>
+            <span v-if="worker.encodingSpeed" class="text-grey q-ml-xs">{{ worker.encodingSpeed }}</span>
+          </div>
+
           <!-- ETC -->
           <div class="col-auto text-caption text-grey q-px-xs" style="min-width: 55px; text-align: right">
             {{ (!worker.idle && !worker.paused) ? worker.etc : '' }}

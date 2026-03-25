@@ -58,6 +58,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { sharedLinksStore } from 'src/js/sharedLinksStore'
 import compressoGlobals from 'src/js/compressoGlobals'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('SharedLinkDropdown')
 
 const { t } = useI18n()
 
@@ -94,7 +97,7 @@ onMounted(async () => {
       canShow.value = true
     }
   } catch (e) {
-    console.error("Error initializing SharedLinkDropdown", e)
+    log.error("Error initializing SharedLinkDropdown: " + e)
   }
 })
 </script>

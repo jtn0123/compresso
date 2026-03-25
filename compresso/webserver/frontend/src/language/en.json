@@ -13,6 +13,27 @@
     "realtimeLost": "Real-time updates lost — data may be stale",
     "uptime": "Uptime"
   },
+  "gpu": {
+    "cardTitle": "GPU Utilization",
+    "chartTitle": "GPU Utilization History",
+    "chartCaption": "Utilization % and temperature over time",
+    "noData": "No GPU data available yet",
+    "utilization": "Utilization",
+    "temperature": "Temp",
+    "memory": "Memory",
+    "utilizationPercent": "Utilization %",
+    "temperatureAxis": "Temperature (\u00B0C)"
+  },
+  "queueEta": {
+    "estCompletion": "Est. completion",
+    "confidence": "Confidence"
+  },
+  "workerStats": {
+    "fps": "fps",
+    "speed": "Speed",
+    "encodingFps": "Encoding FPS",
+    "encodingSpeed": "Encoding Speed"
+  },
   "common": {
     "updatedAgo": "Updated {time}",
     "dataStale": "Data may be stale"
@@ -100,7 +121,9 @@
     "compression": "Compression",
     "approvalQueue": "Approval Queue",
     "abPreview": "A/B Preview",
-    "healthCheck": "Health Check"
+    "healthCheck": "Health Check",
+    "history": "History",
+    "notifications": "Notifications"
   },
   "status": {
     "cannotLoadImage": "Cannot load image",
@@ -800,7 +823,13 @@
         "qualityPoor": "Poor — noticeable quality loss",
         "ssimExplainer": "Structural similarity (100% = identical)",
         "avgQuality": "Avg Quality",
-        "avgVmafSublabel": "avg VMAF across pending"
+        "avgVmafSublabel": "avg VMAF across pending",
+        "filters": "Filters",
+        "allOnPageSelected": "All {count} items on this page are selected.",
+        "selectAllMatching": "Select all {count} matching items",
+        "searchPlaceholder": "Search files...",
+        "codecFilter": "Codec",
+        "qualityThreshold": "Quality (VMAF min)"
       },
       "compressionDashboard": {
         "title": "Compression Dashboard",
@@ -875,6 +904,64 @@
       "errorNotFound": {
         "message": "The page you requested doesn't exist or has been moved.",
         "helpLink": "Need help? Open Help & Support"
+      },
+      "taskHistory": {
+        "title": "Task History",
+        "subtitle": "Browse, filter, and export your completed task records",
+        "exportCsv": "Export CSV",
+        "columns": "Columns",
+        "colFileName": "File Name",
+        "colCodec": "Codec",
+        "colSize": "Size",
+        "colDuration": "Duration",
+        "dateFrom": "From",
+        "dateTo": "To",
+        "codec": "Codec",
+        "library": "Library",
+        "sortBy": "Sort by",
+        "sortAsc": "Sort ascending",
+        "sortDesc": "Sort descending",
+        "selectedCount": "{count} selected",
+        "reprocess": "Reprocess",
+        "delete": "Delete",
+        "viewLog": "View log",
+        "taskLog": "Task Log",
+        "noTasks": "No tasks match your current filters",
+        "noLogAvailable": "No log available for this task.",
+        "confirmDelete": "Are you sure you want to delete this task?",
+        "confirmDeleteSelected": "Are you sure you want to delete {count} selected task(s)?"
+      },
+      "settingsNotifications": {
+        "title": "Notification Integrations",
+        "subtitle": "Configure external notification channels to receive alerts about task events.",
+        "configuredChannels": "Configured Channels",
+        "noChannels": "No notification channels configured. Add one to receive alerts.",
+        "triggerCount": "trigger(s)",
+        "sendTest": "Send test notification",
+        "addChannel": "Add Channel",
+        "editChannel": "Edit Channel",
+        "channelName": "Channel Name",
+        "channelType": "Type",
+        "webhookUrl": "Webhook URL",
+        "customHeaders": "Custom Headers (JSON)",
+        "customHeadersHint": "Optional. Example: {\"Authorization\": \"Bearer token\"}",
+        "triggerEvents": "Trigger Events",
+        "fieldRequired": "This field is required",
+        "typeWebhook": "Webhook",
+        "hintDiscord": "Paste your Discord channel webhook URL",
+        "hintSlack": "Paste your Slack incoming webhook URL",
+        "hintWebhook": "Enter the full URL that will receive POST requests",
+        "fetchError": "Failed to load notification channels.",
+        "testSuccess": "Test notification sent successfully.",
+        "testFailed": "Test notification failed. Check the webhook URL and try again.",
+        "confirmDelete": "Are you sure you want to delete the channel \"{name}\"?",
+        "triggers": {
+          "taskCompleted": "Task completed",
+          "taskFailed": "Task failed",
+          "queueEmpty": "Queue empty",
+          "approvalNeeded": "Approval needed",
+          "healthCheckFailed": "Health check failed"
+        }
       }
     },
     "about": {
@@ -970,6 +1057,7 @@
     "goToCompression": "Go to Compression",
     "goToApproval": "Go to Approval Queue",
     "goToHealth": "Go to Health Check",
+    "goToHistory": "Go to History",
     "goToPreview": "Go to A/B Preview",
     "goToSettingsLibrary": "Go to Settings (Library)",
     "goToSettingsWorkers": "Go to Settings (Workers)",

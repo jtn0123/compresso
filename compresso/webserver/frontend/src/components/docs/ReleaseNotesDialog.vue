@@ -18,6 +18,7 @@ import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
 import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { markdownToHTML } from 'src/js/markupParser'
+import { sanitizeHtml } from 'src/js/sanitize'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
 
 const { t } = useI18n()
@@ -136,7 +137,7 @@ const displayReleaseNotes = () => {
         template.content.prepend(headerDivContainer)
 
         // Display release notes
-        releaseNotes.value = template.innerHTML
+        releaseNotes.value = sanitizeHtml(template.innerHTML)
 
         // Display dialog
         show()

@@ -1,6 +1,9 @@
 import { reactive } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from './compressoGlobals'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('SharedLinks')
 
 export const sharedLinksStore = reactive({
   target: localStorage.getItem('compresso-installation-target') || 'local',
@@ -13,7 +16,7 @@ export const sharedLinksStore = reactive({
       this.availableLinks = response.data.settings.remote_installations || []
       this.localName = response.data.settings.installation_name || ''
     } catch (e) {
-      console.error("Failed to fetch shared links", e)
+      log.error("Failed to fetch shared links", e)
       this.availableLinks = []
     }
   },

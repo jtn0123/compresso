@@ -17,6 +17,7 @@ import tornado.log
 
 from compresso import config
 from compresso.libs import session
+from compresso.libs.gpu_monitor import GpuMonitor
 from compresso.libs.system import System
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
@@ -34,6 +35,11 @@ class ApiSystemHandler(BaseApiHandler):
             "path_pattern":      r"/system/status",
             "supported_methods": ["GET"],
             "call_method":       "get_system_status",
+        },
+        {
+            "path_pattern":      r"/system/gpu-metrics",
+            "supported_methods": ["GET"],
+            "call_method":       "get_gpu_metrics",
         },
     ]
 
@@ -136,6 +142,30 @@ class ApiSystemHandler(BaseApiHandler):
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
+            return
+        except Exception as e:
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_gpu_metrics(self):
+        """
+        System - gpu-metrics
+        ---
+        description: Returns real-time GPU utilization metrics and rolling history.
+        responses:
+            200:
+                description: 'Returns GPU metrics and history.'
+            500:
+                description: Internal error
+        """
+        try:
+            gpu_monitor = GpuMonitor()
+            data = {
+                'gpus': gpu_monitor.get_realtime_metrics(),
+                'history': gpu_monitor.get_history(),
+            }
+            self.write_success(data)
             return
         except Exception as e:
             tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))

@@ -30,7 +30,6 @@
 
 """
 import json
-import subprocess
 import time
 import uuid
 from typing import Any, Dict
@@ -45,8 +44,11 @@ from tornado import gen
 from compresso import config
 from compresso.libs import common, session
 from compresso.libs.frontend_push_messages import FrontendPushMessages
+from compresso.libs.gpu_monitor import GpuMonitor
+from compresso.libs.installation_link import Links
 from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
 from compresso.webserver.helpers import completed_tasks, pending_tasks
+from compresso.webserver.helpers.queue_eta import estimate_queue_eta
 from compresso.webserver.proxy import resolve_proxy_target
 
 
@@ -88,6 +90,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         self.foreman = urt.get_compresso_running_thread('foreman')
         self.session = session.Session()
         self._stream_state: Dict[str, Dict[str, Any]] = {}
+        self._gpu_history_tick = 0
         super().__init__(*args, **kwargs)
 
     async def open(self):
@@ -485,10 +488,17 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     item['deferred_until'] = str(task_result['deferred_until'])
                 results.append(item)
 
+            # Estimate queue ETA and include in payload
+            try:
+                queue_eta = estimate_queue_eta(self.foreman)
+            except Exception:
+                queue_eta = None
+
             await self._send_stream_message(
                 'pending_tasks',
                 {
-                    'results': results
+                    'results': results,
+                    'queue_eta': queue_eta,
                 },
             )
 
@@ -536,46 +546,35 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             await gen.sleep(self.STREAM_POLL_INTERVALS['completed_tasks'])
 
     def _get_gpu_utilization(self):
-        gpus = []
-        try:
-            result = subprocess.run(
-                ['nvidia-smi',
-                 '--query-gpu=index,utilization.gpu,memory.used,memory.total,temperature.gpu',
-                 '--format=csv,noheader,nounits'],
-                capture_output=True, text=True, timeout=5
-            )
-            if result.returncode == 0:
-                for line in result.stdout.strip().split('\n'):
-                    if not line.strip():
-                        continue
-                    parts = [p.strip() for p in line.split(',')]
-                    if len(parts) >= 5:
-                        gpus.append({
-                            'index': int(parts[0]),
-                            'utilization_percent': float(parts[1]),
-                            'memory_used_mb': int(float(parts[2])),
-                            'memory_total_mb': int(float(parts[3])),
-                            'temperature_c': int(float(parts[4])),
-                        })
-        except Exception as e:
-            tornado.log.app_log.warning("GPU monitoring unavailable: %s", e)
-        return gpus
+        """Deprecated: Use GpuMonitor().get_realtime_metrics() instead."""
+        return GpuMonitor().get_realtime_metrics()
 
     async def async_system_status(self):
         while self._stream_is_active(self.sending_system_status):
             mem = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
 
-            await self._send_stream_message(
-                'system_status',
-                {
-                    'cpu_percent':    psutil.cpu_percent(interval=0),
-                    'memory_percent': mem.percent,
-                    'memory_used_gb': round(mem.used / (1024 ** 3), 1),
-                    'disk_percent':   disk.percent,
-                    'disk_used_gb':   round(disk.used / (1024 ** 3), 1),
-                    'gpus':           self._get_gpu_utilization(),
-                },
-            )
+            self._gpu_history_tick += 1
+            gpu_monitor = GpuMonitor()
+
+            # Include remote installation link statuses
+            try:
+                links = Links()
+                link_statuses = links.get_all_link_statuses()
+            except Exception:
+                link_statuses = {}
+
+            payload = {
+                'cpu_percent':    psutil.cpu_percent(interval=0),
+                'memory_percent': mem.percent,
+                'memory_used_gb': round(mem.used / (1024 ** 3), 1),
+                'disk_percent':   disk.percent,
+                'disk_used_gb':   round(disk.used / (1024 ** 3), 1),
+                'gpus':           gpu_monitor.get_realtime_metrics(),
+                'gpu_history':    gpu_monitor.get_history() if self._gpu_history_tick % 6 == 0 else None,
+                'link_statuses':  link_statuses,
+            }
+
+            await self._send_stream_message('system_status', payload)
 
             await gen.sleep(self.STREAM_POLL_INTERVALS['system_status'])

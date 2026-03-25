@@ -35,10 +35,12 @@ def prepare_filtered_approval_tasks(params, include_library=False):
     search_value = params.get('search_value', '')
     library_ids = params.get('library_ids') or []
 
-    order = params.get('order', {
-        "column": 'priority',
-        "dir":    'desc',
-    })
+    order_by = params.get('order_by', 'finish_time')
+    order_direction = params.get('order_direction', 'desc')
+    order = {
+        "column": order_by if order_by else 'finish_time',
+        "dir":    order_direction if order_direction in ('asc', 'desc') else 'desc',
+    }
 
     task_handler = task.Task()
     records_total_count = task_handler.get_total_task_list_count()
@@ -236,6 +238,25 @@ def reject_tasks(task_ids, requeue=False):
     else:
         task_handler = task.Task()
         return task_handler.delete_tasks_recursively(task_ids)
+
+
+def get_all_matching_task_ids(search_value=''):
+    """
+    Return all task IDs that match the given search filter and are awaiting approval.
+    Used for "select all matching" across pages.
+
+    :param search_value: text search on file path
+    :return: list of int task IDs
+    """
+    task_handler = task.Task()
+    results = task_handler.get_task_list_filtered_and_sorted(
+        order={"column": "finish_time", "dir": "desc"},
+        start=0,
+        length=0,
+        search_value=search_value,
+        status='awaiting_approval',
+    )
+    return [t['id'] for t in results]
 
 
 def get_approval_count():

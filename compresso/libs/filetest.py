@@ -29,10 +29,14 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import json
 import os
 import queue
+import subprocess
 import threading
 from copy import deepcopy
+
+import peewee
 
 from compresso import config
 from compresso.libs import history
@@ -137,10 +141,14 @@ class FileTest(object):
                         if target_codecs and file_codec not in [c.lower() for c in target_codecs]:
                             return False, [{'id': 'codec_target',
                                             'message': "Codec '{}' not in target list — '{}'".format(file_codec, path)}], 0, None
-                except Exception as e:
+                except (subprocess.SubprocessError, OSError, json.JSONDecodeError, ValueError) as e:
                     self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, str(e))
-        except Exception as e:
+                except Exception as e:
+                    self.logger.debug("Codec pre-filter probe unexpected error for '%s': %s", path, str(e))
+        except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
             self.logger.debug("Codec pre-filter skipped for '%s': %s", path, str(e))
+        except Exception as e:
+            self.logger.debug("Codec pre-filter unexpected error for '%s': %s", path, str(e))
 
         # TODO: Remove this
         if self.file_in_compresso_ignore_lockfile(path):
@@ -237,7 +245,7 @@ class FileTesterThread(threading.Thread):
                 self._set_testing_state(False)
                 self.event.wait(2)
                 continue
-            except Exception:
+            except (AttributeError, TypeError, OSError):
                 self.logger.exception("Exception in fetching library scan result for path %s:", self.name)
                 self._set_testing_state(False)
                 continue
@@ -267,6 +275,8 @@ class FileTesterThread(threading.Thread):
 
             except UnicodeEncodeError:
                 self.logger.warning("File contains Unicode characters that cannot be processed. Ignoring.")
+            except (OSError, PermissionError):
+                self.logger.exception("File system error testing file path in %s. Ignoring.", self.name)
             except Exception:
                 self.logger.exception("Exception testing file path in %s. Ignoring.", self.name)
             finally:

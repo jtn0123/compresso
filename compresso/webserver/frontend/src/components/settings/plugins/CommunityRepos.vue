@@ -112,6 +112,9 @@ import { date } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('CommunityRepos')
 
 const emit = defineEmits(['hide', 'add-repo'])
 
@@ -149,7 +152,7 @@ const fetchForks = async () => {
       }
     })
   } catch (err) {
-    console.error(err)
+    log.error(err)
     if (err.response && err.response.status === 429) {
       error.value = t('components.plugins.rateLimitExceeded')
     } else {

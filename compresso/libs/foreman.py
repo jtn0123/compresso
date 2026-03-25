@@ -36,6 +36,8 @@ import queue
 import time
 from datetime import datetime, timedelta
 
+import peewee
+
 from compresso.libs import installation_link
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
@@ -110,8 +112,11 @@ class Foreman(threading.Thread):
         for library in Library.get_all_libraries():
             try:
                 library_config = Library(library.get('id'))
-            except Exception:
-                self.logger.exception('Unable to fetch library config for ID', library.get('id'))
+            except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
+                self.logger.exception('Unable to fetch library config for ID %s: %s', library.get('id'), e)
+                continue
+            except Exception as e:
+                self.logger.exception('Unable to fetch library config for ID %s: %s', library.get('id'), e)
                 continue
             # Get list of enabled plugins with their settings
             enabled_plugins = []
@@ -214,7 +219,7 @@ class Foreman(threading.Thread):
             try:
                 worker_group = WorkerGroup(group_id=wg.get('id'))
                 event_schedules = worker_group.get_worker_event_schedules()
-            except Exception as e:
+            except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
                 self.logger.debug('While iterating through the worker groups, the worker group disappeared: %s', str(e))
                 continue
 
@@ -653,6 +658,7 @@ class Foreman(threading.Thread):
 
         last_metrics_time = 0
         metrics_interval = 2
+        _was_queue_active = False
 
         while not self.abort_flag.is_set():
             self.event.wait(2)
@@ -666,8 +672,8 @@ class Foreman(threading.Thread):
                         task_item.set_status('processed')
                     except queue.Empty:
                         continue
-                    except Exception as e:
-                        self.logger.exception('Exception when fetching completed task report from worker', str(e))
+                    except (AttributeError, KeyError, TypeError) as e:
+                        self.logger.exception('Exception when fetching completed task report from worker: %s', str(e))
 
                 # Set up the correct number of workers
                 if not self.abort_flag.is_set():
@@ -705,6 +711,22 @@ class Foreman(threading.Thread):
                                               subprocess=worker_info.get('subprocess'),
                                               )
                     last_metrics_time = now
+
+                # Detect queue transition from active to idle and dispatch notification
+                queue_has_tasks = not self.task_queue.task_list_pending_is_empty()
+                any_workers_busy = any(
+                    not self.worker_threads[t].idle
+                    for t in self.worker_threads
+                    if self.worker_threads[t].is_alive()
+                )
+                queue_is_active = queue_has_tasks or any_workers_busy
+                if _was_queue_active and not queue_is_active:
+                    try:
+                        from compresso.libs.external_notifications import ExternalNotificationDispatcher
+                        ExternalNotificationDispatcher().dispatch('queue_empty', {})
+                    except (ImportError, AttributeError, TypeError):
+                        pass
+                _was_queue_active = queue_is_active
 
                 # Manage worker event schedules
                 self.manage_event_schedules()
@@ -761,7 +783,7 @@ class Foreman(threading.Thread):
                         for worker_id in worker_ids:
                             try:
                                 library_tags = self.get_tags_configured_for_worker(worker_id)
-                            except Exception as e:
+                            except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
                                 # This will happen if the worker group is deleted
                                 self.logger.debug('Error while fetching the tags for the configured worker: %s', str(e))
                                 # Break this fore loop. The main while loop wil clean up these workers on the next pass
@@ -787,8 +809,8 @@ class Foreman(threading.Thread):
                         try:
                             source_abspath = next_item_to_process.get_source_abspath()
                             task_library_name = next_item_to_process.get_task_library_name()
-                        except Exception as e:
-                            self.logger.exception('Exception in fetching task details', str(e))
+                        except (AttributeError, KeyError, TypeError) as e:
+                            self.logger.exception('Exception in fetching task details: %s', str(e))
                             self.event.wait(3)
                             continue
 
@@ -801,8 +823,9 @@ class Foreman(threading.Thread):
                                                 next_item_to_process.get_source_abspath())
                             # Re-queue item at the bottom
                             self.task_queue.requeue_tasks_at_bottom(next_item_to_process.get_task_id())
-            except Exception as e:
-                raise Exception(e)
+            except Exception:
+                self.logger.exception("Unhandled exception in Foreman main loop")
+                self.event.wait(5)
 
         self.logger.info('Leaving Foreman Monitor loop...')
 

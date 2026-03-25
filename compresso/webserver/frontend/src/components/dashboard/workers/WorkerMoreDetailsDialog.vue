@@ -20,8 +20,8 @@
               size="90px"
               :thickness="0.2"
               :color="color"
-              center-color="grey-1"
-              track-color="grey-7"
+              :center-color="$q.dark.isActive ? 'grey-10' : 'grey-1'"
+              :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
               font-size="10px"
               class="q-ma-md"
             >
@@ -41,7 +41,7 @@
                 :value="cpuPercentValue"
                 class="q-mb-sm"
                 color="secondary"
-                track-color="grey-5"
+                :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'"
                 size="20px"
               />
 
@@ -52,7 +52,7 @@
               <q-linear-progress
                 :value="memPercentValue"
                 color="secondary"
-                track-color="grey-5"
+                :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'"
                 size="20px"
               />
             </div>

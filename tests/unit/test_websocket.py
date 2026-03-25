@@ -358,15 +358,21 @@ class TestSend:
 
 @pytest.mark.unittest
 class TestGetGpuUtilization:
-    """Tests for CompressoWebsocketHandler._get_gpu_utilization()."""
+    """Tests for CompressoWebsocketHandler._get_gpu_utilization() (now delegates to GpuMonitor)."""
 
-    @patch(f'{WS_MOD}.subprocess.run')
-    def test_parses_nvidia_smi_output(self, mock_run):
+    @patch(f'{WS_MOD}.GpuMonitor')
+    def test_delegates_to_gpu_monitor(self, mock_gpu_monitor_cls):
         handler = _make_handler()
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "0, 45, 2048, 8192, 65\n1, 30, 1024, 4096, 55\n"
-        mock_run.return_value = mock_result
+        mock_monitor = MagicMock()
+        mock_monitor.get_realtime_metrics.return_value = [
+            {'index': 0, 'type': 'nvidia', 'name': 'GPU-0',
+             'utilization_percent': 45.0, 'memory_used_mb': 2048,
+             'memory_total_mb': 8192, 'temperature_c': 65},
+            {'index': 1, 'type': 'nvidia', 'name': 'GPU-1',
+             'utilization_percent': 30.0, 'memory_used_mb': 1024,
+             'memory_total_mb': 4096, 'temperature_c': 55},
+        ]
+        mock_gpu_monitor_cls.return_value = mock_monitor
 
         gpus = handler._get_gpu_utilization()
         assert len(gpus) == 2
@@ -376,44 +382,17 @@ class TestGetGpuUtilization:
         assert gpus[0]['memory_total_mb'] == 8192
         assert gpus[0]['temperature_c'] == 65
         assert gpus[1]['index'] == 1
+        mock_monitor.get_realtime_metrics.assert_called_once()
 
-    @patch(f'{WS_MOD}.subprocess.run')
-    def test_returns_empty_on_failure(self, mock_run):
+    @patch(f'{WS_MOD}.GpuMonitor')
+    def test_returns_empty_when_no_gpus(self, mock_gpu_monitor_cls):
         handler = _make_handler()
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_run.return_value = mock_result
+        mock_monitor = MagicMock()
+        mock_monitor.get_realtime_metrics.return_value = []
+        mock_gpu_monitor_cls.return_value = mock_monitor
 
         gpus = handler._get_gpu_utilization()
         assert gpus == []
-
-    @patch(f'{WS_MOD}.subprocess.run', side_effect=FileNotFoundError)
-    def test_returns_empty_on_exception(self, mock_run):
-        handler = _make_handler()
-        gpus = handler._get_gpu_utilization()
-        assert gpus == []
-
-    @patch(f'{WS_MOD}.subprocess.run')
-    def test_skips_empty_lines(self, mock_run):
-        handler = _make_handler()
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "\n0, 45, 2048, 8192, 65\n\n"
-        mock_run.return_value = mock_result
-
-        gpus = handler._get_gpu_utilization()
-        assert len(gpus) == 1
-
-    @patch(f'{WS_MOD}.subprocess.run')
-    def test_skips_lines_with_insufficient_parts(self, mock_run):
-        handler = _make_handler()
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "0, 45\n0, 45, 2048, 8192, 65\n"
-        mock_run.return_value = mock_result
-
-        gpus = handler._get_gpu_utilization()
-        assert len(gpus) == 1
 
 
 # ------------------------------------------------------------------
@@ -539,6 +518,7 @@ class TestAsyncLoops:
         handler.send = AsyncMock()
 
         with patch(f'{WS_MOD}.pending_tasks.prepare_filtered_pending_tasks') as mock_pending, \
+             patch(f'{WS_MOD}.estimate_queue_eta', return_value={'total_queue_eta_seconds': 120}) as mock_eta, \
              patch(f'{WS_MOD}.gen.sleep', new_callable=AsyncMock) as mock_sleep:
             mock_pending.return_value = {
                 'results': [
@@ -556,6 +536,7 @@ class TestAsyncLoops:
             assert call_data['type'] == 'pending_tasks'
             assert len(call_data['data']['results']) == 1
             assert call_data['data']['results'][0]['id'] == 1
+            assert call_data['data']['queue_eta'] == {'total_queue_eta_seconds': 120}
 
     @pytest.mark.asyncio
     async def test_async_completed_tasks_info_sends_data(self):
@@ -612,10 +593,14 @@ class TestAsyncLoops:
         handler = _make_handler()
         handler.sending_system_status = True
         handler.send = AsyncMock()
-        handler._get_gpu_utilization = MagicMock(return_value=[])
 
         with patch(f'{WS_MOD}.psutil') as mock_psutil, \
+             patch(f'{WS_MOD}.GpuMonitor') as mock_gpu_cls, \
              patch(f'{WS_MOD}.gen.sleep', new_callable=AsyncMock) as mock_sleep:
+            mock_gpu = MagicMock()
+            mock_gpu.get_realtime_metrics.return_value = []
+            mock_gpu.get_history.return_value = {}
+            mock_gpu_cls.return_value = mock_gpu
             mock_mem = MagicMock()
             mock_mem.percent = 55.0
             mock_mem.used = 8 * (1024 ** 3)
@@ -637,6 +622,8 @@ class TestAsyncLoops:
             assert call_data['type'] == 'system_status'
             assert call_data['data']['cpu_percent'] == 25.0
             assert call_data['data']['memory_percent'] == 55.0
+            assert 'gpus' in call_data['data']
+            assert 'gpu_history' in call_data['data']
 
 
 if __name__ == '__main__':

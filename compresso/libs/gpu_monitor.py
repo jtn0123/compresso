@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+    compresso.libs.gpu_monitor
+
+    Singleton GPU monitor that polls NVIDIA, Intel, and AMD GPUs
+    for real-time utilization metrics and maintains a rolling history.
+"""
+
+import shutil
+import subprocess
+import time
+from collections import deque
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from compresso.libs.logs import CompressoLogging
+from compresso.libs.singleton import SingletonType
+
+HISTORY_MAX_SAMPLES = 120  # 10 minutes at 5-second intervals
+
+
+class GpuMonitor(object, metaclass=SingletonType):
+
+    def __init__(self):
+        self.logger = CompressoLogging.get_logger(name=self.__class__.__name__)
+        self._history: Dict[int, deque] = {}
+        self._capabilities = self._probe_capabilities()
+
+    def _probe_capabilities(self) -> Dict[str, bool]:
+        """Check which GPU monitoring backends are available on this system."""
+        caps = {
+            'nvidia': shutil.which('nvidia-smi') is not None,
+            'intel': False,
+            'amd': False,
+        }
+
+        # Check for Intel GPU via sysfs vendor ID (0x8086)
+        try:
+            for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
+                vendor_id = vendor_path.read_text().strip()
+                if vendor_id == '0x8086':
+                    caps['intel'] = True
+                    break
+        except Exception:
+            pass
+
+        # Check for AMD GPU via sysfs vendor ID (0x1002)
+        try:
+            for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
+                vendor_id = vendor_path.read_text().strip()
+                if vendor_id == '0x1002':
+                    caps['amd'] = True
+                    break
+        except Exception:
+            pass
+
+        self.logger.debug("GPU capabilities: %s", caps)
+        return caps
+
+    def get_realtime_metrics(self) -> List[dict]:
+        """
+        Poll all available GPU backends and return current metrics.
+
+        Returns a list of dicts, each with keys:
+            index, type, name, utilization_percent, memory_used_mb,
+            memory_total_mb, temperature_c
+        """
+        gpus = []
+        gpus.extend(self._poll_nvidia())
+        gpus.extend(self._poll_intel())
+        gpus.extend(self._poll_amd())
+        self._record_history(gpus)
+        return gpus
+
+    def _poll_nvidia(self) -> List[dict]:
+        """Query NVIDIA GPUs via nvidia-smi."""
+        if not self._capabilities.get('nvidia'):
+            return []
+
+        try:
+            result = subprocess.run(
+                [
+                    'nvidia-smi',
+                    '--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu',
+                    '--format=csv,noheader,nounits',
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                self.logger.debug("nvidia-smi returned non-zero exit code: %d", result.returncode)
+                return []
+
+            gpus = []
+            for line in result.stdout.strip().split('\n'):
+                if not line.strip():
+                    continue
+                parts = [p.strip() for p in line.split(',')]
+                if len(parts) >= 6:
+                    gpus.append({
+                        'index': int(parts[0]),
+                        'type': 'nvidia',
+                        'name': parts[1],
+                        'utilization_percent': float(parts[2]),
+                        'memory_used_mb': int(float(parts[3])),
+                        'memory_total_mb': int(float(parts[4])),
+                        'temperature_c': int(float(parts[5])),
+                    })
+            return gpus
+
+        except FileNotFoundError:
+            self.logger.debug("nvidia-smi not found on PATH")
+            self._capabilities['nvidia'] = False
+        except subprocess.TimeoutExpired:
+            self.logger.warning("nvidia-smi timed out after 5 seconds")
+        except Exception as e:
+            self.logger.warning("NVIDIA GPU polling failed: %s", e)
+        return []
+
+    def _poll_intel(self) -> List[dict]:
+        """Best-effort Intel GPU metrics via sysfs."""
+        if not self._capabilities.get('intel'):
+            return []
+
+        gpus = []
+        try:
+            drm_path = Path('/sys/class/drm')
+            for card_dir in sorted(drm_path.glob('card[0-9]*')):
+                vendor_path = card_dir / 'device' / 'vendor'
+                if not vendor_path.exists():
+                    continue
+                try:
+                    vendor_id = vendor_path.read_text().strip()
+                except Exception:
+                    continue
+                if vendor_id != '0x8086':
+                    continue
+
+                card_name = card_dir.name
+                index = int(card_name.replace('card', ''))
+
+                # Approximate utilization from current vs max frequency
+                utilization = 0.0
+                cur_freq_path = card_dir / 'gt_cur_freq_mhz'
+                max_freq_path = card_dir / 'gt_max_freq_mhz'
+                try:
+                    cur_freq = float(cur_freq_path.read_text().strip())
+                    max_freq = float(max_freq_path.read_text().strip())
+                    if max_freq > 0:
+                        utilization = round((cur_freq / max_freq) * 100, 1)
+                except Exception:
+                    pass
+
+                # Read temperature from hwmon if available
+                temperature = 0
+                try:
+                    hwmon_dirs = list((card_dir / 'device' / 'hwmon').iterdir())
+                    for hwmon_dir in hwmon_dirs:
+                        temp_path = hwmon_dir / 'temp1_input'
+                        if temp_path.exists():
+                            # sysfs reports millidegrees Celsius
+                            temperature = int(temp_path.read_text().strip()) // 1000
+                            break
+                except Exception:
+                    pass
+
+                gpus.append({
+                    'index': index,
+                    'type': 'intel',
+                    'name': 'Intel GPU ({})'.format(card_name),
+                    'utilization_percent': utilization,
+                    'memory_used_mb': 0,
+                    'memory_total_mb': 0,
+                    'temperature_c': temperature,
+                })
+
+        except Exception as e:
+            self.logger.warning("Intel GPU polling failed: %s", e)
+        return gpus
+
+    def _poll_amd(self) -> List[dict]:
+        """Best-effort AMD GPU metrics via sysfs."""
+        if not self._capabilities.get('amd'):
+            return []
+
+        gpus = []
+        try:
+            drm_path = Path('/sys/class/drm')
+            for card_dir in sorted(drm_path.glob('card[0-9]*')):
+                vendor_path = card_dir / 'device' / 'vendor'
+                if not vendor_path.exists():
+                    continue
+                try:
+                    vendor_id = vendor_path.read_text().strip()
+                except Exception:
+                    continue
+                if vendor_id != '0x1002':
+                    continue
+
+                card_name = card_dir.name
+                index = int(card_name.replace('card', ''))
+
+                # Read GPU busy percent
+                utilization = 0.0
+                busy_path = card_dir / 'device' / 'gpu_busy_percent'
+                try:
+                    utilization = float(busy_path.read_text().strip())
+                except Exception:
+                    pass
+
+                # Read VRAM usage if available
+                memory_used = 0
+                memory_total = 0
+                try:
+                    vram_used_path = card_dir / 'device' / 'mem_info_vram_used'
+                    vram_total_path = card_dir / 'device' / 'mem_info_vram_total'
+                    if vram_used_path.exists():
+                        memory_used = int(vram_used_path.read_text().strip()) // (1024 * 1024)
+                    if vram_total_path.exists():
+                        memory_total = int(vram_total_path.read_text().strip()) // (1024 * 1024)
+                except Exception:
+                    pass
+
+                # Read temperature from hwmon if available
+                temperature = 0
+                try:
+                    hwmon_dirs = list((card_dir / 'device' / 'hwmon').iterdir())
+                    for hwmon_dir in hwmon_dirs:
+                        temp_path = hwmon_dir / 'temp1_input'
+                        if temp_path.exists():
+                            temperature = int(temp_path.read_text().strip()) // 1000
+                            break
+                except Exception:
+                    pass
+
+                gpus.append({
+                    'index': index,
+                    'type': 'amd',
+                    'name': 'AMD GPU ({})'.format(card_name),
+                    'utilization_percent': utilization,
+                    'memory_used_mb': memory_used,
+                    'memory_total_mb': memory_total,
+                    'temperature_c': temperature,
+                })
+
+        except Exception as e:
+            self.logger.warning("AMD GPU polling failed: %s", e)
+        return gpus
+
+    def _record_history(self, gpus: List[dict]) -> None:
+        """Append current metrics with timestamp to rolling history."""
+        now = time.time()
+        for gpu in gpus:
+            idx = gpu['index']
+            if idx not in self._history:
+                self._history[idx] = deque(maxlen=HISTORY_MAX_SAMPLES)
+            self._history[idx].append({
+                'timestamp': now,
+                'utilization_percent': gpu.get('utilization_percent', 0.0),
+                'memory_used_mb': gpu.get('memory_used_mb', 0),
+                'memory_total_mb': gpu.get('memory_total_mb', 0),
+                'temperature_c': gpu.get('temperature_c', 0),
+            })
+
+    def get_history(self, gpu_index: Optional[int] = None) -> dict:
+        """
+        Return historical samples.
+
+        If gpu_index is provided, return samples for that GPU only.
+        Otherwise return all history keyed by GPU index.
+        """
+        if gpu_index is not None:
+            samples = self._history.get(gpu_index, deque())
+            return {gpu_index: list(samples)}
+        return {idx: list(samples) for idx, samples in self._history.items()}

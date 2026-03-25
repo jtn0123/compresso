@@ -46,6 +46,10 @@
             <q-item-section avatar><q-icon name="link" size="sm"/></q-item-section>
             <q-item-section>{{ $t('navigation.link') }}</q-item-section>
           </q-item>
+          <q-item clickable to="/ui/settings-notifications" v-ripple :active="$route.path === '/ui/settings-notifications'" dense class="q-pl-xl">
+            <q-item-section avatar><q-icon name="notifications_active" size="sm"/></q-item-section>
+            <q-item-section>{{ $t('navigation.notifications') }}</q-item-section>
+          </q-item>
         </q-expansion-item>
         <!--END SETTINGS SELECT-->
         <!--START DATA PANELS SELECT-->
@@ -136,6 +140,20 @@
           </q-item-section>
         </q-item>
         <!--END HEALTH CHECK SELECT-->
+        <!--START TASK HISTORY SELECT-->
+        <q-item
+          clickable
+          to="/ui/history"
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/history' }">
+          <q-item-section avatar>
+            <q-icon name="history"/>
+          </q-item-section>
+          <q-item-section>
+            {{ $t('navigation.history') }}
+          </q-item-section>
+        </q-item>
+        <!--END TASK HISTORY SELECT-->
 
         <q-separator spaced/>
 

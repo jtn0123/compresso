@@ -122,6 +122,7 @@ import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
+import { createLogger } from 'src/composables/useLogger';
 import VideoCompare from 'components/preview/VideoCompare.vue';
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
 import PageHeader from 'components/ui/PageHeader.vue';
@@ -132,6 +133,7 @@ export default {
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();
+    const log = createLogger('Preview');
     const sourcePath = ref('');
     const startTime = ref(0);
     const duration = ref(10);
@@ -168,7 +170,7 @@ export default {
           }
         }
       } catch (error) {
-        console.error('Error loading libraries:', error);
+        log.error('Error loading libraries: ' + error);
         $q.notify({ type: 'negative', message: t('pages.previewCompare.failedLoadLibraries') });
       }
     }
@@ -233,7 +235,7 @@ export default {
             }
           }
         } catch (error) {
-          console.error('Error polling preview status:', error);
+          log.error('Error polling preview status: ' + error);
           $q.notify({ type: 'negative', message: t('pages.previewCompare.failedCheckStatus') });
         }
       }, 2000);
@@ -254,7 +256,7 @@ export default {
             job_id: jobId.value,
           });
         } catch (error) {
-          console.error('Error cleaning up preview:', error);
+          log.error('Error cleaning up preview: ' + error);
         }
       }
       jobId.value = null;
@@ -272,7 +274,7 @@ export default {
             job_id: jobId.value,
           });
         } catch (error) {
-          console.error('Error cleaning up preview:', error);
+          log.error('Error cleaning up preview: ' + error);
           $q.notify({ type: 'negative', message: t('pages.previewCompare.failedCleanup') });
         }
       }

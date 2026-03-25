@@ -283,6 +283,7 @@ import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
 import { formatBytes } from 'src/js/formatUtils';
+import { createLogger } from 'src/composables/useLogger';
 import CodecDistributionChart from 'components/charts/CodecDistributionChart.vue';
 import ResolutionDistributionChart from 'components/charts/ResolutionDistributionChart.vue';
 import SpaceSavedTimelineChart from 'components/charts/SpaceSavedTimelineChart.vue';
@@ -301,6 +302,7 @@ export default {
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();
+    const log = createLogger('Compression');
     const loadingSummary = ref(true);
     const selectedLibraryId = ref(null);
     const libraryOptions = ref([{ label: t('pages.compressionDashboard.allLibraries'), value: null }]);
@@ -369,7 +371,7 @@ export default {
         analysisStatus.value = 'running';
         pollAnalysisStatus();
       } catch (error) {
-        console.error('Error starting analysis:', error);
+        log.error('Error starting analysis: ' + error);
       }
     }
 
@@ -391,7 +393,7 @@ export default {
           analysisPollTimer = setTimeout(pollAnalysisStatus, 2000);
         }
       } catch (error) {
-        console.error('Error polling analysis status:', error);
+        log.error('Error polling analysis status: ' + error);
         analysisStatus.value = 'error';
       }
     }
@@ -461,7 +463,7 @@ export default {
           summary.value = response.data;
         }
       } catch (error) {
-        console.error('Error loading compression summary:', error);
+        log.error('Error loading compression summary: ' + error);
         $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingSummary') });
       } finally {
         loadingSummary.value = false;
@@ -475,7 +477,7 @@ export default {
           pendingEstimate.value = response.data;
         }
       } catch (error) {
-        console.error('Error loading pending estimate:', error);
+        log.error('Error loading pending estimate: ' + error);
         $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingPendingEstimate') });
       }
     }
@@ -495,7 +497,7 @@ export default {
         if (results[2].status === 'fulfilled' && results[2].value.data) timelineData.value = results[2].value.data.data || [];
         if (results[3].status === 'fulfilled' && results[3].value.data) encodingSpeedData.value = results[3].value.data.data || [];
       } catch (error) {
-        console.error('Error loading chart data:', error);
+        log.error('Error loading chart data: ' + error);
       } finally {
         chartsLoading.value = false;
       }
@@ -518,7 +520,7 @@ export default {
           pagination.value.rowsNumber = response.data.recordsFiltered || 0;
         }
       } catch (error) {
-        console.error('Error loading compression stats:', error);
+        log.error('Error loading compression stats: ' + error);
         $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingStats') });
       } finally {
         loading.value = false;
@@ -561,7 +563,7 @@ export default {
           });
         }
       } catch (error) {
-        console.error('Error loading libraries:', error);
+        log.error('Error loading libraries: ' + error);
         $q.notify({ type: 'negative', message: t('pages.compressionDashboard.errorLoadingLibraries') });
       }
     }

@@ -448,6 +448,9 @@ import JsonImportExportDialog from 'components/settings/library/JsonImportExport
 import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog'
 import CompressoListActionButton from "components/ui/buttons/CompressoListActionButton.vue"
 import CompressoListAddButton from "components/ui/buttons/CompressoListAddButton.vue"
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('LibraryConfig')
 
 const props = defineProps({
   libraryId: {
@@ -739,7 +742,7 @@ const importData = (importString, silent) => {
   try {
     data = JSON.parse(importString)
   } catch (e) {
-    console.error('Failed to parse import string', e)
+    log.error('Failed to parse import string: ' + e)
     return
   }
   data.library_id = currentID.value

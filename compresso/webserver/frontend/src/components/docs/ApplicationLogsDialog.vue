@@ -109,6 +109,7 @@ import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { sanitizeHtml } from 'src/js/sanitize'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 
 const emit = defineEmits(['hide'])
@@ -177,13 +178,13 @@ const updateServerLogs = (data) => {
 
   if (currentRawLog.value.length === 0) {
     currentRawLog.value = [...incomingLogs]
-    currentLog.value = incomingLogs.map((line) => styleLogLine(line))
+    currentLog.value = incomingLogs.map((line) => sanitizeHtml(styleLogLine(line)))
   } else {
     const overlap = getOverlapCount(currentRawLog.value, incomingLogs)
     const newLogs = incomingLogs.slice(overlap)
     if (newLogs.length > 0) {
       currentRawLog.value = currentRawLog.value.concat(newLogs)
-      currentLog.value = currentLog.value.concat(newLogs.map((line) => styleLogLine(line)))
+      currentLog.value = currentLog.value.concat(newLogs.map((line) => sanitizeHtml(styleLogLine(line))))
     }
   }
 

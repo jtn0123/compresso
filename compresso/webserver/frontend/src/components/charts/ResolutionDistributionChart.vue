@@ -14,6 +14,7 @@
 
 <script>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { useQuasar } from 'quasar';
 
 export default {
   name: 'ResolutionDistributionChart',
@@ -22,6 +23,7 @@ export default {
     loading: { type: Boolean, default: false },
   },
   setup(props) {
+    const $q = useQuasar();
     const chartRef = ref(null);
     let chart = null;
 
@@ -34,6 +36,10 @@ export default {
       if (chart) chart.destroy();
 
       if (chartRef.value && props.resolutions.length > 0) {
+        const isDark = $q.dark.isActive;
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const labelColor = isDark ? '#ccc' : '#666';
+
         chart = new Chart(chartRef.value, {
           type: 'bar',
           data: {
@@ -47,9 +53,19 @@ export default {
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+              legend: { display: false },
+            },
             scales: {
-              y: { beginAtZero: true, ticks: { stepSize: 1 } },
+              x: {
+                ticks: { color: labelColor },
+                grid: { color: gridColor },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { stepSize: 1, color: labelColor },
+                grid: { color: gridColor },
+              },
             },
           },
         });
@@ -59,6 +75,7 @@ export default {
     watch(() => props.resolutions, () => {
       if (!props.loading) renderChart();
     }, { deep: true });
+    watch(() => $q.dark.isActive, renderChart);
 
     onMounted(() => {
       if (!props.loading) renderChart();

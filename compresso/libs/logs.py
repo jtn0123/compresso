@@ -197,7 +197,7 @@ class ForwardLogHandler(logging.Handler):
             except Full:
                 # Discard log if queue is full
                 pass
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError, OSError) as e:
             logging.getLogger("Compresso.ForwardLogHandler").error("Failed to enqueue log: %s", e)
 
     def _writer_loop(self):
@@ -241,12 +241,12 @@ class ForwardLogHandler(logging.Handler):
             except Empty:
                 # This should not happen
                 pass
-            except Exception:
+            except Full:
                 # Drop oldest item
                 try:
                     self._in_memory_chunks.get_nowait()
                     self._in_memory_chunks.put_nowait(list(batch))
-                except (Empty, Exception):
+                except (Empty, Full):
                     pass
             return
         self._append_to_disk(batch)
@@ -263,7 +263,7 @@ class ForwardLogHandler(logging.Handler):
                     handle.write(json.dumps(log_entry))
                     handle.write("\n")
             self._ensure_state_entry(os.path.basename(buffer_file))
-        except Exception as exc:
+        except (OSError, PermissionError, json.JSONDecodeError, UnicodeEncodeError) as exc:
             logging.getLogger("Compresso.ForwardLogHandler").error("Failed to save logs to disk: %s", exc)
 
     def _ensure_state_entry(self, filename):
@@ -363,7 +363,7 @@ class ForwardLogHandler(logging.Handler):
                         continue
                     try:
                         entry = json.loads(stripped.decode("utf-8"))
-                    except Exception:
+                    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
                         logging.getLogger("Compresso.ForwardLogHandler").warning(
                             "Skipping corrupt log entry in %s.",
                             filename,
@@ -394,7 +394,7 @@ class ForwardLogHandler(logging.Handler):
         except FileNotFoundError:
             self._remove_state_entry(filename)
             return None
-        except Exception as exc:
+        except (OSError, PermissionError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             logging.getLogger("Compresso.ForwardLogHandler").exception(
                 "Failed reading log buffer %s: %s",
                 filename,
@@ -488,7 +488,7 @@ class ForwardLogHandler(logging.Handler):
                     if remaining:
                         try:
                             self._in_memory_chunks.put_nowait(list(remaining))
-                        except (Empty, Exception):
+                        except (Empty, Full):
                             pass
                     return processed
 
@@ -576,7 +576,7 @@ class ForwardLogHandler(logging.Handler):
         try:
             with open(self._buffer_state_path, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
-        except Exception:
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError, PermissionError):
             logging.getLogger("Compresso.ForwardLogHandler").warning(
                 "Failed to load log buffer state. Starting fresh.")
             return {}
@@ -598,7 +598,7 @@ class ForwardLogHandler(logging.Handler):
             with open(temp_path, "w", encoding="utf-8") as handle:
                 json.dump({"files": self._buffer_state}, handle)
             os.replace(temp_path, self._buffer_state_path)
-        except Exception as exc:
+        except (OSError, PermissionError) as exc:
             logging.getLogger("Compresso.ForwardLogHandler").warning(
                 "Failed to persist log buffer state: %s",
                 exc,
@@ -703,7 +703,7 @@ class ForwardLogHandler(logging.Handler):
                 buffer_label,
             )
             self.previous_connection_failed = True
-        except Exception as exc:
+        except (requests.RequestException, OSError, ValueError) as exc:
             logging.getLogger("Compresso.ForwardLogHandler").exception(
                 "Exception while trying to forward logs from %s: %s",
                 buffer_label,

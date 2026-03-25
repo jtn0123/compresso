@@ -41,6 +41,17 @@
 .text-grey-9 { color: var(--compresso-grey-9) !important; }
 .text-grey-10 { color: var(--compresso-grey-10) !important; }
 
+.bg-grey-1 { background-color: var(--compresso-grey-1) !important; }
+.bg-grey-2 { background-color: var(--compresso-grey-2) !important; }
+.bg-grey-3 { background-color: var(--compresso-grey-3) !important; }
+.bg-grey-4 { background-color: var(--compresso-grey-4) !important; }
+.bg-grey-5 { background-color: var(--compresso-grey-5) !important; }
+.bg-grey-6 { background-color: var(--compresso-grey-6) !important; }
+.bg-grey-7 { background-color: var(--compresso-grey-7) !important; }
+.bg-grey-8 { background-color: var(--compresso-grey-8) !important; }
+.bg-grey-9 { background-color: var(--compresso-grey-9) !important; }
+.bg-grey-10 { background-color: var(--compresso-grey-10) !important; }
+
 .border-hover {
   border-radius: 6px;
   border: 1px solid transparent;
@@ -193,4 +204,36 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--compresso-grey-7);
   }
+}
+
+// Smooth theme transitions
+body,
+.q-page,
+.q-card,
+.q-drawer,
+.q-header,
+.q-footer,
+.q-toolbar,
+.q-item,
+.q-table,
+.q-expansion-item,
+.q-tab-panel,
+.q-badge,
+.q-linear-progress,
+.system-status-bar {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+// Dark mode tooltip fix: invert bg-white tooltips
+.body--dark .q-tooltip.bg-white {
+  background-color: var(--compresso-grey-2) !important;
+}
+
+// Dark mode: adapt Quasar's grey-N color prop for badges
+.body--dark .q-badge.bg-grey-7 {
+  background-color: var(--compresso-grey-5) !important;
+}
+
+.body--dark .q-badge.bg-grey-8 {
+  background-color: var(--compresso-grey-4) !important;
 }

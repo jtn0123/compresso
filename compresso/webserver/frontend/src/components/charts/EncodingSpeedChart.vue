@@ -19,6 +19,7 @@
 <script>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useQuasar } from 'quasar';
 
 export default {
   name: 'EncodingSpeedChart',
@@ -28,6 +29,7 @@ export default {
   },
   setup(props) {
     const { t } = useI18n();
+    const $q = useQuasar();
     const chartRef = ref(null);
     let chart = null;
 
@@ -40,6 +42,11 @@ export default {
       if (chart) chart.destroy();
 
       if (chartRef.value && props.data.length > 0) {
+        const isDark = $q.dark.isActive;
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const labelColor = isDark ? '#ccc' : '#666';
+        const titleColor = isDark ? '#eee' : '#333';
+
         // Group by date, averaging across codecs
         const dateMap = {};
         for (const d of props.data) {
@@ -94,19 +101,29 @@ export default {
                   },
                 },
               },
+              legend: {
+                labels: { color: labelColor },
+              },
             },
             scales: {
+              x: {
+                ticks: { color: labelColor },
+                grid: { color: gridColor },
+              },
               y: {
                 type: 'linear',
                 position: 'left',
                 beginAtZero: true,
-                title: { display: true, text: 'FPS' },
+                title: { display: true, text: 'FPS', color: titleColor },
+                ticks: { color: labelColor },
+                grid: { color: gridColor },
               },
               y1: {
                 type: 'linear',
                 position: 'right',
                 beginAtZero: true,
-                title: { display: true, text: 'Speed (x realtime)' },
+                title: { display: true, text: 'Speed (x realtime)', color: titleColor },
+                ticks: { color: labelColor },
                 grid: { drawOnChartArea: false },
               },
             },
@@ -119,6 +136,7 @@ export default {
     watch(() => props.loading, (val) => {
       if (!val) renderChart();
     });
+    watch(() => $q.dark.isActive, renderChart);
 
     onMounted(() => {
       if (!props.loading && props.data.length > 0) renderChart();
