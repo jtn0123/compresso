@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/jtn0123/compresso/compare/v1.4.0...v1.5.0) (2026-03-25)
+
+
+### Features
+
+* task retry, keyboard shortcuts, staging cleanup, onboarding wizard ([#41](https://github.com/jtn0123/compresso/issues/41)) ([84a9f1a](https://github.com/jtn0123/compresso/commit/84a9f1a5c358f364d4757fa374176a9702443176))
+
 # [1.4.0](https://github.com/jtn0123/compresso/compare/v1.3.1...v1.4.0) (2026-03-24)
 
 
