@@ -13,11 +13,10 @@
     Also tests the WebSocket pending tasks helper includes retry fields.
 """
 
-import os
 import threading
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
