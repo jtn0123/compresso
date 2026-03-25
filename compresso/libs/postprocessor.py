@@ -29,6 +29,7 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import datetime
 import os
 import shutil
 import threading
@@ -37,6 +38,7 @@ import time
 from compresso import config
 from compresso.libs import common, history
 from compresso.libs.ffprobe_utils import extract_media_metadata
+from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.metadata import CompressoFileMetadata
@@ -188,11 +190,15 @@ class PostProcessor(threading.Thread):
                             min_pct = library.get_size_guardrail_min_pct()
                             max_pct = library.get_size_guardrail_max_pct()
                             if ratio_pct < min_pct or ratio_pct > max_pct:
-                                self._log("Size guardrail REJECTED: {:.1f}% (allowed {}-{}%)".format(
-                                    ratio_pct, min_pct, max_pct))
+                                rejection_msg = "Size guardrail REJECTED: {:.1f}% (allowed {}-{}%)".format(
+                                    ratio_pct, min_pct, max_pct)
+                                self._log(rejection_msg)
                                 db = self.current_task.task._meta.database
                                 with db.atomic():
                                     self.current_task.task.success = False
+                                    # Write rejection reason into task log so retry logic can detect it
+                                    existing_log = self.current_task.task.log or ''
+                                    self.current_task.task.log = (existing_log + '\n' + rejection_msg).strip()
                                     self.current_task.task.save()
                 except Exception as e:
                     self._log("Exception in size guardrail check", message2=str(e), level="warning")
@@ -215,6 +221,9 @@ class PostProcessor(threading.Thread):
                 else:
                     self._finalize_local_task()
             else:
+                # Check if this failure is eligible for retry (not a guardrail rejection)
+                if self._attempt_retry():
+                    return  # Task re-queued as pending with backoff; skip finalization
                 self._finalize_local_task()
         else:
             self._finalize_remote_task()
@@ -227,6 +236,76 @@ class PostProcessor(threading.Thread):
             self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
 
         self._finalize_local_task()
+
+    def _is_guardrail_rejection(self):
+        """Check if the current task's failure was caused by a size guardrail rejection."""
+        try:
+            task_log = self.current_task.task.log or ''
+            return 'Size guardrail REJECTED' in task_log
+        except Exception:
+            return False
+
+    def _attempt_retry(self):
+        """
+        Check if a failed task should be retried with exponential backoff.
+        Returns True if the task was re-queued for retry, False otherwise.
+        """
+        try:
+            # Don't retry guardrail rejections — those are intentional
+            if self._is_guardrail_rejection():
+                return False
+
+            retry_count = self.current_task.task.retry_count or 0
+            max_retries = self.current_task.task.max_retries or self.settings.get_default_max_retries()
+
+            if retry_count >= max_retries:
+                return False
+
+            # Exponential backoff: 30s, 2min, 8min
+            delay_seconds = 30 * (4 ** retry_count)
+            deferred_until = datetime.datetime.now() + datetime.timedelta(seconds=delay_seconds)
+
+            db = self.current_task.task._meta.database
+            with db.atomic():
+                self.current_task.task.retry_count = retry_count + 1
+                self.current_task.task.deferred_until = deferred_until
+                self.current_task.task.status = 'pending'
+                self.current_task.task.success = None
+                self.current_task.task.log = ''
+                self.current_task.task.save()
+
+            source_path = self.current_task.get_source_abspath()
+            filename = os.path.basename(source_path)
+            self._log("Retrying task (attempt {}/{}) after {} - {}".format(
+                retry_count + 1, max_retries,
+                deferred_until.strftime('%H:%M:%S'),
+                source_path))
+
+            # Push a transient notification to the frontend via the frontend_message stream
+            try:
+                frontend_messages = FrontendPushMessages()
+                msg_id = 'taskRetry_{}'.format(self.current_task.get_task_id())
+                frontend_messages.update({
+                    'id':      msg_id,
+                    'type':    'warning',
+                    'code':    'taskRetrying',
+                    'message': '{} (attempt {}/{}, next at {})'.format(
+                        filename, retry_count + 1, max_retries,
+                        deferred_until.strftime('%H:%M:%S')),
+                    'timeout': 15000,
+                })
+            except Exception as e:
+                self._log("Failed to push retry notification", message2=str(e), level="debug")
+
+            # Clean up cache but don't finalize — task goes back to pending
+            cache_path = self.current_task.get_cache_path()
+            if cache_path:
+                self.__cleanup_cache_files(cache_path)
+
+            return True
+        except Exception as e:
+            self._log("Exception during retry attempt", message2=str(e), level="warning")
+            return False
 
     def _stage_for_approval(self):
         """

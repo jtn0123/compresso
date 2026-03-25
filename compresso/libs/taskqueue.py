@@ -30,6 +30,8 @@
 
 """
 
+import datetime
+
 from compresso.libs import task
 from compresso.libs import common
 from compresso.libs.logs import CompressoLogging
@@ -76,6 +78,11 @@ def build_tasks_query(status, sort_by='id', sort_order='asc', local_only=False, 
     # pick query based on sort params
     query = Tasks.select().where((Tasks.status == status))
 
+    # Exclude deferred tasks that haven't reached their retry time yet
+    query = query.where(
+        (Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= datetime.datetime.now())
+    )
+
     # Limit to one result
     if local_only:
         query = query.where((Tasks.type == 'local'))
@@ -114,6 +121,11 @@ def build_tasks_query_full_task_list(status, sort_by='id', sort_order='asc', lim
     :return:
     """
     query = Tasks.select(Tasks).where((Tasks.status == status))
+
+    # Exclude deferred tasks that haven't reached their retry time yet
+    query = query.where(
+        (Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= datetime.datetime.now())
+    )
 
     # Set the sort order
     if sort_order == 'asc':

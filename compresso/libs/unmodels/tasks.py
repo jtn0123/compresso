@@ -54,3 +54,6 @@ class Tasks(BaseModel):
     source_size = BigIntegerField(null=True, default=0)
     vmaf_score = FloatField(null=True, default=None)
     ssim_score = FloatField(null=True, default=None)
+    retry_count = IntegerField(null=True, default=0)
+    max_retries = IntegerField(null=True, default=3)
+    deferred_until = DateTimeField(null=True, default=None)

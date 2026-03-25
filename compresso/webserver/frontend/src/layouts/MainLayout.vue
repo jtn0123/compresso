@@ -100,24 +100,36 @@
       </q-toolbar>
     </q-footer>
 
+    <!-- Keyboard shortcuts help dialog -->
+    <KeyboardShortcutsDialog v-model="showShortcutsHelp"/>
+
+    <!-- First-run onboarding wizard -->
+    <FirstRunWizard v-model="showOnboarding"/>
+
   </q-layout>
 </template>
 
 <script>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
+import axios from 'axios';
 import DrawerMainNav from "components/drawers/DrawerMainNav";
 import { useQuasar } from "quasar";
 import ThemeSwitch from "components/ThemeSwitch";
 import DrawerNotifications from "components/drawers/DrawerNotifications";
 import SharedLinkDropdown from "components/SharedLinkDropdown";
-import compressoGlobals, { notificationsCount } from "src/js/compressoGlobals";
+import KeyboardShortcutsDialog from "components/ui/KeyboardShortcutsDialog";
+import FirstRunWizard from "components/ui/FirstRunWizard";
+import compressoGlobals, { getCompressoApiUrl, notificationsCount } from "src/js/compressoGlobals";
+import { useKeyboardShortcuts } from "src/composables/useKeyboardShortcuts";
 
 export default {
   components: {
     DrawerMainNav,
     DrawerNotifications,
     ThemeSwitch,
-    SharedLinkDropdown
+    SharedLinkDropdown,
+    KeyboardShortcutsDialog,
+    FirstRunWizard
   },
   setup() {
     const $q = useQuasar();
@@ -126,6 +138,17 @@ export default {
     const rightNotificationsDrawerOpen = ref(false)
 
     const compressoVersion = ref('')
+
+    // Keyboard shortcuts
+    const { showHelp } = useKeyboardShortcuts()
+    const showShortcutsHelp = ref(false)
+
+    // Sync the composable's showHelp with our dialog ref
+    watch(showHelp, (val) => { showShortcutsHelp.value = val })
+    watch(showShortcutsHelp, (val) => { showHelp.value = val })
+
+    // Onboarding wizard
+    const showOnboarding = ref(false)
 
     function toggleMainNavDrawer() {
       leftMainNavDrawerOpen.value = !leftMainNavDrawerOpen.value
@@ -140,6 +163,15 @@ export default {
       compressoGlobals.getCompressoVersion().then((version) => {
         compressoVersion.value = version;
       })
+
+      // Check onboarding status
+      axios.get(getCompressoApiUrl('v2', 'settings/read')).then((res) => {
+        if (!res.data?.settings?.onboarding_completed) {
+          showOnboarding.value = true
+        }
+      }).catch(() => {
+        // If we can't read settings, don't block the UI
+      })
     })
 
     return {
@@ -149,7 +181,10 @@ export default {
       toggleNotificationsDrawer,
 
       notificationsCount,
-      compressoVersion
+      compressoVersion,
+
+      showShortcutsHelp,
+      showOnboarding
     }
   }
 }

@@ -159,6 +159,11 @@ def prepare_filtered_pending_tasks(params, include_library=False):
             'type':     pending_task['type'],
             'status':   pending_task['status'],
         }
+        # Include retry fields when present
+        if pending_task.get('retry_count'):
+            item['retry_count'] = pending_task['retry_count']
+        if pending_task.get('deferred_until'):
+            item['deferred_until'] = str(pending_task['deferred_until'])
         if include_library:
             # Get library
             library = Library(pending_task['library_id'])

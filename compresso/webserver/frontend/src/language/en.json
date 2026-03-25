@@ -151,6 +151,7 @@
         "success": "Unknown message from server",
         "status": "Unknown status update from server"
       },
+      "taskRetrying": "Task queued for retry",
       "incompatiblePlugin": "Compresso has stopped processing tasks as it has detected an incompatible plugin enabled on one of your libraries",
       "libraryEnabledLimits": "Compresso has stopped processing tasks as you have too many libraries configured for a non-supporter tier. Consider sponsoring the project to enable more than 2 libraries.",
       "pluginSettingsChangeWorkersStopped": "Compresso has stopped all workers as it has detected a change to the plugins configuration. When you are ready, resume the workers from the dashboard.",
@@ -170,6 +171,9 @@
   "toasts": {
     "taskCompleted": "Completed",
     "taskFailed": "Failed",
+    "taskRetrying": "Retrying",
+    "retryAttempt": "attempt {current} of {max}",
+    "retriesExhausted": "Retries exhausted",
     "scanCompleted": "Library scan completed",
     "approvalReady": "New file ready for approval",
     "workerFailed": "Worker encountered an error",
@@ -955,5 +959,38 @@
   "dashboard": {
     "ofTotal": "of",
     "remaining": "Remaining"
+  },
+  "keyboardShortcuts": {
+    "title": "Keyboard Shortcuts",
+    "navigation": "Navigation",
+    "actions": "Actions",
+    "pressEscToClose": "Press Escape to close",
+    "goToDashboard": "Go to Dashboard",
+    "goToCompression": "Go to Compression",
+    "goToApproval": "Go to Approval Queue",
+    "goToHealth": "Go to Health Check",
+    "goToPreview": "Go to A/B Preview",
+    "goToSettingsLibrary": "Go to Settings (Library)",
+    "goToSettingsWorkers": "Go to Settings (Workers)",
+    "showHelp": "Toggle shortcut help"
+  },
+  "onboarding": {
+    "welcomeTitle": "Welcome to Compresso",
+    "welcomeSubtitle": "Let's get you set up in 3 quick steps",
+    "stepLibraryTitle": "Add Library",
+    "stepLibraryPrompt": "Where are your media files?",
+    "stepLibraryHint": "e.g., /mnt/media/movies or /data/tv",
+    "stepLibraryLabel": "Library path",
+    "stepApprovalTitle": "Approval Mode",
+    "stepApprovalPrompt": "Do you want to review files before they replace originals?",
+    "stepApprovalHint": "You can change this anytime in Settings \u2192 Library.",
+    "approvalEnabled": "Yes \u2014 require approval before replacing",
+    "approvalDisabled": "No \u2014 auto-replace originals",
+    "stepWorkersTitle": "Workers",
+    "stepWorkersPrompt": "How many files should be transcoded simultaneously?",
+    "stepWorkersHint": "Start with {count} \u2014 you can add more later in Settings \u2192 Workers.",
+    "finishSetup": "Finish Setup",
+    "next": "Next",
+    "back": "Back"
   }
 }
