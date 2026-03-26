@@ -62,7 +62,7 @@ def _stop_thread_if_supported(thread):
         try:
             thread.stop()
         except Exception as exc:
-            warnings.warn(f"Failed to stop leaked thread {thread.name}: {exc}", RuntimeWarning)
+            warnings.warn(f"Failed to stop leaked thread {thread.name}: {exc}", RuntimeWarning, stacklevel=2)
 
     redundant_flag = getattr(thread, "redundant_flag", None)
     if redundant_flag is not None and hasattr(redundant_flag, "set"):
@@ -82,7 +82,7 @@ def _stop_thread_if_supported(thread):
     try:
         thread.join(timeout=1)
     except Exception as exc:
-        warnings.warn(f"Failed to join leaked thread {thread.name}: {exc}", RuntimeWarning)
+        warnings.warn(f"Failed to join leaked thread {thread.name}: {exc}", RuntimeWarning, stacklevel=2)
 
 
 def pytest_configure(config):
@@ -156,7 +156,7 @@ def cleanup_registered_exit_hooks(monkeypatch):
         try:
             atexit.unregister(func)
         except Exception as exc:
-            warnings.warn(f"Failed to unregister atexit callback {func}: {exc}", RuntimeWarning)
+            warnings.warn(f"Failed to unregister atexit callback {func}: {exc}", RuntimeWarning, stacklevel=2)
 
     tornado.autoreload._reload_hooks[:] = baseline_reload_hooks
 

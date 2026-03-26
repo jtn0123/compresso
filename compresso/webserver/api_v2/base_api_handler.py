@@ -112,7 +112,7 @@ class BaseApiHandler(RequestHandler):
             received_body: Any = self.request.body
             if isinstance(received_body, bytes):
                 received_body = received_body.decode('utf-8', errors='replace')
-            raise BaseApiError(f"Expected request body to be JSON. Received '{received_body}'")
+            raise BaseApiError(f"Expected request body to be JSON. Received '{received_body}'") from e
 
         request_validation_errors = schema.validate(json_data)
         if request_validation_errors:

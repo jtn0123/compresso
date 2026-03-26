@@ -243,7 +243,7 @@ def format_ffmpeg_log_text(log_lines):
     pre_text = False
     headers = ['RUNNER:', 'COMMAND:', 'LOG:', 'WORKER TERMINATED!', 'PLUGIN FAILED!', 'REMOTE TASK FAILED!',
                'REMOTE LINK MANAGER TERMINATED!']
-    for i, line in enumerate(log_lines):
+    for _i, line in enumerate(log_lines):
         line_text = line
 
         # Add PRE to lines

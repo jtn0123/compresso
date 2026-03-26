@@ -51,7 +51,7 @@ def ffmpeg_cmd(params):
     try:
         raw_output = out.decode("utf-8")
     except Exception as e:
-        raise FFMpegError(command, str(e))
+        raise FFMpegError(command, str(e)) from e
     if pipe.returncode == 1 or 'error' in raw_output:
         raise FFMpegError(command, raw_output)
     if not raw_output:
@@ -76,7 +76,7 @@ def ffprobe_cmd(params):
     try:
         raw_output = out.decode("utf-8")
     except Exception as e:
-        raise FFProbeError(command, str(e))
+        raise FFProbeError(command, str(e)) from e
     if pipe.returncode == 1 or 'error' in raw_output:
         raise FFProbeError(command, raw_output)
     if not raw_output:
@@ -109,7 +109,7 @@ def ffprobe_file(vid_file_path):
     try:
         info = json.loads(results)
     except Exception as e:
-        raise FFProbeError(vid_file_path, str(e))
+        raise FFProbeError(vid_file_path, str(e)) from e
 
     return info
 
@@ -130,7 +130,7 @@ def ffmpeg_version_info():
     try:
         info = json.loads(results)
     except Exception as e:
-        raise FFProbeError("ffmpeg_version_info function", str(e))
+        raise FFProbeError("ffmpeg_version_info function", str(e)) from e
 
     return info
 

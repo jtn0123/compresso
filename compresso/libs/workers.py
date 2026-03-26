@@ -382,7 +382,7 @@ class Worker(threading.Thread):
                 # Run plugin (in its own thread) to update data
                 result = {"success": None}
 
-                def _run_plugin():
+                def _run_plugin(result=result, runner_id=runner_id):
                     result["success"] = plugin_handler.exec_plugin_runner(
                         data, runner_id, 'worker.process'
                     )

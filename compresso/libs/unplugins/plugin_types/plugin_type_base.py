@@ -217,7 +217,7 @@ class PluginType:
 
             params = plugin_runner_sig.parameters
 
-            def supports_kwarg(name):
+            def supports_kwarg(name, params=params):
                 if name in params:
                     return True
                 for param in params.values():

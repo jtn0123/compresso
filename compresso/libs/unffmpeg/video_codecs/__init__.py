@@ -63,7 +63,7 @@ def grab_module(module_name, *args, **kwargs):
         return instance
 
     except (AttributeError, AssertionError, ModuleNotFoundError):
-        raise ImportError(f'{module_name} is not part of our supported video codecs!')
+        raise ImportError(f'{module_name} is not part of our supported video codecs!') from None
 
 
 def get_all_video_codecs():

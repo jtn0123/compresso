@@ -95,7 +95,7 @@ class TestFindAllHandlers:
         ]
 
         mock_module = MagicMock()
-        setattr(mock_module, 'MockHandler', mock_handler)
+        mock_module.MockHandler = mock_handler
         mock_importlib = MagicMock()
         mock_importlib.import_module.return_value = mock_module
 

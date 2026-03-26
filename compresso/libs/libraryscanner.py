@@ -263,7 +263,7 @@ class LibraryScannerManager(threading.Thread):
         total_file_count = 0
         current_file = ''
         percent_completed_string = ''
-        for root, subFolders, files in os.walk(library_path, followlinks=follow_symlinks):
+        for root, _subFolders, files in os.walk(library_path, followlinks=follow_symlinks):
             if self.abort_flag.is_set():
                 break
             if self.settings.get_debugging():

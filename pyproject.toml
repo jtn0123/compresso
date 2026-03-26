@@ -30,7 +30,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "PIE"]
+select = ["E", "F", "W", "I", "UP", "PIE", "B"]
 ignore = [
     "E241",  # multiple spaces before operator — used for alignment
     "E501",  # line too long — enforced advisory only (many pre-existing)

@@ -101,7 +101,7 @@ def print_table(table_data, col_list=None, sep='\uFFFA', max_col_width=9):
     my_list = [col_list]  # 1st row = header
     for item in table_data:
         my_list.append([str(item[col] or '') for col in col_list])
-    original_col_size = [max(map(len, (sep.join(col)).split(sep))) for col in zip(*my_list)]
+    original_col_size = [max(map(len, (sep.join(col)).split(sep))) for col in zip(*my_list, strict=False)]
     col_size = []
     for col in original_col_size:
         if col > max_col_width:
@@ -601,7 +601,7 @@ class PluginsCLI:
     def configure_test_data(self):
 
         test_files = []
-        for (dir_path, dir_names, file_names) in os.walk(dev_library_directory):
+        for (_dir_path, _dir_names, file_names) in os.walk(dev_library_directory):
             test_files.extend(file_names)
         self.logger.debug("Available test files: %s", test_files)
 

@@ -26,7 +26,7 @@ def validate_library_exists(library_id):
         Libraries.get_by_id(library_id)
         return True
     except Exception:
-        raise ValueError(f"Library with ID {library_id} does not exist")
+        raise ValueError(f"Library with ID {library_id} does not exist") from None
 
 
 def check_single_file(filepath, library_id=1, mode='quick'):

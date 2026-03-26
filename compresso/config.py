@@ -429,7 +429,7 @@ class Config(metaclass=SingletonType):
         try:
             retention_days = int(value)
         except (TypeError, ValueError):
-            raise ValueError(f"log_buffer_retention must be an integer, got {value!r}")
+            raise ValueError(f"log_buffer_retention must be an integer, got {value!r}") from None
         try:
             # On Compresso startup, it may not have yet initialised the logger when this is first run.
             CompressoLogging.set_remote_logging_retention(retention_days)

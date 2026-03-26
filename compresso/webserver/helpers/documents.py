@@ -52,7 +52,7 @@ def generate_log_files_zip():
     out_file = os.path.join(cache_path, 'CompressoLogs.zip')
     with zipfile.ZipFile(out_file, 'w') as zip_object:
         # Iterate over all the files in directory
-        for dir_name, subdirectories, filenames in os.walk(logs_path):
+        for dir_name, _subdirectories, filenames in os.walk(logs_path):
             for filename in filenames:
                 # create complete filepath of file in directory
                 logfile_path = os.path.join(dir_name, filename)

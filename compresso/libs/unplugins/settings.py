@@ -69,7 +69,7 @@ class PluginSettings:
             try:
                 self.library_id = int(self.library_id)
             except ValueError:
-                raise Exception(f"Library ID needs to be an integer. You have provided '{self.library_id}'")
+                raise Exception(f"Library ID needs to be an integer. You have provided '{self.library_id}'") from None
 
     def __get_plugin_settings_file(self, force_library_settings=False):
         plugin_directory = self.get_plugin_directory()

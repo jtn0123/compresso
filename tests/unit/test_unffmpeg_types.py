@@ -341,7 +341,7 @@ class TestContainerDiscovery:
 
     def test_get_all_containers_has_required_keys(self):
         result = get_all_containers()
-        for name, data in result.items():
+        for _name, data in result.items():
             assert 'extension' in data
             assert 'description' in data
             assert 'supports_subtitles' in data
@@ -364,7 +364,7 @@ class TestVideoCodecDiscovery:
 
     def test_get_all_video_codecs_has_required_keys(self):
         result = get_all_video_codecs()
-        for name, data in result.items():
+        for _name, data in result.items():
             assert 'name' in data
             assert 'encoders' in data
             assert 'default_encoder' in data
@@ -388,7 +388,7 @@ class TestAudioCodecDiscovery:
 
     def test_get_all_audio_codecs_has_required_keys(self):
         result = get_all_audio_codecs()
-        for name, data in result.items():
+        for _name, data in result.items():
             assert 'name' in data
             assert 'encoders' in data
             assert 'default_encoder' in data
@@ -412,7 +412,7 @@ class TestSubtitleCodecDiscovery:
 
     def test_get_all_subtitle_codecs_has_required_keys(self):
         result = get_all_subtitle_codecs()
-        for name, data in result.items():
+        for _name, data in result.items():
             assert 'name' in data
             assert 'encoders' in data
             assert 'default_encoder' in data

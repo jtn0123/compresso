@@ -188,7 +188,7 @@ def touch(fname, mode=0o666, dir_fd=None, **kwargs):
 def clean_files_in_cache_dir(cache_directory):
     """This will completely wipe all contents from a directory"""
     if os.path.exists(cache_directory):
-        for root, subFolders, files in os.walk(cache_directory):
+        for root, _subFolders, _files in os.walk(cache_directory):
             root_bn = os.path.basename(root)
             if root_bn.startswith("compresso_file_conversion-"):
                 try:
