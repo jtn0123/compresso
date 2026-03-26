@@ -51,13 +51,17 @@ class TestGetDefaultLibraryPath:
         result = common.get_default_library_path()
         assert os.path.isabs(result)
 
+    @patch('compresso.libs.common.sys')
     @patch('compresso.libs.common.os.name', 'posix')
-    def test_unix_library_path(self):
+    def test_unix_library_path(self, mock_sys):
+        mock_sys.platform = 'linux'
         result = common.get_default_library_path()
         assert result == os.path.join(os.sep, 'library')
 
+    @patch('compresso.libs.common.sys')
     @patch('compresso.libs.common.os.name', 'nt')
-    def test_windows_library_path(self):
+    def test_windows_library_path(self, mock_sys):
+        mock_sys.platform = 'win32'
         result = common.get_default_library_path()
         assert 'Documents' in result
 
@@ -73,13 +77,17 @@ class TestGetDefaultCachePath:
         result = common.get_default_cache_path()
         assert os.path.isabs(result)
 
+    @patch('compresso.libs.common.sys')
     @patch('compresso.libs.common.os.name', 'posix')
-    def test_unix_cache_path(self):
+    def test_unix_cache_path(self, mock_sys):
+        mock_sys.platform = 'linux'
         result = common.get_default_cache_path()
         assert result == os.path.join(os.sep, 'tmp', 'compresso')
 
+    @patch('compresso.libs.common.sys')
     @patch('compresso.libs.common.os.name', 'nt')
-    def test_windows_cache_path(self):
+    def test_windows_cache_path(self, mock_sys):
+        mock_sys.platform = 'win32'
         result = common.get_default_cache_path()
         assert 'Compresso' in result
 

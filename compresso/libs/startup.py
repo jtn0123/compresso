@@ -8,11 +8,17 @@
 
 """
 
+import logging
 import os
+import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 
 from compresso.libs.singleton import SingletonType
+
+logger = logging.getLogger('compresso.startup')
 
 
 class StartupState(object, metaclass=SingletonType):
@@ -106,6 +112,41 @@ def _validate_cache_path(cache_path, config_path, library_path):
         raise RuntimeError("cache path '{}' must not equal library path".format(cache_path))
 
 
+def _validate_ffmpeg():
+    """
+    Check that ffmpeg and ffprobe are available on PATH.
+    Returns a dict with paths and version info. Logs warnings if missing.
+    """
+    result = {'ffmpeg': None, 'ffprobe': None, 'version': None}
+
+    result['ffmpeg'] = shutil.which('ffmpeg')
+    result['ffprobe'] = shutil.which('ffprobe')
+
+    if not result['ffmpeg'] or not result['ffprobe']:
+        missing = [k for k in ('ffmpeg', 'ffprobe') if not result[k]]
+        if sys.platform == "darwin":
+            hint = "Install with: brew install ffmpeg"
+        elif os.name == "nt":
+            hint = "Install with: winget install ffmpeg  (or choco install ffmpeg)"
+        else:
+            hint = "Install with: apt install ffmpeg  (or dnf install ffmpeg)"
+        logger.warning("Missing required tools: %s. %s", ', '.join(missing), hint)
+        return result
+
+    try:
+        proc = subprocess.run(
+            ['ffmpeg', '-version'], capture_output=True, text=True, timeout=10
+        )
+        if proc.returncode == 0 and proc.stdout:
+            first_line = proc.stdout.strip().split('\n')[0]
+            result['version'] = first_line
+            logger.info("FFmpeg found: %s", first_line)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        logger.warning("FFmpeg found on PATH but version check failed: %s", e)
+
+    return result
+
+
 def validate_startup_environment(settings):
     config_path = settings.get_config_path()
     library_path = settings.get_library_path()
@@ -118,6 +159,7 @@ def validate_startup_environment(settings):
 
 
 def build_startup_summary(settings, event_monitor_module):
+    ffmpeg_info = _validate_ffmpeg()
     return {
         'library_path':            settings.get_library_path(),
         'cache_path':              settings.get_cache_path(),
@@ -128,4 +170,5 @@ def build_startup_summary(settings, event_monitor_module):
         'worker_count':            settings.get_number_of_workers(),
         'event_monitor_active':    bool(event_monitor_module),
         'safe_defaults':           settings.get_large_library_safe_defaults(),
+        'ffmpeg_version':          ffmpeg_info.get('version'),
     }

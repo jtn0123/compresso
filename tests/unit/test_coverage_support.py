@@ -185,7 +185,8 @@ def test_fetch_directories_ignores_permission_errors(tmp_path):
          patch.object(filebrowser.os, 'listdir', side_effect=PermissionError):
         results = filebrowser.DirectoryListing.fetch_directories(str(tmp_path))
 
-    assert results == []
+    # No directory entries from listdir — only possible ".." parent entry
+    assert all(item['name'] == '..' for item in results)
 
 
 @pytest.mark.unittest

@@ -652,16 +652,16 @@ class Worker(threading.Thread):
             # Create proc monitor
             self.worker_subprocess_monitor.set_proc(sub_proc.pid)
 
-            # Set process priority on posix systems
-            # TODO: Test how this will work on Windows
-            if os.name == "posix":
-                try:
+            # Set process priority (cross-platform via psutil)
+            try:
+                if os.name == "nt":
+                    proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+                else:
                     parent_proc = psutil.Process(os.getpid())
-                    parent_proc_nice = parent_proc.nice()
-                    proc.nice(parent_proc_nice + 1)
-                except (psutil.AccessDenied, psutil.NoSuchProcess, OSError) as e:
-                    self.logger.warning("Unable to lower priority of subprocess. Subprocess should continue to run at normal priority: %s",
-                                        e)
+                    proc.nice(parent_proc.nice() + 1)
+            except (psutil.AccessDenied, psutil.NoSuchProcess, OSError) as e:
+                self.logger.warning("Unable to lower priority of subprocess. Subprocess should continue to run at normal priority: %s",
+                                    e)
 
             # Poll process for new output until finished
             while not self.redundant_flag.is_set():

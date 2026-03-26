@@ -105,6 +105,13 @@ class TestSystemGetPythonInfo:
 @pytest.mark.unittest
 class TestSystemDetectGpus:
 
+    @pytest.fixture(autouse=True)
+    def force_linux_platform(self):
+        with patch('compresso.libs.system.sys') as mock_sys, \
+             patch('compresso.libs.system.os.name', 'posix'):
+            mock_sys.platform = 'linux'
+            yield
+
     @patch('cpuinfo.get_cpu_info', return_value={'brand_raw': 'CPU'})
     @patch('compresso.libs.system.glob.glob', return_value=[])
     @patch('compresso.libs.system.subprocess.run')

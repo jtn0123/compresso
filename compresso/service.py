@@ -323,6 +323,7 @@ class RootService:
             summary['event_monitor_active'],
             summary['safe_defaults'],
         )
+        self.logger.info("STARTUP_SUMMARY ffmpeg_version=%s", summary.get('ffmpeg_version', 'not found'))
 
     def wait_for_startup_readiness(self, settings):
         deadline = time.time() + settings.get_startup_readiness_timeout_seconds()

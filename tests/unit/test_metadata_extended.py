@@ -37,13 +37,22 @@ def reset_singletons():
 def metadata_db(in_memory_db):
     """Extend the shared in_memory_db fixture with metadata-specific tables."""
     in_memory_db.create_tables([FileMetadata, FileMetadataPaths, TaskMetadata])
-    # Force sync: wait for the queue-based writer to process table creation
-    time.sleep(0.1)
-    in_memory_db.execute_sql('SELECT 1')
+    # SqliteQueueDatabase processes writes asynchronously. Issue a blocking read
+    # via the queue to ensure the CREATE TABLE statements have been flushed.
+    for _attempt in range(10):
+        tables = [r[0] for r in in_memory_db.execute_sql(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()]
+        if 'task_metadata' in tables:
+            break
+        time.sleep(0.2)
     yield in_memory_db
     # Clean up data between tests
     for model in [FileMetadataPaths, TaskMetadata, FileMetadata, Tasks]:
-        model.delete().execute()
+        try:
+            model.delete().execute()
+        except Exception:
+            pass
 
 
 @pytest.fixture(autouse=True)

@@ -23,8 +23,10 @@ class TestGetHomeDir:
             assert common.get_home_dir() == str(tmp_path)
 
     def test_returns_user_home_when_unset(self):
-        with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop('HOME_DIR', None)
+        # Keep USERPROFILE/HOMEDRIVE/HOMEPATH for Windows expanduser() support
+        keep_keys = {'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'SYSTEMROOT', 'SYSTEMDRIVE'}
+        preserved = {k: v for k, v in os.environ.items() if k in keep_keys}
+        with patch.dict(os.environ, preserved, clear=True):
             result = common.get_home_dir()
             assert os.path.isabs(result)
 

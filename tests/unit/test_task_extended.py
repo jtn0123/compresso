@@ -10,6 +10,7 @@
 """
 
 import json
+import os
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -56,7 +57,7 @@ class TestTaskSetCachePath:
             with patch('compresso.libs.task.common.random_string', return_value='xyz'):
                 with patch('compresso.libs.task.time.time', return_value=2000):
                     t.set_cache_path(cache_directory='/custom/cache')
-        assert '/custom/cache/' in t.task.cache_path
+        assert os.path.normpath('/custom/cache') in os.path.normpath(t.task.cache_path)
 
     def test_set_cache_path_custom_extension(self):
         from compresso.libs.task import Task

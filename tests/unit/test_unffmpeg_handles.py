@@ -11,6 +11,8 @@
 
 from unittest.mock import patch, MagicMock
 
+import os
+
 import pytest
 
 from compresso.libs.unffmpeg.video_codec_handle import VideoCodecHandle
@@ -504,8 +506,8 @@ class TestHardwareAccelerationHandle:
         result = handle.list_available_vaapi_devices()
         assert len(result) == 2
         assert result[0]["hwaccel"] == "vaapi"
-        assert result[0]["hwaccel_device"] == "/dev/dri/renderD128"
-        assert result[1]["hwaccel_device"] == "/dev/dri/renderD129"
+        assert result[0]["hwaccel_device"] == os.path.join("/", "dev", "dri", "renderD128")
+        assert result[1]["hwaccel_device"] == os.path.join("/", "dev", "dri", "renderD129")
 
     @patch("compresso.libs.unffmpeg.hardware_acceleration_handle.os.path.exists")
     def test_list_available_vaapi_devices_no_dri_dir(self, mock_exists):

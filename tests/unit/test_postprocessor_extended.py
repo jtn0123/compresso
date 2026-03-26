@@ -112,7 +112,7 @@ class TestStageForApproval:
 
         pp._stage_for_approval()
 
-        mock_makedirs.assert_called_once_with('/staging/task_42', exist_ok=True)
+        mock_makedirs.assert_called_once_with(os.path.join('/staging', 'task_42'), exist_ok=True)
         mock_copy2.assert_called_once()
         pp.current_task.set_status.assert_called_once_with('awaiting_approval')
 

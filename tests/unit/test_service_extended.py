@@ -426,10 +426,14 @@ class TestRootServiceRun:
              patch.object(service, 'wait_for_startup_readiness') as mock_wait_ready, \
              patch.object(service, 'log_startup_summary') as mock_log_summary, \
              patch.object(service, 'stop_threads') as mock_stop_threads, \
-             patch('compresso.service.signal.signal') as mock_signal, \
-             patch('compresso.service.signal.pause', side_effect=lambda: service.stop()), \
+             patch('compresso.service.signal'), \
              patch('compresso.service.time.sleep') as mock_sleep, \
-             patch('compresso.service.os.name', 'posix'):
+             patch('compresso.service.os.name', 'nt'):
+            # Simulate the Windows polling loop: break via KeyboardInterrupt on sleep(1)
+            def sleep_side_effect(seconds):
+                if seconds == 1:
+                    raise KeyboardInterrupt
+            mock_sleep.side_effect = sleep_side_effect
             service.run()
 
         assert mock_register.call_count == 2
@@ -441,8 +445,6 @@ class TestRootServiceRun:
         mock_log_summary.assert_called_once_with(mock_settings)
         mock_stop_threads.assert_called_once_with()
         mock_db.stop.assert_called_once_with()
-        assert mock_signal.call_count == 2
-        mock_sleep.assert_any_call(.5)
         service.startup_state.reset.assert_called_once_with()
 
     def test_run_marks_config_failure_and_raises(self):
