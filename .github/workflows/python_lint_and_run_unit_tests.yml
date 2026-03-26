@@ -92,6 +92,7 @@ jobs:
         rm -rf build dist
 
     - name: Test with pytest
+      shell: bash
       run: |
         pytest tests/unit -q --splits 3 --group ${{ matrix.shard }} \
           --cov=compresso --cov-report=xml:coverage-shard-${{ matrix.shard }}.xml
