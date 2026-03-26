@@ -139,7 +139,7 @@ class Foreman(threading.Thread):
         current_settings = self.get_current_library_configuration()
         # Compare current settings with foreman recorded settings.
         json_encoded_settings = json.dumps(current_settings, sort_keys=True).encode()
-        current_settings_hash = hashlib.md5(json_encoded_settings).hexdigest()
+        current_settings_hash = hashlib.md5(json_encoded_settings).hexdigest()  # noqa: S324 — used for config change detection, not security
         if current_settings_hash == self.current_config.get('settings_hash', ''):
             return False
         # Record current settings

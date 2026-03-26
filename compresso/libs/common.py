@@ -207,7 +207,7 @@ def clean_files_in_cache_dir(cache_directory):
 def random_string(string_length=5):
     """Generate a random string of fixed length"""
     letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(string_length))
+    return ''.join(random.choice(letters) for i in range(string_length))  # noqa: S311 — not used for security/crypto
 
 
 def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
@@ -296,7 +296,7 @@ def get_file_checksum(path):
     :param path:
     :return:
     """
-    file_hash = hashlib.md5()
+    file_hash = hashlib.md5()  # noqa: S324 — used for file fingerprinting, not security
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(8192), b''):
             file_hash.update(chunk)

@@ -97,7 +97,7 @@ class HealthCheckManager:
         ]
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # noqa: S603 - trusted ffmpeg command built internally
             stderr = result.stderr.strip() if result.stderr else ''
 
             if result.returncode != 0:

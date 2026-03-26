@@ -653,6 +653,7 @@ class ForwardLogHandler(logging.Handler):
                 f"{self.endpoint}/api/v1/push",
                 json=payload,
                 headers={"Content-Type": "application/json"},
+                timeout=30,
             )
 
             if response.status_code == 204:

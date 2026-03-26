@@ -48,7 +48,7 @@ class GpuMonitor(metaclass=SingletonType):
                     if vendor_id == INTEL_VENDOR_ID:
                         caps['intel'] = True
                         break
-            except Exception:
+            except Exception:  # noqa: S110 — optional GPU detection; missing sysfs is expected
                 pass
 
             # Check for AMD GPU via sysfs vendor ID (0x1002)
@@ -58,7 +58,7 @@ class GpuMonitor(metaclass=SingletonType):
                     if vendor_id == AMD_VENDOR_ID:
                         caps['amd'] = True
                         break
-            except Exception:
+            except Exception:  # noqa: S110 — optional GPU detection; missing sysfs is expected
                 pass
 
         elif sys.platform == "darwin":
@@ -91,7 +91,7 @@ class GpuMonitor(metaclass=SingletonType):
 
         try:
             result = subprocess.run(
-                [
+                [  # noqa: S607 - nvidia-smi resolved from PATH intentionally
                     'nvidia-smi',
                     '--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu',
                     '--format=csv,noheader,nounits',
@@ -144,7 +144,7 @@ class GpuMonitor(metaclass=SingletonType):
                     continue
                 try:
                     vendor_id = vendor_path.read_text().strip()
-                except Exception:
+                except Exception:  # noqa: S112 — skip unreadable sysfs entries
                     continue
                 if vendor_id != INTEL_VENDOR_ID:
                     continue
@@ -161,7 +161,7 @@ class GpuMonitor(metaclass=SingletonType):
                     max_freq = float(max_freq_path.read_text().strip())
                     if max_freq > 0:
                         utilization = round((cur_freq / max_freq) * 100, 1)
-                except Exception:
+                except Exception:  # noqa: S110 — freq sysfs files may be absent or unreadable
                     pass
 
                 # Read temperature from hwmon if available
@@ -174,7 +174,7 @@ class GpuMonitor(metaclass=SingletonType):
                             # sysfs reports millidegrees Celsius
                             temperature = int(temp_path.read_text().strip()) // 1000
                             break
-                except Exception:
+                except Exception:  # noqa: S110 — hwmon temp files may be absent
                     pass
 
                 gpus.append({
@@ -205,7 +205,7 @@ class GpuMonitor(metaclass=SingletonType):
                     continue
                 try:
                     vendor_id = vendor_path.read_text().strip()
-                except Exception:
+                except Exception:  # noqa: S112 — skip unreadable sysfs entries
                     continue
                 if vendor_id != AMD_VENDOR_ID:
                     continue
@@ -218,7 +218,7 @@ class GpuMonitor(metaclass=SingletonType):
                 busy_path = card_dir / 'device' / 'gpu_busy_percent'
                 try:
                     utilization = float(busy_path.read_text().strip())
-                except Exception:
+                except Exception:  # noqa: S110 — gpu_busy_percent may be absent or unreadable
                     pass
 
                 # Read VRAM usage if available
@@ -231,7 +231,7 @@ class GpuMonitor(metaclass=SingletonType):
                         memory_used = int(vram_used_path.read_text().strip()) // (1024 * 1024)
                     if vram_total_path.exists():
                         memory_total = int(vram_total_path.read_text().strip()) // (1024 * 1024)
-                except Exception:
+                except Exception:  # noqa: S110 — VRAM sysfs files may be absent
                     pass
 
                 # Read temperature from hwmon if available
@@ -243,7 +243,7 @@ class GpuMonitor(metaclass=SingletonType):
                         if temp_path.exists():
                             temperature = int(temp_path.read_text().strip()) // 1000
                             break
-                except Exception:
+                except Exception:  # noqa: S110 — hwmon temp files may be absent
                     pass
 
                 gpus.append({
@@ -271,7 +271,7 @@ class GpuMonitor(metaclass=SingletonType):
 
         try:
             result = subprocess.run(
-                ['system_profiler', 'SPDisplaysDataType', '-json'],
+                ['system_profiler', 'SPDisplaysDataType', '-json'],  # noqa: S607 - macOS system command resolved from PATH
                 capture_output=True, text=True, timeout=10,
             )
             if result.returncode != 0:

@@ -635,10 +635,10 @@ class Worker(threading.Thread):
         try:
             # Execute command
             if isinstance(exec_command, list):
-                sub_proc = subprocess.Popen(exec_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                sub_proc = subprocess.Popen(exec_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,  # noqa: S603 - trusted plugin exec_command from internal pipeline
                                             universal_newlines=True, errors='replace')
             elif isinstance(exec_command, str):
-                sub_proc = subprocess.Popen(exec_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                sub_proc = subprocess.Popen(exec_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,  # noqa: S602 - shell=True required for string commands from plugins
                                             universal_newlines=True, errors='replace', shell=True)
             else:
                 raise TypeError(

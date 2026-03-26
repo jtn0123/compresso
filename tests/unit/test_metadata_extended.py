@@ -50,7 +50,7 @@ def metadata_db(in_memory_db):
     for model in [FileMetadataPaths, TaskMetadata, FileMetadata, Tasks]:
         try:
             model.delete().execute()
-        except Exception:
+        except Exception:  # noqa: S110 — best-effort cleanup; table may not exist
             pass
 
 

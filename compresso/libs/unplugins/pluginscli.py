@@ -639,7 +639,7 @@ class PluginsCLI:
             file_url = sample_files.get(key)
             print()
             print(f"Downloading sample file: '{file_url}'")
-            with requests.get(file_url, stream=True) as r:
+            with requests.get(file_url, stream=True, timeout=30) as r:
                 r.raise_for_status()
                 with open(library_file, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=None):

@@ -133,7 +133,7 @@ class Links(metaclass=SingletonType):
                 'message': label,
                 'timeout': 10 if new_status == 'connected' else 0,
             })
-        except Exception:
+        except Exception:  # noqa: S110 — best-effort UI notification; FrontendPushMessages may not be available
             pass
 
     def __format_address(self, address: str):

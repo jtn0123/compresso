@@ -211,7 +211,7 @@ def _build_ffmpeg_progress_parser(data):
             "-of", "default=noprint_wrappers=1:nokey=1",
             data.get("file_in", "")
         ]
-        result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=30)  # noqa: S603 - trusted ffprobe command built internally
         duration = float(result.stdout.strip())
     except Exception as e:
         logger.debug("Failed to probe duration for progress tracking: %s", e)

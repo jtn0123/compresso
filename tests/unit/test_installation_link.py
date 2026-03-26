@@ -25,7 +25,7 @@ class TestRequestHandler:
 
     @pytest.mark.unittest
     def test_basic_auth(self):
-        handler = RequestHandler(auth='basic', username='user', password='pass')
+        handler = RequestHandler(auth='basic', username='user', password='pass')  # noqa: S106 — test fixture
         result = handler._RequestHandler__get_request_auth()
         assert isinstance(result, HTTPBasicAuth)
 

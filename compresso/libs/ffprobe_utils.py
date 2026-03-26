@@ -35,7 +35,7 @@ def probe_file(filepath, timeout=30):
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)  # noqa: S603 - trusted ffprobe command built internally
         if result.returncode != 0:
             logger.warning("ffprobe failed for %s: %s", filepath, result.stderr[:500] if result.stderr else '')
             return None
@@ -139,7 +139,7 @@ def compute_quality_scores(source_path, encoded_path, duration_limit=30):
             + time_limit_args + ['-i', source_path]
             + ['-lavfi', '[0:v][1:v]ssim', '-f', 'null', '-']
         )
-        result = subprocess.run(ssim_cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(ssim_cmd, capture_output=True, text=True, timeout=120)  # noqa: S603 - trusted ffmpeg command built internally
         if result.returncode == 0 and result.stderr:
             match = re.search(r'All:(\d+(?:\.\d+)?)', result.stderr)
             if match:
@@ -157,7 +157,7 @@ def compute_quality_scores(source_path, encoded_path, duration_limit=30):
             + time_limit_args + ['-i', source_path]
             + ['-lavfi', '[0:v][1:v]libvmaf', '-f', 'null', '-']
         )
-        result = subprocess.run(vmaf_cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(vmaf_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg command built internally
         if result.returncode == 0 and result.stderr:
             match = re.search(r'VMAF score:\s*(\d+(?:\.\d+)?)', result.stderr)
             if not match:

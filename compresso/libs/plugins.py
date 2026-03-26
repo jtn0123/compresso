@@ -69,7 +69,7 @@ class PluginsHandler(metaclass=SingletonType):
 
     @staticmethod
     def get_plugin_repo_id(repo_path):
-        return int(hashlib.md5(repo_path.encode('utf8')).hexdigest(), 16)
+        return int(hashlib.md5(repo_path.encode('utf8')).hexdigest(), 16)  # noqa: S324 — used for deterministic ID generation, not security
 
     def get_repo_cache_file(self, repo_id):
         plugins_directory = self.settings.get_plugins_path()
@@ -520,7 +520,7 @@ class PluginsHandler(metaclass=SingletonType):
         # Recreate the site-packages directory
         os.makedirs(install_target, exist_ok=True)
         try:
-            subprocess.call([
+            subprocess.call([  # noqa: S603 - trusted pip install for plugin dependencies
                 sys.executable, '-m', 'pip', 'install', '--upgrade',
                 '-r', requirements_file,
                 f'--target={install_target}'
@@ -536,14 +536,14 @@ class PluginsHandler(metaclass=SingletonType):
         if not os.path.exists(package_file):
             return
         try:
-            subprocess.call(['npm', 'install'], cwd=plugin_path, timeout=300)
+            subprocess.call(['npm', 'install'], cwd=plugin_path, timeout=300)  # noqa: S603, S607 - trusted npm install for plugin dependencies
         except subprocess.TimeoutExpired:
             logging.getLogger("Compresso.PluginsHandler").error(
                 "Timed out running npm install for plugin at %s", plugin_path
             )
             return
         try:
-            subprocess.call(['npm', 'run', 'build'], cwd=plugin_path, timeout=300)
+            subprocess.call(['npm', 'run', 'build'], cwd=plugin_path, timeout=300)  # noqa: S603, S607 - trusted npm build for plugin dependencies
         except subprocess.TimeoutExpired:
             logging.getLogger("Compresso.PluginsHandler").error(
                 "Timed out running npm build for plugin at %s", plugin_path

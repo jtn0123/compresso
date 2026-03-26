@@ -134,7 +134,7 @@ def _validate_ffmpeg():
 
     try:
         proc = subprocess.run(
-            ['ffmpeg', '-version'], capture_output=True, text=True, timeout=10
+            ['ffmpeg', '-version'], capture_output=True, text=True, timeout=10  # noqa: S607 - ffmpeg resolved from PATH intentionally
         )
         if proc.returncode == 0 and proc.stdout:
             first_line = proc.stdout.strip().split('\n')[0]

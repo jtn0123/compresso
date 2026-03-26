@@ -70,7 +70,7 @@ class System(metaclass=SingletonType):
         # NVIDIA detection via nvidia-smi
         try:
             result = subprocess.run(
-                ['nvidia-smi', '--query-gpu=index,name,memory.total,driver_version', '--format=csv,noheader,nounits'],
+                ['nvidia-smi', '--query-gpu=index,name,memory.total,driver_version', '--format=csv,noheader,nounits'],  # noqa: S607 - nvidia-smi resolved from PATH intentionally
                 capture_output=True, text=True, timeout=10
             )
             if result.returncode == 0:

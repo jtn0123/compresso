@@ -347,5 +347,5 @@ class TestConstructorArgs:
         assert c.ui_port == 5555
 
     def test_address_override(self, tmp_path):
-        c = _make_config(tmp_path, address='0.0.0.0')
-        assert c.ui_address == '0.0.0.0'
+        c = _make_config(tmp_path, address='0.0.0.0')  # noqa: S104
+        assert c.ui_address == '0.0.0.0'  # noqa: S104

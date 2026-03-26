@@ -242,7 +242,7 @@ class DirectoryListingResultsSchema(BaseSchema):
             },
             {
                 'value': "tmp",
-                'label': "/tmp",
+                'label': "/tmp",  # noqa: S108 — UI label for Linux default path
             },
         ]},
         validate=validate.Length(min=0),
@@ -1257,7 +1257,7 @@ class SettingsReadAndWriteSchema(BaseSchema):
             "schedule_full_scan_minutes": 1440,
             "follow_symlinks":            True,
             "run_full_scan_on_start":     False,
-            "cache_path":                 "/tmp/compresso",
+            "cache_path":                 "/tmp/compresso",  # noqa: S108 — Linux default cache path
             "large_library_safe_defaults": True,
             "startup_readiness_timeout_seconds": 30,
             "default_worker_cap":         2

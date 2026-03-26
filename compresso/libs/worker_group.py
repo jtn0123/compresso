@@ -47,7 +47,7 @@ def generate_random_worker_group_name():
              'Vuzashi', 'Wanjin', 'Yaci', 'Yamike', 'Yavo', 'Yera', 'Yeree', 'Yetu', 'Yishi', 'Yuhai', 'Zaejin', 'Zalma',
              'Zea', 'Zelaji', 'Zelea', 'Ziataaman', 'Ziataima', 'Ziatakraa', 'Zola', 'Zoljin', 'Zoti', 'Zujia', 'Zulabar',
              'Zulja', 'Zuljah', 'Zulkis', 'Zulraja', 'Zulrajas', 'Zulwatha', 'Zulyafi', 'Zunabar', 'Zyra', ]
-    return random.choice(names)
+    return random.choice(names)  # noqa: S311 — not used for security/crypto
 
 
 class WorkerGroup:

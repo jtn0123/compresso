@@ -44,7 +44,7 @@ def ffmpeg_cmd(params):
     """
     command = ["ffmpeg"] + params
 
-    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # noqa: S603 - trusted ffmpeg command built internally
     out, err = pipe.communicate()
 
     # Check for results
@@ -69,7 +69,7 @@ def ffprobe_cmd(params):
     """
     command = ["ffprobe"] + params
 
-    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # noqa: S603 - trusted ffprobe command built internally
     out, err = pipe.communicate()
 
     # Check for results

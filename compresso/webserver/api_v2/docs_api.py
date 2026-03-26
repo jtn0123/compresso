@@ -56,7 +56,7 @@ def _generate_changelog_from_git():
 
         # Check if this is a git repo
         result = subprocess.run(
-            ['git', 'rev-parse', '--git-dir'],
+            ['git', 'rev-parse', '--git-dir'],  # noqa: S607 - git resolved from PATH intentionally
             capture_output=True, text=True, cwd=repo_root, timeout=5
         )
         if result.returncode != 0:
@@ -64,7 +64,7 @@ def _generate_changelog_from_git():
 
         # Get all tags sorted by date (newest first)
         tags_result = subprocess.run(
-            ['git', 'tag', '--sort=-creatordate', '--format=%(refname:short)|%(creatordate:short)'],
+            ['git', 'tag', '--sort=-creatordate', '--format=%(refname:short)|%(creatordate:short)'],  # noqa: S607 - git resolved from PATH intentionally
             capture_output=True, text=True, cwd=repo_root, timeout=10
         )
         tags = []
@@ -79,8 +79,8 @@ def _generate_changelog_from_git():
 
         # Get commits from HEAD to the first tag (unreleased)
         if tags:
-            unreleased_result = subprocess.run(
-                ['git', 'log', f'{tags[0][0]}..HEAD', '--pretty=format:- %s (%h)', '--no-merges'],
+            unreleased_result = subprocess.run(  # noqa: S603 - trusted git command with internal tag data
+                ['git', 'log', f'{tags[0][0]}..HEAD', '--pretty=format:- %s (%h)', '--no-merges'],  # noqa: S607 - git resolved from PATH intentionally
                 capture_output=True, text=True, cwd=repo_root, timeout=10
             )
             unreleased = unreleased_result.stdout.strip()
@@ -99,8 +99,8 @@ def _generate_changelog_from_git():
             else:
                 log_range = tag
 
-            commits_result = subprocess.run(
-                ['git', 'log', log_range, '--pretty=format:- %s (%h)', '--no-merges'],
+            commits_result = subprocess.run(  # noqa: S603 - trusted git command with internal tag data
+                ['git', 'log', log_range, '--pretty=format:- %s (%h)', '--no-merges'],  # noqa: S607 - git resolved from PATH intentionally
                 capture_output=True, text=True, cwd=repo_root, timeout=10
             )
             commits = commits_result.stdout.strip()
@@ -113,7 +113,7 @@ def _generate_changelog_from_git():
         if not tags:
             lines.append("## Recent Changes\n\n")
             all_result = subprocess.run(
-                ['git', 'log', '--pretty=format:- %s (%h)', '--no-merges', '-50'],
+                ['git', 'log', '--pretty=format:- %s (%h)', '--no-merges', '-50'],  # noqa: S607 - git resolved from PATH intentionally
                 capture_output=True, text=True, cwd=repo_root, timeout=10
             )
             if all_result.stdout.strip():

@@ -80,7 +80,7 @@ class TestGetPluginRepoId:
     def test_returns_md5_hash(self):
         from compresso.libs.plugins import PluginsHandler
         result = PluginsHandler.get_plugin_repo_id("https://example.com/repo")
-        expected = int(hashlib.md5(b"https://example.com/repo").hexdigest(), 16)
+        expected = int(hashlib.md5(b"https://example.com/repo").hexdigest(), 16)  # noqa: S324 — mirrors production code for test assertion
         assert result == expected
 
     def test_different_paths_produce_different_ids(self):

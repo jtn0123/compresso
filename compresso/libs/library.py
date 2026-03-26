@@ -63,7 +63,7 @@ def generate_random_library_name():
         "sudden", "scandalous", "secretive", "spry", "squiggly", "smooth", "sulky", "scented", "spicy", "sticky", "slushy",
         "symptomatic", "tart", "turbulent", "tiresome", "typical", "xyloid", "xanthic", "zealous", "zany",
     ]
-    return f"{random.choice(names)}, the {random.choice(adjectives)} library"
+    return f"{random.choice(names)}, the {random.choice(adjectives)} library"  # noqa: S311 — not used for security/crypto
 
 
 class Library:

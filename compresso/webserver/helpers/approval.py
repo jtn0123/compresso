@@ -160,7 +160,7 @@ def get_approval_task_detail(task_id):
         task_record = Tasks.get_by_id(task_id)
         vmaf_score = task_record.vmaf_score
         ssim_score = task_record.ssim_score
-    except Exception:
+    except Exception:  # noqa: S110 — scores are optional; task record may not exist yet
         pass
 
     return {

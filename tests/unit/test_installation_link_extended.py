@@ -53,13 +53,13 @@ class TestRequestHandlerInit:
         assert handler.password == ''
 
     def test_basic_auth_type(self):
-        handler = RequestHandler(auth='basic', username='admin', password='secret')
+        handler = RequestHandler(auth='basic', username='admin', password='secret')  # noqa: S106 — test fixture
         assert handler.auth == 'basic'
         assert handler.username == 'admin'
-        assert handler.password == 'secret'
+        assert handler.password == 'secret'  # noqa: S105 — test fixture
 
     def test_none_username_defaults_to_empty(self):
-        handler = RequestHandler(auth='basic', username=None, password='pw')
+        handler = RequestHandler(auth='basic', username=None, password='pw')  # noqa: S106 — test fixture
         assert handler.username == ''
 
     def test_none_password_defaults_to_empty(self):
@@ -71,11 +71,11 @@ class TestRequestHandlerInit:
 class TestRequestHandlerAuth:
 
     def test_basic_auth_returns_httpbasicauth(self):
-        handler = RequestHandler(auth='basic', username='u', password='p')
+        handler = RequestHandler(auth='basic', username='u', password='p')  # noqa: S106 — test fixture
         auth = handler._RequestHandler__get_request_auth()
         assert isinstance(auth, HTTPBasicAuth)
         assert auth.username == 'u'
-        assert auth.password == 'p'
+        assert auth.password == 'p'  # noqa: S105 — test fixture
 
     def test_no_auth_returns_none(self):
         handler = RequestHandler(auth='')
@@ -86,7 +86,7 @@ class TestRequestHandlerAuth:
         assert handler._RequestHandler__get_request_auth() is None
 
     def test_case_insensitive_basic(self):
-        handler = RequestHandler(auth='Basic', username='u', password='p')
+        handler = RequestHandler(auth='Basic', username='u', password='p')  # noqa: S106 — test fixture
         auth = handler._RequestHandler__get_request_auth()
         assert isinstance(auth, HTTPBasicAuth)
 
@@ -96,7 +96,7 @@ class TestRequestHandlerMethods:
 
     @patch('compresso.libs.installation_link.requests.get')
     def test_get_passes_auth_and_kwargs(self, mock_get):
-        handler = RequestHandler(auth='basic', username='u', password='p')
+        handler = RequestHandler(auth='basic', username='u', password='p')  # noqa: S106 — test fixture
         handler.get('http://example.com', timeout=5)
         mock_get.assert_called_once()
         args, kwargs = mock_get.call_args
@@ -115,7 +115,7 @@ class TestRequestHandlerMethods:
 
     @patch('compresso.libs.installation_link.requests.delete')
     def test_delete_passes_auth(self, mock_delete):
-        handler = RequestHandler(auth='basic', username='a', password='b')
+        handler = RequestHandler(auth='basic', username='a', password='b')  # noqa: S106 — test fixture
         handler.delete('http://example.com/item')
         mock_delete.assert_called_once()
         args, kwargs = mock_delete.call_args

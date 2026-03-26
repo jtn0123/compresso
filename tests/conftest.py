@@ -76,7 +76,7 @@ def _stop_thread_if_supported(thread):
     if event is not None and hasattr(event, "set"):
         try:
             event.set()
-        except Exception:
+        except Exception:  # noqa: S110 — best-effort thread wakeup during test cleanup
             pass
 
     try:
@@ -171,7 +171,7 @@ def reset_shared_runtime_state():
         from compresso.libs.preview import PreviewManager
         PreviewManager._jobs = {}
         PreviewManager._current_job = None
-    except Exception:
+    except Exception:  # noqa: S110 — module may not be importable in all test configurations
         pass
 
     try:
@@ -179,20 +179,20 @@ def reset_shared_runtime_state():
         TaskDataStore._runner_state = {}
         TaskDataStore._task_state = {}
         TaskDataStore._ctx = threading.local()
-    except Exception:
+    except Exception:  # noqa: S110 — module may not be importable in all test configurations
         pass
 
     try:
         from compresso.webserver.api_v2 import rate_limiter as rl_module
         rl_module._rate_limiter = None
-    except Exception:
+    except Exception:  # noqa: S110 — module may not be importable in all test configurations
         pass
 
     try:
         from compresso.libs.unplugins import child_process
         child_process.kill_all_plugin_processes()
         child_process.set_shared_manager(None)
-    except Exception:
+    except Exception:  # noqa: S110 — module may not be importable in all test configurations
         pass
 
     gc.collect()

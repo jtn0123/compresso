@@ -158,7 +158,7 @@ class ScheduledTasksManager(threading.Thread):
         #           rotation of workers when the pending task queue is close to the same.
         #       EG. If time now (seconds) > time last checked (seconds) + 10mins (600 seconds) + random seconds within 2mins
         time_now = time.time()
-        time_to_next_force_local_worker = int(self.force_local_worker_timer + 600 + random.randrange(120))
+        time_to_next_force_local_worker = int(self.force_local_worker_timer + 600 + random.randrange(120))  # noqa: S311 — jitter for scheduling, not used for security/crypto
         if time_now > time_to_next_force_local_worker:
             if (local_task_count > 1) and (target_workers_for_this_installation < 1):
                 target_workers_for_this_installation = 1

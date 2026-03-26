@@ -30,7 +30,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "PIE", "B"]
+select = ["E", "F", "W", "I", "UP", "PIE", "B", "S"]
 ignore = [
     "E241",  # multiple spaces before operator — used for alignment
     "E501",  # line too long — enforced advisory only (many pre-existing)
@@ -41,6 +41,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
+"tests/**" = ["S101", "S108", "S311"]
 "tests/unit/test_unffmpeg_types.py" = ["E402"]
 
 [tool.mypy]

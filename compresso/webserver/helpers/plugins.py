@@ -228,7 +228,7 @@ def get_plugin_settings(plugin_id: str, library_id=None):
     if plugin_settings:
         for key in plugin_settings:
             form_input = {
-                "key_id":         hashlib.md5(key.encode('utf8')).hexdigest(),
+                "key_id":         hashlib.md5(key.encode('utf8')).hexdigest(),  # noqa: S324 — used for deterministic ID generation, not security
                 "key":            key,
                 "value":          plugin_settings.get(key),
                 "input_type":     None,

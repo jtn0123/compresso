@@ -56,20 +56,20 @@ class RequestHandler:
 
     def get(self, url, **kwargs):
         kwargs.setdefault('timeout', self.timeout)
-        return requests.get(url, auth=self.__get_request_auth(), **kwargs)
+        return requests.get(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def post(self, url, **kwargs):
         kwargs.setdefault('timeout', self.timeout)
-        return requests.post(url, auth=self.__get_request_auth(), **kwargs)
+        return requests.post(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def put(self, url, **kwargs):
         kwargs.setdefault('timeout', self.timeout)
-        return requests.put(url, auth=self.__get_request_auth(), **kwargs)
+        return requests.put(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def patch(self, url, **kwargs):
         kwargs.setdefault('timeout', self.timeout)
-        return requests.patch(url, auth=self.__get_request_auth(), **kwargs)
+        return requests.patch(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def delete(self, url, **kwargs):
         kwargs.setdefault('timeout', self.timeout)
-        return requests.delete(url, auth=self.__get_request_auth(), **kwargs)
+        return requests.delete(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above

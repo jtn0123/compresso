@@ -103,7 +103,7 @@ class PreviewManager:
 
                 if data['exec_command']:
                     try:
-                        result = subprocess.run(
+                        result = subprocess.run(  # noqa: S603 - trusted plugin exec_command from internal pipeline
                             data['exec_command'],
                             capture_output=True, text=True, timeout=300
                         )
@@ -137,7 +137,7 @@ class PreviewManager:
                     '-c:v', 'copy', '-c:a', 'aac',
                     remux_path,
                 ]
-                result = subprocess.run(remux_cmd, capture_output=True, text=True, timeout=300)
+                result = subprocess.run(remux_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg remux command
                 if result.returncode != 0:
                     # Remux failed (non-mp4-compatible codec), re-encode at CRF 18
                     reencode_cmd = [
@@ -146,7 +146,7 @@ class PreviewManager:
                         '-c:a', 'aac', '-b:a', '128k',
                         remux_path,
                     ]
-                    result = subprocess.run(reencode_cmd, capture_output=True, text=True, timeout=300)
+                    result = subprocess.run(reencode_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg re-encode command
                     if result.returncode != 0:
                         self.logger.warning("Remux/re-encode to MP4 failed: %s",
                                             result.stderr[-500:] if result.stderr else '')
@@ -273,7 +273,7 @@ class PreviewManager:
                 '-c', 'copy',
                 segment_path,
             ]
-            result = subprocess.run(extract_cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(extract_cmd, capture_output=True, text=True, timeout=120)  # noqa: S603 - trusted ffmpeg segment extraction command
             if result.returncode != 0:
                 raise RuntimeError("Segment extraction failed: {}".format(result.stderr[-500:] if result.stderr else ''))
 
@@ -290,7 +290,7 @@ class PreviewManager:
                 '-b:a', '192k',
                 source_web_path,
             ]
-            result = subprocess.run(source_web_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(source_web_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg encode command
             if result.returncode != 0:
                 raise RuntimeError("Source web encode failed: {}".format(result.stderr[-500:] if result.stderr else ''))
 
@@ -315,7 +315,7 @@ class PreviewManager:
                     '-b:a', '128k',
                     encoded_path,
                 ]
-                result = subprocess.run(encoded_cmd, capture_output=True, text=True, timeout=300)
+                result = subprocess.run(encoded_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg fallback encode command
                 if result.returncode != 0:
                     raise RuntimeError("Encoded preview failed: {}".format(result.stderr[-500:] if result.stderr else ''))
 
@@ -360,7 +360,7 @@ class PreviewManager:
                 '-of', 'csv=p=0',
                 filepath,
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: S603 - trusted ffprobe command built internally
             if result.returncode == 0:
                 return result.stdout.strip()
         except Exception as e:
@@ -388,7 +388,7 @@ class PreviewManager:
                 '-lavfi', '[0:v][1:v]ssim',
                 '-f', 'null', '-',
             ]
-            result = subprocess.run(ssim_cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(ssim_cmd, capture_output=True, text=True, timeout=120)  # noqa: S603 - trusted ffmpeg SSIM computation command
             if result.returncode == 0 and result.stderr:
                 match = re.search(r'All:(\d+(?:\.\d+)?)', result.stderr)
                 if match:
@@ -405,7 +405,7 @@ class PreviewManager:
                 '-lavfi', '[0:v][1:v]libvmaf',
                 '-f', 'null', '-',
             ]
-            result = subprocess.run(vmaf_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(vmaf_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg VMAF computation command
             if result.returncode == 0 and result.stderr:
                 match = re.search(r'VMAF score:\s*(\d+(?:\.\d+)?)', result.stderr)
                 if not match:
