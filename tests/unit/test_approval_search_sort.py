@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_approval_search_sort.py
@@ -12,9 +11,9 @@
     - get_all_matching_task_ids returns filtered IDs
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ------------------------------------------------------------------
 # TestApprovalListingOrderAndSearch

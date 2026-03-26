@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.workers.py
@@ -57,7 +56,7 @@ class Worker(threading.Thread):
     worker_runners_info = {}
 
     def __init__(self, thread_id, name, worker_group_id, pending_queue, complete_queue, event):
-        super(Worker, self).__init__(name=name)
+        super().__init__(name=name)
         self.thread_id = thread_id
         self.name = name
         self.worker_group_id = worker_group_id
@@ -520,7 +519,7 @@ class Worker(threading.Thread):
             # If no jobs were carried out on this task
             self.logger.warning("No Plugin requested for Compresso to run commands for this file '%s'", original_abspath)
             self.worker_log.append(
-                "\n\nNo Plugin requested for Compresso to run commands for this file '{}'".format(original_abspath))
+                f"\n\nNo Plugin requested for Compresso to run commands for this file '{original_abspath}'")
 
         # Save the completed command log
         self.current_task.save_command_log(self.worker_log)
@@ -643,8 +642,7 @@ class Worker(threading.Thread):
                                             universal_newlines=True, errors='replace', shell=True)
             else:
                 raise TypeError(
-                    "Plugin's returned 'exec_command' object must be either a list or a string. Received type {}.".format(
-                        type(exec_command)))
+                    f"Plugin's returned 'exec_command' object must be either a list or a string. Received type {type(exec_command)}.")
 
             # Fetch process using psutil for control (sending SIGSTOP on windows will not work)
             proc = psutil.Process(pid=sub_proc.pid)
@@ -731,4 +729,7 @@ class Worker(threading.Thread):
 
 
 # Backward-compatible imports
-from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor as WorkerSubprocessMonitor, WorkerCommandError  # noqa: E402, F811, F401
+from compresso.libs.worker_subprocess_monitor import WorkerCommandError as WorkerCommandError  # noqa: E402, F811, F401
+from compresso.libs.worker_subprocess_monitor import (  # noqa: E402, F811, F401
+    WorkerSubprocessMonitor as WorkerSubprocessMonitor,
+)

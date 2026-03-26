@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_notifications_api.py
@@ -12,9 +11,9 @@
 """
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 

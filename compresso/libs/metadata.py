@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.metadata.py
@@ -38,10 +37,11 @@ from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
 
+from peewee import fn
+
 from compresso.libs import common
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels import FileMetadata, FileMetadataPaths, TaskMetadata, Tasks
-from peewee import fn
 
 
 class CompressoFileMetadata:
@@ -113,7 +113,7 @@ class CompressoFileMetadata:
     def _enforce_plugin_size_limit(cls, plugin_data):
         encoded = json.dumps(plugin_data).encode('utf-8')
         if len(encoded) > cls.MAX_PLUGIN_JSON_BYTES:
-            raise ValueError("Plugin metadata exceeds size limit ({} bytes)".format(cls.MAX_PLUGIN_JSON_BYTES))
+            raise ValueError(f"Plugin metadata exceeds size limit ({cls.MAX_PLUGIN_JSON_BYTES} bytes)")
 
     @classmethod
     def _ensure_task_cache_entry(cls, task_id):

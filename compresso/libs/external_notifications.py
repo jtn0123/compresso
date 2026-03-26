@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.external_notifications.py
@@ -44,7 +43,7 @@ EVENT_TITLES = {
 }
 
 
-class ExternalNotificationDispatcher(object, metaclass=SingletonType):
+class ExternalNotificationDispatcher(metaclass=SingletonType):
     """
     Singleton that dispatches external notifications to configured channels
     (Discord, Slack, generic webhook) in a background thread pool.
@@ -256,7 +255,7 @@ class ExternalNotificationDispatcher(object, metaclass=SingletonType):
             channel_type = channel_config.get('type', '').lower()
             sender = self._get_sender_for_type(channel_type)
             if sender is None:
-                return {'success': False, 'error': "Unknown channel type '{}'".format(channel_type)}
+                return {'success': False, 'error': f"Unknown channel type '{channel_type}'"}
             sender(channel_config, 'task_completed', test_context)
             return {'success': True}
         except Exception as e:

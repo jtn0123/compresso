@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_healthcheck_extended.py
@@ -13,9 +12,9 @@ import os
 import queue
 import threading
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.healthcheck import HealthCheckManager
 

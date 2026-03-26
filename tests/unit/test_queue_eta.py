@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_queue_eta.py
@@ -11,9 +10,9 @@
 """
 
 import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -52,11 +51,11 @@ def _make_worker(worker_id, idle=True, paused=False, eta_seconds=None):
         }
     return {
         'id':              str(worker_id),
-        'name':            'Worker-{}'.format(worker_id),
+        'name':            f'Worker-{worker_id}',
         'idle':            idle,
         'paused':          paused,
-        'current_task':    None if idle else 'task-{}'.format(worker_id),
-        'current_file':    '' if idle else 'file-{}.mp4'.format(worker_id),
+        'current_task':    None if idle else f'task-{worker_id}',
+        'current_file':    '' if idle else f'file-{worker_id}.mp4',
         'subprocess':      subprocess_stats,
     }
 

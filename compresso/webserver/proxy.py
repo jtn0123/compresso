@@ -1,6 +1,8 @@
 import base64
-import tornado.web
+
 import tornado.httpclient
+import tornado.web
+
 from compresso.libs.installation_link import Links
 
 

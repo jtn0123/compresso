@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_session.py
@@ -9,13 +8,14 @@
 """
 
 import os
-import pytest
 import tempfile
+
+import pytest
 
 from compresso.libs.unmodels.lib import Database
 
 
-class TestSession(object):
+class TestSession:
     """
     TestSession
 
@@ -49,8 +49,8 @@ class TestSession(object):
         self.settings = config.Config(config_path=config_path)
 
         # Clear singleton cache so each test class gets a fresh Session
-        from compresso.libs.singleton import SingletonType
         from compresso.libs.session import Session
+        from compresso.libs.singleton import SingletonType
         SingletonType._instances.pop(Session, None)
 
     def teardown_class(self):

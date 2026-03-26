@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.compressionstats.py
@@ -10,8 +9,9 @@
 """
 
 from peewee import *
-from compresso.libs.unmodels.lib import BaseModel
+
 from compresso.libs.unmodels.completedtasks import CompletedTasks
+from compresso.libs.unmodels.lib import BaseModel
 
 
 class CompressionStats(BaseModel):

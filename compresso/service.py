@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.service.py
@@ -33,21 +32,21 @@ import argparse
 import os
 import queue
 import signal
-import time
 import threading
+import time
 
 import psutil
 
 from compresso import config, metadata
-from compresso.libs import libraryscanner, common, eventmonitor, startup
+from compresso.libs import common, eventmonitor, libraryscanner, startup
 from compresso.libs.db_migrate import Migrations
-from compresso.libs.logs import CompressoLogging
-from compresso.libs.scheduler import ScheduledTasksManager
-from compresso.libs.taskqueue import TaskQueue
-from compresso.libs.postprocessor import PostProcessor
-from compresso.libs.taskhandler import TaskHandler
-from compresso.libs.uiserver import UIServer
 from compresso.libs.foreman import Foreman
+from compresso.libs.logs import CompressoLogging
+from compresso.libs.postprocessor import PostProcessor
+from compresso.libs.scheduler import ScheduledTasksManager
+from compresso.libs.taskhandler import TaskHandler
+from compresso.libs.taskqueue import TaskQueue
+from compresso.libs.uiserver import UIServer
 
 
 def init_db(config_path):
@@ -103,7 +102,7 @@ class RootService:
                 self.logger.info("WORKER_THREAD_STARTED name=%s", name)
                 return
             time.sleep(0.1)
-        message = "WORKER_THREAD_STARTUP_FAILED name={} did not remain alive".format(name)
+        message = f"WORKER_THREAD_STARTUP_FAILED name={name} did not remain alive"
         self.logger.error(message)
         self.startup_state.mark_error('threads_ready', message)
         raise RuntimeError(message)
@@ -267,7 +266,7 @@ class RootService:
         try:
             common.clean_files_in_cache_dir(settings.get_cache_path())
         except Exception as e:
-            message = "STARTUP_CACHE_CLEANUP_FAILED cache_path={} error={}".format(settings.get_cache_path(), str(e))
+            message = f"STARTUP_CACHE_CLEANUP_FAILED cache_path={settings.get_cache_path()} error={str(e)}"
             self.logger.error(message)
             self.startup_state.mark_error('startup_validation', message)
             raise
@@ -360,7 +359,7 @@ class RootService:
         self.threads = []
 
     def sig_handle(self, signum, frame):
-        self.logger.info("Received {}".format(signum))
+        self.logger.info(f"Received {signum}")
         self.stop()
 
     def stop(self):
@@ -368,9 +367,11 @@ class RootService:
 
     def run(self):
         # Init the TaskDataStore and PluginChildProcess
-        import tornado.autoreload
-        from multiprocessing import Manager
         import atexit
+        from multiprocessing import Manager
+
+        import tornado.autoreload
+
         from compresso.libs.task import TaskDataStore
         from compresso.libs.unplugins.child_process import kill_all_plugin_processes, set_shared_manager
         # Init a shared manager
@@ -394,7 +395,7 @@ class RootService:
             settings = config.Config()
             self.startup_state.mark_ready('config_loaded', detail=settings.get_config_path())
         except Exception as e:
-            message = "STARTUP_CONFIG_LOAD_FAILED error={}".format(str(e))
+            message = f"STARTUP_CONFIG_LOAD_FAILED error={str(e)}"
             self.logger.error(message)
             self.startup_state.mark_error('config_loaded', message)
             raise
@@ -404,7 +405,7 @@ class RootService:
             startup.validate_startup_environment(settings)
             self.startup_state.mark_ready('startup_validation', detail='validated')
         except Exception as e:
-            message = "STARTUP_VALIDATION_FAILED error={}".format(str(e))
+            message = f"STARTUP_VALIDATION_FAILED error={str(e)}"
             self.logger.error(message)
             self.startup_state.mark_error('startup_validation', message)
             raise
@@ -414,7 +415,7 @@ class RootService:
             self.db_connection = init_db(settings.get_config_path())
             self.startup_state.mark_ready('db_ready', detail=settings.get_config_path())
         except Exception as e:
-            message = "STARTUP_DB_INIT_FAILED error={}".format(str(e))
+            message = f"STARTUP_DB_INIT_FAILED error={str(e)}"
             self.logger.error(message)
             self.startup_state.mark_error('db_ready', message)
             raise
@@ -432,7 +433,7 @@ class RootService:
             self.wait_for_startup_readiness(settings)
             self.log_startup_summary(settings)
         except Exception as e:
-            message = "STARTUP_THREADING_FAILED error={}".format(str(e))
+            message = f"STARTUP_THREADING_FAILED error={str(e)}"
             self.logger.error(message)
             if not self.startup_state.snapshot().get('errors'):
                 self.startup_state.mark_error('threads_ready', message)

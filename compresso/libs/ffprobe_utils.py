@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.ffprobe_utils.py
@@ -87,7 +86,7 @@ def extract_media_metadata(filepath):
         # Fallback: estimate codec from container extension
         hint = CONTAINER_CODEC_HINTS.get(ext, '')
         if hint:
-            result['codec'] = '{} (estimated)'.format(hint)
+            result['codec'] = f'{hint} (estimated)'
         return result
 
     # Extract duration from format level
@@ -112,7 +111,7 @@ def extract_media_metadata(filepath):
             elif height >= 480:
                 result['resolution'] = '480p'
             elif height > 0:
-                result['resolution'] = '{}p'.format(height)
+                result['resolution'] = f'{height}p'
             break
 
     return result

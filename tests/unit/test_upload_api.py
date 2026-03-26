@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_upload_api.py
@@ -10,8 +9,9 @@
 """
 
 
+from unittest.mock import MagicMock, mock_open, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, mock_open
 
 from compresso.libs.singleton import SingletonType
 
@@ -27,7 +27,7 @@ def reset_singletons():
 class TestUploadApiConstants:
 
     def test_constants_defined(self):
-        from compresso.webserver.api_v2.upload_api import MB, GB, TB, MAX_STREAMED_SIZE, SEPARATOR
+        from compresso.webserver.api_v2.upload_api import GB, MAX_STREAMED_SIZE, MB, SEPARATOR, TB
         assert MB == 1024 * 1024
         assert GB == 1024 * MB
         assert TB == 1024 * GB

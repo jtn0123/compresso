@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.subtitle_handle.py
@@ -31,7 +30,7 @@
 """
 
 
-class SubtitleHandle(object):
+class SubtitleHandle:
     """
     SubtitleHandle
 
@@ -77,7 +76,7 @@ class SubtitleHandle(object):
                 if stream['codec_name'] in supported_subtitles:
                     # If dest container supports the current subtitle codec, just copy it
                     self.subtitle_args['streams_to_encode'] = self.subtitle_args['streams_to_encode'] + [
-                        "-c:s:{}".format(subtitle_tracks_count), "copy"
+                        f"-c:s:{subtitle_tracks_count}", "copy"
                     ]
                     subtitle_tracks_count += 1
                 else:
@@ -91,7 +90,7 @@ class SubtitleHandle(object):
                         continue
                     else:
                         self.subtitle_args['streams_to_encode'] = self.subtitle_args['streams_to_encode'] + [
-                            "-c:s:{}".format(subtitle_tracks_count), "{}".format(supported_subtitles[0])
+                            f"-c:s:{subtitle_tracks_count}", f"{supported_subtitles[0]}"
                         ]
                         subtitle_tracks_count += 1
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.pending_api.py
@@ -36,10 +35,9 @@ import os
 import tornado.escape
 
 from compresso import config
+from compresso.libs import task
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
-
-from compresso.libs import task
 from compresso.webserver.helpers import pending_tasks
 
 
@@ -165,7 +163,6 @@ class ApiPendingHandler(BaseApiHandler):
         :param kwargs:
         :return:
         """
-        pass
 
     def create_task_from_path(self, *args, **kwargs):
         """

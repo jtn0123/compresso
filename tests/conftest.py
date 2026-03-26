@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.conftest.py
@@ -39,13 +38,13 @@ import sys
 import tempfile
 import threading
 import warnings
-
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from compresso.libs.singleton import SingletonType
-from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels import Libraries, Tags
+from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.libs.unmodels.workergroups import WorkerGroups, WorkerGroupTags
 from compresso.libs.unmodels.workerschedules import WorkerSchedules
@@ -63,7 +62,7 @@ def _stop_thread_if_supported(thread):
         try:
             thread.stop()
         except Exception as exc:
-            warnings.warn("Failed to stop leaked thread {}: {}".format(thread.name, exc), RuntimeWarning)
+            warnings.warn(f"Failed to stop leaked thread {thread.name}: {exc}", RuntimeWarning)
 
     redundant_flag = getattr(thread, "redundant_flag", None)
     if redundant_flag is not None and hasattr(redundant_flag, "set"):
@@ -83,7 +82,7 @@ def _stop_thread_if_supported(thread):
     try:
         thread.join(timeout=1)
     except Exception as exc:
-        warnings.warn("Failed to join leaked thread {}: {}".format(thread.name, exc), RuntimeWarning)
+        warnings.warn(f"Failed to join leaked thread {thread.name}: {exc}", RuntimeWarning)
 
 
 def pytest_configure(config):
@@ -157,7 +156,7 @@ def cleanup_registered_exit_hooks(monkeypatch):
         try:
             atexit.unregister(func)
         except Exception as exc:
-            warnings.warn("Failed to unregister atexit callback {}: {}".format(func, exc), RuntimeWarning)
+            warnings.warn(f"Failed to unregister atexit callback {func}: {exc}", RuntimeWarning)
 
     tornado.autoreload._reload_hooks[:] = baseline_reload_hooks
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.common.py
@@ -34,9 +33,10 @@ import datetime
 import hashlib
 import os
 import random
-import string
 import shutil
+import string
 import sys
+
 import xxhash
 
 from compresso.libs.logs import CompressoLogging
@@ -89,14 +89,14 @@ def format_message(message, message2=''):
     if message2:
         # Message2 can support other objects:
         if isinstance(message2, str):
-            message = "%s - %s" % (message, str(message2))
+            message = f"{message} - {str(message2)}"
         elif isinstance(message2, dict) or isinstance(message2, list):
             import pprint
             message2 = pprint.pformat(message2, indent=1)
-            message = "%s \n%s" % (message, str(message2))
+            message = f"{message} \n{str(message2)}"
         else:
-            message = "%s - %s" % (message, str(message2))
-    message = "[FORMATTED] - %s" % message
+            message = f"{message} - {str(message2)}"
+    message = f"[FORMATTED] - {message}"
     return message
 
 
@@ -142,7 +142,7 @@ def make_timestamp_human_readable(ts):
             continue  # skip 0's
         else:
             s = "" if d[unit] == 1 else "s"  # handle plurals
-            human_readable_list.append("{} {}{}".format(d[unit], unit, s))
+            human_readable_list.append(f"{d[unit]} {unit}{s}")
         count += 1
 
     return the_tense.format(", ".join(human_readable_list))
@@ -168,7 +168,7 @@ def tail(f, n, offset=0):
             f.seek(-(avg_line_length * to_read), 2)
             while f.read(1) != b'\n':
                 f.seek(-2, os.SEEK_CUR)
-        except IOError:
+        except OSError:
             f.seek(0)
         pos = f.tell()
         lines = f.read().splitlines()
@@ -213,9 +213,9 @@ def random_string(string_length=5):
 def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
     """Dump json data to a file. Optionally checks that the output json data is valid"""
     import json
-    import time
-    import tempfile
     import shutil
+    import tempfile
+    import time
 
     result = {
         'errors':  [],
@@ -225,13 +225,13 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
     # If check param is flagged and there already exists a out file, create a temporary backup
     if rollback_on_fail and os.path.exists(out_file):
         temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, 'json_dump_to_file_backup-{}'.format(time.time()))
+        temp_path = os.path.join(temp_dir, f'json_dump_to_file_backup-{time.time()}')
         try:
             shutil.copy2(out_file, temp_path)
             result['temp_path'] = temp_path
         except Exception as e:
             result['success'] = False
-            result['errors'].append("Failed to create temporary file - {}".format(str(e)))
+            result['errors'].append(f"Failed to create temporary file - {str(e)}")
 
     # Write data to out_file
     try:
@@ -240,7 +240,7 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
         result['success'] = True
     except Exception as e:
         result['success'] = False
-        result['errors'].append("Exception in writing to file: {}".format(str(e)))
+        result['errors'].append(f"Exception in writing to file: {str(e)}")
 
     # If check param is flagged, ensure json data exists in the output file
     if check:
@@ -249,7 +249,7 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
                 json_data = json.load(infile)
         except Exception as e:
             result['success'] = False
-            result['errors'].append("JSON file invalid - {}".format(e))
+            result['errors'].append(f"JSON file invalid - {e}")
 
     # If data save was unsuccessful and the rollback_on_fail param is flagged and there
     #   is a temp file set, roll back to old file. Otherwise, just delete the temp file.
@@ -261,7 +261,7 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
                 os.remove(result.get('temp_path'))
             except Exception as e:
                 result['success'] = False
-                result['errors'].append("Exception while restoring original file file: {}".format(str(e)))
+                result['errors'].append(f"Exception while restoring original file file: {str(e)}")
         else:
             try:
                 os.remove(result.get('temp_path'))

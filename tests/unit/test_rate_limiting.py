@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_rate_limiting.py
@@ -8,14 +7,15 @@
 
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from compresso.webserver.api_v2.rate_limiter import RateLimiter
 
 
 @pytest.mark.unittest
-class TestRateLimiter(object):
+class TestRateLimiter:
     """Tests for the RateLimiter class."""
 
     def _make_limiter(self):

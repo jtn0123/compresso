@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.libraryscanner.py
@@ -48,7 +47,7 @@ from compresso.libs.plugins import PluginsHandler
 
 class LibraryScannerManager(threading.Thread):
     def __init__(self, data_queues, event):
-        super(LibraryScannerManager, self).__init__(name='LibraryScannerManager')
+        super().__init__(name='LibraryScannerManager')
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.interval = 0
         self.firstrun = True
@@ -190,7 +189,7 @@ class LibraryScannerManager(threading.Thread):
         })
 
     def start_results_manager_thread(self, manager_id, status_updates, library_id):
-        manager = FileTesterThread("FileTesterThread-{}".format(manager_id), self.files_to_test,
+        manager = FileTesterThread(f"FileTesterThread-{manager_id}", self.files_to_test,
                                    self.files_to_process, status_updates, library_id, self.event)
         manager.daemon = True
         manager.start()
@@ -255,7 +254,7 @@ class LibraryScannerManager(threading.Thread):
                 'id':      'libraryScanProgress',
                 'type':    'status',
                 'code':    'libraryScanProgress',
-                'message': "Scanning directory - '{}'".format(library_path),
+                'message': f"Scanning directory - '{library_path}'",
                 'timeout': 0
             }
         )
@@ -281,7 +280,7 @@ class LibraryScannerManager(threading.Thread):
                 # Update status messages while fetching file list
                 if not status_updates.empty():
                     current_file = status_updates.get()
-                    percent_completed_string = 'Testing: {}'.format(current_file)
+                    percent_completed_string = f'Testing: {current_file}'
                     self.update_scan_progress(frontend_messages, percent_completed_string)
 
         # Loop while waiting for all threads to finish
@@ -313,14 +312,14 @@ class LibraryScannerManager(threading.Thread):
                 if int(total_file_count) > 0 and int(current_queue_size) > 0:
                     percent_remaining = int((int(current_queue_size) / int(total_file_count)) * 100)
                     percent_completed = int(100 - percent_remaining)
-                    percent_completed_string = '{}% - Testing: {}'.format(percent_completed, current_file)
+                    percent_completed_string = f'{percent_completed}% - Testing: {current_file}'
                 elif current_file:
                     percent_completed_string = '{}% - Testing: {}'.format('???', current_file)
 
             # Fetch frontend messages from queue
             if not status_updates.empty():
                 current_file = status_updates.get()
-                percent_completed_string = 'Testing: {}'.format(current_file)
+                percent_completed_string = f'Testing: {current_file}'
                 self.update_scan_progress(frontend_messages, percent_completed_string)
                 continue
             elif not self.files_to_process.empty():
@@ -338,7 +337,7 @@ class LibraryScannerManager(threading.Thread):
                 self.logger.error("Completing Library scan, but thread %s is still alive. Files tested by this thread will be ignored.", manager_id)
 
         scan_end_time = time.time()
-        scan_duration = str((scan_end_time - scan_start_time))
+        scan_duration = str(scan_end_time - scan_start_time)
         self.logger.warning("Library scan completed in %s seconds", scan_duration)
         CompressoLogging.metric("library_scan_completed",
                               library_name=library_name,

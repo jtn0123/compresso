@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.pending_tasks.py
@@ -30,11 +29,10 @@
 
 """
 import os
-from compresso.libs import task
-from compresso.libs import filetest
+
+from compresso.libs import filetest, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-
 
 logger = CompressoLogging.get_logger(name=__name__)
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_filetest.py
@@ -7,8 +6,9 @@
     Unit tests for compresso.libs.filetest.FileTest.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 def _make_filetest():

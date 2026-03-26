@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.downloads.py
@@ -41,7 +40,7 @@ from tornado import iostream, web
 from compresso.libs.singleton import SingletonType
 
 
-class DownloadsLinks(object, metaclass=SingletonType):
+class DownloadsLinks(metaclass=SingletonType):
     _download_links = {}
     _lock = threading.RLock()
 

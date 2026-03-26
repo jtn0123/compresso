@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.mock_jobqueue_class.py
@@ -31,7 +30,7 @@
 """
 
 
-class MockJobQueue(object):
+class MockJobQueue:
     """
     MockJobQueue
 

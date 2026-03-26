@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.session.py
@@ -37,7 +36,7 @@ from compresso.libs.singleton import SingletonType
 from compresso.libs.unmodels import Installation
 
 
-class Session(object, metaclass=SingletonType):
+class Session(metaclass=SingletonType):
     """
     Session
 
@@ -127,7 +126,6 @@ class Session(object, metaclass=SingletonType):
 
     def fetch_user_data(self):
         """No-op — no remote user data."""
-        pass
 
     def init_device_auth_flow(self):
         """No-op — no device auth needed."""

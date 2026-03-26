@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_plugins_extended.py
@@ -12,9 +11,9 @@
 import json
 import os
 import zipfile
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -461,6 +460,7 @@ class TestSubprocessTimeouts:
 
     def test_pip_install_handles_timeout(self, tmp_path):
         import subprocess
+
         from compresso.libs.plugins import PluginsHandler
         req_file = tmp_path / 'requirements.txt'
         req_file.write_text('some-package')
@@ -471,6 +471,7 @@ class TestSubprocessTimeouts:
 
     def test_npm_install_handles_timeout(self, tmp_path):
         import subprocess
+
         from compresso.libs.plugins import PluginsHandler
         pkg = tmp_path / 'package.json'
         pkg.write_text('{"name": "test"}')

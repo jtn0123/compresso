@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_logs_extended.py
@@ -10,10 +9,10 @@
 
 import logging
 import time
-
-import pytest
 from datetime import datetime
 from unittest.mock import MagicMock
+
+import pytest
 
 from compresso.libs.singleton import SingletonType
 

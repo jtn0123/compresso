@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_installation_link_deep.py
@@ -11,10 +10,10 @@
 
 import json
 import queue
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 import requests
-from unittest.mock import patch, MagicMock, mock_open
 
 from compresso.libs.installation_link import Links, RemoteTaskManager
 from compresso.libs.singleton import SingletonType

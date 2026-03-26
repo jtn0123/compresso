@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.healthcheck_api.py
@@ -12,16 +11,16 @@ import tornado.log
 
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.healthcheck_schemas import (
-    RequestHealthCheckScanSchema,
+    HealthCheckLibraryScanResponseSchema,
+    HealthCheckReadinessResponseSchema,
+    HealthCheckScanResponseSchema,
+    HealthCheckStatusResponseSchema,
+    HealthCheckSummaryResponseSchema,
+    HealthCheckWorkersResponseSchema,
     RequestHealthCheckLibraryScanSchema,
+    RequestHealthCheckScanSchema,
     RequestHealthCheckStatusSchema,
     RequestHealthCheckWorkersSchema,
-    HealthCheckScanResponseSchema,
-    HealthCheckLibraryScanResponseSchema,
-    HealthCheckSummaryResponseSchema,
-    HealthCheckStatusResponseSchema,
-    HealthCheckWorkersResponseSchema,
-    HealthCheckReadinessResponseSchema,
 )
 from compresso.webserver.helpers import healthcheck
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.integration.test_approval_workflow.py
@@ -14,9 +13,9 @@
 import os
 import shutil
 import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), '..', 'fixtures', 'sample_30s.mp4')
 

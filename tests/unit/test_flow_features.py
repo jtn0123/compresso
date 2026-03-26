@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_flow_features.py
@@ -18,10 +17,9 @@ import os
 import shutil
 import tempfile
 import threading
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
-
 
 # =====================================================================
 # Helpers
@@ -866,11 +864,10 @@ class TestLibraryAnalysisGetStatus:
 # =====================================================================
 
 @pytest.mark.unittest
-class TestCompressionApiAnalysis(object):
+class TestCompressionApiAnalysis:
     """Tests for library-analysis API endpoints."""
 
     # We test at the handler level using the existing ApiTestBase pattern
-    pass
 
 
 @pytest.mark.unittest

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_approval.py
@@ -15,9 +14,9 @@ import os
 import shutil
 import tempfile
 import threading
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ------------------------------------------------------------------
 # TestTaskStatusTransitions

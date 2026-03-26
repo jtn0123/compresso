@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_notifications.py
@@ -118,7 +117,7 @@ class TestNotificationsAdd:
 
     def test_add_multiple_distinct_items(self):
         for i in range(3):
-            self.notif.add(_make_valid_item(uuid='item-{}'.format(i)))
+            self.notif.add(_make_valid_item(uuid=f'item-{i}'))
         assert len(self.notif.read_all_items()) == 3
 
 
@@ -213,7 +212,7 @@ class TestNotificationsThreadSafety:
 
         def add_items(start):
             for i in range(start, start + count):
-                notif.add(_make_valid_item(uuid='thread-{}'.format(i)))
+                notif.add(_make_valid_item(uuid=f'thread-{i}'))
 
         threads = [
             threading.Thread(target=add_items, args=(0,)),

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_history_api.py
@@ -9,11 +8,12 @@
 """
 
 import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from tests.unit.api_test_base import ApiTestBase
+import pytest
+
 from compresso.webserver.api_v2.history_api import ApiHistoryHandler
+from tests.unit.api_test_base import ApiTestBase
 
 COMPLETED_TASKS = 'compresso.webserver.helpers.completed_tasks'
 

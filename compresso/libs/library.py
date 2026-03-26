@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.library.py
@@ -64,10 +63,10 @@ def generate_random_library_name():
         "sudden", "scandalous", "secretive", "spry", "squiggly", "smooth", "sulky", "scented", "spicy", "sticky", "slushy",
         "symptomatic", "tart", "turbulent", "tiresome", "typical", "xyloid", "xanthic", "zealous", "zany",
     ]
-    return "{name}, the {adjective} library".format(name=random.choice(names), adjective=random.choice(adjectives))
+    return f"{random.choice(names)}, the {random.choice(adjectives)} library"
 
 
-class Library(object):
+class Library:
     """
     Library
 
@@ -81,7 +80,7 @@ class Library(object):
             raise Exception("Library ID cannot be less than 1")
         self.model = Libraries.get_or_none(id=library_id)
         if not self.model:
-            raise Exception("Unable to fetch library with ID {}".format(library_id))
+            raise Exception(f"Unable to fetch library with ID {library_id}")
 
     @staticmethod
     def get_all_libraries():

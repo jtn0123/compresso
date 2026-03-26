@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_compression_distributions.py
@@ -15,13 +14,14 @@
 import datetime
 import os
 import tempfile
+
 import pytest
 
 from compresso.libs.unmodels.lib import Database
 
 
 @pytest.mark.unittest
-class TestCompressionDistributions(object):
+class TestCompressionDistributions:
     """
     Tests for codec, resolution, container distributions and space-saved timeline.
     Uses a real SQLite database following test_compression_stats.py patterns.
@@ -51,8 +51,8 @@ class TestCompressionDistributions(object):
         pass
 
     def setup_method(self):
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 

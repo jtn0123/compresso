@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.base_containers.py
@@ -31,7 +30,7 @@
 """
 
 
-class Containers(object):
+class Containers:
     """
     Containers
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_completed_tasks.py
@@ -8,9 +7,9 @@
 """
 
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 @pytest.mark.unittest

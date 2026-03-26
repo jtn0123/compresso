@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_db_migrate.py
@@ -9,10 +8,10 @@
 """
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from peewee import Model, CharField
+import pytest
+from peewee import CharField, Model
 
 
 @pytest.mark.unittest

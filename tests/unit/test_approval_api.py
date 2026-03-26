@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_approval_api.py
@@ -9,12 +8,13 @@
     get_task_detail, get_approval_count.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
-from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.approval_api import ApiApprovalHandler
+from tests.unit.api_test_base import ApiTestBase
 
 APPROVAL_HELPERS = 'compresso.webserver.helpers.approval'
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_postprocessor.py
@@ -12,8 +11,9 @@ import os
 import shutil
 import tempfile
 import threading
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 def _make_postprocessor(abort_immediately=False):
@@ -39,7 +39,7 @@ def _make_postprocessor(abort_immediately=False):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestSystemConfigurationIsValid(object):
+class TestSystemConfigurationIsValid:
     """Tests for PostProcessor.system_configuration_is_valid()."""
 
     @patch('compresso.libs.postprocessor.Library.within_library_count_limits', return_value=True)
@@ -78,7 +78,7 @@ class TestSystemConfigurationIsValid(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestCopyFile(object):
+class TestCopyFile:
     """Tests for PostProcessor.__copy_file() using real temp files."""
 
     def setup_method(self):
@@ -142,7 +142,7 @@ class TestCopyFile(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestFileOperationTracker(object):
+class TestFileOperationTracker:
     """Tests for the FileOperationTracker rollback helper."""
 
     def setup_method(self):
@@ -158,8 +158,9 @@ class TestFileOperationTracker(object):
         return path
 
     def _make_tracker(self):
-        from compresso.libs.postprocessor import FileOperationTracker
         import logging
+
+        from compresso.libs.postprocessor import FileOperationTracker
         logger = logging.getLogger('test_tracker')
         return FileOperationTracker(logger)
 
@@ -263,7 +264,7 @@ class TestFileOperationTracker(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestCopyFileWithTracker(object):
+class TestCopyFileWithTracker:
     """Tests for PostProcessor.__copy_file() with tracker parameter."""
 
     def setup_method(self):
@@ -279,8 +280,9 @@ class TestCopyFileWithTracker(object):
         return path
 
     def _make_tracker(self):
-        from compresso.libs.postprocessor import FileOperationTracker
         import logging
+
+        from compresso.libs.postprocessor import FileOperationTracker
         logger = logging.getLogger('test_tracker')
         return FileOperationTracker(logger)
 
@@ -323,7 +325,7 @@ class TestCopyFileWithTracker(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestCleanupCacheFiles(object):
+class TestCleanupCacheFiles:
     """Tests for PostProcessor.__cleanup_cache_files()."""
 
     def test_removes_directory_with_compresso_file_conversion_in_path(self):
@@ -353,7 +355,7 @@ class TestCleanupCacheFiles(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestWriteHistoryLog(object):
+class TestWriteHistoryLog:
     """Tests for PostProcessor.write_history_log()."""
 
     @patch('compresso.libs.postprocessor.PluginsHandler')
@@ -444,7 +446,7 @@ class TestWriteHistoryLog(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestCommitTaskMetadata(object):
+class TestCommitTaskMetadata:
     """Tests for PostProcessor.commit_task_metadata()."""
 
     @patch('compresso.libs.postprocessor.CompressoFileMetadata')
@@ -476,7 +478,7 @@ class TestCommitTaskMetadata(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestLogCompletedTaskData(object):
+class TestLogCompletedTaskData:
     """Tests for PostProcessor._log_completed_task_data()."""
 
     @patch('compresso.libs.postprocessor.CompressoLogging')
@@ -528,7 +530,7 @@ class TestLogCompletedTaskData(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestDumpHistoryLog(object):
+class TestDumpHistoryLog:
     """Tests for PostProcessor.dump_history_log()."""
 
     @patch('compresso.libs.postprocessor.common.json_dump_to_file')
@@ -589,7 +591,7 @@ class TestDumpHistoryLog(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestRunLoopAbort(object):
+class TestRunLoopAbort:
     """Tests for PostProcessor.run() abort behavior."""
 
     def test_stop_causes_run_to_exit(self):

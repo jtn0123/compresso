@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.docs_api.py
@@ -33,9 +32,10 @@ import os
 import subprocess
 
 import tornado.log
+
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.schemas import DocumentContentSuccessSchema
 from compresso.webserver.helpers import documents
 
@@ -75,12 +75,12 @@ def _generate_changelog_from_git():
 
         lines = ["# Changelog\n", "\n"]
         lines.append("All notable changes to this project are documented here. ")
-        lines.append("See [GitHub Releases]({}) for downloads.\n\n".format(GITHUB_RELEASES_URL))
+        lines.append(f"See [GitHub Releases]({GITHUB_RELEASES_URL}) for downloads.\n\n")
 
         # Get commits from HEAD to the first tag (unreleased)
         if tags:
             unreleased_result = subprocess.run(
-                ['git', 'log', '{}..HEAD'.format(tags[0][0]), '--pretty=format:- %s (%h)', '--no-merges'],
+                ['git', 'log', f'{tags[0][0]}..HEAD', '--pretty=format:- %s (%h)', '--no-merges'],
                 capture_output=True, text=True, cwd=repo_root, timeout=10
             )
             unreleased = unreleased_result.stdout.strip()
@@ -90,12 +90,12 @@ def _generate_changelog_from_git():
 
         # For each tag, get commits between it and the previous tag
         for i, (tag, date) in enumerate(tags):
-            tag_url = "{}/tag/{}".format(GITHUB_RELEASES_URL, tag)
-            lines.append("## [{}]({}) — {}\n\n".format(tag, tag_url, date))
+            tag_url = f"{GITHUB_RELEASES_URL}/tag/{tag}"
+            lines.append(f"## [{tag}]({tag_url}) — {date}\n\n")
 
             if i + 1 < len(tags):
                 prev_tag = tags[i + 1][0]
-                log_range = '{}..{}'.format(prev_tag, tag)
+                log_range = f'{prev_tag}..{tag}'
             else:
                 log_range = tag
 
@@ -195,7 +195,7 @@ class ApiDocsHandler(BaseApiHandler):
             if not changelog_content:
                 privacy_policy_file = os.path.join(os.path.dirname(__file__), '..', 'docs', 'privacy_policy.md')
                 if os.path.exists(privacy_policy_file):
-                    with open(privacy_policy_file, 'r') as f:
+                    with open(privacy_policy_file) as f:
                         changelog_content = f.readlines()
 
             if not changelog_content:

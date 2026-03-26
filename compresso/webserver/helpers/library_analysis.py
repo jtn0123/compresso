@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.library_analysis.py
@@ -52,7 +51,7 @@ def start_analysis(library_id):
     thread = threading.Thread(
         target=_run_analysis,
         args=(library_id, library_path, info),
-        name='LibraryAnalysis-{}'.format(library_id),
+        name=f'LibraryAnalysis-{library_id}',
         daemon=True,
     )
     thread.start()

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.audio_codec_handle.py
@@ -33,7 +32,7 @@
 from . import audio_codecs
 
 
-class AudioCodecHandle(object):
+class AudioCodecHandle:
     """
     AudioCodecHandle
 
@@ -65,7 +64,7 @@ class AudioCodecHandle(object):
         :return:
         """
         self.encoding_args['streams_to_encode'] = self.encoding_args['streams_to_encode'] + [
-            "-c:a:{}".format(self.audio_tracks_count), "copy"
+            f"-c:a:{self.audio_tracks_count}", "copy"
         ]
         # Map this stream
         self.encoding_args['streams_to_map'] = self.encoding_args['streams_to_map'] + [
@@ -81,7 +80,7 @@ class AudioCodecHandle(object):
         :return:
         """
         self.encoding_args['streams_to_encode'] = self.encoding_args['streams_to_encode'] + [
-            "-c:a:{}".format(self.audio_tracks_count), self.audio_encoder_transcoding,
+            f"-c:a:{self.audio_tracks_count}", self.audio_encoder_transcoding,
         ]
         # Map this stream
         self.encoding_args['streams_to_map'] = self.encoding_args['streams_to_map'] + [
@@ -108,10 +107,10 @@ class AudioCodecHandle(object):
         ]
 
         self.encoding_args['streams_to_encode'] = self.encoding_args['streams_to_encode'] + [
-            "-c:a:{}".format(self.audio_tracks_count), self.audio_encoder_cloning,
-            "-b:a:{}".format(self.audio_tracks_count), self.audio_stereo_stream_bitrate,
-            "-ac:a:{}".format(self.audio_tracks_count), "2",
-            "-metadata:s:a:{}".format(self.audio_tracks_count), "title='{}'".format(audio_tag),
+            f"-c:a:{self.audio_tracks_count}", self.audio_encoder_cloning,
+            f"-b:a:{self.audio_tracks_count}", self.audio_stereo_stream_bitrate,
+            f"-ac:a:{self.audio_tracks_count}", "2",
+            f"-metadata:s:a:{self.audio_tracks_count}", f"title='{audio_tag}'",
         ]
         self.audio_tracks_count += 1
 

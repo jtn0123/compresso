@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_healthcheck_helpers.py
@@ -7,9 +6,9 @@
     Unit tests for compresso.webserver.helpers.healthcheck helper functions.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ------------------------------------------------------------------
 # TestValidateLibraryExists

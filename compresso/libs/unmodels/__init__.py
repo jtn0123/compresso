@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -30,25 +29,24 @@
 
 """
 
-from __future__ import absolute_import
 
-from .completedtaskscommandlogs import CompletedTasksCommandLogs
 from .completedtasks import CompletedTasks
+from .completedtaskscommandlogs import CompletedTasksCommandLogs
+from .compressionstats import CompressionStats
 from .enabledplugins import EnabledPlugins
 from .filemetadata import FileMetadata
 from .filemetadatapaths import FileMetadataPaths
+from .healthstatus import HealthStatus
 from .installation import Installation
+from .libraries import Libraries, LibraryTags
+from .libraryanalysiscache import LibraryAnalysisCache
+from .librarypluginflow import LibraryPluginFlow
 from .pluginrepos import PluginRepos
 from .plugins import Plugins
-from .libraries import Libraries, LibraryTags
-from .librarypluginflow import LibraryPluginFlow
 from .tags import Tags
 from .taskmetadata import TaskMetadata
 from .tasks import Tasks
-from .workergroups import WorkerGroupTags, WorkerGroups
+from .workergroups import WorkerGroups, WorkerGroupTags
 from .workerschedules import WorkerSchedules
-from .compressionstats import CompressionStats
-from .healthstatus import HealthStatus
-from .libraryanalysiscache import LibraryAnalysisCache
 
 __author__ = 'Josh.5 (jsunnex@gmail.com)'

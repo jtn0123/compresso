@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import importlib
 import runpy
 import sys
 import types
 import zipfile
+from unittest.mock import MagicMock, patch
 
 import pytest
 from tornado.web import URLSpec
-from unittest.mock import MagicMock, patch
 
 
 def _fresh_import(module_name):

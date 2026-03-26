@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_preview.py
@@ -13,13 +12,14 @@
 """
 
 import os
-import time
-import pytest
 import tempfile
-from unittest.mock import patch, MagicMock
+import time
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
-class TestPreviewManager(object):
+class TestPreviewManager:
     """
     TestPreviewManager
 
@@ -473,7 +473,7 @@ class TestPreviewManager(object):
             os.unlink(tmp_path)
 
 
-class TestPreviewQualityMetrics(object):
+class TestPreviewQualityMetrics:
     """
     TestPreviewQualityMetrics
 
@@ -718,7 +718,7 @@ class TestPreviewQualityMetrics(object):
         assert result['encoded_by_pipeline'] is False
 
 
-class TestPreviewJobTimeout(object):
+class TestPreviewJobTimeout:
     """Tests for preview job timeout (Phase 3B)."""
 
     def setup_class(self):

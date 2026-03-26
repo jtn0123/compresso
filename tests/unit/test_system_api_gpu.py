@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_system_api_gpu.py
@@ -8,8 +7,9 @@
     - GET /system/gpu-metrics returns gpus and history
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_pluginscli.py
@@ -10,8 +9,9 @@
 import os
 import sys
 import types
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, Mock
 
 from compresso.libs.singleton import SingletonType
 

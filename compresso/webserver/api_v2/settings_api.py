@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.settings_api.py
@@ -38,13 +37,22 @@ from compresso.libs.library import Library
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.libs.worker_group import WorkerGroup
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import RequestDatabaseItemByIdSchema, RequestLibraryByIdSchema, \
-    RequestRemoteInstallationLinkConfigSchema, SettingsLibrariesListSchema, SettingsLibraryConfigReadAndWriteSchema, \
-    SettingsLibraryPluginConfigExportSchema, \
-    SettingsLibraryPluginConfigImportSchema, SettingsReadAndWriteSchema, \
-    SettingsRemoteInstallationDataSchema, \
-    SettingsRemoteInstallationLinkConfigSchema, SettingsSystemConfigSchema, \
-    RequestSettingsRemoteInstallationAddressValidationSchema, SettingsWorkerGroupConfigSchema, WorkerGroupsListSchema
+from compresso.webserver.api_v2.schema.schemas import (
+    RequestDatabaseItemByIdSchema,
+    RequestLibraryByIdSchema,
+    RequestRemoteInstallationLinkConfigSchema,
+    RequestSettingsRemoteInstallationAddressValidationSchema,
+    SettingsLibrariesListSchema,
+    SettingsLibraryConfigReadAndWriteSchema,
+    SettingsLibraryPluginConfigExportSchema,
+    SettingsLibraryPluginConfigImportSchema,
+    SettingsReadAndWriteSchema,
+    SettingsRemoteInstallationDataSchema,
+    SettingsRemoteInstallationLinkConfigSchema,
+    SettingsSystemConfigSchema,
+    SettingsWorkerGroupConfigSchema,
+    WorkerGroupsListSchema,
+)
 
 
 class ApiSettingsHandler(BaseApiHandler):

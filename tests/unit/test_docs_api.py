@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_docs_api.py
@@ -10,13 +9,13 @@
 """
 
 import os
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from unittest.mock import patch, MagicMock, mock_open
 
 from compresso.libs.singleton import SingletonType
-from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.docs_api import ApiDocsHandler, _generate_changelog_from_git
+from tests.unit.api_test_base import ApiTestBase
 
 
 @pytest.fixture(autouse=True)

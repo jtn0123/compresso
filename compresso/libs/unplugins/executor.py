@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.executor.py
@@ -30,20 +29,21 @@
 
 """
 import copy
+import importlib
+import importlib.util
 import inspect
 import os
-import importlib.util
-import importlib
 import sys
 
-from . import plugin_types
 from compresso.libs import common
-from ..logs import CompressoLogging
-from ..task import TaskDataStore
 from compresso.libs.metadata import CompressoFileMetadata
 
+from ..logs import CompressoLogging
+from ..task import TaskDataStore
+from . import plugin_types
 
-class PluginExecutor(object):
+
+class PluginExecutor:
 
     def __init__(self, plugins_directory=None):
         # Set plugins directory
@@ -143,7 +143,7 @@ class PluginExecutor(object):
         :return:
         """
         # Set the module name
-        module_name = '{}.plugin'.format(plugin_id)
+        module_name = f'{plugin_id}.plugin'
 
         # Get main module file
         plugin_module_path = os.path.join(path, 'plugin.py')
@@ -185,7 +185,7 @@ class PluginExecutor(object):
         :return:
         """
         # Set the module name
-        module_name = '{}.plugin'.format(plugin_id)
+        module_name = f'{plugin_id}.plugin'
         # self.logger.debug("Reloading module '{}'".format(module_name))
 
         if module_name in sys.modules:
@@ -218,7 +218,7 @@ class PluginExecutor(object):
         :return:
         """
         # Set the module name
-        module_name = '{}.plugin'.format(plugin_id)
+        module_name = f'{plugin_id}.plugin'
 
         if module_name in sys.modules:
             del sys.modules[module_name]
@@ -530,7 +530,7 @@ class PluginExecutor(object):
         plugin_path = self.__get_plugin_directory(plugin_id)
         plugin_changelog = os.path.join(plugin_path, 'changelog.md')
         if os.path.exists(plugin_changelog):
-            with open(plugin_changelog, 'r') as f:
+            with open(plugin_changelog) as f:
                 changelog = f.readlines()
 
         return changelog
@@ -547,7 +547,7 @@ class PluginExecutor(object):
         plugin_path = self.__get_plugin_directory(plugin_id)
         plugin_description = os.path.join(plugin_path, 'description.md')
         if os.path.exists(plugin_description):
-            with open(plugin_description, 'r') as f:
+            with open(plugin_description) as f:
                 description = f.readlines()
 
         return description
@@ -572,7 +572,7 @@ class PluginExecutor(object):
             errors = plugin_type_meta.run_data_schema_tests(plugin_id, plugin_module, test_data=test_data)
         except Exception as e:
             self.logger.exception("Exception while testing plugin runner for plugin '%s' %s", plugin_id, e)
-            errors = ["Exception encountered while testing runner - {}".format(str(e))]
+            errors = [f"Exception encountered while testing runner - {str(e)}"]
 
         return errors
 

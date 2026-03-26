@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.plugins.py
@@ -31,8 +30,8 @@
 """
 import os
 
-import tornado.web
 import tornado.log
+import tornado.web
 
 from compresso.webserver.helpers import plugins
 
@@ -140,7 +139,7 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
             self.set_status(404, reason="404 Not Found")
             status_code = self.get_status()
             self.write({
-                'error':    "%(code)d: %(message)s" % {"code": status_code, "message": self._reason},
+                'error':    f"{status_code:d}: {self._reason}",
                 'messages': {},
             })
             return
@@ -156,7 +155,7 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
             self.set_status(500, reason="Internal server error")
             status_code = self.get_status()
             self.write({
-                'error':    "%(code)d: %(message)s" % {"code": status_code, "message": self._reason},
+                'error':    f"{status_code:d}: {self._reason}",
                 'messages': {},
             })
             return
@@ -178,4 +177,4 @@ class PluginStaticFileHandler(tornado.web.StaticFileHandler):
         plugin_module = get_plugin_by_path(self.request.path)
         if plugin_module:
             path = os.path.join(plugin_module.get('plugin_path'), 'static')
-        super(PluginStaticFileHandler, self).initialize(path, default_filename)
+        super().initialize(path, default_filename)

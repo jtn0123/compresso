@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.foreman.py
@@ -31,8 +30,8 @@
 """
 import hashlib
 import json
-import threading
 import queue
+import threading
 import time
 from datetime import datetime, timedelta
 
@@ -49,7 +48,7 @@ from compresso.libs.workers import Worker
 
 class Foreman(threading.Thread):
     def __init__(self, data_queues, settings, task_queue, event):
-        super(Foreman, self).__init__(name='Foreman')
+        super().__init__(name='Foreman')
         self.settings = settings
         self.event = event
         self.task_queue = task_queue
@@ -322,7 +321,7 @@ class Foreman(threading.Thread):
 
         # Startup a thread
         thread = installation_link.RemoteTaskManager(installation_id,
-                                                     "RemoteTaskManager-{}".format(installation_id),
+                                                     f"RemoteTaskManager-{installation_id}",
                                                      installation_info,
                                                      self.remote_workers_pending_task_queue,
                                                      self.complete_queue,
@@ -407,7 +406,7 @@ class Foreman(threading.Thread):
             remote_library_names = available_installations[installation_uuid].get('library_names', [])
             available_slots = available_installations[installation_uuid].get('available_slots', 0)
             for slot_number in range(available_slots):
-                remote_manager_id = "{}|M{}".format(installation_uuid, slot_number)
+                remote_manager_id = f"{installation_uuid}|M{slot_number}"
                 if remote_manager_id in self.available_remote_managers or remote_manager_id in self.remote_task_manager_threads:
                     # This worker is already managed by a link manager thread or is already in the list of available workers
                     continue

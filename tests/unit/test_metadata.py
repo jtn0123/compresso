@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_metadata.py
@@ -196,11 +195,13 @@ class TestMetadataContextBinding:
 
     def setup_method(self):
         import threading
+
         from compresso.libs.metadata import CompressoFileMetadata
         CompressoFileMetadata._ctx = threading.local()
 
     def test_bind_and_get_context(self):
         import os
+
         from compresso.libs.metadata import CompressoFileMetadata
         with patch.object(CompressoFileMetadata, '_main_pid', os.getpid()):
             CompressoFileMetadata.bind_runner_context(plugin_id='test_plug', task_id=1, path='/test')
@@ -216,6 +217,7 @@ class TestMetadataContextBinding:
 
     def test_clear_context(self):
         import os
+
         from compresso.libs.metadata import CompressoFileMetadata
         with patch.object(CompressoFileMetadata, '_main_pid', os.getpid()):
             CompressoFileMetadata.bind_runner_context(plugin_id='test_plug', task_id=1)

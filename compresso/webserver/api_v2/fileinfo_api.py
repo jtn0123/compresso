@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.fileinfo_api.py
@@ -14,9 +13,9 @@ import tornado.log
 
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.fileinfo_schemas import (
+    FileInfoResponseSchema,
     RequestFileInfoProbeSchema,
     RequestFileInfoTaskSchema,
-    FileInfoResponseSchema,
 )
 from compresso.webserver.helpers import fileinfo
 
@@ -60,7 +59,7 @@ class ApiFileinfoHandler(BaseApiHandler):
             file_path = json_request.get('file_path', '')
 
             if not os.path.exists(file_path):
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="File not found: {}".format(file_path))
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"File not found: {file_path}")
                 self.write_error()
                 return
 
@@ -120,13 +119,13 @@ class ApiFileinfoHandler(BaseApiHandler):
             try:
                 task = CompletedTasks.get_by_id(task_id)
             except CompletedTasks.DoesNotExist:
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Task not found: {}".format(task_id))
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Task not found: {task_id}")
                 self.write_error()
                 return
 
             file_path = task.abspath
             if not file_path or not os.path.exists(file_path):
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="File not found: {}".format(file_path))
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"File not found: {file_path}")
                 self.write_error()
                 return
 

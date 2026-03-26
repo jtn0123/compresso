@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.completed_tasks.py
@@ -207,7 +206,7 @@ def add_historic_tasks_to_pending_tasks_list(historic_task_ids, library_id=None)
 
         # Ensure path exists
         if not os.path.exists(abspath):
-            errors[record.get("id")] = "Path does not exist - '{}'".format(abspath)
+            errors[record.get("id")] = f"Path does not exist - '{abspath}'"
             continue
 
         # Create a new task
@@ -216,7 +215,7 @@ def add_historic_tasks_to_pending_tasks_list(historic_task_ids, library_id=None)
         if not new_task.create_task_by_absolute_path(abspath, library_id=library_id):
             # If file exists in task queue already this will return false.
             # Do not carry on.
-            errors[record.get("id")] = "File already in task queue - '{}'".format(abspath)
+            errors[record.get("id")] = f"File already in task queue - '{abspath}'"
 
         continue
     return errors
@@ -249,7 +248,7 @@ def format_ffmpeg_log_text(log_lines):
 
         # Add PRE to lines
         if line_text and pre_text and line_text.rstrip() not in headers:
-            line_text = '<pre>{}</pre>'.format(line_text)
+            line_text = f'<pre>{line_text}</pre>'
 
         # Add bold to headers
         if line_text.rstrip() not in headers:
@@ -257,9 +256,9 @@ def format_ffmpeg_log_text(log_lines):
         else:
             if line_text.rstrip() in ['WORKER TERMINATED!', 'PLUGIN FAILED!', 'REMOTE TASK FAILED!',
                                       'REMOTE LINK MANAGER TERMINATED!']:
-                line_text = '<b><span class="terminated">{}</span></b>'.format(line_text)
+                line_text = f'<b><span class="terminated">{line_text}</span></b>'
             else:
-                line_text = '<b>{}</b>'.format(line_text)
+                line_text = f'<b>{line_text}</b>'
 
         # Replace leading whitespace
         stripped = line.lstrip()

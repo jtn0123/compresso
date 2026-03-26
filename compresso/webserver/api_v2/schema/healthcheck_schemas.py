@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.healthcheck_schemas.py
@@ -9,6 +8,7 @@
 """
 
 from marshmallow import fields, validate
+
 from compresso.webserver.api_v2.schema.schemas import BaseSchema, BaseSuccessSchema, RequestTableDataSchema
 
 

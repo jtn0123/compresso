@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.healthcheck.py
@@ -27,7 +26,7 @@ def validate_library_exists(library_id):
         Libraries.get_by_id(library_id)
         return True
     except Exception:
-        raise ValueError("Library with ID {} does not exist".format(library_id))
+        raise ValueError(f"Library with ID {library_id} does not exist")
 
 
 def check_single_file(filepath, library_id=1, mode='quick'):

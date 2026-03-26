@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.compression_api.py
@@ -12,18 +11,18 @@ import tornado.log
 
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.compression_schemas import (
-    RequestCompressionStatsSchema,
+    CodecDistributionSchema,
     CompressionStatsSchema,
     CompressionSummarySchema,
-    PendingEstimateSchema,
-    CodecDistributionSchema,
-    ResolutionDistributionSchema,
     ContainerDistributionSchema,
-    TimelineSchema,
+    EncodingSpeedTimelineSchema,
     LibraryAnalysisRequestSchema,
     LibraryAnalysisStatusSchema,
     OptimizationProgressSchema,
-    EncodingSpeedTimelineSchema,
+    PendingEstimateSchema,
+    RequestCompressionStatsSchema,
+    ResolutionDistributionSchema,
+    TimelineSchema,
 )
 from compresso.webserver.helpers import compression_stats
 from compresso.webserver.helpers.healthcheck import validate_library_exists

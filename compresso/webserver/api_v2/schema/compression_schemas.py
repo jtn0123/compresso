@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.compression_schemas.py
@@ -9,6 +8,7 @@
 """
 
 from marshmallow import fields
+
 from compresso.webserver.api_v2.schema.schemas import BaseSchema, BaseSuccessSchema, RequestTableDataSchema
 
 

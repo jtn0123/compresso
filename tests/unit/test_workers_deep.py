@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_workers_deep.py
@@ -12,9 +11,9 @@
 import queue
 import threading
 import time
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -350,7 +349,7 @@ class TestWorkerGetStatusEdge:
         mock_task.get_task_id.return_value = 1
         mock_task.get_source_basename.return_value = 'test.mp4'
         worker.set_task(mock_task)
-        worker.worker_log = ['line {}'.format(i) for i in range(100)]
+        worker.worker_log = [f'line {i}' for i in range(100)]
         status = worker.get_status()
         assert len(status['worker_log_tail']) == 39
 

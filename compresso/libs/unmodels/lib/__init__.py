@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -30,11 +29,8 @@
 
 """
 
-from __future__ import absolute_import
 
-from .basemodel import BaseModel
-from .basemodel import Database
-from .basemodel import db
+from .basemodel import BaseModel, Database, db
 
 __author__ = 'Josh.5 (jsunnex@gmail.com)'
 

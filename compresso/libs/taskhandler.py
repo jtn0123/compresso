@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.taskhandler.py
@@ -50,7 +49,7 @@ class TaskHandler(threading.Thread):
     """
 
     def __init__(self, data_queues, task_queue, event):
-        super(TaskHandler, self).__init__(name='TaskHandler')
+        super().__init__(name='TaskHandler')
         self.settings = config.Config()
         self.event = event
         self.data_queues = data_queues
@@ -131,7 +130,7 @@ class TaskHandler(threading.Thread):
             if where_clause is not None:
                 delete_query = delete_query.where(where_clause)
             rows_deleted_count = delete_query.execute()
-            self._log("Deleted {} items from tasks list".format(rows_deleted_count), level='debug')
+            self._log(f"Deleted {rows_deleted_count} items from tasks list", level='debug')
         except OperationalError as error:
             self._log("Skipping task cleanup at startup; tasks table missing", str(error), level='debug')
 
@@ -143,7 +142,7 @@ class TaskHandler(threading.Thread):
         :param abspath:
         :return:
         """
-        existing_task_query = Tasks.select().where((Tasks.abspath == abspath)).limit(1)
+        existing_task_query = Tasks.select().where(Tasks.abspath == abspath).limit(1)
         if existing_task_query.count() > 0:
             return True
         return False

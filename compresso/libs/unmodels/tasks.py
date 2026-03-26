@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.tasks.py
@@ -33,6 +32,7 @@
 import datetime
 
 from peewee import *
+
 from compresso.libs.unmodels.lib import BaseModel
 
 

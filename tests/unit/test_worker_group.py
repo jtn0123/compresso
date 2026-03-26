@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_worker_group.py
@@ -16,8 +15,8 @@ import tempfile
 
 import pytest
 
-from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels import Tags
+from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels.workergroups import WorkerGroups, WorkerGroupTags
 from compresso.libs.unmodels.workerschedules import WorkerSchedules
 

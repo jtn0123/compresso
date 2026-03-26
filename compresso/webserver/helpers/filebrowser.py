@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.filebrowser.py
@@ -37,10 +36,10 @@ from compresso.libs import common
 
 def fetch_windows_drives():
     # Credit: https://stackoverflow.com/a/37761506
-    return ['%s:' % d for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
+    return [f'{d}:' for d in string.ascii_uppercase if os.path.exists(f'{d}:')]
 
 
-class DirectoryListing(object):
+class DirectoryListing:
     """
     DirectoryListing
 

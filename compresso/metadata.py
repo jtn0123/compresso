@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.metadata.py
@@ -55,7 +54,7 @@ __name = "compresso"
 __author = "Josh.5"
 __email = "jsunnex@gmail.com"
 
-__author__ = '%s (%s)' % (__author, __email)
+__author__ = f'{__author} ({__email})'
 __version__ = read_version_string('short')
 __description__ = "Media library optimizer with approval workflow and compression dashboard"
 __disclaimer__ = ""

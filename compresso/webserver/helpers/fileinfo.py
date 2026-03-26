@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.fileinfo.py
@@ -66,7 +65,7 @@ def format_probe_data(probe_data):
             elif height >= 480:
                 info['resolution_label'] = '480p'
             else:
-                info['resolution_label'] = '{}p'.format(height) if height > 0 else ''
+                info['resolution_label'] = f'{height}p' if height > 0 else ''
             video_streams.append(info)
 
         elif codec_type == 'audio':

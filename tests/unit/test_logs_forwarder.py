@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_logs_forwarder.py
@@ -12,8 +11,8 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -322,7 +321,7 @@ class TestCleanupRetention:
         handler._buffer_state["log_buffer_20200101T00.jsonl"] = 0
         # _parse_buffer_filename_timestamp returns naive datetime, but _cleanup_retention
         # compares with timezone-aware threshold. Patch to return tz-aware datetime.
-        old_ts = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        old_ts = datetime(2020, 1, 1, 0, 0, 0, tzinfo=UTC)
         with patch.object(handler, '_parse_buffer_filename_timestamp', return_value=old_ts):
             handler._cleanup_retention()
         assert not old_file.exists()

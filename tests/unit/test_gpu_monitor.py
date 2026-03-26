@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_gpu_monitor.py
@@ -10,9 +9,9 @@
 import logging
 import subprocess
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -521,7 +520,7 @@ class TestHistory:
         assert history == {'nvidia:99': []}
 
     def test_history_respects_max_samples(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor, HISTORY_MAX_SAMPLES
+        from compresso.libs.gpu_monitor import HISTORY_MAX_SAMPLES, GpuMonitor
         monitor = GpuMonitor()
 
         for i in range(HISTORY_MAX_SAMPLES + 20):

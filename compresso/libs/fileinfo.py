@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.fileinfo.py
@@ -44,7 +43,7 @@ An object to represent file_info (Filebot pattern to keep filename history)
 """
 
 
-class FileInfo(object):
+class FileInfo:
     """
     FileInfo
 
@@ -69,15 +68,15 @@ class FileInfo(object):
                         m = re.search('(.+)="(.+)"', line)
                         if m and m.group(1) is not None and m.group(2) is not None:
                             self.entries.append(Entry(m.group(1), m.group(2)))
-            except IOError:
+            except OSError:
                 logger.warning("File not accessible: %s", self.path)
 
     def save(self):
         try:
             with open(self.path, "w") as f:
                 for entry in self.entries:
-                    f.write('%s="%s"\n' % (entry.newname, entry.originalname))
-        except IOError:
+                    f.write(f'{entry.newname}="{entry.originalname}"\n')
+        except OSError:
             logger.warning("File not accessible: %s", self.path)
 
     def _find_oldest_name(self, filename):
@@ -94,7 +93,7 @@ An object to keep a pair of newname and originalname
 """
 
 
-class Entry(object):
+class Entry:
     """
     Entry
 

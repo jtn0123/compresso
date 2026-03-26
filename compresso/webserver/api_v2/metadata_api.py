@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.metadata_api.py
@@ -30,16 +29,23 @@
 
 """
 
-import tornado.log
 from datetime import datetime
+
+import tornado.log
+from peewee import fn
 
 from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.unmodels import CompletedTasks, FileMetadata, FileMetadataPaths
-from peewee import fn
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import MetadataSearchResultsSchema, RequestMetadataSearchSchema, \
-    RequestMetadataByTaskSchema, RequestMetadataUpdateSchema, RequestMetadataDeleteSchema, \
-    RequestMetadataByFingerprintSchema, BaseSuccessSchema
+from compresso.webserver.api_v2.schema.schemas import (
+    BaseSuccessSchema,
+    MetadataSearchResultsSchema,
+    RequestMetadataByFingerprintSchema,
+    RequestMetadataByTaskSchema,
+    RequestMetadataDeleteSchema,
+    RequestMetadataSearchSchema,
+    RequestMetadataUpdateSchema,
+)
 
 
 class ApiMetadataHandler(BaseApiHandler):

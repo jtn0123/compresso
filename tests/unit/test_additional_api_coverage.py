@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import asyncio
 import json
-
-import pytest
 from unittest.mock import MagicMock, patch
 
-from tests.unit.api_test_base import ApiTestBase
+import pytest
+
 from compresso.webserver.api_v2.base_api_handler import BaseApiError
 from compresso.webserver.api_v2.filebrowser_api import ApiFilebrowserHandler
 from compresso.webserver.api_v2.fileinfo_api import ApiFileinfoHandler
 from compresso.webserver.api_v2.notifications_api import ApiNotificationsHandler
+from tests.unit.api_test_base import ApiTestBase
 
 
 def _mock_filebrowser_initialize(self, **kwargs):

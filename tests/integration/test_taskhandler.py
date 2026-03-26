@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.test_taskhandler.py
@@ -30,18 +29,19 @@
 
 """
 import os
-import pytest
-import time
 import tempfile
 import threading
-from unittest.mock import patch, MagicMock
+import time
+from unittest.mock import MagicMock, patch
 
-from tests.support_.test_data import data_queues, mock_jobqueue_class
+import pytest
+
 from compresso.libs.taskhandler import TaskHandler
 from compresso.libs.unmodels.tasks import Tasks
+from tests.support_.test_data import data_queues, mock_jobqueue_class
 
 
-class TestClass(object):
+class TestClass:
     """
     TestClass
 
@@ -95,7 +95,6 @@ class TestClass(object):
 
         :return:
         """
-        pass
 
     def setup_method(self):
         """

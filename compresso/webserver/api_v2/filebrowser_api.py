@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.filebrowser_api.py
@@ -31,9 +30,10 @@
 """
 
 import tornado.log
+
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.schemas import DirectoryListingResultsSchema, RequestDirectoryListingDataSchema
 from compresso.webserver.helpers.filebrowser import DirectoryListing
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_schema_generation.py
@@ -9,8 +8,9 @@
 """
 
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # The apispec module may not be installed in the test environment.
 # Mock it at the module level if needed.
@@ -26,8 +26,9 @@ class TestCompressoSpecPlugin:
 
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_operations_from_urlspec_yields_operations(self):
-        from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
         from tornado.web import URLSpec
+
+        from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
 
         handler_class = type('MockHandler', (), {
             'routes': [
@@ -48,7 +49,6 @@ class TestCompressoSpecPlugin:
                 200:
                     description: Success
             """
-            pass
         handler_class.get_test = get_test
 
         urlspec = URLSpec(r'/test/endpoint', handler_class)
@@ -60,8 +60,9 @@ class TestCompressoSpecPlugin:
 
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_operations_from_urlspec_no_match(self):
-        from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
         from tornado.web import URLSpec
+
+        from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
 
         handler_class = type('MockHandler', (), {
             'routes': [

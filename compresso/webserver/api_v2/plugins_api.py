@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.plugins_api.py
@@ -35,16 +34,29 @@ import os
 import time
 
 import tornado.log
+
 from compresso import config as compresso_config
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
-from compresso.webserver.api_v2.schema.schemas import PluginFlowResultsSchema, PluginReposListResultsSchema, \
-    PluginTypesResultsSchema, PluginsDataPanelTypesDataSchema, PluginsDataSchema, PluginsInfoResultsSchema, \
-    PluginsInstallableResultsSchema, RequestPluginsByIdSchema, RequestPluginsFlowByPluginTypeSchema, \
-    RequestPluginsInfoSchema, RequestPluginsSettingsResetSchema, RequestPluginsSettingsSaveSchema, \
-    RequestPluginsTableDataSchema, \
-    RequestSavingPluginsFlowByPluginTypeSchema, RequestTableUpdateByIdList, RequestUpdatePluginReposListSchema
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.schema.schemas import (
+    PluginFlowResultsSchema,
+    PluginReposListResultsSchema,
+    PluginsDataPanelTypesDataSchema,
+    PluginsDataSchema,
+    PluginsInfoResultsSchema,
+    PluginsInstallableResultsSchema,
+    PluginTypesResultsSchema,
+    RequestPluginsByIdSchema,
+    RequestPluginsFlowByPluginTypeSchema,
+    RequestPluginsInfoSchema,
+    RequestPluginsSettingsResetSchema,
+    RequestPluginsSettingsSaveSchema,
+    RequestPluginsTableDataSchema,
+    RequestSavingPluginsFlowByPluginTypeSchema,
+    RequestTableUpdateByIdList,
+    RequestUpdatePluginReposListSchema,
+)
 from compresso.webserver.helpers import plugins
 
 

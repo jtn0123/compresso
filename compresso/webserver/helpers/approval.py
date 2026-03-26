@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.approval.py
@@ -214,7 +213,7 @@ def reject_tasks(task_ids, requeue=False):
 
     for task_id in task_ids:
         # Clean up staged files
-        task_staging_dir = os.path.join(staging_path, "task_{}".format(task_id))
+        task_staging_dir = os.path.join(staging_path, f"task_{task_id}")
         if os.path.exists(task_staging_dir):
             try:
                 shutil.rmtree(task_staging_dir)
@@ -275,7 +274,7 @@ def _get_staged_file_info(task_id, staging_path):
     :param staging_path: str base staging directory
     :return: dict with 'size' and 'path'
     """
-    task_staging_dir = os.path.join(staging_path, "task_{}".format(task_id))
+    task_staging_dir = os.path.join(staging_path, f"task_{task_id}")
     if not os.path.exists(task_staging_dir):
         return {'size': 0, 'path': ''}
 

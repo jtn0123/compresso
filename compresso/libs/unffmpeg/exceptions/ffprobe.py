@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.ffprobe.py
@@ -33,6 +32,6 @@
 
 class FFProbeError(Exception):
     def __init__(self, path, info):
-        Exception.__init__(self, "Unable to fetch data from file {}. {}".format(path, info))
+        Exception.__init__(self, f"Unable to fetch data from file {path}. {info}")
         self.path = path
         self.info = info

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 import tornado.routing
 import tornado.testing
 import tornado.web
-from unittest.mock import MagicMock, patch
 
 from compresso.webserver.api_request_router import APIRequestRouter
 

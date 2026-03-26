@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_common_extended.py
@@ -10,12 +9,11 @@
 """
 
 import os
-
-import pytest
 from unittest.mock import patch
 
-from compresso.libs import common
+import pytest
 
+from compresso.libs import common
 
 # ------------------------------------------------------------------
 # get_default_root_path

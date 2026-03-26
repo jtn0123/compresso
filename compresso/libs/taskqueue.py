@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.taskqueue.py
@@ -32,8 +31,7 @@
 
 import datetime
 
-from compresso.libs import task
-from compresso.libs import common
+from compresso.libs import common, task
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels import Libraries, LibraryTags, Tags
 from compresso.libs.unmodels.tasks import Tasks
@@ -58,7 +56,7 @@ def build_tasks_count_query(status):
     """
     # Fetch only on result in order to know that there are any at all
     # Filter by status
-    query = Tasks.select().where((Tasks.status == status))
+    query = Tasks.select().where(Tasks.status == status)
     # Exclude deferred tasks that haven't reached their retry time yet
     query = query.where(
         (Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= datetime.datetime.now())
@@ -81,7 +79,7 @@ def build_tasks_query(status, sort_by='id', sort_order='asc', local_only=False, 
     :return:
     """
     # pick query based on sort params
-    query = Tasks.select().where((Tasks.status == status))
+    query = Tasks.select().where(Tasks.status == status)
 
     # Exclude deferred tasks that haven't reached their retry time yet
     query = query.where(
@@ -90,7 +88,7 @@ def build_tasks_query(status, sort_by='id', sort_order='asc', local_only=False, 
 
     # Limit to one result
     if local_only:
-        query = query.where((Tasks.type == 'local'))
+        query = query.where(Tasks.type == 'local')
 
     query = query.join(Libraries, on=(Libraries.id == Tasks.library_id))
     if library_names is not None:
@@ -125,7 +123,7 @@ def build_tasks_query_full_task_list(status, sort_by='id', sort_order='asc', lim
     :param limit:
     :return:
     """
-    query = Tasks.select(Tasks).where((Tasks.status == status))
+    query = Tasks.select(Tasks).where(Tasks.status == status)
 
     # Exclude deferred tasks that haven't reached their retry time yet
     query = query.where(
@@ -169,7 +167,7 @@ def fetch_next_task_filtered(status, sort_by='id', sort_order='asc', local_only=
     return next_task
 
 
-class TaskQueue(object):
+class TaskQueue:
     """
     TaskQueue
 

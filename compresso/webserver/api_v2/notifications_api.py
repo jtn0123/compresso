@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.notifications_api.py
@@ -34,6 +33,7 @@ import json
 import re
 
 import tornado.log
+
 from compresso import config
 from compresso.libs import session
 from compresso.libs.external_notifications import ExternalNotificationDispatcher
@@ -194,7 +194,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             for notification_uuid in json_request.get('uuid_list', []):
                 if not notifications.remove(notification_uuid):
                     self.set_status(self.STATUS_ERROR_EXTERNAL,
-                                    reason="Failed to delete the notification with UUID '{}'".format(notification_uuid))
+                                    reason=f"Failed to delete the notification with UUID '{notification_uuid}'")
                     self.write_error()
                     return
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.compression_stats.py
@@ -73,8 +72,9 @@ def get_encoding_speed_timeline(library_id=None):
     :param library_id: Optional library ID to filter by
     :return: list of dicts with date, avg_fps, avg_speed_ratio, codec
     """
-    from compresso.libs.unmodels import CompressionStats, CompletedTasks
     from peewee import fn
+
+    from compresso.libs.unmodels import CompletedTasks, CompressionStats
 
     query = (CompressionStats
              .select(

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -30,13 +29,9 @@
 
 """
 
-from __future__ import absolute_import
 import warnings
 
-
-from . import ffmpeg
-from . import ffprobe
-
+from . import ffmpeg, ffprobe
 
 __author__ = 'Josh.5 (jsunnex@gmail.com)'
 

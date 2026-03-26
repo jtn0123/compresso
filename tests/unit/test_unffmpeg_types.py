@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     Phase 1: Tests for unffmpeg data classes — containers, codecs, subtitles, exceptions, base classes.
@@ -8,7 +7,6 @@
 import pytest
 
 # ──────────────────────── Base Codecs ────────────────────────
-
 from compresso.libs.unffmpeg.base_codecs import Codecs
 
 
@@ -151,7 +149,6 @@ class TestFFProbeError:
 from compresso.libs.unffmpeg.video_codecs.h264 import H264
 from compresso.libs.unffmpeg.video_codecs.hevc import Hevc
 
-
 VIDEO_CODECS = [
     (H264, 'h264', 'libx264', ['h264_nvenc', 'h264_vaapi', 'libx264', 'libx264rgb'],
      'H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10'),
@@ -188,7 +185,6 @@ class TestVideoCodecs:
 from compresso.libs.unffmpeg.audio_codecs.aac import Aac
 from compresso.libs.unffmpeg.audio_codecs.ac3 import Ac3
 from compresso.libs.unffmpeg.audio_codecs.mp3 import Mp3
-
 
 AUDIO_CODECS = [
     (Aac, 'aac', 'aac', ['aac'], 'AAC (Advanced Audio Coding)'),
@@ -229,7 +225,6 @@ from compresso.libs.unffmpeg.subtitle_codecs.ssa import Ssa
 from compresso.libs.unffmpeg.subtitle_codecs.subrip import Subrip
 from compresso.libs.unffmpeg.subtitle_codecs.xsub import Xsub
 
-
 SUBTITLE_CODECS = [
     (Ass, 'ass', 'ass', ['ass'], 'ASS (Advanced SubStation Alpha) subtitle'),
     (MovText, 'mov_text', 'mov_text', ['mov_text'], '3GPP Timed Text subtitle'),
@@ -265,17 +260,16 @@ class TestSubtitleCodecs:
 
 # ──────────────────────── Containers ────────────────────────
 
-from compresso.libs.unffmpeg.containers.mp4 import Mp4
-from compresso.libs.unffmpeg.containers.matroska import Matroska
 from compresso.libs.unffmpeg.containers.avi import Avi
-from compresso.libs.unffmpeg.containers.mov import Mov
 from compresso.libs.unffmpeg.containers.flv import Flv
-from compresso.libs.unffmpeg.containers.vob import Vob
-from compresso.libs.unffmpeg.containers.ogv import Ogv
+from compresso.libs.unffmpeg.containers.matroska import Matroska
+from compresso.libs.unffmpeg.containers.mov import Mov
+from compresso.libs.unffmpeg.containers.mp4 import Mp4
 from compresso.libs.unffmpeg.containers.mpeg import Mpeg
 from compresso.libs.unffmpeg.containers.mpegts import Mpegts
+from compresso.libs.unffmpeg.containers.ogv import Ogv
 from compresso.libs.unffmpeg.containers.psp import Psp
-
+from compresso.libs.unffmpeg.containers.vob import Vob
 
 CONTAINERS = [
     (Mp4, 'mp4', 'MP4 (MPEG-4 Part 14)', True,
@@ -328,10 +322,14 @@ class TestContainers:
 
 # ──────────────────────── Package-level discovery ────────────────────────
 
-from compresso.libs.unffmpeg.containers import get_all_containers, grab_module as grab_container
-from compresso.libs.unffmpeg.video_codecs import get_all_video_codecs, grab_module as grab_video_codec
-from compresso.libs.unffmpeg.audio_codecs import get_all_audio_codecs, grab_module as grab_audio_codec
-from compresso.libs.unffmpeg.subtitle_codecs import get_all_subtitle_codecs, grab_module as grab_subtitle_codec
+from compresso.libs.unffmpeg.audio_codecs import get_all_audio_codecs
+from compresso.libs.unffmpeg.audio_codecs import grab_module as grab_audio_codec
+from compresso.libs.unffmpeg.containers import get_all_containers
+from compresso.libs.unffmpeg.containers import grab_module as grab_container
+from compresso.libs.unffmpeg.subtitle_codecs import get_all_subtitle_codecs
+from compresso.libs.unffmpeg.subtitle_codecs import grab_module as grab_subtitle_codec
+from compresso.libs.unffmpeg.video_codecs import get_all_video_codecs
+from compresso.libs.unffmpeg.video_codecs import grab_module as grab_video_codec
 
 
 @pytest.mark.unittest

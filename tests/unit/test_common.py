@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_common.py
@@ -9,8 +8,9 @@
 
 import json
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from compresso.libs import common
 

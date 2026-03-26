@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_installation_link_extended.py
@@ -17,12 +16,12 @@
 """
 
 import time
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from requests.auth import HTTPBasicAuth
-from unittest.mock import patch, MagicMock, mock_open
 
-from compresso.libs.installation_link import RequestHandler, Links
+from compresso.libs.installation_link import Links, RequestHandler
 from compresso.libs.singleton import SingletonType
 
 

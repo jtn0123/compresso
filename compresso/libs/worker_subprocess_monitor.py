@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.worker_subprocess_monitor.py
@@ -40,7 +39,7 @@ from compresso.libs.logs import CompressoLogging
 
 class WorkerCommandError(Exception):
     def __init__(self, command):
-        Exception.__init__(self, "Worker command returned non 0 status. Command: {}".format(command))
+        Exception.__init__(self, f"Worker command returned non 0 status. Command: {command}")
         self.command = command
 
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_plugins_api_handler.py
@@ -9,12 +8,12 @@
 """
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
-from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.plugins_api import ApiPluginsHandler
+from tests.unit.api_test_base import ApiTestBase
 
 PLUGINS_HELPERS = 'compresso.webserver.helpers.plugins'
 

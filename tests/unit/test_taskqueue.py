@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_taskqueue.py
@@ -14,12 +13,12 @@
 import os
 import shutil
 import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
-from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels import Libraries, Tags
+from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels.tasks import Tasks
 
 LibraryTags = Libraries.tags.get_through_model()

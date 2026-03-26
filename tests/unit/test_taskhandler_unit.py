@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import queue
+from unittest.mock import MagicMock, patch
+
 import pytest
 from peewee import OperationalError
-from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture

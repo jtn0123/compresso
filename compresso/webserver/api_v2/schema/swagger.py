@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.swagger.py
@@ -71,7 +70,7 @@ def generate_swagger_file():
     """
     errors = []
 
-    file_location = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'api_schema_v{}'.format(API_VERSION))
+    file_location = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', f'api_schema_v{API_VERSION}')
 
     # Starting to generate Swagger spec file. All the relevant
     # information can be found from here https://apispec.readthedocs.io/
@@ -83,7 +82,7 @@ def generate_swagger_file():
         info=dict(description="Documentation for the Compresso application API"),
         plugins=[CompressoSpecPlugin(), MarshmallowPlugin()],
         servers=[
-            {"url": "/compresso/api/v{}/".format(API_VERSION), "description": "Current environment", },
+            {"url": f"/compresso/api/v{API_VERSION}/", "description": "Current environment", },
         ],
         **security_settings
     )
@@ -95,14 +94,13 @@ def generate_swagger_file():
         try:
             spec.path(urlspec=handler)
         except APISpecError as e:
-            errors.append("API Docs - Failed to append spec path - {}".format(str(e)))
-            pass
+            errors.append(f"API Docs - Failed to append spec path - {str(e)}")
 
     # Write the Swagger file into specified location.
-    with open('{}.json'.format(file_location), "w", encoding="utf-8") as file:
+    with open(f'{file_location}.json', "w", encoding="utf-8") as file:
         json.dump(spec.to_dict(), file, ensure_ascii=False, indent=4)
     # TODO: Remove YAML. It sucks!
-    with open('{}.yaml'.format(file_location), "w", encoding="utf-8") as file:
+    with open(f'{file_location}.yaml', "w", encoding="utf-8") as file:
         file.write(spec.to_yaml())
 
     return errors

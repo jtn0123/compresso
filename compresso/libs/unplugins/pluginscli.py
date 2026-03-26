@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.pluginscli.py
@@ -39,15 +38,15 @@ import shutil
 import inquirer
 import requests
 
-from . import plugin_types
-
 from compresso import config
 from compresso.libs import common
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.task import TaskDataStore
 from compresso.libs.unplugins import PluginExecutor
 from compresso.libs.unplugins.child_process import kill_all_plugin_processes, set_shared_manager
+
 from ..logs import CompressoLogging
+from . import plugin_types
 
 home_directory = common.get_home_dir()
 dev_cache_directory = os.path.join(home_directory, '.compresso', 'dev', 'cache')
@@ -108,7 +107,7 @@ def print_table(table_data, col_list=None, sep='\uFFFA', max_col_width=9):
         if col > max_col_width:
             col = max_col_width
         col_size.append(col)
-    format_str = ' | '.join(["{{:<{}}}".format(i) for i in col_size])
+    format_str = ' | '.join([f"{{:<{i}}}" for i in col_size])
     line = format_str.replace(' | ', '-+-').format(*['-' * i for i in col_size])
     item = my_list.pop(0)
     line_done = False
@@ -123,7 +122,7 @@ def print_table(table_data, col_list=None, sep='\uFFFA', max_col_width=9):
         item = [i[1] if len(i) > 1 else '' for i in row]
 
 
-class PluginsCLI(object):
+class PluginsCLI:
 
     def __init__(self, plugins_directory=None):
         from multiprocessing import Manager
@@ -139,7 +138,7 @@ class PluginsCLI(object):
         # Only log to stdout
         CompressoLogging.update_stream_formatter(
             logging.Formatter(
-                '        - {}%(asctime)s:%(levelname)s:%(name)s - %(message)s{}'.format(BColours.RESULTS, BColours.ENDC),
+                f'        - {BColours.RESULTS}%(asctime)s:%(levelname)s:%(name)s - %(message)s{BColours.ENDC}',
                 datefmt='%Y-%m-%dT%H:%M:%S'
             )
         )
@@ -311,8 +310,8 @@ class PluginsCLI(object):
             selected_plugin_runner = plugin_type_details.get('runner')
             selected_plugin_runner_docstring = plugin_type_details.get('runner_docstring')
             runner_templates.extend([
-                'def {}(data):'.format(selected_plugin_runner),
-                '    """{}'.format(selected_plugin_runner_docstring),
+                f'def {selected_plugin_runner}(data):',
+                f'    """{selected_plugin_runner_docstring}',
                 '    """',
                 '    return',
                 '',
@@ -324,10 +323,10 @@ class PluginsCLI(object):
             with open(main_python_file, 'a') as outfile:
                 # Write out main template
                 for template_line in main_plugin_template:
-                    outfile.write("{}\n".format(template_line))
+                    outfile.write(f"{template_line}\n")
                 # Write out runner function template
                 for template_line in runner_templates:
-                    outfile.write("{}\n".format(template_line))
+                    outfile.write(f"{template_line}\n")
 
         # Write plugin info.json
         info_file = os.path.join(new_plugin_path, 'info.json')
@@ -365,7 +364,7 @@ class PluginsCLI(object):
         if not os.path.exists(plugin_gitignore):
             with open(plugin_gitignore, 'a') as outfile:
                 for template_line in gitignore_template:
-                    outfile.write("{}\n".format(template_line))
+                    outfile.write(f"{template_line}\n")
 
         # Insert plugin details to DB
         try:
@@ -375,7 +374,7 @@ class PluginsCLI(object):
             self.logger.error("Exception while saving plugin info to DB. - %s", e)
             return
 
-        print("Plugin created - '{}'".format((plugin_details.get('plugin_id'))))
+        print("Plugin created - '{}'".format(plugin_details.get('plugin_id')))
 
     def create_new_plugins(self):
         plugin_details, plugin_type_details_list = self._collect_new_plugin_details()
@@ -469,12 +468,12 @@ class PluginsCLI(object):
 
         plugin_results = self.__get_installed_plugins(plugin_id=plugin_id)
         if not plugin_results:
-            print("ERROR! Plugin not found: '{}'".format(plugin_id))
+            print(f"ERROR! Plugin not found: '{plugin_id}'")
             return
 
         plugin_table_id = plugin_results[0].get('id')
         if not plugin_table_id:
-            print("ERROR! Plugin record missing id for '{}'.".format(plugin_id))
+            print(f"ERROR! Plugin record missing id for '{plugin_id}'.")
             return
 
         self._uninstall_plugin_by_db_table_id(plugin_table_id)
@@ -516,43 +515,42 @@ class PluginsCLI(object):
 
         plugin_results = self.__get_installed_plugins(plugin_id=plugin_id)
         for plugin_result in plugin_results:
-            print("{1}Testing plugin: '{0}'{2}".format(plugin_result.get("name"), BColours.HEADER, BColours.ENDC))
+            print("{}Testing plugin: '{}'{}".format(BColours.HEADER, plugin_result.get("name"), BColours.ENDC))
             plugin_id = plugin_result.get("plugin_id")
 
             # Reload the plugin
             plugin_executor.reload_plugin_module(plugin_id)
 
             # Test Plugin settings
-            print("  {0}Testing settings{1}".format(BColours.SUBHEADER, BColours.ENDC))
+            print(f"  {BColours.SUBHEADER}Testing settings{BColours.ENDC}")
             errors, plugin_settings = plugin_executor.test_plugin_settings(plugin_id)
-            print("    {}Plugin settings schema{}".format(BColours.SECTION, BColours.ENDC))
+            print(f"    {BColours.SECTION}Plugin settings schema{BColours.ENDC}")
             if errors:
                 for error in errors:
-                    print("        -- {1}FAILED: {0}{2}".format(error, BColours.FAIL, BColours.ENDC))
+                    print(f"        -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
             else:
                 formatted_plugin_settings = json.dumps(plugin_settings, indent=1)
                 formatted_plugin_settings = formatted_plugin_settings.replace('\n', '\n' + '                    ')
-                print("        - {1}Settings: {0}{2}".format(formatted_plugin_settings,
-                      BColours.RESULTS, BColours.ENDC))
-                print("        -- {}PASSED{} --".format(BColours.OKGREEN, BColours.ENDC))
+                print(f"        - {BColours.RESULTS}Settings: {formatted_plugin_settings}{BColours.ENDC}")
+                print(f"        -- {BColours.OKGREEN}PASSED{BColours.ENDC} --")
 
             # Test Plugin runners
-            print("  {0}Testing runners{1}".format(BColours.SUBHEADER, BColours.ENDC))
+            print(f"  {BColours.SUBHEADER}Testing runners{BColours.ENDC}")
             plugin_types_in_plugin = plugin_executor.get_all_plugin_types_in_plugin(plugin_id)
             if not plugin_types_in_plugin:
                 error = "No runners found in plugin"
-                print("  -- {1}FAILED: {0}{2}".format(error, BColours.FAIL, BColours.ENDC))
+                print(f"  -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
                 print()
             else:
                 for plugin_type_in_plugin in plugin_types_in_plugin:
-                    print("    {1}{0}{2}".format(plugin_type_in_plugin, BColours.SECTION, BColours.ENDC))
+                    print(f"    {BColours.SECTION}{plugin_type_in_plugin}{BColours.ENDC}")
                     errors = plugin_executor.test_plugin_runner(plugin_id, plugin_type_in_plugin,
                                                                 test_data_modifiers=self.test_data_modifiers)
                     if errors:
                         for error in errors:
-                            print("        -- {1}FAILED: {0}{2}".format(error, BColours.FAIL, BColours.ENDC))
+                            print(f"        -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
                     else:
-                        print("        -- {}PASSED{} --".format(BColours.OKGREEN, BColours.ENDC))
+                        print(f"        -- {BColours.OKGREEN}PASSED{BColours.ENDC} --")
                     print()
             print()
             print()
@@ -640,7 +638,7 @@ class PluginsCLI(object):
             library_file = os.path.join(dev_library_directory, key)
             file_url = sample_files.get(key)
             print()
-            print("Downloading sample file: '{}'".format(file_url))
+            print(f"Downloading sample file: '{file_url}'")
             with requests.get(file_url, stream=True) as r:
                 r.raise_for_status()
                 with open(library_file, 'wb') as f:

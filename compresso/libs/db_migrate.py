@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.database.py
@@ -33,14 +32,14 @@ import inspect
 import os
 import sys
 
-from peewee import SqliteDatabase, Field
+from peewee import Field, SqliteDatabase
 from peewee_migrate import Migrator, Router
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.lib import BaseModel
 
 
-class Migrations(object):
+class Migrations:
     """
     Migrations
 
@@ -199,12 +198,12 @@ class Migrations(object):
 
         if missing_required_columns:
             details = "; ".join(
-                "{}.{} ({})".format(table, column, reason)
+                f"{table}.{column} ({reason})"
                 for table, column, reason in missing_required_columns
             )
             raise RuntimeError(
-                "Database schema requires non-additive migrations for: {}. "
-                "Create a migration to add these columns safely.".format(details)
+                f"Database schema requires non-additive migrations for: {details}. "
+                "Create a migration to add these columns safely."
             )
 
         # Add missing non-unique indexes declared on models

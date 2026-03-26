@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.filemetadatapaths.py
@@ -33,8 +32,9 @@
 import datetime
 
 from peewee import *
-from compresso.libs.unmodels.lib import BaseModel
+
 from compresso.libs.unmodels.filemetadata import FileMetadata
+from compresso.libs.unmodels.lib import BaseModel
 
 
 class FileMetadataPaths(BaseModel):

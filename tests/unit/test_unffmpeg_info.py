@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     Tests for compresso.libs.unffmpeg.info.Info class.
@@ -11,7 +10,6 @@ from unittest.mock import patch
 import pytest
 
 from compresso.libs.unffmpeg.info import Info
-
 
 # ---------------------------------------------------------------------------
 # Realistic raw ffmpeg output used in multiple tests

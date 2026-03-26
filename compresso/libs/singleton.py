@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.singleton.py
@@ -42,5 +41,5 @@ class SingletonType(type):
         if cls not in cls._instances:
             with lock:
                 if cls not in cls._instances:
-                    cls._instances[cls] = super(SingletonType, cls).__call__(*args, **kwargs)
+                    cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_installation_link.py
@@ -12,13 +11,13 @@
 """
 
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
 from requests.auth import HTTPBasicAuth
-from unittest.mock import patch, MagicMock
 
-from compresso.libs.installation_link import RequestHandler, Links
+from compresso.libs.installation_link import Links, RequestHandler
 from compresso.libs.singleton import SingletonType
 
 
@@ -76,7 +75,7 @@ class TestLinks:
             'available', 'task_count', 'last_updated',
         ]
         for key in expected_keys:
-            assert key in result, "Missing key: {}".format(key)
+            assert key in result, f"Missing key: {key}"
         assert len(result) == 17
 
     @pytest.mark.unittest

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_bundled_plugins.py
@@ -15,17 +14,16 @@ import json
 import os
 import shutil
 import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.bundled_plugins import (
-    install_bundled_plugins,
-    _version_newer,
     _copy_plugin,
     _register_plugin_in_db,
+    _version_newer,
+    install_bundled_plugins,
 )
-
 
 # ------------------------------------------------------------------
 # _version_newer

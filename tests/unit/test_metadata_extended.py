@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_metadata_extended.py
@@ -20,10 +19,10 @@ from unittest.mock import patch
 import pytest
 
 from compresso.libs.singleton import SingletonType
-from compresso.libs.unmodels.tasks import Tasks
 from compresso.libs.unmodels.filemetadata import FileMetadata
 from compresso.libs.unmodels.filemetadatapaths import FileMetadataPaths
 from compresso.libs.unmodels.taskmetadata import TaskMetadata
+from compresso.libs.unmodels.tasks import Tasks
 
 
 @pytest.fixture(autouse=True)

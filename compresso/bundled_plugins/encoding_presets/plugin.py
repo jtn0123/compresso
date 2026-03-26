@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     Encoding Presets Plugin
@@ -260,7 +259,7 @@ def on_worker_process(data, **kwargs):
     # Build output path
     file_in_basename = os.path.splitext(os.path.basename(file_in))[0]
     cache_dir = os.path.dirname(data.get("file_out") or file_in)
-    file_out = os.path.join(cache_dir, "{}.{}".format(file_in_basename, output_format))
+    file_out = os.path.join(cache_dir, f"{file_in_basename}.{output_format}")
     data["file_out"] = file_out
 
     # --- Build FFmpeg command ---
@@ -306,7 +305,7 @@ def on_worker_process(data, **kwargs):
     scale_height = int(s.get("scale_height", 0) or 0)
     if scale_height > 0 and video_encoder:
         # Scale to target height, auto-calculate width (divisible by 2)
-        cmd.extend(["-vf", "scale=-2:{}".format(scale_height)])
+        cmd.extend(["-vf", f"scale=-2:{scale_height}"])
 
     # Audio settings
     audio_codec = s.get("audio_codec", "").strip()

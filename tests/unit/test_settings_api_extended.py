@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_settings_api_extended.py
@@ -9,13 +8,13 @@
 """
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
-from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.settings_api import ApiSettingsHandler
+from tests.unit.api_test_base import ApiTestBase
 
 
 @pytest.fixture(autouse=True)

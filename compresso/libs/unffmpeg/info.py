@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.main.py
@@ -30,13 +29,11 @@
 
 """
 
-from . import audio_codecs
-from . import subtitle_codecs
-from . import video_codecs
+from . import audio_codecs, subtitle_codecs, video_codecs
 from .lib import cli
 
 
-class Info(object):
+class Info:
     """
     Info
 

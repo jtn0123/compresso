@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.basemodel.py
@@ -31,12 +30,12 @@
 """
 
 import logging
+from base64 import b64decode
+from datetime import datetime
 
 from peewee import *
-from playhouse.sqliteq import SqliteQueueDatabase
-from datetime import datetime
-from base64 import b64decode
 from playhouse.shortcuts import model_to_dict
+from playhouse.sqliteq import SqliteQueueDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ db = DatabaseProxy()  # Create a proxy for our db.
 # Stipulate date and time formats
 DATE_FORMAT = '%Y-%m-%d'
 TIME_FORMAT = '%H:%M:%S'
-TIME_FORMAT_ALT = '{}.%f'.format(TIME_FORMAT)
+TIME_FORMAT_ALT = f'{TIME_FORMAT}.%f'
 DATETIME_BASE = '{}T{}'
 DATETIME_FORMAT = DATETIME_BASE.format(DATE_FORMAT, TIME_FORMAT)
 DATETIME_FORMAT_ALT = DATETIME_BASE.format(DATE_FORMAT, TIME_FORMAT_ALT)
@@ -91,7 +90,6 @@ class NoSuchFieldError(TypeError):
     Indicates that the field does not exist in this model
 
     """
-    pass
 
 
 class NullError(TypeError):
@@ -99,7 +97,6 @@ class NullError(TypeError):
     Indicates that the respective field was set to NULL but must not be NULL.
 
     """
-    pass
 
 
 class Database:

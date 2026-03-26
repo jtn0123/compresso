@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_staging_cleanup.py
@@ -16,13 +15,13 @@
 import os
 import threading
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from compresso.libs.singleton import SingletonType
-from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels import Libraries, Tags
+from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels.tasks import Tasks
 
 LibraryTags = Libraries.tags.get_through_model()
@@ -115,7 +114,7 @@ class TestCleanupExpiredStaging:
 
         # Create the staging directory
         staging_dir = os.path.join(str(tmp_path), 'staging')
-        task_staging = os.path.join(staging_dir, 'task_{}'.format(task_obj.id))
+        task_staging = os.path.join(staging_dir, f'task_{task_obj.id}')
         os.makedirs(task_staging)
         # Create a dummy file inside
         with open(os.path.join(task_staging, 'video.mkv'), 'w') as f:
@@ -145,7 +144,7 @@ class TestCleanupExpiredStaging:
         )
 
         staging_dir = os.path.join(str(tmp_path), 'staging')
-        task_staging = os.path.join(staging_dir, 'task_{}'.format(task_obj.id))
+        task_staging = os.path.join(staging_dir, f'task_{task_obj.id}')
         os.makedirs(task_staging)
         with open(os.path.join(task_staging, 'video.mkv'), 'w') as f:
             f.write('dummy')
@@ -172,7 +171,7 @@ class TestCleanupExpiredStaging:
         )
 
         staging_dir = os.path.join(str(tmp_path), 'staging')
-        task_staging = os.path.join(staging_dir, 'task_{}'.format(task_obj.id))
+        task_staging = os.path.join(staging_dir, f'task_{task_obj.id}')
         os.makedirs(task_staging)
         with open(os.path.join(task_staging, 'video.mkv'), 'w') as f:
             f.write('dummy')

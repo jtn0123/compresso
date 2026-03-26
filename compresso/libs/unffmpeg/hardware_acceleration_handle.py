@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.hardware_acceleration_handle.py
@@ -33,7 +32,7 @@ import ctypes
 import os
 
 
-class HardwareAccelerationHandle(object):
+class HardwareAccelerationHandle:
     """
     HardwareAccelerationHandle
 
@@ -187,7 +186,7 @@ class HardwareAccelerationHandle(object):
                 continue
             device_data = {
                 'hwaccel':        'cuda',
-                'hwaccel_device': "{}".format(i),
+                'hwaccel_device': f"{i}",
             }
             decoders.append(device_data)
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.history.py
@@ -32,9 +31,10 @@
 
 import json
 
+from peewee import fn
+
 from compresso import config
 from compresso.libs.logs import CompressoLogging
-from peewee import fn
 from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, CompressionStats
 
 try:
@@ -43,7 +43,7 @@ except ImportError:
     JSONDecodeError = ValueError
 
 
-class History(object):
+class History:
     """
     History
 

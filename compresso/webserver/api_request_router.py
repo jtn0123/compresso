@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.api_request_router.py
@@ -31,9 +30,10 @@
 """
 
 import importlib
+
+import tornado.log
 import tornado.routing
 import tornado.web
-import tornado.log
 
 from compresso import config
 
@@ -67,14 +67,14 @@ class APIRequestRouter(tornado.routing.Router):
         endpoint = request.path.split('/')[4]  # Set the endpoint
         params = list(filter(None, request.path.split('/')[4:]))  # Set the request params
 
-        endpoint_handler = 'Api%sHandler' % endpoint.title()
+        endpoint_handler = f'Api{endpoint.title()}Handler'
 
         # Check if the handler exists - Otherwise set it to 404
         try:
             # Fetch handler class from api module matching api version
-            handler = getattr(importlib.import_module("compresso.webserver.api_{}".format(api_version)), endpoint_handler)
+            handler = getattr(importlib.import_module(f"compresso.webserver.api_{api_version}"), endpoint_handler)
         except (AttributeError, KeyError, ModuleNotFoundError):
-            tornado.log.app_log.warning("Unable to find handler for path: {}".format(endpoint_handler), exc_info=True)
+            tornado.log.app_log.warning(f"Unable to find handler for path: {endpoint_handler}", exc_info=True)
             handler = Handle404
 
         # Return handler

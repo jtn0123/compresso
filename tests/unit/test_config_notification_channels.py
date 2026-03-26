@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_config_notification_channels.py
@@ -11,8 +10,8 @@
 """
 
 import pytest
-from compresso.config import Config
 
+from compresso.config import Config
 
 # ------------------------------------------------------------------
 # TestConfigNotificationChannels

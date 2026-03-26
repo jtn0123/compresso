@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_healthcheck.py
@@ -14,18 +13,18 @@ import datetime
 import os
 import subprocess
 import tempfile
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.unmodels.lib import Database
-
 
 # ------------------------------------------------------------------
 # TestHealthCheckQuickCheck — no DB needed
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHealthCheckQuickCheck(object):
+class TestHealthCheckQuickCheck:
     """Tests for HealthCheckManager.quick_check()."""
 
     def _make_manager(self):
@@ -100,7 +99,7 @@ class TestHealthCheckQuickCheck(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHealthCheckThoroughCheck(object):
+class TestHealthCheckThoroughCheck:
     """Tests for HealthCheckManager.thorough_check()."""
 
     def _make_manager(self):
@@ -136,7 +135,7 @@ class TestHealthCheckThoroughCheck(object):
     @patch('compresso.libs.healthcheck.os.path.exists', return_value=True)
     def test_more_than_10_error_lines(self, mock_exists, mock_run):
         """More than 10 error lines in stderr with returncode 0 → corrupted."""
-        error_lines = '\n'.join(['error line {}'.format(i) for i in range(15)])
+        error_lines = '\n'.join([f'error line {i}' for i in range(15)])
         mock_run.return_value = MagicMock(returncode=0, stderr=error_lines)
         mgr = self._make_manager()
         ok, err = mgr.thorough_check('/test/file.mkv')
@@ -147,7 +146,7 @@ class TestHealthCheckThoroughCheck(object):
     @patch('compresso.libs.healthcheck.os.path.exists', return_value=True)
     def test_10_or_fewer_error_lines_returns_warning(self, mock_exists, mock_run):
         """1-10 error lines with returncode 0 → warning status."""
-        error_lines = '\n'.join(['warning {}'.format(i) for i in range(5)])
+        error_lines = '\n'.join([f'warning {i}' for i in range(5)])
         mock_run.return_value = MagicMock(returncode=0, stderr=error_lines)
         mgr = self._make_manager()
         status, err = mgr.thorough_check('/test/file.mkv')
@@ -178,7 +177,7 @@ class TestHealthCheckThoroughCheck(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHealthCheckCheckFile(object):
+class TestHealthCheckCheckFile:
     """Tests for check_file() — requires DB.
 
     Uses pre-seeded HealthStatus rows and mocks quick_check/thorough_check
@@ -314,7 +313,7 @@ class TestHealthCheckCheckFile(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHealthSummary(object):
+class TestHealthSummary:
     """Tests for get_health_summary() — requires DB."""
 
     db_connection = None
@@ -403,7 +402,7 @@ class TestHealthSummary(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHealthStatusesPaginated(object):
+class TestHealthStatusesPaginated:
     """Tests for get_health_statuses_paginated() — requires DB."""
 
     db_connection = None
@@ -440,7 +439,7 @@ class TestHealthStatusesPaginated(object):
     def test_basic_pagination_structure(self):
         from compresso.libs.unmodels import HealthStatus
         for i in range(5):
-            HealthStatus.create(abspath='/file{}.mkv'.format(i), status='healthy', library_id=1)
+            HealthStatus.create(abspath=f'/file{i}.mkv', status='healthy', library_id=1)
 
         mgr = self._make_manager()
         result = mgr.get_health_statuses_paginated(start=0, length=10)
@@ -453,7 +452,7 @@ class TestHealthStatusesPaginated(object):
     def test_offset_works(self):
         from compresso.libs.unmodels import HealthStatus
         for i in range(5):
-            HealthStatus.create(abspath='/offset{}.mkv'.format(i), status='healthy', library_id=1)
+            HealthStatus.create(abspath=f'/offset{i}.mkv', status='healthy', library_id=1)
 
         mgr = self._make_manager()
         result = mgr.get_health_statuses_paginated(start=3, length=10)
@@ -528,7 +527,7 @@ class TestHealthStatusesPaginated(object):
         expected_keys = ['id', 'abspath', 'library_id', 'status',
                          'check_mode', 'error_detail', 'last_checked', 'error_count']
         for key in expected_keys:
-            assert key in row, "Missing key: {}".format(key)
+            assert key in row, f"Missing key: {key}"
 
 
 # ------------------------------------------------------------------
@@ -536,7 +535,7 @@ class TestHealthStatusesPaginated(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestScheduleLibraryScan(object):
+class TestScheduleLibraryScan:
     """Tests for schedule_library_scan()."""
 
     def _make_manager(self):
@@ -596,7 +595,7 @@ class TestScheduleLibraryScan(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHealthCheckWorkers(object):
+class TestHealthCheckWorkers:
     """Tests for worker count management and enriched scan progress."""
 
     def teardown_method(self):
@@ -630,7 +629,7 @@ class TestHealthCheckWorkers(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestCancelScan(object):
+class TestCancelScan:
     """Tests for cancel_scan()."""
 
     def teardown_method(self):
@@ -660,7 +659,7 @@ class TestCancelScan(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestCheckFileEdgeCases(object):
+class TestCheckFileEdgeCases:
     """Edge case tests for check_file (Issue #29)."""
 
     def _make_manager(self):
@@ -695,7 +694,7 @@ class TestCheckFileEdgeCases(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHistoryOrderWhitelist(object):
+class TestHistoryOrderWhitelist:
     """Tests for get_historic_task_list_filtered_and_sorted column whitelist (Issue #3)."""
 
     db_connection = None
@@ -733,7 +732,7 @@ class TestHistoryOrderWhitelist(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestRecordsTotalRespectsLibraryId(object):
+class TestRecordsTotalRespectsLibraryId:
     """Verify recordsTotal respects library_id filter after 2A fix."""
 
     db_connection = None
@@ -792,7 +791,7 @@ class TestRecordsTotalRespectsLibraryId(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestCancelEventThreadSafe(object):
+class TestCancelEventThreadSafe:
     """Verify _cancel_event is a threading.Event and works correctly."""
 
     def teardown_method(self):
@@ -802,6 +801,7 @@ class TestCancelEventThreadSafe(object):
 
     def test_cancel_event_is_threading_event(self):
         import threading
+
         from compresso.libs.healthcheck import HealthCheckManager
         assert isinstance(HealthCheckManager._cancel_event, threading.Event)
 
@@ -819,7 +819,7 @@ class TestCancelEventThreadSafe(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestGetScanProgressDeepCopy(object):
+class TestGetScanProgressDeepCopy:
     """Verify get_scan_progress returns a deep copy (nested dicts independent)."""
 
     def teardown_method(self):
@@ -852,7 +852,7 @@ class TestGetScanProgressDeepCopy(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestFileLocksClearedAfterScan(object):
+class TestFileLocksClearedAfterScan:
     """Verify _file_locks is cleared after _run_library_scan completes."""
 
     def teardown_method(self):

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.plugins_api.py
@@ -30,6 +29,7 @@
 
 """
 import json
+
 import tornado.log
 
 from compresso.libs.plugins import PluginsHandler
@@ -167,7 +167,7 @@ class ApiPluginsHandler(BaseApiHandler):
             plugins = PluginsHandler()
             plugins.set_plugin_repos(repos_list)
         except Exception as e:
-            tornado.log.app_log.exception("Exception in updating repo list - {}".format(str(e)), exc_info=True)
+            tornado.log.app_log.exception(f"Exception in updating repo list - {str(e)}", exc_info=True)
 
         self.get_repo_list()
 
@@ -187,7 +187,7 @@ class ApiPluginsHandler(BaseApiHandler):
             # Return success
             self.write(json.dumps({"success": True, "repos": return_repos}))
         except Exception as e:
-            tornado.log.app_log.exception("Exception in fetching the current repo list - {}".format(str(e)), exc_info=True)
+            tornado.log.app_log.exception(f"Exception in fetching the current repo list - {str(e)}", exc_info=True)
 
             # Return failure
             self.write(json.dumps({"success": False}))

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_library_extended.py
@@ -11,13 +10,13 @@
 import os
 import shutil
 import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
+from compresso.libs.unmodels import EnabledPlugins, Libraries, LibraryPluginFlow, Plugins, Tags
 from compresso.libs.unmodels.lib import Database
-from compresso.libs.unmodels import Libraries, Tags, EnabledPlugins, LibraryPluginFlow, Plugins
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.libs.unmodels.workergroups import WorkerGroups, WorkerGroupTags
 from compresso.libs.unmodels.workerschedules import WorkerSchedules

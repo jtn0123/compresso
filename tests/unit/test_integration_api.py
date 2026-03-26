@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_integration_api.py
@@ -8,8 +7,9 @@
     workflows end-to-end with mocked backends.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 @pytest.mark.unittest

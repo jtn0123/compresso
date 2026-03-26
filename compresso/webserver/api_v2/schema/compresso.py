@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.swagger.py
@@ -29,12 +28,11 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
-from tornado.routing import PathMatches
-from tornado.web import URLSpec
-
 from apispec import yaml_utils
 from apispec.exceptions import APISpecError
 from apispec_webframeworks.tornado import TornadoPlugin
+from tornado.routing import PathMatches
+from tornado.web import URLSpec
 
 
 class CompressoSpecPlugin(TornadoPlugin):

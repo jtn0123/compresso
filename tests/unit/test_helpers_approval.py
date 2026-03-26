@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_helpers_approval.py
@@ -8,8 +7,9 @@
 
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 APPROVAL_MODULE = 'compresso.webserver.helpers.approval'
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_logging_validation.py
@@ -224,7 +223,7 @@ class TestCompressoLoggingRemote:
 class TestForwardLogHandlerEmit:
 
     def test_emit_enriches_record_with_labels(self):
-        from compresso.libs.logs import ForwardLogHandler, ForwardJSONFormatter
+        from compresso.libs.logs import ForwardJSONFormatter, ForwardLogHandler
         with patch.object(ForwardLogHandler, '_load_buffer_state', return_value={}):
             with patch.object(ForwardLogHandler, '_sync_state_with_disk'):
                 with patch.object(ForwardLogHandler, '_writer_loop'):
@@ -268,7 +267,7 @@ class TestForwardLogHandlerEmit:
                         assert item['labels']['log_type'] == 'APPLICATION_LOG'
 
     def test_emit_discards_when_retention_disabled_and_no_endpoint(self):
-        from compresso.libs.logs import ForwardLogHandler, ForwardJSONFormatter
+        from compresso.libs.logs import ForwardJSONFormatter, ForwardLogHandler
         handler = ForwardLogHandler.__new__(ForwardLogHandler)
         logging.Handler.__init__(handler)
         handler._retention_disabled = True

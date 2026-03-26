@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.worker_group.py
@@ -51,7 +50,7 @@ def generate_random_worker_group_name():
     return random.choice(names)
 
 
-class WorkerGroup(object):
+class WorkerGroup:
     """
     WorkerGroup
 
@@ -65,7 +64,7 @@ class WorkerGroup(object):
             raise Exception("Worker group ID cannot be less than 1")
         self.model = WorkerGroups.get_or_none(id=group_id)
         if not self.model:
-            raise Exception("Unable to fetch Worker group  with ID {}".format(group_id))
+            raise Exception(f"Unable to fetch Worker group  with ID {group_id}")
 
     @staticmethod
     def random_name():

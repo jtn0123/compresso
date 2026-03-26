@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.postprocessor.py
@@ -41,6 +40,7 @@ import peewee
 from compresso import config
 from compresso.libs import common, history
 from compresso.libs.ffprobe_utils import extract_media_metadata
+from compresso.libs.file_operation_tracker import FileOperationTracker, PostProcessError
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
@@ -48,7 +48,6 @@ from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.notifications import Notifications
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.task import TaskDataStore
-from compresso.libs.file_operation_tracker import FileOperationTracker, PostProcessError
 
 """
 
@@ -68,7 +67,7 @@ class PostProcessor(threading.Thread):
     """
 
     def __init__(self, data_queues, task_queue, event):
-        super(PostProcessor, self).__init__(name='PostProcessor')
+        super().__init__(name='PostProcessor')
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.event = event
         self.data_queues = data_queues
@@ -125,7 +124,7 @@ class PostProcessor(threading.Thread):
         })
 
         try:
-            self._log("Post-processing task - {}".format(self.current_task.get_source_abspath()))
+            self._log(f"Post-processing task - {self.current_task.get_source_abspath()}")
         except (AttributeError, KeyError, TypeError) as e:
             self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
 
@@ -143,8 +142,7 @@ class PostProcessor(threading.Thread):
                             min_pct = library.get_size_guardrail_min_pct()
                             max_pct = library.get_size_guardrail_max_pct()
                             if ratio_pct < min_pct or ratio_pct > max_pct:
-                                rejection_msg = "Size guardrail REJECTED: {:.1f}% (allowed {}-{}%)".format(
-                                    ratio_pct, min_pct, max_pct)
+                                rejection_msg = f"Size guardrail REJECTED: {ratio_pct:.1f}% (allowed {min_pct}-{max_pct}%)"
                                 self._log(rejection_msg)
                                 db = self.current_task.task._meta.database
                                 with db.atomic():
@@ -189,7 +187,7 @@ class PostProcessor(threading.Thread):
     def _handle_approved_task(self):
         """Handle a task that was approved by the user — finalize file replacement from staging."""
         try:
-            self._log("Finalizing approved task - {}".format(self.current_task.get_source_abspath()))
+            self._log(f"Finalizing approved task - {self.current_task.get_source_abspath()}")
         except (AttributeError, KeyError, TypeError) as e:
             self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
 
@@ -244,7 +242,7 @@ class PostProcessor(threading.Thread):
             # Push a transient notification to the frontend via the frontend_message stream
             try:
                 frontend_messages = FrontendPushMessages()
-                msg_id = 'taskRetry_{}'.format(self.current_task.get_task_id())
+                msg_id = f'taskRetry_{self.current_task.get_task_id()}'
                 frontend_messages.update({
                     'id':      msg_id,
                     'type':    'warning',
@@ -282,7 +280,7 @@ class PostProcessor(threading.Thread):
             task_id = self.current_task.get_task_id()
 
             # Create a per-task staging subdirectory
-            task_staging_dir = os.path.join(staging_dir, "task_{}".format(task_id))
+            task_staging_dir = os.path.join(staging_dir, f"task_{task_id}")
             os.makedirs(task_staging_dir, exist_ok=True)
 
             # Copy cache file to staging
@@ -290,7 +288,7 @@ class PostProcessor(threading.Thread):
             staged_path = os.path.join(task_staging_dir, staged_filename)
             shutil.copy2(cache_path, staged_path)
 
-            self._log("Staged transcoded file for approval: {} -> {}".format(cache_path, staged_path))
+            self._log(f"Staged transcoded file for approval: {cache_path} -> {staged_path}")
 
             # Compute quality metrics (non-blocking, best-effort)
             try:
@@ -396,7 +394,7 @@ class PostProcessor(threading.Thread):
                 if src_size > 0 and dest_data and dest_data.get('size'):
                     saved = src_size - dest_data['size']
                     pct = (saved / src_size) * 100
-                    context['size_saved'] = '{:.1f} MB ({:.0f}%)'.format(saved / (1024 * 1024), pct)
+                    context['size_saved'] = f'{saved / (1024 * 1024):.1f} MB ({pct:.0f}%)'
             except (AttributeError, TypeError, ZeroDivisionError):
                 pass
             # Include quality scores if available
@@ -434,10 +432,10 @@ class PostProcessor(threading.Thread):
                 except Exception as e:
                     self._log("Unexpected error extracting codec from cache path", message2=str(e), level="warning")
                     codec = 'transcoded'
-                new_path = "{}.{}{}".format(base, codec, ext)
+                new_path = f"{base}.{codec}{ext}"
                 counter = 1
                 while os.path.exists(new_path) and counter <= 100:
-                    new_path = "{}.{}.{}{}".format(base, codec, counter, ext)
+                    new_path = f"{base}.{codec}.{counter}{ext}"
                     counter += 1
                 self.current_task.set_destination_path(new_path)
         except (OSError, AttributeError, KeyError, TypeError) as e:
@@ -476,9 +474,9 @@ class PostProcessor(threading.Thread):
         try:
             task_id = self.current_task.get_task_id()
             staging_dir = self.settings.get_staging_path()
-            task_staging_dir = os.path.join(staging_dir, "task_{}".format(task_id))
+            task_staging_dir = os.path.join(staging_dir, f"task_{task_id}")
             if os.path.exists(task_staging_dir):
-                self._log("Removing staging directory '{}'".format(task_staging_dir))
+                self._log(f"Removing staging directory '{task_staging_dir}'")
                 shutil.rmtree(task_staging_dir)
         except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception while cleaning up staging files", message2=str(e), level="warning")
@@ -615,11 +613,10 @@ class PostProcessor(threading.Thread):
             # Log a final error if not all file moments were successful
             if not file_move_processes_success:
                 self._log(
-                    "Error while running postprocessor file movement on file '{}'. Not all postprocessor file movement functions completed.".format(
-                        cache_path), level="error")
+                    f"Error while running postprocessor file movement on file '{cache_path}'. Not all postprocessor file movement functions completed.", level="error")
 
         else:
-            self._log("Skipping file movement post-processor as the task was not successful '{}'".format(cache_path),
+            self._log(f"Skipping file movement post-processor as the task was not successful '{cache_path}'",
                       level='warning')
 
         # Fetch all 'postprocessor.task_result' plugin modules
@@ -669,10 +666,10 @@ class PostProcessor(threading.Thread):
         if def_cache_path not in destination_data['abspath']:
             remove_source_file = False
 
-        self._log("Cache path: {}".format(def_cache_path), level='debug')
+        self._log(f"Cache path: {def_cache_path}", level='debug')
         self._log(
             "Remote source: {}, destination file: {}.".format(source_data['abspath'], destination_data['abspath']), level='debug')
-        self._log("Task cache path: {}".format(cache_path), level='debug')
+        self._log(f"Task cache path: {cache_path}", level='debug')
 
         # Remove the source
         if os.path.exists(source_data.get('abspath')) and remove_source_file:
@@ -685,7 +682,7 @@ class PostProcessor(threading.Thread):
             self._log("Remote source file '{}' does not exist!".format(source_data.get('abspath')), level="warning")
 
         # Copy final cache file to original directory
-        random_string = '{}-{}'.format(common.random_string(), int(time.time()))
+        random_string = f'{common.random_string()}-{int(time.time())}'
         library_tdir = os.path.join(os.path.dirname(source_data.get('abspath')),
                                     "compresso_remote_pending_library-" + random_string)
         cache_tdir = os.path.join(def_cache_path, "compresso_remote_pending_library-" + random_string)
@@ -707,9 +704,9 @@ class PostProcessor(threading.Thread):
                     cache_tdir, os.path.basename(cache_path)), [], 'DEFAULT', move=True)
                 tdir = cache_tdir
             finally:
-                self._log("tdir: {}".format(tdir), level='debug')
+                self._log(f"tdir: {tdir}", level='debug')
         else:
-            self._log("Final cache file '{}' does not exist!".format(cache_path), level="warning")
+            self._log(f"Final cache file '{cache_path}' does not exist!", level="warning")
 
         # Cleanup cache files
         self.__cleanup_cache_files(cache_path)
@@ -731,55 +728,55 @@ class PostProcessor(threading.Thread):
         """
         task_cache_directory = os.path.dirname(cache_path)
         if os.path.exists(task_cache_directory) and "compresso_file_conversion" in task_cache_directory:
-            self._log("Removing task cache directory '{}'".format(task_cache_directory))
+            self._log(f"Removing task cache directory '{task_cache_directory}'")
             try:
                 shutil.rmtree(task_cache_directory)
             except (OSError, PermissionError, shutil.Error) as e:
-                self._log("Exception while clearing cache path '{}'".format(str(e)), level='error')
+                self._log(f"Exception while clearing cache path '{str(e)}'", level='error')
 
     def __copy_file(self, file_in, file_out, destination_files, plugin_id, move=False, tracker=None):
         if move:
-            self._log("Move file triggered by ({}) {} --> {}".format(plugin_id, file_in, file_out))
+            self._log(f"Move file triggered by ({plugin_id}) {file_in} --> {file_out}")
         else:
-            self._log("Copy file triggered by ({}) {} --> {}".format(plugin_id, file_in, file_out))
+            self._log(f"Copy file triggered by ({plugin_id}) {file_in} --> {file_out}")
 
         file_move_processes_success = True
         try:
             # Ensure the src and dst are not the same file
             if os.path.exists(file_out) and os.path.samefile(file_in, file_out):
-                self._log("The file_in and file_out path are the same file. Nothing will be done! '{}'".format(file_in),
+                self._log(f"The file_in and file_out path are the same file. Nothing will be done! '{file_in}'",
                           level="warning")
                 return False
 
             # Get a checksum prior to copy
             if not os.path.exists(file_in):
-                self._log("The file_in path does not exist! '{}'".format(file_in), level="warning")
+                self._log(f"The file_in path does not exist! '{file_in}'", level="warning")
                 self.event.wait(1)
-            self._log("Fetching checksum of source file '{}'.".format(file_in), level='debug')
+            self._log(f"Fetching checksum of source file '{file_in}'.", level='debug')
 
             # Use a '.part' suffix for the file movement, then rename it after
-            part_file_out = os.path.join("{}.compresso.part".format(file_out))
+            part_file_out = os.path.join(f"{file_out}.compresso.part")
 
             # Carry out the file movement
             if move:
-                self._log("Moving file '{}' --> '{}'.".format(file_in, part_file_out), level='debug')
+                self._log(f"Moving file '{file_in}' --> '{part_file_out}'.", level='debug')
                 if os.path.exists(part_file_out):
                     os.remove(part_file_out)
                 shutil.move(file_in, part_file_out, copy_function=shutil.copyfile)
             else:
-                self._log("Copying file '{}' --> '{}'.".format(file_in, part_file_out), level='debug')
+                self._log(f"Copying file '{file_in}' --> '{part_file_out}'.", level='debug')
                 shutil.copyfile(file_in, part_file_out)
 
             # Remove dest file if it already exists (required only for moves)
             if os.path.exists(file_out):
-                self._log("The file_out path already exists. Removing file '{}'".format(file_out), level="debug")
+                self._log(f"The file_out path already exists. Removing file '{file_out}'", level="debug")
                 if tracker:
                     tracker.safe_remove(file_out)
                 else:
                     os.remove(file_out)
 
             # Move file from part to final destination
-            self._log("Renaming file '{}' --> '{}'.".format(part_file_out, file_out), level='debug')
+            self._log(f"Renaming file '{part_file_out}' --> '{file_out}'.", level='debug')
             shutil.move(part_file_out, file_out, copy_function=shutil.copyfile)
             # Write final path to destination_files list
             destination_files.append(file_out)
@@ -787,7 +784,7 @@ class PostProcessor(threading.Thread):
             return True
         except (OSError, PermissionError, shutil.SameFileError, shutil.Error) as e:
             self.logger.error("POSTPROCESS_FILE_COPY_FAILED source=%s dest=%s", file_in, file_out)
-            self._log("Exception while copying file {} to {}:".format(file_in, file_out),
+            self._log(f"Exception while copying file {file_in} to {file_out}:",
                       message2=str(e), level="exception")
             if tracker:
                 self._log("Rolling back file operations due to copy failure", level="warning")
@@ -838,7 +835,7 @@ class PostProcessor(threading.Thread):
                     destination_size = os.path.getsize(dest_path)
                 except OSError:
                     self.logger.warning("POSTPROCESS_DESTINATION_SIZE_UNAVAILABLE path=%s", dest_path)
-                    self._log("Could not get destination file size for '{}'".format(dest_path), level='warning')
+                    self._log(f"Could not get destination file size for '{dest_path}'", level='warning')
 
         # Extract media metadata for compression stats (codec, resolution, container)
         # Always extract source metadata (even on failure, for stats tracking)
@@ -850,14 +847,14 @@ class PostProcessor(threading.Thread):
                 source_meta = extract_media_metadata(source_abspath)
             except (subprocess.SubprocessError, OSError, ValueError) as e:
                 self.logger.warning("POSTPROCESS_SOURCE_METADATA_UNAVAILABLE path=%s", source_abspath)
-                self._log("Could not extract source metadata: {}".format(e), level='warning')
+                self._log(f"Could not extract source metadata: {e}", level='warning')
         # Destination metadata only on success
         if task_dump.get('task_success', False):
             if dest_path and os.path.exists(dest_path):
                 try:
                     dest_meta = extract_media_metadata(dest_path)
                 except (subprocess.SubprocessError, OSError, ValueError) as e:
-                    self._log("Could not extract destination metadata: {}".format(e), level='debug')
+                    self._log(f"Could not extract destination metadata: {e}", level='debug')
 
         # Extract source duration for encoding speed context
         source_duration_seconds = 0
@@ -933,7 +930,7 @@ class PostProcessor(threading.Thread):
             destination_paths=destination_files,
         )
         if committed:
-            self._log("Committed file metadata entries: {}".format(committed), level='debug')
+            self._log(f"Committed file metadata entries: {committed}", level='debug')
         return committed
 
     def dump_history_log(self):

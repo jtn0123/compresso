@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_pending_api_deep.py
@@ -11,13 +10,13 @@
 
 import json
 import queue
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
-from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.pending_api import ApiPendingHandler
+from tests.unit.api_test_base import ApiTestBase
 
 PENDING_HELPERS = 'compresso.webserver.helpers.pending_tasks'
 

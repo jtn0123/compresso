@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_downloads.py
@@ -11,15 +10,14 @@
 
 import os
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
-
 import tornado.testing
 import tornado.web
 
 from compresso.libs.singleton import SingletonType
-from compresso.webserver.downloads import DownloadsLinks, DownloadsHandler
+from compresso.webserver.downloads import DownloadsHandler, DownloadsLinks
 
 
 @pytest.fixture(autouse=True)

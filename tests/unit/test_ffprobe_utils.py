@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_ffprobe_utils.py
@@ -11,13 +10,13 @@
 
 import json
 import subprocess
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 @pytest.mark.unittest
-class TestProbeFile(object):
+class TestProbeFile:
     """Tests for probe_file()."""
 
     def _call(self, *args, **kwargs):
@@ -108,7 +107,7 @@ class TestProbeFile(object):
 
 
 @pytest.mark.unittest
-class TestExtractMediaMetadata(object):
+class TestExtractMediaMetadata:
     """Tests for extract_media_metadata()."""
 
     def _call(self, *args, **kwargs):
@@ -268,7 +267,7 @@ class TestExtractMediaMetadata(object):
 
 
 @pytest.mark.unittest
-class TestComputeQualityScores(object):
+class TestComputeQualityScores:
     """Tests for compute_quality_scores()."""
 
     def _call(self, *args, **kwargs):

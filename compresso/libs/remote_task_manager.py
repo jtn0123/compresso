@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.remote_task_manager.py
@@ -59,7 +58,7 @@ class RemoteTaskManager(threading.Thread):
     worker_runners_info = {}
 
     def __init__(self, thread_id, name, installation_info, pending_queue, complete_queue, event):
-        super(RemoteTaskManager, self).__init__(name=name)
+        super().__init__(name=name)
         self.thread_id = thread_id
         self.name = name
         self.event = event
@@ -109,7 +108,7 @@ class RemoteTaskManager(threading.Thread):
         except queue.Empty:
             self._log("Remote task manager started by the pending queue was empty", level="warning")
         except Exception as e:
-            self._log("Exception in processing job with {}:".format(self.name), message2=str(e),
+            self._log(f"Exception in processing job with {self.name}:", message2=str(e),
                       level="exception")
             if self.current_task is not None:
                 # Task was being processed -- mark it as failed and send to complete queue
@@ -162,7 +161,7 @@ class RemoteTaskManager(threading.Thread):
         self.worker_subprocess_elapsed = '0'
 
         # Log the start of the job
-        self._log("Picked up job - {}".format(self.current_task.get_source_abspath()))
+        self._log(f"Picked up job - {self.current_task.get_source_abspath()}")
 
         # Mark as being "in progress"
         self.current_task.set_status('in_progress')
@@ -179,7 +178,7 @@ class RemoteTaskManager(threading.Thread):
         self.__set_finish_task_stats()
 
         # Log completion of job
-        self._log("Finished job - {}".format(self.current_task.get_source_abspath()))
+        self._log(f"Finished job - {self.current_task.get_source_abspath()}")
 
         # Place the task into the completed queue
         self.complete_queue.put(self.current_task)
@@ -216,7 +215,7 @@ class RemoteTaskManager(threading.Thread):
         self.worker_log.append("\n    - during the remote task processing")
         self.worker_log.append("\n    - while attempting to retrieve the completed task from the remote installation")
         self.worker_log.append("\nCheck Compresso logs for more information.")
-        self.worker_log.append("\nRelevant logs will be prefixed with 'ERROR:Compresso.{}'".format(self.name))
+        self.worker_log.append(f"\nRelevant logs will be prefixed with 'ERROR:Compresso.{self.name}'")
         self.current_task.save_command_log(self.worker_log)
 
     def __send_task_to_remote_worker_and_monitor(self):
@@ -235,7 +234,7 @@ class RemoteTaskManager(threading.Thread):
 
         # Ensure file exists
         if not os.path.exists(original_abspath):
-            self._log("File no longer exists '{}'. Was it removed?".format(original_abspath), level='warning')
+            self._log(f"File no longer exists '{original_abspath}'. Was it removed?", level='warning')
             self.__write_failure_to_worker_log()
             return False
 
@@ -249,7 +248,7 @@ class RemoteTaskManager(threading.Thread):
         try:
             library = Library(library_id)
         except Exception:
-            self._log("Unable to fetch library config for ID {}".format(library_id), level='exception')
+            self._log(f"Unable to fetch library config for ID {library_id}", level='exception')
             self.__write_failure_to_worker_log()
             return False
         library_name = library.get_name()
@@ -279,16 +278,13 @@ class RemoteTaskManager(threading.Thread):
                                                                              remote_original_abspath,
                                                                              remote_library_id)
             if not info:
-                self._log("Unable to create remote pending task for path '{}'. Fallback to sending file.".format(
-                    remote_original_abspath), level='debug')
+                self._log(f"Unable to create remote pending task for path '{remote_original_abspath}'. Fallback to sending file.", level='debug')
                 send_file = True
             elif 'path does not exist' in info.get('error', '').lower():
-                self._log("Unable to find file in remote library's path '{}'. Fallback to sending file.".format(
-                    remote_original_abspath), level='debug')
+                self._log(f"Unable to find file in remote library's path '{remote_original_abspath}'. Fallback to sending file.", level='debug')
                 send_file = True
             elif 'task already exists' in info.get('error', '').lower():
-                self._log("A remote task already exists with the path '{}'. Fallback to sending file.".format(
-                    remote_original_abspath), level='error')
+                self._log(f"A remote task already exists with the path '{remote_original_abspath}'. Fallback to sending file.", level='error')
                 self.__write_failure_to_worker_log()
                 return False
 
@@ -307,7 +303,7 @@ class RemoteTaskManager(threading.Thread):
             upload_deadline = time.monotonic() + 1800  # 30 min max
             while not self.redundant_flag.is_set():
                 if time.monotonic() > upload_deadline:
-                    self._log("Upload retry deadline exceeded for '{}'".format(original_abspath), level='error')
+                    self._log(f"Upload retry deadline exceeded for '{original_abspath}'", level='error')
                     self.__write_failure_to_worker_log()
                     return False
                 # For files smaller than 100MB, just transfer them in parallel
@@ -321,11 +317,11 @@ class RemoteTaskManager(threading.Thread):
                         continue
 
                 # Send a file to a remote installation.
-                self._log("Uploading file to remote installation '{}'".format(original_abspath), level='debug')
+                self._log(f"Uploading file to remote installation '{original_abspath}'", level='debug')
                 info = self.links.send_file_to_remote_installation(self.installation_info, original_abspath)
                 self.links.release_network_transfer_lock(lock_key)
                 if not info:
-                    self._log("Failed to upload the file '{}'".format(original_abspath), level='error')
+                    self._log(f"Failed to upload the file '{original_abspath}'", level='error')
                     self.__write_failure_to_worker_log()
                     return False
                 break
@@ -335,7 +331,7 @@ class RemoteTaskManager(threading.Thread):
 
             # Compare uploaded file md5checksum
             if initial_checksum and info.get('checksum') != initial_checksum:
-                self._log("The uploaded file did not return a correct checksum '{}'".format(original_abspath), level='error')
+                self._log(f"The uploaded file did not return a correct checksum '{original_abspath}'", level='error')
                 # Send request to terminate the remote worker then return
                 self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                 self.__write_failure_to_worker_log()
@@ -351,7 +347,7 @@ class RemoteTaskManager(threading.Thread):
         set_lib_deadline = time.monotonic() + 1800  # 30 min max
         while not self.redundant_flag.is_set():
             if time.monotonic() > set_lib_deadline:
-                self._log("Set-remote-library retry deadline exceeded for '{}'".format(original_abspath), level='error')
+                self._log(f"Set-remote-library retry deadline exceeded for '{original_abspath}'", level='error')
                 self.__write_failure_to_worker_log()
                 return False
             result = self.links.set_the_remote_task_library(self.installation_info, remote_task_id, library_name)
@@ -361,8 +357,7 @@ class RemoteTaskManager(threading.Thread):
                 continue
             if not result.get('success'):
                 self._log(
-                    "Failed to match a remote library named '{}'. Remote installation will use the default library".format(
-                        library_name), level='warning')
+                    f"Failed to match a remote library named '{library_name}'. Remote installation will use the default library", level='warning')
                 # Just log the warning for this. If no matching library name is found it will remain set as the default library
                 break
             if result.get('success'):
@@ -372,7 +367,7 @@ class RemoteTaskManager(threading.Thread):
         start_task_deadline = time.monotonic() + 1800  # 30 min max
         while not self.redundant_flag.is_set():
             if time.monotonic() > start_task_deadline:
-                self._log("Start-task retry deadline exceeded for '{}'".format(original_abspath), level='error')
+                self._log(f"Start-task retry deadline exceeded for '{original_abspath}'", level='error')
                 self.__write_failure_to_worker_log()
                 return False
             result = self.links.start_the_remote_task_by_id(self.installation_info, remote_task_id)
@@ -381,7 +376,7 @@ class RemoteTaskManager(threading.Thread):
                 self.event.wait(2)
                 continue
             if not result.get('success'):
-                self._log("Failed to set initial remote pending task to status '{}'".format(original_abspath), level='error')
+                self._log(f"Failed to set initial remote pending task to status '{original_abspath}'", level='error')
                 # Send request to terminate the remote worker then return
                 self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                 self.__write_failure_to_worker_log()
@@ -412,8 +407,7 @@ class RemoteTaskManager(threading.Thread):
 
             # Check if we have exceeded the maximum retry window
             if first_failure_time and (time_now - first_failure_time) > max_retry_seconds:
-                self._log("Remote link unreachable for over {} seconds, giving up on task '{}'".format(
-                    max_retry_seconds, original_abspath), level='error')
+                self._log(f"Remote link unreachable for over {max_retry_seconds} seconds, giving up on task '{original_abspath}'", level='error')
                 self.__write_failure_to_worker_log()
                 return False
 
@@ -449,12 +443,11 @@ class RemoteTaskManager(threading.Thread):
                 if first_failure_time is None:
                     first_failure_time = time_now
                 polling_delay = min(60, 5 * (2 ** min(consecutive_poll_failures, 4)))
-                self._log("Lost contact with remote installation (attempt {}), next poll in {}s for '{}'".format(
-                    consecutive_poll_failures, polling_delay, original_abspath), level='warning')
+                self._log(f"Lost contact with remote installation (attempt {consecutive_poll_failures}), next poll in {polling_delay}s for '{original_abspath}'", level='warning')
                 last_status_fetch = time_now
                 continue
             elif task_status == 'removed':
-                self._log("Task has been removed by remote installation '{}'".format(original_abspath), level='error')
+                self._log(f"Task has been removed by remote installation '{original_abspath}'", level='error')
                 self.__write_failure_to_worker_log()
                 return False
             elif task_status != 'in_progress':
@@ -499,7 +492,7 @@ class RemoteTaskManager(threading.Thread):
             self.current_task.save_command_log(self.worker_log)
             return False
 
-        self._log("Remote task completed '{}'".format(original_abspath), level='info')
+        self._log(f"Remote task completed '{original_abspath}'", level='info')
 
         # Create local cache path to download results
         task_cache_path = self.current_task.get_cache_path()
@@ -514,8 +507,7 @@ class RemoteTaskManager(threading.Thread):
 
         if not data:
             self._log(
-                "Failed to retrieve remote task data for '{}'. NOTE: The cached files have not been removed from the remote host.".format(
-                    original_abspath), level='error')
+                f"Failed to retrieve remote task data for '{original_abspath}'. NOTE: The cached files have not been removed from the remote host.", level='error')
             self.__write_failure_to_worker_log()
             return False
         self.worker_log = [data.get('log')]
@@ -533,8 +525,7 @@ class RemoteTaskManager(threading.Thread):
         if data.get('task_success'):
             task_label = data.get('task_label')
             self._log(
-                "Remote task #{} was successful, proceeding to download the completed file '{}'".format(remote_task_id,
-                                                                                                        task_label),
+                f"Remote task #{remote_task_id} was successful, proceeding to download the completed file '{task_label}'",
                 level='debug')
             self._log(
                 "Remote task abspath {} to be transferred".format(data.get('abspath')),
@@ -543,7 +534,7 @@ class RemoteTaskManager(threading.Thread):
                 # /library/tvshows/show_name/season/compresso_remote_pending_library/file.mkv
                 task_cache_path = data.get('abspath')
                 self.current_task.cache_path = task_cache_path
-                self._log("abspath exists - task cache path: '{}'".format(task_cache_path), level='debug')
+                self._log(f"abspath exists - task cache path: '{task_cache_path}'", level='debug')
                 # need to get the file into the local instance /tmp/compresso/compresso_file_conversion... location
                 # the task_cache_path file is currently sitting in the library's compresso_remote_pending_library directory
                 # with a different random string - reformulate the basename of the file with the correct random string
@@ -553,7 +544,7 @@ class RemoteTaskManager(threading.Thread):
                 if match1:
                     correct_random_string = match1.group()
                 else:
-                    self._log("Unable to detect random_string pattern in main instance cache directory named '{}'".format(cache_directory), level='error')
+                    self._log(f"Unable to detect random_string pattern in main instance cache directory named '{cache_directory}'", level='error')
                     self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                     self.__write_failure_to_worker_log()
                     return False
@@ -561,7 +552,7 @@ class RemoteTaskManager(threading.Thread):
                 if match2:
                     incorrect_random_string = match2.group()
                 else:
-                    self._log("Unable to detect random_string pattern in remote library located directory named '{}'".format(task_cache_path), level='error')
+                    self._log(f"Unable to detect random_string pattern in remote library located directory named '{task_cache_path}'", level='error')
                     self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                     self.__write_failure_to_worker_log()
                     return False
@@ -572,16 +563,16 @@ class RemoteTaskManager(threading.Thread):
                 try:
                     output = shutil.copy(task_cache_path, correct_cache_file_path)
                     if os.path.exists(output) and os.path.getsize(output) > 0:
-                        self._log("File successfully copied from remote library located cache to main instance cache at '{}'".format(output), level='info')
+                        self._log(f"File successfully copied from remote library located cache to main instance cache at '{output}'", level='info')
                         # Update task pointers to the new local cache path
                         task_cache_path = output
                         self.current_task.cache_path = output
                     else:
-                        self._log("Copied file is missing or empty at '{}'".format(correct_cache_file_path), level='error')
+                        self._log(f"Copied file is missing or empty at '{correct_cache_file_path}'", level='error')
                         self.__write_failure_to_worker_log()
                         return False
                 except (FileNotFoundError, PermissionError, shutil.SameFileError):
-                    self._log("Failed to copy file from '{}' to '{}'".format(task_cache_path, correct_cache_file_path), level='error')
+                    self._log(f"Failed to copy file from '{task_cache_path}' to '{correct_cache_file_path}'", level='error')
                     self.__write_failure_to_worker_log()
                     return False
             else:
@@ -591,13 +582,13 @@ class RemoteTaskManager(threading.Thread):
                 self.current_task.set_cache_path(cache_directory, file_extension)
                 # Read the updated cache path
                 task_cache_path = self.current_task.get_cache_path()
-                self._log("task cache path: '{}'".format(task_cache_path), level='debug')
+                self._log(f"task cache path: '{task_cache_path}'", level='debug')
 
                 # Loop until we are able to download the file from the remote installation
                 download_deadline = time.monotonic() + 1800  # 30 min max
                 while not self.redundant_flag.is_set():
                     if time.monotonic() > download_deadline:
-                        self._log("Download retry deadline exceeded for '{}'".format(task_label), level='error')
+                        self._log(f"Download retry deadline exceeded for '{task_label}'", level='error')
                         self.__write_failure_to_worker_log()
                         return False
                     # Check for network transfer lock
@@ -606,7 +597,7 @@ class RemoteTaskManager(threading.Thread):
                         self.event.wait(1)
                         continue
                     # Download the file
-                    self._log("Downloading file from remote installation '{}'".format(task_label), level='debug')
+                    self._log(f"Downloading file from remote installation '{task_label}'", level='debug')
                     success = self.links.fetch_remote_task_completed_file(self.installation_info, remote_task_id, task_cache_path)
                     self.links.release_network_transfer_lock(lock_key)
                     if not success:
@@ -627,7 +618,7 @@ class RemoteTaskManager(threading.Thread):
             if self.installation_info.get('enable_checksum_validation', False):
                 downloaded_checksum = common.get_file_checksum(task_cache_path)
                 if downloaded_checksum != data.get('checksum'):
-                    self._log("The downloaded file did not produce a correct checksum '{}'".format(task_cache_path),
+                    self._log(f"The downloaded file did not produce a correct checksum '{task_cache_path}'",
                               level='error')
                     # Send request to terminate the remote worker then return
                     self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)

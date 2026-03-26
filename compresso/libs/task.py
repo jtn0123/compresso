@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.task.py
@@ -53,7 +52,7 @@ def prepare_file_destination_data(pathname, file_extension):
     file_name_without_extension = os.path.splitext(basename)[0]
 
     # Set destination dict
-    basename = "{}.{}".format(file_name_without_extension, file_extension)
+    basename = f"{file_name_without_extension}.{file_extension}"
     abspath = os.path.join(dirname, basename)
     file_data = {
         'basename': basename,
@@ -63,7 +62,7 @@ def prepare_file_destination_data(pathname, file_extension):
     return file_data
 
 
-class Task(object):
+class Task:
     """
     Task
 
@@ -92,10 +91,10 @@ class Task(object):
             file_extension = split_file_name[1].lstrip('.')
 
         # Parse an output cache path
-        random_string = '{}-{}'.format(common.random_string(), int(time.time()))
-        out_file = "{}-{}.{}".format(file_name_without_extension, random_string, file_extension)
+        random_string = f'{common.random_string()}-{int(time.time())}'
+        out_file = f"{file_name_without_extension}-{random_string}.{file_extension}"
         if not cache_directory:
-            out_folder = "compresso_file_conversion-{}".format(random_string)
+            out_folder = f"compresso_file_conversion-{random_string}"
             cache_directory = os.path.join(self.settings.get_cache_path(), out_folder)
 
         # Set cache path class attribute

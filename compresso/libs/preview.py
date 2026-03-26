@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.preview.py
@@ -88,7 +87,7 @@ class PreviewManager:
         try:
             for i, plugin_module in enumerate(plugin_modules):
                 _, ext = os.path.splitext(data['file_in'])
-                plugin_out = os.path.join(job_dir, 'plugin_{}{}'.format(i, ext))
+                plugin_out = os.path.join(job_dir, f'plugin_{i}{ext}')
                 data['file_out'] = plugin_out
                 data['exec_command'] = []
                 data['repeat'] = False
@@ -186,7 +185,7 @@ class PreviewManager:
         """
         # Validate inputs
         if not os.path.isfile(source_path):
-            raise ValueError("Source file does not exist or is not a file: {}".format(source_path))
+            raise ValueError(f"Source file does not exist or is not a file: {source_path}")
 
         if duration > self.MAX_DURATION:
             duration = self.MAX_DURATION
@@ -242,13 +241,11 @@ class PreviewManager:
         """Check if a preview job has exceeded MAX_JOB_TIMEOUT and raise if so."""
         job = self._jobs.get(job_id)
         if not job:
-            raise RuntimeError("Job {} not found".format(job_id))
+            raise RuntimeError(f"Job {job_id} not found")
         elapsed = time.time() - job['created_at']
         if elapsed > self.MAX_JOB_TIMEOUT:
             raise RuntimeError(
-                "Preview job {} timed out after {:.0f}s (limit {}s)".format(
-                    job_id, elapsed, self.MAX_JOB_TIMEOUT
-                )
+                f"Preview job {job_id} timed out after {elapsed:.0f}s (limit {self.MAX_JOB_TIMEOUT}s)"
             )
 
     def _generate_preview(self, job_id):
@@ -445,8 +442,8 @@ class PreviewManager:
         }
 
         if job['status'] == 'ready':
-            result['source_url'] = '/compresso/preview/{}/source_web.mp4'.format(job_id)
-            result['encoded_url'] = '/compresso/preview/{}/encoded.mp4'.format(job_id)
+            result['source_url'] = f'/compresso/preview/{job_id}/source_web.mp4'
+            result['encoded_url'] = f'/compresso/preview/{job_id}/encoded.mp4'
 
         return result
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.child_process.py
@@ -29,10 +28,10 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
-import signal
-import time
 import queue
+import signal
 import threading
+import time
 
 import psutil
 

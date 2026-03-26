@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -30,15 +29,14 @@
 
 """
 
-from __future__ import absolute_import
 
+import inspect
 import os
+import pkgutil
+import sys
 import warnings
 from importlib import import_module
 from pathlib import Path
-import sys
-import inspect
-import pkgutil
 
 from ..base_codecs import Codecs
 
@@ -65,7 +63,7 @@ def grab_module(module_name, *args, **kwargs):
         return instance
 
     except (AttributeError, AssertionError, ModuleNotFoundError):
-        raise ImportError('{} is not part of our supported subtitle codecs!'.format(module_name))
+        raise ImportError(f'{module_name} is not part of our supported subtitle codecs!')
 
 
 def get_all_subtitle_codecs():

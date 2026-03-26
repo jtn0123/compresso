@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.startup.py
@@ -21,7 +20,7 @@ from compresso.libs.singleton import SingletonType
 logger = logging.getLogger('compresso.startup')
 
 
-class StartupState(object, metaclass=SingletonType):
+class StartupState(metaclass=SingletonType):
     REQUIRED_STAGES = (
         'config_loaded',
         'startup_validation',
@@ -70,16 +69,16 @@ class StartupState(object, metaclass=SingletonType):
 
 def _ensure_writable_dir(path, label, create=False):
     if not path:
-        raise RuntimeError("{} is not configured".format(label))
+        raise RuntimeError(f"{label} is not configured")
 
     if create:
         os.makedirs(path, exist_ok=True)
 
     if not os.path.isdir(path):
-        raise RuntimeError("{} '{}' is not a directory".format(label, path))
+        raise RuntimeError(f"{label} '{path}' is not a directory")
 
     if not os.access(path, os.W_OK):
-        raise RuntimeError("{} '{}' is not writable".format(label, path))
+        raise RuntimeError(f"{label} '{path}' is not writable")
 
     fd, tmp_path = tempfile.mkstemp(prefix='compresso-startup-', dir=path)
     os.close(fd)
@@ -88,11 +87,11 @@ def _ensure_writable_dir(path, label, create=False):
 
 def _ensure_readable_dir(path, label):
     if not path:
-        raise RuntimeError("{} is not configured".format(label))
+        raise RuntimeError(f"{label} is not configured")
     if not os.path.isdir(path):
-        raise RuntimeError("{} '{}' does not exist".format(label, path))
+        raise RuntimeError(f"{label} '{path}' does not exist")
     if not os.access(path, os.R_OK | os.X_OK):
-        raise RuntimeError("{} '{}' is not readable".format(label, path))
+        raise RuntimeError(f"{label} '{path}' is not readable")
 
 
 def _validate_cache_path(cache_path, config_path, library_path):
@@ -104,12 +103,12 @@ def _validate_cache_path(cache_path, config_path, library_path):
     if os.name == "nt":
         invalid_roots.add(os.path.abspath(os.path.splitdrive(normalized)[0] + os.sep))
     if normalized in invalid_roots:
-        raise RuntimeError("cache path '{}' is invalid".format(cache_path))
+        raise RuntimeError(f"cache path '{cache_path}' is invalid")
 
     if normalized == os.path.abspath(config_path):
-        raise RuntimeError("cache path '{}' must not equal config path".format(cache_path))
+        raise RuntimeError(f"cache path '{cache_path}' must not equal config path")
     if normalized == os.path.abspath(library_path):
-        raise RuntimeError("cache path '{}' must not equal library path".format(cache_path))
+        raise RuntimeError(f"cache path '{cache_path}' must not equal library path")
 
 
 def _validate_ffmpeg():

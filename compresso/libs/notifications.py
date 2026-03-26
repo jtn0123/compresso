@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.notifications.py
@@ -31,7 +30,7 @@
 """
 import threading
 import uuid
-from queue import Queue, Empty
+from queue import Empty, Queue
 
 from compresso.libs.singleton import SingletonType
 
@@ -102,7 +101,7 @@ class Notifications(Queue, metaclass=SingletonType):
         # Ensure all required keys are present
         for key in ['type', 'icon', 'label', 'message', 'navigation']:
             if key not in item:
-                raise Exception("Frontend message item incorrectly formatted. Missing key: '{}'".format(key))
+                raise Exception(f"Frontend message item incorrectly formatted. Missing key: '{key}'")
 
         # Ensure the given type is valid
         if item.get('type') not in ['error', 'warning', 'success', 'info']:

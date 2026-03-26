@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_system_api.py
@@ -8,12 +7,13 @@
 
 """
 
-import pytest
 from collections import namedtuple
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from tests.unit.api_test_base import ApiTestBase
+import pytest
+
 from compresso.webserver.api_v2.system_api import ApiSystemHandler
+from tests.unit.api_test_base import ApiTestBase
 
 
 def _mock_initialize(self, **kwargs):

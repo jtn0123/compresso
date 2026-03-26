@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.scheduler.py
@@ -52,7 +51,7 @@ class ScheduledTasksManager(threading.Thread):
     """
 
     def __init__(self, event):
-        super(ScheduledTasksManager, self).__init__(name='ScheduledTasksManager')
+        super().__init__(name='ScheduledTasksManager')
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.event = event
         self.abort_flag = threading.Event()

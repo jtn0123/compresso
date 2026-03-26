@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.history_api.py
@@ -36,10 +35,14 @@ from compresso import config
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import CompletedTasksLogRequestSchema, CompletedTasksLogSchema, \
-    CompletedTasksSchema, \
-    RequestHistoryTableDataSchema, \
-    RequestAddCompletedToPendingTasksSchema, RequestCompletedTasksBulkActionSchema
+from compresso.webserver.api_v2.schema.schemas import (
+    CompletedTasksLogRequestSchema,
+    CompletedTasksLogSchema,
+    CompletedTasksSchema,
+    RequestAddCompletedToPendingTasksSchema,
+    RequestCompletedTasksBulkActionSchema,
+    RequestHistoryTableDataSchema,
+)
 from compresso.webserver.helpers import completed_tasks
 
 
@@ -310,12 +313,11 @@ class ApiHistoryHandler(BaseApiHandler):
             if errors:
                 failed_ids = ''
                 for task_id in errors:
-                    failed_ids += " {}".format(task_id)
+                    failed_ids += f" {task_id}"
                     tornado.log.app_log.error(
                         "ApiHistoryHandler.{}: {}".format(self.route.get('call_method'), errors.get(task_id)))
                 self.set_status(self.STATUS_ERROR_INTERNAL,
-                                reason="Failed to add the provided completed tasks to the pending task list: '{}'".format(
-                                    failed_ids))
+                                reason=f"Failed to add the provided completed tasks to the pending task list: '{failed_ids}'")
                 self.write_error()
                 return
 

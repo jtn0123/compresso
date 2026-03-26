@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.base_api_handler.py
@@ -33,17 +32,12 @@ import json
 import sys
 import traceback
 from json import JSONDecodeError
-from typing import (
-    Any,
-    Dict,
-    List,
-)
+from typing import Any
 
-import tornado.web
 import tornado.log
 import tornado.routing
+import tornado.web
 from marshmallow import Schema, exceptions
-
 from tornado.web import RequestHandler
 
 
@@ -58,9 +52,9 @@ class BaseApiError(Exception):
 
 class BaseApiHandler(RequestHandler):
     api_version = 2
-    routes: List[Dict[str, Any]] = []
-    route: Dict[str, Any] = {}
-    error_messages: Dict[str, Any] = {}
+    routes: list[dict[str, Any]] = []
+    route: dict[str, Any] = {}
+    error_messages: dict[str, Any] = {}
 
     """
     Valid API return status codes:
@@ -90,7 +84,7 @@ class BaseApiHandler(RequestHandler):
             self.set_status(self.STATUS_ERROR_RATE_LIMITED, reason="Too Many Requests")
             self.finish({
                 'error': '429: Too Many Requests',
-                'messages': {'rate_limit': 'Rate limit exceeded. Try again in {} seconds.'.format(reset_time)},
+                'messages': {'rate_limit': f'Rate limit exceeded. Try again in {reset_time} seconds.'},
             })
 
     def set_default_headers(self):
@@ -118,14 +112,14 @@ class BaseApiHandler(RequestHandler):
             received_body: Any = self.request.body
             if isinstance(received_body, bytes):
                 received_body = received_body.decode('utf-8', errors='replace')
-            raise BaseApiError("Expected request body to be JSON. Received '{}'".format(received_body))
+            raise BaseApiError(f"Expected request body to be JSON. Received '{received_body}'")
 
         request_validation_errors = schema.validate(json_data)
         if request_validation_errors:
             self.error_messages = request_validation_errors
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Failed request schema validation")
             self.write_error()
-            raise BaseApiError("Failed schema validation: {}".format(str(request_validation_errors)))
+            raise BaseApiError(f"Failed schema validation: {str(request_validation_errors)}")
 
         return schema.dump(schema.load(json_data))
 
@@ -185,7 +179,7 @@ class BaseApiHandler(RequestHandler):
         if status_code is None:
             status_code = self.get_status()
         response = {
-            'error':    "%(code)d: %(message)s" % {"code": status_code, "message": self._reason},
+            'error':    f"{status_code:d}: {self._reason}",
             'messages': {},
         }
         if self.error_messages:
@@ -211,7 +205,7 @@ class BaseApiHandler(RequestHandler):
         :return:
         """
         response = {
-            'error': "%(code)d: Endpoint not found" % {"code": self.STATUS_ERROR_ENDPOINT_NOT_FOUND}
+            'error': f"{self.STATUS_ERROR_ENDPOINT_NOT_FOUND:d}: Endpoint not found"
         }
         self.set_status(self.STATUS_ERROR_ENDPOINT_NOT_FOUND)
         self.finish(response)
@@ -224,10 +218,7 @@ class BaseApiHandler(RequestHandler):
         :return:
         """
         response = {
-            'error': "%(code)d: Method '%(method)s' not allowed" % {
-                "code":   self.STATUS_ERROR_METHOD_NOT_ALLOWED,
-                "method": self.request.method
-            }
+            'error': f"{self.STATUS_ERROR_METHOD_NOT_ALLOWED:d}: Method '{self.request.method}' not allowed"
         }
         self.set_status(self.STATUS_ERROR_METHOD_NOT_ALLOWED)
         self.finish(response)
@@ -281,10 +272,10 @@ class BaseApiHandler(RequestHandler):
                 return
 
         if matched_route_with_unsupported_method:
-            tornado.log.app_log.warning("Method not allowed for API route: {}".format(self.request.uri), exc_info=True)
+            tornado.log.app_log.warning(f"Method not allowed for API route: {self.request.uri}", exc_info=True)
             self.handle_method_not_allowed()
         else:
-            tornado.log.app_log.warning("No match found for API route: {}".format(self.request.uri), exc_info=True)
+            tornado.log.app_log.warning(f"No match found for API route: {self.request.uri}", exc_info=True)
             self.handle_endpoint_not_found()
 
     async def delete(self, path):

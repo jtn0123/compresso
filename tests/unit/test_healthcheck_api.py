@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_healthcheck_api.py
@@ -9,13 +8,13 @@
 
 """
 
-import pytest
 from unittest.mock import patch
 
+import pytest
 import tornado.log
 
-from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.healthcheck_api import ApiHealthcheckHandler
+from tests.unit.api_test_base import ApiTestBase
 
 VALIDATE_LIB = 'compresso.webserver.helpers.healthcheck.validate_library_exists'
 

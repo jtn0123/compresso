@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.plugin_type_base.py
@@ -33,11 +32,11 @@ import inspect
 import json
 from copy import deepcopy
 
-from compresso.libs.task import TaskDataStore
 from compresso.libs.metadata import CompressoFileMetadata
+from compresso.libs.task import TaskDataStore
 
 
-class PluginType(object):
+class PluginType:
     """
     PluginType
 
@@ -132,8 +131,7 @@ class PluginType(object):
         errors = []
         if not isinstance(result_data, dict):
             # This runner function is not returning anything
-            error = "Plugin '{0} - {1}()' has failed to return any output data.".format(plugin_id,
-                                                                                        plugin_runner, )
+            error = f"Plugin '{plugin_id} - {plugin_runner}()' has failed to return any output data."
             errors.append(error)
             return errors
         for key in data_schema:
@@ -141,9 +139,7 @@ class PluginType(object):
             if schema_meta.get('required'):
                 # Ensure the required item is present in result_data
                 if key not in result_data:
-                    error = "Plugin '{0} - {1}()' is missing required key '{2}{3}' in the output data.".format(plugin_id,
-                                                                                                               plugin_runner,
-                                                                                                               data_tree, key)
+                    error = f"Plugin '{plugin_id} - {plugin_runner}()' is missing required key '{data_tree}{key}' in the output data."
                     errors.append(error)
 
             # Ensure that data present is of the correct type
@@ -166,15 +162,13 @@ class PluginType(object):
 
                 # If data is not of the correct type, then append the error message
                 if not correct_type:
-                    error = "Plugin '{0} - {1}()' output data returned incorrect data type in key '{2}{3}'. " \
-                            "Expected '{4}', but received '{5}'.".format(plugin_id, plugin_runner,
-                                                                         data_tree, key, data_type,
-                                                                         type(result_data.get(key)))
+                    error = f"Plugin '{plugin_id} - {plugin_runner}()' output data returned incorrect data type in key '{data_tree}{key}'. " \
+                            f"Expected '{data_type}', but received '{type(result_data.get(key))}'."
                     errors.append(error)
                 # Check if data_schema has children
                 children_data_schema = schema_meta.get('children')
                 if children_data_schema:
-                    child_data_tree = "{}{}>".format(data_tree, key)
+                    child_data_tree = f"{data_tree}{key}>"
                     errors += self.__data_schema_test_data(plugin_id, plugin_runner, child_data, children_data_schema,
                                                            data_tree=child_data_tree)
 

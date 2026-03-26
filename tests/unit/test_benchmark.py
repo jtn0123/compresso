@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_benchmark.py
@@ -10,6 +9,7 @@
 """
 
 import os
+
 import pytest
 
 try:
@@ -47,7 +47,7 @@ class TestCommonBenchmarks:
     def test_json_dump_performance(self, benchmark, tmp_path):
         """Benchmark JSON write with validation."""
         out_file = str(tmp_path / "bench.json")
-        data = {"key_{}".format(i): "value_{}".format(i) for i in range(100)}
+        data = {f"key_{i}": f"value_{i}" for i in range(100)}
         benchmark(common.json_dump_to_file, data, out_file)
 
     def test_random_string_performance(self, benchmark):

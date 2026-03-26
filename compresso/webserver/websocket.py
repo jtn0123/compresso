@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.websocket.py
@@ -32,12 +31,12 @@
 import json
 import time
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 import psutil
-import tornado.web
-import tornado.locks
 import tornado.ioloop
+import tornado.locks
+import tornado.web
 import tornado.websocket
 from tornado import gen
 
@@ -89,7 +88,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         self.data_queues = udq.get_compresso_data_queues()
         self.foreman = urt.get_compresso_running_thread('foreman')
         self.session = session.Session()
-        self._stream_state: Dict[str, Dict[str, Any]] = {}
+        self._stream_state: dict[str, dict[str, Any]] = {}
         self._gpu_history_tick = 0
         super().__init__(*args, **kwargs)
 
@@ -137,7 +136,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 getattr(self, message_data.get('command', 'default_failure_response'))(
                     params=message_data.get('params', {}))
         except json.decoder.JSONDecodeError:
-            tornado.log.app_log.error('Received incorrectly formatted message - {}'.format(message), exc_info=False)
+            tornado.log.app_log.error(f'Received incorrectly formatted message - {message}', exc_info=False)
 
     def on_close(self):
         tornado.log.app_log.warning('WS Closed', exc_info=True)
@@ -369,7 +368,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             return sorted(data, key=lambda item: (str(item.get('name', '')), str(item.get('id', ''))))
         return data
 
-    def _should_send_stream(self, stream_name: str, payload: Any) -> Dict[str, Any]:
+    def _should_send_stream(self, stream_name: str, payload: Any) -> dict[str, Any]:
         normalized_payload = self._normalize_stream_data(stream_name, payload)
         serialized_payload = json.dumps(normalized_payload, sort_keys=True, default=str)
         payload_bytes = len(serialized_payload.encode('utf-8'))

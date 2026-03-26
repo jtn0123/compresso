@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.libraryanalysiscache.py
@@ -10,6 +9,7 @@
 """
 
 from peewee import *
+
 from compresso.libs.unmodels.lib import BaseModel
 
 

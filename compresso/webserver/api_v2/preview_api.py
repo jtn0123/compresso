@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.preview_api.py
@@ -13,11 +12,11 @@ import tornado.log
 from compresso.libs.preview import PreviewManager
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.preview_schemas import (
-    RequestPreviewCreateSchema,
     PreviewCreateResponseSchema,
-    RequestPreviewStatusSchema,
     PreviewStatusResponseSchema,
     RequestPreviewCleanupSchema,
+    RequestPreviewCreateSchema,
+    RequestPreviewStatusSchema,
 )
 
 

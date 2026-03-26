@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.approval_api.py
@@ -13,13 +12,13 @@ import tornado.log
 
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.approval_schemas import (
-    RequestApprovalTasksSchema,
+    ApprovalCountResponseSchema,
+    ApprovalDetailResponseSchema,
     ApprovalTasksResponseSchema,
     RequestApprovalActionSchema,
-    RequestRejectActionSchema,
     RequestApprovalDetailSchema,
-    ApprovalDetailResponseSchema,
-    ApprovalCountResponseSchema,
+    RequestApprovalTasksSchema,
+    RequestRejectActionSchema,
 )
 
 

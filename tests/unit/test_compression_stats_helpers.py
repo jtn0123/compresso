@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_compression_stats_helpers.py
@@ -7,8 +6,9 @@
     Unit tests for compresso/webserver/helpers/compression_stats.py helper wrappers.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 @pytest.mark.unittest

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_compression_api.py
@@ -8,11 +7,12 @@
 
 """
 
-import pytest
 from unittest.mock import patch
 
-from tests.unit.api_test_base import ApiTestBase
+import pytest
+
 from compresso.webserver.api_v2.compression_api import ApiCompressionHandler
+from tests.unit.api_test_base import ApiTestBase
 
 VALIDATE_LIB = 'compresso.webserver.api_v2.compression_api.validate_library_exists'
 

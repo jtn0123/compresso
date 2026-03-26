@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.unlogger.py
@@ -30,19 +29,20 @@
 
 """
 
-import os
-import logging
-import threading
 import json
+import logging
+import os
+import threading
 import time
+from datetime import UTC, datetime, timedelta
 from logging.handlers import RotatingFileHandler
-from queue import Queue, Empty, Full
+from queue import Empty, Full, Queue
+
 import requests
-from datetime import datetime, timedelta, timezone
 from json_log_formatter import JSONFormatter
 
-from compresso.libs.notifications import Notifications
 from compresso.libs.frontend_push_messages import FrontendPushMessages
+from compresso.libs.notifications import Notifications
 
 
 class ForwardJSONFormatter(JSONFormatter):
@@ -76,12 +76,12 @@ class ForwardJSONFormatter(JSONFormatter):
         if ts_str:
             try:
                 ts_float = float(ts_str)
-                extra['time'] = datetime.fromtimestamp(ts_float, tz=timezone.utc).isoformat()
+                extra['time'] = datetime.fromtimestamp(ts_float, tz=UTC).isoformat()
             except (ValueError, TypeError, OverflowError, OSError):
                 pass  # Ignore this. The default formatter will add a "time" record
         if 'time' not in extra:
-            extra['time'] = datetime.now(tz=timezone.utc)
-        return super(ForwardJSONFormatter, self).json_record(message, extra, record)
+            extra['time'] = datetime.now(tz=UTC)
+        return super().json_record(message, extra, record)
 
 
 class ForwardLogHandler(logging.Handler):
@@ -438,7 +438,7 @@ class ForwardLogHandler(logging.Handler):
             return
 
         timestamp = self._parse_buffer_filename_timestamp(filename)
-        current_hour = datetime.now(tz=timezone.utc).replace(minute=0, second=0, microsecond=0)
+        current_hour = datetime.now(tz=UTC).replace(minute=0, second=0, microsecond=0)
         if timestamp and timestamp >= current_hour:
             return
 
@@ -452,7 +452,7 @@ class ForwardLogHandler(logging.Handler):
         """Remove buffer files that sit beyond the configured retention horizon."""
         if not self.buffer_retention_max_days or self.buffer_retention_max_days <= 0:
             return
-        threshold = datetime.now(tz=timezone.utc) - timedelta(days=self.buffer_retention_max_days)
+        threshold = datetime.now(tz=UTC) - timedelta(days=self.buffer_retention_max_days)
 
         for file_path in self._list_buffer_files():
             filename = os.path.basename(file_path)
@@ -526,7 +526,7 @@ class ForwardLogHandler(logging.Handler):
 
     def _get_hourly_buffer_file(self):
         """Return the JSONL filename for the current UTC hour."""
-        current_hour = datetime.now(tz=timezone.utc).replace(minute=0, second=0, microsecond=0)
+        current_hour = datetime.now(tz=UTC).replace(minute=0, second=0, microsecond=0)
         timestamp = current_hour.strftime("%Y%m%dT%H")
         return os.path.join(self.buffer_path, f"log_buffer_{timestamp}.jsonl")
 
@@ -537,7 +537,7 @@ class ForwardLogHandler(logging.Handler):
         files = [
             os.path.join(self.buffer_path, name)
             for name in os.listdir(self.buffer_path)
-            if name.startswith("log_buffer_") and (name.endswith(".jsonl") or name.endswith(".json"))
+            if name.startswith("log_buffer_") and (name.endswith((".jsonl", ".json")))
         ]
         files.sort()
         return files
@@ -574,7 +574,7 @@ class ForwardLogHandler(logging.Handler):
         if not os.path.exists(self._buffer_state_path):
             return {}
         try:
-            with open(self._buffer_state_path, "r", encoding="utf-8") as handle:
+            with open(self._buffer_state_path, encoding="utf-8") as handle:
                 data = json.load(handle)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError, PermissionError):
             logging.getLogger("Compresso.ForwardLogHandler").warning(
@@ -663,11 +663,7 @@ class ForwardLogHandler(logging.Handler):
                 return True
 
             self.previous_connection_failed = True
-            message_text = "Failed to forward logs to remote host {}: {} {}".format(
-                self.endpoint,
-                response.status_code,
-                response.text,
-            )
+            message_text = f"Failed to forward logs to remote host {self.endpoint}: {response.status_code} {response.text}"
 
             status_key = str(response.status_code)
 
@@ -778,7 +774,7 @@ class CompressoLogging:
     def __new__(cls):
         with cls._lock:
             if cls._instance is None:
-                cls._instance = super(CompressoLogging, cls).__new__(cls)
+                cls._instance = super().__new__(cls)
                 cls._instance._logger = logging.getLogger("Compresso")
                 logging.addLevelName(cls._instance.METRIC, "METRIC")
                 logging.addLevelName(cls._instance.DATA, "DATA")

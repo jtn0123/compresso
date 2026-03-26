@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import os
 import tempfile
@@ -12,7 +11,7 @@ from compresso.libs.startup import StartupState
 from compresso.service import RootService
 
 
-class DummyThread(object):
+class DummyThread:
     def __init__(self, name):
         self.name = name
         self._alive = True

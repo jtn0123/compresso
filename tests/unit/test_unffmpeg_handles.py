@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     Tests for unffmpeg handle classes:
@@ -9,17 +8,15 @@
       - HardwareAccelerationHandle
 """
 
-from unittest.mock import patch, MagicMock
-
 import os
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from compresso.libs.unffmpeg.video_codec_handle import VideoCodecHandle
 from compresso.libs.unffmpeg.audio_codec_handle import AudioCodecHandle
-from compresso.libs.unffmpeg.subtitle_handle import SubtitleHandle
 from compresso.libs.unffmpeg.hardware_acceleration_handle import HardwareAccelerationHandle
-
+from compresso.libs.unffmpeg.subtitle_handle import SubtitleHandle
+from compresso.libs.unffmpeg.video_codec_handle import VideoCodecHandle
 
 # ===========================================================================
 # Shared probe data helpers

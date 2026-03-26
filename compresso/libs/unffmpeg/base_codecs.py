@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.base_codecs.py
@@ -31,7 +30,7 @@
 """
 
 
-class Codecs(object):
+class Codecs:
     """
     Codecs
 

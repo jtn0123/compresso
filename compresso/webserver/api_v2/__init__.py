@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -30,21 +29,20 @@
 
 """
 
-from __future__ import absolute_import
 import warnings
 
 from .approval_api import ApiApprovalHandler
 from .compression_api import ApiCompressionHandler
 from .docs_api import ApiDocsHandler
+from .filebrowser_api import ApiFilebrowserHandler
 from .fileinfo_api import ApiFileinfoHandler
 from .healthcheck_api import ApiHealthcheckHandler
-from .preview_api import ApiPreviewHandler
-from .filebrowser_api import ApiFilebrowserHandler
 from .history_api import ApiHistoryHandler
 from .metadata_api import ApiMetadataHandler
 from .notifications_api import ApiNotificationsHandler
 from .pending_api import ApiPendingHandler
 from .plugins_api import ApiPluginsHandler
+from .preview_api import ApiPreviewHandler
 from .session_api import ApiSessionHandler
 from .settings_api import ApiSettingsHandler
 from .system_api import ApiSystemHandler

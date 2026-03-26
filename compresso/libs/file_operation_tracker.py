@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.file_operation_tracker.py
@@ -78,7 +77,6 @@ class FileOperationTracker:
 
 class PostProcessError(Exception):
     def __init__(self, expected_var, result_var):
-        Exception.__init__(self, "Errors found during post process checks. Expected {}, but instead found {}".format(
-            expected_var, result_var))
+        Exception.__init__(self, f"Errors found during post process checks. Expected {expected_var}, but instead found {result_var}")
         self.expected_var = expected_var
         self.result_var = result_var

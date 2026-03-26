@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_compression_stats.py
@@ -13,15 +12,16 @@
 
 """
 
-import os
-import pytest
-import tempfile
 import datetime
+import os
+import tempfile
+
+import pytest
 
 from compresso.libs.unmodels.lib import Database
 
 
-class TestCompressionStats(object):
+class TestCompressionStats:
     """
     TestCompressionStats
 
@@ -114,10 +114,10 @@ class TestCompressionStats(object):
     def test_get_library_compression_summary_returns_correct_aggregates(self):
         """Summary should aggregate source/dest sizes and compute avg_ratio."""
         from compresso.libs.history import History
+        from compresso.libs.unmodels import CompletedTasks
 
         # Clear existing data
         from compresso.libs.unmodels.compressionstats import CompressionStats
-        from compresso.libs.unmodels import CompletedTasks
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -141,8 +141,8 @@ class TestCompressionStats(object):
     def test_summary_with_library_filter(self):
         """Summary filtered by library_id returns only that library's data."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -162,8 +162,8 @@ class TestCompressionStats(object):
     def test_summary_multiple_libraries_per_library_breakdown(self):
         """Summary without filter returns per_library breakdown for each library."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -198,8 +198,8 @@ class TestCompressionStats(object):
     def test_get_compression_stats_for_task_returns_correct_data(self):
         """Stats for a single task should return the correct dict."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -225,9 +225,10 @@ class TestCompressionStats(object):
     @pytest.mark.unittest
     def test_get_compression_stats_for_nonexistent_task_returns_none(self):
         """Stats for a task that does not exist should return None."""
+        from unittest.mock import patch
+
         from compresso.libs.history import History
         from compresso.libs.unmodels.compressionstats import CompressionStats
-        from unittest.mock import patch
         with patch.object(CompressionStats, 'get', side_effect=CompressionStats.DoesNotExist):
             history = History()
             result = history.get_compression_stats_for_task(999999)
@@ -241,14 +242,14 @@ class TestCompressionStats(object):
     def test_get_compression_stats_paginated_returns_correct_results(self):
         """Paginated stats should return the expected structure."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
         # Create 5 tasks with stats
         for i in range(5):
-            t = self._create_completed_task(label='paginated_{}.mkv'.format(i))
+            t = self._create_completed_task(label=f'paginated_{i}.mkv')
             self._create_stats(t, source_size=(i + 1) * 1000,
                                dest_size=(i + 1) * 500, library_id=1)
 
@@ -266,13 +267,13 @@ class TestCompressionStats(object):
     def test_get_compression_stats_paginated_offset(self):
         """Pagination with an offset should skip initial rows."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
         for i in range(5):
-            t = self._create_completed_task(label='offset_{}.mkv'.format(i))
+            t = self._create_completed_task(label=f'offset_{i}.mkv')
             self._create_stats(t, source_size=(i + 1) * 1000,
                                dest_size=(i + 1) * 500, library_id=1)
 
@@ -286,8 +287,8 @@ class TestCompressionStats(object):
     def test_get_compression_stats_paginated_library_filter(self):
         """Paginated stats filtered by library_id should only return matching rows."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -310,8 +311,8 @@ class TestCompressionStats(object):
     def test_paginated_result_contains_expected_fields(self):
         """Each paginated result row should have the required keys."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -331,7 +332,7 @@ class TestCompressionStats(object):
             'library_id', 'ratio', 'space_saved',
         ]
         for key in expected_keys:
-            assert key in row, "Missing key: {}".format(key)
+            assert key in row, f"Missing key: {key}"
 
 
     # ------------------------------------------------------------------
@@ -342,8 +343,8 @@ class TestCompressionStats(object):
     def test_invalid_order_column_falls_back_to_finish_time(self):
         """An invalid order column should not crash; results still returned."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -361,8 +362,8 @@ class TestCompressionStats(object):
     def test_valid_order_column_source_size(self):
         """Ordering by source_size asc should return smallest first."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -386,8 +387,8 @@ class TestCompressionStats(object):
     def test_compression_stats_ratio_calculation(self):
         """source=1000, dest=250 → ratio=0.25, space_saved=750."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -403,8 +404,8 @@ class TestCompressionStats(object):
     def test_compression_stats_zero_source_size(self):
         """source=0 → ratio=0, no division error."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -425,8 +426,8 @@ class TestCompressionStats(object):
     def test_stats_recorded_with_zero_source_size(self):
         """save_task_history with source_size=0 and task_success=True should still create a CompressionStats row."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasks.delete().execute()
 
@@ -469,8 +470,8 @@ class TestCompressionStats(object):
     def test_negative_space_saved(self):
         """When dest > source (file grew), space_saved should be negative."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasksCommandLogs.delete().execute()
         CompletedTasks.delete().execute()
@@ -487,8 +488,8 @@ class TestCompressionStats(object):
     def test_summary_with_negative_space_saved(self):
         """Summary should handle files that grew in size."""
         from compresso.libs.history import History
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasksCommandLogs.delete().execute()
         CompletedTasks.delete().execute()

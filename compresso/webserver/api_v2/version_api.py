@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.version_api.py
@@ -31,6 +30,7 @@
 """
 
 import tornado.log
+
 from compresso import config
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues

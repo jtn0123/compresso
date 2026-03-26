@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_child_process.py
@@ -7,8 +6,9 @@
     Unit tests for compresso.libs.unplugins.child_process.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -35,12 +35,12 @@ def reset_child_process_globals():
 class TestRegisterPid:
 
     def test_adds_pid_to_active_set(self):
-        from compresso.libs.unplugins.child_process import _register_pid, _active_plugin_pids
+        from compresso.libs.unplugins.child_process import _active_plugin_pids, _register_pid
         _register_pid(1234)
         assert 1234 in _active_plugin_pids
 
     def test_adding_same_pid_twice(self):
-        from compresso.libs.unplugins.child_process import _register_pid, _active_plugin_pids
+        from compresso.libs.unplugins.child_process import _active_plugin_pids, _register_pid
         _register_pid(1234)
         _register_pid(1234)
         assert len(_active_plugin_pids) == 1
@@ -50,7 +50,7 @@ class TestRegisterPid:
 class TestUnregisterPid:
 
     def test_removes_pid_from_active_set(self):
-        from compresso.libs.unplugins.child_process import _register_pid, _unregister_pid, _active_plugin_pids
+        from compresso.libs.unplugins.child_process import _active_plugin_pids, _register_pid, _unregister_pid
         _register_pid(5678)
         _unregister_pid(5678)
         assert 5678 not in _active_plugin_pids
@@ -65,7 +65,7 @@ class TestUnregisterPid:
 class TestKillAllPluginProcesses:
 
     def test_kills_registered_processes(self):
-        from compresso.libs.unplugins.child_process import _register_pid, kill_all_plugin_processes, _active_plugin_pids
+        from compresso.libs.unplugins.child_process import _active_plugin_pids, _register_pid, kill_all_plugin_processes
 
         _register_pid(100)
         _register_pid(200)
@@ -82,6 +82,7 @@ class TestKillAllPluginProcesses:
 
     def test_handles_no_such_process(self):
         import psutil
+
         from compresso.libs.unplugins.child_process import _register_pid, kill_all_plugin_processes
 
         _register_pid(300)
@@ -92,7 +93,7 @@ class TestKillAllPluginProcesses:
             kill_all_plugin_processes()
 
     def test_clears_pids_set(self):
-        from compresso.libs.unplugins.child_process import _register_pid, kill_all_plugin_processes, _active_plugin_pids
+        from compresso.libs.unplugins.child_process import _active_plugin_pids, _register_pid, kill_all_plugin_processes
 
         _register_pid(400)
 

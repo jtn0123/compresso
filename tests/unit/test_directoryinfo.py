@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_directoryinfo.py
@@ -110,7 +109,7 @@ class TestCompressoDirectoryInfoINIMigration:
         info = CompressoDirectoryInfo(tmp_config)
         info.save()
         # Verify the file is now valid JSON
-        with open(os.path.join(tmp_config, '.compresso'), 'r') as f:
+        with open(os.path.join(tmp_config, '.compresso')) as f:
             data = json.load(f)
         assert isinstance(data, dict)
         assert data.get('section1', {}).get('key1') == 'value1'

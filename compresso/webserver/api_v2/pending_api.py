@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.pending_api.py
@@ -32,14 +31,24 @@
 import os.path
 
 import tornado.log
-from compresso.libs.library import Library
+
 from compresso.libs import session
+from compresso.libs.library import Library
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
-from compresso.webserver.api_v2.schema.schemas import PendingTasksTableResultsSchema, RequestPendingTaskCreateSchema, \
-    RequestPendingTasksLibraryUpdateSchema, RequestPendingTasksReorderSchema, PendingTasksSchema, \
-    RequestPendingTableDataSchema, RequestPendingTasksBulkActionSchema, TaskDownloadLinkSchema, \
-    RequestPendingTaskTestSchema, PendingTaskTestResultSchema, RequestTableUpdateByIdList
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.schema.schemas import (
+    PendingTasksSchema,
+    PendingTasksTableResultsSchema,
+    PendingTaskTestResultSchema,
+    RequestPendingTableDataSchema,
+    RequestPendingTaskCreateSchema,
+    RequestPendingTasksBulkActionSchema,
+    RequestPendingTasksLibraryUpdateSchema,
+    RequestPendingTasksReorderSchema,
+    RequestPendingTaskTestSchema,
+    RequestTableUpdateByIdList,
+    TaskDownloadLinkSchema,
+)
 from compresso.webserver.downloads import DownloadsLinks
 from compresso.webserver.helpers import pending_tasks
 
@@ -462,14 +471,14 @@ class ApiPendingHandler(BaseApiHandler):
 
             # Ensure path exists
             if not os.path.exists(abspath):
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Path does not exist: '{}'".format(abspath))
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Path does not exist: '{abspath}'")
                 self.write_error()
                 return False
 
             # Ensure a task does not already exist with this path
             if pending_tasks.check_if_task_exists_matching_path(abspath):
                 self.set_status(self.STATUS_ERROR_EXTERNAL,
-                                reason="A task already exists with the provided path: '{}'".format(abspath))
+                                reason=f"A task already exists with the provided path: '{abspath}'")
                 self.write_error()
                 return False
 
@@ -558,7 +567,7 @@ class ApiPendingHandler(BaseApiHandler):
                         break
                 if library_id is None:
                     self.set_status(self.STATUS_ERROR_EXTERNAL,
-                                    reason="Library not found with name '{}'".format(library_name))
+                                    reason=f"Library not found with name '{library_name}'")
                     self.write_error()
                     return
 
@@ -575,7 +584,7 @@ class ApiPendingHandler(BaseApiHandler):
                 abspath = os.path.abspath(path)
 
             if not os.path.exists(abspath):
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Path does not exist: '{}'".format(abspath))
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Path does not exist: '{abspath}'")
                 self.write_error()
                 return
 

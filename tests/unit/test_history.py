@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_history.py
@@ -21,16 +20,17 @@
 
 """
 
-import os
-import pytest
-import tempfile
 import datetime
+import os
+import tempfile
+
+import pytest
 
 from compresso.libs.unmodels.lib import Database
 
 
 @pytest.mark.unittest
-class TestHistory(object):
+class TestHistory:
     """
     TestHistory
 
@@ -68,8 +68,8 @@ class TestHistory(object):
         pass
 
     def setup_method(self):
-        from compresso.libs.unmodels.compressionstats import CompressionStats
         from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs
+        from compresso.libs.unmodels.compressionstats import CompressionStats
         CompressionStats.delete().execute()
         CompletedTasksCommandLogs.delete().execute()
         CompletedTasks.delete().execute()
@@ -272,7 +272,7 @@ class TestHistory(object):
     @pytest.mark.unittest
     def test_filtered_and_sorted_pagination(self):
         for i in range(5):
-            self._create_task(label='file_{}.mkv'.format(i))
+            self._create_task(label=f'file_{i}.mkv')
         self.db_connection.execute_sql('SELECT 1')
 
         history = self._make_history()

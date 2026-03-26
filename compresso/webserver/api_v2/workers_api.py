@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.workers_api.py
@@ -31,8 +30,9 @@
 """
 
 import tornado.log
+
 from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.schemas import RequestWorkerByIdSchema, WorkerStatusSuccessSchema
 from compresso.webserver.helpers import workers
 

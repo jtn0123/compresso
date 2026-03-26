@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.uiserver.py
@@ -30,10 +29,9 @@
 
 """
 import asyncio
-import os
-import socket
-import threading
 import logging
+import os
+import threading
 
 import tornado.httpserver
 import tornado.ioloop
@@ -61,7 +59,7 @@ tornado_settings = {
 }
 
 
-class CompressoDataQueues(object, metaclass=SingletonType):
+class CompressoDataQueues(metaclass=SingletonType):
     _compresso_data_queues = {}
 
     def __init__(self):
@@ -74,7 +72,7 @@ class CompressoDataQueues(object, metaclass=SingletonType):
         return self._compresso_data_queues
 
 
-class CompressoRunningThreads(object, metaclass=SingletonType):
+class CompressoRunningThreads(metaclass=SingletonType):
     _compresso_threads = {}
 
     def __init__(self):
@@ -95,7 +93,7 @@ class UIServer(threading.Thread):
     app = None
 
     def __init__(self, compresso_data_queues, foreman, developer):
-        super(UIServer, self).__init__(name='UIServer')
+        super().__init__(name='UIServer')
         self.config = config.Config()
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
 
@@ -193,10 +191,10 @@ class UIServer(threading.Thread):
                     # Verify certificate and key files exist
                     if not os.path.exists(certfile):
                         self._log(f"SSL certificate file not found: {certfile}", level="error")
-                        raise RuntimeError("SSL certificate file not found: {}".format(certfile))
+                        raise RuntimeError(f"SSL certificate file not found: {certfile}")
                     if not os.path.exists(keyfile):
                         self._log(f"SSL key file not found: {keyfile}", level="error")
-                        raise RuntimeError("SSL key file not found: {}".format(keyfile))
+                        raise RuntimeError(f"SSL key file not found: {keyfile}")
 
                     ssl_options_config = {
                         "certfile": certfile,
@@ -218,16 +216,16 @@ class UIServer(threading.Thread):
                 'ui_server_ready',
                 detail="{}:{}".format(self.config.get_ui_address() or '0.0.0.0', self.config.get_ui_port()),
             )
-            self._log("UI_SERVER_READY port={}".format(self.config.get_ui_port()), level="info")
+            self._log(f"UI_SERVER_READY port={self.config.get_ui_port()}", level="info")
 
             self.io_loop = tornado.ioloop.IOLoop.current()
             self.io_loop.start()
-        except socket.error as e:
-            message = "UI_SERVER_STARTUP_FAILED port={} error={}".format(self.config.get_ui_port(), str(e))
+        except OSError as e:
+            message = f"UI_SERVER_STARTUP_FAILED port={self.config.get_ui_port()} error={str(e)}"
             StartupState().mark_error('ui_server_ready', message)
             self._log(message, level="error")
         except Exception as e:
-            message = "UI_SERVER_STARTUP_FAILED error={}".format(str(e))
+            message = f"UI_SERVER_STARTUP_FAILED error={str(e)}"
             StartupState().mark_error('ui_server_ready', message)
             self._log(message, level="error")
         finally:
@@ -288,9 +286,7 @@ class UIServer(threading.Thread):
         ])
 
         # Add widgets routes
-        from compresso.webserver.plugins import DataPanelRequestHandler
-        from compresso.webserver.plugins import PluginStaticFileHandler
-        from compresso.webserver.plugins import PluginAPIRequestHandler
+        from compresso.webserver.plugins import DataPanelRequestHandler, PluginAPIRequestHandler, PluginStaticFileHandler
         app.add_handlers(r'.*', [
             (
                 tornado.routing.PathMatches(r"/compresso/panel/[^/]+(/(?!static/|assets$).*)?$"),

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -29,7 +28,6 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
-from __future__ import absolute_import
 import warnings
 
 from . import plugin_types

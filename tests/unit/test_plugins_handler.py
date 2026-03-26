@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_plugins_handler.py
@@ -8,8 +7,9 @@
 """
 
 import hashlib
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -80,7 +80,7 @@ class TestGetPluginRepoId:
     def test_returns_md5_hash(self):
         from compresso.libs.plugins import PluginsHandler
         result = PluginsHandler.get_plugin_repo_id("https://example.com/repo")
-        expected = int(hashlib.md5("https://example.com/repo".encode('utf8')).hexdigest(), 16)
+        expected = int(hashlib.md5(b"https://example.com/repo").hexdigest(), 16)
         assert result == expected
 
     def test_different_paths_produce_different_ids(self):

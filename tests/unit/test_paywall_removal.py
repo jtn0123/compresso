@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_paywall_removal.py
@@ -12,13 +11,14 @@
 """
 
 import os
-import pytest
 import tempfile
+
+import pytest
 
 from compresso.libs.unmodels.lib import Database
 
 
-class TestPaywallRemoval(object):
+class TestPaywallRemoval:
     """
     TestPaywallRemoval
 
@@ -45,8 +45,13 @@ class TestPaywallRemoval(object):
         self.db_connection = Database.select_database(database_settings)
 
         from compresso.libs.unmodels import (
-            CompletedTasks, Installation, Libraries, Tags,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
+            CompletedTasks,
+            EnabledPlugins,
+            Installation,
+            Libraries,
+            LibraryPluginFlow,
+            Plugins,
+            Tags,
         )
         self.db_connection.create_tables([
             CompletedTasks, Installation, Libraries, Tags,
@@ -57,8 +62,8 @@ class TestPaywallRemoval(object):
         self.settings = config.Config(config_path=config_path)
 
         # Clear Session singleton so it picks up our in-memory DB
-        from compresso.libs.singleton import SingletonType
         from compresso.libs.session import Session
+        from compresso.libs.singleton import SingletonType
         SingletonType._instances.pop(Session, None)
 
     def teardown_class(self):
@@ -82,6 +87,7 @@ class TestPaywallRemoval(object):
     def test_links_within_enabled_link_limits_returns_true(self):
         """Links.within_enabled_link_limits() must always return True."""
         from compresso.libs.installation_link import Links
+
         # Clear any singleton cache so we get a fresh Links instance
         from compresso.libs.singleton import SingletonType
         SingletonType._instances.pop(Links, None)
@@ -136,6 +142,7 @@ class TestPaywallRemoval(object):
         get_supporter_level() is not called to block settings.
         """
         import inspect
+
         from compresso.libs.unplugins.executor import PluginExecutor
 
         source = inspect.getsource(PluginExecutor.save_plugin_settings)

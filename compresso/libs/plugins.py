@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.plugins.py
@@ -49,11 +48,11 @@ from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.session import Session
 from compresso.libs.singleton import SingletonType
-from compresso.libs.unmodels import EnabledPlugins, LibraryPluginFlow, Plugins, PluginRepos
+from compresso.libs.unmodels import EnabledPlugins, LibraryPluginFlow, PluginRepos, Plugins
 from compresso.libs.unplugins import PluginExecutor
 
 
-class PluginsHandler(object, metaclass=SingletonType):
+class PluginsHandler(metaclass=SingletonType):
     """
     Set plugin version.
     Plugins must be compatible with this version to be installed.
@@ -76,7 +75,7 @@ class PluginsHandler(object, metaclass=SingletonType):
         plugins_directory = self.settings.get_plugins_path()
         if not os.path.exists(plugins_directory):
             os.makedirs(plugins_directory)
-        return os.path.join(plugins_directory, "repo-{}.json".format(repo_id))
+        return os.path.join(plugins_directory, f"repo-{repo_id}.json")
 
     def get_plugin_path(self, plugin_id):
         plugin_directory = os.path.join(self.settings.get_plugins_path(), plugin_id)
@@ -86,7 +85,7 @@ class PluginsHandler(object, metaclass=SingletonType):
 
     def get_plugin_download_cache_path(self, plugin_id, plugin_version):
         plugin_directory = self.settings.get_plugins_path()
-        return os.path.join(plugin_directory, "{}-{}.zip".format(plugin_id, plugin_version))
+        return os.path.join(plugin_directory, f"{plugin_id}-{plugin_version}.zip")
 
     @staticmethod
     def get_default_repo():
@@ -248,7 +247,7 @@ class PluginsHandler(object, metaclass=SingletonType):
                         plugin.get('id'),
                         plugin.get('version'),
                     )
-                    plugin_changelog_url = "{0}/{1}/changelog.md".format(
+                    plugin_changelog_url = "{}/{}/changelog.md".format(
                         repo_data_directory,
                         plugin.get('id'),
                     )
@@ -492,7 +491,7 @@ class PluginsHandler(object, metaclass=SingletonType):
         if os.path.exists(os.path.join(str(plugin_directory), '.git')):
             raise Exception("Plugin directory contains a git repository. Uninstall this source version before installing.")
         # Extract zip file contents
-        self.logger.debug("Extracting plugin to '{}'".format(plugin_directory))
+        self.logger.debug(f"Extracting plugin to '{plugin_directory}'")
         with zipfile.ZipFile(zip_file, "r") as zip_ref:
             zip_ref.extractall(str(plugin_directory))
         # Read plugin info
@@ -524,7 +523,7 @@ class PluginsHandler(object, metaclass=SingletonType):
             subprocess.call([
                 sys.executable, '-m', 'pip', 'install', '--upgrade',
                 '-r', requirements_file,
-                '--target={}'.format(install_target)
+                f'--target={install_target}'
             ], timeout=300)
         except subprocess.TimeoutExpired:
             logging.getLogger("Compresso.PluginsHandler").error(
@@ -680,7 +679,7 @@ class PluginsHandler(object, metaclass=SingletonType):
 
             # Remove from disk
             plugin_directory = self.get_plugin_path(record.get('plugin_id'))
-            self._log("Removing plugin files from disk '{}'".format(plugin_directory), level='debug')
+            self._log(f"Removing plugin files from disk '{plugin_directory}'", level='debug')
             try:
                 # Delete the info file first to prevent any other process trying to read the plugin.
                 # Without the info file, the plugin is effectivly uninstalled
@@ -690,7 +689,7 @@ class PluginsHandler(object, metaclass=SingletonType):
                 # Cleanup the rest of the plugin directory
                 shutil.rmtree(plugin_directory)
             except Exception as e:
-                self._log("Exception while removing directory {}:".format(plugin_directory), message2=str(e),
+                self._log(f"Exception while removing directory {plugin_directory}:", message2=str(e),
                           level="exception")
 
         # Unlink from library by ID in DB
@@ -761,7 +760,6 @@ class PluginsHandler(object, metaclass=SingletonType):
         :param priority:
         :return:
         """
-        pass
 
     def get_enabled_plugin_modules_by_type(self, plugin_type, library_id=None):
         """

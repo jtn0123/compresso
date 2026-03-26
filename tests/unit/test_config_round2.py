@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_config_round2.py
@@ -12,9 +11,9 @@
 
 import json
 import os
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from compresso.libs.singleton import SingletonType
 

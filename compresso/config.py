@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.config.py
@@ -30,8 +29,8 @@
 
 """
 
-import os
 import json
+import os
 
 from compresso import metadata
 from compresso.libs import common
@@ -54,7 +53,7 @@ DEFAULT_READINESS_TIMEOUT_SECONDS = 30
 DEFAULT_WORKER_CAP = 2
 
 
-class Config(object, metaclass=SingletonType):
+class Config(metaclass=SingletonType):
     app_version = ''
 
     test = ''
@@ -266,8 +265,8 @@ class Config(object, metaclass=SingletonType):
         :return:
         """
         # First attempt to fetch it from this class' get functions
-        if hasattr(self, "get_{}".format(key)):
-            getter = getattr(self, "get_{}".format(key))
+        if hasattr(self, f"get_{key}"):
+            getter = getattr(self, f"get_{key}")
             if callable(getter):
                 return getter()
 
@@ -293,8 +292,8 @@ class Config(object, metaclass=SingletonType):
             return
 
         # If in a special config list, execute that command
-        if hasattr(self, "set_{}".format(key)):
-            setter = getattr(self, "set_{}".format(key))
+        if hasattr(self, f"set_{key}"):
+            setter = getattr(self, f"set_{key}")
             if callable(setter):
                 setter(value)
         else:

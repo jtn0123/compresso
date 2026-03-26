@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_fileinfo.py
@@ -9,18 +8,18 @@
 
 """
 
-import pytest
 from unittest.mock import patch
 
-from compresso.webserver.helpers.fileinfo import format_probe_data, _is_hdr
+import pytest
 
+from compresso.webserver.helpers.fileinfo import _is_hdr, format_probe_data
 
 # ------------------------------------------------------------------
 # TestFormatProbeData
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestFormatProbeData(object):
+class TestFormatProbeData:
     """Tests for format_probe_data()."""
 
     def test_none_input_returns_none(self):
@@ -162,7 +161,7 @@ class TestFormatProbeData(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestResolutionLabels(object):
+class TestResolutionLabels:
     """Tests for resolution label assignment inside format_probe_data."""
 
     def _get_label(self, height):
@@ -205,7 +204,7 @@ class TestResolutionLabels(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestHdrDetection(object):
+class TestHdrDetection:
     """Tests for _is_hdr() function."""
 
     def test_smpte2084_is_hdr(self):
@@ -241,7 +240,7 @@ class TestHdrDetection(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestTagsSafety(object):
+class TestTagsSafety:
     """Tests for non-dict tags handling in format_probe_data."""
 
     def test_audio_stream_with_non_dict_tags(self):
@@ -286,7 +285,7 @@ class TestTagsSafety(object):
 # ------------------------------------------------------------------
 
 @pytest.mark.unittest
-class TestProbeAndFormat(object):
+class TestProbeAndFormat:
     """Tests for probe_and_format()."""
 
     @patch('compresso.webserver.helpers.fileinfo.probe_file', return_value=None)

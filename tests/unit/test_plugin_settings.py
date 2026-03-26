@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_plugin_settings.py
@@ -9,9 +8,9 @@
 
 import json
 import os
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from unittest.mock import patch, MagicMock, mock_open
 
 from compresso.libs.singleton import SingletonType
 
@@ -23,9 +22,8 @@ def reset_singletons():
     SingletonType._instances = {}
 
 
-class FakeSettings(object):
+class FakeSettings:
     """A concrete subclass of PluginSettings for testing."""
-    pass
 
 
 def _make_settings_class(**kwargs):

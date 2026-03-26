@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.directoryinfo.py
@@ -29,14 +28,14 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import configparser
 import json
 import os
-import configparser
 
 
 class CompressoDirectoryInfoException(Exception):
     def __init__(self, message, path):
-        errmsg = '%s: file %s' % (message, path)
+        errmsg = f'{message}: file {path}'
         Exception.__init__(self, errmsg)
         self.message = message
         self.path = path
@@ -151,7 +150,7 @@ class CompressoDirectoryInfo:
                 self.config_parser.add_section(section)
             self.config_parser.set(section, option, value)
             return
-        raise CompressoDirectoryInfoException("Failed to set section '{}' option '{}' value '{}'".format(section, option, value),
+        raise CompressoDirectoryInfoException(f"Failed to set section '{section}' option '{option}' value '{value}'",
                                             self.path)
 
     def get(self, section, option):
@@ -167,7 +166,7 @@ class CompressoDirectoryInfo:
             return self.json_data.get(section, {}).get(option)
         elif self.config_parser:
             return self.config_parser.get(section, option)
-        raise CompressoDirectoryInfoException("Failed to get section '{}' option '{}'".format(section, option), self.path)
+        raise CompressoDirectoryInfoException(f"Failed to get section '{section}' option '{option}'", self.path)
 
     def save(self):
         """

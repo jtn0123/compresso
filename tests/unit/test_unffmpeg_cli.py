@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     Tests for compresso.libs.unffmpeg.lib.cli module.
@@ -7,14 +6,13 @@
 """
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from compresso.libs.unffmpeg.exceptions.ffmpeg import FFMpegError
 from compresso.libs.unffmpeg.exceptions.ffprobe import FFProbeError
 from compresso.libs.unffmpeg.lib import cli
-
 
 # ---------------------------------------------------------------------------
 # Helpers

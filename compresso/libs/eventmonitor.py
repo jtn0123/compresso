@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.eventmonitor.py
@@ -41,16 +40,16 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 
 try:
-    from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer
 
     event_monitor_module = 'watchdog'
 except ImportError:
-    class Observer(object):
+    class Observer:
         pass
 
 
-    class FileSystemEventHandler(object):
+    class FileSystemEventHandler:
         pass
 
 
@@ -110,7 +109,7 @@ class EventMonitorManager(threading.Thread):
     """
 
     def __init__(self, data_queues, event):
-        super(EventMonitorManager, self).__init__(name='EventMonitorManager')
+        super().__init__(name='EventMonitorManager')
         self.name = __class__.__name__
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.data_queues = data_queues

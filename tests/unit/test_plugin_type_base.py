@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_plugin_type_base.py
@@ -10,8 +9,9 @@
 """
 
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 from compresso.libs.unplugins.plugin_types.plugin_type_base import PluginType

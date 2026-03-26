@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.plugins.py
@@ -31,6 +30,7 @@
 """
 
 from peewee import *
+
 from compresso.libs.unmodels.lib import BaseModel
 
 

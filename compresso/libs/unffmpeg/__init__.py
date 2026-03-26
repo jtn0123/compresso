@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -30,17 +29,12 @@
 
 """
 
-from __future__ import absolute_import
 import warnings
 
-from . import containers
-from . import exceptions
-from . import audio_codecs
-from . import subtitle_codecs
-from . import video_codecs
-from .info import Info
+from . import audio_codecs, containers, exceptions, subtitle_codecs, video_codecs
 from .audio_codec_handle import AudioCodecHandle
 from .hardware_acceleration_handle import HardwareAccelerationHandle
+from .info import Info
 from .subtitle_handle import SubtitleHandle
 from .video_codec_handle import VideoCodecHandle
 

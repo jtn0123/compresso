@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -30,14 +29,13 @@
 
 """
 
-from __future__ import absolute_import
 
+import inspect
 import os
+import pkgutil
+import sys
 from importlib import import_module
 from pathlib import Path
-import sys
-import inspect
-import pkgutil
 
 from ..plugin_type_base import PluginType
 

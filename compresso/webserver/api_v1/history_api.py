@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.history_api.py
@@ -36,9 +35,8 @@ import time
 import tornado.escape
 
 from compresso import config
-from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
-
 from compresso.libs import history
+from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
 
 class ApiHistoryHandler(BaseApiHandler):

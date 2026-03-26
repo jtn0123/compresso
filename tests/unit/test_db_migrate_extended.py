@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     tests.unit.test_db_migrate_extended.py
@@ -10,10 +9,9 @@
 """
 
 import os
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
-
 from peewee import CharField, IntegerField
 
 from compresso.libs.singleton import SingletonType

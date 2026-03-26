@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.base_api_handler.py
@@ -31,10 +30,9 @@
 """
 import re
 
-import tornado.web
 import tornado.log
 import tornado.routing
-
+import tornado.web
 from tornado.web import RequestHandler
 
 
@@ -77,5 +75,5 @@ class BaseApiHandler(RequestHandler):
                 return
 
         # If we got this far, then the URI does not match any of our configured routes.
-        tornado.log.app_log.warning("No match found for API route: {}".format(self.request.uri), exc_info=True)
+        tornado.log.app_log.warning(f"No match found for API route: {self.request.uri}", exc_info=True)
         self.handle_404()

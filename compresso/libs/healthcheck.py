@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.healthcheck.py
@@ -118,7 +117,7 @@ class HealthCheckManager:
         except subprocess.TimeoutExpired:
             return False, "Thorough check timed out (>600s)"
         except Exception as e:
-            return False, "Check failed: {}".format(str(e))
+            return False, f"Check failed: {str(e)}"
 
     def _get_file_lock(self, filepath):
         """Get or create a lock for a specific file path."""

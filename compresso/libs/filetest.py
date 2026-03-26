@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.filetest.py
@@ -44,7 +43,7 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 
 
-class FileTest(object):
+class FileTest:
     """
     FileTest
 
@@ -137,10 +136,10 @@ class FileTest(object):
                     if file_codec:
                         if skip_codecs and file_codec in [c.lower() for c in skip_codecs]:
                             return False, [{'id': 'codec_skip',
-                                            'message': "Codec '{}' in skip list — '{}'".format(file_codec, path)}], 0, None
+                                            'message': f"Codec '{file_codec}' in skip list — '{path}'"}], 0, None
                         if target_codecs and file_codec not in [c.lower() for c in target_codecs]:
                             return False, [{'id': 'codec_target',
-                                            'message': "Codec '{}' not in target list — '{}'".format(file_codec, path)}], 0, None
+                                            'message': f"Codec '{file_codec}' not in target list — '{path}'"}], 0, None
                 except (subprocess.SubprocessError, OSError, json.JSONDecodeError, ValueError) as e:
                     self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, str(e))
                 except Exception as e:
@@ -154,7 +153,7 @@ class FileTest(object):
         if self.file_in_compresso_ignore_lockfile(path):
             file_issues.append({
                 'id':      'compressoignore',
-                'message': "File found in compresso ignore file - '{}'".format(path),
+                'message': f"File found in compresso ignore file - '{path}'",
             })
             return_value = False
 
@@ -162,7 +161,7 @@ class FileTest(object):
         if self.file_failed_in_history(path):
             file_issues.append({
                 'id':      'blacklisted',
-                'message': "File found already failed in history - '{}'".format(path),
+                'message': f"File found already failed in history - '{path}'",
             })
             return_value = False
 
@@ -207,7 +206,7 @@ class FileTest(object):
 
 class FileTesterThread(threading.Thread):
     def __init__(self, name, files_to_test, files_to_process, status_updates, library_id, event):
-        super(FileTesterThread, self).__init__(name=name)
+        super().__init__(name=name)
         self.settings = config.Config()
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.event = event

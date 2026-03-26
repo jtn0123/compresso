@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.system.py
@@ -33,16 +32,16 @@ import glob
 import os
 import subprocess
 import sys
-from typing import Any, Dict
+from typing import Any
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
 
-class System(object, metaclass=SingletonType):
-    devices: Dict[str, Any] = {}
-    ffmpeg: Dict[str, Any] = {}
-    platform: Dict[str, Any] = {}
+class System(metaclass=SingletonType):
+    devices: dict[str, Any] = {}
+    ffmpeg: dict[str, Any] = {}
+    platform: dict[str, Any] = {}
     python_version: str = ""
 
     def __init__(self, *args, **kwargs):
@@ -56,7 +55,7 @@ class System(object, metaclass=SingletonType):
         """
         import sys
         if not self.python_version:
-            self.python_version = "{0}.{1}.{2}.{3}.{4}".format(*sys.version_info)
+            self.python_version = "{}.{}.{}.{}.{}".format(*sys.version_info)
         return self.python_version
 
     def __detect_gpus(self):
@@ -172,8 +171,8 @@ class System(object, metaclass=SingletonType):
 
 if __name__ == "__main__":
     import json
-    import sys
     import os
+    import sys
 
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     print(project_dir)

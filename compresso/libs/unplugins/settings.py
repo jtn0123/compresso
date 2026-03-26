@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.settings.py
@@ -36,7 +35,7 @@ import sys
 from compresso import config
 
 
-class PluginSettings(object):
+class PluginSettings:
     """
     A dictionary of settings accessible to the Plugin class and able
     to be configured by users from within the Compresso WebUI.
@@ -70,7 +69,7 @@ class PluginSettings(object):
             try:
                 self.library_id = int(self.library_id)
             except ValueError:
-                raise Exception("Library ID needs to be an integer. You have provided '{}'".format(self.library_id))
+                raise Exception(f"Library ID needs to be an integer. You have provided '{self.library_id}'")
 
     def __get_plugin_settings_file(self, force_library_settings=False):
         plugin_directory = self.get_plugin_directory()
@@ -87,7 +86,7 @@ class PluginSettings(object):
         # If provided with a library ID, then the settings file will be different
         plugin_settings_file = os.path.join(profile_directory, 'settings.json')
         if self.library_id:
-            plugin_settings_file = os.path.join(profile_directory, 'settings.{}.json'.format(self.library_id))
+            plugin_settings_file = os.path.join(profile_directory, f'settings.{self.library_id}.json')
             if not os.path.exists(plugin_settings_file) and not force_library_settings:
                 # If the library file does not yet exist, then resort to using the default settings file
                 plugin_settings_file = os.path.join(profile_directory, 'settings.json')

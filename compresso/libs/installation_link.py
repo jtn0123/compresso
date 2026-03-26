@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.installation_link.py
@@ -44,7 +43,7 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
 
-class Links(object, metaclass=SingletonType):
+class Links(metaclass=SingletonType):
     _network_transfer_lock = {}
 
     def __init__(self, *args, **kwargs):
@@ -128,7 +127,7 @@ class Links(object, metaclass=SingletonType):
             msg_type = 'warning' if new_status != 'connected' else 'success'
             label = "Remote link {}".format('reconnected' if new_status == 'connected' else 'disconnected')
             FrontendPushMessages().update({
-                'id': 'link_status_{}'.format(uuid),
+                'id': f'link_status_{uuid}',
                 'type': msg_type,
                 'code': 'linkStatusChanged',
                 'message': label,
@@ -142,7 +141,7 @@ class Links(object, metaclass=SingletonType):
         address = address.strip()
         # Add http if it does not exist
         if not address.lower().startswith('http'):
-            address = "http://{}".format(address)
+            address = f"http://{address}"
         # Strip any trailing slashes
         address = address.rstrip('/')
         return address
@@ -193,7 +192,7 @@ class Links(object, metaclass=SingletonType):
         # Acquire a lock if one is available
         with lock:
             for tx_lock in range(transfer_limit):
-                lock_key = "[{}-{}]-{}".format(lock_type, tx_lock, url)
+                lock_key = f"[{lock_type}-{tx_lock}]-{url}"
                 if self._network_transfer_lock.get(lock_key, {}).get('expires', 0) < time_now:
                     # Create new upload lock that will expire in 1 minute
                     self._network_transfer_lock[lock_key] = {
@@ -232,7 +231,7 @@ class Links(object, metaclass=SingletonType):
             password=remote_config.get('password'),
         )
         address = self.__format_address(remote_config.get('address'))
-        url = "{}{}".format(address, endpoint)
+        url = f"{address}{endpoint}"
         res = request_handler.get(url, timeout=timeout)
         if res.status_code == 200:
             return res.json()
@@ -260,7 +259,7 @@ class Links(object, metaclass=SingletonType):
             password=remote_config.get('password'),
         )
         address = self.__format_address(remote_config.get('address'))
-        url = "{}{}".format(address, endpoint)
+        url = f"{address}{endpoint}"
         res = request_handler.post(url, json=data, timeout=timeout)
         if res.status_code == 200:
             return res.json()
@@ -289,7 +288,7 @@ class Links(object, metaclass=SingletonType):
             password=remote_config.get('password'),
         )
         address = self.__format_address(remote_config.get('address'))
-        url = "{}{}".format(address, endpoint)
+        url = f"{address}{endpoint}"
         # NOTE: If you remove a content type from the upload (text/plain) the file upload fails
         # NOTE2: The 'ith open(path, "rb") as f' method reads the file into memory before uploading.
         #   This is slow and not ideal for devices with small amounts of ram.
@@ -330,7 +329,7 @@ class Links(object, metaclass=SingletonType):
             password=remote_config.get('password'),
         )
         address = self.__format_address(remote_config.get('address'))
-        url = "{}{}".format(address, endpoint)
+        url = f"{address}{endpoint}"
         res = request_handler.delete(url, json=data, timeout=timeout)
         if res.status_code == 200:
             return res.json()
@@ -357,7 +356,7 @@ class Links(object, metaclass=SingletonType):
             password=remote_config.get('password'),
         )
         address = self.__format_address(remote_config.get('address'))
-        url = "{}{}".format(address, endpoint)
+        url = f"{address}{endpoint}"
         with request_handler.get(url, stream=True) as r:
             r.raise_for_status()
             with open(path, 'wb') as f:
@@ -385,7 +384,7 @@ class Links(object, metaclass=SingletonType):
         )
 
         # Fetch config
-        url = "{}/compresso/api/v2/settings/configuration".format(address)
+        url = f"{address}/compresso/api/v2/settings/configuration"
         res = request_handler.get(url, timeout=2)
         if res.status_code != 200:
             if res.status_code in [400, 404, 405, 500]:
@@ -396,7 +395,7 @@ class Links(object, metaclass=SingletonType):
         system_configuration_data = res.json()
 
         # Fetch settings
-        url = "{}/compresso/api/v2/settings/read".format(address)
+        url = f"{address}/compresso/api/v2/settings/read"
         res = request_handler.get(url, timeout=2)
         if res.status_code != 200:
             if res.status_code in [400, 404, 405, 500]:
@@ -407,7 +406,7 @@ class Links(object, metaclass=SingletonType):
         settings_data = res.json()
 
         # Fetch version
-        url = "{}/compresso/api/v2/version/read".format(address)
+        url = f"{address}/compresso/api/v2/version/read"
         res = request_handler.get(url, timeout=2)
         if res.status_code != 200:
             if res.status_code in [400, 404, 405, 500]:
@@ -418,7 +417,7 @@ class Links(object, metaclass=SingletonType):
         version_data = res.json()
 
         # Fetch version
-        url = "{}/compresso/api/v2/session/state".format(address)
+        url = f"{address}/compresso/api/v2/session/state"
         res = request_handler.get(url, timeout=2)
         if res.status_code != 200:
             if res.status_code in [400, 404, 405, 500]:
@@ -434,7 +433,7 @@ class Links(object, metaclass=SingletonType):
             "start":  0,
             "length": 1
         }
-        url = "{}/compresso/api/v2/pending/tasks".format(address)
+        url = f"{address}/compresso/api/v2/pending/tasks"
         res = request_handler.post(url, json=data, timeout=2)
         if res.status_code != 200:
             if res.status_code in [400, 404, 405, 500]:
@@ -742,7 +741,7 @@ class Links(object, metaclass=SingletonType):
             password=remote_config.get('password'),
         )
         address = self.__format_address(remote_config.get('address'))
-        url = "{}/compresso/api/v2/settings/link/read".format(address)
+        url = f"{address}/compresso/api/v2/settings/link/read"
         data = {
             "uuid": self.session.uuid
         }
@@ -768,7 +767,7 @@ class Links(object, metaclass=SingletonType):
             password=configuration.get('password'),
         )
         address = self.__format_address(configuration.get('address'))
-        url = "{}/compresso/api/v2/settings/link/write".format(address)
+        url = f"{address}/compresso/api/v2/settings/link/write"
 
         # First generate an updated config
         updated_config = self.__generate_default_config(configuration)
@@ -857,8 +856,7 @@ class Links(object, metaclass=SingletonType):
                     continue
                 current_pending_tasks = int(results.get('recordsFiltered', 0))
                 if local_config.get('enable_task_preloading') and current_pending_tasks >= max_pending_tasks:
-                    self._log("Remote installation has exceeded the max remote pending task count ({})".format(
-                        current_pending_tasks), level='debug')
+                    self._log(f"Remote installation has exceeded the max remote pending task count ({current_pending_tasks})", level='debug')
                     continue
 
                 # Fetch remote installation library name list
@@ -932,7 +930,7 @@ class Links(object, metaclass=SingletonType):
                 password=remote_config.get('password'),
             )
             address = self.__format_address(remote_config.get('address'))
-            url = "{}/compresso/api/v2/pending/create".format(address)
+            url = f"{address}/compresso/api/v2/pending/create"
             data = {
                 "path":       abspath,
                 "library_id": library_id,
@@ -947,13 +945,13 @@ class Links(object, metaclass=SingletonType):
                           message2=json_data.get('traceback', []), level='error')
             return {}
         except requests.exceptions.Timeout:
-            self._log("Request to create remote pending task timed out '{}'".format(abspath), level='warning')
+            self._log(f"Request to create remote pending task timed out '{abspath}'", level='warning')
             return None
         except requests.exceptions.RequestException as e:
-            self._log("Request to create remote pending task failed '{}'".format(abspath), message2=str(e), level='warning')
+            self._log(f"Request to create remote pending task failed '{abspath}'", message2=str(e), level='warning')
             return None
         except Exception as e:
-            self._log("Failed to create remote pending task '{}'".format(abspath), message2=str(e), level='error')
+            self._log(f"Failed to create remote pending task '{abspath}'", message2=str(e), level='error')
         return {}
 
     def send_file_to_remote_installation(self, remote_config: dict, path: str):
@@ -1166,7 +1164,7 @@ class Links(object, metaclass=SingletonType):
         try:
             # Request API generate a DL link
             link_info = self.remote_api_get(remote_config,
-                                            '/compresso/api/v2/pending/download/data/id/{}'.format(remote_task_id))
+                                            f'/compresso/api/v2/pending/download/data/id/{remote_task_id}')
             if link_info.get('link_id'):
                 # Download the data file
                 res = self.remote_api_get_download(remote_config, '/compresso/downloads/{}'.format(link_info.get('link_id')),
@@ -1194,7 +1192,7 @@ class Links(object, metaclass=SingletonType):
         try:
             # Request API generate a DL link
             link_info = self.remote_api_get(remote_config,
-                                            '/compresso/api/v2/pending/download/file/id/{}'.format(remote_task_id))
+                                            f'/compresso/api/v2/pending/download/file/id/{remote_task_id}')
             if link_info.get('link_id'):
                 # Download the file
                 res = self.remote_api_get_download(remote_config, '/compresso/downloads/{}'.format(link_info.get('link_id')),

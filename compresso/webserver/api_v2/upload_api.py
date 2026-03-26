@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.upload_api.py
@@ -38,7 +37,7 @@ import tornado.web
 from compresso import config
 from compresso.libs import common, session
 from compresso.libs.frontend_push_messages import FrontendPushMessages
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.schemas import PendingTasksTableResultsSchema
 from compresso.webserver.helpers import pending_tasks
 
@@ -94,7 +93,7 @@ class ApiUploadHandler(BaseApiHandler):
         self.request.connection.set_max_body_size(MAX_STREAMED_SIZE)
 
         # Set the output path to the cache directory
-        out_folder = "compresso_remote_pending_library-{}".format(time.time())
+        out_folder = f"compresso_remote_pending_library-{time.time()}"
         if not self.cache_directory:
             self.cache_directory = os.path.join(self.config.get_cache_path(), 'remote_library', out_folder)
             if not os.path.exists(self.cache_directory):

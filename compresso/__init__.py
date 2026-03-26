@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
     compresso.__init__.py
@@ -32,11 +31,13 @@
 
 import warnings
 
-from .metadata import __author__
-from .metadata import __version__
-from .metadata import __description__
-from .metadata import __disclaimer__
-from .metadata import __forum__
-from .metadata import __video__
-from .metadata import __website__
-from .metadata import __copyright__
+from .metadata import (
+    __author__,
+    __copyright__,
+    __description__,
+    __disclaimer__,
+    __forum__,
+    __version__,
+    __video__,
+    __website__,
+)
