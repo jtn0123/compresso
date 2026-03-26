@@ -78,7 +78,7 @@ class ProxyHandler(tornado.web.RequestHandler):
 
         if not target_info:
             self.set_status(400)
-            self.write(f"Unknown remote installation: {target_id}")
+            self.write({"error": "Unknown remote installation"})
             return
 
         # Construct URL
@@ -121,9 +121,9 @@ class ProxyHandler(tornado.web.RequestHandler):
             if response.body:
                 self.write(response.body)
 
-        except Exception as e:
+        except Exception:
             self.set_status(502)
-            self.write(f"Proxy Error: {str(e)}")
+            self.write({"error": "Proxy Error"})
 
     async def get(self):
         await self._handle_request('GET')

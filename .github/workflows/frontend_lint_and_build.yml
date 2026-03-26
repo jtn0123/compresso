@@ -9,6 +9,9 @@ on:
       - "master"
       - "staging"
 
+permissions:
+  contents: read
+
 jobs:
   frontend_lint_and_build:
     name: Lint & Build Frontend

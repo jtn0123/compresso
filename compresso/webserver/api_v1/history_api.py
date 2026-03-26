@@ -81,12 +81,12 @@ class ApiHistoryHandler(BaseApiHandler):
         if request_dict.get("customActionName") == "delete-from-history":
             success = self.delete_historic_tasks(request_dict.get("id"))
             if not success:
-                self.write(json.dumps({"success": False}))
+                self.write({"success": False})
                 return
 
         # Return a list of historical tasks based on the request JSON body
         results = self.prepare_filtered_historic_tasks(request_dict)
-        self.write(json.dumps(results))
+        self.write(results)
 
     def delete_historic_tasks(self, historic_task_ids):
         """

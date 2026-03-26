@@ -30,8 +30,6 @@
 
 """
 import os
-import sys
-import traceback
 
 import tornado.web
 import tornado.log
@@ -152,18 +150,14 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
             if not plugins.exec_plugin_api_plugin_runner(data, plugin_module.get('plugin_id')):
                 tornado.log.app_log.exception(
                     "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get('plugin_id')))
-        except Exception as e:
-            self.set_status(500, reason="Error running plugin API: {}".format(str(e)))
+        except Exception:
+            tornado.log.app_log.exception(
+                "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get('plugin_id')))
+            self.set_status(500, reason="Internal server error")
             status_code = self.get_status()
-            exc_info = sys.exc_info()
-            traceback_lines = []
-            if exc_info and exc_info[0]:
-                for line in traceback.format_exception(*exc_info):
-                    traceback_lines.append(line)
             self.write({
-                'error':     "%(code)d: %(message)s" % {"code": status_code, "message": self._reason},
-                'messages':  {},
-                'traceback': traceback_lines
+                'error':    "%(code)d: %(message)s" % {"code": status_code, "message": self._reason},
+                'messages': {},
             })
             return
 

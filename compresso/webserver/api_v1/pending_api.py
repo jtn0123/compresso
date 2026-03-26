@@ -107,7 +107,7 @@ class ApiPendingHandler(BaseApiHandler):
 
         # Return a list of tasks based on the request JSON body
         results = pending_tasks.prepare_filtered_pending_tasks_for_table(request_dict)
-        self.write(json.dumps(results))
+        self.write(results)
 
     def trigger_library_rescan(self):
         """
@@ -174,8 +174,8 @@ class ApiPendingHandler(BaseApiHandler):
         """
         request_dict = json.loads(self.request.body)
 
-        # Fetch the abspath name
-        abspath = os.path.abspath(request_dict.get("path"))
+        # Fetch the abspath name (realpath resolves symlinks and traversal)
+        abspath = os.path.realpath(request_dict.get("path", ""))
 
         # Ensure path exists
         if not os.path.exists(abspath):
