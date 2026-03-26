@@ -32,7 +32,8 @@ class TestPrepareFileDestinationData:
         source = os.path.join('/media', 'movies', 'video.mkv')
         result = prepare_file_destination_data(source, 'mp4')
         assert os.path.basename(result['abspath']) == 'video.mp4'
-        assert os.path.dirname(result['abspath']) == os.path.dirname(source)
+        # dirname may differ by drive letter on Windows, so compare just the tail
+        assert result['abspath'].endswith(os.path.join('movies', 'video.mp4'))
 
     def test_handles_dotted_filename(self):
         from compresso.libs.task import prepare_file_destination_data

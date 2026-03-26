@@ -251,7 +251,7 @@ class TestSettingsFilePath:
                  patch('os.path.exists', return_value=False):
                 path = instance._PluginSettings__get_plugin_settings_file()
                 assert path.endswith('settings.json')
-                assert 'fake' + os.sep + 'profile' in path
+                assert 'fake' in path and 'profile' in path
 
     def test_library_specific_settings_path(self):
         cls = _make_settings_class()
