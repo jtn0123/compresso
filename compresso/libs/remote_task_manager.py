@@ -55,7 +55,7 @@ class RemoteTaskManager(threading.Thread):
     worker_subprocess_percent = '0'
     worker_subprocess_elapsed = '0'
 
-    worker_runners_info = {}
+    worker_runners_info: dict = {}
 
     def __init__(self, thread_id, name, installation_info, pending_queue, complete_queue, event):
         super().__init__(name=name)

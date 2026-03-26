@@ -41,7 +41,7 @@ from compresso.libs.singleton import SingletonType
 
 
 class DownloadsLinks(metaclass=SingletonType):
-    _download_links = {}
+    _download_links: dict = {}
     _lock = threading.RLock()
 
     def __remove_expired(self):

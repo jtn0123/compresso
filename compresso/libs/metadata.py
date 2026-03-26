@@ -59,8 +59,8 @@ class CompressoFileMetadata:
     _logger = CompressoLogging.get_logger(name="CompressoFileMetadata")
     _main_pid = os.getpid()
 
-    _task_cache = {}
-    _path_cache = OrderedDict()
+    _task_cache: dict = {}
+    _path_cache: OrderedDict = OrderedDict()
     _last_prune = 0
 
     @classmethod

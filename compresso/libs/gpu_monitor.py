@@ -27,7 +27,7 @@ class GpuMonitor(metaclass=SingletonType):
 
     def __init__(self):
         self.logger = CompressoLogging.get_logger(name=self.__class__.__name__)
-        self._history: dict[int, deque] = {}
+        self._history: dict[str, deque] = {}
         self._capabilities = self._probe_capabilities()
         self._macos_gpu_cache: list[dict] = []
 

@@ -37,7 +37,7 @@ from tornado.web import RequestHandler
 
 
 class BaseApiHandler(RequestHandler):
-    routes = []
+    routes: list = []
 
     def handle_404(self):
         self.set_status(404)

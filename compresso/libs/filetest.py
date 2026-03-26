@@ -54,7 +54,7 @@ class FileTest:
 
     def __init__(self, library_id: int):
         self.settings = config.Config()
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=__class__.__name__)  # type: ignore[name-defined]
 
         # Init plugins
         self.library_id = library_id
@@ -63,7 +63,7 @@ class FileTest:
                                                                                      library_id=library_id)
 
         # List of filed tasks
-        self.failed_paths = []
+        self.failed_paths: list = []
 
     def set_file(self):
         pass

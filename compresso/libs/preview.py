@@ -30,7 +30,7 @@ class PreviewManager:
 
     _lock = threading.Lock()
     _current_job = None
-    _jobs = {}
+    _jobs: dict = {}
 
     MAX_DURATION = 30  # seconds
     MAX_JOB_TIMEOUT = 600  # 10 minutes max per preview job

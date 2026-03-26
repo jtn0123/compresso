@@ -40,7 +40,7 @@ from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, C
 try:
     from json.decoder import JSONDecodeError
 except ImportError:
-    JSONDecodeError = ValueError
+    JSONDecodeError = ValueError  # type: ignore[assignment,misc]
 
 
 class History:

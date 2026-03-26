@@ -90,7 +90,7 @@ def get_all_containers():
 Import all submodules for this package
 
 """
-for (_, name, _) in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
+for (_, name, _) in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):  # type: ignore[assignment]
 
     imported_module = import_module('.' + name, package=__name__)
 

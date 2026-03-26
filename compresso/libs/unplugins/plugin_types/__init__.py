@@ -97,7 +97,7 @@ Import all submodules for this package
 """
 for type_modules_path in type_modules_paths:
     plugin_type = os.path.basename(Path(type_modules_path))
-    for (_, name, _) in pkgutil.iter_modules([type_modules_path]):
+    for (_, name, _) in pkgutil.iter_modules([type_modules_path]):  # type: ignore[assignment]
 
         imported_module = import_module('.' + plugin_type + '.' + name, package=__name__)
 

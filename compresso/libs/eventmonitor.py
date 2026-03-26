@@ -45,15 +45,15 @@ try:
 
     event_monitor_module = 'watchdog'
 except ImportError:
-    class Observer:
+    class Observer:  # type: ignore[no-redef]
         pass
 
 
-    class FileSystemEventHandler:
+    class FileSystemEventHandler:  # type: ignore[no-redef]
         pass
 
 
-    event_monitor_module = None
+    event_monitor_module = None  # type: ignore[assignment]
 
 from compresso.libs.filetest import FileTest
 

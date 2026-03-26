@@ -45,8 +45,8 @@ class PluginType:
     name = ''
     runner = ''
     runner_docstring = ''
-    data_schema = {}
-    test_data = {}
+    data_schema: dict = {}
+    test_data: dict = {}
 
     def plugin_type_name(self):
         """

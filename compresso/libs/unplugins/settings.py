@@ -42,14 +42,14 @@ class PluginSettings:
     to be configured by users from within the Compresso WebUI.
 
     """
-    settings = {}
+    settings: dict = {}
 
     """
     A dictionary of form settings used by Compresso's WebUI to configure
     the plugin's settings form.
 
     """
-    form_settings = {}
+    form_settings: dict = {}
 
     """
     A cached copy of settings as they are stored on disk.

@@ -220,4 +220,4 @@ if __name__ == "__main__":
     for hardware_decoder in hw_a.get_hwaccel_devices():
         hw_a.hardware_device = hardware_decoder
         break
-    print(hw_a.args())  # noqa: T201
+    print(hw_a.args())  # type: ignore[attr-defined]  # noqa: T201

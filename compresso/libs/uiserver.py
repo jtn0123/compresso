@@ -60,7 +60,7 @@ tornado_settings = {
 
 
 class CompressoDataQueues(metaclass=SingletonType):
-    _compresso_data_queues = {}
+    _compresso_data_queues: dict = {}
 
     def __init__(self):
         pass
@@ -73,7 +73,7 @@ class CompressoDataQueues(metaclass=SingletonType):
 
 
 class CompressoRunningThreads(metaclass=SingletonType):
-    _compresso_threads = {}
+    _compresso_threads: dict = {}
 
     def __init__(self):
         pass

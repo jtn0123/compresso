@@ -41,7 +41,7 @@ from compresso.libs.singleton import SingletonType
 try:
     from json.decoder import JSONDecodeError
 except ImportError:
-    JSONDecodeError = ValueError
+    JSONDecodeError = ValueError  # type: ignore[assignment,misc]
 
 logger = CompressoLogging.get_logger(name="Config")
 

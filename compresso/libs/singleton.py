@@ -35,7 +35,7 @@ lock = threading.RLock()
 
 class SingletonType(type):
     """Singleton metaclass"""
-    _instances = {}
+    _instances: dict = {}
 
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:

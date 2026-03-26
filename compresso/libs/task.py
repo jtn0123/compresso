@@ -42,7 +42,7 @@ from compresso import config
 from compresso.libs import common
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.unmodels.tasks import IntegrityError, Tasks
+from compresso.libs.unmodels.tasks import IntegrityError, Tasks  # type: ignore[attr-defined]
 
 
 def prepare_file_destination_data(pathname, file_extension):
@@ -533,8 +533,8 @@ class TaskDataStore:
            }
     """
 
-    _runner_state = {}
-    _task_state = {}
+    _runner_state: dict = {}
+    _task_state: dict = {}
     _lock = threading.RLock()
     _ctx = threading.local()
 

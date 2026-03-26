@@ -37,7 +37,7 @@ class Codecs:
     Generic configuration and methods used across all codec classes
     """
     name = ''
-    encoders = []
+    encoders: list = []
     default_encoder = ''
     codec_long_name = ''
 

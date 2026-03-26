@@ -44,7 +44,7 @@ from compresso.libs.singleton import SingletonType
 
 
 class Links(metaclass=SingletonType):
-    _network_transfer_lock = {}
+    _network_transfer_lock: dict = {}
 
     def __init__(self, *args, **kwargs):
         self.settings = config.Config()
@@ -138,7 +138,9 @@ class Links(metaclass=SingletonType):
         except Exception:  # noqa: S110 — best-effort UI notification; FrontendPushMessages may not be available
             pass
 
-    def __format_address(self, address: str):
+    def __format_address(self, address: str | None):
+        if address is None:
+            address = ''
         # Strip all whitespace
         address = address.strip()
         # Add http if it does not exist

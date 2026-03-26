@@ -53,7 +53,7 @@ class Worker(threading.Thread):
     start_time = None
     finish_time = None
 
-    worker_runners_info = {}
+    worker_runners_info: dict = {}
 
     def __init__(self, thread_id, name, worker_group_id, pending_queue, complete_queue, event):
         super().__init__(name=name)

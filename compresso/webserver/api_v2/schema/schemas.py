@@ -315,7 +315,7 @@ class CompletedTasksSchema(TableRecordsSuccessSchema):
         required=True,
         metadata={'description': "Total count of times with a failed status in the results list", 'example': 2},
     )
-    results = fields.Nested(
+    results = fields.Nested(  # type: ignore[assignment]
         CompletedTasksTableResultsSchema,
         required=True,
         metadata={'description': "Results"},
@@ -671,7 +671,7 @@ class PendingTasksTableResultsSchema(BaseSchema):
 class PendingTasksSchema(TableRecordsSuccessSchema):
     """Schema for returning a list of pending task results"""
 
-    results = fields.Nested(
+    results = fields.Nested(  # type: ignore[assignment]
         PendingTasksTableResultsSchema,
         required=True,
         metadata={'description': "Results"},
@@ -900,7 +900,7 @@ class PluginsTableResultsSchema(PluginsMetadataResultsSchema):
 class PluginsDataSchema(TableRecordsSuccessSchema):
     """Schema for returning a list of plugin table results"""
 
-    results = fields.Nested(
+    results = fields.Nested(  # type: ignore[assignment]
         PluginsTableResultsSchema,
         required=True,
         metadata={'description': "Results"},

@@ -23,7 +23,7 @@ from compresso.libs.unmodels import CompressionStats, LibraryAnalysisCache
 logger = CompressoLogging.get_logger('library_analysis')
 
 # In-progress analyses keyed by library_id
-_active_analyses = {}
+_active_analyses: dict = {}
 _analyses_lock = threading.Lock()
 
 

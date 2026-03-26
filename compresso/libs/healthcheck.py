@@ -27,7 +27,7 @@ class HealthCheckManager:
     _lock = threading.Lock()
     _scanning = False
     _cancel_event = threading.Event()
-    _scan_progress = {
+    _scan_progress: dict = {
         'total': 0,
         'checked': 0,
         'library_id': None,
@@ -40,7 +40,7 @@ class HealthCheckManager:
     }
     _worker_count_requested = 1
 
-    _file_locks = {}
+    _file_locks: dict = {}
     _file_locks_lock = threading.Lock()
 
     def __init__(self):

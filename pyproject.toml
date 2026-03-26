@@ -52,6 +52,7 @@ python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+warn_redundant_casts = true
 exclude = [
     "compresso/webserver/frontend",
     "venv",
@@ -59,3 +60,8 @@ exclude = [
     "dist",
     "build",
 ]
+
+# ORM models use peewee wildcard imports — no type stubs available
+[[tool.mypy.overrides]]
+module = "compresso.libs.unmodels.*"
+disable_error_code = ["name-defined"]
