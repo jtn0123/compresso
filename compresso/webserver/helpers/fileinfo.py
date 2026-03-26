@@ -132,9 +132,7 @@ def _is_hdr(stream):
         return True
     # Secondary signal: BT.2020 color primaries suggest HDR content
     primaries = stream.get('color_primaries', '').lower()
-    if primaries == 'bt2020':
-        return True
-    return False
+    return primaries == 'bt2020'
 
 
 def _safe_int(value):

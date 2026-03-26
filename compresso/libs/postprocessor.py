@@ -28,6 +28,7 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import contextlib
 import datetime
 import os
 import shutil
@@ -578,30 +579,29 @@ class PostProcessor(threading.Thread):
                     # Only run the final file copy to overwrite the source file if the remove_source_file flag was never set
                     # The remove_source_file flag will remove the source file in later lines after this copy operation,
                     #   so if we did copy the file here, it would be a waste of time
-                    if not data.get('remove_source_file'):
-                        if not self.__copy_file(cache_path, destination_data.get('abspath'), destination_files, 'DEFAULT',
-                                                move=True, tracker=tracker):
-                            file_move_processes_success = False
+                    if not data.get('remove_source_file') and not self.__copy_file(
+                        cache_path, destination_data.get('abspath'), destination_files, 'DEFAULT',
+                        move=True, tracker=tracker,
+                    ):
+                        file_move_processes_success = False
                 elif not self.__copy_file(cache_path, destination_data.get('abspath'), destination_files, 'DEFAULT',
                                           move=True, tracker=tracker):
                     file_move_processes_success = False
 
             # Source file removal process
             # Only run if all final post-processor file moments were successful
-            if file_move_processes_success:
-                # Check if the remove source flag is still True after all plugins have run. If so, we will remove the source file
-                if data.get('remove_source_file'):
-                    # Only carry out a source removal if the file exists and the final copy was also successful
-                    if file_move_processes_success and os.path.exists(source_data.get('abspath')):
-                        self._log("Removing source: {}".format(source_data.get('abspath')))
-                        try:
-                            tracker.safe_remove(source_data.get('abspath'))
-                        except (OSError, PermissionError, shutil.Error) as e:
-                            self._log("Failed to safely remove source file", message2=str(e), level="error")
-                            file_move_processes_success = False
-                    else:
-                        self._log("Keeping source file '{}'. Not all postprocessor file movement functions completed.".format(
-                            source_data.get('abspath')), level="warning")
+            if file_move_processes_success and data.get('remove_source_file'):
+                # Only carry out a source removal if the file exists and the final copy was also successful
+                if file_move_processes_success and os.path.exists(source_data.get('abspath')):
+                    self._log("Removing source: {}".format(source_data.get('abspath')))
+                    try:
+                        tracker.safe_remove(source_data.get('abspath'))
+                    except (OSError, PermissionError, shutil.Error) as e:
+                        self._log("Failed to safely remove source file", message2=str(e), level="error")
+                        file_move_processes_success = False
+                else:
+                    self._log("Keeping source file '{}'. Not all postprocessor file movement functions completed.".format(
+                        source_data.get('abspath')), level="warning")
 
             # Commit or rollback tracked file operations
             if file_move_processes_success:
@@ -849,19 +849,16 @@ class PostProcessor(threading.Thread):
                 self.logger.warning("POSTPROCESS_SOURCE_METADATA_UNAVAILABLE path=%s", source_abspath)
                 self._log(f"Could not extract source metadata: {e}", level='warning')
         # Destination metadata only on success
-        if task_dump.get('task_success', False):
-            if dest_path and os.path.exists(dest_path):
-                try:
-                    dest_meta = extract_media_metadata(dest_path)
-                except (subprocess.SubprocessError, OSError, ValueError) as e:
-                    self._log(f"Could not extract destination metadata: {e}", level='debug')
+        if task_dump.get('task_success', False) and dest_path and os.path.exists(dest_path):
+            try:
+                dest_meta = extract_media_metadata(dest_path)
+            except (subprocess.SubprocessError, OSError, ValueError) as e:
+                self._log(f"Could not extract destination metadata: {e}", level='debug')
 
         # Extract source duration for encoding speed context
         source_duration_seconds = 0
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             source_duration_seconds = float(source_meta.get('duration', 0))
-        except (TypeError, ValueError):
-            pass
 
         history_logging.save_task_history(
             {

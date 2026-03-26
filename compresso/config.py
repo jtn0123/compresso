@@ -29,6 +29,7 @@
 
 """
 
+import contextlib
 import json
 import os
 
@@ -430,11 +431,9 @@ class Config(metaclass=SingletonType):
             retention_days = int(value)
         except (TypeError, ValueError):
             raise ValueError(f"log_buffer_retention must be an integer, got {value!r}") from None
-        try:
-            # On Compresso startup, it may not have yet initialised the logger when this is first run.
+        # On Compresso startup, it may not have yet initialised the logger when this is first run.
+        with contextlib.suppress(AttributeError):
             CompressoLogging.set_remote_logging_retention(retention_days)
-        except (AttributeError):
-            pass
         self.log_buffer_retention = retention_days
 
     def get_first_run(self):

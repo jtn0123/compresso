@@ -29,16 +29,18 @@ def reset_singletons():
 def _make_handler(tmp_path, flush_interval=5, max_chunk_size=5 * 1024 * 1024):
     """Create a ForwardLogHandler without starting background threads."""
     from compresso.libs.logs import ForwardLogHandler
-    with patch.object(ForwardLogHandler, '_load_buffer_state', return_value={}):
-        with patch.object(ForwardLogHandler, '_sync_state_with_disk'):
-            with patch('threading.Thread') as mock_thread:
-                mock_thread.return_value.start = MagicMock()
-                handler = ForwardLogHandler(
-                    buffer_path=str(tmp_path / "buffer"),
-                    installation_name="test-install",
-                    flush_interval=flush_interval,
-                    max_chunk_size=max_chunk_size,
-                )
+    with (
+        patch.object(ForwardLogHandler, '_load_buffer_state', return_value={}),
+        patch.object(ForwardLogHandler, '_sync_state_with_disk'),
+        patch('threading.Thread') as mock_thread,
+    ):
+        mock_thread.return_value.start = MagicMock()
+        handler = ForwardLogHandler(
+            buffer_path=str(tmp_path / "buffer"),
+            installation_name="test-install",
+            flush_interval=flush_interval,
+            max_chunk_size=max_chunk_size,
+        )
     return handler
 
 
@@ -260,12 +262,14 @@ class TestTransmitBuffer:
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         mock_resp.text = "Internal Server Error"
-        with patch('requests.post', return_value=mock_resp):
-            with patch('compresso.libs.logs.Notifications'):
-                with patch('compresso.libs.logs.FrontendPushMessages'):
-                    result = handler._transmit_buffer(
-                        [{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test"
-                    )
+        with (
+            patch('requests.post', return_value=mock_resp),
+            patch('compresso.libs.logs.Notifications'),
+            patch('compresso.libs.logs.FrontendPushMessages'),
+        ):
+            result = handler._transmit_buffer(
+                [{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test"
+            )
         assert result is False
         assert handler.previous_connection_failed is True
 
@@ -426,10 +430,9 @@ class TestLoadBufferState:
         buf_dir.mkdir()
         state_file = buf_dir / ForwardLogHandler.STATE_FILENAME
         state_file.write_text(json.dumps({"files": {"log_buffer_20240101T00.jsonl": 100}}))
-        with patch.object(ForwardLogHandler, '_sync_state_with_disk'):
-            with patch('threading.Thread') as mock_thread:
-                mock_thread.return_value.start = MagicMock()
-                handler = ForwardLogHandler(str(buf_dir), "test")
+        with patch.object(ForwardLogHandler, '_sync_state_with_disk'), patch('threading.Thread') as mock_thread:
+            mock_thread.return_value.start = MagicMock()
+            handler = ForwardLogHandler(str(buf_dir), "test")
         assert handler._buffer_state.get("log_buffer_20240101T00.jsonl") == 100
 
     def test_load_returns_empty_on_missing_file(self, tmp_path):

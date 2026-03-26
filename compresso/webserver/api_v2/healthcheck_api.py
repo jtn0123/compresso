@@ -158,10 +158,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
                 mode=json_request.get('mode', 'quick'),
             )
 
-            if started:
-                message = "Library scan started"
-            else:
-                message = "A scan is already in progress"
+            message = "Library scan started" if started else "A scan is already in progress"
 
             response = self.build_response(
                 HealthCheckLibraryScanResponseSchema(),

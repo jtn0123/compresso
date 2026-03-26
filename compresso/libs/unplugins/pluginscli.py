@@ -660,7 +660,7 @@ class PluginsCLI:
             'Remove plugin':                'remove_plugin',
             'Install test data':            'install_test_data',
         }
-        function = switcher.get(arg, None)
+        function = switcher.get(arg)
         if function:
             getattr(self, function)()
         else:

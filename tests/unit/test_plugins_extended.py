@@ -173,9 +173,11 @@ class TestGetPluginsInRepoData:
                 {"id": "old_plugin", "name": "Old", "version": "2.0", "compatibility": [2]},
             ]
         }
-        with patch.object(handler, 'get_plugin_info', return_value={"version": "1.0"}):
-            with patch.object(handler, 'flag_plugin_for_update_by_id'):
-                result = handler.get_plugins_in_repo_data(repo_data)
+        with (
+            patch.object(handler, 'get_plugin_info', return_value={"version": "1.0"}),
+            patch.object(handler, 'flag_plugin_for_update_by_id'),
+        ):
+            result = handler.get_plugins_in_repo_data(repo_data)
         assert result[0]['status']['installed'] is True
         assert result[0]['status']['update_available'] is True
 
@@ -186,20 +188,24 @@ class TestGetInstallablePluginsList:
     def test_returns_list_from_repos(self, tmp_path):
         handler = _make_handler(tmp_path)
         fake_plugins = [{"plugin_id": "p1", "name": "P1"}]
-        with patch.object(handler, 'get_plugin_repos', return_value=[{"path": "default"}]):
-            with patch.object(handler, 'get_plugin_repo_id', return_value=1):
-                with patch.object(handler, 'read_repo_data', return_value={}):
-                    with patch.object(handler, 'get_plugins_in_repo_data', return_value=fake_plugins):
-                        result = handler.get_installable_plugins_list()
+        with (
+            patch.object(handler, 'get_plugin_repos', return_value=[{"path": "default"}]),
+            patch.object(handler, 'get_plugin_repo_id', return_value=1),
+            patch.object(handler, 'read_repo_data', return_value={}),
+            patch.object(handler, 'get_plugins_in_repo_data', return_value=fake_plugins),
+        ):
+            result = handler.get_installable_plugins_list()
         assert len(result) == 1
         assert result[0]['plugin_id'] == "p1"
         assert result[0]['repo_id'] == '1'
 
     def test_filters_by_repo_id(self, tmp_path):
         handler = _make_handler(tmp_path)
-        with patch.object(handler, 'get_plugin_repos', return_value=[{"path": "default"}]):
-            with patch.object(handler, 'get_plugin_repo_id', return_value=1):
-                result = handler.get_installable_plugins_list(filter_repo_id=999)
+        with (
+            patch.object(handler, 'get_plugin_repos', return_value=[{"path": "default"}]),
+            patch.object(handler, 'get_plugin_repo_id', return_value=1),
+        ):
+            result = handler.get_installable_plugins_list(filter_repo_id=999)
         assert result == []
 
 
@@ -260,9 +266,11 @@ class TestUpdatePluginRepos:
         plugins_dir = tmp_path / 'plugins'
         plugins_dir.mkdir(parents=True, exist_ok=True)
         repo_data = {"repo": {"name": "test"}, "plugins": []}
-        with patch.object(handler, 'get_plugin_repos', return_value=[{"path": "default"}]):
-            with patch.object(handler, 'fetch_remote_repo_data', return_value=repo_data):
-                result = handler.update_plugin_repos()
+        with (
+            patch.object(handler, 'get_plugin_repos', return_value=[{"path": "default"}]),
+            patch.object(handler, 'fetch_remote_repo_data', return_value=repo_data),
+        ):
+            result = handler.update_plugin_repos()
         assert result is True
 
 
@@ -278,20 +286,24 @@ class TestInstallPluginById:
     def test_install_plugin_by_id_download_failure(self, tmp_path):
         handler = _make_handler(tmp_path)
         plugin = {"plugin_id": "test_plugin", "name": "Test", "version": "1.0"}
-        with patch.object(handler, 'get_installable_plugins_list', return_value=[plugin]):
-            with patch.object(handler, 'download_and_install_plugin', return_value=False):
-                result = handler.install_plugin_by_id("test_plugin")
+        with (
+            patch.object(handler, 'get_installable_plugins_list', return_value=[plugin]),
+            patch.object(handler, 'download_and_install_plugin', return_value=False),
+        ):
+            result = handler.install_plugin_by_id("test_plugin")
         assert result is False
 
     def test_install_plugin_by_id_success(self, tmp_path):
         handler = _make_handler(tmp_path)
         plugin = {"plugin_id": "test_plugin", "name": "Test", "version": "1.0"}
-        with patch.object(handler, 'get_installable_plugins_list', return_value=[plugin]):
-            with patch.object(handler, 'download_and_install_plugin', return_value=True):
-                with patch.object(handler, 'write_plugin_data_to_db', return_value=True):
-                    with patch.object(handler, 'get_plugin_path', return_value=str(tmp_path / 'plugins' / 'test_plugin')):
-                        with patch('compresso.libs.plugins.PluginExecutor'):
-                            result = handler.install_plugin_by_id("test_plugin")
+        with (
+            patch.object(handler, 'get_installable_plugins_list', return_value=[plugin]),
+            patch.object(handler, 'download_and_install_plugin', return_value=True),
+            patch.object(handler, 'write_plugin_data_to_db', return_value=True),
+            patch.object(handler, 'get_plugin_path', return_value=str(tmp_path / 'plugins' / 'test_plugin')),
+            patch('compresso.libs.plugins.PluginExecutor'),
+        ):
+            result = handler.install_plugin_by_id("test_plugin")
         assert result is True
 
 
@@ -301,12 +313,14 @@ class TestDownloadAndInstallPlugin:
     def test_download_and_install_success(self, tmp_path):
         handler = _make_handler(tmp_path)
         plugin = {"plugin_id": "p1", "name": "P1", "version": "1.0", "package_url": "http://x.com/p.zip"}
-        with patch.object(handler, 'download_plugin', return_value=str(tmp_path / 'downloaded.zip')):
-            with patch.object(handler, 'install_plugin', return_value={"id": "p1"}):
-                with patch('os.path.isfile', return_value=True):
-                    with patch('os.remove'):
-                        with patch.object(handler, 'notify_site_of_plugin_install'):
-                            result = handler.download_and_install_plugin(plugin)
+        with (
+            patch.object(handler, 'download_plugin', return_value=str(tmp_path / 'downloaded.zip')),
+            patch.object(handler, 'install_plugin', return_value={"id": "p1"}),
+            patch('os.path.isfile', return_value=True),
+            patch('os.remove'),
+            patch.object(handler, 'notify_site_of_plugin_install'),
+        ):
+            result = handler.download_and_install_plugin(plugin)
         assert result is True
 
     def test_download_and_install_exception_returns_false(self, tmp_path):
@@ -335,11 +349,13 @@ class TestInstallPluginFromPath:
         with zipfile.ZipFile(str(zip_path), 'w') as zf:
             zf.writestr("info.json", json.dumps(info))
 
-        with patch.object(handler, 'install_plugin', return_value=info):
-            with patch.object(handler, 'write_plugin_data_to_db', return_value=True):
-                with patch.object(handler, 'get_plugin_path', return_value=str(tmp_path / 'plugins' / 'zip_plugin')):
-                    with patch('compresso.libs.plugins.PluginExecutor'):
-                        result = handler.install_plugin_from_path_on_disk(str(zip_path))
+        with (
+            patch.object(handler, 'install_plugin', return_value=info),
+            patch.object(handler, 'write_plugin_data_to_db', return_value=True),
+            patch.object(handler, 'get_plugin_path', return_value=str(tmp_path / 'plugins' / 'zip_plugin')),
+            patch('compresso.libs.plugins.PluginExecutor'),
+        ):
+            result = handler.install_plugin_from_path_on_disk(str(zip_path))
         assert result is True
 
 
@@ -388,11 +404,13 @@ class TestSetPluginRepos:
 
     def test_set_plugin_repos_success(self, tmp_path):
         handler = _make_handler(tmp_path)
-        with patch.object(handler, 'fetch_remote_repo_data', return_value={"repo": {}}):
-            with patch('compresso.libs.plugins.PluginRepos') as mock_pr:
-                mock_pr.delete.return_value.execute.return_value = None
-                mock_pr.insert_many.return_value.execute.return_value = None
-                result = handler.set_plugin_repos(["https://good.com"])
+        with (
+            patch.object(handler, 'fetch_remote_repo_data', return_value={"repo": {}}),
+            patch('compresso.libs.plugins.PluginRepos') as mock_pr,
+        ):
+            mock_pr.delete.return_value.execute.return_value = None
+            mock_pr.insert_many.return_value.execute.return_value = None
+            result = handler.set_plugin_repos(["https://good.com"])
         assert result is True
 
 

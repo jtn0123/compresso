@@ -74,9 +74,9 @@ def _stop_thread_if_supported(thread):
 
     event = getattr(thread, "event", None)
     if event is not None and hasattr(event, "set"):
-        try:
+        try:  # noqa: SIM105 — best-effort thread wakeup during test cleanup
             event.set()
-        except Exception:  # noqa: S110 — best-effort thread wakeup during test cleanup
+        except Exception:  # noqa: S110
             pass
 
     try:

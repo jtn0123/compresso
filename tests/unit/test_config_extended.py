@@ -34,17 +34,15 @@ def _make_config(tmp_path, env_vars=None, settings_data=None, **kwargs):
             json.dump(settings_data, f)
 
     env = env_vars or {}
-    with patch.dict(os.environ, env, clear=False):
-        with patch('compresso.config.common') as mock_common:
-            mock_common.get_home_dir.return_value = str(tmp_path)
-            mock_common.get_default_library_path.return_value = str(tmp_path / 'library')
-            mock_common.get_default_cache_path.return_value = str(tmp_path / 'cache')
-            mock_common.json_dump_to_file.return_value = {'success': True, 'errors': []}
-            with patch('compresso.config.CompressoLogging'):
-                with patch('compresso.config.metadata') as mock_meta:
-                    mock_meta.read_version_string.return_value = '1.0.0-test'
-                    from compresso.config import Config
-                    c = Config(config_path=config_path, **kwargs)
+    with patch.dict(os.environ, env, clear=False), patch('compresso.config.common') as mock_common:
+        mock_common.get_home_dir.return_value = str(tmp_path)
+        mock_common.get_default_library_path.return_value = str(tmp_path / 'library')
+        mock_common.get_default_cache_path.return_value = str(tmp_path / 'cache')
+        mock_common.json_dump_to_file.return_value = {'success': True, 'errors': []}
+        with patch('compresso.config.CompressoLogging'), patch('compresso.config.metadata') as mock_meta:
+            mock_meta.read_version_string.return_value = '1.0.0-test'
+            from compresso.config import Config
+            c = Config(config_path=config_path, **kwargs)
     return c
 
 

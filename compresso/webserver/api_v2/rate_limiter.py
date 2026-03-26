@@ -45,10 +45,7 @@ class RateLimiter:
 
     def is_expensive(self, path):
         """Check if a path matches an expensive endpoint."""
-        for expensive in self.EXPENSIVE_PATHS:
-            if path.endswith(expensive):
-                return True
-        return False
+        return any(path.endswith(expensive) for expensive in self.EXPENSIVE_PATHS)
 
     def _cleanup_stale_ips(self):
         """Remove IPs that have no requests in the last 5 minutes."""

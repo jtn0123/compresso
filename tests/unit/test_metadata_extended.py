@@ -48,9 +48,9 @@ def metadata_db(in_memory_db):
     yield in_memory_db
     # Clean up data between tests
     for model in [FileMetadataPaths, TaskMetadata, FileMetadata, Tasks]:
-        try:
+        try:  # noqa: SIM105 — best-effort cleanup; table may not exist
             model.delete().execute()
-        except Exception:  # noqa: S110 — best-effort cleanup; table may not exist
+        except Exception:  # noqa: S110
             pass
 
 
@@ -536,9 +536,11 @@ class TestEnsureMainProcess:
 
     def test_wrong_pid_raises(self):
         from compresso.libs.metadata import CompressoFileMetadata
-        with patch.object(CompressoFileMetadata, '_main_pid', -1):
-            with pytest.raises(RuntimeError, match="only available in the main process"):
-                CompressoFileMetadata._ensure_main_process()
+        with (
+            patch.object(CompressoFileMetadata, '_main_pid', -1),
+            pytest.raises(RuntimeError, match="only available in the main process"),
+        ):
+            CompressoFileMetadata._ensure_main_process()
 
     def test_correct_pid_passes(self):
         from compresso.libs.metadata import CompressoFileMetadata

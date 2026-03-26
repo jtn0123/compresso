@@ -227,6 +227,8 @@ class TestMetadataContextBinding:
 
     def test_bind_runner_context_wrong_process_raises(self):
         from compresso.libs.metadata import CompressoFileMetadata
-        with patch.object(CompressoFileMetadata, '_main_pid', -1):
-            with pytest.raises(RuntimeError, match="only available in the main process"):
-                CompressoFileMetadata.bind_runner_context(plugin_id='test_plug')
+        with (
+            patch.object(CompressoFileMetadata, '_main_pid', -1),
+            pytest.raises(RuntimeError, match="only available in the main process"),
+        ):
+            CompressoFileMetadata.bind_runner_context(plugin_id='test_plug')

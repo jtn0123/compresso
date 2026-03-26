@@ -938,7 +938,7 @@ class TestRemoteApiPostFileHandleLeak:
                 '/api/upload',
                 str(test_file)
             )
-            mock_fh.close.assert_called_once()
+            mock_fh.__exit__.assert_called_once()
 
     def test_file_handle_closed_on_post_exception(self, tmp_path):
         links = _create_links()
@@ -956,7 +956,7 @@ class TestRemoteApiPostFileHandleLeak:
                     '/api/upload',
                     str(test_file)
                 )
-            mock_fh.close.assert_called_once()
+            mock_fh.__exit__.assert_called_once()
 
 
 if __name__ == '__main__':

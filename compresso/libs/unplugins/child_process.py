@@ -28,6 +28,7 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import contextlib
 import queue
 import signal
 import threading
@@ -89,19 +90,15 @@ def kill_all_plugin_processes():
 
         # Attempt graceful shutdown
         for p in procs:
-            try:
+            with contextlib.suppress(psutil.NoSuchProcess):
                 p.terminate()
-            except psutil.NoSuchProcess:
-                pass
 
         gone, alive = psutil.wait_procs(procs, timeout=3)
 
         # Finally, force kill any stragglers
         for p in alive:
-            try:
+            with contextlib.suppress(psutil.NoSuchProcess):
                 p.kill()
-            except psutil.NoSuchProcess:
-                pass
         psutil.wait_procs(alive, timeout=3)
 
 

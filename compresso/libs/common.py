@@ -47,15 +47,8 @@ logger = CompressoLogging.get_logger('common')
 def get_home_dir():
     # Attempt to get the HOME_DIR environment variable
     home_dir = os.environ.get('HOME_DIR')
-    # If HOME_DIR is unset, empty, or specifically set to use the home directory
-    if not home_dir:
-        # Expand the tilde to the user's home directory
-        home_dir = os.path.expanduser("~")
-    else:
-        # For any value of HOME_DIR, ensure tilde and relative paths are correctly handled
-        # os.path.expanduser will handle tilde but won't affect absolute paths
-        # os.path.abspath will convert a relative path to an absolute path
-        home_dir = os.path.abspath(os.path.expanduser(home_dir))
+    # If HOME_DIR is unset/empty, expand ~; otherwise resolve tilde and relative paths to absolute.
+    home_dir = os.path.expanduser("~") if not home_dir else os.path.abspath(os.path.expanduser(home_dir))
     return home_dir
 
 
@@ -90,7 +83,7 @@ def format_message(message, message2=''):
         # Message2 can support other objects:
         if isinstance(message2, str):
             message = f"{message} - {str(message2)}"
-        elif isinstance(message2, dict) or isinstance(message2, list):
+        elif isinstance(message2, (dict, list)):
             import pprint
             message2 = pprint.pformat(message2, indent=1)
             message = f"{message} \n{str(message2)}"
@@ -351,14 +344,10 @@ def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
 
     actual_algo_to_use = algo
 
-    if algo in ["sampled_sha256_v1", "sampled_xxhash_v1"]:
-        if file_size <= algos[algo]["full_hash_limit"]:
-            actual_algo_to_use = algos[algo]["fallback_algo"]
+    if algo in ["sampled_sha256_v1", "sampled_xxhash_v1"] and file_size <= algos[algo]["full_hash_limit"]:
+        actual_algo_to_use = algos[algo]["fallback_algo"]
 
-    if actual_algo_to_use in ["full_xxhash_v1", "sampled_xxhash_v1"]:
-        file_hash_obj = xxhash.xxh64()
-    else:
-        file_hash_obj = hashlib.sha256()
+    file_hash_obj = xxhash.xxh64() if actual_algo_to_use in ["full_xxhash_v1", "sampled_xxhash_v1"] else hashlib.sha256()
 
     file_hash_obj.update(str(file_size).encode('utf-8'))
 

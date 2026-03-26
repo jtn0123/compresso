@@ -618,10 +618,7 @@ class PluginsHandler(metaclass=SingletonType):
             # Get order by
             if order:
                 for o in order:
-                    if o.get("model"):
-                        model = o.get("model")
-                    else:
-                        model = Plugins
+                    model = o.get("model") if o.get("model") else Plugins
                     if o.get("dir") == "asc":
                         order_by = attrgetter(o.get("column"))(model).asc()
                     else:
@@ -696,10 +693,7 @@ class PluginsHandler(metaclass=SingletonType):
         EnabledPlugins.delete().where(EnabledPlugins.plugin_id.in_(plugin_table_ids)).execute()
 
         # Delete by ID in DB
-        if not Plugins.delete().where(Plugins.id.in_(plugin_table_ids)).execute():
-            return False
-
-        return True
+        return Plugins.delete().where(Plugins.id.in_(plugin_table_ids)).execute()
 
     def update_plugins_by_db_table_id(self, plugin_table_ids):
         self.logger.debug("Update plugins '%s'", plugin_table_ids)
@@ -852,11 +846,10 @@ class PluginsHandler(metaclass=SingletonType):
                     plugin_info = None
                     self._log("Exception while fetching plugin info for {}:".format(record.get('plugin_id')), message2=str(e),
                               level="exception")
-                if plugin_info:
-                    # Plugins will require a 'compatibility' entry in their info.json file.
-                    #   This must list the plugin handler versions that it is compatible with
-                    if self.version in plugin_info.get('compatibility', []):
-                        continue
+                # Plugins will require a 'compatibility' entry in their info.json file.
+                #   This must list the plugin handler versions that it is compatible with
+                if plugin_info and self.version in plugin_info.get('compatibility', []):
+                    continue
 
                 self._log(
                     "Incompatible plugin detected: {} ({})".format(record.get('name'), record.get('plugin_id')),

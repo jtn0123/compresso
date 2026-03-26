@@ -68,14 +68,9 @@ class VideoCodecHandle:
                 if stream['codec_name'] in ['mjpeg']:
                     just_copy_video_stream = True
 
-                # Check for more details about the stream
-                if 'tags' in stream:
-                    # Is 'mimetype' in the tags
-                    if 'mimetype' in stream['tags']:
-                        # If this video stream is really an embedded jpeg file (image/jpeg)
-                        # simply copy the stream
-                        if stream['tags']['mimetype'] == 'image/jpeg':
-                            just_copy_video_stream = True
+                # If this video stream is really an embedded jpeg file (image/jpeg), simply copy the stream
+                if 'tags' in stream and 'mimetype' in stream['tags'] and stream['tags']['mimetype'] == 'image/jpeg':
+                    just_copy_video_stream = True
 
                 # If this video encoding is disabled. Then copy the stream
                 if self.disable_video_encoding:

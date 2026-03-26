@@ -59,10 +59,7 @@ class Containers:
 
         :return:
         """
-        if hasattr(self, 'supports_subtitles'):
-            if self.supports_subtitles:
-                return True
-        return False
+        return bool(hasattr(self, 'supports_subtitles') and self.supports_subtitles)
 
     def supported_subtitles(self):
         """

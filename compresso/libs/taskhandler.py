@@ -143,9 +143,7 @@ class TaskHandler(threading.Thread):
         :return:
         """
         existing_task_query = Tasks.select().where(Tasks.abspath == abspath).limit(1)
-        if existing_task_query.count() > 0:
-            return True
-        return False
+        return existing_task_query.count() > 0
 
     def add_path_to_task_queue(self, pathname, library_id, priority_score=0):
         """

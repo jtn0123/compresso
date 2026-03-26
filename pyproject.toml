@@ -30,7 +30,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "PIE", "B", "S"]
+select = ["E", "F", "W", "I", "UP", "PIE", "B", "S", "SIM", "T20"]
 ignore = [
     "E241",  # multiple spaces before operator — used for alignment
     "E501",  # line too long — enforced advisory only (many pre-existing)
@@ -43,6 +43,7 @@ ignore = [
 "__init__.py" = ["F401", "F403"]
 "tests/**" = ["S101", "S108", "S311"]
 "tests/unit/test_unffmpeg_types.py" = ["E402"]
+"compresso/libs/unplugins/pluginscli.py" = ["T201"]
 
 [tool.mypy]
 python_version = "3.13"

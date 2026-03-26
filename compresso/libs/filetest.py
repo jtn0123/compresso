@@ -80,11 +80,7 @@ class FileTest:
             failed_tasks = history_logging.get_historic_tasks_list_with_source_probe(task_success=False)
             for task in failed_tasks:
                 self.failed_paths.append(task.get('abspath'))
-        if path in self.failed_paths:
-            # That pathname was found in the results of failed historic tasks
-            return True
-        # No results were found matching that pathname
-        return False
+        return path in self.failed_paths
 
     def file_in_compresso_ignore_lockfile(self, path):
         """

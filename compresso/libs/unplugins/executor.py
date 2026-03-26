@@ -305,10 +305,7 @@ class PluginExecutor:
             def supports_kwarg(name):
                 if name in params:
                     return True
-                for param in params.values():
-                    if param.kind == inspect.Parameter.VAR_KEYWORD:
-                        return True
-                return False
+                return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
             def has_required_positional_after_data():
                 positional = []
@@ -317,10 +314,7 @@ class PluginExecutor:
                         positional.append(param)
                 # First positional is expected to be `data`
                 remaining = positional[1:]
-                for param in remaining:
-                    if param.default is inspect._empty:
-                        return True
-                return False
+                return any(param.default is inspect._empty for param in remaining)
 
             kwargs = {}
             if supports_kwarg("task_data_store"):

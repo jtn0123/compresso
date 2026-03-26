@@ -1172,23 +1172,21 @@ class ApiPluginsHandler(BaseApiHandler):
             os.makedirs(cache_root, exist_ok=True)
             cache_path = os.path.join(cache_root, 'community-repos-cache.json')
 
-            if not self.settings.get("serve_traceback"):
-                if os.path.exists(cache_path):
-                    try:
-                        with open(cache_path) as f:
-                            cached = json.load(f)
-                        cached_at = cached.get('cached_at', 0)
-                        cached_response = cached.get('response')
-                        repos = cached_response.get('repos') if cached_response else None
-                        if repos:
-                            # Validate cached schema (repo_* keys) to avoid serving stale/old-format data.
-                            if not isinstance(repos, list) or not repos or not repos[0].get('repo_id'):
-                                repos = None
-                        if cached_response and repos and (time.time() - cached_at) < cache_ttl_seconds:
-                            self.write_success(cached_response)
-                            return
-                    except Exception:
-                        tornado.log.app_log.warning("Failed to read community repos cache", exc_info=True)
+            if not self.settings.get("serve_traceback") and os.path.exists(cache_path):
+                try:
+                    with open(cache_path) as f:
+                        cached = json.load(f)
+                    cached_at = cached.get('cached_at', 0)
+                    cached_response = cached.get('response')
+                    repos = cached_response.get('repos') if cached_response else None
+                    # Validate cached schema (repo_* keys) to avoid serving stale/old-format data.
+                    if repos and (not isinstance(repos, list) or not repos or not repos[0].get('repo_id')):
+                        repos = None
+                    if cached_response and repos and (time.time() - cached_at) < cache_ttl_seconds:
+                        self.write_success(cached_response)
+                        return
+                except Exception:
+                    tornado.log.app_log.warning("Failed to read community repos cache", exc_info=True)
 
             uuid = self.session.get_installation_uuid()
             level = self.session.get_supporter_level()

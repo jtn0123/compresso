@@ -105,10 +105,7 @@ class History:
                 if col not in ALLOWED_ORDER_COLUMNS:
                     col = "id"
                 order_field = getattr(CompletedTasks, col, CompletedTasks.id)
-                if order.get("dir") == "asc":
-                    order_by = order_field.asc()
-                else:
-                    order_by = order_field.desc()
+                order_by = order_field.asc() if order.get("dir") == "asc" else order_field.desc()
 
                 query = query.order_by(order_by)
 
@@ -485,10 +482,7 @@ class History:
                 order_field = getattr(CompletedTasks, col)
             else:
                 order_field = CompletedTasks.finish_time
-            if direction == 'asc':
-                query = query.order_by(order_field.asc())
-            else:
-                query = query.order_by(order_field.desc())
+            query = query.order_by(order_field.asc()) if direction == 'asc' else query.order_by(order_field.desc())
         else:
             query = query.order_by(CompletedTasks.finish_time.desc())
 

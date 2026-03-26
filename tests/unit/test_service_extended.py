@@ -455,9 +455,8 @@ class TestRootServiceRun:
              patch('atexit.register'), \
              patch('tornado.autoreload.add_reload_hook'), \
              patch('compresso.service.config.Config', side_effect=Exception('bad config')), \
-             patch('compresso.libs.unplugins.child_process.set_shared_manager'):
-            with pytest.raises(Exception, match='bad config'):
-                service.run()
+             patch('compresso.libs.unplugins.child_process.set_shared_manager'), pytest.raises(Exception, match='bad config'):
+            service.run()
 
         service.startup_state.mark_error.assert_called_once()
 
@@ -473,9 +472,8 @@ class TestRootServiceRun:
              patch('tornado.autoreload.add_reload_hook'), \
              patch('compresso.service.config.Config', return_value=mock_settings), \
              patch('compresso.service.startup.validate_startup_environment', side_effect=Exception('bad env')), \
-             patch('compresso.libs.unplugins.child_process.set_shared_manager'):
-            with pytest.raises(Exception, match='bad env'):
-                service.run()
+             patch('compresso.libs.unplugins.child_process.set_shared_manager'), pytest.raises(Exception, match='bad env'):
+            service.run()
 
         service.startup_state.mark_error.assert_called_once()
 
@@ -489,16 +487,18 @@ class TestRootServiceRun:
         mock_settings.get_plugins_path.return_value = '/tmp/fake_plugins'
         mock_db = MagicMock()
 
-        with patch('multiprocessing.Manager', return_value=mock_manager), \
-             patch('atexit.register'), \
-             patch('tornado.autoreload.add_reload_hook'), \
-             patch('compresso.service.config.Config', return_value=mock_settings), \
-             patch('compresso.service.startup.validate_startup_environment'), \
-             patch('compresso.service.init_db', return_value=mock_db), \
-             patch('compresso.libs.unplugins.child_process.set_shared_manager'), \
-             patch.object(service, 'start_threads', side_effect=Exception('thread failure')):
-            with pytest.raises(Exception, match='thread failure'):
-                service.run()
+        with (
+            patch('multiprocessing.Manager', return_value=mock_manager),
+            patch('atexit.register'),
+            patch('tornado.autoreload.add_reload_hook'),
+            patch('compresso.service.config.Config', return_value=mock_settings),
+            patch('compresso.service.startup.validate_startup_environment'),
+            patch('compresso.service.init_db', return_value=mock_db),
+            patch('compresso.libs.unplugins.child_process.set_shared_manager'),
+            patch.object(service, 'start_threads', side_effect=Exception('thread failure')),
+            pytest.raises(Exception, match='thread failure'),
+        ):
+            service.run()
 
         service.startup_state.mark_error.assert_called_once()
 

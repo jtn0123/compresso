@@ -54,10 +54,9 @@ class DownloadsLinks(metaclass=SingletonType):
         keys = [t for t in self._download_links]
         with self._lock:
             for k in keys:
-                if k in self._download_links:
-                    if self._download_links[k].get('expires', 0) < time_now:
-                        # Item has expired. Remove this item
-                        del self._download_links[k]
+                if k in self._download_links and self._download_links[k].get('expires', 0) < time_now:
+                    # Item has expired. Remove this item
+                    del self._download_links[k]
 
     def generate_download_link(self, link_data):
         link_id = str(uuid.uuid4())

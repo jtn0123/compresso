@@ -222,15 +222,15 @@ class TestRegisterPluginInDb:
             'icon': 'icon.png',
         }
 
-        with patch('compresso.bundled_plugins._register_plugin_in_db.__module__', 'compresso.bundled_plugins'):
-            with patch.dict('sys.modules', {}):
-                with patch(
-                    'compresso.libs.unmodels.plugins.Plugins'
-                ) as mock_db_plugins:
-                    mock_db_plugins.get_or_none.return_value = None
-                    _register_plugin_in_db(plugin_info, '/plugins/test_plugin')
-                    mock_db_plugins.insert.assert_called_once()
-                    mock_db_plugins.insert.return_value.execute.assert_called_once()
+        with (
+            patch('compresso.bundled_plugins._register_plugin_in_db.__module__', 'compresso.bundled_plugins'),
+            patch.dict('sys.modules', {}),
+            patch('compresso.libs.unmodels.plugins.Plugins') as mock_db_plugins,
+        ):
+            mock_db_plugins.get_or_none.return_value = None
+            _register_plugin_in_db(plugin_info, '/plugins/test_plugin')
+            mock_db_plugins.insert.assert_called_once()
+            mock_db_plugins.insert.return_value.execute.assert_called_once()
 
     @patch('compresso.libs.unmodels.plugins.Plugins')
     def test_updates_existing_plugin(self, mock_db_plugins):

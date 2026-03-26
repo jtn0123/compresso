@@ -96,7 +96,7 @@ def build_tasks_query(status, sort_by='id', sort_order='asc', local_only=False, 
     if library_tags is not None:
         query = query.join(LibraryTags, join_type='LEFT OUTER JOIN')
         query = query.join(Tags, join_type='LEFT OUTER JOIN')
-        if library_tags:
+        if library_tags:  # noqa: SIM102, SIM108
             query = query.where(Tags.name.in_(library_tags))
         else:
             # Handle a query where the list is empty. In this case we want to match for only libraries that have no tags
@@ -104,10 +104,7 @@ def build_tasks_query(status, sort_by='id', sort_order='asc', local_only=False, 
 
     # Limit to one result
     query = query.limit(1)
-    if sort_order == 'asc':
-        query = query.order_by(sort_by.asc())
-    else:
-        query = query.order_by(sort_by.desc())
+    query = query.order_by(sort_by.asc()) if sort_order == 'asc' else query.order_by(sort_by.desc())
     return query.first()
 
 
@@ -131,10 +128,7 @@ def build_tasks_query_full_task_list(status, sort_by='id', sort_order='asc', lim
     )
 
     # Set the sort order
-    if sort_order == 'asc':
-        query = query.order_by(sort_by.asc())
-    else:
-        query = query.order_by(sort_by.desc())
+    query = query.order_by(sort_by.asc()) if sort_order == 'asc' else query.order_by(sort_by.desc())
 
     # Set query limit if one was given
     if limit:
@@ -289,39 +283,29 @@ class TaskQueue:
     def task_list_pending_is_empty():
         # Fetch only on result in order to know that there are any at all
         pending_query_count = build_tasks_count_query('pending')
-        if pending_query_count > 0:
-            return False
-        return True
+        return not pending_query_count > 0
 
     @staticmethod
     def task_list_in_progress_is_empty():
         # Fetch only on result in order to know that there are any at all
         pending_query_count = build_tasks_count_query('in_progress')
-        if pending_query_count > 0:
-            return False
-        return True
+        return not pending_query_count > 0
 
     @staticmethod
     def task_list_processed_is_empty():
         # Fetch only on result in order to know that there are any at all
         pending_query_count = build_tasks_count_query('processed')
-        if pending_query_count > 0:
-            return False
-        return True
+        return not pending_query_count > 0
 
     @staticmethod
     def task_list_awaiting_approval_is_empty():
         count = build_tasks_count_query('awaiting_approval')
-        if count > 0:
-            return False
-        return True
+        return not count > 0
 
     @staticmethod
     def task_list_approved_is_empty():
         count = build_tasks_count_query('approved')
-        if count > 0:
-            return False
-        return True
+        return not count > 0
 
     """
     Set the status of a task item

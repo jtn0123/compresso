@@ -121,20 +121,19 @@ class ApiUploadHandler(BaseApiHandler):
                 if not self.meta['filename'] or self.meta['filename'] in {".", ".."}:
                     raise ValueError("Invalid filename in upload")
 
-                if frontend_messages:
-                    if upload_type == 'pending':
-                        frontend_messages.update(
-                            {
-                                'id':      'receivingRemoteFile',
-                                'type':    'status',
-                                'code':    'receivingRemoteFile',
-                                'message': self.meta['filename'],
-                                'timeout': 10000
-                            }
-                        )
+                if frontend_messages and upload_type == 'pending':
+                    frontend_messages.update(
+                        {
+                            'id':      'receivingRemoteFile',
+                            'type':    'status',
+                            'code':    'receivingRemoteFile',
+                            'message': self.meta['filename'],
+                            'timeout': 10000
+                        }
+                    )
 
                 chunk = chunk[len(self.meta['header']):]
-                self.fp = open(os.path.join(self.cache_directory, self.meta['filename']), "wb")
+                self.fp = open(os.path.join(self.cache_directory, self.meta['filename']), "wb")  # noqa: SIM115
                 self.fp.write(chunk)
             else:
                 self.fp.write(chunk)

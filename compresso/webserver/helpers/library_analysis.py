@@ -139,10 +139,7 @@ def _run_analysis(library_id, library_path, info):
                         duration = float(probe_data['format'].get('duration', 0))
                         if duration > 0:
                             bit_rate = probe_data['format'].get('bit_rate')
-                            if bit_rate:
-                                bitrate_mbps = float(bit_rate) / 1_000_000
-                            else:
-                                bitrate_mbps = (file_size * 8) / duration / 1_000_000
+                            bitrate_mbps = float(bit_rate) / 1000000 if bit_rate else file_size * 8 / duration / 1000000
                 except Exception as e:
                     logger.debug("Failed to probe bitrate for %s: %s", filepath, e)
 

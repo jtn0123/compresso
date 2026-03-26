@@ -216,8 +216,8 @@ class HardwareAccelerationHandle:
 
 if __name__ == "__main__":
     hw_a = HardwareAccelerationHandle('blah')
-    print(hw_a.get_hwaccel_devices())
+    print(hw_a.get_hwaccel_devices())  # noqa: T201
     for hardware_decoder in hw_a.get_hwaccel_devices():
         hw_a.hardware_device = hardware_decoder
         break
-    print(hw_a.args())
+    print(hw_a.args())  # noqa: T201

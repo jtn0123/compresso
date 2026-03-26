@@ -927,7 +927,7 @@ class ApiPendingHandler(BaseApiHandler):
                 self.write_error()
                 return
 
-            if not status_results[0].get('status') == 'complete':
+            if status_results[0].get('status') != 'complete':
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Pending tasks status is not 'complete'")
                 self.write_error()
                 return

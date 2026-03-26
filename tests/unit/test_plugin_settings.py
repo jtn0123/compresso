@@ -62,9 +62,11 @@ class TestPluginSettingsInit:
 
     def test_init_with_invalid_library_id_raises(self):
         cls = _make_settings_class()
-        with patch('compresso.libs.unplugins.settings.config'):
-            with pytest.raises(Exception, match="Library ID needs to be an integer"):
-                cls(library_id='not_a_number')
+        with (
+            patch('compresso.libs.unplugins.settings.config'),
+            pytest.raises(Exception, match="Library ID needs to be an integer"),
+        ):
+            cls(library_id='not_a_number')
 
 
 @pytest.mark.unittest
@@ -261,9 +263,7 @@ class TestSettingsFilePath:
                 # Then library-specific settings.7.json exists
                 if 'settings.7.json' in p:
                     return True
-                if p.endswith('settings.json'):
-                    return True
-                return False
+                return bool(p.endswith('settings.json'))
 
             with patch.object(instance, 'get_plugin_directory', return_value='/fake/plugin'), \
                  patch.object(instance, 'get_profile_directory', return_value='/fake/profile'), \

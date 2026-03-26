@@ -169,16 +169,20 @@ class TestLinks:
     @pytest.mark.unittest
     def test_validate_remote_installation_timeout(self):
         links = self._create_links()
-        with patch.object(RequestHandler, 'get', side_effect=requests.exceptions.Timeout):
-            with pytest.raises(requests.exceptions.Timeout):
-                links.validate_remote_installation('192.168.1.5:8888')
+        with (
+            patch.object(RequestHandler, 'get', side_effect=requests.exceptions.Timeout),
+            pytest.raises(requests.exceptions.Timeout),
+        ):
+            links.validate_remote_installation('192.168.1.5:8888')
 
     @pytest.mark.unittest
     def test_validate_remote_installation_offline(self):
         links = self._create_links()
-        with patch.object(RequestHandler, 'get', side_effect=requests.exceptions.ConnectionError):
-            with pytest.raises(requests.exceptions.ConnectionError):
-                links.validate_remote_installation('192.168.1.5:8888')
+        with (
+            patch.object(RequestHandler, 'get', side_effect=requests.exceptions.ConnectionError),
+            pytest.raises(requests.exceptions.ConnectionError),
+        ):
+            links.validate_remote_installation('192.168.1.5:8888')
 
 
 if __name__ == '__main__':

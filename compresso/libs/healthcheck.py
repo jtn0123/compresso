@@ -250,10 +250,7 @@ class HealthCheckManager:
             if col not in ALLOWED_ORDER_COLUMNS:
                 col = 'last_checked'
             order_field = getattr(HealthStatus, col, HealthStatus.last_checked)
-            if direction == 'asc':
-                query = query.order_by(order_field.asc())
-            else:
-                query = query.order_by(order_field.desc())
+            query = query.order_by(order_field.asc()) if direction == 'asc' else query.order_by(order_field.desc())
         else:
             query = query.order_by(HealthStatus.last_checked.desc())
 

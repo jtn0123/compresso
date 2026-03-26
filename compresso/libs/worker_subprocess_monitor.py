@@ -28,6 +28,7 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import contextlib
 import re
 import threading
 import time
@@ -196,27 +197,21 @@ class WorkerSubprocessMonitor(threading.Thread):
 
             # Resume all suspended processes so they can handle signals
             for p in all_procs:
-                try:
+                with contextlib.suppress(psutil.NoSuchProcess, NotImplementedError):
                     p.resume()
-                except (psutil.NoSuchProcess, NotImplementedError):
-                    pass
 
             # Attempt graceful shutdown
             for p in all_procs:
-                try:
+                with contextlib.suppress(psutil.NoSuchProcess):
                     p.terminate()
-                except psutil.NoSuchProcess:
-                    pass
 
             # Wait up to 3s for them to exit
             gone, alive = psutil.wait_procs(all_procs, timeout=3, callback=self.__log_proc_terminated)
 
             # Force-kill any remaining processes
             for p in alive:
-                try:
+                with contextlib.suppress(psutil.NoSuchProcess):
                     p.kill()
-                except psutil.NoSuchProcess:
-                    pass
 
             # Final wait to reap
             psutil.wait_procs(alive, timeout=3, callback=self.__log_proc_terminated)

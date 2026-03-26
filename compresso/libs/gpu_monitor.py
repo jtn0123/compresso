@@ -216,9 +216,9 @@ class GpuMonitor(metaclass=SingletonType):
                 # Read GPU busy percent
                 utilization = 0.0
                 busy_path = card_dir / 'device' / 'gpu_busy_percent'
-                try:
+                try:  # noqa: SIM105 — gpu_busy_percent may be absent or unreadable
                     utilization = float(busy_path.read_text().strip())
-                except Exception:  # noqa: S110 — gpu_busy_percent may be absent or unreadable
+                except Exception:  # noqa: S110
                     pass
 
                 # Read VRAM usage if available
@@ -289,10 +289,7 @@ class GpuMonitor(metaclass=SingletonType):
                     parts = vram_str.split()
                     try:
                         val = int(parts[0])
-                        if len(parts) > 1 and parts[1].upper().startswith('G'):
-                            memory_total_mb = val * 1024
-                        else:
-                            memory_total_mb = val
+                        memory_total_mb = val * 1024 if len(parts) > 1 and parts[1].upper().startswith('G') else val
                     except (ValueError, IndexError):
                         pass
 

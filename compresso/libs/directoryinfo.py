@@ -189,7 +189,7 @@ if __name__ == '__main__':
     directory_info = CompressoDirectoryInfo('/tmp/compresso')  # noqa: S108 — dev test block
     directory_info.set('test_section', 'key', 'value')
     directory_info.save()
-    print(directory_info.get('test_section', 'key'))
+    print(directory_info.get('test_section', 'key'))  # noqa: T201
     directory_info.set('"section with double quotes"', '"key with double quotes"', '"value with double quotes"')
     directory_info.save()
-    print(directory_info.get('"section with double quotes"', '"key with double quotes"'))
+    print(directory_info.get('"section with double quotes"', '"key with double quotes"'))  # noqa: T201

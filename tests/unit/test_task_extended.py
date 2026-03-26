@@ -39,11 +39,13 @@ class TestTaskSetCachePath:
         mock_task = MagicMock()
         mock_task.cache_path = None
         t.task = mock_task
-        with patch('compresso.libs.task.os.path.splitext', return_value=('video', '.mkv')):
-            with patch.object(t, 'get_source_basename', return_value='video.mkv'):
-                with patch('compresso.libs.task.common.random_string', return_value='abc'):
-                    with patch('compresso.libs.task.time.time', return_value=1000):
-                        t.set_cache_path()
+        with (
+            patch('compresso.libs.task.os.path.splitext', return_value=('video', '.mkv')),
+            patch.object(t, 'get_source_basename', return_value='video.mkv'),
+            patch('compresso.libs.task.common.random_string', return_value='abc'),
+            patch('compresso.libs.task.time.time', return_value=1000),
+        ):
+            t.set_cache_path()
         assert t.task.cache_path is not None
 
     def test_set_cache_path_custom_directory(self):
@@ -52,10 +54,12 @@ class TestTaskSetCachePath:
         mock_task = MagicMock()
         mock_task.cache_path = None
         t.task = mock_task
-        with patch.object(t, 'get_source_basename', return_value='file.mp4'):
-            with patch('compresso.libs.task.common.random_string', return_value='xyz'):
-                with patch('compresso.libs.task.time.time', return_value=2000):
-                    t.set_cache_path(cache_directory='/custom/cache')
+        with (
+            patch.object(t, 'get_source_basename', return_value='file.mp4'),
+            patch('compresso.libs.task.common.random_string', return_value='xyz'),
+            patch('compresso.libs.task.time.time', return_value=2000),
+        ):
+            t.set_cache_path(cache_directory='/custom/cache')
         assert os.path.normpath('/custom/cache') in os.path.normpath(t.task.cache_path)
 
     def test_set_cache_path_custom_extension(self):
@@ -64,10 +68,12 @@ class TestTaskSetCachePath:
         mock_task = MagicMock()
         mock_task.cache_path = None
         t.task = mock_task
-        with patch.object(t, 'get_source_basename', return_value='file.mkv'):
-            with patch('compresso.libs.task.common.random_string', return_value='test'):
-                with patch('compresso.libs.task.time.time', return_value=3000):
-                    t.set_cache_path(file_extension='avi')
+        with (
+            patch.object(t, 'get_source_basename', return_value='file.mkv'),
+            patch('compresso.libs.task.common.random_string', return_value='test'),
+            patch('compresso.libs.task.time.time', return_value=3000),
+        ):
+            t.set_cache_path(file_extension='avi')
         assert t.task.cache_path.endswith('.avi')
 
 

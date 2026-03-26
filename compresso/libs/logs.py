@@ -29,6 +29,7 @@
 
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -189,14 +190,11 @@ class ForwardLogHandler(logging.Handler):
             if hasattr(record, "data_primary_key") and record.data_primary_key:
                 labels["data_primary_key"] = record.data_primary_key
 
-            try:
+            with contextlib.suppress(Full):
                 self.log_queue.put_nowait({
                     "labels": labels,
                     "entry":  [ts, log_entry]
                 })
-            except Full:
-                # Discard log if queue is full
-                pass
         except (ValueError, TypeError, AttributeError, OSError) as e:
             logging.getLogger("Compresso.ForwardLogHandler").error("Failed to enqueue log: %s", e)
 
@@ -442,10 +440,8 @@ class ForwardLogHandler(logging.Handler):
         if timestamp and timestamp >= current_hour:
             return
 
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.remove(file_path)
-        except FileNotFoundError:
-            pass
         self._remove_state_entry(filename)
 
     def _cleanup_retention(self):
@@ -458,10 +454,8 @@ class ForwardLogHandler(logging.Handler):
             filename = os.path.basename(file_path)
             timestamp = self._parse_buffer_filename_timestamp(filename)
             if timestamp and timestamp < threshold:
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     os.remove(file_path)
-                except FileNotFoundError:
-                    pass
                 self._remove_state_entry(filename)
 
     def _send_from_memory(self):
@@ -486,10 +480,8 @@ class ForwardLogHandler(logging.Handler):
                 if not self._transmit_buffer(sub_entries, "in-memory chunk", payload):
                     remaining = list(sub_entries) + chunk[index + consumed:]
                     if remaining:
-                        try:
+                        with contextlib.suppress(Empty, Full):
                             self._in_memory_chunks.put_nowait(list(remaining))
-                        except (Empty, Full):
-                            pass
                     return processed
 
                 processed = True

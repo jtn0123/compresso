@@ -224,47 +224,49 @@ class TestForwardLogHandlerEmit:
 
     def test_emit_enriches_record_with_labels(self):
         from compresso.libs.logs import ForwardJSONFormatter, ForwardLogHandler
-        with patch.object(ForwardLogHandler, '_load_buffer_state', return_value={}):
-            with patch.object(ForwardLogHandler, '_sync_state_with_disk'):
-                with patch.object(ForwardLogHandler, '_writer_loop'):
-                    with patch.object(ForwardLogHandler, '_sender_loop'):
-                        handler = ForwardLogHandler.__new__(ForwardLogHandler)
-                        logging.Handler.__init__(handler)
-                        handler.buffer_path = '/tmp/test_buffer'
-                        handler.endpoint = 'https://example.com'
-                        handler.app_id = 'test_app'
-                        handler.installation_name = 'test_install'
-                        handler.labels = {'job': 'compresso'}
-                        handler._retention_disabled = False
-                        handler.buffer_retention_max_days = 7
-                        handler.flush_interval = 5
-                        handler.max_chunk_size = 5 * 1024 * 1024
-                        handler._state_lock = MagicMock()
-                        handler._buffer_state = {}
-                        handler._buffer_state_path = '/tmp/buffer_state.json'
-                        handler._in_memory_chunks = MagicMock()
-                        from queue import Queue
-                        handler.log_queue = Queue(maxsize=10000)
-                        handler.stop_event = MagicMock()
-                        handler._last_cleanup = time.monotonic()
-                        handler.previous_connection_failed = False
-                        handler._notified_failures = set()
+        with (
+            patch.object(ForwardLogHandler, '_load_buffer_state', return_value={}),
+            patch.object(ForwardLogHandler, '_sync_state_with_disk'),
+            patch.object(ForwardLogHandler, '_writer_loop'),
+            patch.object(ForwardLogHandler, '_sender_loop'),
+        ):
+            handler = ForwardLogHandler.__new__(ForwardLogHandler)
+            logging.Handler.__init__(handler)
+            handler.buffer_path = '/tmp/test_buffer'
+            handler.endpoint = 'https://example.com'
+            handler.app_id = 'test_app'
+            handler.installation_name = 'test_install'
+            handler.labels = {'job': 'compresso'}
+            handler._retention_disabled = False
+            handler.buffer_retention_max_days = 7
+            handler.flush_interval = 5
+            handler.max_chunk_size = 5 * 1024 * 1024
+            handler._state_lock = MagicMock()
+            handler._buffer_state = {}
+            handler._buffer_state_path = '/tmp/buffer_state.json'
+            handler._in_memory_chunks = MagicMock()
+            from queue import Queue
+            handler.log_queue = Queue(maxsize=10000)
+            handler.stop_event = MagicMock()
+            handler._last_cleanup = time.monotonic()
+            handler.previous_connection_failed = False
+            handler._notified_failures = set()
 
-                        formatter = ForwardJSONFormatter()
-                        handler.setFormatter(formatter)
+            formatter = ForwardJSONFormatter()
+            handler.setFormatter(formatter)
 
-                        record = logging.LogRecord(
-                            name='test.module', level=logging.INFO, pathname='test.py',
-                            lineno=1, msg='Test message', args=(), exc_info=None,
-                        )
-                        handler.emit(record)
+            record = logging.LogRecord(
+                name='test.module', level=logging.INFO, pathname='test.py',
+                lineno=1, msg='Test message', args=(), exc_info=None,
+            )
+            handler.emit(record)
 
-                        item = handler.log_queue.get_nowait()
-                        assert item['labels']['service_name'] == 'compresso'
-                        assert item['labels']['logger'] == 'test.module'
-                        assert item['labels']['level'] == 'INFO'
-                        assert item['labels']['installation_name'] == 'test_install'
-                        assert item['labels']['log_type'] == 'APPLICATION_LOG'
+            item = handler.log_queue.get_nowait()
+            assert item['labels']['service_name'] == 'compresso'
+            assert item['labels']['logger'] == 'test.module'
+            assert item['labels']['level'] == 'INFO'
+            assert item['labels']['installation_name'] == 'test_install'
+            assert item['labels']['log_type'] == 'APPLICATION_LOG'
 
     def test_emit_discards_when_retention_disabled_and_no_endpoint(self):
         from compresso.libs.logs import ForwardJSONFormatter, ForwardLogHandler

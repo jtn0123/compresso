@@ -8,6 +8,7 @@
 
 """
 
+import contextlib
 import json
 import re
 import subprocess
@@ -90,10 +91,8 @@ def extract_media_metadata(filepath):
         return result
 
     # Extract duration from format level
-    try:
+    with contextlib.suppress(TypeError, ValueError):
         result['duration'] = float(probe_data.get('format', {}).get('duration', 0) or 0)
-    except (TypeError, ValueError):
-        pass
 
     # Find the first video stream
     for stream in probe_data.get('streams', []):

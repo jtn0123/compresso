@@ -175,7 +175,7 @@ if __name__ == "__main__":
     import sys
 
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    print(project_dir)
+    print(project_dir)  # noqa: T201
     sys.path.append(project_dir)
     system = System()
-    print(json.dumps(system.info(), indent=2))
+    print(json.dumps(system.info(), indent=2))  # noqa: T201

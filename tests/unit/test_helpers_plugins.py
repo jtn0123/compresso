@@ -34,10 +34,12 @@ class TestPrepareFilteredPlugins:
         mock_pe = MagicMock()
         mock_pe.get_plugin_settings.return_value = (None, None)
 
-        with patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_plugins):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import prepare_filtered_plugins
-                result = prepare_filtered_plugins({'start': 0, 'length': 10})
+        with (
+            patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_plugins),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import prepare_filtered_plugins
+            result = prepare_filtered_plugins({'start': 0, 'length': 10})
         assert 'recordsTotal' in result
         assert 'recordsFiltered' in result
         assert 'results' in result
@@ -58,10 +60,12 @@ class TestPrepareFilteredPlugins:
         mock_pe = MagicMock()
         mock_pe.get_plugin_settings.return_value = ({'setting1': 'value1'}, {})
 
-        with patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_plugins):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import prepare_filtered_plugins
-                result = prepare_filtered_plugins({'start': 0, 'length': 10})
+        with (
+            patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_plugins),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import prepare_filtered_plugins
+            result = prepare_filtered_plugins({'start': 0, 'length': 10})
         assert result['results'][0]['has_config'] is True
 
 
@@ -185,10 +189,12 @@ class TestGetPluginSettings:
             {'option1': 'value1'},
             {'option1': {'input_type': None, 'label': 'Option 1', 'description': 'Desc'}},
         )
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert len(result) == 1
         assert result[0]['input_type'] == 'text'
 
@@ -200,10 +206,12 @@ class TestGetPluginSettings:
             {'enabled': True},
             {'enabled': {}},
         )
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert result[0]['input_type'] == 'checkbox'
 
     def test_select_reverts_to_text_without_options(self):
@@ -214,10 +222,12 @@ class TestGetPluginSettings:
             {'choice': 'a'},
             {'choice': {'input_type': 'select', 'select_options': []}},
         )
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert result[0]['input_type'] == 'text'
 
     def test_slider_reverts_to_text_without_options(self):
@@ -228,10 +238,12 @@ class TestGetPluginSettings:
             {'quality': 50},
             {'quality': {'input_type': 'slider'}},
         )
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert result[0]['input_type'] == 'text'
 
     def test_slider_with_options(self):
@@ -242,10 +254,12 @@ class TestGetPluginSettings:
             {'quality': 50},
             {'quality': {'input_type': 'slider', 'slider_options': {'min': '0', 'max': '100', 'step': '5'}}},
         )
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert result[0]['input_type'] == 'slider'
         assert result[0]['slider_options']['min'] == '0'
 
@@ -257,10 +271,12 @@ class TestGetPluginSettings:
             {'field': 'val'},
             {'field': {'input_type': 'color_picker'}},
         )
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert result[0]['input_type'] == 'text'
 
     def test_req_lev_disables_setting(self):
@@ -271,10 +287,12 @@ class TestGetPluginSettings:
             {'premium': 'val'},
             {'premium': {'input_type': 'text', 'req_lev': 5, 'description': 'Premium option'}},
         )
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert result[0]['display'] == 'disabled'
 
     def test_empty_settings(self):
@@ -282,10 +300,12 @@ class TestGetPluginSettings:
         mock_session.level = 0
         mock_pe = MagicMock()
         mock_pe.get_plugin_settings.return_value = (None, None)
-        with patch('compresso.libs.session.Session', return_value=mock_session):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import get_plugin_settings
-                result = get_plugin_settings('test_plugin')
+        with (
+            patch('compresso.libs.session.Session', return_value=mock_session),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import get_plugin_settings
+            result = get_plugin_settings('test_plugin')
         assert result == []
 
 
@@ -302,25 +322,29 @@ class TestUpdatePluginSettings:
         plugin_data = {'plugin_id': 'test_plugin', 'settings': []}
         mock_pe = MagicMock()
         mock_pe.save_plugin_settings.return_value = True
-        with patch('compresso.webserver.helpers.plugins.prepare_plugin_info_and_settings', return_value=plugin_data):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import update_plugin_settings
-                result = update_plugin_settings('test_plugin', [
-                    {'key': 'header', 'input_type': 'section_header', 'value': 'Header'},
-                    {'key': 'opt', 'input_type': 'text', 'value': 'hello'},
-                ])
+        with (
+            patch('compresso.webserver.helpers.plugins.prepare_plugin_info_and_settings', return_value=plugin_data),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import update_plugin_settings
+            result = update_plugin_settings('test_plugin', [
+                {'key': 'header', 'input_type': 'section_header', 'value': 'Header'},
+                {'key': 'opt', 'input_type': 'text', 'value': 'hello'},
+            ])
         assert result is True
 
     def test_converts_checkbox_string_to_bool(self):
         plugin_data = {'plugin_id': 'test_plugin'}
         mock_pe = MagicMock()
         mock_pe.save_plugin_settings.return_value = True
-        with patch('compresso.webserver.helpers.plugins.prepare_plugin_info_and_settings', return_value=plugin_data):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                from compresso.webserver.helpers.plugins import update_plugin_settings
-                update_plugin_settings('test_plugin', [
-                    {'key': 'enabled', 'input_type': 'checkbox', 'value': 'true'},
-                ])
+        with (
+            patch('compresso.webserver.helpers.plugins.prepare_plugin_info_and_settings', return_value=plugin_data),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+        ):
+            from compresso.webserver.helpers.plugins import update_plugin_settings
+            update_plugin_settings('test_plugin', [
+                {'key': 'enabled', 'input_type': 'checkbox', 'value': 'true'},
+            ])
         saved = mock_pe.save_plugin_settings.call_args[0][1]
         assert saved['enabled'] is True
 
@@ -422,13 +446,15 @@ class TestPreparePluginInfoAndSettings:
         mock_pe.get_plugin_settings.return_value = (None, None)
         mock_pe.get_plugin_changelog.return_value = ['# v1.0']
         mock_pe.get_plugin_long_description.return_value = ['Long desc']
-        with patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_handler):
-            with patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe):
-                with patch('compresso.libs.session.Session') as mock_session_cls:
-                    mock_session_cls.return_value.level = 0
-                    mock_session_cls.return_value.register_compresso = MagicMock()
-                    from compresso.webserver.helpers.plugins import prepare_plugin_info_and_settings
-                    result = prepare_plugin_info_and_settings('p1')
+        with (
+            patch('compresso.webserver.helpers.plugins.PluginsHandler', return_value=mock_handler),
+            patch('compresso.webserver.helpers.plugins.PluginExecutor', return_value=mock_pe),
+            patch('compresso.libs.session.Session') as mock_session_cls,
+        ):
+            mock_session_cls.return_value.level = 0
+            mock_session_cls.return_value.register_compresso = MagicMock()
+            from compresso.webserver.helpers.plugins import prepare_plugin_info_and_settings
+            result = prepare_plugin_info_and_settings('p1')
         assert result['plugin_id'] == 'p1'
 
     def test_not_installed_fetches_from_repo(self):

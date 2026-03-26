@@ -267,11 +267,10 @@ class TestTriggerFiltering:
             _make_channel(name='c', triggers=['task_completed']),
         ]
         with patch('compresso.libs.external_notifications.ExternalNotificationDispatcher._get_channels_for_event',
-                   wraps=dispatcher._get_channels_for_event):
-            with patch('compresso.config.Config') as MockConfig:
-                instance = MockConfig.return_value
-                instance.get_notification_channels.return_value = channels
-                result = dispatcher._get_channels_for_event('task_completed')
+                   wraps=dispatcher._get_channels_for_event), patch('compresso.config.Config') as MockConfig:
+            instance = MockConfig.return_value
+            instance.get_notification_channels.return_value = channels
+            result = dispatcher._get_channels_for_event('task_completed')
 
         assert len(result) == 2
         names = [ch['name'] for ch in result]

@@ -179,7 +179,7 @@ class BaseModel(Model):
         """
         model_fields = self.get_fields()
 
-        if field_id not in model_fields.keys():
+        if field_id not in model_fields:
             raise NoSuchFieldError()
 
         # Set the field from model
@@ -200,9 +200,7 @@ class BaseModel(Model):
             return False
         elif isinstance(field, IntegerField):
             return int(value)
-        elif isinstance(field, FloatField):
-            return float(value)
-        elif isinstance(field, DecimalField):
+        elif isinstance(field, (FloatField, DecimalField)):
             return float(value)
         elif isinstance(field, DateTimeField):
             return strpdatetime(value)

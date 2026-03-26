@@ -147,7 +147,7 @@ class Links(metaclass=SingletonType):
         return address
 
     def __merge_config_dicts(self, config_dict, compare_dict):
-        for key in config_dict.keys():
+        for key in config_dict:
             if config_dict.get(key) != compare_dict.get(key) and compare_dict.get(key) is not None:
                 # Apply the new value
                 config_dict[key] = compare_dict.get(key)
@@ -297,12 +297,9 @@ class Links(metaclass=SingletonType):
         #           files = {"fileName": (os.path.basename(path), f, 'text/plain')}
         #           res = requests.post(url, files=files)
         #   ```
-        fh = open(path, 'rb')
-        try:
+        with open(path, 'rb') as fh:
             m = MultipartEncoder(fields={'fileName': (os.path.basename(path), fh, 'text/plain')})
             res = request_handler.post(url, data=m, headers={'Content-Type': m.content_type})
-        finally:
-            fh.close()
         if res.status_code == 200:
             return res.json()
         elif res.status_code in [400, 404, 405, 500]:
@@ -490,10 +487,7 @@ class Links(metaclass=SingletonType):
             # Check if this link is in backoff period
             # Derive a stable per-link key even when uuid is not yet synced
             raw_uuid = local_config.get('uuid', '???')
-            if raw_uuid == '???':
-                link_uuid = '_addr_{}'.format(local_config.get('address', 'unknown'))
-            else:
-                link_uuid = raw_uuid
+            link_uuid = '_addr_{}'.format(local_config.get('address', 'unknown')) if raw_uuid == '???' else raw_uuid
             if self._should_skip_link(link_uuid):
                 # Still in backoff -- keep existing config but mark unavailable
                 updated_config = self.__generate_default_config(local_config)

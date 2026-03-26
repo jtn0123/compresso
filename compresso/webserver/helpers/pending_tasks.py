@@ -316,9 +316,7 @@ def fetch_tasks_status(pending_task_ids):
 
 def check_if_task_exists_matching_path(abspath):
     from compresso.libs.taskhandler import TaskHandler
-    if TaskHandler.check_if_task_exists_matching_path(abspath):
-        return True
-    return False
+    return bool(TaskHandler.check_if_task_exists_matching_path(abspath))
 
 
 def create_task(abspath, library_id=1, library_name=None, task_type='local', priority_score=0):

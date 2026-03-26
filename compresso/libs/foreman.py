@@ -237,16 +237,7 @@ class Foreman(threading.Thread):
                     continue
 
                 # Check if it should run
-                if repetition == 'daily':
-                    self.run_task(time_now, event_schedule.get('schedule_task'), event_schedule.get('schedule_worker_count'),
-                                  worker_group)
-                elif repetition == 'weekday' and days[day_of_week] not in ['saturday', 'sunday']:
-                    self.run_task(time_now, event_schedule.get('schedule_task'), event_schedule.get('schedule_worker_count'),
-                                  worker_group)
-                elif repetition == 'weekend' and days[day_of_week] in ['saturday', 'sunday']:
-                    self.run_task(time_now, event_schedule.get('schedule_task'), event_schedule.get('schedule_worker_count'),
-                                  worker_group)
-                elif repetition == days[day_of_week]:
+                if repetition == 'daily' or repetition == 'weekday' and days[day_of_week] not in ['saturday', 'sunday'] or repetition == 'weekend' and days[day_of_week] in ['saturday', 'sunday'] or repetition == days[day_of_week]:
                     self.run_task(time_now, event_schedule.get('schedule_task'), event_schedule.get('schedule_worker_count'),
                                   worker_group)
 
@@ -256,9 +247,8 @@ class Foreman(threading.Thread):
         #   we need to first get the thread_keys, then iterate through that
         thread_keys = [t for t in self.worker_threads]
         for thread in thread_keys:
-            if thread in self.worker_threads:
-                if not self.worker_threads[thread].is_alive():
-                    del self.worker_threads[thread]
+            if thread in self.worker_threads and not self.worker_threads[thread].is_alive():
+                del self.worker_threads[thread]
 
         # Check that we have enough workers running. Spawn new ones as required.
         worker_group_ids = []
@@ -279,19 +269,17 @@ class Foreman(threading.Thread):
             # Remove any workers that do not belong. The max number of supported workers is 12
             for i in range(worker_group.get('number_of_workers'), 12):
                 worker_id = "{}-{}".format(worker_group.get('name'), i)
-                if worker_id in self.worker_threads:
-                    # Only remove threads that are idle (never terminate a task just to reduce worker count)
-                    if self.worker_threads[worker_id].idle:
-                        self.mark_worker_thread_as_redundant(worker_id)
+                # Only remove threads that are idle (never terminate a task just to reduce worker count)
+                if worker_id in self.worker_threads and self.worker_threads[worker_id].idle:
+                    self.mark_worker_thread_as_redundant(worker_id)
 
         # Remove workers for groups that no longer exist
         for thread in self.worker_threads:
             worker_group_id = self.worker_threads[thread].worker_group_id
             worker_name = self.worker_threads[thread].name
-            if worker_group_id not in worker_group_ids or worker_name not in worker_group_names:
-                # Only remove threads that are idle (never terminate a task just to reduce worker count)
-                if self.worker_threads[thread].idle:
-                    self.mark_worker_thread_as_redundant(thread)
+            # Only remove threads that are idle (never terminate a task just to reduce worker count)
+            if (worker_group_id not in worker_group_ids or worker_name not in worker_group_names) and self.worker_threads[thread].idle:
+                self.mark_worker_thread_as_redundant(thread)
 
     def fetch_available_remote_installation(self, library_name=None):
         # Fetch the first matching remote worker from the list
@@ -356,11 +344,10 @@ class Foreman(threading.Thread):
         # Remove any redundant link managers from our list
         thread_keys = [t for t in self.remote_task_manager_threads]
         for thread in thread_keys:
-            if thread in self.remote_task_manager_threads:
-                if not self.remote_task_manager_threads[thread].is_alive():
-                    self.logger.debug('Removing thread %s', thread)
-                    del self.remote_task_manager_threads[thread]
-                    continue
+            if thread in self.remote_task_manager_threads and not self.remote_task_manager_threads[thread].is_alive():
+                self.logger.debug('Removing thread %s', thread)
+                del self.remote_task_manager_threads[thread]
+                continue
 
     def terminate_unlinked_remote_task_manager_threads(self):
         """
@@ -431,22 +418,18 @@ class Foreman(threading.Thread):
     def fetch_available_worker_ids(self):
         tread_ids = []
         for thread in self.worker_threads:
-            if self.worker_threads[thread].idle and self.worker_threads[thread].is_alive():
-                if not self.worker_threads[thread].paused:
-                    tread_ids.append(self.worker_threads[thread].thread_id)
+            if self.worker_threads[thread].idle and self.worker_threads[thread].is_alive() and not self.worker_threads[thread].paused:
+                tread_ids.append(self.worker_threads[thread].thread_id)
         return tread_ids
 
     def check_for_idle_workers(self):
         for thread in self.worker_threads:
-            if self.worker_threads[thread].idle and self.worker_threads[thread].is_alive():
-                if not self.worker_threads[thread].paused:
-                    return True
+            if self.worker_threads[thread].idle and self.worker_threads[thread].is_alive() and not self.worker_threads[thread].paused:
+                return True
         return False
 
     def check_for_idle_remote_workers(self):
-        if self.available_remote_managers:
-            return True
-        return False
+        return bool(self.available_remote_managers)
 
     def get_available_remote_library_names(self):
         library_names = []

@@ -28,6 +28,7 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+import contextlib
 import json
 import os
 import sys
@@ -76,13 +77,12 @@ class PluginSettings:
         profile_directory = self.get_profile_directory()
         # Legacy migration: move settings.json from plugin dir to profile dir
         # TODO(v2.0): Remove this migration shim
-        if not os.path.exists(os.path.join(profile_directory, 'settings.json')):
-            if os.path.exists(os.path.join(plugin_directory, 'settings.json')):
-                import shutil
-                shutil.move(
-                    os.path.join(plugin_directory, 'settings.json'),
-                    os.path.join(profile_directory, 'settings.json')
-                )
+        if not os.path.exists(os.path.join(profile_directory, 'settings.json')) and os.path.exists(os.path.join(plugin_directory, 'settings.json')):  # noqa: E501
+            import shutil
+            shutil.move(
+                os.path.join(plugin_directory, 'settings.json'),
+                os.path.join(profile_directory, 'settings.json')
+            )
         # If provided with a library ID, then the settings file will be different
         plugin_settings_file = os.path.join(profile_directory, 'settings.json')
         if self.library_id:
@@ -151,9 +151,7 @@ class PluginSettings:
         if os.path.exists(plugin_settings_file):
             os.remove(plugin_settings_file)
 
-        if not os.path.exists(plugin_settings_file):
-            return True
-        return False
+        return bool(not os.path.exists(plugin_settings_file))
 
     def get_plugin_directory(self):
         """
@@ -223,12 +221,9 @@ class PluginSettings:
         :return:
         """
         # First import settings
-        try:
+        # If the import fails, it will resort to defaults. Better than breaking the rest of the process.
+        with contextlib.suppress(json.decoder.JSONDecodeError):
             self.__import_configured_settings()
-        except json.decoder.JSONDecodeError:
-            # If the import fails, then it will resort to defaults.
-            # That is fine. Better than breaking the rest of the process
-            pass
 
         # Ensure plugin has this setting
         if key not in self.settings:

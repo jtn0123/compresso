@@ -244,10 +244,12 @@ class TestRunLibraryScan:
         mock_get_logger.return_value = MagicMock()
         mgr = HealthCheckManager()
 
-        with patch('compresso.libs.healthcheck.HealthCheckManager._scanning', True):
-            with patch('compresso.libs.unmodels.Libraries') as mock_lib:
-                mock_lib.get_by_id.side_effect = Exception("Not found")
-                mgr._run_library_scan(999, 'quick')
+        with (
+            patch('compresso.libs.healthcheck.HealthCheckManager._scanning', True),
+            patch('compresso.libs.unmodels.Libraries') as mock_lib,
+        ):
+            mock_lib.get_by_id.side_effect = Exception("Not found")
+            mgr._run_library_scan(999, 'quick')
 
         # Should have set _scanning to False in finally block
         assert HealthCheckManager._scanning is False
@@ -260,11 +262,13 @@ class TestRunLibraryScan:
         mock_library = MagicMock()
         mock_library.path = '/empty/library'
 
-        with patch('compresso.libs.unmodels.Libraries') as mock_lib_cls:
+        with (
+            patch('compresso.libs.unmodels.Libraries') as mock_lib_cls,
+            patch('os.walk', return_value=[]),
+        ):
             mock_lib_cls.get_by_id.return_value = mock_library
-            with patch('os.walk', return_value=[]):
-                HealthCheckManager._scanning = True
-                mgr._run_library_scan(1, 'quick')
+            HealthCheckManager._scanning = True
+            mgr._run_library_scan(1, 'quick')
 
         assert HealthCheckManager._scanning is False
         progress = HealthCheckManager.get_scan_progress()
@@ -284,12 +288,14 @@ class TestRunLibraryScan:
 
         checked_files = []
 
-        with patch('compresso.libs.unmodels.Libraries') as mock_lib_cls:
+        with (
+            patch('compresso.libs.unmodels.Libraries') as mock_lib_cls,
+            patch('os.walk', return_value=walk_result),
+            patch.object(mgr, 'check_file', side_effect=lambda fp, **kw: checked_files.append(fp)),
+        ):
             mock_lib_cls.get_by_id.return_value = mock_library
-            with patch('os.walk', return_value=walk_result):
-                with patch.object(mgr, 'check_file', side_effect=lambda fp, **kw: checked_files.append(fp)):
-                    HealthCheckManager._scanning = True
-                    mgr._run_library_scan(1, 'quick')
+            HealthCheckManager._scanning = True
+            mgr._run_library_scan(1, 'quick')
 
         # Should only include .mkv, .mp4, .avi (not .mp3, .txt)
         assert len(checked_files) == 3

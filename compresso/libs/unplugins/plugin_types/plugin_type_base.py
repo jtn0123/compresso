@@ -136,11 +136,9 @@ class PluginType:
             return errors
         for key in data_schema:
             schema_meta = data_schema.get(key)
-            if schema_meta.get('required'):
-                # Ensure the required item is present in result_data
-                if key not in result_data:
-                    error = f"Plugin '{plugin_id} - {plugin_runner}()' is missing required key '{data_tree}{key}' in the output data."
-                    errors.append(error)
+            if schema_meta.get('required') and key not in result_data:
+                error = f"Plugin '{plugin_id} - {plugin_runner}()' is missing required key '{data_tree}{key}' in the output data."
+                errors.append(error)
 
             # Ensure that data present is of the correct type
             # Recursively check for children elements
@@ -220,10 +218,7 @@ class PluginType:
             def supports_kwarg(name, params=params):
                 if name in params:
                     return True
-                for param in params.values():
-                    if param.kind == inspect.Parameter.VAR_KEYWORD:
-                        return True
-                return False
+                return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
             kwargs = {}
             if supports_kwarg("task_data_store"):

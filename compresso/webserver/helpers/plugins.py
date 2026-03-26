@@ -447,9 +447,9 @@ def update_plugin_settings(plugin_id, settings, library_id=None):
         # Check if value should be boolean
         if input_type == 'checkbox':
             if isinstance(value, str):
-                value = True if value.lower() == 'true' else False
+                value = value.lower() == 'true'
             elif isinstance(value, int):
-                value = True if value > 0 else False
+                value = value > 0
         # Add that to our dictionary of settings to save
         settings_to_save[key] = value
 

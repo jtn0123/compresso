@@ -466,13 +466,13 @@ class Worker(threading.Thread):
                             # We also want to ensure that the 'file_out' is not removed if the plugin set it to the same path as the 'file_in'.
                             # To avoid this, run x3 tests.
                             # First, check current 'file_in' is not the original file.
-                            if os.path.abspath(data.get("file_in")) != os.path.abspath(original_abspath):
-                                # Second, check that the 'file_in' is actually in cache directory. If it is not, we did not create it.
-                                if "compresso_file_conversion" in os.path.abspath(data.get("file_in")):
-                                    # Finally, check that the file_out is not the same file as the file_in
-                                    if os.path.abspath(data.get("file_out")) != os.path.abspath(data.get("file_in")):
-                                        # Remove the old file_in file
-                                        os.remove(os.path.abspath(data.get("file_in")))
+                            if (  # noqa: SIM102
+                                os.path.abspath(data.get("file_in")) != os.path.abspath(original_abspath)
+                                and "compresso_file_conversion" in os.path.abspath(data.get("file_in"))
+                            ):
+                                # Ensure file_out is not the same file as file_in before removing old file_in
+                                if os.path.abspath(data.get("file_out")) != os.path.abspath(data.get("file_in")):
+                                    os.remove(os.path.abspath(data.get("file_in")))
 
                             # Set the new 'file_in' as the previous runner's 'file_out' for the next loop
                             file_in = data.get("file_out")
