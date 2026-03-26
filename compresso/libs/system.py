@@ -30,7 +30,9 @@
 
 """
 import glob
+import os
 import subprocess
+import sys
 from typing import Any, Dict
 
 from compresso.libs.logs import CompressoLogging
@@ -89,20 +91,43 @@ class System(object, metaclass=SingletonType):
         except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
             self.logger.debug('NVIDIA GPU detection skipped: %s', str(e))
 
-        # VAAPI detection via /dev/dri/render* devices
-        try:
-            render_devices = sorted(glob.glob('/dev/dri/render*'))
-            for i, device_path in enumerate(render_devices):
-                gpus.append({
-                    'type': 'vaapi',
-                    'hwaccel': 'vaapi',
-                    'index': i,
-                    'name': device_path,
-                    'memory_total_mb': 0,
-                    'driver_version': '',
-                })
-        except Exception as e:
-            self.logger.debug('VAAPI GPU detection skipped: %s', str(e))
+        # VAAPI detection via /dev/dri/render* devices (Linux only)
+        if sys.platform == "linux":
+            try:
+                render_devices = sorted(glob.glob('/dev/dri/render*'))
+                for i, device_path in enumerate(render_devices):
+                    gpus.append({
+                        'type': 'vaapi',
+                        'hwaccel': 'vaapi',
+                        'index': i,
+                        'name': device_path,
+                        'memory_total_mb': 0,
+                        'driver_version': '',
+                    })
+            except Exception as e:
+                self.logger.debug('VAAPI GPU detection skipped: %s', str(e))
+
+        # VideoToolbox is always available on macOS
+        if sys.platform == "darwin":
+            gpus.append({
+                'type': 'videotoolbox',
+                'hwaccel': 'videotoolbox',
+                'index': 0,
+                'name': 'VideoToolbox',
+                'memory_total_mb': 0,
+                'driver_version': '',
+            })
+
+        # D3D11VA hardware acceleration on Windows
+        if os.name == "nt":
+            gpus.append({
+                'type': 'd3d11va',
+                'hwaccel': 'd3d11va',
+                'index': 0,
+                'name': 'Direct3D 11 Video Acceleration',
+                'memory_total_mb': 0,
+                'driver_version': '',
+            })
 
         return gpus
 

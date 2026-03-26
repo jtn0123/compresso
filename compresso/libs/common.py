@@ -36,6 +36,7 @@ import os
 import random
 import string
 import shutil
+import sys
 import xxhash
 
 from compresso.libs.logs import CompressoLogging
@@ -67,16 +68,18 @@ def get_default_root_path():
 
 def get_default_library_path():
     library_path = os.path.join(get_default_root_path(), 'library')
-    # Windows set the default library directory into %USERPROFILE%\Documents
-    if os.name == "nt":
+    if sys.platform == "darwin":
+        library_path = os.path.join(os.path.expanduser("~"), 'Movies')
+    elif os.name == "nt":
         library_path = os.path.join(os.path.expandvars(r'%USERPROFILE%'), 'Documents')
     return library_path
 
 
 def get_default_cache_path():
     cache_path = os.path.join(get_default_root_path(), 'tmp', 'compresso')
-    # Windows set the default temp directory into %LOCALAPPDATA%\Temp\Compresso
-    if os.name == "nt":
+    if sys.platform == "darwin":
+        cache_path = os.path.join(os.path.expanduser("~"), 'Library', 'Caches', 'Compresso')
+    elif os.name == "nt":
         cache_path = os.path.join(os.path.expandvars(r'%LOCALAPPDATA%\Temp'), 'Compresso')
     return cache_path
 

@@ -37,7 +37,9 @@ def mock_logger():
 def no_backends():
     """Patch shutil.which and sysfs so no GPU backends are detected."""
     with patch(GPU_MONITOR + '.shutil.which', return_value=None), \
+         patch(GPU_MONITOR + '.sys') as mock_sys, \
          patch(GPU_MONITOR + '.Path') as mock_path_cls:
+        mock_sys.platform = 'linux'
         mock_drm = MagicMock()
         mock_drm.glob.return_value = []
         mock_path_cls.return_value = mock_drm
@@ -48,7 +50,9 @@ def no_backends():
 def nvidia_only():
     """Patch so only NVIDIA backend is detected."""
     with patch(GPU_MONITOR + '.shutil.which', side_effect=lambda cmd: '/usr/bin/nvidia-smi' if cmd == 'nvidia-smi' else None), \
+         patch(GPU_MONITOR + '.sys') as mock_sys, \
          patch(GPU_MONITOR + '.Path') as mock_path_cls:
+        mock_sys.platform = 'linux'
         mock_drm = MagicMock()
         mock_drm.glob.return_value = []
         mock_path_cls.return_value = mock_drm
@@ -108,7 +112,9 @@ class TestProbeCapabilities:
         mock_vendor.__truediv__ = MagicMock(return_value=mock_vendor)
 
         with patch(GPU_MONITOR + '.shutil.which', return_value=None), \
+             patch(GPU_MONITOR + '.sys') as mock_sys, \
              patch(GPU_MONITOR + '.Path') as mock_path_cls:
+            mock_sys.platform = 'linux'
             mock_drm = MagicMock()
 
             def glob_side_effect(pattern):
@@ -128,7 +134,9 @@ class TestProbeCapabilities:
         mock_vendor.read_text.return_value = '0x1002'
 
         with patch(GPU_MONITOR + '.shutil.which', return_value=None), \
+             patch(GPU_MONITOR + '.sys') as mock_sys, \
              patch(GPU_MONITOR + '.Path') as mock_path_cls:
+            mock_sys.platform = 'linux'
             mock_drm = MagicMock()
 
             def glob_side_effect(pattern):
@@ -436,7 +444,7 @@ class TestGetRealtimeMetrics:
     def test_aggregates_all_backends(self, no_backends):
         from compresso.libs.gpu_monitor import GpuMonitor
         monitor = GpuMonitor()
-        monitor._capabilities = {'nvidia': True, 'intel': False, 'amd': False}
+        monitor._capabilities = {'nvidia': True, 'intel': False, 'amd': False, 'videotoolbox': False}
 
         csv_output = _make_nvidia_csv((0, 'RTX 3080', 55, 2048, 10240, 70))
         with patch(GPU_MONITOR + '.subprocess.run') as mock_run:
@@ -455,7 +463,7 @@ class TestGetRealtimeMetrics:
     def test_records_history_after_poll(self, no_backends):
         from compresso.libs.gpu_monitor import GpuMonitor
         monitor = GpuMonitor()
-        monitor._capabilities = {'nvidia': True, 'intel': False, 'amd': False}
+        monitor._capabilities = {'nvidia': True, 'intel': False, 'amd': False, 'videotoolbox': False}
 
         csv_output = _make_nvidia_csv((0, 'RTX 3080', 55, 2048, 10240, 70))
         with patch(GPU_MONITOR + '.subprocess.run') as mock_run:
@@ -563,11 +571,90 @@ class TestErrorResilience:
         from compresso.libs.gpu_monitor import GpuMonitor
         monitor = GpuMonitor()
         # Force capability on, but make subprocess blow up
-        monitor._capabilities = {'nvidia': True, 'intel': False, 'amd': False}
+        monitor._capabilities = {'nvidia': True, 'intel': False, 'amd': False, 'videotoolbox': False}
 
         with patch(GPU_MONITOR + '.subprocess.run') as mock_run:
             mock_run.side_effect = RuntimeError("catastrophic failure")
             # Should NOT raise
             result = monitor.get_realtime_metrics()
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# macOS VideoToolbox backend
+# ---------------------------------------------------------------------------
+@pytest.mark.unittest
+class TestMacOsGpuDetection:
+
+    def test_videotoolbox_capability_on_darwin(self):
+        with patch(GPU_MONITOR + '.shutil.which', return_value=None), \
+             patch(GPU_MONITOR + '.sys') as mock_sys, \
+             patch(GPU_MONITOR + '.Path') as mock_path_cls:
+            mock_sys.platform = 'darwin'
+            mock_drm = MagicMock()
+            mock_drm.glob.return_value = []
+            mock_path_cls.return_value = mock_drm
+
+            from compresso.libs.gpu_monitor import GpuMonitor
+            monitor = GpuMonitor()
+            assert monitor._capabilities['videotoolbox'] is True
+            assert monitor._capabilities['intel'] is False
+            assert monitor._capabilities['amd'] is False
+
+    def test_videotoolbox_not_set_on_linux(self):
+        with patch(GPU_MONITOR + '.shutil.which', return_value=None), \
+             patch(GPU_MONITOR + '.sys') as mock_sys, \
+             patch(GPU_MONITOR + '.Path') as mock_path_cls:
+            mock_sys.platform = 'linux'
+            mock_drm = MagicMock()
+            mock_drm.glob.return_value = []
+            mock_path_cls.return_value = mock_drm
+
+            from compresso.libs.gpu_monitor import GpuMonitor
+            monitor = GpuMonitor()
+            assert monitor._capabilities['videotoolbox'] is False
+
+    def test_poll_macos_gpu_parses_system_profiler(self, no_backends):
+        import json
+        system_profiler_output = json.dumps({
+            'SPDisplaysDataType': [
+                {
+                    'sppci_model': 'Apple M2 Pro',
+                    'spdisplays_vram': '16 GB',
+                }
+            ]
+        })
+        from compresso.libs.gpu_monitor import GpuMonitor
+        monitor = GpuMonitor()
+        monitor._capabilities['videotoolbox'] = True
+
+        with patch(GPU_MONITOR + '.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout=system_profiler_output,
+            )
+            result = monitor._poll_macos_gpu()
+
+        assert len(result) == 1
+        assert result[0]['type'] == 'apple'
+        assert result[0]['name'] == 'Apple M2 Pro'
+        assert result[0]['memory_total_mb'] == 16384
+        assert result[0]['utilization_percent'] is None
+
+    def test_poll_macos_gpu_returns_empty_when_not_macos(self, no_backends):
+        from compresso.libs.gpu_monitor import GpuMonitor
+        monitor = GpuMonitor()
+        # videotoolbox not set (default)
+        result = monitor._poll_macos_gpu()
+        assert result == []
+
+    def test_poll_macos_gpu_handles_failure(self, no_backends):
+        from compresso.libs.gpu_monitor import GpuMonitor
+        monitor = GpuMonitor()
+        monitor._capabilities['videotoolbox'] = True
+
+        with patch(GPU_MONITOR + '.subprocess.run', side_effect=FileNotFoundError):
+            result = monitor._poll_macos_gpu()
 
         assert result == []

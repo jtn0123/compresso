@@ -8,8 +8,10 @@
     for real-time utilization metrics and maintains a rolling history.
 """
 
+import json
 import shutil
 import subprocess
+import sys
 import time
 from collections import deque
 from pathlib import Path
@@ -34,27 +36,33 @@ class GpuMonitor(object, metaclass=SingletonType):
             'nvidia': shutil.which('nvidia-smi') is not None,
             'intel': False,
             'amd': False,
+            'videotoolbox': False,
         }
 
-        # Check for Intel GPU via sysfs vendor ID (0x8086)
-        try:
-            for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
-                vendor_id = vendor_path.read_text().strip()
-                if vendor_id == '0x8086':
-                    caps['intel'] = True
-                    break
-        except Exception:
-            pass
+        if sys.platform == "linux":
+            # Check for Intel GPU via sysfs vendor ID (0x8086)
+            try:
+                for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
+                    vendor_id = vendor_path.read_text().strip()
+                    if vendor_id == '0x8086':
+                        caps['intel'] = True
+                        break
+            except Exception:
+                pass
 
-        # Check for AMD GPU via sysfs vendor ID (0x1002)
-        try:
-            for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
-                vendor_id = vendor_path.read_text().strip()
-                if vendor_id == '0x1002':
-                    caps['amd'] = True
-                    break
-        except Exception:
-            pass
+            # Check for AMD GPU via sysfs vendor ID (0x1002)
+            try:
+                for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
+                    vendor_id = vendor_path.read_text().strip()
+                    if vendor_id == '0x1002':
+                        caps['amd'] = True
+                        break
+            except Exception:
+                pass
+
+        elif sys.platform == "darwin":
+            # VideoToolbox is always available on macOS
+            caps['videotoolbox'] = True
 
         self.logger.debug("GPU capabilities: %s", caps)
         return caps
@@ -71,6 +79,7 @@ class GpuMonitor(object, metaclass=SingletonType):
         gpus.extend(self._poll_nvidia())
         gpus.extend(self._poll_intel())
         gpus.extend(self._poll_amd())
+        gpus.extend(self._poll_macos_gpu())
         self._record_history(gpus)
         return gpus
 
@@ -249,6 +258,55 @@ class GpuMonitor(object, metaclass=SingletonType):
         except Exception as e:
             self.logger.warning("AMD GPU polling failed: %s", e)
         return gpus
+
+    def _poll_macos_gpu(self) -> List[dict]:
+        """Detect GPU info on macOS via system_profiler."""
+        if not self._capabilities.get('videotoolbox'):
+            return []
+
+        try:
+            result = subprocess.run(
+                ['system_profiler', 'SPDisplaysDataType', '-json'],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode != 0:
+                return []
+
+            data = json.loads(result.stdout)
+            displays = data.get('SPDisplaysDataType', [])
+            gpus = []
+            for i, gpu_info in enumerate(displays):
+                name = gpu_info.get('sppci_model', 'Apple GPU')
+                # VRAM may be reported as a string like "8 GB" or missing entirely
+                vram_str = gpu_info.get('spdisplays_vram', gpu_info.get('sppci_vram', ''))
+                memory_total_mb = 0
+                if isinstance(vram_str, str):
+                    parts = vram_str.split()
+                    try:
+                        val = int(parts[0])
+                        if len(parts) > 1 and parts[1].upper().startswith('G'):
+                            memory_total_mb = val * 1024
+                        else:
+                            memory_total_mb = val
+                    except (ValueError, IndexError):
+                        pass
+
+                gpus.append({
+                    'index': i,
+                    'type': 'apple',
+                    'name': name,
+                    'utilization_percent': None,
+                    'memory_used_mb': 0,
+                    'memory_total_mb': memory_total_mb,
+                    'temperature_c': None,
+                })
+            return gpus
+
+        except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError) as e:
+            self.logger.debug("macOS GPU detection failed: %s", e)
+        except Exception as e:
+            self.logger.warning("macOS GPU polling failed: %s", e)
+        return []
 
     def _record_history(self, gpus: List[dict]) -> None:
         """Append current metrics with timestamp to rolling history.
