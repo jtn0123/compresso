@@ -1,3 +1,18 @@
+# [1.6.0](https://github.com/jtn0123/compresso/compare/v1.5.0...v1.6.0) (2026-03-26)
+
+
+### Bug Fixes
+
+* address all remaining CodeRabbit review comments ([62f8d82](https://github.com/jtn0123/compresso/commit/62f8d82453d5d2aa225a491c5758ab0b54697989))
+* address remaining CodeQL alerts — XSS sanitization and URL check ([0656aa6](https://github.com/jtn0123/compresso/commit/0656aa6717bbb41bbe8a5eaae7356dda9008747d))
+* resolve CI failures — upgrade requests for CVE, fix CodeQL security alerts ([447bb10](https://github.com/jtn0123/compresso/commit/447bb10a94d05dd2c9017b6426a1c52ff7e31947))
+* resolve CI lint errors and address CodeRabbit review feedback ([36cd63d](https://github.com/jtn0123/compresso/commit/36cd63d13a01304f6f96dd8ddcbb9eb811ce0806))
+
+
+### Features
+
+* comprehensive polish pass — GPU dashboard, ETA, notifications, and quality improvements ([f60653a](https://github.com/jtn0123/compresso/commit/f60653a0cae73ab9ee247b45613f267520046832))
+
 # [1.5.0](https://github.com/jtn0123/compresso/compare/v1.4.0...v1.5.0) (2026-03-25)
 
 
