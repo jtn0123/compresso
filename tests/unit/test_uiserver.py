@@ -218,7 +218,9 @@ class TestUIServerMakeWebApp:
         server.config.get_cache_path.return_value = '/tmp/cache'
         mock_gen = MagicMock(return_value=[])
         with patch('compresso.libs.uiserver.tornado.web.Application') as mock_app_cls, \
-             patch.dict('sys.modules', {'compresso.webserver.api_v2.schema.swagger': MagicMock(generate_swagger_file=mock_gen)}):
+             patch.dict('sys.modules', {
+                 'compresso.webserver.api_v2.schema.swagger': MagicMock(generate_swagger_file=mock_gen),
+             }):
             mock_app = MagicMock()
             mock_app_cls.return_value = mock_app
             server.make_web_app()

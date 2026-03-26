@@ -219,7 +219,10 @@ class TestWorkersStatus(ApiTestBase):
 
     def test_workers_status_exception(self):
         # Make foreman raise to trigger the except branch
-        with patch.object(ApiWorkersHandler, 'initialize', lambda self, **kw: setattr(self, 'foreman', None) or setattr(self, 'params', None)):
+        with patch.object(
+            ApiWorkersHandler, 'initialize',
+            lambda self, **kw: setattr(self, 'foreman', None) or setattr(self, 'params', None),
+        ):
             # We need the foreman to raise; easiest via a new test class instance
             pass
         # Covered by the success test above; the exception path returns 500

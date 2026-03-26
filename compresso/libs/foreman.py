@@ -237,7 +237,12 @@ class Foreman(threading.Thread):
                     continue
 
                 # Check if it should run
-                if repetition == 'daily' or repetition == 'weekday' and days[day_of_week] not in ['saturday', 'sunday'] or repetition == 'weekend' and days[day_of_week] in ['saturday', 'sunday'] or repetition == days[day_of_week]:
+                if (
+                    repetition == 'daily'
+                    or repetition == 'weekday' and days[day_of_week] not in ['saturday', 'sunday']
+                    or repetition == 'weekend' and days[day_of_week] in ['saturday', 'sunday']
+                    or repetition == days[day_of_week]
+                ):
                     self.run_task(time_now, event_schedule.get('schedule_task'), event_schedule.get('schedule_worker_count'),
                                   worker_group)
 
@@ -278,7 +283,10 @@ class Foreman(threading.Thread):
             worker_group_id = self.worker_threads[thread].worker_group_id
             worker_name = self.worker_threads[thread].name
             # Only remove threads that are idle (never terminate a task just to reduce worker count)
-            if (worker_group_id not in worker_group_ids or worker_name not in worker_group_names) and self.worker_threads[thread].idle:
+            if (
+                worker_group_id not in worker_group_ids
+                or worker_name not in worker_group_names
+            ) and self.worker_threads[thread].idle:
                 self.mark_worker_thread_as_redundant(thread)
 
     def fetch_available_remote_installation(self, library_name=None):
@@ -394,7 +402,10 @@ class Foreman(threading.Thread):
             available_slots = available_installations[installation_uuid].get('available_slots', 0)
             for slot_number in range(available_slots):
                 remote_manager_id = f"{installation_uuid}|M{slot_number}"
-                if remote_manager_id in self.available_remote_managers or remote_manager_id in self.remote_task_manager_threads:
+                if (
+                    remote_manager_id in self.available_remote_managers
+                    or remote_manager_id in self.remote_task_manager_threads
+                ):
                     # This worker is already managed by a link manager thread or is already in the list of available workers
                     continue
                 # Add this remote worker ID to the list of available remote managers
@@ -418,13 +429,15 @@ class Foreman(threading.Thread):
     def fetch_available_worker_ids(self):
         tread_ids = []
         for thread in self.worker_threads:
-            if self.worker_threads[thread].idle and self.worker_threads[thread].is_alive() and not self.worker_threads[thread].paused:
-                tread_ids.append(self.worker_threads[thread].thread_id)
+            wt = self.worker_threads[thread]
+            if wt.idle and wt.is_alive() and not wt.paused:
+                tread_ids.append(wt.thread_id)
         return tread_ids
 
     def check_for_idle_workers(self):
         for thread in self.worker_threads:
-            if self.worker_threads[thread].idle and self.worker_threads[thread].is_alive() and not self.worker_threads[thread].paused:
+            wt = self.worker_threads[thread]
+            if wt.idle and wt.is_alive() and not wt.paused:
                 return True
         return False
 
@@ -582,7 +595,8 @@ class Foreman(threading.Thread):
             if worker_id in self.worker_threads and self.worker_threads[worker_id].is_alive():
                 self.worker_threads[worker_id].set_task(item)
                 if item.get_task_type() == "local":
-                    # Execute event plugin runners (only for locally added tasks. Remote tasks are scheduled on the installation they were considered "local")
+                    # Execute event plugin runners (only for locally added tasks.
+                    # Remote tasks are scheduled on the installation they were considered "local")
                     event_data = {
                         "library_id":               item.get_task_library_id(),
                         "task_id":                  item.get_task_id(),
@@ -630,7 +644,7 @@ class Foreman(threading.Thread):
         # Mark this as the last time run
         self.link_heartbeat_last_run = time_now
 
-    def run(self):
+    def run(self):  # noqa: C901
         self.logger.info('Starting Foreman Monitor loop')
 
         # Flag to force checking for idle remote workers when set to False.

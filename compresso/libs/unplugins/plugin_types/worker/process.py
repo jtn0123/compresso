@@ -43,10 +43,13 @@ class ProcessItem(PluginType):
         worker_log              - Array, the log lines that are being tailed by the frontend. Can be left empty.
         library_id              - Number, the library that the current task is associated with.
         exec_command            - Array, a subprocess command that Compresso should execute. Can be empty.
-        current_command         - Array, shared list for updating the worker's "current command" text in the UI (last entry wins).
-        command_progress_parser - Function, a function that Compresso can use to parse the STDOUT of the command to collect progress stats. Can be empty.
+        current_command         - Array, shared list for updating the worker's "current command"
+                                  text in the UI (last entry wins).
+        command_progress_parser - Function, a function that Compresso can use to parse the STDOUT
+                                  of the command to collect progress stats. Can be empty.
         file_in                 - String, the source file to be processed by the command.
-        file_out                - String, the destination that the command should output (may be the same as the file_in if necessary).
+        file_out                - String, the destination that the command should output
+                                  (may be the same as the file_in if necessary).
         original_file_path      - String, the absolute path to the original file.
         repeat                  - Boolean, should this runner be executed again once completed with the same variables.
 
@@ -65,7 +68,8 @@ class ProcessItem(PluginType):
         val = TaskDataStore.get_runner_value("probe_info")
 
     **Spawning your own child process**
-    Instead of setting `exec_command`, you can perform complex or Python‐only work in a separate process while still reporting logs & progress:
+    Instead of setting `exec_command`, you can perform complex or Python-only work
+    in a separate process while still reporting logs & progress:
 
         from compresso.libs.unplugins.child_process import PluginChildProcess
 
@@ -88,7 +92,8 @@ class ProcessItem(PluginType):
       2. Registers its PID & start‐time with the worker’s `default_progress_parser`.
       3. Drains `log_queue` → `data["worker_log"]` for UI tail.
       4. Drains `prog_queue` → `command_progress_parser(line_text)` to update the progress bar.
-      5. Will unset the child process PID on exit to reset all tracked subprocess metrics in the Compresso Worker (CPU, memory, progress, etc.).
+      5. Will unset the child process PID on exit to reset all tracked subprocess
+         metrics in the Compresso Worker (CPU, memory, progress, etc.).
 
     :param data:
     :return:

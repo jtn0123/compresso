@@ -30,10 +30,9 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "PIE", "B", "S", "SIM", "T20"]
+select = ["E", "F", "W", "I", "UP", "PIE", "B", "S", "SIM", "T20", "C90"]
 ignore = [
     "E241",  # multiple spaces before operator — used for alignment
-    "E501",  # line too long — enforced advisory only (many pre-existing)
     "F402",  # import shadowed by loop variable — false positive on common patterns
     "F403",  # wildcard imports — used in __init__.py and basemodel
     "F405",  # undefined from wildcard — consequence of F403
@@ -44,6 +43,9 @@ ignore = [
 "tests/**" = ["S101", "S108", "S311"]
 "tests/unit/test_unffmpeg_types.py" = ["E402"]
 "compresso/libs/unplugins/pluginscli.py" = ["T201"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
 
 [tool.mypy]
 python_version = "3.13"

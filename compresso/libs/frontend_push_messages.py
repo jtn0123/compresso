@@ -66,9 +66,9 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
         # Ensure the given type is valid
         if item.get('type') not in ['error', 'warning', 'success', 'info', 'status']:
             raise Exception(
-                "Frontend message item's code must be in ['error', 'warning', 'success', 'info', 'status']. Received '{}'".format(
-                    item.get('type')
-                )
+                "Frontend message item's code must be in "
+                "['error', 'warning', 'success', 'info', 'status']. "
+                "Received '{}'".format(item.get('type'))
             )
         return True
 

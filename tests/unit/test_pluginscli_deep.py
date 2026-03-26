@@ -797,8 +797,11 @@ class TestRemovePluginInteractive:
     def test_remove_plugin_returns_on_go_back(self):
         pluginscli = _import_pluginscli()
         cli = _make_cli(pluginscli)
-        with patch.object(pluginscli.inquirer, 'prompt', return_value={'cli_action': 'Go Back'}), \
-             patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[{'plugin_id': 'p1', 'id': 1}]), \
+        with patch.object(pluginscli.inquirer, 'prompt',
+                          return_value={'cli_action': 'Go Back'}), \
+             patch.object(pluginscli.PluginsCLI,
+                          '_PluginsCLI__get_installed_plugins',
+                          return_value=[{'plugin_id': 'p1', 'id': 1}]), \
              patch.object(cli, '_uninstall_plugin_by_db_table_id') as mock_uninstall:
             cli.remove_plugin()
 
@@ -807,8 +810,11 @@ class TestRemovePluginInteractive:
     def test_remove_plugin_uninstalls_selected_plugin(self):
         pluginscli = _import_pluginscli()
         cli = _make_cli(pluginscli)
-        with patch.object(pluginscli.inquirer, 'prompt', return_value={'cli_action': 'p1'}), \
-             patch.object(pluginscli.PluginsCLI, '_PluginsCLI__get_installed_plugins', return_value=[{'plugin_id': 'p1', 'id': 42}]), \
+        with patch.object(pluginscli.inquirer, 'prompt',
+                          return_value={'cli_action': 'p1'}), \
+             patch.object(pluginscli.PluginsCLI,
+                          '_PluginsCLI__get_installed_plugins',
+                          return_value=[{'plugin_id': 'p1', 'id': 42}]), \
              patch.object(cli, '_uninstall_plugin_by_db_table_id') as mock_uninstall:
             cli.remove_plugin()
 

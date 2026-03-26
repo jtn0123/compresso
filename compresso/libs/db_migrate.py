@@ -103,7 +103,7 @@ class Migrations:
             "Migrator does not support adding columns (expected add_fields or add_columns)."
         )
 
-    def update_schema(self):
+    def update_schema(self):  # noqa: C901
         """
         Bring the database schema up-to-date at application startup.
 

@@ -553,7 +553,10 @@ class TestValidateRemoteInstallationExtended:
             urls_called.append(url)
             resp = MagicMock()
             resp.status_code = 200
-            resp.json.return_value = {'configuration': {}, 'settings': {}, 'version': '', 'level': 0, 'picture_uri': '', 'name': '', 'email': '', 'uuid': ''}
+            resp.json.return_value = {
+                'configuration': {}, 'settings': {}, 'version': '',
+                'level': 0, 'picture_uri': '', 'name': '', 'email': '', 'uuid': '',
+            }
             return resp
 
         def mock_post(url, **kwargs):

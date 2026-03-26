@@ -137,7 +137,10 @@ class PluginType:
         for key in data_schema:
             schema_meta = data_schema.get(key)
             if schema_meta.get('required') and key not in result_data:
-                error = f"Plugin '{plugin_id} - {plugin_runner}()' is missing required key '{data_tree}{key}' in the output data."
+                error = (
+                    f"Plugin '{plugin_id} - {plugin_runner}()' is missing required key"
+                    f" '{data_tree}{key}' in the output data."
+                )
                 errors.append(error)
 
             # Ensure that data present is of the correct type
@@ -160,8 +163,12 @@ class PluginType:
 
                 # If data is not of the correct type, then append the error message
                 if not correct_type:
-                    error = f"Plugin '{plugin_id} - {plugin_runner}()' output data returned incorrect data type in key '{data_tree}{key}'. " \
-                            f"Expected '{data_type}', but received '{type(result_data.get(key))}'."
+                    error = (
+                        f"Plugin '{plugin_id} - {plugin_runner}()' output data returned"
+                        f" incorrect data type in key '{data_tree}{key}'."
+                        f" Expected '{data_type}', but received"
+                        f" '{type(result_data.get(key))}'."
+                    )
                     errors.append(error)
                 # Check if data_schema has children
                 children_data_schema = schema_meta.get('children')

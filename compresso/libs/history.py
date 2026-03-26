@@ -99,7 +99,10 @@ class History:
                 query = query.where(CompletedTasks.finish_time <= before_time)
 
             # Get order by
-            ALLOWED_ORDER_COLUMNS = {'id', 'task_label', 'task_success', 'start_time', 'finish_time', 'processed_by_worker', 'abspath'}
+            ALLOWED_ORDER_COLUMNS = {
+                'id', 'task_label', 'task_success', 'start_time',
+                'finish_time', 'processed_by_worker', 'abspath',
+            }
             if order:
                 col = order.get("column", "id")
                 if col not in ALLOWED_ORDER_COLUMNS:
@@ -587,7 +590,11 @@ class History:
             dest_query = dest_query.where(CompressionStats.library_id == library_id)
 
         source_query = source_query.where(CompressionStats.source_container != '').group_by(CompressionStats.source_container)
-        dest_query = dest_query.where(CompressionStats.destination_container != '').group_by(CompressionStats.destination_container)
+        dest_query = (
+            dest_query
+            .where(CompressionStats.destination_container != '')
+            .group_by(CompressionStats.destination_container)
+        )
 
         source_containers = [{'container': row.source_container, 'count': row.count} for row in source_query]
         dest_containers = [{'container': row.destination_container, 'count': row.count} for row in dest_query]

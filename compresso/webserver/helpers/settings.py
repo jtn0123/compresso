@@ -36,7 +36,7 @@ from compresso.webserver.helpers import plugins
 logger = CompressoLogging.get_logger(name="SettingsHelper")
 
 
-def save_library_config(library_id, library_config=None, plugin_config=None):
+def save_library_config(library_id, library_config=None, plugin_config=None):  # noqa: C901
     """
     Save a complete library configuration
 

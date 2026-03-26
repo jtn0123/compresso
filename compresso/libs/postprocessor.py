@@ -527,11 +527,14 @@ class PostProcessor(threading.Thread):
             # Set initial data (some fields will be overwritten further down)
             # - 'library_id'                - The library ID for this task
             # - 'source_data'               - Dictionary of data pertaining to the source file
-            # - 'remove_source_file'        - True to remove the original file (default is True if file name has changed)
-            # - 'copy_file'                 - True to run a plugin initiated file copy (default is False unless the plugin says otherwise)
-            # - 'file_in'                   - Source path to copy from (if 'copy_file' is True)
-            # - 'file_out'                  - Destination path to copy to (if 'copy_file' is True)
-            # - 'run_default_file_copy'     - Prevent the final Compresso post-process file movement (if different from the original file name)
+            # - 'remove_source_file'    - True to remove the original file
+            #                             (default is True if file name has changed)
+            # - 'copy_file'             - True to run a plugin initiated file copy
+            #                             (default is False unless the plugin says otherwise)
+            # - 'file_in'               - Source path to copy from (if 'copy_file' is True)
+            # - 'file_out'              - Destination path to copy to (if 'copy_file' is True)
+            # - 'run_default_file_copy' - Prevent the final Compresso post-process
+            #                             file movement (if different from the original file name)
             data = {
                 'library_id':            library_id,
                 'task_id':               self.current_task.get_task_id(),
@@ -613,7 +616,10 @@ class PostProcessor(threading.Thread):
             # Log a final error if not all file moments were successful
             if not file_move_processes_success:
                 self._log(
-                    f"Error while running postprocessor file movement on file '{cache_path}'. Not all postprocessor file movement functions completed.", level="error")
+                    f"Error while running postprocessor file movement on file '{cache_path}'."
+                    " Not all postprocessor file movement functions completed.",
+                    level="error",
+                )
 
         else:
             self._log(f"Skipping file movement post-processor as the task was not successful '{cache_path}'",
@@ -649,8 +655,10 @@ class PostProcessor(threading.Thread):
     def post_process_remote_file(self):
         """
         Process remote files.
-        Remote files are not processed by plugins. They are just sent back to the OG installation and then the cache files are cleaned up here.
-        A remote file's source_data will be the download path where this installation initial received and stored it.
+        Remote files are not processed by plugins. They are just sent back
+        to the OG installation and then the cache files are cleaned up here.
+        A remote file's source_data will be the download path where this
+        installation initial received and stored it.
 
         TODO: Should we move remote tasks to a permanent download location within the cache path? Possibly not...
 
@@ -668,7 +676,11 @@ class PostProcessor(threading.Thread):
 
         self._log(f"Cache path: {def_cache_path}", level='debug')
         self._log(
-            "Remote source: {}, destination file: {}.".format(source_data['abspath'], destination_data['abspath']), level='debug')
+            "Remote source: {}, destination file: {}.".format(
+                source_data['abspath'], destination_data['abspath'],
+            ),
+            level='debug',
+        )
         self._log(f"Task cache path: {cache_path}", level='debug')
 
         # Remove the source

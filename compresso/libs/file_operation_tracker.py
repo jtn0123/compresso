@@ -77,6 +77,10 @@ class FileOperationTracker:
 
 class PostProcessError(Exception):
     def __init__(self, expected_var, result_var):
-        Exception.__init__(self, f"Errors found during post process checks. Expected {expected_var}, but instead found {result_var}")
+        Exception.__init__(
+            self,
+            f"Errors found during post process checks. Expected {expected_var},"
+            f" but instead found {result_var}",
+        )
         self.expected_var = expected_var
         self.result_var = result_var

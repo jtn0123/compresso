@@ -42,7 +42,8 @@ class TaskResult(PluginType):
         library_id                      - The library that the current task is associated with.
         task_id                         - Integer, unique identifier of the task.
         task_type                       - String, "local" or "remote".
-        final_cache_path                - The path to the final cache file that was then used as the source for all destination files.
+        final_cache_path                - The path to the final cache file that was then used as the
+                                          source for all destination files.
         task_processing_success         - Boolean, did all task processes complete successfully.
         file_move_processes_success     - Boolean, did all postprocessor movement tasks complete successfully.
         destination_files               - List containing all file paths created by postprocessor file movements.

@@ -35,7 +35,11 @@ class TestConfigNotificationChannels:
     def test_set_persists_list(self):
         obj = self._make_bare_config()
         channels = [
-            {'type': 'discord', 'name': 'test', 'url': 'https://discord.com/webhook', 'triggers': ['task_completed'], 'enabled': True},
+            {
+                'type': 'discord', 'name': 'test',
+                'url': 'https://discord.com/webhook',
+                'triggers': ['task_completed'], 'enabled': True,
+            },
         ]
         obj.set_notification_channels(channels)
         result = obj.get_notification_channels()

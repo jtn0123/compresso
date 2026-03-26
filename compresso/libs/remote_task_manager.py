@@ -218,7 +218,7 @@ class RemoteTaskManager(threading.Thread):
         self.worker_log.append(f"\nRelevant logs will be prefixed with 'ERROR:Compresso.{self.name}'")
         self.current_task.save_command_log(self.worker_log)
 
-    def __send_task_to_remote_worker_and_monitor(self):
+    def __send_task_to_remote_worker_and_monitor(self):  # noqa: C901
         """
         Sends the task file to the remote installation to process.
         Monitors progress and then fetches the results.
@@ -278,13 +278,25 @@ class RemoteTaskManager(threading.Thread):
                                                                              remote_original_abspath,
                                                                              remote_library_id)
             if not info:
-                self._log(f"Unable to create remote pending task for path '{remote_original_abspath}'. Fallback to sending file.", level='debug')
+                self._log(
+                    f"Unable to create remote pending task for path '{remote_original_abspath}'."
+                    " Fallback to sending file.",
+                    level='debug',
+                )
                 send_file = True
             elif 'path does not exist' in info.get('error', '').lower():
-                self._log(f"Unable to find file in remote library's path '{remote_original_abspath}'. Fallback to sending file.", level='debug')
+                self._log(
+                    f"Unable to find file in remote library's path '{remote_original_abspath}'."
+                    " Fallback to sending file.",
+                    level='debug',
+                )
                 send_file = True
             elif 'task already exists' in info.get('error', '').lower():
-                self._log(f"A remote task already exists with the path '{remote_original_abspath}'. Fallback to sending file.", level='error')
+                self._log(
+                    f"A remote task already exists with the path '{remote_original_abspath}'."
+                    " Fallback to sending file.",
+                    level='error',
+                )
                 self.__write_failure_to_worker_log()
                 return False
 
@@ -357,7 +369,10 @@ class RemoteTaskManager(threading.Thread):
                 continue
             if not result.get('success'):
                 self._log(
-                    f"Failed to match a remote library named '{library_name}'. Remote installation will use the default library", level='warning')
+                    f"Failed to match a remote library named '{library_name}'."
+                    " Remote installation will use the default library",
+                    level='warning',
+                )
                 # Just log the warning for this. If no matching library name is found it will remain set as the default library
                 break
             if result.get('success'):
@@ -407,7 +422,11 @@ class RemoteTaskManager(threading.Thread):
 
             # Check if we have exceeded the maximum retry window
             if first_failure_time and (time_now - first_failure_time) > max_retry_seconds:
-                self._log(f"Remote link unreachable for over {max_retry_seconds} seconds, giving up on task '{original_abspath}'", level='error')
+                self._log(
+                    f"Remote link unreachable for over {max_retry_seconds} seconds,"
+                    f" giving up on task '{original_abspath}'",
+                    level='error',
+                )
                 self.__write_failure_to_worker_log()
                 return False
 
@@ -443,7 +462,11 @@ class RemoteTaskManager(threading.Thread):
                 if first_failure_time is None:
                     first_failure_time = time_now
                 polling_delay = min(60, 5 * (2 ** min(consecutive_poll_failures, 4)))
-                self._log(f"Lost contact with remote installation (attempt {consecutive_poll_failures}), next poll in {polling_delay}s for '{original_abspath}'", level='warning')
+                self._log(
+                    f"Lost contact with remote installation (attempt {consecutive_poll_failures}),"
+                    f" next poll in {polling_delay}s for '{original_abspath}'",
+                    level='warning',
+                )
                 last_status_fetch = time_now
                 continue
             elif task_status == 'removed':
@@ -507,7 +530,10 @@ class RemoteTaskManager(threading.Thread):
 
         if not data:
             self._log(
-                f"Failed to retrieve remote task data for '{original_abspath}'. NOTE: The cached files have not been removed from the remote host.", level='error')
+                f"Failed to retrieve remote task data for '{original_abspath}'."
+                " NOTE: The cached files have not been removed from the remote host.",
+                level='error',
+            )
             self.__write_failure_to_worker_log()
             return False
         self.worker_log = [data.get('log')]
@@ -544,7 +570,11 @@ class RemoteTaskManager(threading.Thread):
                 if match1:
                     correct_random_string = match1.group()
                 else:
-                    self._log(f"Unable to detect random_string pattern in main instance cache directory named '{cache_directory}'", level='error')
+                    self._log(
+                        f"Unable to detect random_string pattern in main instance"
+                        f" cache directory named '{cache_directory}'",
+                        level='error',
+                    )
                     self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                     self.__write_failure_to_worker_log()
                     return False
@@ -552,7 +582,11 @@ class RemoteTaskManager(threading.Thread):
                 if match2:
                     incorrect_random_string = match2.group()
                 else:
-                    self._log(f"Unable to detect random_string pattern in remote library located directory named '{task_cache_path}'", level='error')
+                    self._log(
+                        f"Unable to detect random_string pattern in remote library"
+                        f" located directory named '{task_cache_path}'",
+                        level='error',
+                    )
                     self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                     self.__write_failure_to_worker_log()
                     return False
@@ -563,7 +597,11 @@ class RemoteTaskManager(threading.Thread):
                 try:
                     output = shutil.copy(task_cache_path, correct_cache_file_path)
                     if os.path.exists(output) and os.path.getsize(output) > 0:
-                        self._log(f"File successfully copied from remote library located cache to main instance cache at '{output}'", level='info')
+                        self._log(
+                            f"File successfully copied from remote library located"
+                            f" cache to main instance cache at '{output}'",
+                            level='info',
+                        )
                         # Update task pointers to the new local cache path
                         task_cache_path = output
                         self.current_task.cache_path = output
@@ -598,7 +636,9 @@ class RemoteTaskManager(threading.Thread):
                         continue
                     # Download the file
                     self._log(f"Downloading file from remote installation '{task_label}'", level='debug')
-                    success = self.links.fetch_remote_task_completed_file(self.installation_info, remote_task_id, task_cache_path)
+                    success = self.links.fetch_remote_task_completed_file(
+                        self.installation_info, remote_task_id, task_cache_path,
+                    )
                     self.links.release_network_transfer_lock(lock_key)
                     if not success:
                         self._log("Failed to download file '{}'".format(os.path.basename(data.get('abspath'))), level='error')

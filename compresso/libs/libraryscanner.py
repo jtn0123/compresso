@@ -222,7 +222,7 @@ class LibraryScannerManager(threading.Thread):
                 return True
         return False
 
-    def scan_library_path(self, library_name, library_path, library_id):
+    def scan_library_path(self, library_name, library_path, library_id):  # noqa: C901
         """
         Run a scan of the given library path
 
@@ -334,7 +334,11 @@ class LibraryScannerManager(threading.Thread):
             self.file_test_managers[manager_id].abort_flag.set()
             self.file_test_managers[manager_id].join(2)
             if self.file_test_managers[manager_id].is_alive():
-                self.logger.error("Completing Library scan, but thread %s is still alive. Files tested by this thread will be ignored.", manager_id)
+                self.logger.error(
+                    "Completing Library scan, but thread %s is still alive."
+                    " Files tested by this thread will be ignored.",
+                    manager_id,
+                )
 
         scan_end_time = time.time()
         scan_duration = str(scan_end_time - scan_start_time)

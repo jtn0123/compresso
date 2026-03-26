@@ -43,8 +43,10 @@ class FileTest(PluginType):
         path                            - String containing the full path to the file being tested.
         issues                          - List of currently found issues for not processing the file.
         add_file_to_pending_tasks       - Boolean, is the file currently marked to be added to the queue for processing.
-        priority_score                  - Integer, an additional score that can be added to set the position of the new task in the task queue.
-        shared_info                     - Dictionary, information provided by previous plugin runners. This can be appended to for subsequent runners.
+        priority_score                  - Integer, an additional score that can be added to set the
+                                          position of the new task in the task queue.
+        shared_info                     - Dictionary, information provided by previous plugin runners.
+                                          This can be appended to for subsequent runners.
 
     :param data:
     :return:

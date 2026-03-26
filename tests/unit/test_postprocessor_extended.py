@@ -522,7 +522,9 @@ class TestPostProcessRemoteFile:
     @patch(f'{PP_MOD}.os.mkdir')
     @patch(f'{PP_MOD}.common.random_string', return_value='abc')
     @patch(f'{PP_MOD}.time.time', return_value=1000)
-    def test_remote_source_not_in_cache(self, mock_time, mock_random, mock_mkdir, mock_remove, mock_exists, mock_copy, mock_cleanup):
+    def test_remote_source_not_in_cache(
+        self, mock_time, mock_random, mock_mkdir, mock_remove, mock_exists, mock_copy, mock_cleanup,
+    ):
         """Remote source outside cache: keep source, copy cache to library dir."""
         pp = _make_postprocessor()
         pp.settings = MagicMock()

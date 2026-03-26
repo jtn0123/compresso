@@ -48,7 +48,8 @@ def no_backends():
 @pytest.fixture
 def nvidia_only():
     """Patch so only NVIDIA backend is detected."""
-    with patch(GPU_MONITOR + '.shutil.which', side_effect=lambda cmd: '/usr/bin/nvidia-smi' if cmd == 'nvidia-smi' else None), \
+    with patch(GPU_MONITOR + '.shutil.which',
+               side_effect=lambda cmd: '/usr/bin/nvidia-smi' if cmd == 'nvidia-smi' else None), \
          patch(GPU_MONITOR + '.sys') as mock_sys, \
          patch(GPU_MONITOR + '.Path') as mock_path_cls:
         mock_sys.platform = 'linux'

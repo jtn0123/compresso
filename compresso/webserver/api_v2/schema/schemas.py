@@ -52,7 +52,10 @@ class BaseErrorSchema(BaseSchema):
     )
     messages = fields.Dict(
         required=True,
-        metadata={'description': "Attached request body validation errors", 'example': {"name": ["The thing that went wrong."]}},
+        metadata={
+            'description': "Attached request body validation errors",
+            'example': {"name": ["The thing that went wrong."]},
+        },
     )
     traceback = fields.List(
         cls_or_instance=fields.Str,
@@ -406,7 +409,10 @@ class MetadataEntrySchema(BaseSchema):
     paths = fields.List(
         fields.Dict(),
         required=False,
-        metadata={'description': "Associated file paths for this fingerprint", 'example': [{"path": "/mnt/user/Movies/Example.mkv", "path_type": "destination"}]},
+        metadata={
+            'description': "Associated file paths for this fingerprint",
+            'example': [{"path": "/mnt/user/Movies/Example.mkv", "path_type": "destination"}],
+        },
     )
 
 
@@ -540,11 +546,17 @@ class NotificationDataSchema(BaseSchema):
     )
     label = fields.Str(
         required=True,
-        metadata={'description': "The label of the notification. Can be a I18n key or a string", 'example': "updateAvailableLabel"},
+        metadata={
+            'description': "The label of the notification. Can be a I18n key or a string",
+            'example': "updateAvailableLabel",
+        },
     )
     message = fields.Str(
         required=True,
-        metadata={'description': "The message of the notification. Can be a I18n key or a string", 'example': "updateAvailableMessage"},
+        metadata={
+            'description': "The message of the notification. Can be a I18n key or a string",
+            'example': "updateAvailableMessage",
+        },
     )
     navigation = fields.Dict(
         required=True,
@@ -699,7 +711,11 @@ class RequestPendingTaskCreateSchema(BaseSchema):
     )
     priority_score = fields.Int(
         required=False,
-        metadata={'description': "Apply a priority score to the created task to either increase or decrease its position in the queue", 'example': 1000},
+        metadata={
+            'description': "Apply a priority score to the created task to either"
+            " increase or decrease its position in the queue",
+            'example': 1000,
+        },
     )
 
 
@@ -708,7 +724,10 @@ class RequestPendingTaskTestSchema(BaseSchema):
 
     path = fields.Str(
         required=True,
-        metadata={'description': "The path to a file (absolute or relative to the selected library)", 'example': "/library/TEST_FILE.mkv"},
+        metadata={
+            'description': "The path to a file (absolute or relative to the selected library)",
+            'example': "/library/TEST_FILE.mkv",
+        },
     )
     library_id = fields.Int(
         required=False,
@@ -738,7 +757,11 @@ class PendingTaskTestResultSchema(BaseSchema):
     add_file_to_pending_tasks = fields.Boolean(
         required=False,
         allow_none=True,
-        metadata={'description': "Final decision after file tests (true: plugin requested queueing, false: plugin rejected, null: no plugin decided)", 'example': True},
+        metadata={
+            'description': "Final decision after file tests (true: plugin requested queueing,"
+            " false: plugin rejected, null: no plugin decided)",
+            'example': True,
+        },
     )
     issues = fields.List(
         fields.Dict(),
@@ -760,7 +783,10 @@ class TaskDownloadLinkSchema(BaseSchema):
 
     link_id = fields.Str(
         required=True,
-        metadata={'description': "The ID used to download the file /compresso/downloads/{link_id}", 'example': "2960645c-a4e2-4b05-8866-7bd469ee9ef8"},
+        metadata={
+            'description': "The ID used to download the file /compresso/downloads/{link_id}",
+            'example': "2960645c-a4e2-4b05-8866-7bd469ee9ef8",
+        },
     )
 
 
@@ -805,7 +831,10 @@ class RequestPluginsByIdSchema(BaseSchema):
     )
     repo_id = fields.Str(
         required=False,
-        metadata={'description': "The ID of the repository that this plugin is in", 'example': "158899500680826593283708490873332175078"},
+        metadata={
+            'description': "The ID of the repository that this plugin is in",
+            'example': "158899500680826593283708490873332175078",
+        },
     )
 
 
@@ -826,7 +855,11 @@ class PluginsMetadataResultsSchema(BaseSchema):
     )
     description = fields.Str(
         required=True,
-        metadata={'description': "The plugin description", 'example': "Ensure all video streams are encoded with the H264 codec using the h264_nvenc encoder."},
+        metadata={
+            'description': "The plugin description",
+            'example': "Ensure all video streams are encoded with the H264 codec"
+            " using the h264_nvenc encoder.",
+        },
     )
     version = fields.Str(
         required=True,
@@ -896,7 +929,11 @@ class PluginsConfigInputItemSchema(BaseSchema):
 
     key_id = fields.Str(
         required=True,
-        metadata={'description': "The config input base64 encoded key (used for linking keys containing spaces, etc.)", 'example': "c8f122656ed2acabde9b57101a4c8ec7"},
+        metadata={
+            'description': "The config input base64 encoded key"
+            " (used for linking keys containing spaces, etc.)",
+            'example': "c8f122656ed2acabde9b57101a4c8ec7",
+        },
     )
     key = fields.Str(
         required=True,
@@ -912,16 +949,25 @@ class PluginsConfigInputItemSchema(BaseSchema):
     )
     label = fields.Str(
         required=True,
-        metadata={'description': "The label used to define this config input", 'example': "Downmix DTS-HD Master Audio (max 5.1 channels)?"},
+        metadata={
+            'description': "The label used to define this config input",
+            'example': "Downmix DTS-HD Master Audio (max 5.1 channels)?",
+        },
     )
     description = fields.Str(
         required=True,
-        metadata={'description': "Description of input field", 'example': "Will automatically downmix DTS-HD Master Audio to 5.1 channels "},
+        metadata={
+            'description': "Description of input field",
+            'example': "Will automatically downmix DTS-HD Master Audio to 5.1 channels ",
+        },
         allow_none=True,
     )
     tooltip = fields.Str(
         required=True,
-        metadata={'description': "Description of input field", 'example': "Will automatically downmix DTS-HD Master Audio to 5.1 channels "},
+        metadata={
+            'description': "Description of input field",
+            'example': "Will automatically downmix DTS-HD Master Audio to 5.1 channels ",
+        },
         allow_none=True,
     )
     select_options = fields.List(
@@ -1018,7 +1064,10 @@ class PluginsMetadataInstallableResultsSchema(PluginsMetadataResultsSchema):
     )
     repo_id = fields.Str(
         required=False,
-        metadata={'description': "The ID of the repository that this plugin is in", 'example': "158899500680826593283708490873332175078"},
+        metadata={
+            'description': "The ID of the repository that this plugin is in",
+            'example': "158899500680826593283708490873332175078",
+        },
     )
 
 
@@ -1080,7 +1129,11 @@ class PluginFlowDataResultsSchema(BaseSchema):
     )
     description = fields.Str(
         required=True,
-        metadata={'description': "The plugin description", 'example': "Ensure all video streams are encoded with the H264 codec using the h264_nvenc encoder."},
+        metadata={
+            'description': "The plugin description",
+            'example': "Ensure all video streams are encoded with the H264 codec"
+            " using the h264_nvenc encoder.",
+        },
     )
     version = fields.Str(
         required=True,
@@ -1224,7 +1277,10 @@ class SessionAuthCodeSchema(BaseSchema):
     )
     device_code = fields.Str(
         required=True,
-        metadata={'description': "A device code", 'example': "6f6867e0006f7240c9a85703a521f1705873630355f68ebbcf251a07b080172b"},
+        metadata={
+            'description': "A device code",
+            'example': "6f6867e0006f7240c9a85703a521f1705873630355f68ebbcf251a07b080172b",
+        },
     )
     verification_uri = fields.Str(
         required=True,
@@ -1248,7 +1304,8 @@ class SettingsReadAndWriteSchema(BaseSchema):
 
     settings = fields.Dict(
         required=True,
-        metadata={'description': "The current settings, including fork-specific deployment defaults such as safe startup behavior and worker caps", 'example': {
+        metadata={'description': "The current settings, including fork-specific deployment"
+                  " defaults such as safe startup behavior and worker caps", 'example': {
             "ui_port":                    8888,
             "debugging":                  False,
             "log_buffer_retention":       0,
@@ -1414,7 +1471,11 @@ class SettingsRemoteInstallationLinkConfigSchema(BaseSchema):
     )
     distributed_worker_count_target = fields.Int(
         required=False,
-        metadata={'description': "The target count of workers to be distributed across any configured linked installations", 'example': 4},
+        metadata={
+            'description': "The target count of workers to be distributed"
+            " across any configured linked installations",
+            'example': 4,
+        },
     )
 
 
@@ -1550,7 +1611,8 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
                     "library_id":  1,
                     "plugin_id":   "encoder_audio_ac3",
                     "name":        "Audio Encoder AC3",
-                    "description": "Ensure all audio streams are encoded with the AC3 codec using the native FFmpeg ac3 encoder.",
+                    "description": "Ensure all audio streams are encoded with the AC3 codec"
+                                   " using the native FFmpeg ac3 encoder.",
                     "icon":        "https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png"
                 }
             ],
@@ -1560,7 +1622,8 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
                         "plugin_id":   "encoder_audio_ac3",
                         "name":        "Audio Encoder AC3",
                         "author":      "Josh.5",
-                        "description": "Ensure all audio streams are encoded with the AC3 codec using the native FFmpeg ac3 encoder.",
+                        "description": "Ensure all audio streams are encoded with the AC3 codec"
+                                   " using the native FFmpeg ac3 encoder.",
                         "version":     "0.0.2",
                         "icon":        "https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png"
                     }
@@ -1570,7 +1633,8 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
                         "plugin_id":   "encoder_audio_ac3",
                         "name":        "Audio Encoder AC3",
                         "author":      "Josh.5",
-                        "description": "Ensure all audio streams are encoded with the AC3 codec using the native FFmpeg ac3 encoder.",
+                        "description": "Ensure all audio streams are encoded with the AC3 codec"
+                                   " using the native FFmpeg ac3 encoder.",
                         "version":     "0.0.2",
                         "icon":        "https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png"
                     }
@@ -1723,7 +1787,8 @@ class WorkerStatusResultsSchema(BaseSchema):
             "\n\nRUNNER: \nRemux Video Files [Pass #1]\n\n",
             "\nExecuting plugin runner... Please wait",
             "\nRunner did not request to execute a command",
-            "\n\nNo Plugin requested to run commands for this file '/tmp/compresso/compresso_remote_pending_library-1635746225.3336523/file.mp4'"
+            "\n\nNo Plugin requested to run commands for this file"
+            " '/tmp/compresso/compresso_remote_pending_library-1635746225.3336523/file.mp4'"
         ]},
         validate=validate.Length(min=0),
     )

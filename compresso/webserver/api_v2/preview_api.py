@@ -85,7 +85,10 @@ class ApiPreviewHandler(BaseApiHandler):
                         allowed_roots.add(os.path.realpath(cache_path))
                 except Exception as e:
                     tornado.log.app_log.error("Failed to load cache path for path validation: %s", e)
-                if not allowed_roots or not any(real_path.startswith(root + os.sep) or real_path == root for root in allowed_roots):
+                if not allowed_roots or not any(
+                    real_path.startswith(root + os.sep) or real_path == root
+                    for root in allowed_roots
+                ):
                     raise ValueError("Source path is not within an allowed directory")
 
             preview_manager = PreviewManager()

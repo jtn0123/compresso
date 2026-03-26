@@ -88,17 +88,26 @@ class ApiPendingHandler(BaseApiHandler):
 
         # Delete a list of tasks.
         #   (on success will continue to return the current list of tasks)
-        if request_dict.get("customActionName") == "remove-from-task-list" and not self.delete_pending_tasks(request_dict.get("id")):
+        if (
+            request_dict.get("customActionName") == "remove-from-task-list"
+            and not self.delete_pending_tasks(request_dict.get("id"))
+        ):
             self.write(json.dumps({"success": False}))
             return
 
         # Move a list of tasks to the top of the queue
-        if request_dict.get("customActionName") == "move-to-top-of-task-list" and not pending_tasks.reorder_pending_tasks(request_dict.get("id"), "top"):
+        if (
+            request_dict.get("customActionName") == "move-to-top-of-task-list"
+            and not pending_tasks.reorder_pending_tasks(request_dict.get("id"), "top")
+        ):
             self.write(json.dumps({"success": False}))
             return
 
         # Move a list of tasks to the bottom of the queue
-        if request_dict.get("customActionName") == "move-to-bottom-of-task-list" and not pending_tasks.reorder_pending_tasks(request_dict.get("id"), "bottom"):
+        if (
+            request_dict.get("customActionName") == "move-to-bottom-of-task-list"
+            and not pending_tasks.reorder_pending_tasks(request_dict.get("id"), "bottom")
+        ):
             self.write(json.dumps({"success": False}))
             return
 

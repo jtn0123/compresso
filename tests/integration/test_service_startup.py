@@ -144,14 +144,38 @@ def test_root_service_readiness_fails_when_ui_server_never_becomes_ready(monkeyp
     settings.set_config_item('startup_readiness_timeout_seconds', 1, save_settings=False)
 
     monkeypatch.setattr(RootService, 'initial_register_compresso', lambda self: None)
-    monkeypatch.setattr(RootService, 'start_post_processor', lambda self, data_queues, task_queue: append_dummy_thread(self, 'PostProcessor'))
-    monkeypatch.setattr(RootService, 'start_foreman', lambda self, data_queues, settings, task_queue: append_dummy_thread(self, 'Foreman'))
-    monkeypatch.setattr(RootService, 'start_handler', lambda self, data_queues, task_queue: append_dummy_thread(self, 'TaskHandler'))
-    monkeypatch.setattr(RootService, 'start_library_scanner_manager', lambda self, data_queues: append_dummy_thread(self, 'LibraryScannerManager'))
-    monkeypatch.setattr(RootService, 'start_inotify_watch_manager', lambda self, data_queues, settings: append_dummy_thread(self, 'EventMonitorManager'))
-    monkeypatch.setattr(RootService, 'start_ui_server', lambda self, data_queues, foreman: append_dummy_thread(self, 'UIServer'))
-    monkeypatch.setattr(RootService, 'start_scheduled_tasks_manager', lambda self: append_dummy_thread(self, 'ScheduledTasksManager'))
-    monkeypatch.setattr(RootService, 'start_resource_logger', lambda self: append_dummy_thread(self, 'RootServiceResourceLogger'))
+    monkeypatch.setattr(
+        RootService, 'start_post_processor',
+        lambda self, data_queues, task_queue: append_dummy_thread(self, 'PostProcessor'),
+    )
+    monkeypatch.setattr(
+        RootService, 'start_foreman',
+        lambda self, data_queues, settings, task_queue: append_dummy_thread(self, 'Foreman'),
+    )
+    monkeypatch.setattr(
+        RootService, 'start_handler',
+        lambda self, data_queues, task_queue: append_dummy_thread(self, 'TaskHandler'),
+    )
+    monkeypatch.setattr(
+        RootService, 'start_library_scanner_manager',
+        lambda self, data_queues: append_dummy_thread(self, 'LibraryScannerManager'),
+    )
+    monkeypatch.setattr(
+        RootService, 'start_inotify_watch_manager',
+        lambda self, data_queues, settings: append_dummy_thread(self, 'EventMonitorManager'),
+    )
+    monkeypatch.setattr(
+        RootService, 'start_ui_server',
+        lambda self, data_queues, foreman: append_dummy_thread(self, 'UIServer'),
+    )
+    monkeypatch.setattr(
+        RootService, 'start_scheduled_tasks_manager',
+        lambda self: append_dummy_thread(self, 'ScheduledTasksManager'),
+    )
+    monkeypatch.setattr(
+        RootService, 'start_resource_logger',
+        lambda self: append_dummy_thread(self, 'RootServiceResourceLogger'),
+    )
 
     service = RootService()
     service.startup_state.reset()

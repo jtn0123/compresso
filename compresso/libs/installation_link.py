@@ -50,7 +50,9 @@ class Links(metaclass=SingletonType):
         self.settings = config.Config()
         self.session = session.Session()
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
-        self._link_status = {}  # {uuid: {'status': 'connected', 'last_seen': time.time(), 'consecutive_failures': 0, 'next_retry': 0}}
+        # {uuid: {'status': 'connected', 'last_seen': time.time(),
+        #         'consecutive_failures': 0, 'next_retry': 0}}
+        self._link_status = {}
 
     def _log(self, message, message2='', level="info"):
         message = common.format_message(message, message2)
@@ -455,7 +457,7 @@ class Links(metaclass=SingletonType):
             'task_count':           int(tasks_data.get('recordsTotal', 0))
         }
 
-    def update_all_remote_installation_links(self):
+    def update_all_remote_installation_links(self):  # noqa: C901
         """
         Updates the link status and configuration of linked remote installations
 
@@ -750,7 +752,8 @@ class Links(metaclass=SingletonType):
 
     def push_remote_installation_link_config(self, configuration: dict):
         """
-        Pushes the given link config to the remote installation returns the corresponding link configuration from a remote installation
+        Pushes the given link config to the remote installation returns
+        the corresponding link configuration from a remote installation
 
         :param configuration:
         :return:
@@ -850,7 +853,10 @@ class Links(metaclass=SingletonType):
                     continue
                 current_pending_tasks = int(results.get('recordsFiltered', 0))
                 if local_config.get('enable_task_preloading') and current_pending_tasks >= max_pending_tasks:
-                    self._log(f"Remote installation has exceeded the max remote pending task count ({current_pending_tasks})", level='debug')
+                    self._log(
+                        f"Remote installation has exceeded the max remote pending task count ({current_pending_tasks})",
+                        level='debug',
+                    )
                     continue
 
                 # Fetch remote installation library name list

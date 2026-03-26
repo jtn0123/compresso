@@ -196,7 +196,8 @@ class ApiUploadHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            # TODO: Add POST endpoint to receive metadata or a recipe pertaining to this uploaded file (for future when plugins can be sent with the file).
+            # TODO: Add POST endpoint to receive metadata or a recipe pertaining
+            # to this uploaded file (for future when plugins can be sent with the file).
             self.meta['content_length'] = int(self.request.headers.get('Content-Length')) - \
                                           len(self.meta['header']) - \
                                           len(self.meta['boundary'])

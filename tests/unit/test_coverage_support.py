@@ -269,7 +269,9 @@ def test_swagger_helpers_find_handlers_and_generate_files(fake_apispec, tmp_path
             'get': lambda self: None,
         },
     )
-    bad_handler = type('BadSwaggerHandler', (), {'routes': [{'path_pattern': r'/bad', 'supported_methods': ['GET'], 'call_method': 'get'}]})
+    bad_handler = type('BadSwaggerHandler', (), {
+        'routes': [{'path_pattern': r'/bad', 'supported_methods': ['GET'], 'call_method': 'get'}],
+    })
     bad_handler.raise_spec_error = True
     bad_handler.get = lambda self: None
 

@@ -23,7 +23,9 @@ def resolve_proxy_target(target_id):
         # Priority 1: Address (normalized)
         for r in search_list:
             addr = str(r.get('address', '')).strip().lower().rstrip('/')
-            if addr == t_id or addr == t_id.rstrip('/') or addr.replace('http://', '').replace('https://', '') == t_id.replace('http://', '').replace('https://', ''):
+            addr_bare = addr.replace('http://', '').replace('https://', '')
+            t_id_bare = t_id.replace('http://', '').replace('https://', '')
+            if addr == t_id or addr == t_id.rstrip('/') or addr_bare == t_id_bare:
                 return r
         # Priority 2: UUID
         for r in search_list:

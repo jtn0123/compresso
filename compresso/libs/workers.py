@@ -269,7 +269,7 @@ class Worker(threading.Thread):
         # Set the finish time in the statistics data
         self.current_task.task.finish_time = self.finish_time
 
-    def __exec_worker_runners_on_set_task(self):
+    def __exec_worker_runners_on_set_task(self):  # noqa: C901
         """
         Executes the configured plugin runners against the set task.
 
@@ -453,9 +453,11 @@ class Worker(threading.Thread):
                         self.logger.info("Successfully ran worker process '%s' on file '%s'",
                                          runner_id,
                                          data.get("file_in"))
-                        # Check if 'file_out' was nulled by the plugin. If it is, then we will assume that the plugin modified the file_in in-place
+                        # Check if 'file_out' was nulled by the plugin.
+                        # If it is, we assume the plugin modified the file_in in-place
                         if not data.get('file_out'):
-                            # The 'file_out' is None. Ensure the new 'file_in' is set to whatever the plugin returned for 'file_in' for the next loop
+                            # The 'file_out' is None. Ensure the new 'file_in' is set to
+                            # whatever the plugin returned for 'file_in' for the next loop
                             file_in = data.get("file_in")
                         # Ensure the 'file_out' that was specified by the plugin to be created was actually created.
                         elif os.path.exists(data.get('file_out')):
@@ -463,7 +465,8 @@ class Worker(threading.Thread):
                             # In order to clean up as we go and avoid unnecessary RAM/disk use in the cache directory,
                             #   we want to remove the 'file_in' file.
                             # We want to ensure that we do not accidentally remove any original files here.
-                            # We also want to ensure that the 'file_out' is not removed if the plugin set it to the same path as the 'file_in'.
+                            # We also want to ensure that the 'file_out' is not removed if
+                            # the plugin set it to the same path as the 'file_in'.
                             # To avoid this, run x3 tests.
                             # First, check current 'file_in' is not the original file.
                             if (  # noqa: SIM102
@@ -638,11 +641,18 @@ class Worker(threading.Thread):
                 sub_proc = subprocess.Popen(exec_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,  # noqa: S603 - trusted plugin exec_command from internal pipeline
                                             universal_newlines=True, errors='replace')
             elif isinstance(exec_command, str):
-                sub_proc = subprocess.Popen(exec_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,  # noqa: S602 - shell=True required for string commands from plugins
-                                            universal_newlines=True, errors='replace', shell=True)
+                sub_proc = subprocess.Popen(  # noqa: S602
+                exec_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                errors='replace',
+                shell=True,
+            )
             else:
                 raise TypeError(
-                    f"Plugin's returned 'exec_command' object must be either a list or a string. Received type {type(exec_command)}.")
+                    f"Plugin's returned 'exec_command' object must be either a list"
+                    f" or a string. Received type {type(exec_command)}.")
 
             # Fetch process using psutil for control (sending SIGSTOP on windows will not work)
             proc = psutil.Process(pid=sub_proc.pid)
@@ -658,8 +668,11 @@ class Worker(threading.Thread):
                     parent_proc = psutil.Process(os.getpid())
                     proc.nice(parent_proc.nice() + 1)
             except (psutil.AccessDenied, psutil.NoSuchProcess, OSError) as e:
-                self.logger.warning("Unable to lower priority of subprocess. Subprocess should continue to run at normal priority: %s",
-                                    e)
+                self.logger.warning(
+                    "Unable to lower priority of subprocess."
+                    " Subprocess should continue to run at normal priority: %s",
+                    e,
+                )
 
             # Poll process for new output until finished
             while not self.redundant_flag.is_set():
