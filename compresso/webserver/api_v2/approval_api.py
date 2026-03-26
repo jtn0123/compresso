@@ -129,6 +129,7 @@ class ApiApprovalHandler(BaseApiHandler):
             if json_request.get('all_matching', False):
                 ids = approval.get_all_matching_task_ids(
                     search_value=json_request.get('search_value', ''),
+                    library_ids=json_request.get('library_ids', []),
                 )
             else:
                 ids = json_request.get('id_list', [])
@@ -173,6 +174,7 @@ class ApiApprovalHandler(BaseApiHandler):
             if json_request.get('all_matching', False):
                 ids = approval.get_all_matching_task_ids(
                     search_value=json_request.get('search_value', ''),
+                    library_ids=json_request.get('library_ids', []),
                 )
             else:
                 ids = json_request.get('id_list', [])

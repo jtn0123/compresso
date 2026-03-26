@@ -100,11 +100,12 @@ class WorkerSubprocessMonitor(threading.Thread):
 
     def unset_proc(self):
         try:
+            # Preserve the final elapsed time before clearing the subprocess
+            self.subprocess_elapsed = self.get_subprocess_elapsed()
             self.subprocess_pid = None
             self.subprocess = None
             # Reset subprocess progress
             self.subprocess_percent = 0
-            self.subprocess_elapsed = 0
             # Reset resource values
             self.set_proc_resources_in_parent_worker(0, 0, 0, 0)
         except Exception:
@@ -226,7 +227,7 @@ class WorkerSubprocessMonitor(threading.Thread):
 
     def get_subprocess_elapsed(self):
         try:
-            subprocess_elapsed = 0
+            subprocess_elapsed = self.subprocess_elapsed
             if self.subprocess is not None:
                 # Get the time now
                 now = int(time.time())
@@ -235,10 +236,11 @@ class WorkerSubprocessMonitor(threading.Thread):
                 # Get the time when we started being paused
                 # Calculate elapsed time of the subprocess subtracting the pause duration
                 subprocess_elapsed = int(total_run_time - self.subprocess_pause_time)
+            self.subprocess_elapsed = subprocess_elapsed
             return subprocess_elapsed
         except Exception:
             self.logger.exception("Exception in get_subprocess_elapsed()")
-            return 0
+            return self.subprocess_elapsed
 
     def get_subprocess_stats(self):
         try:
@@ -323,7 +325,9 @@ class WorkerSubprocessMonitor(threading.Thread):
 
     def set_subprocess_percent(self, percent):
         try:
-            self.subprocess_percent = percent
+            self.subprocess_percent = max(0, min(100, int(float(percent))))
+        except (TypeError, ValueError):
+            self.subprocess_percent = 0
         except Exception:
             self.logger.exception("Exception in set_subprocess_percent()")
 

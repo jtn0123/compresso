@@ -61,7 +61,8 @@ const fetchCompletedTaskLog = () => {
     url: getCompressoApiUrl('v2', 'history/task/log'),
     data: data
   }).then((response) => {
-    taskDetails.value = (response.data.command_log_lines || []).map(sanitizeHtml)
+    const lines = Array.isArray(response.data.command_log_lines) ? response.data.command_log_lines : []
+    taskDetails.value = lines.map(sanitizeHtml)
   }).catch(() => {
     $q.notify({
       color: 'negative',

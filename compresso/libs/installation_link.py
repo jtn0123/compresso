@@ -489,7 +489,12 @@ class Links(object, metaclass=SingletonType):
                 continue
 
             # Check if this link is in backoff period
-            link_uuid = local_config.get('uuid', '???')
+            # Derive a stable per-link key even when uuid is not yet synced
+            raw_uuid = local_config.get('uuid', '???')
+            if raw_uuid == '???':
+                link_uuid = '_addr_{}'.format(local_config.get('address', 'unknown'))
+            else:
+                link_uuid = raw_uuid
             if self._should_skip_link(link_uuid):
                 # Still in backoff -- keep existing config but mark unavailable
                 updated_config = self.__generate_default_config(local_config)
@@ -518,6 +523,12 @@ class Links(object, metaclass=SingletonType):
             updated_config = self.__generate_default_config(local_config)
             updated_config["available"] = False
             if installation_data:
+                # If we used a temp address-based key, migrate status to the real UUID
+                real_uuid = installation_data.get('session', {}).get('uuid')
+                if real_uuid and link_uuid != real_uuid:
+                    if link_uuid in self._link_status:
+                        self._link_status[real_uuid] = self._link_status.pop(link_uuid)
+                    link_uuid = real_uuid
                 # Record successful contact
                 self._record_link_success(link_uuid)
                 # Mark the installation as available

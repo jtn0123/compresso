@@ -128,11 +128,14 @@ class TestSetUnsetProc:
         monitor.subprocess = MagicMock()
         monitor.subprocess_percent = 50
         monitor.subprocess_elapsed = 120
+        monitor.subprocess_start_time = int(time.time()) - 120
+        monitor.subprocess_pause_time = 0
         monitor.unset_proc()
         assert monitor.subprocess is None
         assert monitor.subprocess_pid is None
         assert monitor.subprocess_percent == 0
-        assert monitor.subprocess_elapsed == 0
+        # subprocess_elapsed is preserved (final value captured before clearing)
+        assert monitor.subprocess_elapsed > 0
 
 
 # ------------------------------------------------------------------

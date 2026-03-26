@@ -22,7 +22,12 @@
     "temperature": "Temp",
     "memory": "Memory",
     "utilizationPercent": "Utilization %",
-    "temperatureAxis": "Temperature (\u00B0C)"
+    "temperatureAxis": "Temperature (\u00B0C)",
+    "chartAriaLabel": "GPU utilization chart",
+    "gpuFallbackLabel": "GPU {index}",
+    "notAvailable": "N/A",
+    "utilizationDatasetLabel": "{name} Utilization",
+    "temperatureDatasetLabel": "{name} Temp"
   },
   "queueEta": {
     "estCompletion": "Est. completion",
@@ -269,7 +274,8 @@
       "local": "Local",
       "unknownRemote": "Unknown Remote",
       "thisInstallation": "This installation",
-      "centralLink": "Compresso Central"
+      "centralLink": "Compresso Central",
+      "initError": "Error initializing SharedLinkDropdown"
     },
     "settings": {
       "pleaseEnterAValidNumber": "Please enter a valid number",
@@ -841,6 +847,8 @@
         "noSpeedData": "No encoding speed data available yet",
         "avgFps": "Avg FPS",
         "speedRatio": "Speed Ratio",
+        "fpsAxisTitle": "FPS",
+        "speedAxisTitle": "Speed (x realtime)",
         "tooltipSpaceSaved": "Total disk space recovered by replacing originals with compressed versions.",
         "tooltipRatio": "Output size divided by input size. 50% means the file is half its original size.",
         "tooltipPendingEstimate": "Estimated savings if pending tasks complete at the current average compression ratio.",
@@ -1001,7 +1009,9 @@
       "noteTitle": "Note:",
       "noteLineOne": "Streaming Tech is the umbrella organisation for all open-source GitHub projects by Josh Sunnex (Josh.5).",
       "noteLineTwo": "Sponsorship funds (e.g., via Patreon) are used to hire or contract outside help, maintain infrastructure, and fuel my coffee addiction.",
-      "noteLineThree": "Supporting Compresso also sustains our wider free and open-source development."
+      "noteLineThree": "Supporting Compresso also sustains our wider free and open-source development.",
+      "trialSessionIgnored": "Detected Trial Session. Ignoring.",
+      "sessionStateFailed": "Failed to get session state."
     }
   },
   "flow": {

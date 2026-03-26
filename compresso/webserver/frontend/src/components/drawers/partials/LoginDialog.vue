@@ -143,11 +143,11 @@ function startCountdown(expiresIn) {
             if (response.data.level !== 9) {
               location.reload();
             } else {
-              log.debug("Detected Trial Session. Ignoring.")
+              log.debug(t('components.loginDialog.trialSessionIgnored'))
             }
           }
         }).catch(() => {
-          log.error("Failed to get session state.")
+          log.error(t('components.loginDialog.sessionStateFailed'))
         })
       }
     } else {

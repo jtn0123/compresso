@@ -92,9 +92,7 @@ describe('GpuUtilizationChart.vue', () => {
       const wrapper = shallowMountWithQuasar(GpuUtilizationChart, {
         props: { gpuHistory: gpuHistoryWithData },
       })
-      // The component conditionally renders canvas via v-else
-      // With hasData = true, the no-data section is hidden
-      expect(wrapper.vm.hasData).toBe(true)
+      expect(wrapper.find('canvas').exists()).toBe(true)
     })
   })
 
@@ -118,15 +116,28 @@ describe('GpuUtilizationChart.vue', () => {
 
   // 4. Handles dark mode prop/detection
   describe('dark mode', () => {
-    it('hasData computation is independent of dark mode', () => {
+    it('renders correctly with dark mode active', () => {
       const wrapper = shallowMountWithQuasar(GpuUtilizationChart, {
         props: {
           gpuHistory: {
             0: [{ timestamp: 1700000000, gpu_name: 'GPU0', utilization_percent: 50, temperature_c: 60 }],
           },
         },
+        global: {
+          mocks: {
+            $q: {
+              notify: vi.fn(),
+              dark: { isActive: true },
+              screen: {
+                gt: { xs: true, sm: true },
+                lt: { sm: false, md: false },
+              },
+            },
+          },
+        },
       })
       expect(wrapper.vm.hasData).toBe(true)
+      expect(wrapper.find('canvas').exists()).toBe(true)
     })
   })
 

@@ -13,7 +13,7 @@ import subprocess
 import time
 from collections import deque
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType

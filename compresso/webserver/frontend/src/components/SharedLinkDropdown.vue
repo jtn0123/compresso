@@ -97,7 +97,7 @@ onMounted(async () => {
       canShow.value = true
     }
   } catch (e) {
-    log.error("Error initializing SharedLinkDropdown: " + e)
+    log.error(t('components.sharedLinkDropdown.initError'), e)
   }
 })
 </script>

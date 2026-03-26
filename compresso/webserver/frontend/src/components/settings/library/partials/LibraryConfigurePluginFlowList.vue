@@ -125,14 +125,15 @@ export default {
   components: {
     draggable
   },
-  created() {
-    this._log = createLogger('PluginFlowList');
-  },
   props: {
     libraryId: {
       type: Number,
       required: false
     }
+  },
+  created() {
+    this._log = createLogger('PluginFlowList');
+    this.fetchPluginTypes();
   },
   methods: {
     fetchPluginTypes: function () {
@@ -236,9 +237,6 @@ export default {
       this.pluginFlowByType[pluginType] = pluginFlow;
       this.savePluginFlow(pluginType);
     }
-  },
-  created() {
-    this.fetchPluginTypes();
   },
   data: function () {
     return {

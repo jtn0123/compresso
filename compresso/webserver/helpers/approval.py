@@ -240,12 +240,13 @@ def reject_tasks(task_ids, requeue=False):
         return task_handler.delete_tasks_recursively(task_ids)
 
 
-def get_all_matching_task_ids(search_value=''):
+def get_all_matching_task_ids(search_value='', library_ids=None):
     """
     Return all task IDs that match the given search filter and are awaiting approval.
     Used for "select all matching" across pages.
 
     :param search_value: text search on file path
+    :param library_ids: optional list of library IDs to filter by
     :return: list of int task IDs
     """
     task_handler = task.Task()
@@ -255,6 +256,7 @@ def get_all_matching_task_ids(search_value=''):
         length=0,
         search_value=search_value,
         status='awaiting_approval',
+        library_ids=library_ids or [],
     )
     return [t['id'] for t in results]
 

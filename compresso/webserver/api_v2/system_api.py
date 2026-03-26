@@ -155,9 +155,35 @@ class ApiSystemHandler(BaseApiHandler):
         description: Returns real-time GPU utilization metrics and rolling history.
         responses:
             200:
-                description: 'Returns GPU metrics and history.'
+                description: 'Sample response: Returns GPU metrics and history.'
+                content:
+                    application/json:
+                        schema:
+                            SystemStatusSuccessSchema
+            400:
+                description: Bad request; Check `messages` for any validation errors
+                content:
+                    application/json:
+                        schema:
+                            BadRequestSchema
+            404:
+                description: Bad request; Requested endpoint not found
+                content:
+                    application/json:
+                        schema:
+                            BadEndpointSchema
+            405:
+                description: Bad request; Requested method is not allowed
+                content:
+                    application/json:
+                        schema:
+                            BadMethodSchema
             500:
-                description: Internal error
+                description: Internal error; Check `error` for exception
+                content:
+                    application/json:
+                        schema:
+                            InternalErrorSchema
         """
         try:
             gpu_monitor = GpuMonitor()

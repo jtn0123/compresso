@@ -95,6 +95,7 @@ class RemoteTaskManager(threading.Thread):
         # If either of these become unavailable, then the manager should exit
         self._log("Starting remote task manager {} - {}".format(self.thread_id, self.installation_info.get('address')))
         # Pull task
+        next_task = None
         try:
             # Pending task queue has an item available. Fetch it.
             next_task = self.pending_queue.get_nowait()
@@ -110,6 +111,18 @@ class RemoteTaskManager(threading.Thread):
         except Exception as e:
             self._log("Exception in processing job with {}:".format(self.name), message2=str(e),
                       level="exception")
+            if self.current_task is not None:
+                # Task was being processed -- mark it as failed and send to complete queue
+                self.current_task.set_success(False)
+                self.__write_failure_to_worker_log()
+                self.complete_queue.put(self.current_task)
+                self.__unset_current_task()
+            elif next_task is not None:
+                # Task was dequeued but never started -- requeue it
+                try:
+                    self.pending_queue.put(next_task)
+                except Exception:
+                    self._log("Failed to requeue task after exception", level="error")
 
         self._log("Stopping remote task manager {} - {}".format(self.thread_id, self.installation_info.get('address')))
 
@@ -291,7 +304,12 @@ class RemoteTaskManager(threading.Thread):
 
             # Loop until we are able to upload the file to the remote installation
             info = {}
+            upload_deadline = time.monotonic() + 1800  # 30 min max
             while not self.redundant_flag.is_set():
+                if time.monotonic() > upload_deadline:
+                    self._log("Upload retry deadline exceeded for '{}'".format(original_abspath), level='error')
+                    self.__write_failure_to_worker_log()
+                    return False
                 # For files smaller than 100MB, just transfer them in parallel
                 # Smaller files add a lot of time overhead with the waiting in line and it slows the whole process down
                 # Larger files benefit from being transferred one at a time.
@@ -330,7 +348,12 @@ class RemoteTaskManager(threading.Thread):
             return False
 
         # Set the library of the remote task using the library's name
+        set_lib_deadline = time.monotonic() + 1800  # 30 min max
         while not self.redundant_flag.is_set():
+            if time.monotonic() > set_lib_deadline:
+                self._log("Set-remote-library retry deadline exceeded for '{}'".format(original_abspath), level='error')
+                self.__write_failure_to_worker_log()
+                return False
             result = self.links.set_the_remote_task_library(self.installation_info, remote_task_id, library_name)
             if result is None:
                 # Unable to reach remote installation
@@ -346,7 +369,12 @@ class RemoteTaskManager(threading.Thread):
                 break
 
         # Start the remote task
+        start_task_deadline = time.monotonic() + 1800  # 30 min max
         while not self.redundant_flag.is_set():
+            if time.monotonic() > start_task_deadline:
+                self._log("Start-task retry deadline exceeded for '{}'".format(original_abspath), level='error')
+                self.__write_failure_to_worker_log()
+                return False
             result = self.links.start_the_remote_task_by_id(self.installation_info, remote_task_id)
             if not result:
                 # Unable to reach remote installation
@@ -545,10 +573,17 @@ class RemoteTaskManager(threading.Thread):
                     output = shutil.copy(task_cache_path, correct_cache_file_path)
                     if os.path.exists(output) and os.path.getsize(output) > 0:
                         self._log("File successfully copied from remote library located cache to main instance cache at '{}'".format(output), level='info')
+                        # Update task pointers to the new local cache path
+                        task_cache_path = output
+                        self.current_task.cache_path = output
                     else:
+                        self._log("Copied file is missing or empty at '{}'".format(correct_cache_file_path), level='error')
                         self.__write_failure_to_worker_log()
+                        return False
                 except (FileNotFoundError, PermissionError, shutil.SameFileError):
+                    self._log("Failed to copy file from '{}' to '{}'".format(task_cache_path, correct_cache_file_path), level='error')
                     self.__write_failure_to_worker_log()
+                    return False
             else:
                 # Set the new file out as the extension may have changed
                 split_file_name = os.path.splitext(data.get('abspath'))
@@ -558,8 +593,13 @@ class RemoteTaskManager(threading.Thread):
                 task_cache_path = self.current_task.get_cache_path()
                 self._log("task cache path: '{}'".format(task_cache_path), level='debug')
 
-                # Loop until we are able to upload the file to the remote installation
+                # Loop until we are able to download the file from the remote installation
+                download_deadline = time.monotonic() + 1800  # 30 min max
                 while not self.redundant_flag.is_set():
+                    if time.monotonic() > download_deadline:
+                        self._log("Download retry deadline exceeded for '{}'".format(task_label), level='error')
+                        self.__write_failure_to_worker_log()
+                        return False
                     # Check for network transfer lock
                     lock_key = self.links.acquire_network_transfer_lock(address, transfer_limit=2, lock_type='receive')
                     if not lock_key:

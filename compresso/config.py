@@ -755,5 +755,5 @@ class Config(object, metaclass=SingletonType):
         if isinstance(value, list):
             self.notification_channels = value
         else:
-            self.logger.warning("notification_channels must be a list, got %s; resetting to []", type(value).__name__)
+            logger.warning("notification_channels must be a list, got %s; resetting to []", type(value).__name__)
             self.notification_channels = []

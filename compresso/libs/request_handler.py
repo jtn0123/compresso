@@ -32,11 +32,14 @@
 import requests
 from requests.auth import HTTPBasicAuth
 
+DEFAULT_TIMEOUT = 30
+
 
 class RequestHandler:
 
     def __init__(self, *args, **kwargs):
         self.auth = kwargs.get('auth', '')
+        self.timeout = kwargs.get('timeout', DEFAULT_TIMEOUT)
         # Set username (could be passed in as None)
         self.username = ''
         if kwargs.get('username'):
@@ -53,10 +56,21 @@ class RequestHandler:
         return request_auth
 
     def get(self, url, **kwargs):
+        kwargs.setdefault('timeout', self.timeout)
         return requests.get(url, auth=self.__get_request_auth(), **kwargs)
 
     def post(self, url, **kwargs):
+        kwargs.setdefault('timeout', self.timeout)
         return requests.post(url, auth=self.__get_request_auth(), **kwargs)
 
+    def put(self, url, **kwargs):
+        kwargs.setdefault('timeout', self.timeout)
+        return requests.put(url, auth=self.__get_request_auth(), **kwargs)
+
+    def patch(self, url, **kwargs):
+        kwargs.setdefault('timeout', self.timeout)
+        return requests.patch(url, auth=self.__get_request_auth(), **kwargs)
+
     def delete(self, url, **kwargs):
+        kwargs.setdefault('timeout', self.timeout)
         return requests.delete(url, auth=self.__get_request_auth(), **kwargs)
