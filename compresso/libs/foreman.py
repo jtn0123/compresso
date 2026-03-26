@@ -719,13 +719,17 @@ class Foreman(threading.Thread):
                     for t in self.worker_threads
                     if self.worker_threads[t].is_alive()
                 )
-                queue_is_active = queue_has_tasks or any_workers_busy
+                any_remote_workers_busy = any(
+                    self.remote_task_manager_threads[t].is_alive()
+                    for t in self.remote_task_manager_threads
+                )
+                queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
                 if _was_queue_active and not queue_is_active:
                     try:
                         from compresso.libs.external_notifications import ExternalNotificationDispatcher
                         ExternalNotificationDispatcher().dispatch('queue_empty', {})
-                    except (ImportError, AttributeError, TypeError):
-                        pass
+                    except Exception as e:
+                        self.logger.debug('Failed to dispatch queue_empty notification: %s', e)
                 _was_queue_active = queue_is_active
 
                 # Manage worker event schedules

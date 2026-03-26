@@ -8,7 +8,6 @@
 
 """
 
-from compresso.libs import history
 from compresso.libs.logs import CompressoLogging
 
 logger = CompressoLogging.get_logger(name=__name__)

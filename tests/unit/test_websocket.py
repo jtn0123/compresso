@@ -518,7 +518,7 @@ class TestAsyncLoops:
         handler.send = AsyncMock()
 
         with patch(f'{WS_MOD}.pending_tasks.prepare_filtered_pending_tasks') as mock_pending, \
-             patch(f'{WS_MOD}.estimate_queue_eta', return_value={'total_queue_eta_seconds': 120}) as mock_eta, \
+             patch(f'{WS_MOD}.estimate_queue_eta', return_value={'total_queue_eta_seconds': 120}), \
              patch(f'{WS_MOD}.gen.sleep', new_callable=AsyncMock) as mock_sleep:
             mock_pending.return_value = {
                 'results': [

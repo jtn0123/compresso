@@ -12,7 +12,7 @@ import subprocess
 import time
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -462,10 +462,10 @@ class TestGetRealtimeMetrics:
             mock_run.return_value = MagicMock(returncode=0, stdout=csv_output)
             monitor.get_realtime_metrics()
 
-        history = monitor.get_history(gpu_index=0)
-        assert 0 in history
-        assert len(history[0]) == 1
-        assert history[0][0]['utilization_percent'] == 55.0
+        history = monitor.get_history(gpu_index='nvidia:0')
+        assert 'nvidia:0' in history
+        assert len(history['nvidia:0']) == 1
+        assert history['nvidia:0'][0]['utilization_percent'] == 55.0
 
 
 # ---------------------------------------------------------------------------
@@ -479,38 +479,38 @@ class TestHistory:
         monitor = GpuMonitor()
 
         gpus = [
-            {'index': 0, 'utilization_percent': 50.0, 'memory_used_mb': 1024,
+            {'index': 0, 'type': 'nvidia', 'utilization_percent': 50.0, 'memory_used_mb': 1024,
              'memory_total_mb': 8192, 'temperature_c': 60},
-            {'index': 1, 'utilization_percent': 30.0, 'memory_used_mb': 512,
+            {'index': 1, 'type': 'nvidia', 'utilization_percent': 30.0, 'memory_used_mb': 512,
              'memory_total_mb': 4096, 'temperature_c': 45},
         ]
         monitor._record_history(gpus)
 
         all_history = monitor.get_history()
-        assert 0 in all_history
-        assert 1 in all_history
-        assert len(all_history[0]) == 1
-        assert all_history[0][0]['utilization_percent'] == 50.0
-        assert all_history[1][0]['temperature_c'] == 45
+        assert 'nvidia:0' in all_history
+        assert 'nvidia:1' in all_history
+        assert len(all_history['nvidia:0']) == 1
+        assert all_history['nvidia:0'][0]['utilization_percent'] == 50.0
+        assert all_history['nvidia:1'][0]['temperature_c'] == 45
 
     def test_get_history_single_gpu(self, no_backends):
         from compresso.libs.gpu_monitor import GpuMonitor
         monitor = GpuMonitor()
 
         gpus = [
-            {'index': 0, 'utilization_percent': 50.0, 'memory_used_mb': 0,
+            {'index': 0, 'type': 'nvidia', 'utilization_percent': 50.0, 'memory_used_mb': 0,
              'memory_total_mb': 0, 'temperature_c': 0},
         ]
         monitor._record_history(gpus)
-        history = monitor.get_history(gpu_index=0)
-        assert 0 in history
+        history = monitor.get_history(gpu_index='nvidia:0')
+        assert 'nvidia:0' in history
         assert len(history) == 1
 
     def test_get_history_missing_gpu_returns_empty(self, no_backends):
         from compresso.libs.gpu_monitor import GpuMonitor
         monitor = GpuMonitor()
-        history = monitor.get_history(gpu_index=99)
-        assert history == {99: []}
+        history = monitor.get_history(gpu_index='nvidia:99')
+        assert history == {'nvidia:99': []}
 
     def test_history_respects_max_samples(self, no_backends):
         from compresso.libs.gpu_monitor import GpuMonitor, HISTORY_MAX_SAMPLES
@@ -518,14 +518,14 @@ class TestHistory:
 
         for i in range(HISTORY_MAX_SAMPLES + 20):
             monitor._record_history([{
-                'index': 0, 'utilization_percent': float(i),
+                'index': 0, 'type': 'nvidia', 'utilization_percent': float(i),
                 'memory_used_mb': 0, 'memory_total_mb': 0, 'temperature_c': 0,
             }])
 
-        history = monitor.get_history(gpu_index=0)
-        assert len(history[0]) == HISTORY_MAX_SAMPLES
+        history = monitor.get_history(gpu_index='nvidia:0')
+        assert len(history['nvidia:0']) == HISTORY_MAX_SAMPLES
         # Oldest samples should have been evicted; newest is the last one recorded
-        assert history[0][-1]['utilization_percent'] == float(HISTORY_MAX_SAMPLES + 19)
+        assert history['nvidia:0'][-1]['utilization_percent'] == float(HISTORY_MAX_SAMPLES + 19)
 
     def test_history_includes_timestamps(self, no_backends):
         from compresso.libs.gpu_monitor import GpuMonitor
@@ -533,13 +533,13 @@ class TestHistory:
 
         before = time.time()
         monitor._record_history([{
-            'index': 0, 'utilization_percent': 10.0,
+            'index': 0, 'type': 'nvidia', 'utilization_percent': 10.0,
             'memory_used_mb': 0, 'memory_total_mb': 0, 'temperature_c': 0,
         }])
         after = time.time()
 
-        history = monitor.get_history(gpu_index=0)
-        ts = history[0][0]['timestamp']
+        history = monitor.get_history(gpu_index='nvidia:0')
+        ts = history['nvidia:0'][0]['timestamp']
         assert before <= ts <= after
 
 

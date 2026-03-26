@@ -12,7 +12,7 @@
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 
 
 def _make_foreman():
@@ -48,6 +48,7 @@ class TestQueueEmptyNotification:
         # _was_queue_active = True, then queue becomes empty (no tasks, no busy workers)
         foreman.task_queue.task_list_pending_is_empty.return_value = True
         foreman.worker_threads = {}  # No workers at all => no busy workers
+        foreman.remote_task_manager_threads = {}  # No remote workers
 
         # The logic inline from foreman.run():
         _was_queue_active = True
@@ -57,7 +58,11 @@ class TestQueueEmptyNotification:
             for t in foreman.worker_threads
             if foreman.worker_threads[t].is_alive()
         )
-        queue_is_active = queue_has_tasks or any_workers_busy
+        any_remote_workers_busy = any(
+            foreman.remote_task_manager_threads[t].is_alive()
+            for t in foreman.remote_task_manager_threads
+        )
+        queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
 
         with patch('compresso.libs.external_notifications.ExternalNotificationDispatcher') as mock_dispatcher_cls:
             mock_dispatcher = MagicMock()
@@ -75,11 +80,13 @@ class TestQueueEmptyNotification:
 
         foreman.task_queue.task_list_pending_is_empty.return_value = True
         foreman.worker_threads = {}
+        foreman.remote_task_manager_threads = {}
 
         _was_queue_active = False  # Queue was already empty
         queue_has_tasks = not foreman.task_queue.task_list_pending_is_empty()
         any_workers_busy = False
-        queue_is_active = queue_has_tasks or any_workers_busy
+        any_remote_workers_busy = False
+        queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
 
         dispatched = False
         if _was_queue_active and not queue_is_active:
@@ -93,6 +100,7 @@ class TestQueueEmptyNotification:
 
         foreman.task_queue.task_list_pending_is_empty.return_value = False  # tasks present
         foreman.worker_threads = {}
+        foreman.remote_task_manager_threads = {}
 
         _was_queue_active = False
 
@@ -108,6 +116,7 @@ class TestQueueEmptyNotification:
         foreman = _make_foreman()
 
         foreman.task_queue.task_list_pending_is_empty.return_value = True
+        foreman.remote_task_manager_threads = {}
 
         mock_worker = MagicMock()
         mock_worker.idle = False
@@ -120,7 +129,11 @@ class TestQueueEmptyNotification:
             for t in foreman.worker_threads
             if foreman.worker_threads[t].is_alive()
         )
-        queue_is_active = queue_has_tasks or any_workers_busy
+        any_remote_workers_busy = any(
+            foreman.remote_task_manager_threads[t].is_alive()
+            for t in foreman.remote_task_manager_threads
+        )
+        queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
 
         assert queue_is_active is True
 
@@ -129,6 +142,7 @@ class TestQueueEmptyNotification:
         foreman = _make_foreman()
 
         foreman.task_queue.task_list_pending_is_empty.return_value = True
+        foreman.remote_task_manager_threads = {}
 
         mock_worker = MagicMock()
         mock_worker.idle = False
@@ -142,6 +156,31 @@ class TestQueueEmptyNotification:
         )
 
         assert any_workers_busy is False
+
+    def test_active_remote_workers_count_as_active(self):
+        """Queue is considered active if remote workers are alive, even with no local workers or tasks."""
+        foreman = _make_foreman()
+
+        foreman.task_queue.task_list_pending_is_empty.return_value = True
+        foreman.worker_threads = {}
+
+        mock_remote = MagicMock()
+        mock_remote.is_alive.return_value = True
+        foreman.remote_task_manager_threads = {'r1': mock_remote}
+
+        queue_has_tasks = not foreman.task_queue.task_list_pending_is_empty()
+        any_workers_busy = any(
+            not foreman.worker_threads[t].idle
+            for t in foreman.worker_threads
+            if foreman.worker_threads[t].is_alive()
+        )
+        any_remote_workers_busy = any(
+            foreman.remote_task_manager_threads[t].is_alive()
+            for t in foreman.remote_task_manager_threads
+        )
+        queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
+
+        assert queue_is_active is True
 
 
 if __name__ == '__main__':

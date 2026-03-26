@@ -272,7 +272,7 @@ class EventMonitorManager(threading.Thread):
                 self.__add_path_to_queue(pathname, library_id, priority_score)
         except UnicodeEncodeError:
             self.logger.warning("File contains Unicode characters that cannot be processed. Ignoring.")
-        except (OSError, PermissionError):
+        except OSError:
             self.logger.exception("File system error testing file path in %s. Ignoring.", self.name)
         except Exception:
             self.logger.exception("Exception testing file path in %s. Ignoring.", self.name)

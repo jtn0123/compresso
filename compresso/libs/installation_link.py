@@ -31,11 +31,8 @@
 """
 import json
 import os.path
-import queue
 import threading
 import time
-import shutil
-import re
 
 import requests
 from requests_toolbelt import MultipartEncoder
@@ -44,10 +41,7 @@ from compresso import config
 from compresso.libs import common, session, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.plugins import PluginsHandler
-from compresso.libs.request_handler import RequestHandler
 from compresso.libs.singleton import SingletonType
-from compresso.libs.task import TaskDataStore
 
 
 class Links(object, metaclass=SingletonType):
@@ -65,12 +59,15 @@ class Links(object, metaclass=SingletonType):
 
     def get_link_status(self, uuid):
         """Get status of a remote installation link."""
-        return self._link_status.get(uuid, {
-            'status': 'unknown',
-            'last_seen': None,
-            'consecutive_failures': 0,
-            'next_retry': 0,
-        })
+        status = self._link_status.get(uuid)
+        if status is None:
+            return {
+                'status': 'unknown',
+                'last_seen': None,
+                'consecutive_failures': 0,
+                'next_retry': 0,
+            }
+        return dict(status)
 
     def set_link_status(self, uuid, status):
         """Update status of a remote installation link."""
@@ -85,7 +82,7 @@ class Links(object, metaclass=SingletonType):
 
     def get_all_link_statuses(self):
         """Get all link statuses for WebSocket push."""
-        return dict(self._link_status)
+        return {k: dict(v) for k, v in self._link_status.items()}
 
     def _record_link_success(self, uuid):
         """Record successful communication with a remote link."""

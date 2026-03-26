@@ -251,10 +251,14 @@ class GpuMonitor(object, metaclass=SingletonType):
         return gpus
 
     def _record_history(self, gpus: List[dict]) -> None:
-        """Append current metrics with timestamp to rolling history."""
+        """Append current metrics with timestamp to rolling history.
+
+        Uses composite key 'type:index' to avoid collisions when multiple GPU
+        vendors are present (e.g., NVIDIA index 0 and Intel card0).
+        """
         now = time.time()
         for gpu in gpus:
-            idx = gpu['index']
+            idx = '{}:{}'.format(gpu.get('type', 'unknown'), gpu['index'])
             if idx not in self._history:
                 self._history[idx] = deque(maxlen=HISTORY_MAX_SAMPLES)
             self._history[idx].append({
@@ -265,12 +269,12 @@ class GpuMonitor(object, metaclass=SingletonType):
                 'temperature_c': gpu.get('temperature_c', 0),
             })
 
-    def get_history(self, gpu_index: Optional[int] = None) -> dict:
+    def get_history(self, gpu_index=None) -> dict:
         """
         Return historical samples.
 
-        If gpu_index is provided, return samples for that GPU only.
-        Otherwise return all history keyed by GPU index.
+        If gpu_index is provided (composite key like 'nvidia:0'), return
+        samples for that GPU only.  Otherwise return all history.
         """
         if gpu_index is not None:
             samples = self._history.get(gpu_index, deque())

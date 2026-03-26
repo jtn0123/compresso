@@ -8,7 +8,7 @@
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
 
@@ -244,9 +244,9 @@ class TestTriggerFiltering:
         mock_post.return_value = MagicMock(status_code=200)
         discord_ch = _make_channel(channel_type='discord', name='discord-ch',
                                    triggers=['task_completed'])
-        slack_ch = _make_channel(channel_type='slack', name='slack-ch',
-                                 url='https://hooks.slack.com/services/T00/B00/xxx',
-                                 triggers=['task_failed'])
+        _make_channel(channel_type='slack', name='slack-ch',
+                      url='https://hooks.slack.com/services/T00/B00/xxx',
+                      triggers=['task_failed'])
         mock_get_channels.return_value = [discord_ch]
 
         dispatcher = _fresh_dispatcher()
