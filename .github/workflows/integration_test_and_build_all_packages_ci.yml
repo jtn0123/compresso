@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "npm"
@@ -167,7 +167,7 @@ jobs:
           rm -rf build dist
 
       # Setup node environment for building compresso's webui
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
 
