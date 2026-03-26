@@ -123,6 +123,12 @@
             </template>
           </div>
 
+          <!-- Encoding stats -->
+          <div v-if="!worker.idle && !worker.paused && (worker.encodingFps != null || worker.encodingSpeed)" class="col-auto text-caption q-px-xs worker-encoding-stats">
+            <span v-if="worker.encodingFps != null" class="worker-fps">{{ worker.encodingFps }} {{ $t('workerStats.fps') }}</span>
+            <span v-if="worker.encodingSpeed" class="worker-speed q-ml-xs">{{ worker.encodingSpeed }}</span>
+          </div>
+
           <!-- ETC -->
           <div class="col-auto text-caption text-grey q-px-xs" style="min-width: 55px; text-align: right">
             {{ (!worker.idle && !worker.paused) ? worker.etc : '' }}
@@ -344,5 +350,15 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.worker-encoding-stats {
+  min-width: 80px;
+  text-align: right;
+}
+.worker-fps {
+  color: var(--q-blue-6, #1e88e5);
+}
+.worker-speed {
+  color: var(--q-grey, #9e9e9e);
 }
 </style>

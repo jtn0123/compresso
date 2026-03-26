@@ -22,6 +22,7 @@
 import { ref, onMounted } from 'vue'
 import axios from "axios"
 import { getCompressoApiUrl } from "src/js/compressoGlobals"
+import { sanitizeHtml } from 'src/js/sanitize'
 import CompressoDialogWindow from "components/ui/dialogs/CompressoDialogWindow.vue"
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
@@ -60,7 +61,8 @@ const fetchCompletedTaskLog = () => {
     url: getCompressoApiUrl('v2', 'history/task/log'),
     data: data
   }).then((response) => {
-    taskDetails.value = response.data.command_log_lines
+    const lines = Array.isArray(response.data.command_log_lines) ? response.data.command_log_lines : []
+    taskDetails.value = lines.map(sanitizeHtml)
   }).catch(() => {
     $q.notify({
       color: 'negative',

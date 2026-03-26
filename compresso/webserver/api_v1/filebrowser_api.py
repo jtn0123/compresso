@@ -29,8 +29,9 @@
            OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
-import json
 import os
+
+import tornado.escape
 
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
@@ -66,12 +67,12 @@ class ApiFilebrowserHandler(BaseApiHandler):
         self.action_route()
 
     def fetch_directory_listing(self, *args, **kwargs):
-        current_path = self.get_argument('current_path')
+        current_path = os.path.realpath(self.get_argument('current_path'))
         list_type = self.get_argument('list_type') if self.get_body_arguments('list_type') else "all"
 
         path_data = self.fetch_path_data(current_path, list_type)
 
-        self.write(json.dumps(path_data))
+        self.finish(tornado.escape.json_encode(path_data))
 
     def fetch_path_data(self, current_path, list_type="directories"):
         """
@@ -103,20 +104,21 @@ class ApiFilebrowserHandler(BaseApiHandler):
         :param path:
         :return:
         """
+        path = os.path.realpath(path)
         results = []
         if os.path.exists(path):
             # check if this is a root path or if it has a parent
-            parent_path = os.path.join(path, '..')
-            if os.path.exists(parent_path) and os.path.abspath(parent_path) != path:
+            parent_path = os.path.realpath(os.path.join(path, '..'))
+            if parent_path != path:
                 # Path has a parent, Add the double dots
                 results.append(
                     {
                         "name":      "..",
-                        "full_path": os.path.abspath(parent_path),
+                        "full_path": parent_path,
                     }
                 )
             for item in sorted(os.listdir(path)):
-                abspath = os.path.abspath(os.path.join(path, item))
+                abspath = os.path.realpath(os.path.join(path, item))
                 if os.path.isdir(abspath):
                     results.append(
                         {
@@ -142,10 +144,11 @@ class ApiFilebrowserHandler(BaseApiHandler):
         :param path:
         :return:
         """
+        path = os.path.realpath(path)
         results = []
         if os.path.exists(path):
             for item in sorted(os.listdir(path)):
-                abspath = os.path.abspath(os.path.join(path, item))
+                abspath = os.path.realpath(os.path.join(path, item))
                 if os.path.isfile(abspath):
                     results.append(
                         {

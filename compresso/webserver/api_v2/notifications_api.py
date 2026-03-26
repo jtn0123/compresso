@@ -30,9 +30,13 @@
 
 """
 
+import json
+import re
+
 import tornado.log
 from compresso import config
 from compresso.libs import session
+from compresso.libs.external_notifications import ExternalNotificationDispatcher
 from compresso.libs.notifications import Notifications
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
@@ -55,6 +59,21 @@ class ApiNotificationsHandler(BaseApiHandler):
             "path_pattern":      r"/notifications/remove",
             "supported_methods": ["DELETE"],
             "call_method":       "remove_notifications",
+        },
+        {
+            "path_pattern":      r"/notifications/channels",
+            "supported_methods": ["GET"],
+            "call_method":       "get_notification_channels",
+        },
+        {
+            "path_pattern":      r"/notifications/channels/save",
+            "supported_methods": ["POST"],
+            "call_method":       "save_notification_channels",
+        },
+        {
+            "path_pattern":      r"/notifications/channels/test",
+            "supported_methods": ["POST"],
+            "call_method":       "test_notification_channel",
         },
     ]
 
@@ -184,6 +203,132 @@ class ApiNotificationsHandler(BaseApiHandler):
         except BaseApiError as bae:
             tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    @staticmethod
+    def _mask_url(url):
+        """
+        Partially mask a webhook URL for display security.
+        Shows the protocol + first 12 chars of the rest, then '***'.
+        """
+        if not url:
+            return ''
+        match = re.match(r'^(https?://)', url)
+        if match:
+            prefix = match.group(1)
+            rest = url[len(prefix):]
+            if len(rest) > 12:
+                return prefix + rest[:12] + '***'
+            return url
+        if len(url) > 12:
+            return url[:12] + '***'
+        return url
+
+    async def get_notification_channels(self):
+        """
+        Notification Channels - read
+        ---
+        description: Returns the list of configured external notification channels
+                     with webhook URLs partially masked.
+        responses:
+            200:
+                description: 'List of configured notification channels.'
+            500:
+                description: Internal error
+        """
+        try:
+            channels = self.config.get_notification_channels()
+            # Mask URLs for display security
+            masked = []
+            for ch in channels:
+                masked_ch = dict(ch)
+                masked_ch['url'] = self._mask_url(ch.get('url', ''))
+                masked.append(masked_ch)
+            self.write_success({'channels': masked})
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def save_notification_channels(self):
+        """
+        Notification Channels - save
+        ---
+        description: Save the full list of notification channels to config.
+        requestBody:
+            required: True
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            channels:
+                                type: array
+        responses:
+            200:
+                description: 'Channels saved successfully.'
+            400:
+                description: Bad request
+            500:
+                description: Internal error
+        """
+        try:
+            body = json.loads(self.request.body)
+            channels = body.get('channels')
+            if not isinstance(channels, list):
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channels' must be a list")
+                self.write_error()
+                return
+            self.config.set_config_item('notification_channels', channels)
+            self.write_success()
+            return
+        except (json.JSONDecodeError, TypeError) as e:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
+            self.write_error()
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def test_notification_channel(self):
+        """
+        Notification Channels - test
+        ---
+        description: Send a test notification to a single channel.
+        requestBody:
+            required: True
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            channel:
+                                type: object
+        responses:
+            200:
+                description: 'Test result with success boolean.'
+            400:
+                description: Bad request
+            500:
+                description: Internal error
+        """
+        try:
+            body = json.loads(self.request.body)
+            channel_config = body.get('channel')
+            if not isinstance(channel_config, dict):
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channel' must be an object")
+                self.write_error()
+                return
+            dispatcher = ExternalNotificationDispatcher()
+            result = dispatcher.test_channel(channel_config)
+            self.write_success(result)
+            return
+        except (json.JSONDecodeError, TypeError) as e:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
             self.write_error()
             return
         except Exception as e:

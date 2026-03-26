@@ -117,6 +117,7 @@ import axios from "axios";
 import { getCompressoApiUrl } from "src/js/compressoGlobals";
 import draggable from "vuedraggable";
 import { ref } from "vue";
+import { createLogger } from "src/composables/useLogger";
 
 // Plugin flow list refreshes when the parent dialog is opened
 export default {
@@ -129,6 +130,10 @@ export default {
       type: Number,
       required: false
     }
+  },
+  created() {
+    this._log = createLogger('PluginFlowList');
+    this.fetchPluginTypes();
   },
   methods: {
     fetchPluginTypes: function () {
@@ -207,7 +212,7 @@ export default {
       if (direction === 'up') {
         // Dont move up if already at the top
         if (currentIndex === 0) {
-          console.debug('Cannot move up - already at the top')
+          this._log.debug('Cannot move up - already at the top')
           return
         }
         newIndex = (currentIndex - 1)
@@ -216,7 +221,7 @@ export default {
         newIndex = (currentIndex + 1)
         // Dont move down if already at the bottom
         if (newIndex === pluginFlow.length) {
-          console.debug('Cannot move down - already at the bottom')
+          this._log.debug('Cannot move down - already at the bottom')
           return
         }
       }
@@ -232,9 +237,6 @@ export default {
       this.pluginFlowByType[pluginType] = pluginFlow;
       this.savePluginFlow(pluginType);
     }
-  },
-  created() {
-    this.fetchPluginTypes();
   },
   data: function () {
     return {

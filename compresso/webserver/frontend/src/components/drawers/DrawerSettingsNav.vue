@@ -47,7 +47,7 @@
         </q-item>
         <!--END PLUGINS SELECT-->
 
-        <!--START PLUGINS SELECT-->
+        <!--START LINK SELECT-->
         <q-item
           clickable
           to="/ui/settings-link"
@@ -59,7 +59,21 @@
             {{ $t('navigation.link') }}
           </q-item-section>
         </q-item>
-        <!--END PLUGINS SELECT-->
+        <!--END LINK SELECT-->
+
+        <!--START NOTIFICATIONS SELECT-->
+        <q-item
+          clickable
+          to="/ui/settings-notifications"
+          v-ripple>
+          <q-item-section avatar>
+            <q-icon name="notifications_active"/>
+          </q-item-section>
+          <q-item-section>
+            {{ $t('navigation.notifications') }}
+          </q-item-section>
+        </q-item>
+        <!--END NOTIFICATIONS SELECT-->
 
         <q-separator spaced/>
 

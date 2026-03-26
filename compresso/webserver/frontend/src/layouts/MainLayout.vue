@@ -121,6 +121,7 @@ import KeyboardShortcutsDialog from "components/ui/KeyboardShortcutsDialog";
 import FirstRunWizard from "components/ui/FirstRunWizard";
 import compressoGlobals, { getCompressoApiUrl, notificationsCount } from "src/js/compressoGlobals";
 import { useKeyboardShortcuts } from "src/composables/useKeyboardShortcuts";
+import { createLogger } from "src/composables/useLogger";
 
 export default {
   components: {
@@ -133,6 +134,7 @@ export default {
   },
   setup() {
     const $q = useQuasar();
+    const log = createLogger('MainLayout');
 
     const leftMainNavDrawerOpen = ref(false)
     const rightNotificationsDrawerOpen = ref(false)
@@ -171,7 +173,7 @@ export default {
         }
       }).catch((err) => {
         // If we can't read settings, don't block the UI
-        console.warn('Failed to fetch settings for onboarding check:', err)
+        log.warn('Failed to fetch settings for onboarding check: ' + err)
       })
     })
 

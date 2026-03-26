@@ -77,6 +77,9 @@ import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import axios from "axios"
 import { copyToClipboard, useQuasar } from 'quasar'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('Login')
 
 const { t } = useI18n()
 const $q = useQuasar()
@@ -140,11 +143,11 @@ function startCountdown(expiresIn) {
             if (response.data.level !== 9) {
               location.reload();
             } else {
-              console.debug("Detected Trial Session. Ignoring.")
+              log.debug(t('components.loginDialog.trialSessionIgnored'))
             }
           }
         }).catch(() => {
-          console.error("Failed to get session state.")
+          log.error(t('components.loginDialog.sessionStateFailed'))
         })
       }
     } else {

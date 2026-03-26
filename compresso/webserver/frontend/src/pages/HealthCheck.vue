@@ -314,6 +314,7 @@ import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import { getCompressoApiUrl } from 'src/js/compressoGlobals';
+import { createLogger } from 'src/composables/useLogger';
 import FileInfoDialog from 'components/fileinfo/FileInfoDialog.vue';
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
 import PageHeader from 'components/ui/PageHeader.vue';
@@ -324,6 +325,7 @@ export default {
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();
+    const log = createLogger('HealthCheck');
     const loadingSummary = ref(true);
     const summary = ref({ healthy: 0, warning: 0, corrupted: 0, unchecked: 0, checking: 0, total: 0 });
     const scanning = ref(false);
@@ -398,7 +400,7 @@ export default {
           }
         }
       } catch (error) {
-        console.error('Error loading health summary:', error);
+        log.error('Error loading health summary: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadSummary') });
       } finally {
         loadingSummary.value = false;
@@ -418,7 +420,7 @@ export default {
           }
         }
       } catch (error) {
-        console.error('Error loading worker info:', error);
+        log.error('Error loading worker info: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadWorkerInfo') });
       }
     }
@@ -434,7 +436,7 @@ export default {
           workerCount.value = response.data.worker_count || newCount;
         }
       } catch (error) {
-        console.error('Error setting worker count:', error);
+        log.error('Error setting worker count: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedUpdateWorkerCount') });
       }
     }
@@ -474,7 +476,7 @@ export default {
           pagination.value.rowsNumber = response.data.recordsFiltered || 0;
         }
       } catch (error) {
-        console.error('Error loading health statuses:', error);
+        log.error('Error loading health statuses: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadStatuses') });
       } finally {
         loadingStatuses.value = false;
@@ -503,7 +505,7 @@ export default {
             }
           }
         } catch (error) {
-          console.error('Error starting library scan:', error);
+          log.error('Error starting library scan: ' + error);
           $q.notify({ type: 'negative', message: t('pages.healthCheck.failedStartScan') });
         }
       });
@@ -514,7 +516,7 @@ export default {
         await axios.post(getCompressoApiUrl('v2', 'healthcheck/cancel-scan'));
         $q.notify({ type: 'info', message: t('pages.healthCheck.scanCancelRequested') });
       } catch (error) {
-        console.error('Error cancelling scan:', error);
+        log.error('Error cancelling scan: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedCancelScan') });
       }
     }
@@ -533,7 +535,7 @@ export default {
           await loadStatuses();
         }
       } catch (error) {
-        console.error('Error checking file:', error);
+        log.error('Error checking file: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedCheckFile') });
       }
     }
@@ -549,7 +551,7 @@ export default {
         await loadSummary();
         await loadStatuses();
       } catch (error) {
-        console.error('Error re-checking file:', error);
+        log.error('Error re-checking file: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedRecheckFile') });
       } finally {
         row._checking = false;
@@ -617,7 +619,7 @@ export default {
           }
         }
       } catch (error) {
-        console.error('Error loading libraries:', error);
+        log.error('Error loading libraries: ' + error);
         $q.notify({ type: 'negative', message: t('pages.healthCheck.failedLoadLibraries') });
       }
     }

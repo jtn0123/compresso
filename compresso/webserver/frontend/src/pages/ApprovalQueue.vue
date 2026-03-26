@@ -99,6 +99,59 @@
       </div>
     </div>
 
+    <!-- Search & Filters -->
+    <div class="row q-col-gutter-sm q-mb-md items-center">
+      <div class="col-12 col-sm-6 col-md-4">
+        <q-input
+          outlined dense
+          debounce="300"
+          v-model="searchValue"
+          :placeholder="$t('navigation.search')"
+          clearable
+          @update:model-value="onSearchChange"
+        >
+          <template v-slot:append>
+            <q-icon name="search"/>
+          </template>
+        </q-input>
+      </div>
+      <div class="col-auto">
+        <q-btn-dropdown flat icon="filter_list" :color="hasActiveFilters ? 'primary' : undefined" :label="$t('pages.approvalQueue.filters')">
+          <q-list style="min-width: 250px">
+            <q-item-label header>{{ $t('pages.approvalQueue.codecFilter') }}</q-item-label>
+            <q-item>
+              <q-select outlined dense v-model="filterCodec" :options="codecOptions" clearable :label="$t('pages.approvalQueue.codecFilter')" emit-value map-options style="width: 100%"/>
+            </q-item>
+            <q-item-label header>{{ $t('pages.approvalQueue.qualityThreshold') }}</q-item-label>
+            <q-item>
+              <q-slider v-model="filterQualityMin" :min="0" :max="100" :step="5" label/>
+            </q-item>
+          </q-list>
+        </q-btn-dropdown>
+      </div>
+    </div>
+
+    <!-- Select All Across Pages Banner -->
+    <q-banner
+      v-if="selected.length > 0 && selected.length === tasks.length && pagination.rowsNumber > tasks.length && !selectAllMode"
+      class="q-mb-sm" :class="$q.dark.isActive ? 'bg-blue-10 text-blue-3' : 'bg-blue-1 text-primary'" dense rounded
+    >
+      {{ $t('pages.approvalQueue.allOnPageSelected', { count: selected.length }) }}
+      <template v-slot:action>
+        <q-btn flat color="primary" :label="$t('pages.approvalQueue.selectAllMatching', { count: pagination.rowsNumber })"
+          @click="selectAllMode = true"/>
+      </template>
+    </q-banner>
+    <q-banner
+      v-if="selectAllMode"
+      class="q-mb-sm" :class="$q.dark.isActive ? 'bg-blue-10 text-blue-3' : 'bg-blue-1 text-primary'" dense rounded
+    >
+      {{ $t('pages.approvalQueue.selectAllMatching', { count: pagination.rowsNumber }) }} selected.
+      <template v-slot:action>
+        <q-btn flat color="primary" label="Clear" @click="selectAllMode = false; selected = []"/>
+      </template>
+    </q-banner>
+
     <!-- Tasks Table -->
     <q-table
       :rows="tasks"
@@ -294,7 +347,7 @@
           <div class="text-subtitle2 q-mb-sm">{{ $t('pages.approvalQueue.whatChanged') }}</div>
           <div class="row q-col-gutter-md q-mb-md">
             <div class="col-12 col-sm-6">
-              <q-card flat bordered class="bg-grey-2">
+              <q-card flat bordered :class="detailCardBg">
                 <q-card-section class="q-pa-sm">
                   <div class="text-caption text-weight-bold">{{ $t('pages.approvalQueue.original') }}</div>
                   <div class="row q-gutter-xs q-mt-xs">
@@ -307,7 +360,7 @@
               </q-card>
             </div>
             <div class="col-12 col-sm-6">
-              <q-card flat bordered class="bg-grey-2">
+              <q-card flat bordered :class="detailCardBg">
                 <q-card-section class="q-pa-sm">
                   <div class="text-caption text-weight-bold">{{ $t('pages.approvalQueue.transcoded') }}</div>
                   <div class="row q-gutter-xs q-mt-xs">
@@ -494,7 +547,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 import axios from 'axios';
@@ -522,6 +575,10 @@ export default {
     const approvalEnabled = ref(null);
     const newItemCount = ref(0);
     const allTasks = ref([]);  // All tasks for summary cards (not just current page)
+    const searchValue = ref('');
+    const filterCodec = ref(null);
+    const filterQualityMin = ref(0);
+    const selectAllMode = ref(false);
     let lastKnownIds = new Set();
     let refreshInterval = null;
 
@@ -537,17 +594,19 @@ export default {
       page: 1,
       rowsPerPage: 25,
       rowsNumber: 0,
+      sortBy: 'finish_time',
+      descending: true,
     });
 
     const columns = computed(() => [
       { name: 'abspath', label: $t('pages.approvalQueue.columnFile'), field: 'abspath', align: 'left', sortable: false },
       { name: 'codec', label: $t('pages.approvalQueue.columnCodec'), field: 'source_codec', align: 'left', sortable: false },
-      { name: 'source_size', label: $t('pages.approvalQueue.columnOriginal'), field: 'source_size', align: 'right', sortable: false },
-      { name: 'staged_size', label: $t('pages.approvalQueue.columnNew'), field: 'staged_size', align: 'right', sortable: false },
-      { name: 'size_delta', label: $t('pages.approvalQueue.columnChange'), field: 'size_delta', align: 'center', sortable: false },
-      { name: 'savings', label: $t('pages.approvalQueue.columnSpaceSaved'), field: 'source_size', align: 'center', sortable: false },
-      { name: 'quality', label: $t('pages.approvalQueue.columnQuality'), field: 'vmaf_score', align: 'center', sortable: false },
-      { name: 'finish_time', label: $t('pages.approvalQueue.columnCompleted'), field: 'finish_time', align: 'left', sortable: false },
+      { name: 'source_size', label: $t('pages.approvalQueue.columnOriginal'), field: 'source_size', align: 'right', sortable: true },
+      { name: 'staged_size', label: $t('pages.approvalQueue.columnNew'), field: 'staged_size', align: 'right', sortable: true },
+      { name: 'size_delta', label: $t('pages.approvalQueue.columnChange'), field: 'size_delta', align: 'center', sortable: true },
+      { name: 'savings', label: $t('pages.approvalQueue.columnSpaceSaved'), field: 'source_size', align: 'center', sortable: true },
+      { name: 'quality', label: $t('pages.approvalQueue.columnQuality'), field: 'vmaf_score', align: 'center', sortable: true },
+      { name: 'finish_time', label: $t('pages.approvalQueue.columnCompleted'), field: 'finish_time', align: 'left', sortable: true },
       { name: 'actions', label: $t('pages.approvalQueue.columnActions'), field: 'id', align: 'center', sortable: false },
     ]);
 
@@ -560,6 +619,8 @@ export default {
       }
       return all;
     });
+
+    const detailCardBg = computed(() => $q.dark.isActive ? 'bg-grey-9' : 'bg-grey-2');
 
     const logTail = computed(() => {
       if (!detailData.value || !detailData.value.log) return '';
@@ -577,6 +638,31 @@ export default {
       { label: $t('pages.approvalQueue.discardOption'), value: 'discard' },
       { label: $t('pages.approvalQueue.requeueOption'), value: 'requeue' },
     ]);
+
+    const codecOptions = computed(() => {
+      const codecs = new Set();
+      allTasks.value.forEach(t => {
+        if (t.source_codec) codecs.add(t.source_codec);
+        if (t.staged_codec) codecs.add(t.staged_codec);
+      });
+      return Array.from(codecs).sort().map(c => ({ label: c, value: c }));
+    });
+
+    const hasActiveFilters = computed(() => {
+      return filterCodec.value !== null || filterQualityMin.value > 0;
+    });
+
+    function onSearchChange() {
+      pagination.value.page = 1;
+      selectAllMode.value = false;
+      fetchTasks();
+    }
+
+    watch([filterCodec, filterQualityMin], () => {
+      pagination.value.page = 1;
+      selectAllMode.value = false;
+      fetchTasks();
+    });
 
     // Summary card computations (use allTasks so they reflect the full queue, not just current page)
     const totalSpaceSaved = computed(() => {
@@ -708,7 +794,9 @@ export default {
         const res = await axios.post(getCompressoApiUrl('v2', 'approval/tasks'), {
           start: start,
           length: pg.rowsPerPage,
-          search_value: '',
+          search_value: searchValue.value || '',
+          order_by: pg.sortBy || 'finish_time',
+          order_direction: pg.descending ? 'desc' : 'asc',
           include_library: false,
         });
         const data = res.data;
@@ -734,6 +822,8 @@ export default {
         pagination.value.rowsNumber = newCount;
         pagination.value.page = pg.page;
         pagination.value.rowsPerPage = pg.rowsPerPage;
+        pagination.value.sortBy = pg.sortBy;
+        pagination.value.descending = pg.descending;
 
         // Restore selection
         selected.value = newTasks.filter(t => selectedIdSet.has(t.id));
@@ -764,9 +854,14 @@ export default {
     async function doApprove(ids) {
       approving.value = true;
       try {
-        await axios.post(getCompressoApiUrl('v2', 'approval/approve'), { id_list: ids });
-        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.approvedCount', { count: ids.length }), timeout: 3000, position: 'top' });
+        const payload = selectAllMode.value
+          ? { all_matching: true, search_value: searchValue.value || '' }
+          : { id_list: ids };
+        await axios.post(getCompressoApiUrl('v2', 'approval/approve'), payload);
+        const count = selectAllMode.value ? pagination.value.rowsNumber : ids.length;
+        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.approvedCount', { count }), timeout: 3000, position: 'top' });
         selected.value = [];
+        selectAllMode.value = false;
         await fetchTasks();
       } catch (e) {
         $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToApprove'), timeout: 3000, position: 'top' });
@@ -785,12 +880,14 @@ export default {
       const ids = rejectTargetIds.value.length > 0 ? rejectTargetIds.value : selectedIds.value;
       rejecting.value = true;
       try {
-        await axios.post(getCompressoApiUrl('v2', 'approval/reject'), {
-          id_list: ids,
-          requeue: rejectAction.value === 'requeue',
-        });
-        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.rejectedCount', { count: ids.length }), timeout: 3000, position: 'top' });
+        const payload = selectAllMode.value && rejectTargetIds.value.length === 0
+          ? { all_matching: true, search_value: searchValue.value || '', requeue: rejectAction.value === 'requeue' }
+          : { id_list: ids, requeue: rejectAction.value === 'requeue' };
+        await axios.post(getCompressoApiUrl('v2', 'approval/reject'), payload);
+        const count = selectAllMode.value && rejectTargetIds.value.length === 0 ? pagination.value.rowsNumber : ids.length;
+        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.rejectedCount', { count }), timeout: 3000, position: 'top' });
         selected.value = [];
+        selectAllMode.value = false;
         rejectTargetIds.value = [];
         showRejectDialog.value = false;
         await fetchTasks();
@@ -903,6 +1000,18 @@ export default {
       previewData.value = null;
     }
 
+    function handleKeydown(e) {
+      if (showDetailDialog.value) {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
+          e.preventDefault();
+          approveFromDetail();
+        }
+        if (e.key === 'Escape') {
+          closeDetail();
+        }
+      }
+    }
+
     onMounted(() => {
       fetchApprovalSetting();
       fetchTasks();
@@ -911,6 +1020,7 @@ export default {
         fetchTasks();
         fetchAllTasksForSummary();
       }, 10000);
+      window.addEventListener('keydown', handleKeydown);
     });
 
     onUnmounted(() => {
@@ -918,6 +1028,7 @@ export default {
         clearInterval(refreshInterval);
       }
       cleanupPreview();
+      window.removeEventListener('keydown', handleKeydown);
     });
 
     return {
@@ -969,6 +1080,14 @@ export default {
       rejectFromDetail,
       closeDetail,
       startPreview,
+      detailCardBg,
+      searchValue,
+      filterCodec,
+      filterQualityMin,
+      codecOptions,
+      hasActiveFilters,
+      selectAllMode,
+      onSearchChange,
     };
   },
 };

@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('axios', () => ({ default: { get: vi.fn() } }))
 vi.mock('quasar', () => ({ setCssVar: vi.fn(), Notify: { create: vi.fn() } }))
+vi.mock('src/js/compressoGlobals', async () => {
+  const actual = await vi.importActual('src/js/compressoGlobals')
+  return {
+    ...actual,
+    showEventToast: vi.fn(),
+  }
+})
 
 // Mock location.reload — jsdom/happy-dom does not allow reassigning it directly,
 // so we use Object.defineProperty once before the suite runs.
@@ -128,14 +135,14 @@ describe('fetchLinks with missing fields', () => {
 // fetchLinks — error path
 // ---------------------------------------------------------------------------
 describe('fetchLinks error', () => {
-  it('logs the error to console.error', async () => {
+  it('logs the error to console.error via logger', async () => {
     const err = new Error('network failure')
     axios.get.mockRejectedValueOnce(err)
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await sharedLinksStore.fetchLinks()
 
-    expect(spy).toHaveBeenCalledWith('Failed to fetch shared links', err)
+    expect(spy).toHaveBeenCalledWith('[SharedLinks]', 'Failed to fetch shared links')
   })
 
   it('resets availableLinks to [] on error', async () => {

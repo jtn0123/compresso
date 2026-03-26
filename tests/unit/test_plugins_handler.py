@@ -164,7 +164,7 @@ class TestGetPluginRepos:
         result = handler.get_plugin_repos()
         paths = [r['path'] for r in result]
         assert 'default' in paths
-        assert 'https://custom.repo' in paths
+        assert any(p == 'https://custom.repo' for p in paths)
 
 
 @pytest.mark.unittest

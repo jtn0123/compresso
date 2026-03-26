@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
   },
   resolve: {
+    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.vue'],
     alias: {
       src: path.resolve(__dirname, 'src'),
       components: path.resolve(__dirname, 'src/components'),

@@ -104,6 +104,9 @@ import axios from 'axios'
 import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('TrialWelcome')
 
 const dialogRef = ref(null)
 
@@ -131,7 +134,7 @@ const onDialogHide = () => {
     url: getCompressoApiUrl('v2', 'settings/write'),
     data: data
   }).catch((error) => {
-    console.error('Failed to save trial_welcome_viewed setting', error)
+    log.error('Failed to save trial_welcome_viewed setting: ' + error)
   })
 
   // TODO: Trigger intro.js guide here
@@ -158,7 +161,7 @@ const checkAndShow = async () => {
     show()
 
   } catch (error) {
-    console.error('Error checking trial welcome eligibility', error)
+    log.error('Error checking trial welcome eligibility: ' + error)
   }
 }
 

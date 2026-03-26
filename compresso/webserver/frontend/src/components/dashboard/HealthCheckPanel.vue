@@ -17,7 +17,7 @@
               ({{ scanPercent }}%)
             </span>
           </div>
-          <q-linear-progress :value="scanPercent / 100" size="8px" color="positive" track-color="grey-4" />
+          <q-linear-progress :value="scanPercent / 100" size="8px" color="positive" :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'" />
         </div>
         <div v-else class="q-mb-sm">
           <q-badge color="grey" :label="$t('healthCheckPanel.notScanning')" />

@@ -83,6 +83,9 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('FirstRun')
 
 const props = defineProps({
   modelValue: {
@@ -119,12 +122,12 @@ axios.get(getCompressoApiUrl('v2', 'settings/read')).then((res) => {
   if (settings.approval_required !== undefined) approvalMode.value = !!settings.approval_required
   if (settings.number_of_workers) workerCount.value = Math.min(4, Math.max(1, parseInt(settings.number_of_workers) || 1))
 }).catch((err) => {
-  console.warn('Failed to fetch initial settings, using defaults:', err)
+  log.warn('Failed to fetch initial settings, using defaults: ' + err)
 })
 
 async function completeOnboarding() {
   if (!libraryPath.value.trim()) {
-    console.error('Library path is required')
+    log.error('Library path is required')
     return
   }
   saving.value = true
@@ -140,7 +143,7 @@ async function completeOnboarding() {
     dialogVisible.value = false
     emit('update:modelValue', false)
   } catch (e) {
-    console.error('Failed to save onboarding settings:', e)
+    log.error('Failed to save onboarding settings: ' + e)
   } finally {
     saving.value = false
   }

@@ -34,6 +34,15 @@ class RequestApprovalTasksSchema(BaseSchema):
         load_default=False,
         metadata={'description': "Include library name in results"},
     )
+    order_by = fields.Str(
+        load_default="finish_time",
+        metadata={'description': "Column to order results by", 'example': "finish_time"},
+    )
+    order_direction = fields.Str(
+        load_default="desc",
+        metadata={'description': "Order direction ('asc' or 'desc')", 'example': "desc"},
+        validate=validate.OneOf(["asc", "desc"]),
+    )
 
 
 class ApprovalTaskItemSchema(BaseSchema):
@@ -69,9 +78,16 @@ class RequestApprovalActionSchema(BaseSchema):
     """Schema for approve/reject actions"""
     id_list = fields.List(
         fields.Int(),
-        required=True,
+        load_default=[],
         metadata={'description': "List of task IDs to approve or reject"},
-        validate=validate.Length(min=1),
+    )
+    all_matching = fields.Boolean(
+        load_default=False,
+        metadata={'description': "If true, approve all tasks matching the current filter instead of explicit IDs"},
+    )
+    search_value = fields.Str(
+        load_default="",
+        metadata={'description': "Search filter when all_matching is true"},
     )
 
 
@@ -79,13 +95,20 @@ class RequestRejectActionSchema(BaseSchema):
     """Schema for reject action with optional requeue"""
     id_list = fields.List(
         fields.Int(),
-        required=True,
+        load_default=[],
         metadata={'description': "List of task IDs to reject"},
-        validate=validate.Length(min=1),
     )
     requeue = fields.Boolean(
         load_default=False,
         metadata={'description': "If true, requeue the tasks as pending instead of deleting them"},
+    )
+    all_matching = fields.Boolean(
+        load_default=False,
+        metadata={'description': "If true, reject all tasks matching the current filter instead of explicit IDs"},
+    )
+    search_value = fields.Str(
+        load_default="",
+        metadata={'description': "Search filter when all_matching is true"},
     )
 
 

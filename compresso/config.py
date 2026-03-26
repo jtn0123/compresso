@@ -124,6 +124,9 @@ class Config(object, metaclass=SingletonType):
         # Staging auto-cleanup settings
         self.staging_expiry_days = 7  # 0 = disabled
 
+        # External notification channels (Discord, Slack, Webhook)
+        self.notification_channels = []
+
         # Onboarding wizard
         self.onboarding_completed = False
 
@@ -732,3 +735,25 @@ class Config(object, metaclass=SingletonType):
             self.onboarding_completed = value.lower() in ('true', '1', 'yes', 'on')
         else:
             self.onboarding_completed = bool(value)
+
+    def get_notification_channels(self):
+        """
+        Get setting - notification_channels
+
+        :return:
+        """
+        if not isinstance(self.notification_channels, list):
+            return []
+        return list(self.notification_channels)
+
+    def set_notification_channels(self, value):
+        """
+        Set setting - notification_channels
+
+        :return:
+        """
+        if isinstance(value, list):
+            self.notification_channels = value
+        else:
+            logger.warning("notification_channels must be a list, got %s; resetting to []", type(value).__name__)
+            self.notification_channels = []

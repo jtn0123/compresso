@@ -32,8 +32,11 @@
 import datetime
 import os
 import shutil
+import subprocess
 import threading
 import time
+
+import peewee
 
 from compresso import config
 from compresso.libs import common, history
@@ -45,6 +48,7 @@ from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.notifications import Notifications
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.task import TaskDataStore
+from compresso.libs.file_operation_tracker import FileOperationTracker, PostProcessError
 
 """
 
@@ -55,57 +59,6 @@ The post-processor runs as a single thread, processing completed jobs one at a t
 This prevents conflicting copy operations or deleting a file that is also being post processed.
 
 """
-
-
-class FileOperationTracker:
-    """Track destructive file operations for rollback on failure."""
-
-    def __init__(self, logger):
-        self._logger = logger
-        self._backups = []  # list of (backup_path, original_path)
-
-    def safe_remove(self, filepath):
-        """Back up a file before removing it, enabling rollback."""
-        if not os.path.exists(filepath):
-            return
-        backup_path = filepath + '.compresso.bak'
-        try:
-            shutil.copy2(filepath, backup_path)
-            self._backups.append((backup_path, filepath))
-            os.remove(filepath)
-        except Exception as e:
-            self._logger.warning("FileOperationTracker: failed to back up '%s': %s", filepath, e)
-            raise
-
-    def commit(self):
-        """Remove all backups -- operations are finalized."""
-        for backup_path, _ in self._backups:
-            try:
-                if os.path.exists(backup_path):
-                    os.remove(backup_path)
-            except Exception as e:
-                self._logger.warning("FileOperationTracker: failed to remove backup '%s': %s", backup_path, e)
-        self._backups.clear()
-
-    def rollback(self):
-        """Restore all backed-up files to their original paths."""
-        for backup_path, original_path in reversed(self._backups):
-            try:
-                if os.path.exists(backup_path):
-                    shutil.move(backup_path, original_path)
-                    self._logger.info("FileOperationTracker: restored '%s' from backup", original_path)
-            except Exception as e:
-                self._logger.error("FileOperationTracker: FAILED to restore '%s' from backup '%s': %s",
-                                   original_path, backup_path, e)
-        self._backups.clear()
-
-
-class PostProcessError(Exception):
-    def __init__(self, expected_var, result_var):
-        Exception.__init__(self, "Errors found during post process checks. Expected {}, but instead found {}".format(
-            expected_var, result_var))
-        self.expected_var = expected_var
-        self.result_var = result_var
 
 
 class PostProcessor(threading.Thread):
@@ -173,7 +126,7 @@ class PostProcessor(threading.Thread):
 
         try:
             self._log("Post-processing task - {}".format(self.current_task.get_source_abspath()))
-        except Exception as e:
+        except (AttributeError, KeyError, TypeError) as e:
             self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
 
         if self.current_task.get_task_type() == 'local':
@@ -200,15 +153,20 @@ class PostProcessor(threading.Thread):
                                     existing_log = self.current_task.task.log or ''
                                     self.current_task.task.log = (existing_log + '\n' + rejection_msg).strip()
                                     self.current_task.task.save()
-                except Exception as e:
+                except (OSError, ZeroDivisionError, peewee.PeeweeException) as e:
                     self._log("Exception in size guardrail check", message2=str(e), level="warning")
+                except Exception as e:
+                    self._log("Unexpected error in size guardrail check", message2=str(e), level="warning")
 
             # Determine replacement policy (per-library with global fallback)
             try:
                 library = Library(self.current_task.get_task_library_id())
                 policy = library.get_replacement_policy()
-            except Exception as e:
+            except (peewee.PeeweeException, AttributeError, KeyError, TypeError) as e:
                 self._log("Could not determine replacement policy for library", message2=str(e), level="warning")
+                policy = ''
+            except Exception as e:
+                self._log("Unexpected error determining replacement policy", message2=str(e), level="warning")
                 policy = ''
             if not policy:
                 policy = 'approval_required' if self.settings.get_approval_required() else 'replace'
@@ -232,7 +190,7 @@ class PostProcessor(threading.Thread):
         """Handle a task that was approved by the user — finalize file replacement from staging."""
         try:
             self._log("Finalizing approved task - {}".format(self.current_task.get_source_abspath()))
-        except Exception as e:
+        except (AttributeError, KeyError, TypeError) as e:
             self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
 
         self._finalize_local_task()
@@ -242,6 +200,8 @@ class PostProcessor(threading.Thread):
         try:
             task_log = self.current_task.task.log or ''
             return 'Size guardrail REJECTED' in task_log
+        except (AttributeError, TypeError):
+            return False
         except Exception:
             return False
 
@@ -294,7 +254,7 @@ class PostProcessor(threading.Thread):
                         deferred_until.strftime('%H:%M:%S')),
                     'timeout': 15000,
                 })
-            except Exception as e:
+            except (AttributeError, KeyError, TypeError) as e:
                 self._log("Failed to push retry notification", message2=str(e), level="debug")
 
             # Clean up cache but don't finalize — task goes back to pending
@@ -303,8 +263,11 @@ class PostProcessor(threading.Thread):
                 self.__cleanup_cache_files(cache_path)
 
             return True
-        except Exception as e:
+        except (AttributeError, TypeError, OSError) as e:
             self._log("Exception during retry attempt", message2=str(e), level="warning")
+            return False
+        except Exception as e:
+            self._log("Unexpected error during retry attempt", message2=str(e), level="warning")
             return False
 
     def _stage_for_approval(self):
@@ -342,13 +305,38 @@ class PostProcessor(threading.Thread):
                         self.current_task.task.save()
                     self._log("Quality scores computed - VMAF: {}, SSIM: {}".format(
                         scores.get('vmaf_score'), scores.get('ssim_score')), level='debug')
-            except Exception as e:
+            except (subprocess.SubprocessError, OSError, ValueError) as e:
                 self._log("Quality metric computation failed (non-fatal)", message2=str(e), level="warning")
 
             # Set the task status to awaiting_approval (keeps cache and task alive)
             self.current_task.set_status('awaiting_approval')
 
-        except Exception as e:
+            # Dispatch approval_needed notification
+            try:
+                from compresso.libs.external_notifications import ExternalNotificationDispatcher
+                source_data = self.current_task.get_source_data()
+                context = {
+                    'file_name': os.path.basename(source_data.get('abspath', '')),
+                    'task_id': task_id,
+                    'staged_path': staged_path,
+                    'message': 'A transcoded file is awaiting approval.',
+                }
+                # Include quality scores if computed
+                try:
+                    quality_scores = {}
+                    if getattr(self.current_task.task, 'vmaf_score', None) is not None:
+                        quality_scores['vmaf'] = self.current_task.task.vmaf_score
+                    if getattr(self.current_task.task, 'ssim_score', None) is not None:
+                        quality_scores['ssim'] = self.current_task.task.ssim_score
+                    if quality_scores:
+                        context['quality_scores'] = quality_scores
+                except (AttributeError, TypeError):
+                    pass
+                ExternalNotificationDispatcher().dispatch('approval_needed', context)
+            except (ImportError, AttributeError, TypeError):
+                pass  # notification failure is non-fatal
+
+        except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception in staging file for approval", message2=str(e), level="exception")
             # Fall back to normal processing on staging failure
             self._finalize_local_task()
@@ -357,24 +345,77 @@ class PostProcessor(threading.Thread):
         """Run the standard local task postprocessing: file move, history, metadata, cleanup."""
         try:
             self.post_process_file()
-        except Exception as e:
+        except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception in post-processing local task file",
+                      message2=str(e), level="exception")
+        except Exception as e:
+            self._log("Unexpected error in post-processing local task file",
                       message2=str(e), level="exception")
         try:
             self.write_history_log()
-        except Exception as e:
+        except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in writing history log", message2=str(e), level="exception")
+        except Exception as e:
+            self._log("Unexpected error in writing history log", message2=str(e), level="exception")
         try:
             self.commit_task_metadata()
-        except Exception as e:
+        except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in committing task metadata", message2=str(e), level="exception")
+        except Exception as e:
+            self._log("Unexpected error in committing task metadata", message2=str(e), level="exception")
         try:
             # Clean up the staging directory for this task if it exists
             self._cleanup_staging_files()
             # Remove file from task queue
             self.current_task.delete()
-        except Exception as e:
+        except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in removing task from task list", message2=str(e), level="exception")
+
+        # Dispatch external notification for task completion or failure
+        try:
+            from compresso.libs.external_notifications import ExternalNotificationDispatcher
+            dispatcher = ExternalNotificationDispatcher()
+            source_data = self.current_task.get_source_data()
+            dest_data = self.current_task.get_destination_data()
+            context = {
+                'file_name': os.path.basename(source_data.get('abspath', '')),
+                'source_size': source_data.get('size'),
+                'destination_size': dest_data.get('size') if dest_data else None,
+            }
+            # Include codec from destination metadata if available
+            try:
+                cache_path = self.current_task.get_cache_path()
+                if cache_path and os.path.exists(cache_path):
+                    meta = extract_media_metadata(cache_path)
+                    context['codec'] = meta.get('codec', '')
+            except (subprocess.SubprocessError, OSError, ValueError):
+                pass
+            # Include size savings
+            try:
+                src_size = self.current_task.task.source_size or 0
+                if src_size > 0 and dest_data and dest_data.get('size'):
+                    saved = src_size - dest_data['size']
+                    pct = (saved / src_size) * 100
+                    context['size_saved'] = '{:.1f} MB ({:.0f}%)'.format(saved / (1024 * 1024), pct)
+            except (AttributeError, TypeError, ZeroDivisionError):
+                pass
+            # Include quality scores if available
+            try:
+                scores = {}
+                if getattr(self.current_task.task, 'vmaf_score', None) is not None:
+                    scores['vmaf'] = self.current_task.task.vmaf_score
+                if getattr(self.current_task.task, 'ssim_score', None) is not None:
+                    scores['ssim'] = self.current_task.task.ssim_score
+                if scores:
+                    context['quality_scores'] = scores
+            except (AttributeError, TypeError):
+                pass
+            if self.current_task.task.success:
+                dispatcher.dispatch('task_completed', context)
+            else:
+                dispatcher.dispatch('task_failed', context)
+        except (ImportError, AttributeError, TypeError):
+            pass  # notification failure is non-fatal
 
     def _finalize_local_task_keep_both(self):
         """Finalize task but keep original — save output alongside with codec suffix."""
@@ -387,8 +428,11 @@ class PostProcessor(threading.Thread):
                 try:
                     meta = extract_media_metadata(self.current_task.get_cache_path())
                     codec = meta.get('codec', 'transcoded')
-                except Exception as e:
+                except (subprocess.SubprocessError, OSError, ValueError) as e:
                     self._log("Failed to extract codec from cache path", message2=str(e), level="warning")
+                    codec = 'transcoded'
+                except Exception as e:
+                    self._log("Unexpected error extracting codec from cache path", message2=str(e), level="warning")
                     codec = 'transcoded'
                 new_path = "{}.{}{}".format(base, codec, ext)
                 counter = 1
@@ -396,7 +440,7 @@ class PostProcessor(threading.Thread):
                     new_path = "{}.{}.{}{}".format(base, codec, counter, ext)
                     counter += 1
                 self.current_task.set_destination_path(new_path)
-        except Exception as e:
+        except (OSError, AttributeError, KeyError, TypeError) as e:
             self._log("Exception in keep_both path adjustment", message2=str(e), level="warning")
         self._finalize_local_task()
 
@@ -404,18 +448,27 @@ class PostProcessor(threading.Thread):
         """Run the standard remote task postprocessing."""
         try:
             self.post_process_remote_file()
-        except Exception as e:
+        except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception in post-processing remote task file",
+                      message2=str(e), level="exception")
+        except Exception as e:
+            self._log("Unexpected error in post-processing remote task file",
                       message2=str(e), level="exception")
         try:
             self.dump_history_log()
-        except Exception as e:
+        except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in dumping history log for remote task",
+                      message2=str(e), level="exception")
+        except Exception as e:
+            self._log("Unexpected error in dumping history log for remote task",
                       message2=str(e), level="exception")
         try:
             self.current_task.set_status('complete')
-        except Exception as e:
+        except (AttributeError, TypeError) as e:
             self._log("Exception in marking remote task as complete",
+                      message2=str(e), level="exception")
+        except Exception as e:
+            self._log("Unexpected error in marking remote task as complete",
                       message2=str(e), level="exception")
 
     def _cleanup_staging_files(self):
@@ -427,7 +480,7 @@ class PostProcessor(threading.Thread):
             if os.path.exists(task_staging_dir):
                 self._log("Removing staging directory '{}'".format(task_staging_dir))
                 shutil.rmtree(task_staging_dir)
-        except Exception as e:
+        except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception while cleaning up staging files", message2=str(e), level="warning")
 
     def system_configuration_is_valid(self):
@@ -545,7 +598,7 @@ class PostProcessor(threading.Thread):
                         self._log("Removing source: {}".format(source_data.get('abspath')))
                         try:
                             tracker.safe_remove(source_data.get('abspath'))
-                        except Exception as e:
+                        except (OSError, PermissionError, shutil.Error) as e:
                             self._log("Failed to safely remove source file", message2=str(e), level="error")
                             file_move_processes_success = False
                     else:
@@ -647,8 +700,8 @@ class PostProcessor(threading.Thread):
                 capture_success = self.__copy_file(cache_path, os.path.join(
                     library_tdir, os.path.basename(cache_path)), [], 'DEFAULT', move=True)
                 if not capture_success:
-                    raise Exception("Failed to copy back to network share")
-            except Exception:
+                    raise OSError("Failed to copy back to network share")
+            except (OSError, PermissionError, shutil.Error):
                 os.mkdir(cache_tdir)
                 self.__copy_file(cache_path, os.path.join(
                     cache_tdir, os.path.basename(cache_path)), [], 'DEFAULT', move=True)
@@ -681,7 +734,7 @@ class PostProcessor(threading.Thread):
             self._log("Removing task cache directory '{}'".format(task_cache_directory))
             try:
                 shutil.rmtree(task_cache_directory)
-            except Exception as e:
+            except (OSError, PermissionError, shutil.Error) as e:
                 self._log("Exception while clearing cache path '{}'".format(str(e)), level='error')
 
     def __copy_file(self, file_in, file_out, destination_files, plugin_id, move=False, tracker=None):
@@ -732,7 +785,7 @@ class PostProcessor(threading.Thread):
             destination_files.append(file_out)
             # Mark move process a success
             return True
-        except Exception as e:
+        except (OSError, PermissionError, shutil.SameFileError, shutil.Error) as e:
             self.logger.error("POSTPROCESS_FILE_COPY_FAILED source=%s dest=%s", file_in, file_out)
             self._log("Exception while copying file {} to {}:".format(file_in, file_out),
                       message2=str(e), level="exception")
@@ -795,7 +848,7 @@ class PostProcessor(threading.Thread):
         if source_abspath and os.path.exists(source_abspath):
             try:
                 source_meta = extract_media_metadata(source_abspath)
-            except Exception as e:
+            except (subprocess.SubprocessError, OSError, ValueError) as e:
                 self.logger.warning("POSTPROCESS_SOURCE_METADATA_UNAVAILABLE path=%s", source_abspath)
                 self._log("Could not extract source metadata: {}".format(e), level='warning')
         # Destination metadata only on success
@@ -803,7 +856,7 @@ class PostProcessor(threading.Thread):
             if dest_path and os.path.exists(dest_path):
                 try:
                     dest_meta = extract_media_metadata(dest_path)
-                except Exception as e:
+                except (subprocess.SubprocessError, OSError, ValueError) as e:
                     self._log("Could not extract destination metadata: {}".format(e), level='debug')
 
         # Extract source duration for encoding speed context
@@ -845,7 +898,7 @@ class PostProcessor(threading.Thread):
             if cache_entry:
                 cache_entry.version += 1
                 cache_entry.save()
-        except Exception as e:
+        except (ImportError, AttributeError, TypeError, peewee.PeeweeException) as e:
             self.logger.debug("Failed to bump analysis cache version: %s", e)
 
         # Execute event plugin runners
@@ -920,7 +973,7 @@ class PostProcessor(threading.Thread):
         try:
             library_id = self.current_task.get_task_library_id()
             library_name = self.current_task.get_task_library_name()
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             library_id = None
             library_name = None
 
@@ -940,3 +993,7 @@ class PostProcessor(threading.Thread):
             dest_path=destination_data.get('abspath', ''),
             command_error_log_tail=command_error_log_tail,
         )
+
+
+# Backward-compatible imports
+from compresso.libs.file_operation_tracker import FileOperationTracker, PostProcessError  # noqa: E402, F811, F401

@@ -41,8 +41,8 @@
           size="90px"
           :thickness="0.2"
           :color="color"
-          center-color="grey-1"
-          track-color="grey-7"
+          :center-color="$q.dark.isActive ? 'grey-10' : 'grey-1'"
+          :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
           font-size="10px"
           class="q-ma-md"
         >
@@ -87,12 +87,12 @@
     <div v-if="!idle" class="q-px-md q-pb-sm">
       <div class="row items-center q-gutter-xs">
         <span class="text-caption text-grey">{{ $t('workers.cpuLabel') }}</span>
-        <q-linear-progress :value="cpuValue" size="6px" class="col" color="secondary" track-color="grey-5" />
+        <q-linear-progress :value="cpuValue" size="6px" class="col" color="secondary" :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'" />
         <span class="text-caption" :style="{color: cpuColor}">{{ cpuDisplay }}%</span>
       </div>
       <div class="row items-center q-gutter-xs q-mt-xs">
         <span class="text-caption text-grey">{{ $t('workers.memLabel') }}</span>
-        <q-linear-progress :value="memValue" size="6px" class="col" color="secondary" track-color="grey-5" />
+        <q-linear-progress :value="memValue" size="6px" class="col" color="secondary" :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'" />
         <span class="text-caption" :style="{color: memColor}">{{ memDisplay }}%</span>
       </div>
     </div>

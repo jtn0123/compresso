@@ -9,11 +9,13 @@ import { onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import axios from "axios";
 import { getCompressoApiUrl } from "src/js/compressoGlobals";
+import { createLogger } from "src/composables/useLogger";
 
 export default {
   setup() {
     const router = useRouter()
     const route = useRoute()
+    const log = createLogger('ActionTrigger')
 
     function navigateToDashboard() {
       router.replace('/ui/dashboard')
@@ -26,7 +28,7 @@ export default {
       }).then((response) => {
         navigateToDashboard();
       }).catch(() => {
-        console.error("Failed to reload session.")
+        log.error("Failed to reload session.")
       })
     }
 

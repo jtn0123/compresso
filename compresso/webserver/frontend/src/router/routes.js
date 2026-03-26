@@ -88,6 +88,17 @@ const routes = [
     }
   },
   {
+    path: '/ui/settings-notifications',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      { path: '', component: () => import('pages/SettingsNotifications.vue') }
+    ],
+    meta: {
+      showHome: true,
+      showMainNavDrawer: true,
+    }
+  },
+  {
     name: 'compression',
     path: '/ui/compression',
     component: () => import('layouts/MainLayout.vue'),
@@ -105,6 +116,18 @@ const routes = [
     component: () => import('layouts/MainLayout.vue'),
     children: [
       { path: '', component: () => import('pages/HealthCheck.vue') }
+    ],
+    meta: {
+      showHome: true,
+      showMainNavDrawer: true,
+    }
+  },
+  {
+    name: 'history',
+    path: '/ui/history',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      { path: '', component: () => import('pages/TaskHistory.vue') }
     ],
     meta: {
       showHome: true,

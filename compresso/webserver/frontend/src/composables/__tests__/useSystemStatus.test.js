@@ -4,6 +4,7 @@ vi.mock('axios', () => ({ default: { get: vi.fn() } }))
 vi.mock('quasar', () => ({ setCssVar: vi.fn(), Notify: { create: vi.fn() } }))
 vi.mock('src/js/compressoGlobals', () => ({
   getCompressoApiUrl: vi.fn(() => 'http://localhost/compresso/api/v2/system/status'),
+  showEventToast: vi.fn(),
 }))
 
 import axios from 'axios'
@@ -103,8 +104,8 @@ describe('useSystemStatus', () => {
       expect(systemInfo.value).toBeNull()
       expect(liveMetrics.value.cpu_percent).toBe(0)
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to fetch system status:',
-        expect.any(Error),
+        '[SystemStatus]',
+        expect.stringContaining('Failed to fetch system status:'),
       )
       consoleSpy.mockRestore()
     })

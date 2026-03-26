@@ -46,9 +46,59 @@
         </div>
       </div>
 
+      <!-- Row 2.5: GPU Utilization -->
+      <div v-if="liveMetrics.gpus && liveMetrics.gpus.length > 0" class="col-12">
+        <q-card flat bordered>
+          <q-card-section class="bg-card-head">
+            <div class="text-h6 text-primary">
+              <q-icon name="memory" />
+              {{ $t('gpu.cardTitle') }}
+            </div>
+          </q-card-section>
+          <q-card-section class="q-pa-sm">
+            <div
+              v-for="(gpu, i) in liveMetrics.gpus"
+              :key="'gpu-stat-' + i"
+              class="row items-center no-wrap q-py-xs q-col-gutter-sm"
+            >
+              <div class="col-auto text-caption text-weight-medium" style="min-width: 140px">
+                {{ gpu.name || ('GPU ' + gpu.index) }}
+              </div>
+              <div class="col-auto">
+                <q-badge
+                  :color="gpu.utilization_percent > 80 ? 'negative' : gpu.utilization_percent > 50 ? 'warning' : 'positive'"
+                  :label="Math.round(gpu.utilization_percent) + '%'"
+                />
+              </div>
+              <div class="col q-px-sm">
+                <q-linear-progress
+                  :value="(gpu.memory_used_mb || 0) / (gpu.memory_total_mb || 1)"
+                  size="8px"
+                  rounded
+                  color="blue-6"
+                  :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
+                >
+                  <q-tooltip>
+                    {{ $t('gpu.memory') }}: {{ gpu.memory_used_mb }}MB / {{ gpu.memory_total_mb }}MB
+                  </q-tooltip>
+                </q-linear-progress>
+              </div>
+              <div class="col-auto text-caption text-grey" style="min-width: 50px; text-align: right">
+                <template v-if="gpu.temperature_c != null">
+                  {{ gpu.temperature_c }}&deg;C
+                </template>
+              </div>
+            </div>
+          </q-card-section>
+          <q-card-section class="q-pt-none">
+            <GpuUtilizationChart :gpuHistory="gpuHistory" />
+          </q-card-section>
+        </q-card>
+      </div>
+
       <!-- Row 3: Tasks -->
       <div class="col-12 col-md-6">
-        <PendingTasks v-bind="pendingTasksData" />
+        <PendingTasks v-bind="pendingTasksData" :queueEta="queueEta" />
       </div>
       <div class="col-12 col-md-6">
         <CompletedTasks v-bind="completedTasksData" />
@@ -85,8 +135,10 @@ import { CompressoWebsocketHandler } from "src/js/compressoWebsocket"
 import axios from "axios"
 import { getCompressoApiUrl } from "src/js/compressoGlobals"
 import ReleaseNotesDialog from "components/docs/ReleaseNotesDialog.vue"
+import GpuUtilizationChart from "components/charts/GpuUtilizationChart.vue"
 import { useWorkerGauges } from "src/composables/useWorkerGauges"
 import { useSystemStatus } from "src/composables/useSystemStatus"
+import { createLogger } from "src/composables/useLogger"
 
 export default {
   name: 'MainDashboard',
@@ -99,13 +151,15 @@ export default {
     WorkersPanel,
     LinkedNodesPanel,
     HealthCheckPanel,
-    PendingTasks
+    PendingTasks,
+    GpuUtilizationChart
   },
   setup() {
     const { t: $t } = useI18n();
     const $q = useQuasar();
+    const log = createLogger('Dashboard');
     const { generateGroupColour } = useWorkerGauges();
-    const { systemInfo, liveMetrics, fetchSystemInfo, startLiveMetrics, stopLiveMetrics, updateLiveMetrics } = useSystemStatus();
+    const { systemInfo, liveMetrics, gpuHistory, fetchSystemInfo, startLiveMetrics, stopLiveMetrics, updateLiveMetrics } = useSystemStatus();
     const lastWorkersUpdate = ref(null);
     const workersStale = ref(false);
     const workerProgressList = ref([]);
@@ -121,6 +175,16 @@ export default {
       percent: 0,
       loading: true
     });
+    const queueEta = ref(null);
+
+    function formatDuration(seconds) {
+      if (seconds == null || seconds <= 0) return null;
+      if (seconds < 60) return '< 1m';
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours > 0) return hours + 'h ' + minutes + 'm';
+      return minutes + 'm';
+    }
 
     let ws = null;
     let compressoWSHandler = CompressoWebsocketHandler($t);
@@ -217,8 +281,20 @@ export default {
 
         if (canEstimate) {
           workerEntry.elapsed = dateTools.printSecondsAsDuration(elapsedValue);
-          workerEntry.etc = dateTools.printSecondsAsDuration(calculateEtc(percentValue, elapsedValue));
+          // Prefer backend ETA when available, fall back to frontend calculation
+          const backendEta = Number(worker.subprocess?.eta_seconds);
+          if (Number.isFinite(backendEta) && backendEta > 0) {
+            workerEntry.etc = formatDuration(backendEta);
+          } else {
+            workerEntry.etc = dateTools.printSecondsAsDuration(calculateEtc(percentValue, elapsedValue));
+          }
         }
+
+        // Encoding FPS and speed from backend
+        const encodingFps = Number(worker.subprocess?.encoding_fps);
+        const encodingSpeed = Number(worker.subprocess?.encoding_speed);
+        workerEntry.encodingFps = Number.isFinite(encodingFps) && encodingFps > 0 ? encodingFps.toFixed(1) : null;
+        workerEntry.encodingSpeed = Number.isFinite(encodingSpeed) && encodingSpeed > 0 ? encodingSpeed.toFixed(1) + 'x' : null;
 
         if (worker.paused) {
           workerEntry.indeterminate = true;
@@ -289,6 +365,15 @@ export default {
         }
       }
       pendingTasksData.value.taskList = results;
+      if (data.queue_eta) {
+        queueEta.value = {
+          formatted: formatDuration(data.queue_eta.eta_seconds),
+          seconds: data.queue_eta.eta_seconds,
+          confidence: data.queue_eta.confidence || 'low',
+        };
+      } else {
+        queueEta.value = null;
+      }
     }
 
     function updateCompletedTasksList(data) {
@@ -327,7 +412,7 @@ export default {
               activeServerId = jsonData.server_id;
             } else {
               if (jsonData.server_id !== activeServerId) {
-                console.debug('Compresso server has restarted. Reloading page...');
+                log.debug('Compresso server has restarted. Reloading page...');
                 location.reload();
               }
             }
@@ -346,10 +431,10 @@ export default {
                 break;
             }
           } else {
-            console.error('WebSocket Error: Received contained errors - ' + evt.data);
+            log.error('WebSocket Error: Received contained errors - ' + evt.data);
           }
         } else {
-          console.error('WebSocket Error: Received data was not JSON - ' + evt.data);
+          log.error('WebSocket Error: Received data was not JSON - ' + evt.data);
         }
       });
     }
@@ -402,8 +487,10 @@ export default {
       completedTasksData,
       systemInfo,
       liveMetrics,
+      gpuHistory,
       workersStale,
       optimizationData,
+      queueEta,
     }
   },
   methods: {

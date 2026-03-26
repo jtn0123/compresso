@@ -33,6 +33,8 @@ import os
 import queue
 import threading
 
+import peewee
+
 from compresso import config
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
@@ -148,8 +150,8 @@ class EventMonitorManager(threading.Thread):
             for lib_info in Library.get_all_libraries():
                 try:
                     library = Library(lib_info['id'])
-                except Exception:
-                    self.logger.exception("Unable to fetch library config for ID %s", lib_info['id'])
+                except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
+                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info['id'], e)
                     continue
                 # Check if the library is configured for remote files only
                 if library.get_enable_remote_only():
@@ -201,8 +203,8 @@ class EventMonitorManager(threading.Thread):
                 self.event.wait(.2)
                 try:
                     library = Library(lib_info['id'])
-                except Exception:
-                    self.logger.exception("Unable to fetch library config for ID %s", lib_info['id'])
+                except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
+                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info['id'], e)
                     continue
                 # Check if the library is configured for remote files only
                 if library.get_enable_remote_only():
@@ -270,6 +272,8 @@ class EventMonitorManager(threading.Thread):
                 self.__add_path_to_queue(pathname, library_id, priority_score)
         except UnicodeEncodeError:
             self.logger.warning("File contains Unicode characters that cannot be processed. Ignoring.")
+        except OSError:
+            self.logger.exception("File system error testing file path in %s. Ignoring.", self.name)
         except Exception:
             self.logger.exception("Exception testing file path in %s. Ignoring.", self.name)
 

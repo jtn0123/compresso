@@ -12,7 +12,7 @@
               size="6px"
               rounded
               :color="cpuColor"
-              track-color="grey-4"
+              :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
             />
             <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
               {{ Math.round(liveMetrics.cpu_percent) }}%
@@ -30,7 +30,7 @@
               size="6px"
               rounded
               :color="memColor"
-              track-color="grey-4"
+              :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
             />
             <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
               {{ Math.round(liveMetrics.memory_percent) }}%
@@ -48,7 +48,7 @@
               size="6px"
               rounded
               :color="diskColor"
-              track-color="grey-4"
+              :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
             />
             <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
               {{ Math.round(liveMetrics.disk_percent) }}%
@@ -71,7 +71,7 @@
                 size="6px"
                 rounded
                 :color="gpuColor(gpu.utilization_percent)"
-                track-color="grey-4"
+                :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
               />
               <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
                 {{ Math.round(gpu.utilization_percent) }}%
@@ -127,9 +127,12 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
+import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import { wsConnectionState } from 'src/js/compressoWebsocket'
+
+const $q = useQuasar()
 
 const props = defineProps({
   systemInfo: { type: Object, default: null },

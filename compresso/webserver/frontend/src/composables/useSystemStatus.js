@@ -1,6 +1,9 @@
 import { ref } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { createLogger } from 'src/composables/useLogger'
+
+const log = createLogger('SystemStatus')
 
 /**
  * Composable for system status data.
@@ -16,6 +19,7 @@ export function useSystemStatus() {
     disk_used_gb: 0,
     gpus: [],
   })
+  const gpuHistory = ref({})
 
   async function fetchSystemInfo() {
     try {
@@ -31,7 +35,7 @@ export function useSystemStatus() {
         gpus: response.data.gpus || [],
       }
     } catch (e) {
-      console.error('Failed to fetch system status:', e)
+      log.error('Failed to fetch system status: ' + e)
     }
   }
 
@@ -56,11 +60,15 @@ export function useSystemStatus() {
       disk_used_gb: data.disk_used_gb ?? liveMetrics.value.disk_used_gb,
       gpus: data.gpus ?? liveMetrics.value.gpus,
     })
+    if (data.gpu_history) {
+      gpuHistory.value = data.gpu_history
+    }
   }
 
   return {
     systemInfo,
     liveMetrics,
+    gpuHistory,
     fetchSystemInfo,
     startLiveMetrics,
     stopLiveMetrics,
