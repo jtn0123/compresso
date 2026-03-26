@@ -33,6 +33,8 @@
 import json
 import os
 
+import tornado.escape
+
 from compresso import config
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
@@ -107,7 +109,7 @@ class ApiPendingHandler(BaseApiHandler):
 
         # Return a list of tasks based on the request JSON body
         results = pending_tasks.prepare_filtered_pending_tasks_for_table(request_dict)
-        self.write(results)
+        self.finish(tornado.escape.json_encode(results))
 
     def trigger_library_rescan(self):
         """

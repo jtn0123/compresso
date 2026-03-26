@@ -31,6 +31,8 @@
 """
 import os
 
+import tornado.escape
+
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
@@ -70,7 +72,7 @@ class ApiFilebrowserHandler(BaseApiHandler):
 
         path_data = self.fetch_path_data(current_path, list_type)
 
-        self.write(path_data)
+        self.finish(tornado.escape.json_encode(path_data))
 
     def fetch_path_data(self, current_path, list_type="directories"):
         """

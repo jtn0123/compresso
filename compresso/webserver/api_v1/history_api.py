@@ -33,6 +33,8 @@
 import json
 import time
 
+import tornado.escape
+
 from compresso import config
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
@@ -86,7 +88,7 @@ class ApiHistoryHandler(BaseApiHandler):
 
         # Return a list of historical tasks based on the request JSON body
         results = self.prepare_filtered_historic_tasks(request_dict)
-        self.write(results)
+        self.finish(tornado.escape.json_encode(results))
 
     def delete_historic_tasks(self, historic_task_ids):
         """

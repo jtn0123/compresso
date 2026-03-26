@@ -257,7 +257,7 @@ class TestTriggerFiltering:
         # Only discord should have been sent
         assert mock_post.call_count == 1
         sent_url = mock_post.call_args[0][0]
-        assert 'discord.com' in sent_url
+        assert sent_url.startswith('https://discord.com/')
 
     def test_get_channels_for_event_filters_by_trigger(self):
         dispatcher = _fresh_dispatcher()
