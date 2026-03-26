@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Stale
-        uses: actions/stale@v5
+        uses: actions/stale@v10
         with:
           close-issue-message: >
             This issue was closed because it has been stalled for 5 days with no activity.
@@ -36,7 +36,7 @@ jobs:
             Comment or remove the stale label, otherwise this will be closed in 10 days.
 
       - name: Plugin Issues
-        uses: actions/stale@v5
+        uses: actions/stale@v10
         with:
           close-issue-message: >
             This issue was related to a plugin and not the core Compresso project.
@@ -48,7 +48,7 @@ jobs:
           stale-issue-label: "invalid:plugin"
 
       - name: Documentation Issues
-        uses: actions/stale@v5
+        uses: actions/stale@v10
         with:
           close-issue-message: >
             This issue was related to documentation and not the core Compresso project.
