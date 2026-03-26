@@ -157,8 +157,6 @@ def validate_startup_environment(settings):
     _validate_cache_path(cache_path, config_path, library_path)
     _ensure_writable_dir(cache_path, "cache path", create=True)
 
-    _validate_ffmpeg()
-
 
 def build_startup_summary(settings, event_monitor_module):
     ffmpeg_info = _validate_ffmpeg()

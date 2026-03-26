@@ -21,6 +21,8 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
 HISTORY_MAX_SAMPLES = 120  # 10 minutes at 5-second intervals
+INTEL_VENDOR_ID = '0x8086'
+AMD_VENDOR_ID = '0x1002'
 
 
 class GpuMonitor(object, metaclass=SingletonType):
@@ -29,6 +31,7 @@ class GpuMonitor(object, metaclass=SingletonType):
         self.logger = CompressoLogging.get_logger(name=self.__class__.__name__)
         self._history: Dict[int, deque] = {}
         self._capabilities = self._probe_capabilities()
+        self._macos_gpu_cache: List[dict] = []
 
     def _probe_capabilities(self) -> Dict[str, bool]:
         """Check which GPU monitoring backends are available on this system."""
@@ -44,7 +47,7 @@ class GpuMonitor(object, metaclass=SingletonType):
             try:
                 for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
                     vendor_id = vendor_path.read_text().strip()
-                    if vendor_id == '0x8086':
+                    if vendor_id == INTEL_VENDOR_ID:
                         caps['intel'] = True
                         break
             except Exception:
@@ -54,7 +57,7 @@ class GpuMonitor(object, metaclass=SingletonType):
             try:
                 for vendor_path in Path('/sys/class/drm').glob('card*/device/vendor'):
                     vendor_id = vendor_path.read_text().strip()
-                    if vendor_id == '0x1002':
+                    if vendor_id == AMD_VENDOR_ID:
                         caps['amd'] = True
                         break
             except Exception:
@@ -145,7 +148,7 @@ class GpuMonitor(object, metaclass=SingletonType):
                     vendor_id = vendor_path.read_text().strip()
                 except Exception:
                     continue
-                if vendor_id != '0x8086':
+                if vendor_id != INTEL_VENDOR_ID:
                     continue
 
                 card_name = card_dir.name
@@ -206,7 +209,7 @@ class GpuMonitor(object, metaclass=SingletonType):
                     vendor_id = vendor_path.read_text().strip()
                 except Exception:
                     continue
-                if vendor_id != '0x1002':
+                if vendor_id != AMD_VENDOR_ID:
                     continue
 
                 card_name = card_dir.name
@@ -260,9 +263,13 @@ class GpuMonitor(object, metaclass=SingletonType):
         return gpus
 
     def _poll_macos_gpu(self) -> List[dict]:
-        """Detect GPU info on macOS via system_profiler."""
+        """Detect GPU info on macOS via system_profiler. Cached after first call
+        since GPU identity/VRAM are static hardware info."""
         if not self._capabilities.get('videotoolbox'):
             return []
+
+        if self._macos_gpu_cache:
+            return self._macos_gpu_cache
 
         try:
             result = subprocess.run(
@@ -300,6 +307,7 @@ class GpuMonitor(object, metaclass=SingletonType):
                     'memory_total_mb': memory_total_mb,
                     'temperature_c': None,
                 })
+            self._macos_gpu_cache = gpus
             return gpus
 
         except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError) as e:
