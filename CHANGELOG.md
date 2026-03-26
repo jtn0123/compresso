@@ -1,3 +1,18 @@
+# [1.7.0](https://github.com/jtn0123/compresso/compare/v1.6.0...v1.7.0) (2026-03-26)
+
+
+### Bug Fixes
+
+* add shell: bash to pytest step for Windows CI compatibility ([297c76f](https://github.com/jtn0123/compresso/commit/297c76f1da3a83c98d0f2fe5b0a6c4637a07022f))
+* improve metadata DB fixture for Windows SqliteQueueDatabase timing ([3a7575d](https://github.com/jtn0123/compresso/commit/3a7575d2a57f151666080572127914bdd7dd2938))
+* resolve all pre-existing Windows test failures ([6757ebf](https://github.com/jtn0123/compresso/commit/6757ebf7385ddb5d336be5b902e49a608d7640bd))
+* resolve remaining Windows path assertion failures ([ab3d1f4](https://github.com/jtn0123/compresso/commit/ab3d1f4d413147b403b4a5473a6d6861565aa0f5))
+
+
+### Features
+
+* multi-platform support — macOS/Windows/Linux paths, GPU backends, FFmpeg validation, CI matrix ([0727dab](https://github.com/jtn0123/compresso/commit/0727dab9febb64b23a427b03377fc5bab5db23ff))
+
 # [1.6.0](https://github.com/jtn0123/compresso/compare/v1.5.0...v1.6.0) (2026-03-26)
 
 
