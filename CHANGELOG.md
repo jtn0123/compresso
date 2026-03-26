@@ -1,3 +1,11 @@
+## [1.7.1](https://github.com/jtn0123/compresso/compare/v1.7.0...v1.7.1) (2026-03-26)
+
+
+### Bug Fixes
+
+* add autoprefixer as explicit devDependency for @quasar/app-webpack v4 ([bc622ff](https://github.com/jtn0123/compresso/commit/bc622ff1df11953098612ee68fb6c39115f16c7c))
+* migrate to @quasar/app-webpack v4 project structure ([d2bc549](https://github.com/jtn0123/compresso/commit/d2bc549ce44623e00458c3a2d647694a6f131cf6))
+
 # [1.7.0](https://github.com/jtn0123/compresso/compare/v1.6.0...v1.7.0) (2026-03-26)
 
 
