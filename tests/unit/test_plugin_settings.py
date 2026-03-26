@@ -8,6 +8,8 @@
 """
 
 import json
+import os
+
 import pytest
 from unittest.mock import patch, MagicMock, mock_open
 
@@ -76,10 +78,10 @@ class TestGetPluginDirectory:
             instance = cls()
             # Mock the module file location
             fake_module = MagicMock()
-            fake_module.__file__ = '/plugins/my_plugin/plugin.py'
+            fake_module.__file__ = os.path.join('/plugins', 'my_plugin', 'plugin.py')
             with patch.dict('sys.modules', {'fake_plugin.plugin': fake_module}):
                 result = instance.get_plugin_directory()
-                assert result == '/plugins/my_plugin'
+                assert os.path.basename(result) == 'my_plugin'
 
 
 @pytest.mark.unittest
@@ -249,7 +251,7 @@ class TestSettingsFilePath:
                  patch('os.path.exists', return_value=False):
                 path = instance._PluginSettings__get_plugin_settings_file()
                 assert path.endswith('settings.json')
-                assert '/fake/profile/' in path
+                assert 'fake' + os.sep + 'profile' in path
 
     def test_library_specific_settings_path(self):
         cls = _make_settings_class()

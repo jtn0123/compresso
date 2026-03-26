@@ -7,6 +7,8 @@
     Unit tests for prepare_file_destination_data() and Task class methods.
 """
 
+import os
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -27,9 +29,10 @@ class TestPrepareFileDestinationData:
 
     def test_abspath_combines_dirname_and_basename(self):
         from compresso.libs.task import prepare_file_destination_data
-        result = prepare_file_destination_data('/media/movies/video.mkv', 'mp4')
-        assert result['abspath'].endswith('/video.mp4')
-        assert '/media/movies/' in result['abspath']
+        source = os.path.join('/media', 'movies', 'video.mkv')
+        result = prepare_file_destination_data(source, 'mp4')
+        assert os.path.basename(result['abspath']) == 'video.mp4'
+        assert os.path.dirname(result['abspath']) == os.path.dirname(source)
 
     def test_handles_dotted_filename(self):
         from compresso.libs.task import prepare_file_destination_data
