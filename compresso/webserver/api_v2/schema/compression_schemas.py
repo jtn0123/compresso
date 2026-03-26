@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    compresso.compression_schemas.py
+compresso.compression_schemas.py
 
-    Marshmallow schemas for compression statistics API endpoints.
+Marshmallow schemas for compression statistics API endpoints.
 
 """
 
@@ -14,24 +14,27 @@ from compresso.webserver.api_v2.schema.schemas import BaseSchema, BaseSuccessSch
 
 class RequestCompressionStatsSchema(RequestTableDataSchema):
     """Schema for requesting paginated compression stats"""
+
     library_id = fields.Int(
         required=False,
-        metadata={'description': "Optional library ID to filter by"},
+        metadata={"description": "Optional library ID to filter by"},
         allow_none=True,
     )
 
 
 class RequestCompressionSummarySchema(BaseSchema):
     """Schema for requesting compression summary"""
+
     library_id = fields.Int(
         required=False,
-        metadata={'description': "Optional library ID to filter by"},
+        metadata={"description": "Optional library ID to filter by"},
         allow_none=True,
     )
 
 
 class CompressionStatsResultSchema(BaseSchema):
     """Schema for a single compression stats result"""
+
     id = fields.Int()
     completedtask_id = fields.Int()
     task_label = fields.Str()
@@ -53,6 +56,7 @@ class CompressionStatsResultSchema(BaseSchema):
 
 class CompressionStatsSchema(BaseSuccessSchema):
     """Schema for paginated compression stats response"""
+
     recordsTotal = fields.Int()
     recordsFiltered = fields.Int()
     results = fields.List(fields.Raw())
@@ -60,6 +64,7 @@ class CompressionStatsSchema(BaseSuccessSchema):
 
 class PerLibraryCompressionSchema(BaseSchema):
     """Schema for per-library compression summary"""
+
     library_id = fields.Int()
     total_source_size = fields.Int()
     total_destination_size = fields.Int()
@@ -70,6 +75,7 @@ class PerLibraryCompressionSchema(BaseSchema):
 
 class CompressionSummarySchema(BaseSuccessSchema):
     """Schema for compression summary response"""
+
     total_source_size = fields.Int()
     total_destination_size = fields.Int()
     file_count = fields.Int()
@@ -80,6 +86,7 @@ class CompressionSummarySchema(BaseSuccessSchema):
 
 class PendingEstimateSchema(BaseSuccessSchema):
     """Schema for pending estimate response"""
+
     pending_count = fields.Int()
     total_pending_size = fields.Int()
     estimated_output_size = fields.Int()
@@ -89,36 +96,42 @@ class PendingEstimateSchema(BaseSuccessSchema):
 
 class CodecDistributionSchema(BaseSuccessSchema):
     """Schema for codec distribution response"""
+
     source_codecs = fields.List(fields.Raw())
     destination_codecs = fields.List(fields.Raw())
 
 
 class ResolutionDistributionSchema(BaseSuccessSchema):
     """Schema for resolution distribution response"""
+
     resolutions = fields.List(fields.Raw())
 
 
 class ContainerDistributionSchema(BaseSuccessSchema):
     """Schema for container distribution response"""
+
     source_containers = fields.List(fields.Raw())
     destination_containers = fields.List(fields.Raw())
 
 
 class TimelineSchema(BaseSuccessSchema):
     """Schema for space saved timeline response"""
+
     data = fields.List(fields.Raw())
 
 
 class LibraryAnalysisRequestSchema(BaseSchema):
     """Schema for library analysis request"""
+
     library_id = fields.Int(
         required=True,
-        metadata={'description': "Library ID to analyze"},
+        metadata={"description": "Library ID to analyze"},
     )
 
 
 class LibraryAnalysisStatusSchema(BaseSuccessSchema):
     """Schema for library analysis status response"""
+
     status = fields.Str()
     progress = fields.Raw()
     version = fields.Int()
@@ -127,6 +140,7 @@ class LibraryAnalysisStatusSchema(BaseSuccessSchema):
 
 class OptimizationProgressSchema(BaseSuccessSchema):
     """Schema for optimization progress response"""
+
     total_files = fields.Int()
     processed_files = fields.Int()
     percent = fields.Float()
@@ -134,4 +148,5 @@ class OptimizationProgressSchema(BaseSuccessSchema):
 
 class EncodingSpeedTimelineSchema(BaseSuccessSchema):
     """Schema for encoding speed timeline response"""
+
     data = fields.List(fields.Raw())

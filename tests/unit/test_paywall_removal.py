@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 """
-    tests.unit.test_paywall_removal.py
+tests.unit.test_paywall_removal.py
 
-    Unit tests verifying that paywall / feature-gating has been removed:
-    - Library.within_library_count_limits() always returns True
-    - Links.within_enabled_link_limits() always returns True
-    - Session level is always 100
+Unit tests verifying that paywall / feature-gating has been removed:
+- Library.within_library_count_limits() always returns True
+- Links.within_enabled_link_limits() always returns True
+- Session level is always 100
 
 """
 
@@ -34,13 +34,13 @@ class TestPaywallRemoval:
         Creates an in-memory SQLite database and the tables required
         by the classes under test.
         """
-        config_path = tempfile.mkdtemp(prefix='compresso_tests_')
+        config_path = tempfile.mkdtemp(prefix="compresso_tests_")
 
         app_dir = os.path.dirname(os.path.abspath(__file__))
         database_settings = {
             "TYPE": "SQLITE",
-            "FILE": ':memory:',
-            "MIGRATIONS_DIR": os.path.join(app_dir, '..', 'migrations'),
+            "FILE": ":memory:",
+            "MIGRATIONS_DIR": os.path.join(app_dir, "..", "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
 
@@ -53,17 +53,27 @@ class TestPaywallRemoval:
             Plugins,
             Tags,
         )
-        self.db_connection.create_tables([
-            CompletedTasks, Installation, Libraries, Tags,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+
+        self.db_connection.create_tables(
+            [
+                CompletedTasks,
+                Installation,
+                Libraries,
+                Tags,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
         from compresso import config
+
         self.settings = config.Config(config_path=config_path)
 
         # Clear Session singleton so it picks up our in-memory DB
         from compresso.libs.session import Session
         from compresso.libs.singleton import SingletonType
+
         SingletonType._instances.pop(Session, None)
 
     def teardown_class(self):
@@ -77,6 +87,7 @@ class TestPaywallRemoval:
     def test_library_within_library_count_limits_returns_true(self):
         """Library.within_library_count_limits() must always return True."""
         from compresso.libs.library import Library
+
         assert Library.within_library_count_limits() is True
 
     # ------------------------------------------------------------------
@@ -90,6 +101,7 @@ class TestPaywallRemoval:
 
         # Clear any singleton cache so we get a fresh Links instance
         from compresso.libs.singleton import SingletonType
+
         SingletonType._instances.pop(Links, None)
 
         links = Links()
@@ -103,12 +115,14 @@ class TestPaywallRemoval:
     def test_session_level_is_100(self):
         """Session.level should be 100, meaning all features unlocked."""
         from compresso.libs.session import Session
+
         assert Session.level == 100
 
     @pytest.mark.unittest
     def test_session_instance_supporter_level_is_100(self):
         """An instantiated Session should report supporter level 100."""
         from compresso.libs.session import Session
+
         s = Session()
         assert s.get_supporter_level() == 100
 
@@ -116,6 +130,7 @@ class TestPaywallRemoval:
     def test_session_library_count_is_high(self):
         """Session.library_count should be effectively unlimited."""
         from compresso.libs.session import Session
+
         s = Session()
         assert s.library_count >= 999
 
@@ -123,6 +138,7 @@ class TestPaywallRemoval:
     def test_session_link_count_is_high(self):
         """Session.link_count should be effectively unlimited."""
         from compresso.libs.session import Session
+
         s = Session()
         assert s.link_count >= 999
 
@@ -148,10 +164,10 @@ class TestPaywallRemoval:
         source = inspect.getsource(PluginExecutor.save_plugin_settings)
         # The old paywall code called get_supporter_level() and compared
         # against a required level before allowing settings to be saved.
-        assert 'get_supporter_level' not in source, (
+        assert "get_supporter_level" not in source, (
             "save_plugin_settings still calls get_supporter_level — paywall not removed"
         )
 
 
-if __name__ == '__main__':
-    pytest.main(['-s', '--log-cli-level=INFO', __file__])
+if __name__ == "__main__":
+    pytest.main(["-s", "--log-cli-level=INFO", __file__])

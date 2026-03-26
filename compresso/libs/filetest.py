@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.filetest.py
+compresso.filetest.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     28 Mar 2021, (7:28 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     28 Mar 2021, (7:28 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import json
 import os
 import queue
@@ -59,8 +60,9 @@ class FileTest:
         # Init plugins
         self.library_id = library_id
         self.plugin_handler = PluginsHandler()
-        self.plugin_modules = self.plugin_handler.get_enabled_plugin_modules_by_type('library_management.file_test',
-                                                                                     library_id=library_id)
+        self.plugin_modules = self.plugin_handler.get_enabled_plugin_modules_by_type(
+            "library_management.file_test", library_id=library_id
+        )
 
         # List of filed tasks
         self.failed_paths: list = []
@@ -79,7 +81,7 @@ class FileTest:
         if not self.failed_paths:
             failed_tasks = history_logging.get_historic_tasks_list_with_source_probe(task_success=False)
             for task in failed_tasks:
-                self.failed_paths.append(task.get('abspath'))
+                self.failed_paths.append(task.get("abspath"))
         return path in self.failed_paths
 
     def file_in_compresso_ignore_lockfile(self, path):
@@ -91,7 +93,7 @@ class FileTest:
         # Get file parent directory
         dirname = os.path.dirname(path)
         # Check if lockfile (.compressoignore) exists
-        compresso_ignore_file = os.path.join(dirname, '.compressoignore')
+        compresso_ignore_file = os.path.join(dirname, ".compressoignore")
         if os.path.exists(compresso_ignore_file):
             # Get file basename
             basename = os.path.basename(path)
@@ -99,7 +101,7 @@ class FileTest:
             with open(compresso_ignore_file) as f:
                 for line in f:
                     entry = line.strip()
-                    if not entry or entry.startswith('#'):
+                    if not entry or entry.startswith("#"):
                         continue
                     if basename == entry:
                         return True
@@ -117,25 +119,35 @@ class FileTest:
 
         # Codec pre-filter (before plugins, for speed)
         from compresso.libs.library import Library
+
         try:
             library = Library(self.library_id)
             target_codecs = library.get_target_codecs()
             skip_codecs = library.get_skip_codecs()
             if target_codecs or skip_codecs:
                 from compresso.libs.ffprobe_utils import extract_media_metadata
+
                 try:
                     meta = extract_media_metadata(path)
-                    file_codec = meta.get('codec', '').lower()
+                    file_codec = meta.get("codec", "").lower()
                     # Strip "(estimated)" suffix from codec hint
-                    if ' (estimated)' in file_codec:
-                        file_codec = file_codec.replace(' (estimated)', '')
+                    if " (estimated)" in file_codec:
+                        file_codec = file_codec.replace(" (estimated)", "")
                     if file_codec:
                         if skip_codecs and file_codec in [c.lower() for c in skip_codecs]:
-                            return False, [{'id': 'codec_skip',
-                                            'message': f"Codec '{file_codec}' in skip list — '{path}'"}], 0, None
+                            return (
+                                False,
+                                [{"id": "codec_skip", "message": f"Codec '{file_codec}' in skip list — '{path}'"}],
+                                0,
+                                None,
+                            )
                         if target_codecs and file_codec not in [c.lower() for c in target_codecs]:
-                            return False, [{'id': 'codec_target',
-                                            'message': f"Codec '{file_codec}' not in target list — '{path}'"}], 0, None
+                            return (
+                                False,
+                                [{"id": "codec_target", "message": f"Codec '{file_codec}' not in target list — '{path}'"}],
+                                0,
+                                None,
+                            )
                 except (subprocess.SubprocessError, OSError, json.JSONDecodeError, ValueError) as e:
                     self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, str(e))
                 except Exception as e:
@@ -147,18 +159,22 @@ class FileTest:
 
         # TODO: Remove this
         if self.file_in_compresso_ignore_lockfile(path):
-            file_issues.append({
-                'id':      'compressoignore',
-                'message': f"File found in compresso ignore file - '{path}'",
-            })
+            file_issues.append(
+                {
+                    "id": "compressoignore",
+                    "message": f"File found in compresso ignore file - '{path}'",
+                }
+            )
             return_value = False
 
         # Check if file has failed in history.
         if self.file_failed_in_history(path):
-            file_issues.append({
-                'id':      'blacklisted',
-                'message': f"File found already failed in history - '{path}'",
-            })
+            file_issues.append(
+                {
+                    "id": "blacklisted",
+                    "message": f"File found already failed in history - '{path}'",
+                }
+            )
             return_value = False
 
         # Only run checks with plugins if other tests were not conclusive
@@ -166,36 +182,37 @@ class FileTest:
         if return_value is None:
             # Set the initial data with just the priority score.
             data = {
-                'priority_score': 0,
-                'shared_info':    {},
+                "priority_score": 0,
+                "shared_info": {},
             }
             # Run tests against plugins
             for plugin_module in self.plugin_modules:
-                data['library_id'] = self.library_id
-                data['path'] = path
-                data['issues'] = deepcopy(file_issues)
-                data['add_file_to_pending_tasks'] = None
+                data["library_id"] = self.library_id
+                data["path"] = path
+                data["issues"] = deepcopy(file_issues)
+                data["add_file_to_pending_tasks"] = None
 
                 # Run plugin to update data
-                if not self.plugin_handler.exec_plugin_runner(data, plugin_module.get('plugin_id'),
-                                                              'library_management.file_test'):
+                if not self.plugin_handler.exec_plugin_runner(
+                    data, plugin_module.get("plugin_id"), "library_management.file_test"
+                ):
                     continue
 
                 # Append any file issues found during previous tests
-                file_issues = data.get('issues')
+                file_issues = data.get("issues")
 
                 # Set the return_value based on the plugin results
                 # If the add_file_to_pending_tasks returned an answer (True/False) then break the loop.
                 # No need to continue.
-                if data.get('add_file_to_pending_tasks') is not None:
-                    return_value = data.get('add_file_to_pending_tasks')
+                if data.get("add_file_to_pending_tasks") is not None:
+                    return_value = data.get("add_file_to_pending_tasks")
                     decision_plugin = {
-                        'plugin_id':   plugin_module.get('plugin_id'),
-                        'plugin_name': plugin_module.get('name'),
+                        "plugin_id": plugin_module.get("plugin_id"),
+                        "plugin_name": plugin_module.get("name"),
                     }
                     break
             # Set the priority score modification
-            priority_score_modification = data.get('priority_score', 0)
+            priority_score_modification = data.get("priority_score", 0)
 
         return return_value, file_issues, priority_score_modification, decision_plugin
 
@@ -251,22 +268,27 @@ class FileTesterThread(threading.Thread):
                 # Log any error messages
                 for issue in issues:
                     if type(issue) is dict:
-                        self.logger.info(issue.get('message'))
+                        self.logger.info(issue.get("message"))
                     else:
                         self.logger.info(issue)
                 # If file needs to be added, then add it
                 if result:
-                    self.add_path_to_queue({
-                        'path':           next_file,
-                        'priority_score': priority_score,
-                    })
+                    self.add_path_to_queue(
+                        {
+                            "path": next_file,
+                            "priority_score": priority_score,
+                        }
+                    )
                     # Execute event plugin runners (only when added to queue)
-                    plugin_handler.run_event_plugins_for_plugin_type('events.file_queued', {
-                        'library_id':     self.library_id,
-                        'file_path':      next_file,
-                        'priority_score': priority_score,
-                        'issues':         issues,
-                    })
+                    plugin_handler.run_event_plugins_for_plugin_type(
+                        "events.file_queued",
+                        {
+                            "library_id": self.library_id,
+                            "file_path": next_file,
+                            "priority_score": priority_score,
+                            "issues": issues,
+                        },
+                    )
 
             except UnicodeEncodeError:
                 self.logger.warning("File contains Unicode characters that cannot be processed. Ignoring.")

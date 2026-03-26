@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.file_operation_tracker.py
+compresso.file_operation_tracker.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     23 Apr 2019, (7:33 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     23 Apr 2019, (7:33 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 import shutil
 
@@ -43,7 +44,7 @@ class FileOperationTracker:
         """Back up a file before removing it, enabling rollback."""
         if not os.path.exists(filepath):
             return
-        backup_path = filepath + '.compresso.bak'
+        backup_path = filepath + ".compresso.bak"
         try:
             shutil.copy2(filepath, backup_path)
             self._backups.append((backup_path, filepath))
@@ -70,8 +71,9 @@ class FileOperationTracker:
                     shutil.move(backup_path, original_path)
                     self._logger.info("FileOperationTracker: restored '%s' from backup", original_path)
             except (OSError, PermissionError, shutil.Error) as e:
-                self._logger.error("FileOperationTracker: FAILED to restore '%s' from backup '%s': %s",
-                                   original_path, backup_path, e)
+                self._logger.error(
+                    "FileOperationTracker: FAILED to restore '%s' from backup '%s': %s", original_path, backup_path, e
+                )
         self._backups.clear()
 
 
@@ -79,8 +81,7 @@ class PostProcessError(Exception):
     def __init__(self, expected_var, result_var):
         Exception.__init__(
             self,
-            f"Errors found during post process checks. Expected {expected_var},"
-            f" but instead found {result_var}",
+            f"Errors found during post process checks. Expected {expected_var}, but instead found {result_var}",
         )
         self.expected_var = expected_var
         self.result_var = result_var

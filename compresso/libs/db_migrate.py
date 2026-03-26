@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.database.py
+compresso.database.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     14 Aug 2021, (12:03 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     14 Aug 2021, (12:03 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import inspect
 import os
 import sys
@@ -52,23 +53,25 @@ class Migrations:
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
 
         # Based on configuration, select database to connect to.
-        if config['TYPE'] == 'SQLITE':
+        if config["TYPE"] == "SQLITE":
             # Create SQLite directory if not exists
-            db_file_directory = os.path.dirname(config['FILE'])
+            db_file_directory = os.path.dirname(config["FILE"])
             if not os.path.exists(db_file_directory):
                 os.makedirs(db_file_directory)
             self.database = SqliteDatabase(
-                config['FILE'],
+                config["FILE"],
                 pragmas=(
-                    ('foreign_keys', 1),
-                    ('journal_mode', 'wal'),
+                    ("foreign_keys", 1),
+                    ("journal_mode", "wal"),
                 ),
             )
 
-            self.router = Router(database=self.database,
-                                 migrate_table='migratehistory_{}'.format(config.get('MIGRATIONS_HISTORY_VERSION')),
-                                 migrate_dir=config.get('MIGRATIONS_DIR'),
-                                 logger=self.logger)
+            self.router = Router(
+                database=self.database,
+                migrate_table="migratehistory_{}".format(config.get("MIGRATIONS_HISTORY_VERSION")),
+                migrate_dir=config.get("MIGRATIONS_DIR"),
+                logger=self.logger,
+            )
 
             self.migrator = Migrator(self.database)
 
@@ -89,19 +92,17 @@ class Migrations:
         across releases. We prefer `add_fields` when present and fall back to
         `add_columns` for compatibility with older variants.
         """
-        add_fields = getattr(self.migrator, 'add_fields', None)
+        add_fields = getattr(self.migrator, "add_fields", None)
         if callable(add_fields):
             add_fields(model, **{field_name: field})
             return
 
-        add_columns = getattr(self.migrator, 'add_columns', None)
+        add_columns = getattr(self.migrator, "add_columns", None)
         if callable(add_columns):
             add_columns(model, **{field_name: field})
             return
 
-        raise AttributeError(
-            "Migrator does not support adding columns (expected add_fields or add_columns)."
-        )
+        raise AttributeError("Migrator does not support adding columns (expected add_fields or add_columns).")
 
     def update_schema(self):  # noqa: C901
         """
@@ -173,8 +174,8 @@ class Migrations:
                 for fk in field_keys:
                     field = fields.get(fk)
                     if isinstance(field, Field):
-                        column_name = getattr(field, 'column_name', field.name)
-                        if getattr(field, 'primary_key', False):
+                        column_name = getattr(field, "column_name", field.name)
+                        if getattr(field, "primary_key", False):
                             # SQLite cannot safely add primary key columns via ALTER TABLE.
                             # These must be handled explicitly in migrations if ever required.
                             if not any(f for f in self.database.get_columns(table_name) if f.name == column_name):
@@ -197,10 +198,7 @@ class Migrations:
                                 raise
 
         if missing_required_columns:
-            details = "; ".join(
-                f"{table}.{column} ({reason})"
-                for table, column, reason in missing_required_columns
-            )
+            details = "; ".join(f"{table}.{column} ({reason})" for table, column, reason in missing_required_columns)
             raise RuntimeError(
                 f"Database schema requires non-additive migrations for: {details}. "
                 "Create a migration to add these columns safely."
@@ -219,15 +217,8 @@ class Migrations:
                 self.logger.exception("Failed to fetch indexes for table %s", table_name)
                 continue
 
-            existing_index_columns = set(
-                tuple(getattr(idx, 'columns', []))
-                for idx in existing_indexes
-            )
-            existing_index_names = set(
-                getattr(idx, 'name', None)
-                for idx in existing_indexes
-                if getattr(idx, 'name', None)
-            )
+            existing_index_columns = set(tuple(getattr(idx, "columns", [])) for idx in existing_indexes)
+            existing_index_names = set(getattr(idx, "name", None) for idx in existing_indexes if getattr(idx, "name", None))
 
             declared_indexes = []
             for columns, unique in model._meta.indexes:
@@ -241,7 +232,7 @@ class Migrations:
                     declared_indexes.append((tuple(columns), tuple(compare_columns)))
 
             for field_name, field in model._meta.fields.items():
-                if getattr(field, 'index', False) and not getattr(field, 'unique', False):
+                if getattr(field, "index", False) and not getattr(field, "unique", False):
                     declared_indexes.append(((field_name,), (field.column_name,)))
 
             for add_columns, compare_columns in declared_indexes:

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    compresso.healthcheck.py
+compresso.healthcheck.py
 
-    Health check manager for validating media file integrity.
+Health check manager for validating media file integrity.
 
 """
 
@@ -28,15 +28,15 @@ class HealthCheckManager:
     _scanning = False
     _cancel_event = threading.Event()
     _scan_progress: dict = {
-        'total': 0,
-        'checked': 0,
-        'library_id': None,
-        'worker_count': 0,
-        'max_workers': 1,
-        'workers': {},
-        'start_time': None,
-        'files_per_second': 0.0,
-        'eta_seconds': 0,
+        "total": 0,
+        "checked": 0,
+        "library_id": None,
+        "worker_count": 0,
+        "max_workers": 1,
+        "workers": {},
+        "start_time": None,
+        "files_per_second": 0.0,
+        "eta_seconds": 0,
     }
     _worker_count_requested = 1
 
@@ -61,12 +61,12 @@ class HealthCheckManager:
         if result is None:
             return False, "ffprobe failed to parse file"
 
-        streams = result.get('streams', [])
+        streams = result.get("streams", [])
         if not streams:
             return False, "No streams found in file"
 
-        fmt = result.get('format', {})
-        duration = fmt.get('duration')
+        fmt = result.get("format", {})
+        duration = fmt.get("duration")
         if duration is not None:
             try:
                 dur = float(duration)
@@ -89,28 +89,31 @@ class HealthCheckManager:
             return False, "File not found"
 
         cmd = [
-            'ffmpeg',
-            '-v', 'error',
-            '-i', filepath,
-            '-f', 'null',
-            '-',
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            filepath,
+            "-f",
+            "null",
+            "-",
         ]
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # noqa: S603 - trusted ffmpeg command built internally
-            stderr = result.stderr.strip() if result.stderr else ''
+            stderr = result.stderr.strip() if result.stderr else ""
 
             if result.returncode != 0:
-                error_lines = stderr.split('\n') if stderr else ['Unknown error']
-                return False, '; '.join(error_lines[:5])
+                error_lines = stderr.split("\n") if stderr else ["Unknown error"]
+                return False, "; ".join(error_lines[:5])
 
             if stderr:
-                error_lines = [line for line in stderr.split('\n') if line.strip()]
+                error_lines = [line for line in stderr.split("\n") if line.strip()]
                 error_count = len(error_lines)
                 if error_count > 10:
-                    return False, "Decode produced {} errors: {}".format(error_count, '; '.join(error_lines[:3]))
+                    return False, "Decode produced {} errors: {}".format(error_count, "; ".join(error_lines[:3]))
                 if error_count >= 1:
-                    return 'warning', "Decode produced {} warning(s): {}".format(error_count, '; '.join(error_lines[:3]))
+                    return "warning", "Decode produced {} warning(s): {}".format(error_count, "; ".join(error_lines[:3]))
 
             return True, ""
 
@@ -126,7 +129,7 @@ class HealthCheckManager:
                 HealthCheckManager._file_locks[filepath] = threading.Lock()
             return HealthCheckManager._file_locks[filepath]
 
-    def check_file(self, filepath, library_id=1, mode='quick'):
+    def check_file(self, filepath, library_id=1, mode="quick"):
         """
         Check a single file and store the result.
 
@@ -139,40 +142,39 @@ class HealthCheckManager:
         with file_lock:
             # Mark as checking
             health, _ = HealthStatus.get_or_create(
-                abspath=filepath,
-                defaults={'library_id': library_id, 'status': 'checking', 'check_mode': mode}
+                abspath=filepath, defaults={"library_id": library_id, "status": "checking", "check_mode": mode}
             )
-            health.status = 'checking'
+            health.status = "checking"
             health.check_mode = mode
             health.library_id = library_id
             health.save()
 
             # Run check
-            if mode == 'thorough':
+            if mode == "thorough":
                 is_healthy, error_detail = self.thorough_check(filepath)
             else:
                 is_healthy, error_detail = self.quick_check(filepath)
 
             # Update result — thorough_check may return 'warning' as is_healthy
-            if is_healthy == 'warning':
-                health.status = 'warning'
+            if is_healthy == "warning":
+                health.status = "warning"
             elif is_healthy:
-                health.status = 'healthy'
+                health.status = "healthy"
             else:
-                health.status = 'corrupted'
+                health.status = "corrupted"
             health.error_detail = error_detail
             health.last_checked = datetime.datetime.now()
-            if health.status in ('corrupted', 'warning'):
+            if health.status in ("corrupted", "warning"):
                 health.error_count = health.error_count + 1
             health.save()
 
             result = {
-                'abspath': filepath,
-                'status': health.status,
-                'check_mode': mode,
-                'error_detail': error_detail,
-                'last_checked': str(health.last_checked),
-                'error_count': health.error_count,
+                "abspath": filepath,
+                "status": health.status,
+                "check_mode": mode,
+                "error_detail": error_detail,
+                "last_checked": str(health.last_checked),
+                "error_count": health.error_count,
             }
 
         # Release the per-file lock to prevent unbounded growth
@@ -192,7 +194,7 @@ class HealthCheckManager:
 
         query = HealthStatus.select(
             HealthStatus.status,
-            fn.COUNT(HealthStatus.id).alias('count'),
+            fn.COUNT(HealthStatus.id).alias("count"),
         )
 
         if library_id is not None:
@@ -201,12 +203,12 @@ class HealthCheckManager:
         query = query.group_by(HealthStatus.status)
 
         result = {
-            'healthy': 0,
-            'corrupted': 0,
-            'warning': 0,
-            'unchecked': 0,
-            'checking': 0,
-            'total': 0,
+            "healthy": 0,
+            "corrupted": 0,
+            "warning": 0,
+            "unchecked": 0,
+            "checking": 0,
+            "total": 0,
         }
 
         for row in query:
@@ -214,12 +216,13 @@ class HealthCheckManager:
             count = row.count
             if status in result:
                 result[status] = count
-            result['total'] += count
+            result["total"] += count
 
         return result
 
-    def get_health_statuses_paginated(self, start=0, length=10, search_value=None,
-                                       library_id=None, status_filter=None, order=None):
+    def get_health_statuses_paginated(
+        self, start=0, length=10, search_value=None, library_id=None, status_filter=None, order=None
+    ):
         """
         Get paginated health status records.
 
@@ -242,15 +245,15 @@ class HealthCheckManager:
         records_total = records_total_query.count()
         records_filtered = query.count()
 
-        ALLOWED_ORDER_COLUMNS = {'last_checked', 'abspath', 'status', 'check_mode', 'library_id', 'error_count'}
+        ALLOWED_ORDER_COLUMNS = {"last_checked", "abspath", "status", "check_mode", "library_id", "error_count"}
 
         if order:
-            col = order.get('column', 'last_checked')
-            direction = order.get('dir', 'desc')
+            col = order.get("column", "last_checked")
+            direction = order.get("dir", "desc")
             if col not in ALLOWED_ORDER_COLUMNS:
-                col = 'last_checked'
+                col = "last_checked"
             order_field = getattr(HealthStatus, col, HealthStatus.last_checked)
-            query = query.order_by(order_field.asc()) if direction == 'asc' else query.order_by(order_field.desc())
+            query = query.order_by(order_field.asc()) if direction == "asc" else query.order_by(order_field.desc())
         else:
             query = query.order_by(HealthStatus.last_checked.desc())
 
@@ -259,24 +262,26 @@ class HealthCheckManager:
 
         results = []
         for row in query:
-            results.append({
-                'id': row.id,
-                'abspath': row.abspath,
-                'library_id': row.library_id,
-                'status': row.status,
-                'check_mode': row.check_mode or '',
-                'error_detail': row.error_detail or '',
-                'last_checked': str(row.last_checked) if row.last_checked else '',
-                'error_count': row.error_count,
-            })
+            results.append(
+                {
+                    "id": row.id,
+                    "abspath": row.abspath,
+                    "library_id": row.library_id,
+                    "status": row.status,
+                    "check_mode": row.check_mode or "",
+                    "error_detail": row.error_detail or "",
+                    "last_checked": str(row.last_checked) if row.last_checked else "",
+                    "error_count": row.error_count,
+                }
+            )
 
         return {
-            'recordsTotal': records_total,
-            'recordsFiltered': records_filtered,
-            'results': results,
+            "recordsTotal": records_total,
+            "recordsFiltered": records_filtered,
+            "results": results,
         }
 
-    def schedule_library_scan(self, library_id, mode='quick'):
+    def schedule_library_scan(self, library_id, mode="quick"):
         """
         Start a background scan of all files in a library.
 
@@ -301,9 +306,9 @@ class HealthCheckManager:
     def _scan_worker(self, worker_id, file_queue, library_id, mode):
         """Worker thread that pulls files from the queue and checks them."""
         with HealthCheckManager._lock:
-            HealthCheckManager._scan_progress['workers'][worker_id] = {
-                'status': 'idle',
-                'current_file': '',
+            HealthCheckManager._scan_progress["workers"][worker_id] = {
+                "status": "idle",
+                "current_file": "",
             }
 
         while True:
@@ -318,9 +323,9 @@ class HealthCheckManager:
                 break
 
             with HealthCheckManager._lock:
-                HealthCheckManager._scan_progress['workers'][worker_id] = {
-                    'status': 'checking',
-                    'current_file': filepath,
+                HealthCheckManager._scan_progress["workers"][worker_id] = {
+                    "status": "checking",
+                    "current_file": filepath,
                 }
 
             try:
@@ -329,27 +334,28 @@ class HealthCheckManager:
                 self.logger.error("Health check failed for %s: %s", filepath, str(e))
 
             with HealthCheckManager._lock:
-                HealthCheckManager._scan_progress['checked'] += 1
-                checked = HealthCheckManager._scan_progress['checked']
-                start_time = HealthCheckManager._scan_progress['start_time']
-                total = HealthCheckManager._scan_progress['total']
+                HealthCheckManager._scan_progress["checked"] += 1
+                checked = HealthCheckManager._scan_progress["checked"]
+                start_time = HealthCheckManager._scan_progress["start_time"]
+                total = HealthCheckManager._scan_progress["total"]
                 if start_time and checked > 0:
                     elapsed = time.time() - start_time
                     fps = checked / elapsed if elapsed > 0 else 0.0
-                    HealthCheckManager._scan_progress['files_per_second'] = round(fps, 2)
+                    HealthCheckManager._scan_progress["files_per_second"] = round(fps, 2)
                     remaining = total - checked
-                    HealthCheckManager._scan_progress['eta_seconds'] = int(remaining / fps) if fps > 0 else 0
+                    HealthCheckManager._scan_progress["eta_seconds"] = int(remaining / fps) if fps > 0 else 0
 
         with HealthCheckManager._lock:
-            HealthCheckManager._scan_progress['workers'][worker_id] = {
-                'status': 'idle',
-                'current_file': '',
+            HealthCheckManager._scan_progress["workers"][worker_id] = {
+                "status": "idle",
+                "current_file": "",
             }
 
     def _run_library_scan(self, library_id, mode):
         """Run library scan in background thread using a worker pool."""
         try:
             from compresso.libs.unmodels import Libraries
+
             try:
                 library = Libraries.get_by_id(library_id)
                 library_path = library.path
@@ -359,9 +365,24 @@ class HealthCheckManager:
 
             # Collect media files
             media_extensions = {
-                '.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm',
-                '.m4v', '.mpg', '.mpeg', '.ts', '.vob', '.3gp',
-                '.m2ts', '.mts', '.ogv', '.mxf', '.rmvb',
+                ".mkv",
+                ".mp4",
+                ".avi",
+                ".mov",
+                ".wmv",
+                ".flv",
+                ".webm",
+                ".m4v",
+                ".mpg",
+                ".mpeg",
+                ".ts",
+                ".vob",
+                ".3gp",
+                ".m2ts",
+                ".mts",
+                ".ogv",
+                ".mxf",
+                ".rmvb",
             }
 
             files_to_check = []
@@ -373,15 +394,15 @@ class HealthCheckManager:
 
             with HealthCheckManager._lock:
                 HealthCheckManager._scan_progress = {
-                    'total': len(files_to_check),
-                    'checked': 0,
-                    'library_id': library_id,
-                    'worker_count': 0,
-                    'max_workers': HealthCheckManager._worker_count_requested,
-                    'workers': {},
-                    'start_time': time.time(),
-                    'files_per_second': 0.0,
-                    'eta_seconds': 0,
+                    "total": len(files_to_check),
+                    "checked": 0,
+                    "library_id": library_id,
+                    "worker_count": 0,
+                    "max_workers": HealthCheckManager._worker_count_requested,
+                    "workers": {},
+                    "start_time": time.time(),
+                    "files_per_second": 0.0,
+                    "eta_seconds": 0,
                 }
 
             self.logger.info("Health scan: checking %d files in library %s", len(files_to_check), library_id)
@@ -408,7 +429,7 @@ class HealthCheckManager:
                 workers.append(t)
 
             with HealthCheckManager._lock:
-                HealthCheckManager._scan_progress['worker_count'] = initial_count
+                HealthCheckManager._scan_progress["worker_count"] = initial_count
 
             next_worker_id = initial_count
 
@@ -429,8 +450,8 @@ class HealthCheckManager:
                 with HealthCheckManager._lock:
                     requested = HealthCheckManager._worker_count_requested
                     current_alive = sum(1 for t in workers if t.is_alive())
-                    HealthCheckManager._scan_progress['worker_count'] = current_alive
-                    HealthCheckManager._scan_progress['max_workers'] = requested
+                    HealthCheckManager._scan_progress["worker_count"] = current_alive
+                    HealthCheckManager._scan_progress["max_workers"] = requested
 
                 # Spawn more workers if requested count increased and queue has items
                 if current_alive < requested and not file_queue.empty():
@@ -473,6 +494,7 @@ class HealthCheckManager:
     @classmethod
     def get_scan_progress(cls):
         import copy
+
         with cls._lock:
             return copy.deepcopy(cls._scan_progress)
 

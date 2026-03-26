@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.common.py
+compresso.common.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     06 Dec 2018, (7:21 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     06 Dec 2018, (7:21 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import copy
 import datetime
 import hashlib
@@ -41,12 +42,12 @@ import xxhash
 
 from compresso.libs.logs import CompressoLogging
 
-logger = CompressoLogging.get_logger('common')
+logger = CompressoLogging.get_logger("common")
 
 
 def get_home_dir():
     # Attempt to get the HOME_DIR environment variable
-    home_dir = os.environ.get('HOME_DIR')
+    home_dir = os.environ.get("HOME_DIR")
     # If HOME_DIR is unset/empty, expand ~; otherwise resolve tilde and relative paths to absolute.
     home_dir = os.path.expanduser("~") if not home_dir else os.path.abspath(os.path.expanduser(home_dir))
     return home_dir
@@ -55,29 +56,29 @@ def get_home_dir():
 def get_default_root_path():
     root = os.path.join(os.sep)
     if os.name == "nt":
-        root = os.path.join('c:', os.sep)
+        root = os.path.join("c:", os.sep)
     return root
 
 
 def get_default_library_path():
-    library_path = os.path.join(get_default_root_path(), 'library')
+    library_path = os.path.join(get_default_root_path(), "library")
     if sys.platform == "darwin":
-        library_path = os.path.join(os.path.expanduser("~"), 'Movies')
+        library_path = os.path.join(os.path.expanduser("~"), "Movies")
     elif os.name == "nt":
-        library_path = os.path.join(os.path.expandvars(r'%USERPROFILE%'), 'Documents')
+        library_path = os.path.join(os.path.expandvars(r"%USERPROFILE%"), "Documents")
     return library_path
 
 
 def get_default_cache_path():
-    cache_path = os.path.join(get_default_root_path(), 'tmp', 'compresso')
+    cache_path = os.path.join(get_default_root_path(), "tmp", "compresso")
     if sys.platform == "darwin":
-        cache_path = os.path.join(os.path.expanduser("~"), 'Library', 'Caches', 'Compresso')
+        cache_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "Compresso")
     elif os.name == "nt":
-        cache_path = os.path.join(os.path.expandvars(r'%LOCALAPPDATA%\Temp'), 'Compresso')
+        cache_path = os.path.join(os.path.expandvars(r"%LOCALAPPDATA%\Temp"), "Compresso")
     return cache_path
 
 
-def format_message(message, message2=''):
+def format_message(message, message2=""):
     message = str(message)
     if message2:
         # Message2 can support other objects:
@@ -85,6 +86,7 @@ def format_message(message, message2=''):
             message = f"{message} - {str(message2)}"
         elif isinstance(message2, (dict, list)):
             import pprint
+
             message2 = pprint.pformat(message2, indent=1)
             message = f"{message} \n{str(message2)}"
         else:
@@ -115,11 +117,11 @@ def make_timestamp_human_readable(ts):
     # Create a dictionary of units
     delta = abs(delta)
     d = {
-        "year":        int(delta.days / 365),
-        "day":         int(delta.days % 365),
-        "hour":        int(delta.seconds / 3600),
-        "minute":      int(delta.seconds / 60) % 60,
-        "second":      delta.seconds % 60,
+        "year": int(delta.days / 365),
+        "day": int(delta.days % 365),
+        "hour": int(delta.seconds / 3600),
+        "minute": int(delta.seconds / 60) % 60,
+        "second": delta.seconds % 60,
         "millisecond": delta.microseconds / 1000,
         "microsecond": delta.microseconds % 1000,
     }
@@ -148,7 +150,7 @@ def ensure_dir(file_path):
 
 
 def time_string_to_seconds(time_string):
-    pt = datetime.datetime.strptime(time_string, '%H:%M:%S.%f')
+    pt = datetime.datetime.strptime(time_string, "%H:%M:%S.%f")
     return pt.second + pt.minute * 60 + pt.hour * 3600
 
 
@@ -159,7 +161,7 @@ def tail(f, n, offset=0):
     while 1:
         try:
             f.seek(-(avg_line_length * to_read), 2)
-            while f.read(1) != b'\n':
+            while f.read(1) != b"\n":
                 f.seek(-2, os.SEEK_CUR)
         except OSError:
             f.seek(0)
@@ -174,8 +176,7 @@ def touch(fname, mode=0o666, dir_fd=None, **kwargs):
     """Touch a file. If it does not exist, create it."""
     flags = os.O_CREAT | os.O_APPEND
     with os.fdopen(os.open(fname, flags=flags, mode=mode, dir_fd=dir_fd)) as f:
-        os.utime(f.fileno() if os.utime in os.supports_fd else fname,
-                 dir_fd=None if os.supports_fd else dir_fd, **kwargs)
+        os.utime(f.fileno() if os.utime in os.supports_fd else fname, dir_fd=None if os.supports_fd else dir_fd, **kwargs)
 
 
 def clean_files_in_cache_dir(cache_directory):
@@ -200,7 +201,7 @@ def clean_files_in_cache_dir(cache_directory):
 def random_string(string_length=5):
     """Generate a random string of fixed length"""
     letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(string_length))  # noqa: S311 — not used for security/crypto
+    return "".join(random.choice(letters) for i in range(string_length))  # noqa: S311 — not used for security/crypto
 
 
 def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
@@ -210,30 +211,27 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
     import tempfile
     import time
 
-    result = {
-        'errors':  [],
-        'success': False
-    }
+    result = {"errors": [], "success": False}
 
     # If check param is flagged and there already exists a out file, create a temporary backup
     if rollback_on_fail and os.path.exists(out_file):
         temp_dir = tempfile.gettempdir()
-        temp_path = os.path.join(temp_dir, f'json_dump_to_file_backup-{time.time()}')
+        temp_path = os.path.join(temp_dir, f"json_dump_to_file_backup-{time.time()}")
         try:
             shutil.copy2(out_file, temp_path)
-            result['temp_path'] = temp_path
+            result["temp_path"] = temp_path
         except Exception as e:
-            result['success'] = False
-            result['errors'].append(f"Failed to create temporary file - {str(e)}")
+            result["success"] = False
+            result["errors"].append(f"Failed to create temporary file - {str(e)}")
 
     # Write data to out_file
     try:
-        with open(out_file, 'w') as outfile:
+        with open(out_file, "w") as outfile:
             json.dump(json_data, outfile, sort_keys=True, indent=4)
-        result['success'] = True
+        result["success"] = True
     except Exception as e:
-        result['success'] = False
-        result['errors'].append(f"Exception in writing to file: {str(e)}")
+        result["success"] = False
+        result["errors"].append(f"Exception in writing to file: {str(e)}")
 
     # If check param is flagged, ensure json data exists in the output file
     if check:
@@ -241,25 +239,25 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
             with open(out_file) as infile:
                 json_data = json.load(infile)
         except Exception as e:
-            result['success'] = False
-            result['errors'].append(f"JSON file invalid - {e}")
+            result["success"] = False
+            result["errors"].append(f"JSON file invalid - {e}")
 
     # If data save was unsuccessful and the rollback_on_fail param is flagged and there
     #   is a temp file set, roll back to old file. Otherwise, just delete the temp file.
-    if rollback_on_fail and result.get('temp_path'):
-        if not result.get('success'):
+    if rollback_on_fail and result.get("temp_path"):
+        if not result.get("success"):
             try:
                 os.remove(out_file)
-                shutil.copy2(result.get('temp_path'), out_file)
-                os.remove(result.get('temp_path'))
+                shutil.copy2(result.get("temp_path"), out_file)
+                os.remove(result.get("temp_path"))
             except Exception as e:
-                result['success'] = False
-                result['errors'].append(f"Exception while restoring original file file: {str(e)}")
+                result["success"] = False
+                result["errors"].append(f"Exception while restoring original file file: {str(e)}")
         else:
             try:
-                os.remove(result.get('temp_path'))
+                os.remove(result.get("temp_path"))
             except Exception as e:
-                logger.debug("Failed to remove temp file %s: %s", result.get('temp_path'), e)
+                logger.debug("Failed to remove temp file %s: %s", result.get("temp_path"), e)
 
     return result
 
@@ -273,9 +271,9 @@ def extract_video_codecs_from_file_properties(file_properties: dict):
     :return:
     """
     codecs = []
-    for stream in file_properties['streams']:
-        if stream['codec_type'] == 'video':
-            codecs.append(stream['codec_name'])
+    for stream in file_properties["streams"]:
+        if stream["codec_type"] == "video":
+            codecs.append(stream["codec_name"])
     return codecs
 
 
@@ -291,7 +289,7 @@ def get_file_checksum(path):
     """
     file_hash = hashlib.md5()  # noqa: S324 — used for file fingerprinting, not security
     with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b''):
+        for chunk in iter(lambda: f.read(8192), b""):
             file_hash.update(chunk)
     return copy.copy(file_hash.hexdigest())
 
@@ -314,25 +312,25 @@ def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
     """
     algos = {
         "sampled_sha256_v1": {
-            "sample_size":     8 * 1024 * 1024,
-            "sample_count":    10,
+            "sample_size": 8 * 1024 * 1024,
+            "sample_count": 10,
             "full_hash_limit": 100 * 1024 * 1024,
-            "fallback_algo":   "full_sha256_v1",
+            "fallback_algo": "full_sha256_v1",
         },
         "full_sha256_v1": {
-            "sample_size":     None,
-            "sample_count":    None,
+            "sample_size": None,
+            "sample_count": None,
             "full_hash_limit": 0,
         },
         "sampled_xxhash_v1": {
-            "sample_size":     8 * 1024 * 1024,
-            "sample_count":    10,
+            "sample_size": 8 * 1024 * 1024,
+            "sample_count": 10,
             "full_hash_limit": 100 * 1024 * 1024,
-            "fallback_algo":   "full_xxhash_v1",
+            "fallback_algo": "full_xxhash_v1",
         },
         "full_xxhash_v1": {
-            "sample_size":     None,
-            "sample_count":    None,
+            "sample_size": None,
+            "sample_count": None,
             "full_hash_limit": 0,
         },
     }
@@ -349,7 +347,7 @@ def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
 
     file_hash_obj = xxhash.xxh64() if actual_algo_to_use in ["full_xxhash_v1", "sampled_xxhash_v1"] else hashlib.sha256()
 
-    file_hash_obj.update(str(file_size).encode('utf-8'))
+    file_hash_obj.update(str(file_size).encode("utf-8"))
 
     perform_full_hash = False
     if actual_algo_to_use in ["full_sha256_v1", "full_xxhash_v1"]:
@@ -357,7 +355,7 @@ def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
 
     if perform_full_hash:
         with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b''):
+            for chunk in iter(lambda: f.read(8192), b""):
                 file_hash_obj.update(chunk)
         return file_hash_obj.hexdigest(), actual_algo_to_use
 

@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.settings.py
+compresso.settings.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     16 Mar 2021, (7:14 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     16 Mar 2021, (7:14 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import contextlib
 import json
 import os
@@ -42,6 +43,7 @@ class PluginSettings:
     to be configured by users from within the Compresso WebUI.
 
     """
+
     settings: dict = {}
 
     """
@@ -64,7 +66,7 @@ class PluginSettings:
     library_id = None
 
     def __init__(self, *args, **kwargs):
-        self.library_id = kwargs.get('library_id')
+        self.library_id = kwargs.get("library_id")
         # If the given library is not None, ensure that it is a number
         if self.library_id:
             try:
@@ -77,19 +79,19 @@ class PluginSettings:
         profile_directory = self.get_profile_directory()
         # Legacy migration: move settings.json from plugin dir to profile dir
         # TODO(v2.0): Remove this migration shim
-        if not os.path.exists(os.path.join(profile_directory, 'settings.json')) and os.path.exists(os.path.join(plugin_directory, 'settings.json')):  # noqa: E501
+        if not os.path.exists(os.path.join(profile_directory, "settings.json")) and os.path.exists(
+            os.path.join(plugin_directory, "settings.json")
+        ):  # noqa: E501
             import shutil
-            shutil.move(
-                os.path.join(plugin_directory, 'settings.json'),
-                os.path.join(profile_directory, 'settings.json')
-            )
+
+            shutil.move(os.path.join(plugin_directory, "settings.json"), os.path.join(profile_directory, "settings.json"))
         # If provided with a library ID, then the settings file will be different
-        plugin_settings_file = os.path.join(profile_directory, 'settings.json')
+        plugin_settings_file = os.path.join(profile_directory, "settings.json")
         if self.library_id:
-            plugin_settings_file = os.path.join(profile_directory, f'settings.{self.library_id}.json')
+            plugin_settings_file = os.path.join(profile_directory, f"settings.{self.library_id}.json")
             if not os.path.exists(plugin_settings_file) and not force_library_settings:
                 # If the library file does not yet exist, then resort to using the default settings file
-                plugin_settings_file = os.path.join(profile_directory, 'settings.json')
+                plugin_settings_file = os.path.join(profile_directory, "settings.json")
         return plugin_settings_file
 
     def __export_configured_settings(self):
@@ -100,7 +102,7 @@ class PluginSettings:
         """
         plugin_settings_file = self.__get_plugin_settings_file(force_library_settings=True)
 
-        with open(plugin_settings_file, 'w') as f:
+        with open(plugin_settings_file, "w") as f:
             json.dump(self.settings_configured, f, indent=2)
 
     def __import_configured_settings(self):
@@ -144,7 +146,7 @@ class PluginSettings:
 
         # If the settings file returned is the global settings file and this was called on a library config,
         # do not reset the config.
-        if self.library_id is not None and os.path.basename(plugin_settings_file) == 'settings.json':
+        if self.library_id is not None and os.path.basename(plugin_settings_file) == "settings.json":
             return False
 
         # if the file does not yet exist, create it

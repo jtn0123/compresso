@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.uiserver.py
+compresso.uiserver.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     06 Dec 2018, (7:21 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     06 Dec 2018, (7:21 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import asyncio
 import logging
 import os
@@ -48,14 +49,14 @@ from compresso.webserver.downloads import DownloadsHandler
 
 public_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "webserver", "public"))
 tornado_settings = {
-    'template_loader': tornado.template.Loader(public_directory),
-    'static_css':      os.path.join(public_directory, "css"),
-    'static_fonts':    os.path.join(public_directory, "fonts"),
-    'static_icons':    os.path.join(public_directory, "icons"),
-    'static_img':      os.path.join(public_directory, "img"),
-    'static_js':       os.path.join(public_directory, "js"),
-    'debug':           True,
-    'autoreload':      False,
+    "template_loader": tornado.template.Loader(public_directory),
+    "static_css": os.path.join(public_directory, "css"),
+    "static_fonts": os.path.join(public_directory, "fonts"),
+    "static_icons": os.path.join(public_directory, "icons"),
+    "static_img": os.path.join(public_directory, "img"),
+    "static_js": os.path.join(public_directory, "js"),
+    "debug": True,
+    "autoreload": False,
 }
 
 
@@ -93,7 +94,7 @@ class UIServer(threading.Thread):
     app = None
 
     def __init__(self, compresso_data_queues, foreman, developer):
-        super().__init__(name='UIServer')
+        super().__init__(name="UIServer")
         self.config = config.Config()
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
 
@@ -108,13 +109,9 @@ class UIServer(threading.Thread):
         udq = CompressoDataQueues()
         udq.set_compresso_data_queues(compresso_data_queues)
         urt = CompressoRunningThreads()
-        urt.set_compresso_running_threads(
-            {
-                'foreman': foreman
-            }
-        )
+        urt.set_compresso_running_threads({"foreman": foreman})
 
-    def _log(self, message, message2='', level="info"):
+    def _log(self, message, message2="", level="info"):
         message = common.format_message(message, message2)
         getattr(self.logger, level)(message)
 
@@ -132,9 +129,8 @@ class UIServer(threading.Thread):
                 os.makedirs(self.config.get_log_path())
 
             # Create file handler
-            log_file = os.path.join(self.config.get_log_path(), 'tornado.log')
-            file_handler = logging.handlers.TimedRotatingFileHandler(log_file, when='midnight', interval=1,
-                                                                     backupCount=7)
+            log_file = os.path.join(self.config.get_log_path(), "tornado.log")
+            file_handler = logging.handlers.TimedRotatingFileHandler(log_file, when="midnight", interval=1, backupCount=7)
             file_handler.setLevel(logging.INFO)
 
             # Set tornado.access logging to file. Disable propagation of logs
@@ -167,8 +163,8 @@ class UIServer(threading.Thread):
     def update_tornado_settings(self):
         # Check if this is a development environment or not
         if self.developer:
-            tornado_settings['autoreload'] = True
-            tornado_settings['serve_traceback'] = True
+            tornado_settings["autoreload"] = True
+            tornado_settings["serve_traceback"] = True
 
     def run(self):
         asyncio.set_event_loop(asyncio.new_event_loop())
@@ -213,8 +209,8 @@ class UIServer(threading.Thread):
 
             self.server.listen(int(self.config.get_ui_port()), address=self.config.get_ui_address())
             StartupState().mark_ready(
-                'ui_server_ready',
-                detail="{}:{}".format(self.config.get_ui_address() or '0.0.0.0', self.config.get_ui_port()),  # noqa: S104
+                "ui_server_ready",
+                detail="{}:{}".format(self.config.get_ui_address() or "0.0.0.0", self.config.get_ui_port()),  # noqa: S104
             )
             self._log(f"UI_SERVER_READY port={self.config.get_ui_port()}", level="info")
 
@@ -222,11 +218,11 @@ class UIServer(threading.Thread):
             self.io_loop.start()
         except OSError as e:
             message = f"UI_SERVER_STARTUP_FAILED port={self.config.get_ui_port()} error={str(e)}"
-            StartupState().mark_error('ui_server_ready', message)
+            StartupState().mark_error("ui_server_ready", message)
             self._log(message, level="error")
         except Exception as e:
             message = f"UI_SERVER_STARTUP_FAILED error={str(e)}"
-            StartupState().mark_error('ui_server_ready', message)
+            StartupState().mark_error("ui_server_ready", message)
             self._log(message, level="error")
         finally:
             self.started = False
@@ -235,76 +231,74 @@ class UIServer(threading.Thread):
     def make_web_app(self):
         # Start with web application routes
         from compresso.webserver.websocket import CompressoWebsocketHandler
-        app = tornado.web.Application([
-            (r"/compresso/websocket", CompressoWebsocketHandler),
-            (r"/compresso/downloads/(.*)", DownloadsHandler),
-            (r"/(.*)", tornado.web.RedirectHandler, dict(
-                url="/compresso/ui/dashboard/"
-            )),
-        ], **tornado_settings)
+
+        app = tornado.web.Application(
+            [
+                (r"/compresso/websocket", CompressoWebsocketHandler),
+                (r"/compresso/downloads/(.*)", DownloadsHandler),
+                (r"/(.*)", tornado.web.RedirectHandler, dict(url="/compresso/ui/dashboard/")),
+            ],
+            **tornado_settings,
+        )
 
         # Add API routes
         from compresso.webserver.api_request_router import APIRequestRouter
-        app.add_handlers(r'.*', [
-            (
-                tornado.routing.PathMatches(r"/compresso/api/.*"),
-                APIRequestRouter(app)
-            ),
-        ])
+
+        app.add_handlers(
+            r".*",
+            [
+                (tornado.routing.PathMatches(r"/compresso/api/.*"), APIRequestRouter(app)),
+            ],
+        )
 
         # Add frontend routes
         from compresso.webserver.main import MainUIRequestHandler
-        app.add_handlers(r'.*', [
-            (r"/compresso/css/(.*)", tornado.web.StaticFileHandler, dict(
-                path=tornado_settings['static_css']
-            )),
-            (r"/compresso/fonts/(.*)", tornado.web.StaticFileHandler, dict(
-                path=tornado_settings['static_fonts']
-            )),
-            (r"/compresso/icons/(.*)", tornado.web.StaticFileHandler, dict(
-                path=tornado_settings['static_icons']
-            )),
-            (r"/compresso/img/(.*)", tornado.web.StaticFileHandler, dict(
-                path=tornado_settings['static_img']
-            )),
-            (r"/compresso/js/(.*)", tornado.web.StaticFileHandler, dict(
-                path=tornado_settings['static_js']
-            )),
-            (
-                tornado.routing.PathMatches(r"/compresso/ui/(.*)"),
-                MainUIRequestHandler,
-            ),
-        ])
+
+        app.add_handlers(
+            r".*",
+            [
+                (r"/compresso/css/(.*)", tornado.web.StaticFileHandler, dict(path=tornado_settings["static_css"])),
+                (r"/compresso/fonts/(.*)", tornado.web.StaticFileHandler, dict(path=tornado_settings["static_fonts"])),
+                (r"/compresso/icons/(.*)", tornado.web.StaticFileHandler, dict(path=tornado_settings["static_icons"])),
+                (r"/compresso/img/(.*)", tornado.web.StaticFileHandler, dict(path=tornado_settings["static_img"])),
+                (r"/compresso/js/(.*)", tornado.web.StaticFileHandler, dict(path=tornado_settings["static_js"])),
+                (
+                    tornado.routing.PathMatches(r"/compresso/ui/(.*)"),
+                    MainUIRequestHandler,
+                ),
+            ],
+        )
 
         # Add preview static file handler
-        preview_cache_dir = os.path.join(self.config.get_cache_path(), 'preview')
+        preview_cache_dir = os.path.join(self.config.get_cache_path(), "preview")
         os.makedirs(preview_cache_dir, exist_ok=True)
-        app.add_handlers(r'.*', [
-            (r"/compresso/preview/(.*)", tornado.web.StaticFileHandler, dict(
-                path=preview_cache_dir
-            )),
-        ])
+        app.add_handlers(
+            r".*",
+            [
+                (r"/compresso/preview/(.*)", tornado.web.StaticFileHandler, dict(path=preview_cache_dir)),
+            ],
+        )
 
         # Add widgets routes
         from compresso.webserver.plugins import DataPanelRequestHandler, PluginAPIRequestHandler, PluginStaticFileHandler
-        app.add_handlers(r'.*', [
-            (
-                tornado.routing.PathMatches(r"/compresso/panel/[^/]+(/(?!static/|assets$).*)?$"),
-                DataPanelRequestHandler
-            ),
-            (
-                tornado.routing.PathMatches(r"/compresso/plugin_api/[^/]+(/(?!static/|assets$).*)?$"),
-                PluginAPIRequestHandler
-            ),
-            (r"/compresso/panel/.*/static/(.*)", PluginStaticFileHandler, dict(
-                path=tornado_settings['static_img']
-            )),
-        ])
+
+        app.add_handlers(
+            r".*",
+            [
+                (tornado.routing.PathMatches(r"/compresso/panel/[^/]+(/(?!static/|assets$).*)?$"), DataPanelRequestHandler),
+                (
+                    tornado.routing.PathMatches(r"/compresso/plugin_api/[^/]+(/(?!static/|assets$).*)?$"),
+                    PluginAPIRequestHandler,
+                ),
+                (r"/compresso/panel/.*/static/(.*)", PluginStaticFileHandler, dict(path=tornado_settings["static_img"])),
+            ],
+        )
 
         if self.developer:
             self._log("API Docs - Updating...", level="debug")
             try:
                 from compresso.webserver.api_v2.schema.swagger import generate_swagger_file
+
                 errors = generate_swagger_file()
                 for error in errors:
                     self._log(error, level="warn")
@@ -316,11 +310,12 @@ class UIServer(threading.Thread):
         # Start the Swagger UI. Automatically generated swagger.json can also
         # be served using a separate Swagger-service.
         from swagger_ui import tornado_api_doc
+
         tornado_api_doc(
             app,
             config_path=os.path.join(os.path.dirname(__file__), "..", "webserver", "docs", "api_schema_v2.json"),
             url_prefix="/compresso/swagger",
-            title="Compresso application API"
+            title="Compresso application API",
         )
 
         return app

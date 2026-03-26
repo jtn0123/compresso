@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    tests.unit.test_session.py
+tests.unit.test_session.py
 
-    Unit tests for the Session class (all features unlocked, no remote API).
+Unit tests for the Session class (all features unlocked, no remote API).
 
 """
 
@@ -31,26 +31,29 @@ class TestSession:
         Creates an in-memory SQLite database and initialises
         the required tables so that Session can fetch installation data.
         """
-        config_path = tempfile.mkdtemp(prefix='compresso_tests_')
+        config_path = tempfile.mkdtemp(prefix="compresso_tests_")
 
         app_dir = os.path.dirname(os.path.abspath(__file__))
         database_settings = {
             "TYPE": "SQLITE",
-            "FILE": ':memory:',
-            "MIGRATIONS_DIR": os.path.join(app_dir, '..', 'migrations'),
+            "FILE": ":memory:",
+            "MIGRATIONS_DIR": os.path.join(app_dir, "..", "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
 
         # Create the Installation table (needed by Session.__fetch_installation_data)
         from compresso.libs.unmodels import Installation
+
         self.db_connection.create_tables([Installation])
 
         from compresso import config
+
         self.settings = config.Config(config_path=config_path)
 
         # Clear singleton cache so each test class gets a fresh Session
         from compresso.libs.session import Session
         from compresso.libs.singleton import SingletonType
+
         SingletonType._instances.pop(Session, None)
 
     def teardown_class(self):
@@ -59,6 +62,7 @@ class TestSession:
     def _make_session(self):
         """Create a fresh Session instance (singleton-cleared in setup_class)."""
         from compresso.libs.session import Session
+
         return Session()
 
     # ------------------------------------------------------------------
@@ -69,6 +73,7 @@ class TestSession:
     def test_default_level_is_100(self):
         """Session.level should be 100 by default (all features unlocked)."""
         from compresso.libs.session import Session
+
         assert Session.level == 100
 
     @pytest.mark.unittest
@@ -164,5 +169,5 @@ class TestSession:
         assert s.init_device_auth_flow() is False
 
 
-if __name__ == '__main__':
-    pytest.main(['-s', '--log-cli-level=INFO', __file__])
+if __name__ == "__main__":
+    pytest.main(["-s", "--log-cli-level=INFO", __file__])

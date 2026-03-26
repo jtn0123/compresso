@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 """
-    compresso.libraryanalysiscache.py
+compresso.libraryanalysiscache.py
 
-    Cache table for library analysis results (codec distribution,
-    estimated savings, etc.).
+Cache table for library analysis results (codec distribution,
+estimated savings, etc.).
 
 """
 
@@ -19,8 +19,9 @@ class LibraryAnalysisCache(BaseModel):
 
     Stores cached library analysis results per library.
     """
+
     library_id = IntegerField(index=True)
-    analysis_json = TextField(default='{}')
+    analysis_json = TextField(default="{}")
     file_count = IntegerField(default=0)
     last_run = DateTimeField(null=True)
     version = IntegerField(default=0)

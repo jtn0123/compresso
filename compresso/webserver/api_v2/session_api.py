@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.session_api.py
+compresso.session_api.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     10 Mar 2021, (7:14 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     10 Mar 2021, (7:14 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -48,29 +48,29 @@ class ApiSessionHandler(BaseApiHandler):
 
     routes = [
         {
-            "path_pattern":      r"/session/state",
+            "path_pattern": r"/session/state",
             "supported_methods": ["GET"],
-            "call_method":       "get_session_state",
+            "call_method": "get_session_state",
         },
         {
-            "path_pattern":      r"/session/reload",
+            "path_pattern": r"/session/reload",
             "supported_methods": ["POST"],
-            "call_method":       "session_reload",
+            "call_method": "session_reload",
         },
         {
-            "path_pattern":      r"/session/logout",
+            "path_pattern": r"/session/logout",
             "supported_methods": ["GET"],
-            "call_method":       "session_logout",
+            "call_method": "session_logout",
         },
         {
-            "path_pattern":      r"/session/get_app_auth_code",
+            "path_pattern": r"/session/get_app_auth_code",
             "supported_methods": ["GET"],
-            "call_method":       "get_app_auth_code",
+            "call_method": "get_app_auth_code",
         },
         {
-            "path_pattern":      r"/session/funding_proposals",
+            "path_pattern": r"/session/funding_proposals",
             "supported_methods": ["GET"],
-            "call_method":       "get_funding_proposals",
+            "call_method": "get_funding_proposals",
         },
     ]
 
@@ -127,21 +127,21 @@ class ApiSessionHandler(BaseApiHandler):
                 response = self.build_response(
                     SessionStateSuccessSchema(),
                     {
-                        "level":       self.session.level,
+                        "level": self.session.level,
                         "picture_uri": self.session.picture_uri,
-                        "name":        self.session.name,
-                        "email":       self.session.email,
-                        "created":     self.session.created,
-                        "uuid":        self.session.uuid,
-                    }
+                        "name": self.session.name,
+                        "email": self.session.email,
+                        "created": self.session.created,
+                        "uuid": self.session.uuid,
+                    },
                 )
                 self.write_success(response)
                 return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
+            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -191,10 +191,10 @@ class ApiSessionHandler(BaseApiHandler):
                 self.write_success()
                 return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
+            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -244,10 +244,10 @@ class ApiSessionHandler(BaseApiHandler):
                 self.write_success()
                 return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
+            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -308,28 +308,24 @@ class ApiSessionHandler(BaseApiHandler):
                 self.logger.info("Cancelling the running poll task and starting a new one.")
                 self.session.token_poll_task.cancel()
             self.session.token_poll_task = current_loop.run_in_executor(
-                None,
-                self.session.poll_for_app_token,
-                device_code,
-                interval,
-                expires_in
+                None, self.session.poll_for_app_token, device_code, interval, expires_in
             )
 
             response = self.build_response(
                 SessionAuthCodeSchema(),
                 {
-                    "user_code":                 user_code,
-                    "device_code":               device_code,
-                    "verification_uri":          verification_uri,
+                    "user_code": user_code,
+                    "device_code": device_code,
+                    "verification_uri": verification_uri,
                     "verification_uri_complete": verification_uri_complete,
-                    "expires_in":                expires_in,
-                }
+                    "expires_in": expires_in,
+                },
             )
             self.write_success(response)
             return
 
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -389,9 +385,9 @@ class ApiSessionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get('call_method'), str(bae))
+            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

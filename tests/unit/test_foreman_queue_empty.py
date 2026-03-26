@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 """
-    tests.unit.test_foreman_queue_empty.py
+tests.unit.test_foreman_queue_empty.py
 
-    Unit tests for the queue_empty notification dispatch in Foreman.run().
-    Tests the queue transition logic:
-    - Transition from active to empty dispatches 'queue_empty'
-    - Queue staying empty does not re-dispatch
-    - Transition from empty to active resets the flag
+Unit tests for the queue_empty notification dispatch in Foreman.run().
+Tests the queue transition logic:
+- Transition from active to empty dispatches 'queue_empty'
+- Queue staying empty does not re-dispatch
+- Transition from empty to active resets the flag
 """
 
 from unittest.mock import MagicMock, patch
@@ -17,12 +17,15 @@ import pytest
 
 def _make_foreman():
     """Create a Foreman instance with mocked dependencies."""
-    with patch('compresso.libs.foreman.WorkerGroup'), \
-         patch('compresso.libs.foreman.installation_link'), \
-         patch('compresso.libs.foreman.PluginsHandler'), \
-         patch('compresso.libs.foreman.CompressoLogging'), \
-         patch('compresso.libs.foreman.Foreman.configuration_changed', return_value=False):
+    with (
+        patch("compresso.libs.foreman.WorkerGroup"),
+        patch("compresso.libs.foreman.installation_link"),
+        patch("compresso.libs.foreman.PluginsHandler"),
+        patch("compresso.libs.foreman.CompressoLogging"),
+        patch("compresso.libs.foreman.Foreman.configuration_changed", return_value=False),
+    ):
         from compresso.libs.foreman import Foreman
+
         settings = MagicMock()
         settings.get_remote_installations.return_value = []
         data_queues = {}
@@ -35,6 +38,7 @@ def _make_foreman():
 # ------------------------------------------------------------------
 # TestQueueEmptyNotification
 # ------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestQueueEmptyNotification:
@@ -54,25 +58,23 @@ class TestQueueEmptyNotification:
         _was_queue_active = True
         queue_has_tasks = not foreman.task_queue.task_list_pending_is_empty()
         any_workers_busy = any(
-            not foreman.worker_threads[t].idle
-            for t in foreman.worker_threads
-            if foreman.worker_threads[t].is_alive()
+            not foreman.worker_threads[t].idle for t in foreman.worker_threads if foreman.worker_threads[t].is_alive()
         )
         any_remote_workers_busy = any(
-            foreman.remote_task_manager_threads[t].is_alive()
-            for t in foreman.remote_task_manager_threads
+            foreman.remote_task_manager_threads[t].is_alive() for t in foreman.remote_task_manager_threads
         )
         queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
 
-        with patch('compresso.libs.external_notifications.ExternalNotificationDispatcher') as mock_dispatcher_cls:
+        with patch("compresso.libs.external_notifications.ExternalNotificationDispatcher") as mock_dispatcher_cls:
             mock_dispatcher = MagicMock()
             mock_dispatcher_cls.return_value = mock_dispatcher
 
             if _was_queue_active and not queue_is_active:
                 from compresso.libs.external_notifications import ExternalNotificationDispatcher
-                ExternalNotificationDispatcher().dispatch('queue_empty', {})
 
-            mock_dispatcher.dispatch.assert_called_once_with('queue_empty', {})
+                ExternalNotificationDispatcher().dispatch("queue_empty", {})
+
+            mock_dispatcher.dispatch.assert_called_once_with("queue_empty", {})
 
     def test_empty_staying_empty_does_not_redispatch(self):
         """When queue was already empty and stays empty, should not dispatch again."""
@@ -121,17 +123,14 @@ class TestQueueEmptyNotification:
         mock_worker = MagicMock()
         mock_worker.idle = False
         mock_worker.is_alive.return_value = True
-        foreman.worker_threads = {'w1': mock_worker}
+        foreman.worker_threads = {"w1": mock_worker}
 
         queue_has_tasks = not foreman.task_queue.task_list_pending_is_empty()
         any_workers_busy = any(
-            not foreman.worker_threads[t].idle
-            for t in foreman.worker_threads
-            if foreman.worker_threads[t].is_alive()
+            not foreman.worker_threads[t].idle for t in foreman.worker_threads if foreman.worker_threads[t].is_alive()
         )
         any_remote_workers_busy = any(
-            foreman.remote_task_manager_threads[t].is_alive()
-            for t in foreman.remote_task_manager_threads
+            foreman.remote_task_manager_threads[t].is_alive() for t in foreman.remote_task_manager_threads
         )
         queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
 
@@ -147,12 +146,10 @@ class TestQueueEmptyNotification:
         mock_worker = MagicMock()
         mock_worker.idle = False
         mock_worker.is_alive.return_value = False  # dead thread
-        foreman.worker_threads = {'w1': mock_worker}
+        foreman.worker_threads = {"w1": mock_worker}
 
         any_workers_busy = any(
-            not foreman.worker_threads[t].idle
-            for t in foreman.worker_threads
-            if foreman.worker_threads[t].is_alive()
+            not foreman.worker_threads[t].idle for t in foreman.worker_threads if foreman.worker_threads[t].is_alive()
         )
 
         assert any_workers_busy is False
@@ -166,22 +163,19 @@ class TestQueueEmptyNotification:
 
         mock_remote = MagicMock()
         mock_remote.is_alive.return_value = True
-        foreman.remote_task_manager_threads = {'r1': mock_remote}
+        foreman.remote_task_manager_threads = {"r1": mock_remote}
 
         queue_has_tasks = not foreman.task_queue.task_list_pending_is_empty()
         any_workers_busy = any(
-            not foreman.worker_threads[t].idle
-            for t in foreman.worker_threads
-            if foreman.worker_threads[t].is_alive()
+            not foreman.worker_threads[t].idle for t in foreman.worker_threads if foreman.worker_threads[t].is_alive()
         )
         any_remote_workers_busy = any(
-            foreman.remote_task_manager_threads[t].is_alive()
-            for t in foreman.remote_task_manager_threads
+            foreman.remote_task_manager_threads[t].is_alive() for t in foreman.remote_task_manager_threads
         )
         queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
 
         assert queue_is_active is True
 
 
-if __name__ == '__main__':
-    pytest.main(['-s', '--log-cli-level=INFO', __file__])
+if __name__ == "__main__":
+    pytest.main(["-s", "--log-cli-level=INFO", __file__])

@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.unlogger.py
+compresso.unlogger.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     06 Jan 2019, (8:41 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     06 Jan 2019, (8:41 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -55,33 +55,33 @@ class ForwardJSONFormatter(JSONFormatter):
         # Check the logger's effective level
         logger = logging.getLogger(record.name)
         # Always include levelname used for labels
-        extra['levelname'] = record.levelname
+        extra["levelname"] = record.levelname
         # If the logger's effective level is DEBUG, add more context
         if logger.getEffectiveLevel() == logging.DEBUG:
-            extra['filename'] = record.filename
-            extra['funcName'] = record.funcName
-            extra['lineno'] = record.lineno
-            extra['module'] = record.module
-            extra['name'] = record.name
-            extra['pathname'] = record.pathname
-            extra['process'] = record.process
-            extra['processName'] = record.processName
-            if hasattr(record, 'stack_info'):
-                extra['stack_info'] = record.stack_info
+            extra["filename"] = record.filename
+            extra["funcName"] = record.funcName
+            extra["lineno"] = record.lineno
+            extra["module"] = record.module
+            extra["name"] = record.name
+            extra["pathname"] = record.pathname
+            extra["process"] = record.process
+            extra["processName"] = record.processName
+            if hasattr(record, "stack_info"):
+                extra["stack_info"] = record.stack_info
             else:
-                extra['stack_info'] = None
-            extra['thread'] = record.thread
-            extra['threadName'] = record.threadName
+                extra["stack_info"] = None
+            extra["thread"] = record.thread
+            extra["threadName"] = record.threadName
         # Choose time from metric_timestamp or data_timestamp
-        ts_str = extra.get('metric_timestamp') or extra.get('data_timestamp')
+        ts_str = extra.get("metric_timestamp") or extra.get("data_timestamp")
         if ts_str:
             try:
                 ts_float = float(ts_str)
-                extra['time'] = datetime.fromtimestamp(ts_float, tz=UTC).isoformat()
+                extra["time"] = datetime.fromtimestamp(ts_float, tz=UTC).isoformat()
             except (ValueError, TypeError, OverflowError, OSError):
                 pass  # Ignore this. The default formatter will add a "time" record
-        if 'time' not in extra:
-            extra['time'] = datetime.now(tz=UTC)
+        if "time" not in extra:
+            extra["time"] = datetime.now(tz=UTC)
         return super().json_record(message, extra, record)
 
 
@@ -140,8 +140,7 @@ class ForwardLogHandler(logging.Handler):
         except (TypeError, ValueError):
             if max_days is not None:
                 logging.getLogger("Compresso.ForwardLogHandler").warning(
-                    "Invalid log buffer retention value %r. Falling back to default.",
-                    max_days
+                    "Invalid log buffer retention value %r. Falling back to default.", max_days
                 )
             max_days_int = None
 
@@ -171,11 +170,11 @@ class ForwardLogHandler(logging.Handler):
 
             # Set default labels
             labels = {
-                "service_name":      "compresso",  # This is a required label
-                "logger":            record.name,
-                "level":             record.levelname,
+                "service_name": "compresso",  # This is a required label
+                "logger": record.name,
+                "level": record.levelname,
                 "installation_name": self.installation_name,
-                "log_type":          "APPLICATION_LOG",
+                "log_type": "APPLICATION_LOG",
             }
 
             # If the record has a log_type attribute, override
@@ -191,10 +190,7 @@ class ForwardLogHandler(logging.Handler):
                 labels["data_primary_key"] = record.data_primary_key
 
             with contextlib.suppress(Full):
-                self.log_queue.put_nowait({
-                    "labels": labels,
-                    "entry":  [ts, log_entry]
-                })
+                self.log_queue.put_nowait({"labels": labels, "entry": [ts, log_entry]})
         except (ValueError, TypeError, AttributeError, OSError) as e:
             logging.getLogger("Compresso.ForwardLogHandler").error("Failed to enqueue log: %s", e)
 
@@ -204,7 +200,6 @@ class ForwardLogHandler(logging.Handler):
         last_flush = time.monotonic()
 
         while not self.stop_event.is_set():
-
             try:
                 log_entry = self.log_queue.get(timeout=0.2)
                 if log_entry is None:
@@ -478,7 +473,7 @@ class ForwardLogHandler(logging.Handler):
                     return processed
 
                 if not self._transmit_buffer(sub_entries, "in-memory chunk", payload):
-                    remaining = list(sub_entries) + chunk[index + consumed:]
+                    remaining = list(sub_entries) + chunk[index + consumed :]
                     if remaining:
                         with contextlib.suppress(Empty, Full):
                             self._in_memory_chunks.put_nowait(list(remaining))
@@ -540,7 +535,7 @@ class ForwardLogHandler(logging.Handler):
         suffix = ".jsonl"
         if not filename.startswith(prefix) or not filename.endswith(suffix):
             return None
-        timestamp_str = filename[len(prefix):-len(suffix)]
+        timestamp_str = filename[len(prefix) : -len(suffix)]
         try:
             return datetime.strptime(timestamp_str, "%Y%m%dT%H")
         except ValueError:
@@ -559,7 +554,7 @@ class ForwardLogHandler(logging.Handler):
             return
 
         for start in range(0, len(pending), self._BATCH_MAX_ITEMS):
-            self._append_to_disk(pending[start:start + self._BATCH_MAX_ITEMS])
+            self._append_to_disk(pending[start : start + self._BATCH_MAX_ITEMS])
 
     def _load_buffer_state(self):
         """Read the persisted offsets mapping from disk, if present."""
@@ -569,8 +564,7 @@ class ForwardLogHandler(logging.Handler):
             with open(self._buffer_state_path, encoding="utf-8") as handle:
                 data = json.load(handle)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError, PermissionError):
-            logging.getLogger("Compresso.ForwardLogHandler").warning(
-                "Failed to load log buffer state. Starting fresh.")
+            logging.getLogger("Compresso.ForwardLogHandler").warning("Failed to load log buffer state. Starting fresh.")
             return {}
 
         files = data.get("files", {})
@@ -613,9 +607,7 @@ class ForwardLogHandler(logging.Handler):
         if not os.path.isdir(self.buffer_path):
             return
         existing = {
-            name
-            for name in os.listdir(self.buffer_path)
-            if name.startswith("log_buffer_") and name.endswith(".jsonl")
+            name for name in os.listdir(self.buffer_path) if name.startswith("log_buffer_") and name.endswith(".jsonl")
         }
         with self._state_lock:
             changed = False
@@ -662,25 +654,27 @@ class ForwardLogHandler(logging.Handler):
 
             if status_key not in self._notified_failures:
                 notifications = Notifications()
-                notifications.update({
-                    'uuid':       f'forwardLogHandlerError_{response.status_code}',
-                    'type':       'warning',
-                    'icon':       'report_problem',
-                    'label':      'forwardLogHandlerErrorLabel',
-                    'message':    message_text,
-                    'navigation': {
-                        'push': '/ui/settings-support',
-                    },
-                })
+                notifications.update(
+                    {
+                        "uuid": f"forwardLogHandlerError_{response.status_code}",
+                        "type": "warning",
+                        "icon": "report_problem",
+                        "label": "forwardLogHandlerErrorLabel",
+                        "message": message_text,
+                        "navigation": {
+                            "push": "/ui/settings-support",
+                        },
+                    }
+                )
 
                 frontend_messages = FrontendPushMessages()
                 frontend_messages.add(
                     {
-                        'id':      f'forwardLogHandlerError_{response.status_code}',
-                        'type':    'error',
-                        'code':    'forwardLogHandlerError',
-                        'message': message_text,
-                        'timeout': 20000
+                        "id": f"forwardLogHandlerError_{response.status_code}",
+                        "type": "error",
+                        "code": "forwardLogHandlerError",
+                        "message": message_text,
+                        "timeout": 20000,
                     }
                 )
                 logging.getLogger("Compresso.ForwardLogHandler").error(message_text)
@@ -699,7 +693,7 @@ class ForwardLogHandler(logging.Handler):
                 exc,
             )
             self.previous_connection_failed = True
-            self._notified_failures.add('EXCEPTION')
+            self._notified_failures.add("EXCEPTION")
         return False
 
     def _create_payload(self, buffer):
@@ -716,7 +710,7 @@ class ForwardLogHandler(logging.Handler):
 
         return {
             "app_id": self.app_id,
-            "data":   {"streams": list(combined_streams.values())},
+            "data": {"streams": list(combined_streams.values())},
         }
 
     def close(self):
@@ -801,10 +795,7 @@ class CompressoLogging:
             init_logger = logging.getLogger("Compresso.CompressoLogging")
 
             # Default formatter
-            formatter = logging.Formatter(
-                '%(asctime)s:%(levelname)s:%(name)s - %(message)s',
-                datefmt='%Y-%m-%dT%H:%M:%S'
-            )
+            formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s - %(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
 
             # Set up stream handler
             if self.stream_handler is None:
@@ -855,14 +846,13 @@ class CompressoLogging:
         if not timestamp:
             timestamp = datetime.now()
         log_record = {
-            'log_type':         'METRIC',
-            'metric_name':      name,
-            'metric_timestamp': f"{int(timestamp.timestamp())}.{timestamp.microsecond}",
-            **kwargs
+            "log_type": "METRIC",
+            "metric_name": name,
+            "metric_timestamp": f"{int(timestamp.timestamp())}.{timestamp.microsecond}",
+            **kwargs,
         }
         log_message = " ".join(
-            f'{key}="{value}"' if " " in str(value) else f"{key}={value}"
-            for key, value in log_record.items() if value
+            f'{key}="{value}"' if " " in str(value) else f"{key}={value}" for key, value in log_record.items() if value
         )
         instance._emit_structured_log(instance.METRIC, log_message, log_record)
 
@@ -876,11 +866,11 @@ class CompressoLogging:
         if not timestamp:
             timestamp = datetime.now()
         log_record = {
-            'log_type':         'DATA',
-            'data_primary_key': data_primary_key,
-            'data_search_key':  data_search_key,
-            'data_timestamp':   f"{int(timestamp.timestamp())}.{timestamp.microsecond}",
-            **kwargs
+            "log_type": "DATA",
+            "data_primary_key": data_primary_key,
+            "data_search_key": data_search_key,
+            "data_timestamp": f"{int(timestamp.timestamp())}.{timestamp.microsecond}",
+            **kwargs,
         }
         log_message = "DATA STREAM"
         instance._emit_structured_log(instance.DATA, log_message, log_record)

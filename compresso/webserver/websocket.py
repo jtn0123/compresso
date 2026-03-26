@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.websocket.py
+compresso.websocket.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     23 Jul 2021, (6:08 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     23 Jul 2021, (6:08 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import json
 import time
 import uuid
@@ -53,20 +54,20 @@ from compresso.webserver.proxy import resolve_proxy_target
 
 class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
     STREAM_POLL_INTERVALS = {
-        'frontend_message': 0.5,
-        'system_logs': 1,
-        'workers_info': 0.5,
-        'pending_tasks': 3,
-        'completed_tasks': 3,
-        'system_status': 5,
+        "frontend_message": 0.5,
+        "system_logs": 1,
+        "workers_info": 0.5,
+        "pending_tasks": 3,
+        "completed_tasks": 3,
+        "system_status": 5,
     }
     STREAM_FORCE_REFRESH_INTERVALS = {
-        'frontend_message': 3,
-        'system_logs': 5,
-        'workers_info': 2,
-        'pending_tasks': 10,
-        'completed_tasks': 10,
-        'system_status': 15,
+        "frontend_message": 3,
+        "system_logs": 5,
+        "workers_info": 2,
+        "pending_tasks": 10,
+        "completed_tasks": 10,
+        "system_status": 15,
     }
 
     name = None
@@ -80,20 +81,20 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
     close_event = None
 
     def __init__(self, *args, **kwargs):
-        self.name = 'CompressoWebsocketHandler'
+        self.name = "CompressoWebsocketHandler"
         self.config = config.Config()
         self.server_id = str(uuid.uuid4())
         udq = CompressoDataQueues()
         urt = CompressoRunningThreads()
         self.data_queues = udq.get_compresso_data_queues()
-        self.foreman = urt.get_compresso_running_thread('foreman')
+        self.foreman = urt.get_compresso_running_thread("foreman")
         self.session = session.Session()
         self._stream_state: dict[str, dict[str, Any]] = {}
         self._gpu_history_tick = 0
         super().__init__(*args, **kwargs)
 
     async def open(self):
-        tornado.log.app_log.warning('WS Opened', exc_info=True)
+        tornado.log.app_log.warning("WS Opened", exc_info=True)
         self.close_event = tornado.locks.Event()
 
         # Check if we are proxying to a remote installation
@@ -104,7 +105,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             if target_info:
                 self.is_proxy = True
                 # WS URL: http -> ws, https -> wss
-                url_base = target_info['url_base']
+                url_base = target_info["url_base"]
                 if url_base.startswith("https"):
                     ws_url = url_base.replace("https", "wss", 1)
                 else:
@@ -112,7 +113,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
                 ws_url = f"{ws_url}/compresso/websocket"
 
-                headers = target_info['headers']
+                headers = target_info["headers"]
                 try:
                     request = tornado.httpclient.HTTPRequest(url=ws_url, headers=headers)
                     self.remote_ws = await tornado.websocket.websocket_connect(
@@ -124,26 +125,25 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     self.close()
 
     def on_message(self, message):
-        if getattr(self, 'is_proxy', False):
-            if hasattr(self, 'remote_ws') and self.remote_ws:
+        if getattr(self, "is_proxy", False):
+            if hasattr(self, "remote_ws") and self.remote_ws:
                 self.remote_ws.write_message(message)
             return
 
         try:
             message_data = json.loads(message)
-            if message_data.get('command'):
+            if message_data.get("command"):
                 # Execute the function
-                getattr(self, message_data.get('command', 'default_failure_response'))(
-                    params=message_data.get('params', {}))
+                getattr(self, message_data.get("command", "default_failure_response"))(params=message_data.get("params", {}))
         except json.decoder.JSONDecodeError:
-            tornado.log.app_log.error(f'Received incorrectly formatted message - {message}', exc_info=False)
+            tornado.log.app_log.error(f"Received incorrectly formatted message - {message}", exc_info=False)
 
     def on_close(self):
-        tornado.log.app_log.warning('WS Closed', exc_info=True)
+        tornado.log.app_log.warning("WS Closed", exc_info=True)
         self.close_event.set()
 
-        if getattr(self, 'is_proxy', False):
-            if hasattr(self, 'remote_ws') and self.remote_ws:
+        if getattr(self, "is_proxy", False):
+            if hasattr(self, "remote_ws") and self.remote_ws:
                 self.remote_ws.close()
             return
 
@@ -166,7 +166,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         :return:
         :rtype:
         """
-        self.write_message({'success': False})
+        self.write_message({"success": False})
 
     def start_frontend_messages(self, params=None):
         """
@@ -338,7 +338,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         :rtype:
         """
         frontend_messages = FrontendPushMessages()
-        frontend_messages.remove_item(params.get('message_id', ''))
+        frontend_messages.remove_item(params.get("message_id", ""))
 
     async def send(self, message):
         if self.ws_connection:
@@ -362,69 +362,69 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
     @staticmethod
     def _normalize_stream_data(stream_name: str, data: Any) -> Any:
-        if stream_name == 'frontend_message' and isinstance(data, list):
-            return sorted(data, key=lambda item: str(item.get('id', '')))
-        if stream_name == 'workers_info' and isinstance(data, list):
-            return sorted(data, key=lambda item: (str(item.get('name', '')), str(item.get('id', ''))))
+        if stream_name == "frontend_message" and isinstance(data, list):
+            return sorted(data, key=lambda item: str(item.get("id", "")))
+        if stream_name == "workers_info" and isinstance(data, list):
+            return sorted(data, key=lambda item: (str(item.get("name", "")), str(item.get("id", ""))))
         return data
 
     def _should_send_stream(self, stream_name: str, payload: Any) -> dict[str, Any]:
         normalized_payload = self._normalize_stream_data(stream_name, payload)
         serialized_payload = json.dumps(normalized_payload, sort_keys=True, default=str)
-        payload_bytes = len(serialized_payload.encode('utf-8'))
+        payload_bytes = len(serialized_payload.encode("utf-8"))
         now = time.time()
         state = self._stream_state.setdefault(
             stream_name,
             {
-                'last_payload': None,
-                'last_sent_at': 0.0,
-                'sequence': 0,
-                'skipped_duplicates': 0,
+                "last_payload": None,
+                "last_sent_at": 0.0,
+                "sequence": 0,
+                "skipped_duplicates": 0,
             },
         )
 
         should_send = (
-            state['last_payload'] is None
-            or state['last_payload'] != serialized_payload
-            or (now - state['last_sent_at']) >= self.STREAM_FORCE_REFRESH_INTERVALS.get(stream_name, 5)
+            state["last_payload"] is None
+            or state["last_payload"] != serialized_payload
+            or (now - state["last_sent_at"]) >= self.STREAM_FORCE_REFRESH_INTERVALS.get(stream_name, 5)
         )
 
         if not should_send:
-            state['skipped_duplicates'] += 1
+            state["skipped_duplicates"] += 1
             return {
-                'should_send': False,
-                'normalized_payload': normalized_payload,
-                'payload_bytes': payload_bytes,
+                "should_send": False,
+                "normalized_payload": normalized_payload,
+                "payload_bytes": payload_bytes,
             }
 
-        state['last_payload'] = serialized_payload
-        state['last_sent_at'] = now
-        state['sequence'] += 1
+        state["last_payload"] = serialized_payload
+        state["last_sent_at"] = now
+        state["sequence"] += 1
         return {
-            'should_send': True,
-            'normalized_payload': normalized_payload,
-            'payload_bytes': payload_bytes,
-            'sequence': state['sequence'],
-            'sent_at': now,
-            'skipped_duplicates': state['skipped_duplicates'],
+            "should_send": True,
+            "normalized_payload": normalized_payload,
+            "payload_bytes": payload_bytes,
+            "sequence": state["sequence"],
+            "sent_at": now,
+            "skipped_duplicates": state["skipped_duplicates"],
         }
 
     async def _send_stream_message(self, stream_name: str, payload: Any):
         stream_state = self._should_send_stream(stream_name, payload)
-        if not stream_state['should_send']:
+        if not stream_state["should_send"]:
             return False
 
         await self.send(
             {
-                'success': True,
-                'server_id': self.server_id,
-                'type': stream_name,
-                'data': stream_state['normalized_payload'],
-                'meta': {
-                    'sequence': stream_state['sequence'],
-                    'sent_at': stream_state['sent_at'],
-                    'payload_bytes': stream_state['payload_bytes'],
-                    'skipped_duplicates': stream_state['skipped_duplicates'],
+                "success": True,
+                "server_id": self.server_id,
+                "type": stream_name,
+                "data": stream_state["normalized_payload"],
+                "meta": {
+                    "sequence": stream_state["sequence"],
+                    "sent_at": stream_state["sent_at"],
+                    "payload_bytes": stream_state["payload_bytes"],
+                    "skipped_duplicates": stream_state["skipped_duplicates"],
                 },
             }
         )
@@ -434,57 +434,57 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         while self._stream_is_active(self.sending_frontend_message):
             frontend_messages = FrontendPushMessages()
             frontend_message_items = frontend_messages.read_all_items()
-            await self._send_stream_message('frontend_message', frontend_message_items)
+            await self._send_stream_message("frontend_message", frontend_message_items)
 
-            await gen.sleep(self.STREAM_POLL_INTERVALS['frontend_message'])
+            await gen.sleep(self.STREAM_POLL_INTERVALS["frontend_message"])
 
     async def async_system_logs(self):
         while self._stream_is_active(self.sending_system_logs):
             system_logs = self.config.read_system_logs(lines=1000)
 
             await self._send_stream_message(
-                'system_logs',
+                "system_logs",
                 {
                     "logs_path": self.config.get_log_path(),
-                    'system_logs': system_logs,
+                    "system_logs": system_logs,
                 },
             )
 
-            await gen.sleep(self.STREAM_POLL_INTERVALS['system_logs'])
+            await gen.sleep(self.STREAM_POLL_INTERVALS["system_logs"])
 
     async def async_workers_info(self):
         while self._stream_is_active(self.sending_worker_info):
             workers_info = self.foreman.get_all_worker_status()
-            await self._send_stream_message('workers_info', workers_info)
-            await gen.sleep(self.STREAM_POLL_INTERVALS['workers_info'])
+            await self._send_stream_message("workers_info", workers_info)
+            await gen.sleep(self.STREAM_POLL_INTERVALS["workers_info"])
 
     async def async_pending_tasks_info(self):
         while self._stream_is_active(self.sending_pending_tasks_info):
             results = []
             params = {
-                'start':        '0',
-                'length':       '10',
-                'search_value': '',
-                'order':        {
-                    "column": 'priority',
-                    "dir":    'desc',
-                }
+                "start": "0",
+                "length": "10",
+                "search_value": "",
+                "order": {
+                    "column": "priority",
+                    "dir": "desc",
+                },
             }
             task_list = pending_tasks.prepare_filtered_pending_tasks(params)
 
-            for task_result in task_list.get('results', []):
+            for task_result in task_list.get("results", []):
                 # Append the task to the results list
                 item = {
-                    'id':       task_result['id'],
-                    'label':    task_result['abspath'],
-                    'priority': task_result['priority'],
-                    'status':   task_result['status'],
+                    "id": task_result["id"],
+                    "label": task_result["abspath"],
+                    "priority": task_result["priority"],
+                    "status": task_result["status"],
                 }
                 # Include retry info when present
-                if task_result.get('retry_count'):
-                    item['retry_count'] = task_result['retry_count']
-                if task_result.get('deferred_until'):
-                    item['deferred_until'] = str(task_result['deferred_until'])
+                if task_result.get("retry_count"):
+                    item["retry_count"] = task_result["retry_count"]
+                if task_result.get("deferred_until"):
+                    item["deferred_until"] = str(task_result["deferred_until"])
                 results.append(item)
 
             # Estimate queue ETA and include in payload
@@ -494,55 +494,53 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 queue_eta = None
 
             await self._send_stream_message(
-                'pending_tasks',
+                "pending_tasks",
                 {
-                    'results': results,
-                    'queue_eta': queue_eta,
+                    "results": results,
+                    "queue_eta": queue_eta,
                 },
             )
 
-            await gen.sleep(self.STREAM_POLL_INTERVALS['pending_tasks'])
+            await gen.sleep(self.STREAM_POLL_INTERVALS["pending_tasks"])
 
     async def async_completed_tasks_info(self):
         while self._stream_is_active(self.sending_completed_tasks_info):
             results = []
             params = {
-                'start':        '0',
-                'length':       '10',
-                'search_value': '',
-                'order':        {
-                    "column": 'finish_time',
-                    "dir":    'desc',
-                }
+                "start": "0",
+                "length": "10",
+                "search_value": "",
+                "order": {
+                    "column": "finish_time",
+                    "dir": "desc",
+                },
             }
             task_list = completed_tasks.prepare_filtered_completed_tasks(params)
 
-            for task_result in task_list.get('results', []):
+            for task_result in task_list.get("results", []):
                 # Set human-readable time
-                if (int(task_result['finish_time']) + 60) > int(time.time()):
-                    human_readable_time = 'Just Now'
+                if (int(task_result["finish_time"]) + 60) > int(time.time()):
+                    human_readable_time = "Just Now"
                 else:
-                    human_readable_time = common.make_timestamp_human_readable(int(task_result['finish_time']))
+                    human_readable_time = common.make_timestamp_human_readable(int(task_result["finish_time"]))
 
                 # Append the task to the results list
                 results.append(
                     {
-                        'id':                  task_result['id'],
-                        'label':               task_result['task_label'],
-                        'success':             task_result['task_success'],
-                        'finish_time':         task_result['finish_time'],
-                        'human_readable_time': human_readable_time,
+                        "id": task_result["id"],
+                        "label": task_result["task_label"],
+                        "success": task_result["task_success"],
+                        "finish_time": task_result["finish_time"],
+                        "human_readable_time": human_readable_time,
                     }
                 )
 
             await self._send_stream_message(
-                'completed_tasks',
-                {
-                    'results': results
-                },
+                "completed_tasks",
+                {"results": results},
             )
 
-            await gen.sleep(self.STREAM_POLL_INTERVALS['completed_tasks'])
+            await gen.sleep(self.STREAM_POLL_INTERVALS["completed_tasks"])
 
     def _get_gpu_utilization(self):
         """Deprecated: Use GpuMonitor().get_realtime_metrics() instead."""
@@ -551,7 +549,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
     async def async_system_status(self):
         while self._stream_is_active(self.sending_system_status):
             mem = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
 
             self._gpu_history_tick += 1
             gpu_monitor = GpuMonitor()
@@ -564,16 +562,16 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 link_statuses = {}
 
             payload = {
-                'cpu_percent':    psutil.cpu_percent(interval=0),
-                'memory_percent': mem.percent,
-                'memory_used_gb': round(mem.used / (1024 ** 3), 1),
-                'disk_percent':   disk.percent,
-                'disk_used_gb':   round(disk.used / (1024 ** 3), 1),
-                'gpus':           gpu_monitor.get_realtime_metrics(),
-                'gpu_history':    gpu_monitor.get_history() if self._gpu_history_tick % 6 == 0 else None,
-                'link_statuses':  link_statuses,
+                "cpu_percent": psutil.cpu_percent(interval=0),
+                "memory_percent": mem.percent,
+                "memory_used_gb": round(mem.used / (1024**3), 1),
+                "disk_percent": disk.percent,
+                "disk_used_gb": round(disk.used / (1024**3), 1),
+                "gpus": gpu_monitor.get_realtime_metrics(),
+                "gpu_history": gpu_monitor.get_history() if self._gpu_history_tick % 6 == 0 else None,
+                "link_statuses": link_statuses,
             }
 
-            await self._send_stream_message('system_status', payload)
+            await self._send_stream_message("system_status", payload)
 
-            await gen.sleep(self.STREAM_POLL_INTERVALS['system_status'])
+            await gen.sleep(self.STREAM_POLL_INTERVALS["system_status"])

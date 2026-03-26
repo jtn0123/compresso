@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.config.py
+compresso.config.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     06 Dec 2018, (7:21 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     06 Dec 2018, (7:21 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -55,14 +55,14 @@ DEFAULT_WORKER_CAP = 2
 
 
 class Config(metaclass=SingletonType):
-    app_version = ''
+    app_version = ""
 
-    test = ''
+    test = ""
 
     def __init__(self, config_path=None, **kwargs):
         # Set the default UI Port
         self.ui_port = DEFAULT_UI_PORT
-        self.ui_address = ''
+        self.ui_address = ""
 
         # SSL/TLS settings
         self.ssl_enabled = False
@@ -71,10 +71,10 @@ class Config(metaclass=SingletonType):
 
         # Set default directories
         home_directory = common.get_home_dir()
-        self.config_path = os.path.join(home_directory, '.compresso', 'config')
-        self.log_path = os.path.join(home_directory, '.compresso', 'logs')
-        self.plugins_path = os.path.join(home_directory, '.compresso', 'plugins')
-        self.userdata_path = os.path.join(home_directory, '.compresso', 'userdata')
+        self.config_path = os.path.join(home_directory, ".compresso", "config")
+        self.log_path = os.path.join(home_directory, ".compresso", "logs")
+        self.plugins_path = os.path.join(home_directory, ".compresso", "plugins")
+        self.userdata_path = os.path.join(home_directory, ".compresso", "userdata")
 
         # Configure debugging
         self.debugging = False
@@ -104,8 +104,8 @@ class Config(metaclass=SingletonType):
         self.cache_path = common.get_default_cache_path()
 
         # Link settings
-        self.installation_name = ''
-        self.installation_public_address = ''
+        self.installation_name = ""
+        self.installation_public_address = ""
         self.remote_installations = []
         self.distributed_worker_count_target = 0
 
@@ -116,7 +116,7 @@ class Config(metaclass=SingletonType):
 
         # Approval workflow settings
         self.approval_required = False
-        self.staging_path = os.path.join(home_directory, '.compresso', 'staging')
+        self.staging_path = os.path.join(home_directory, ".compresso", "staging")
 
         # Task retry settings
         self.default_max_retries = 3
@@ -139,23 +139,23 @@ class Config(metaclass=SingletonType):
         self.__import_settings_from_env()
 
         # Import Compresso path settings from command params
-        if kwargs.get('compresso_path'):
-            self.set_config_item('config_path', os.path.join(kwargs.get('compresso_path'), 'config'), save_settings=False)
-            self.set_config_item('plugins_path', os.path.join(kwargs.get('compresso_path'), 'plugins'), save_settings=False)
-            self.set_config_item('userdata_path', os.path.join(kwargs.get('compresso_path'), 'userdata'), save_settings=False)
+        if kwargs.get("compresso_path"):
+            self.set_config_item("config_path", os.path.join(kwargs.get("compresso_path"), "config"), save_settings=False)
+            self.set_config_item("plugins_path", os.path.join(kwargs.get("compresso_path"), "plugins"), save_settings=False)
+            self.set_config_item("userdata_path", os.path.join(kwargs.get("compresso_path"), "userdata"), save_settings=False)
 
         # Finally, re-read config from file and override all previous settings.
         self.__import_settings_from_file(config_path)
 
         # Overwrite current settings with given args
         if config_path:
-            self.set_config_item('config_path', config_path, save_settings=False)
+            self.set_config_item("config_path", config_path, save_settings=False)
 
         # Overwrite all other settings passed from command params
-        if kwargs.get('port'):
-            self.set_config_item('ui_port', kwargs.get('port'), save_settings=False)
-        if kwargs.get('address'):
-            self.set_config_item('ui_address', kwargs.get('address'), save_settings=False)
+        if kwargs.get("port"):
+            self.set_config_item("ui_port", kwargs.get("port"), save_settings=False)
+        if kwargs.get("address"):
+            self.set_config_item("ui_address", kwargs.get("address"), save_settings=False)
 
         # Apply fork-safe defaults after all explicit config has loaded.
         # Effective precedence for this fork is:
@@ -224,7 +224,7 @@ class Config(metaclass=SingletonType):
         # Ensure the config path exists
         if not os.path.exists(config_path):
             os.makedirs(config_path)
-        settings_file = os.path.join(config_path, 'settings.json')
+        settings_file = os.path.join(config_path, "settings.json")
         if os.path.exists(settings_file):
             data = {}
             try:
@@ -250,11 +250,11 @@ class Config(metaclass=SingletonType):
         """
         if not os.path.exists(self.get_config_path()):
             os.makedirs(self.get_config_path())
-        settings_file = os.path.join(self.get_config_path(), 'settings.json')
+        settings_file = os.path.join(self.get_config_path(), "settings.json")
         data = self.get_config_as_dict()
         result = common.json_dump_to_file(data, settings_file)
-        if not result['success']:
-            for message in result['errors']:
+        if not result["success"]:
+            for message in result["errors"]:
                 logger.error(message)
             raise Exception("Exception in writing settings to file")
 
@@ -330,7 +330,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return metadata.read_version_string('long')
+        return metadata.read_version_string("long")
 
     def read_system_logs(self, lines=None):
         """
@@ -339,7 +339,7 @@ class Config(metaclass=SingletonType):
         :param lines:
         :return:
         """
-        log_file = os.path.join(self.log_path, 'compresso.log')
+        log_file = os.path.join(self.log_path, "compresso.log")
         with open(log_file) as f:
             all_lines = f.readlines()
         if lines is not None:
@@ -611,7 +611,7 @@ class Config(metaclass=SingletonType):
         :return:
         """
         if isinstance(self.large_library_safe_defaults, str):
-            return self.large_library_safe_defaults.lower() in ('true', '1', 'yes', 'on')
+            return self.large_library_safe_defaults.lower() in ("true", "1", "yes", "on")
         return bool(self.large_library_safe_defaults)
 
     def get_startup_readiness_timeout_seconds(self):
@@ -632,7 +632,7 @@ class Config(metaclass=SingletonType):
 
     def get_approval_required(self):
         if isinstance(self.approval_required, str):
-            return self.approval_required.lower() in ('true', '1', 'yes', 'on')
+            return self.approval_required.lower() in ("true", "1", "yes", "on")
         return bool(self.approval_required)
 
     def get_staging_path(self):
@@ -640,7 +640,7 @@ class Config(metaclass=SingletonType):
 
     def set_staging_path(self, staging_path):
         if staging_path == "":
-            staging_path = os.path.join(common.get_home_dir(), '.compresso', 'staging')
+            staging_path = os.path.join(common.get_home_dir(), ".compresso", "staging")
         self.staging_path = staging_path
 
     def get_remote_installations(self):
@@ -651,7 +651,7 @@ class Config(metaclass=SingletonType):
         """
         remote_installations = []
         for ri in self.remote_installations:
-            ri['distributed_worker_count_target'] = self.distributed_worker_count_target
+            ri["distributed_worker_count_target"] = self.distributed_worker_count_target
             remote_installations.append(ri)
         return remote_installations
 
@@ -671,7 +671,7 @@ class Config(metaclass=SingletonType):
         """
         # Convert string to boolean if necessary (for environment variables)
         if isinstance(self.ssl_enabled, str):
-            return self.ssl_enabled.lower() in ('true', '1', 'yes', 'on')
+            return self.ssl_enabled.lower() in ("true", "1", "yes", "on")
         return bool(self.ssl_enabled)
 
     def get_ssl_certfilepath(self):
@@ -720,7 +720,7 @@ class Config(metaclass=SingletonType):
         :return:
         """
         if isinstance(self.onboarding_completed, str):
-            return self.onboarding_completed.lower() in ('true', '1', 'yes', 'on')
+            return self.onboarding_completed.lower() in ("true", "1", "yes", "on")
         return bool(self.onboarding_completed)
 
     def set_onboarding_completed(self, value):
@@ -730,7 +730,7 @@ class Config(metaclass=SingletonType):
         :return:
         """
         if isinstance(value, str):
-            self.onboarding_completed = value.lower() in ('true', '1', 'yes', 'on')
+            self.onboarding_completed = value.lower() in ("true", "1", "yes", "on")
         else:
             self.onboarding_completed = bool(value)
 

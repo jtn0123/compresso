@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.worker_group.py
+compresso.worker_group.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     18 Apr 2022, (4:08 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     18 Apr 2022, (4:08 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import random
 
 from compresso import config
@@ -37,16 +38,119 @@ from compresso.libs.unmodels.workerschedules import WorkerSchedules
 
 
 def generate_random_worker_group_name():
-    names = ['Altoa', 'Anje', 'Anji', 'Azibo', 'Azra', 'Bajin', 'Baliaja', 'Benni', 'Bie', 'Ditid', 'Ecia', 'Ejie', 'Ekon',
-             'Equinus', 'Erasto', 'Fefeya', 'Gamjee', 'Gilta', 'Girisha', 'Haijen', 'Hakalai', 'Halasuwa', 'Hamedi', 'Hokajin',
-             'Hokima', 'Hyptu', 'Ithra', 'Jaryaya', 'Javinda', 'Javyn', 'Jijel', 'Jinjin', 'Jiranty', 'Jumoke', 'Kaijin',
-             'Kanjin', 'Khuwei', 'Kina', 'Lakjin', 'Makas', 'Malak', 'Meimei', 'Melkree', 'Napokue', 'Nelina', 'Nepita',
-             'Nuenvan', 'Prerrahar', 'Pujati', 'Rakash', 'Reji', 'Renji', 'Rhazin', 'Ronjaty', 'Rujabu', 'Saonji', 'Shadrala',
-             'Shengis', 'Suja', 'Suli', 'Suliya', 'Talisa', 'Tanjin', 'Tayo', 'Tazingo', 'Tedar', 'Teshi', 'Tirezi',
-             'Trezzahn', 'Trolgar', 'Ttarmek', 'Ugoki', 'Valja', 'Vekuzz', 'Venjo', 'Venmara', 'Vinji', 'Voyambi', 'Vujii',
-             'Vuzashi', 'Wanjin', 'Yaci', 'Yamike', 'Yavo', 'Yera', 'Yeree', 'Yetu', 'Yishi', 'Yuhai', 'Zaejin', 'Zalma',
-             'Zea', 'Zelaji', 'Zelea', 'Ziataaman', 'Ziataima', 'Ziatakraa', 'Zola', 'Zoljin', 'Zoti', 'Zujia', 'Zulabar',
-             'Zulja', 'Zuljah', 'Zulkis', 'Zulraja', 'Zulrajas', 'Zulwatha', 'Zulyafi', 'Zunabar', 'Zyra', ]
+    names = [
+        "Altoa",
+        "Anje",
+        "Anji",
+        "Azibo",
+        "Azra",
+        "Bajin",
+        "Baliaja",
+        "Benni",
+        "Bie",
+        "Ditid",
+        "Ecia",
+        "Ejie",
+        "Ekon",
+        "Equinus",
+        "Erasto",
+        "Fefeya",
+        "Gamjee",
+        "Gilta",
+        "Girisha",
+        "Haijen",
+        "Hakalai",
+        "Halasuwa",
+        "Hamedi",
+        "Hokajin",
+        "Hokima",
+        "Hyptu",
+        "Ithra",
+        "Jaryaya",
+        "Javinda",
+        "Javyn",
+        "Jijel",
+        "Jinjin",
+        "Jiranty",
+        "Jumoke",
+        "Kaijin",
+        "Kanjin",
+        "Khuwei",
+        "Kina",
+        "Lakjin",
+        "Makas",
+        "Malak",
+        "Meimei",
+        "Melkree",
+        "Napokue",
+        "Nelina",
+        "Nepita",
+        "Nuenvan",
+        "Prerrahar",
+        "Pujati",
+        "Rakash",
+        "Reji",
+        "Renji",
+        "Rhazin",
+        "Ronjaty",
+        "Rujabu",
+        "Saonji",
+        "Shadrala",
+        "Shengis",
+        "Suja",
+        "Suli",
+        "Suliya",
+        "Talisa",
+        "Tanjin",
+        "Tayo",
+        "Tazingo",
+        "Tedar",
+        "Teshi",
+        "Tirezi",
+        "Trezzahn",
+        "Trolgar",
+        "Ttarmek",
+        "Ugoki",
+        "Valja",
+        "Vekuzz",
+        "Venjo",
+        "Venmara",
+        "Vinji",
+        "Voyambi",
+        "Vujii",
+        "Vuzashi",
+        "Wanjin",
+        "Yaci",
+        "Yamike",
+        "Yavo",
+        "Yera",
+        "Yeree",
+        "Yetu",
+        "Yishi",
+        "Yuhai",
+        "Zaejin",
+        "Zalma",
+        "Zea",
+        "Zelaji",
+        "Zelea",
+        "Ziataaman",
+        "Ziataima",
+        "Ziatakraa",
+        "Zola",
+        "Zoljin",
+        "Zoti",
+        "Zujia",
+        "Zulabar",
+        "Zulja",
+        "Zuljah",
+        "Zulkis",
+        "Zulraja",
+        "Zulrajas",
+        "Zulwatha",
+        "Zulyafi",
+        "Zunabar",
+        "Zyra",
+    ]
     return random.choice(names)  # noqa: S311 — not used for security/crypto
 
 
@@ -82,25 +186,25 @@ class WorkerGroup:
 
         if not configured_worker_groups:
             default_worker_group = {
-                'id':                     1,
-                'locked':                 False,
-                'name':                   generate_random_worker_group_name(),
-                'number_of_workers':      0,
-                'worker_type':            'cpu',
-                'tags':                   [],
-                'worker_event_schedules': [],
+                "id": 1,
+                "locked": False,
+                "name": generate_random_worker_group_name(),
+                "number_of_workers": 0,
+                "worker_type": "cpu",
+                "tags": [],
+                "worker_event_schedules": [],
             }
 
             # Migrate default worker data from
             settings = config.Config()
             if settings.number_of_workers is not None:
-                default_worker_group['number_of_workers'] = settings.number_of_workers
+                default_worker_group["number_of_workers"] = settings.number_of_workers
                 if settings.worker_event_schedules is not None:
-                    default_worker_group['worker_event_schedules'] = settings.worker_event_schedules
+                    default_worker_group["worker_event_schedules"] = settings.worker_event_schedules
 
                 # Disable the legacy settings
-                settings.set_config_item('number_of_workers', None, save_settings=True)
-                settings.set_config_item('worker_event_schedules', None, save_settings=True)
+                settings.set_config_item("number_of_workers", None, save_settings=True)
+                settings.set_config_item("worker_event_schedules", None, save_settings=True)
 
                 WorkerGroup.create(default_worker_group)
                 return [default_worker_group]
@@ -109,25 +213,27 @@ class WorkerGroup:
         worker_groups = []
         for group in configured_worker_groups:
             group_config = {
-                'id':                     group.id,
-                'locked':                 group.locked,
-                'name':                   group.name,
-                'number_of_workers':      group.number_of_workers,
-                'worker_type':            group.worker_type,
-                'worker_event_schedules': [],
-                'tags':                   [],
+                "id": group.id,
+                "locked": group.locked,
+                "name": group.name,
+                "number_of_workers": group.number_of_workers,
+                "worker_type": group.worker_type,
+                "worker_event_schedules": [],
+                "tags": [],
             }
             # Append tags
             for tag in group.tags.order_by(Tags.name):
-                group_config['tags'].append(tag.name)
+                group_config["tags"].append(tag.name)
             # Append worker_event_schedules
             for event_schedule in group.worker_schedules:
-                group_config['worker_event_schedules'].append({
-                    'repetition':            event_schedule.repetition,
-                    'schedule_task':         event_schedule.schedule_task,
-                    'schedule_time':         event_schedule.schedule_time,
-                    'schedule_worker_count': event_schedule.schedule_worker_count,
-                })
+                group_config["worker_event_schedules"].append(
+                    {
+                        "repetition": event_schedule.repetition,
+                        "schedule_task": event_schedule.schedule_task,
+                        "schedule_time": event_schedule.schedule_time,
+                        "schedule_worker_count": event_schedule.schedule_worker_count,
+                    }
+                )
 
             worker_groups.append(group_config)
 
@@ -143,14 +249,14 @@ class WorkerGroup:
         :return:
         """
         # Ensure the name is not blank
-        if not data.get('name'):
-            data['name'] = generate_random_worker_group_name()
+        if not data.get("name"):
+            data["name"] = generate_random_worker_group_name()
 
         worker_group_data = {
-            'locked':            data.get('locked'),
-            'name':              data.get('name'),
-            'number_of_workers': data.get('number_of_workers'),
-            'worker_type':       data.get('worker_type', 'cpu'),
+            "locked": data.get("locked"),
+            "name": data.get("name"),
+            "number_of_workers": data.get("number_of_workers"),
+            "worker_type": data.get("worker_type", "cpu"),
         }
         worker_group_id = WorkerGroups.create(**worker_group_data)
 
@@ -158,18 +264,18 @@ class WorkerGroup:
         worker_group = WorkerGroup(int(worker_group_id.id))
 
         # Set lists
-        worker_group.set_tags(data.get('tags', []))
-        worker_group.set_worker_event_schedules(data.get('worker_event_schedules', []))
+        worker_group.set_tags(data.get("tags", []))
+        worker_group.set_worker_event_schedules(data.get("worker_event_schedules", []))
 
     @staticmethod
     def create_schedules(worker_group_id: int, worker_event_schedules: list):
         for worker_event_schedule in worker_event_schedules:
             worker_event_schedule_data = {
-                'worker_group_id':       worker_group_id,
-                'repetition':            worker_event_schedule.get('repetition'),
-                'schedule_task':         worker_event_schedule.get('schedule_task'),
-                'schedule_time':         worker_event_schedule.get('schedule_time'),
-                'schedule_worker_count': worker_event_schedule.get('schedule_worker_count'),
+                "worker_group_id": worker_group_id,
+                "repetition": worker_event_schedule.get("repetition"),
+                "schedule_task": worker_event_schedule.get("schedule_task"),
+                "schedule_time": worker_event_schedule.get("schedule_time"),
+                "schedule_worker_count": worker_event_schedule.get("schedule_worker_count"),
             }
             WorkerSchedules.create(**worker_event_schedule_data)
 
@@ -215,7 +321,7 @@ class WorkerGroup:
         return self.model.worker_type
 
     def set_worker_type(self, value):
-        if value not in ('cpu', 'gpu'):
+        if value not in ("cpu", "gpu"):
             raise ValueError("worker_type must be 'cpu' or 'gpu'")
         self.model.worker_type = value
 
@@ -240,12 +346,14 @@ class WorkerGroup:
     def get_worker_event_schedules(self):
         return_value = []
         for event_schedule in self.model.worker_schedules:
-            return_value.append({
-                'repetition':            event_schedule.repetition,
-                'schedule_task':         event_schedule.schedule_task,
-                'schedule_time':         event_schedule.schedule_time,
-                'schedule_worker_count': event_schedule.schedule_worker_count,
-            })
+            return_value.append(
+                {
+                    "repetition": event_schedule.repetition,
+                    "schedule_task": event_schedule.schedule_task,
+                    "schedule_time": event_schedule.schedule_time,
+                    "schedule_worker_count": event_schedule.schedule_worker_count,
+                }
+            )
         return return_value
 
     def set_worker_event_schedules(self, value):

@@ -14,12 +14,8 @@ def migrate(migrator, database, fake=False, **kwargs):
     # Columns are auto-added by update_schema() since they are nullable with defaults.
     # Backfill existing rows with ORM default values
     if not fake:
-        database.execute_sql(
-            "UPDATE tasks SET retry_count = 0 WHERE retry_count IS NULL"
-        )
-        database.execute_sql(
-            "UPDATE tasks SET max_retries = 3 WHERE max_retries IS NULL"
-        )
+        database.execute_sql("UPDATE tasks SET retry_count = 0 WHERE retry_count IS NULL")
+        database.execute_sql("UPDATE tasks SET max_retries = 3 WHERE max_retries IS NULL")
         # deferred_until default is NULL, so no backfill needed
 
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    compresso.approval_schemas.py
+compresso.approval_schemas.py
 
-    Marshmallow schemas for approval workflow API endpoints.
+Marshmallow schemas for approval workflow API endpoints.
 """
 
 from marshmallow import fields, validate
@@ -13,40 +13,42 @@ from compresso.webserver.api_v2.schema.schemas import BaseSchema, BaseSuccessSch
 
 class RequestApprovalTasksSchema(BaseSchema):
     """Schema for listing tasks awaiting approval"""
+
     start = fields.Int(
         load_default=0,
-        metadata={'description': "Pagination offset"},
+        metadata={"description": "Pagination offset"},
     )
     length = fields.Int(
         load_default=10,
-        metadata={'description': "Number of records to return"},
+        metadata={"description": "Number of records to return"},
     )
     search_value = fields.Str(
         load_default="",
-        metadata={'description': "Filter by file path substring"},
+        metadata={"description": "Filter by file path substring"},
     )
     library_ids = fields.List(
         fields.Int(),
         load_default=[],
-        metadata={'description': "Filter by library IDs"},
+        metadata={"description": "Filter by library IDs"},
     )
     include_library = fields.Boolean(
         load_default=False,
-        metadata={'description': "Include library name in results"},
+        metadata={"description": "Include library name in results"},
     )
     order_by = fields.Str(
         load_default="finish_time",
-        metadata={'description': "Column to order results by", 'example': "finish_time"},
+        metadata={"description": "Column to order results by", "example": "finish_time"},
     )
     order_direction = fields.Str(
         load_default="desc",
-        metadata={'description': "Order direction ('asc' or 'desc')", 'example': "desc"},
+        metadata={"description": "Order direction ('asc' or 'desc')", "example": "desc"},
         validate=validate.OneOf(["asc", "desc"]),
     )
 
 
 class ApprovalTaskItemSchema(BaseSchema):
     """Schema for a single approval task in the list"""
+
     id = fields.Int()
     abspath = fields.Str()
     priority = fields.Int()
@@ -57,10 +59,10 @@ class ApprovalTaskItemSchema(BaseSchema):
     staged_path = fields.Str()
     size_delta = fields.Int()
     finish_time = fields.Str()
-    source_codec = fields.Str(load_default='')
-    source_resolution = fields.Str(load_default='')
-    staged_codec = fields.Str(load_default='')
-    staged_resolution = fields.Str(load_default='')
+    source_codec = fields.Str(load_default="")
+    source_resolution = fields.Str(load_default="")
+    staged_codec = fields.Str(load_default="")
+    staged_resolution = fields.Str(load_default="")
     vmaf_score = fields.Float(load_default=None, allow_none=True)
     ssim_score = fields.Float(load_default=None, allow_none=True)
     library_id = fields.Int(load_default=None, allow_none=True)
@@ -69,6 +71,7 @@ class ApprovalTaskItemSchema(BaseSchema):
 
 class ApprovalTasksResponseSchema(BaseSuccessSchema):
     """Schema for the approval tasks list response"""
+
     recordsTotal = fields.Int()
     recordsFiltered = fields.Int()
     results = fields.List(fields.Nested(ApprovalTaskItemSchema))
@@ -76,52 +79,56 @@ class ApprovalTasksResponseSchema(BaseSuccessSchema):
 
 class RequestApprovalActionSchema(BaseSchema):
     """Schema for approve/reject actions"""
+
     id_list = fields.List(
         fields.Int(),
         load_default=[],
-        metadata={'description': "List of task IDs to approve or reject"},
+        metadata={"description": "List of task IDs to approve or reject"},
     )
     all_matching = fields.Boolean(
         load_default=False,
-        metadata={'description': "If true, approve all tasks matching the current filter instead of explicit IDs"},
+        metadata={"description": "If true, approve all tasks matching the current filter instead of explicit IDs"},
     )
     search_value = fields.Str(
         load_default="",
-        metadata={'description': "Search filter when all_matching is true"},
+        metadata={"description": "Search filter when all_matching is true"},
     )
 
 
 class RequestRejectActionSchema(BaseSchema):
     """Schema for reject action with optional requeue"""
+
     id_list = fields.List(
         fields.Int(),
         load_default=[],
-        metadata={'description': "List of task IDs to reject"},
+        metadata={"description": "List of task IDs to reject"},
     )
     requeue = fields.Boolean(
         load_default=False,
-        metadata={'description': "If true, requeue the tasks as pending instead of deleting them"},
+        metadata={"description": "If true, requeue the tasks as pending instead of deleting them"},
     )
     all_matching = fields.Boolean(
         load_default=False,
-        metadata={'description': "If true, reject all tasks matching the current filter instead of explicit IDs"},
+        metadata={"description": "If true, reject all tasks matching the current filter instead of explicit IDs"},
     )
     search_value = fields.Str(
         load_default="",
-        metadata={'description': "Search filter when all_matching is true"},
+        metadata={"description": "Search filter when all_matching is true"},
     )
 
 
 class RequestApprovalDetailSchema(BaseSchema):
     """Schema for getting detail of a single approval task"""
+
     id = fields.Int(
         required=True,
-        metadata={'description': "Task ID to get details for"},
+        metadata={"description": "Task ID to get details for"},
     )
 
 
 class ApprovalDetailResponseSchema(BaseSuccessSchema):
     """Schema for the detail response"""
+
     id = fields.Int()
     abspath = fields.Str()
     source_size = fields.Int()
@@ -135,16 +142,17 @@ class ApprovalDetailResponseSchema(BaseSuccessSchema):
     finish_time = fields.Str()
     log = fields.Str()
     library_id = fields.Int()
-    source_codec = fields.Str(load_default='')
-    source_resolution = fields.Str(load_default='')
-    source_container = fields.Str(load_default='')
-    staged_codec = fields.Str(load_default='')
-    staged_resolution = fields.Str(load_default='')
-    staged_container = fields.Str(load_default='')
+    source_codec = fields.Str(load_default="")
+    source_resolution = fields.Str(load_default="")
+    source_container = fields.Str(load_default="")
+    staged_codec = fields.Str(load_default="")
+    staged_resolution = fields.Str(load_default="")
+    staged_container = fields.Str(load_default="")
     vmaf_score = fields.Float(load_default=None, allow_none=True)
     ssim_score = fields.Float(load_default=None, allow_none=True)
 
 
 class ApprovalCountResponseSchema(BaseSuccessSchema):
     """Schema for the approval count response"""
+
     count = fields.Int()

@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.service.py
+compresso.service.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     06 Dec 2018, (7:21 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     06 Dec 2018, (7:21 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import argparse
 import os
 import queue
@@ -55,10 +56,10 @@ def init_db(config_path):
 
     # Set database connection settings
     database_settings = {
-        "TYPE":                       "SQLITE",
-        "FILE":                       os.path.join(config_path, 'compresso.db'),
-        "MIGRATIONS_DIR":             os.path.join(app_dir, 'migrations_v1'),
-        "MIGRATIONS_HISTORY_VERSION": 'v1',
+        "TYPE": "SQLITE",
+        "FILE": os.path.join(config_path, "compresso.db"),
+        "MIGRATIONS_DIR": os.path.join(app_dir, "migrations_v1"),
+        "MIGRATIONS_HISTORY_VERSION": "v1",
     }
 
     # Ensure the config path exists
@@ -67,6 +68,7 @@ def init_db(config_path):
 
     # Create database connection
     from compresso.libs.unmodels.lib import Database
+
     db_connection = Database.select_database(database_settings)
 
     # Run database migrations
@@ -78,7 +80,6 @@ def init_db(config_path):
 
 
 class RootService:
-
     def __init__(self):
         self.threads = []
         self.run_threads = True
@@ -104,7 +105,7 @@ class RootService:
             time.sleep(0.1)
         message = f"WORKER_THREAD_STARTUP_FAILED name={name} did not remain alive"
         self.logger.error(message)
-        self.startup_state.mark_error('threads_ready', message)
+        self.startup_state.mark_error("threads_ready", message)
         raise RuntimeError(message)
 
     def start_handler(self, data_queues, task_queue):
@@ -112,11 +113,8 @@ class RootService:
         handler = TaskHandler(data_queues, task_queue, self.event)
         handler.daemon = True
         handler.start()
-        self._verify_thread_started('TaskHandler', handler)
-        self.threads.append({
-            'name':   'TaskHandler',
-            'thread': handler
-        })
+        self._verify_thread_started("TaskHandler", handler)
+        self.threads.append({"name": "TaskHandler", "thread": handler})
         return handler
 
     def start_post_processor(self, data_queues, task_queue):
@@ -124,11 +122,8 @@ class RootService:
         postprocessor = PostProcessor(data_queues, task_queue, self.event)
         postprocessor.daemon = True
         postprocessor.start()
-        self._verify_thread_started('PostProcessor', postprocessor)
-        self.threads.append({
-            'name':   'PostProcessor',
-            'thread': postprocessor
-        })
+        self._verify_thread_started("PostProcessor", postprocessor)
+        self.threads.append({"name": "PostProcessor", "thread": postprocessor})
         return postprocessor
 
     def start_foreman(self, data_queues, settings, task_queue):
@@ -136,11 +131,8 @@ class RootService:
         foreman = Foreman(data_queues, settings, task_queue, self.event)
         foreman.daemon = True
         foreman.start()
-        self._verify_thread_started('Foreman', foreman)
-        self.threads.append({
-            'name':   'Foreman',
-            'thread': foreman
-        })
+        self._verify_thread_started("Foreman", foreman)
+        self.threads.append({"name": "Foreman", "thread": foreman})
         return foreman
 
     def start_library_scanner_manager(self, data_queues):
@@ -148,11 +140,8 @@ class RootService:
         library_scanner_manager = libraryscanner.LibraryScannerManager(data_queues, self.event)
         library_scanner_manager.daemon = True
         library_scanner_manager.start()
-        self._verify_thread_started('LibraryScannerManager', library_scanner_manager)
-        self.threads.append({
-            'name':   'LibraryScannerManager',
-            'thread': library_scanner_manager
-        })
+        self._verify_thread_started("LibraryScannerManager", library_scanner_manager)
+        self.threads.append({"name": "LibraryScannerManager", "thread": library_scanner_manager})
         return library_scanner_manager
 
     def start_inotify_watch_manager(self, data_queues, settings):
@@ -161,11 +150,8 @@ class RootService:
             event_monitor_manager = eventmonitor.EventMonitorManager(data_queues, self.event)
             event_monitor_manager.daemon = True
             event_monitor_manager.start()
-            self._verify_thread_started('EventMonitorManager', event_monitor_manager)
-            self.threads.append({
-                'name':   'EventMonitorManager',
-                'thread': event_monitor_manager
-            })
+            self._verify_thread_started("EventMonitorManager", event_monitor_manager)
+            self.threads.append({"name": "EventMonitorManager", "thread": event_monitor_manager})
             return event_monitor_manager
         else:
             self.logger.error("EVENT_MONITOR_UNAVAILABLE no event monitor module was found")
@@ -175,10 +161,7 @@ class RootService:
         uiserver = UIServer(data_queues, foreman, self.developer)
         uiserver.daemon = True
         uiserver.start()
-        self.threads.append({
-            'name':   'UIServer',
-            'thread': uiserver
-        })
+        self.threads.append({"name": "UIServer", "thread": uiserver})
         return uiserver
 
     def start_scheduled_tasks_manager(self):
@@ -186,11 +169,8 @@ class RootService:
         scheduled_tasks_manager = ScheduledTasksManager(self.event)
         scheduled_tasks_manager.daemon = True
         scheduled_tasks_manager.start()
-        self._verify_thread_started('ScheduledTasksManager', scheduled_tasks_manager)
-        self.threads.append({
-            'name':   'ScheduledTasksManager',
-            'thread': scheduled_tasks_manager
-        })
+        self._verify_thread_started("ScheduledTasksManager", scheduled_tasks_manager)
+        self.threads.append({"name": "ScheduledTasksManager", "thread": scheduled_tasks_manager})
         return scheduled_tasks_manager
 
     def start_resource_logger(self):
@@ -220,13 +200,15 @@ class RootService:
                     # Calculate uptime in seconds
                     uptime = int(time.time() - start_time)
 
-                    CompressoLogging.metric("root_service_resources",
-                                          pid=pid,
-                                          uptime=uptime,
-                                          cpu_percent=normalised_cpu_percent,
-                                          mem_percent=mem_percent,
-                                          rss_bytes=rss_bytes,
-                                          vms_bytes=vms_bytes)
+                    CompressoLogging.metric(
+                        "root_service_resources",
+                        pid=pid,
+                        uptime=uptime,
+                        cpu_percent=normalised_cpu_percent,
+                        mem_percent=mem_percent,
+                        rss_bytes=rss_bytes,
+                        vms_bytes=vms_bytes,
+                    )
                 except Exception as e:
                     self.logger.warning(f"Resource logging failed: {e}")
                     time.sleep(5)
@@ -234,21 +216,15 @@ class RootService:
 
                 time.sleep(5)  # Polling interval
 
-        thread = threading.Thread(
-            target=log_resources,
-            name='RootServiceResourceLogger',
-            daemon=True
-        )
+        thread = threading.Thread(target=log_resources, name="RootServiceResourceLogger", daemon=True)
         thread.stop = abort_flag.set
         thread.start()
-        self._verify_thread_started('RootServiceResourceLogger', thread)
-        self.threads.append({
-            'name':   'RootServiceResourceLogger',
-            'thread': thread
-        })
+        self._verify_thread_started("RootServiceResourceLogger", thread)
+        self.threads.append({"name": "RootServiceResourceLogger", "thread": thread})
 
     def initial_register_compresso(self):
         from compresso.libs import session
+
         s = session.Session(dev_api=self.dev_api)
         s.register_compresso(s.get_installation_uuid())
 
@@ -256,9 +232,9 @@ class RootService:
         # Create our data queues
         data_queues = {
             "library_scanner_triggers": queue.Queue(maxsize=1),
-            "scheduledtasks":           queue.Queue(),
-            "inotifytasks":             queue.Queue(),
-            "progress_reports":         queue.Queue(),
+            "scheduledtasks": queue.Queue(),
+            "inotifytasks": queue.Queue(),
+            "progress_reports": queue.Queue(),
         }
 
         # Clear cache directory
@@ -268,7 +244,7 @@ class RootService:
         except Exception as e:
             message = f"STARTUP_CACHE_CLEANUP_FAILED cache_path={settings.get_cache_path()} error={str(e)}"
             self.logger.error(message)
-            self.startup_state.mark_error('startup_validation', message)
+            self.startup_state.mark_error("startup_validation", message)
             raise
 
         self.logger.info("Starting all threads")
@@ -302,60 +278,62 @@ class RootService:
 
         # Start main thread resource logger
         self.start_resource_logger()
-        thread_names = [thread['name'] for thread in self.threads if thread['name'] != 'UIServer']
-        self.startup_state.mark_ready('threads_ready', detail=", ".join(thread_names))
+        thread_names = [thread["name"] for thread in self.threads if thread["name"] != "UIServer"]
+        self.startup_state.mark_ready("threads_ready", detail=", ".join(thread_names))
 
     def log_startup_summary(self, settings):
         summary = startup.build_startup_summary(settings, eventmonitor.event_monitor_module)
-        self.logger.info("STARTUP_SUMMARY library_path=%s", summary['library_path'])
-        self.logger.info("STARTUP_SUMMARY cache_path=%s", summary['cache_path'])
-        self.logger.info("STARTUP_SUMMARY config_path=%s", summary['config_path'])
+        self.logger.info("STARTUP_SUMMARY library_path=%s", summary["library_path"])
+        self.logger.info("STARTUP_SUMMARY cache_path=%s", summary["cache_path"])
+        self.logger.info("STARTUP_SUMMARY config_path=%s", summary["config_path"])
         self.logger.info(
             "STARTUP_SUMMARY scan_enabled=%s full_scan_on_start=%s concurrent_file_testers=%s",
-            summary['enable_library_scanner'],
-            summary['run_full_scan_on_start'],
-            summary['concurrent_file_testers'],
+            summary["enable_library_scanner"],
+            summary["run_full_scan_on_start"],
+            summary["concurrent_file_testers"],
         )
         self.logger.info(
             "STARTUP_SUMMARY worker_count=%s event_monitor_active=%s safe_defaults=%s",
-            summary['worker_count'],
-            summary['event_monitor_active'],
-            summary['safe_defaults'],
+            summary["worker_count"],
+            summary["event_monitor_active"],
+            summary["safe_defaults"],
         )
-        self.logger.info("STARTUP_SUMMARY ffmpeg_version=%s", summary.get('ffmpeg_version', 'not found'))
+        self.logger.info("STARTUP_SUMMARY ffmpeg_version=%s", summary.get("ffmpeg_version", "not found"))
 
     def wait_for_startup_readiness(self, settings):
         deadline = time.time() + settings.get_startup_readiness_timeout_seconds()
         while time.time() < deadline:
             snapshot = self.startup_state.snapshot()
-            if snapshot.get('ready'):
+            if snapshot.get("ready"):
                 return snapshot
-            if snapshot.get('errors'):
+            if snapshot.get("errors"):
                 break
             time.sleep(0.2)
 
         snapshot = self.startup_state.snapshot()
-        if snapshot.get('errors'):
-            self.logger.error("STARTUP_READINESS_PARTIAL_FAILURE stages=%s errors=%s",
-                              snapshot.get('stages'), snapshot.get('errors'))
+        if snapshot.get("errors"):
+            self.logger.error(
+                "STARTUP_READINESS_PARTIAL_FAILURE stages=%s errors=%s", snapshot.get("stages"), snapshot.get("errors")
+            )
         else:
-            self.logger.error("STARTUP_READINESS_TIMEOUT stages=%s details=%s",
-                              snapshot.get('stages'), snapshot.get('details'))
+            self.logger.error(
+                "STARTUP_READINESS_TIMEOUT stages=%s details=%s", snapshot.get("stages"), snapshot.get("details")
+            )
         raise RuntimeError("Startup readiness check failed")
 
     def stop_threads(self):
         self.logger.info("Stopping all threads")
         self.event.set()
         for thread in self.threads:
-            self.logger.info("Sending thread {} abort signal".format(thread['name']))
-            thread['thread'].stop()
+            self.logger.info("Sending thread {} abort signal".format(thread["name"]))
+            thread["thread"].stop()
         for thread in self.threads:
-            self.logger.info("Waiting for thread {} to stop".format(thread['name']))
-            thread['thread'].join(10)
-            if thread['thread'].is_alive():
-                self.logger.error("WORKER_THREAD_STOP_TIMEOUT name=%s", thread['name'])
+            self.logger.info("Waiting for thread {} to stop".format(thread["name"]))
+            thread["thread"].join(10)
+            if thread["thread"].is_alive():
+                self.logger.error("WORKER_THREAD_STOP_TIMEOUT name=%s", thread["name"])
             else:
-                self.logger.info("WORKER_THREAD_STOPPED name=%s", thread['name'])
+                self.logger.info("WORKER_THREAD_STOPPED name=%s", thread["name"])
         self.threads = []
 
     def sig_handle(self, signum, frame):
@@ -374,6 +352,7 @@ class RootService:
 
         from compresso.libs.task import TaskDataStore
         from compresso.libs.unplugins.child_process import kill_all_plugin_processes, set_shared_manager
+
         # Init a shared manager
         self._mgr = Manager()
         # Ensure Manager shuts down on process exit or tornado autoreload (dev mode)
@@ -393,36 +372,37 @@ class RootService:
         # Init the configuration
         try:
             settings = config.Config()
-            self.startup_state.mark_ready('config_loaded', detail=settings.get_config_path())
+            self.startup_state.mark_ready("config_loaded", detail=settings.get_config_path())
         except Exception as e:
             message = f"STARTUP_CONFIG_LOAD_FAILED error={str(e)}"
             self.logger.error(message)
-            self.startup_state.mark_error('config_loaded', message)
+            self.startup_state.mark_error("config_loaded", message)
             raise
 
         # Validate deployment paths before worker startup.
         try:
             startup.validate_startup_environment(settings)
-            self.startup_state.mark_ready('startup_validation', detail='validated')
+            self.startup_state.mark_ready("startup_validation", detail="validated")
         except Exception as e:
             message = f"STARTUP_VALIDATION_FAILED error={str(e)}"
             self.logger.error(message)
-            self.startup_state.mark_error('startup_validation', message)
+            self.startup_state.mark_error("startup_validation", message)
             raise
 
         # Init the database
         try:
             self.db_connection = init_db(settings.get_config_path())
-            self.startup_state.mark_ready('db_ready', detail=settings.get_config_path())
+            self.startup_state.mark_ready("db_ready", detail=settings.get_config_path())
         except Exception as e:
             message = f"STARTUP_DB_INIT_FAILED error={str(e)}"
             self.logger.error(message)
-            self.startup_state.mark_error('db_ready', message)
+            self.startup_state.mark_error("db_ready", message)
             raise
 
         # Install bundled plugins
         try:
             from compresso.bundled_plugins import install_bundled_plugins
+
             install_bundled_plugins(settings.get_plugins_path())
         except Exception as e:
             self.logger.warning("STARTUP_BUNDLED_PLUGINS_FAILED error=%s", str(e))
@@ -435,8 +415,8 @@ class RootService:
         except Exception as e:
             message = f"STARTUP_THREADING_FAILED error={str(e)}"
             self.logger.error(message)
-            if not self.startup_state.snapshot().get('errors'):
-                self.startup_state.mark_error('threads_ready', message)
+            if not self.startup_state.snapshot().get("errors"):
+                self.startup_state.mark_error("threads_ready", message)
             raise
 
         # Watch for the term signal
@@ -451,64 +431,56 @@ class RootService:
             signal.signal(signal.SIGTERM, self.sig_handle)
             while self.run_threads:
                 signal.pause()
-                time.sleep(.5)
+                time.sleep(0.5)
 
         # Received term signal. Stop everything
         self.stop_threads()
         self.db_connection.stop()
         while not self.db_connection.is_stopped():
-            time.sleep(.5)
+            time.sleep(0.5)
             continue
         self.logger.info("Exit Compresso")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Compresso')
-    parser.add_argument('--version', action='version',
-                        version='%(prog)s {version}'.format(version=metadata.read_version_string('long')))
-    parser.add_argument('--manage-plugins', '--manage_plugins', action='store_true', dest='manage_plugins',
-                        help='manage installed plugins')
-    parser.add_argument('--create-plugin', action='store_true',
-                        help='Create a new plugin (use with --manage-plugins)')
-    parser.add_argument('--plugin-id', nargs='?',
-                        help='Plugin id for plugin CLI actions')
-    parser.add_argument('--plugin-name', nargs='?',
-                        help='Plugin name for --create-plugin')
-    parser.add_argument('--plugin-runners', nargs='+',
-                        help='Plugin runner types for --create-plugin (names or runner functions)')
-    parser.add_argument('--test-plugin', nargs='?',
-                        help='Test a specific plugin by id (use with --manage-plugins)')
-    parser.add_argument('--test-plugins', action='store_true',
-                        help='Test all plugins (use with --manage-plugins)')
-    parser.add_argument('--test-file-in', nargs='?',
-                        help='Override test_file_in for plugin tests (use with --manage-plugins)')
-    parser.add_argument('--test-file-out', nargs='?',
-                        help='Override test_file_out for plugin tests (use with --manage-plugins)')
-    parser.add_argument('--remove-plugin', action='store_true',
-                        help='Remove a plugin by id (use with --manage-plugins and --plugin-id)')
-    parser.add_argument('--reload-plugins', action='store_true',
-                        help='Reload all plugins from disk (use with --manage-plugins)')
-    parser.add_argument('--install-test-data', action='store_true',
-                        help='Install test data (use with --manage-plugins)')
-    parser.add_argument('--dev',
-                        action='store_true',
-                        help='Enable developer mode')
-    parser.add_argument('--dev-api', nargs='?',
-                        help='Enable development against another compresso support api')
-    parser.add_argument('--port', nargs='?',
-                        help='Specify the port to run the webserver on')
-    parser.add_argument('--address', nargs='?',
-                        help='Specify the address to listen on, to limit connections to a specific interface')
+    parser = argparse.ArgumentParser(description="Compresso")
+    parser.add_argument(
+        "--version", action="version", version="%(prog)s {version}".format(version=metadata.read_version_string("long"))
+    )
+    parser.add_argument(
+        "--manage-plugins", "--manage_plugins", action="store_true", dest="manage_plugins", help="manage installed plugins"
+    )
+    parser.add_argument("--create-plugin", action="store_true", help="Create a new plugin (use with --manage-plugins)")
+    parser.add_argument("--plugin-id", nargs="?", help="Plugin id for plugin CLI actions")
+    parser.add_argument("--plugin-name", nargs="?", help="Plugin name for --create-plugin")
+    parser.add_argument(
+        "--plugin-runners", nargs="+", help="Plugin runner types for --create-plugin (names or runner functions)"
+    )
+    parser.add_argument("--test-plugin", nargs="?", help="Test a specific plugin by id (use with --manage-plugins)")
+    parser.add_argument("--test-plugins", action="store_true", help="Test all plugins (use with --manage-plugins)")
+    parser.add_argument("--test-file-in", nargs="?", help="Override test_file_in for plugin tests (use with --manage-plugins)")
+    parser.add_argument(
+        "--test-file-out", nargs="?", help="Override test_file_out for plugin tests (use with --manage-plugins)"
+    )
+    parser.add_argument(
+        "--remove-plugin", action="store_true", help="Remove a plugin by id (use with --manage-plugins and --plugin-id)"
+    )
+    parser.add_argument(
+        "--reload-plugins", action="store_true", help="Reload all plugins from disk (use with --manage-plugins)"
+    )
+    parser.add_argument("--install-test-data", action="store_true", help="Install test data (use with --manage-plugins)")
+    parser.add_argument("--dev", action="store_true", help="Enable developer mode")
+    parser.add_argument("--dev-api", nargs="?", help="Enable development against another compresso support api")
+    parser.add_argument("--port", nargs="?", help="Specify the port to run the webserver on")
+    parser.add_argument(
+        "--address", nargs="?", help="Specify the address to listen on, to limit connections to a specific interface"
+    )
     # parser.add_argument('--compresso_path', nargs='?',
     #                    help='Specify the compresso configuration path instead of ~/.compresso')
     args = parser.parse_args()
 
     # Configure application from args
-    settings = config.Config(
-        port=args.port,
-        address=args.address,
-        compresso_path=None
-    )
+    settings = config.Config(port=args.port, address=args.address, compresso_path=None)
 
     if args.manage_plugins:
         # Init the DB connection
@@ -516,9 +488,16 @@ def main():
 
         # Run the plugin manager CLI
         from compresso.libs.unplugins.pluginscli import PluginsCLI
+
         plugin_cli = PluginsCLI()
-        if (args.create_plugin or args.remove_plugin or args.reload_plugins or args.test_plugin
-                or args.test_plugins or args.install_test_data):
+        if (
+            args.create_plugin
+            or args.remove_plugin
+            or args.reload_plugins
+            or args.test_plugin
+            or args.test_plugins
+            or args.install_test_data
+        ):
             plugin_cli.run_from_args(args)
         else:
             plugin_cli.run()
@@ -526,7 +505,7 @@ def main():
         # Stop the DB connection
         db_connection.stop()
         while not db_connection.is_stopped():
-            time.sleep(.2)
+            time.sleep(0.2)
             continue
     else:
         # Run the main Compresso service

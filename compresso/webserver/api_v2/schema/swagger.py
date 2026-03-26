@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.swagger.py
+compresso.swagger.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     01 Aug 2021, (9:50 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     01 Aug 2021, (9:50 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import importlib
 import json
 import os
@@ -57,9 +58,12 @@ def find_all_handlers():
     for handler in list_all_handlers():
         endpoint_handler = getattr(importlib.import_module("compresso.webserver.api_v2"), handler)
         for route in endpoint_handler.routes:
-            path_pattern = route.get('path_pattern')
+            path_pattern = route.get("path_pattern")
             return_list.append(
-                (path_pattern, endpoint_handler,)
+                (
+                    path_pattern,
+                    endpoint_handler,
+                )
             )
     return return_list
 
@@ -70,7 +74,7 @@ def generate_swagger_file():
     """
     errors = []
 
-    file_location = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', f'api_schema_v{API_VERSION}')
+    file_location = os.path.join(os.path.dirname(__file__), "..", "..", "docs", f"api_schema_v{API_VERSION}")
 
     # Starting to generate Swagger spec file. All the relevant
     # information can be found from here https://apispec.readthedocs.io/
@@ -82,9 +86,12 @@ def generate_swagger_file():
         info=dict(description="Documentation for the Compresso application API"),
         plugins=[CompressoSpecPlugin(), MarshmallowPlugin()],
         servers=[
-            {"url": f"/compresso/api/v{API_VERSION}/", "description": "Current environment", },
+            {
+                "url": f"/compresso/api/v{API_VERSION}/",
+                "description": "Current environment",
+            },
         ],
-        **security_settings
+        **security_settings,
     )
     # Looping through all the handlers and trying to register them.
     # Handlers without docstring will raise errors. That's why we
@@ -97,10 +104,10 @@ def generate_swagger_file():
             errors.append(f"API Docs - Failed to append spec path - {str(e)}")
 
     # Write the Swagger file into specified location.
-    with open(f'{file_location}.json', "w", encoding="utf-8") as file:
+    with open(f"{file_location}.json", "w", encoding="utf-8") as file:
         json.dump(spec.to_dict(), file, ensure_ascii=False, indent=4)
     # TODO: Remove YAML. It sucks!
-    with open(f'{file_location}.yaml', "w", encoding="utf-8") as file:
+    with open(f"{file_location}.yaml", "w", encoding="utf-8") as file:
         file.write(spec.to_yaml())
 
     return errors

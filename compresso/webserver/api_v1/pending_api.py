@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.pending_api.py
+compresso.pending_api.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     26 Oct 2020, (2:26 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     26 Oct 2020, (2:26 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -50,23 +50,23 @@ class ApiPendingHandler(BaseApiHandler):
     routes = [
         {
             "supported_methods": ["POST"],
-            "call_method":       "create_task_from_path",
-            "path_pattern":      r"/api/v1/pending/add/",
+            "call_method": "create_task_from_path",
+            "path_pattern": r"/api/v1/pending/add/",
         },
         {
             "supported_methods": ["POST"],
-            "call_method":       "manage_pending_tasks_list",
-            "path_pattern":      r"/api/v1/pending/list",
+            "call_method": "manage_pending_tasks_list",
+            "path_pattern": r"/api/v1/pending/list",
         },
         {
             "supported_methods": ["GET"],
-            "call_method":       "trigger_library_rescan",
-            "path_pattern":      r"/api/v1/pending/rescan",
+            "call_method": "trigger_library_rescan",
+            "path_pattern": r"/api/v1/pending/rescan",
         },
     ]
 
     def initialize(self, **kwargs):
-        self.name = 'pending_api'
+        self.name = "pending_api"
         self.config = config.Config()
 
         self.params = kwargs.get("params")
@@ -88,25 +88,22 @@ class ApiPendingHandler(BaseApiHandler):
 
         # Delete a list of tasks.
         #   (on success will continue to return the current list of tasks)
-        if (
-            request_dict.get("customActionName") == "remove-from-task-list"
-            and not self.delete_pending_tasks(request_dict.get("id"))
+        if request_dict.get("customActionName") == "remove-from-task-list" and not self.delete_pending_tasks(
+            request_dict.get("id")
         ):
             self.write(json.dumps({"success": False}))
             return
 
         # Move a list of tasks to the top of the queue
-        if (
-            request_dict.get("customActionName") == "move-to-top-of-task-list"
-            and not pending_tasks.reorder_pending_tasks(request_dict.get("id"), "top")
+        if request_dict.get("customActionName") == "move-to-top-of-task-list" and not pending_tasks.reorder_pending_tasks(
+            request_dict.get("id"), "top"
         ):
             self.write(json.dumps({"success": False}))
             return
 
         # Move a list of tasks to the bottom of the queue
-        if (
-            request_dict.get("customActionName") == "move-to-bottom-of-task-list"
-            and not pending_tasks.reorder_pending_tasks(request_dict.get("id"), "bottom")
+        if request_dict.get("customActionName") == "move-to-bottom-of-task-list" and not pending_tasks.reorder_pending_tasks(
+            request_dict.get("id"), "bottom"
         ):
             self.write(json.dumps({"success": False}))
             return
@@ -126,12 +123,12 @@ class ApiPendingHandler(BaseApiHandler):
         """
         # Handle request to manually trigger a rescan of the library
         # Check if we are able to start up a worker for another encoding job
-        library_scanner_triggers = self.compresso_data_queues.get('library_scanner_triggers')
+        library_scanner_triggers = self.compresso_data_queues.get("library_scanner_triggers")
         if library_scanner_triggers.full():
             self.write(json.dumps({"success": False}))
             return
         else:
-            library_scanner_triggers.put('library_scan')
+            library_scanner_triggers.put("library_scan")
             self.write(json.dumps({"success": True}))
             return
 

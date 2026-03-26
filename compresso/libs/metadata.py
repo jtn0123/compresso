@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.metadata.py
+compresso.metadata.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     03 Feb 2026
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     03 Feb 2026
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -83,11 +83,11 @@ class CompressoFileMetadata:
 
     @classmethod
     def _get_context(cls):
-        plugin_id = getattr(cls._ctx, 'plugin_id', None)
+        plugin_id = getattr(cls._ctx, "plugin_id", None)
         if not plugin_id:
             raise RuntimeError("Metadata context not bound to a plugin_id")
-        task_id = getattr(cls._ctx, 'task_id', None)
-        path = getattr(cls._ctx, 'path', None)
+        task_id = getattr(cls._ctx, "task_id", None)
+        path = getattr(cls._ctx, "path", None)
         return plugin_id, task_id, path
 
     @classmethod
@@ -111,7 +111,7 @@ class CompressoFileMetadata:
 
     @classmethod
     def _enforce_plugin_size_limit(cls, plugin_data):
-        encoded = json.dumps(plugin_data).encode('utf-8')
+        encoded = json.dumps(plugin_data).encode("utf-8")
         if len(encoded) > cls.MAX_PLUGIN_JSON_BYTES:
             raise ValueError(f"Plugin metadata exceeds size limit ({cls.MAX_PLUGIN_JSON_BYTES} bytes)")
 
@@ -120,17 +120,17 @@ class CompressoFileMetadata:
         entry = cls._task_cache.get(task_id)
         if entry is None:
             entry = {
-                'staged': {},
-                'staged_loaded': False,
-                'file': {},
-                'file_loaded': False,
-                'source_path': None,
-                'fingerprint': None,
-                'fingerprint_algo': None,
-                'source_plugins': set(),
-                'source_fingerprint': None,
-                'source_fingerprint_algo': None,
-                'source_path_at_set': None,
+                "staged": {},
+                "staged_loaded": False,
+                "file": {},
+                "file_loaded": False,
+                "source_path": None,
+                "fingerprint": None,
+                "fingerprint_algo": None,
+                "source_plugins": set(),
+                "source_fingerprint": None,
+                "source_fingerprint_algo": None,
+                "source_path_at_set": None,
             }
             cls._task_cache[task_id] = entry
         return entry
@@ -138,72 +138,72 @@ class CompressoFileMetadata:
     @classmethod
     def _load_task_metadata(cls, task_id):
         entry = cls._ensure_task_cache_entry(task_id)
-        if entry['staged_loaded']:
-            return entry['staged']
+        if entry["staged_loaded"]:
+            return entry["staged"]
 
         try:
             row = TaskMetadata.get(TaskMetadata.task == task_id)
-            entry['staged'] = cls._load_json_dict(row.json_blob)
+            entry["staged"] = cls._load_json_dict(row.json_blob)
         except TaskMetadata.DoesNotExist:
-            entry['staged'] = {}
-        entry['staged_loaded'] = True
-        return entry['staged']
+            entry["staged"] = {}
+        entry["staged_loaded"] = True
+        return entry["staged"]
 
     @classmethod
     def _normalize_scoped_staged(cls, staged):
         if not isinstance(staged, dict):
-            return {'source': {}, 'destination': {}, '__meta__': {}}
-        if 'source' in staged or 'destination' in staged or '__meta__' in staged:
-            source = staged.get('source') or {}
-            destination = staged.get('destination') or {}
-            meta = staged.get('__meta__') or {}
+            return {"source": {}, "destination": {}, "__meta__": {}}
+        if "source" in staged or "destination" in staged or "__meta__" in staged:
+            source = staged.get("source") or {}
+            destination = staged.get("destination") or {}
+            meta = staged.get("__meta__") or {}
             if not isinstance(source, dict):
                 source = {}
             if not isinstance(destination, dict):
                 destination = {}
             if not isinstance(meta, dict):
                 meta = {}
-            return {'source': source, 'destination': destination, '__meta__': meta}
+            return {"source": source, "destination": destination, "__meta__": meta}
 
         # Legacy format: plugin_id -> dict. Treat as source scope.
-        return {'source': staged, 'destination': {}, '__meta__': {}}
+        return {"source": staged, "destination": {}, "__meta__": {}}
 
     @classmethod
     def _load_task_source_path(cls, task_id):
         entry = cls._ensure_task_cache_entry(task_id)
-        if entry['source_path']:
-            return entry['source_path']
+        if entry["source_path"]:
+            return entry["source_path"]
         try:
             task = Tasks.get_by_id(task_id)
-            entry['source_path'] = task.abspath
+            entry["source_path"] = task.abspath
         except Tasks.DoesNotExist:
             cls._logger.debug("Task %s not found while loading source path", task_id)
-            entry['source_path'] = None
-        return entry['source_path']
+            entry["source_path"] = None
+        return entry["source_path"]
 
     @classmethod
     def _load_file_metadata_for_task(cls, task_id):
         entry = cls._ensure_task_cache_entry(task_id)
-        if entry['file_loaded']:
-            return entry['file']
+        if entry["file_loaded"]:
+            return entry["file"]
 
         source_path = cls._load_task_source_path(task_id)
         if not source_path or not os.path.exists(source_path):
-            entry['file'] = {}
-            entry['file_loaded'] = True
-            return entry['file']
+            entry["file"] = {}
+            entry["file_loaded"] = True
+            return entry["file"]
 
         fingerprint, algo = common.get_file_fingerprint(source_path)
-        entry['fingerprint'] = fingerprint
-        entry['fingerprint_algo'] = algo
+        entry["fingerprint"] = fingerprint
+        entry["fingerprint_algo"] = algo
 
         try:
             row = FileMetadata.get(FileMetadata.fingerprint == fingerprint)
-            entry['file'] = cls._load_json_dict(row.metadata_json)
+            entry["file"] = cls._load_json_dict(row.metadata_json)
         except FileMetadata.DoesNotExist:
-            entry['file'] = {}
-        entry['file_loaded'] = True
-        return entry['file']
+            entry["file"] = {}
+        entry["file_loaded"] = True
+        return entry["file"]
 
     @classmethod
     def _prune_path_cache(cls, now):
@@ -213,7 +213,7 @@ class CompressoFileMetadata:
 
         expired = []
         for key, entry in cls._path_cache.items():
-            if now - entry.get('last_accessed', now) > cls.CACHE_TTL_SECONDS:
+            if now - entry.get("last_accessed", now) > cls.CACHE_TTL_SECONDS:
                 expired.append(key)
         for key in expired:
             cls._path_cache.pop(key, None)
@@ -229,15 +229,15 @@ class CompressoFileMetadata:
             entry = cls._path_cache.get(path)
             if not entry:
                 return None
-            entry['last_accessed'] = now
+            entry["last_accessed"] = now
             cls._path_cache.move_to_end(path)
             return entry
 
     @classmethod
     def _set_cached_path_entry(cls, path, entry):
         now = time.time()
-        entry['created_at'] = now
-        entry['last_accessed'] = now
+        entry["created_at"] = now
+        entry["last_accessed"] = now
         with cls._lock:
             cls._path_cache[path] = entry
             cls._path_cache.move_to_end(path)
@@ -255,8 +255,8 @@ class CompressoFileMetadata:
             staged_scoped = cls._normalize_scoped_staged(staged)
             file_data = cls._load_file_metadata_for_task(task_id)
             merged = dict(file_data)
-            merged.update(staged_scoped.get('source', {}))
-            merged.update(staged_scoped.get('destination', {}))
+            merged.update(staged_scoped.get("source", {}))
+            merged.update(staged_scoped.get("destination", {}))
             return deepcopy(merged.get(plugin_id, {}))
 
         if not path:
@@ -264,7 +264,7 @@ class CompressoFileMetadata:
 
         cached = cls._get_cached_path_entry(path)
         if cached:
-            return deepcopy(cached.get('metadata', {}).get(plugin_id, {}))
+            return deepcopy(cached.get("metadata", {}).get(plugin_id, {}))
 
         if not os.path.exists(path):
             return {}
@@ -277,9 +277,9 @@ class CompressoFileMetadata:
             metadata = {}
 
         entry = {
-            'fingerprint': fingerprint,
-            'fingerprint_algo': algo,
-            'metadata': metadata,
+            "fingerprint": fingerprint,
+            "fingerprint_algo": algo,
+            "metadata": metadata,
         }
         cls._set_cached_path_entry(path, entry)
         return deepcopy(metadata.get(plugin_id, {}))
@@ -297,7 +297,7 @@ class CompressoFileMetadata:
             entry = cls._ensure_task_cache_entry(task_id)
             staged = cls._load_task_metadata(task_id)
             staged_scoped = cls._normalize_scoped_staged(staged)
-            scope_key = 'source' if use_source_scope else 'destination'
+            scope_key = "source" if use_source_scope else "destination"
             scope_blob = staged_scoped[scope_key]
             plugin_data = scope_blob.get(plugin_id, {})
             if not isinstance(plugin_data, dict):
@@ -310,26 +310,29 @@ class CompressoFileMetadata:
             cls._enforce_plugin_size_limit(plugin_data)
             scope_blob[plugin_id] = plugin_data
 
-            if scope_key == 'source':
-                meta = staged_scoped.get('__meta__', {})
-                if not meta.get('source_fingerprint'):
+            if scope_key == "source":
+                meta = staged_scoped.get("__meta__", {})
+                if not meta.get("source_fingerprint"):
                     source_path = cls._load_task_source_path(task_id)
-                    meta['source_path_at_set'] = source_path
+                    meta["source_path_at_set"] = source_path
                     if source_path and os.path.exists(source_path):
                         fingerprint, algo = common.get_file_fingerprint(source_path)
-                        meta['source_fingerprint'] = fingerprint
-                        meta['source_fingerprint_algo'] = algo
+                        meta["source_fingerprint"] = fingerprint
+                        meta["source_fingerprint_algo"] = algo
                     else:
                         cls._logger.info("Unable to fingerprint source path for metadata set: %s", source_path)
-                staged_scoped['__meta__'] = meta
+                staged_scoped["__meta__"] = meta
 
-            entry['staged'] = staged_scoped
-            entry['staged_loaded'] = True
+            entry["staged"] = staged_scoped
+            entry["staged_loaded"] = True
 
-            row, created = TaskMetadata.get_or_create(task=task_id, defaults={
-                'json_blob': cls._dump_json_dict(staged_scoped),
-                'updated_at': datetime.now(),
-            })
+            row, created = TaskMetadata.get_or_create(
+                task=task_id,
+                defaults={
+                    "json_blob": cls._dump_json_dict(staged_scoped),
+                    "updated_at": datetime.now(),
+                },
+            )
             if not created:
                 row.json_blob = cls._dump_json_dict(staged_scoped)
                 row.updated_at = datetime.now()
@@ -343,14 +346,10 @@ class CompressoFileMetadata:
         FileMetadataPaths.update(
             path_type=path_type,
             updated_at=now,
-        ).where(
-            (FileMetadataPaths.file_metadata == file_metadata_id) &
-            (FileMetadataPaths.path == path)
-        ).execute()
+        ).where((FileMetadataPaths.file_metadata == file_metadata_id) & (FileMetadataPaths.path == path)).execute()
 
         row = FileMetadataPaths.get_or_none(
-            (FileMetadataPaths.file_metadata == file_metadata_id) &
-            (FileMetadataPaths.path == path)
+            (FileMetadataPaths.file_metadata == file_metadata_id) & (FileMetadataPaths.path == path)
         )
         if not row:
             FileMetadataPaths.create(
@@ -376,9 +375,9 @@ class CompressoFileMetadata:
 
             cls._ensure_task_cache_entry(task_id)
             staged_scoped = cls._normalize_scoped_staged(staged)
-            source_staged = staged_scoped.get('source', {})
-            destination_staged = staged_scoped.get('destination', {})
-            meta = staged_scoped.get('__meta__', {})
+            source_staged = staged_scoped.get("source", {})
+            destination_staged = staged_scoped.get("destination", {})
+            meta = staged_scoped.get("__meta__", {})
 
         destination_paths = destination_paths or []
         destination_paths = [p for p in destination_paths if p]
@@ -389,33 +388,33 @@ class CompressoFileMetadata:
                 if not os.path.exists(path):
                     continue
                 fingerprint, algo = common.get_file_fingerprint(path)
-                group = fingerprint_groups.setdefault(fingerprint, {'algo': algo, 'paths': [], 'scope': 'destination'})
-                if path not in group['paths']:
-                    group['paths'].append(path)
+                group = fingerprint_groups.setdefault(fingerprint, {"algo": algo, "paths": [], "scope": "destination"})
+                if path not in group["paths"]:
+                    group["paths"].append(path)
         if source_staged:
-            source_path_at_set = meta.get('source_path_at_set') or source_path
+            source_path_at_set = meta.get("source_path_at_set") or source_path
             if not source_path_at_set or not os.path.exists(source_path_at_set):
                 cls._logger.info(
                     "Source file missing at metadata commit; dropping source-scoped metadata for task %s",
                     task_id,
                 )
             else:
-                source_fingerprint = meta.get('source_fingerprint')
-                source_algo = meta.get('source_fingerprint_algo')
+                source_fingerprint = meta.get("source_fingerprint")
+                source_algo = meta.get("source_fingerprint_algo")
                 if not source_fingerprint:
                     source_fingerprint, source_algo = common.get_file_fingerprint(source_path_at_set)
                 group = fingerprint_groups.setdefault(
                     source_fingerprint,
-                    {'algo': source_algo, 'paths': [], 'scope': 'source'},
+                    {"algo": source_algo, "paths": [], "scope": "source"},
                 )
-                if source_path_at_set not in group['paths']:
-                    group['paths'].append(source_path_at_set)
+                if source_path_at_set not in group["paths"]:
+                    group["paths"].append(source_path_at_set)
 
         with cls._lock:
             for fingerprint, data in fingerprint_groups.items():
-                algo = data['algo']
-                paths = data['paths']
-                staged_payload = source_staged if data.get('scope') == 'source' else destination_staged
+                algo = data["algo"]
+                paths = data["paths"]
+                staged_payload = source_staged if data.get("scope") == "source" else destination_staged
 
                 if not staged_payload:
                     continue
@@ -438,15 +437,15 @@ class CompressoFileMetadata:
                         last_task_id=task_id,
                     )
 
-                if data.get('scope') == 'source':
-                    source_path_at_set = meta.get('source_path_at_set') or source_path
+                if data.get("scope") == "source":
+                    source_path_at_set = meta.get("source_path_at_set") or source_path
                     if source_path_at_set:
-                        cls._upsert_path(row.id, source_path_at_set, 'source')
+                        cls._upsert_path(row.id, source_path_at_set, "source")
                 else:
                     for path in paths:
-                        cls._upsert_path(row.id, path, 'destination')
+                        cls._upsert_path(row.id, path, "destination")
                     if paths:
-                        cls._upsert_path(row.id, paths[-1], 'last_seen')
+                        cls._upsert_path(row.id, paths[-1], "last_seen")
 
             TaskMetadata.delete().where(TaskMetadata.task == task_id).execute()
             cls._task_cache.pop(task_id, None)
@@ -469,20 +468,24 @@ class CompressoFileMetadata:
 
         path_map = {}
         for row in FileMetadataPaths.select().where(FileMetadataPaths.file_metadata.in_(metadata_ids)):
-            path_map.setdefault(row.file_metadata.id, []).append({
-                'path': row.path,
-                'path_type': row.path_type,
-            })
+            path_map.setdefault(row.file_metadata.id, []).append(
+                {
+                    "path": row.path,
+                    "path_type": row.path_type,
+                }
+            )
 
         results = []
         for row in FileMetadata.select().where(FileMetadata.id.in_(metadata_ids)):
-            results.append({
-                'fingerprint': row.fingerprint,
-                'fingerprint_algo': row.fingerprint_algo,
-                'metadata_json': cls._load_json_dict(row.metadata_json),
-                'last_task_id': row.last_task_id,
-                'paths': path_map.get(row.id, []),
-            })
+            results.append(
+                {
+                    "fingerprint": row.fingerprint,
+                    "fingerprint_algo": row.fingerprint_algo,
+                    "metadata_json": cls._load_json_dict(row.metadata_json),
+                    "last_task_id": row.last_task_id,
+                    "paths": path_map.get(row.id, []),
+                }
+            )
         return results
 
     @classmethod
@@ -490,20 +493,24 @@ class CompressoFileMetadata:
         cls._ensure_main_process()
         path_map = {}
         for row in FileMetadataPaths.select():
-            path_map.setdefault(row.file_metadata.id, []).append({
-                'path': row.path,
-                'path_type': row.path_type,
-            })
+            path_map.setdefault(row.file_metadata.id, []).append(
+                {
+                    "path": row.path,
+                    "path_type": row.path_type,
+                }
+            )
 
         results = []
         for row in FileMetadata.select():
-            results.append({
-                'fingerprint': row.fingerprint,
-                'fingerprint_algo': row.fingerprint_algo,
-                'metadata_json': cls._load_json_dict(row.metadata_json),
-                'last_task_id': row.last_task_id,
-                'paths': path_map.get(row.id, []),
-            })
+            results.append(
+                {
+                    "fingerprint": row.fingerprint,
+                    "fingerprint_algo": row.fingerprint_algo,
+                    "metadata_json": cls._load_json_dict(row.metadata_json),
+                    "last_task_id": row.last_task_id,
+                    "paths": path_map.get(row.id, []),
+                }
+            )
         return results
 
     @classmethod

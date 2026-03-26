@@ -22,18 +22,18 @@ def resolve_proxy_target(target_id):
         t_id = str(target_id).strip().lower()
         # Priority 1: Address (normalized)
         for r in search_list:
-            addr = str(r.get('address', '')).strip().lower().rstrip('/')
-            addr_bare = addr.replace('http://', '').replace('https://', '')
-            t_id_bare = t_id.replace('http://', '').replace('https://', '')
-            if addr == t_id or addr == t_id.rstrip('/') or addr_bare == t_id_bare:
+            addr = str(r.get("address", "")).strip().lower().rstrip("/")
+            addr_bare = addr.replace("http://", "").replace("https://", "")
+            t_id_bare = t_id.replace("http://", "").replace("https://", "")
+            if addr == t_id or addr == t_id.rstrip("/") or addr_bare == t_id_bare:
                 return r
         # Priority 2: UUID
         for r in search_list:
-            if str(r.get('uuid', '')).strip().lower() == t_id:
+            if str(r.get("uuid", "")).strip().lower() == t_id:
                 return r
         # Priority 3: Name
         for r in search_list:
-            if str(r.get('name', '')).strip().lower() == t_id:
+            if str(r.get("name", "")).strip().lower() == t_id:
                 return r
         return None
 
@@ -49,25 +49,21 @@ def resolve_proxy_target(target_id):
         return None
 
     # Construct URL base
-    url_base = target_config.get('address', '').rstrip('/')
-    if not url_base.startswith('http'):
-        url_base = 'http://' + url_base
+    url_base = target_config.get("address", "").rstrip("/")
+    if not url_base.startswith("http"):
+        url_base = "http://" + url_base
 
     # Auth
     auth_headers = {}
-    if target_config.get('auth') and target_config.get('auth').lower() == 'basic':
-        username = target_config.get('username', '')
-        password = target_config.get('password', '')
+    if target_config.get("auth") and target_config.get("auth").lower() == "basic":
+        username = target_config.get("username", "")
+        password = target_config.get("password", "")
         auth_str = f"{username}:{password}"
-        auth_bytes = auth_str.encode('ascii')
+        auth_bytes = auth_str.encode("ascii")
         base64_bytes = base64.b64encode(auth_bytes)
-        auth_headers['Authorization'] = f"Basic {base64_bytes.decode('ascii')}"
+        auth_headers["Authorization"] = f"Basic {base64_bytes.decode('ascii')}"
 
-    return {
-        'url_base': url_base,
-        'headers':  auth_headers,
-        'config':   target_config
-    }
+    return {"url_base": url_base, "headers": auth_headers, "config": target_config}
 
 
 class ProxyHandler(tornado.web.RequestHandler):
@@ -94,12 +90,12 @@ class ProxyHandler(tornado.web.RequestHandler):
 
         # Prepare headers
         headers = self.request.headers.copy()
-        for h in ['Host', 'Content-Length', 'Transfer-Encoding', 'Connection', 'X-Compresso-Target-Installation']:
+        for h in ["Host", "Content-Length", "Transfer-Encoding", "Connection", "X-Compresso-Target-Installation"]:
             if h in headers:
                 del headers[h]
 
         # Add Auth
-        headers.update(target_info['headers'])
+        headers.update(target_info["headers"])
 
         # Override Host to target? optional, but some servers require it matching
         # headers['Host'] = ...
@@ -109,17 +105,12 @@ class ProxyHandler(tornado.web.RequestHandler):
         client = tornado.httpclient.AsyncHTTPClient()
         try:
             response = await client.fetch(
-                url,
-                method=method,
-                headers=headers,
-                body=body,
-                follow_redirects=False,
-                raise_error=False
+                url, method=method, headers=headers, body=body, follow_redirects=False, raise_error=False
             )
 
             self.set_status(response.code)
             for k, v in response.headers.get_all():
-                if k.lower() not in ['content-length', 'transfer-encoding', 'connection', 'server']:
+                if k.lower() not in ["content-length", "transfer-encoding", "connection", "server"]:
                     self.set_header(k, v)
 
             if response.body:
@@ -130,22 +121,22 @@ class ProxyHandler(tornado.web.RequestHandler):
             self.write({"error": "Proxy Error"})
 
     async def get(self):
-        await self._handle_request('GET')
+        await self._handle_request("GET")
 
     async def head(self):
-        await self._handle_request('HEAD')
+        await self._handle_request("HEAD")
 
     async def post(self):
-        await self._handle_request('POST')
+        await self._handle_request("POST")
 
     async def delete(self):
-        await self._handle_request('DELETE')
+        await self._handle_request("DELETE")
 
     async def patch(self):
-        await self._handle_request('PATCH')
+        await self._handle_request("PATCH")
 
     async def put(self):
-        await self._handle_request('PUT')
+        await self._handle_request("PUT")
 
     async def options(self):
-        await self._handle_request('OPTIONS')
+        await self._handle_request("OPTIONS")

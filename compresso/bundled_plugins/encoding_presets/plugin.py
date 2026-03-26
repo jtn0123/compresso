@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 """
-    Encoding Presets Plugin
+Encoding Presets Plugin
 
-    Configurable encoding quality controls for FFmpeg-based transcoding.
-    Supports CRF/quality, encoder preset, bitrate cap, resolution scaling,
-    and audio bitrate.
+Configurable encoding quality controls for FFmpeg-based transcoding.
+Supports CRF/quality, encoder preset, bitrate cap, resolution scaling,
+and audio bitrate.
 """
 
 import logging
@@ -20,118 +20,118 @@ logger = logging.getLogger(__name__)
 class Settings(PluginSettings):
     settings = {
         # Video codec — leave empty to use the source codec
-        "video_codec":       "",
+        "video_codec": "",
         # Encoder — leave empty to auto-select based on codec
-        "video_encoder":     "",
+        "video_encoder": "",
         # CRF / quality value (0-51 for x264/x265, 0-63 for SVT-AV1/VP9)
-        "crf":               23,
+        "crf": 23,
         # Encoder preset (speed/quality tradeoff)
-        "encoder_preset":    "medium",
+        "encoder_preset": "medium",
         # Max video bitrate cap (e.g., "8000k", "15M"). Empty = no cap.
-        "max_bitrate":       "",
+        "max_bitrate": "",
         # Resolution scaling — target height in pixels. 0 = no scaling.
-        "scale_height":      0,
+        "scale_height": 0,
         # Audio codec — leave empty to copy audio
-        "audio_codec":       "",
+        "audio_codec": "",
         # Audio bitrate (e.g., "128k", "192k"). Empty = codec default.
-        "audio_bitrate":     "",
+        "audio_bitrate": "",
         # Output container format (e.g., "mkv", "mp4"). Empty = same as source.
-        "output_format":     "",
+        "output_format": "",
         # Extra FFmpeg output flags (advanced)
-        "extra_flags":       "",
+        "extra_flags": "",
     }
 
     form_settings = {
         "video_codec": {
-            "label":       "Video Codec",
+            "label": "Video Codec",
             "description": "Target video codec. Leave empty to keep source codec.",
-            "input_type":  "select",
+            "input_type": "select",
             "select_options": [
-                {"value": "",     "label": "Same as source"},
+                {"value": "", "label": "Same as source"},
                 {"value": "h264", "label": "H.264 (AVC)"},
                 {"value": "hevc", "label": "H.265 (HEVC)"},
-                {"value": "av1",  "label": "AV1"},
-                {"value": "vp9",  "label": "VP9"},
+                {"value": "av1", "label": "AV1"},
+                {"value": "vp9", "label": "VP9"},
             ],
         },
         "video_encoder": {
-            "label":       "Video Encoder",
+            "label": "Video Encoder",
             "description": "Specific encoder to use. Leave empty for auto-detection based on codec.",
-            "input_type":  "text",
+            "input_type": "text",
             "placeholder": "e.g., libx265, libsvtav1, hevc_nvenc",
         },
         "crf": {
-            "label":       "Quality (CRF)",
+            "label": "Quality (CRF)",
             "description": "Constant Rate Factor. Lower = better quality, larger files. Typical: 18-28.",
-            "input_type":  "slider",
-            "slider_min":  0,
-            "slider_max":  63,
+            "input_type": "slider",
+            "slider_min": 0,
+            "slider_max": 63,
             "slider_step": 1,
         },
         "encoder_preset": {
-            "label":       "Encoder Preset",
+            "label": "Encoder Preset",
             "description": "Speed/quality tradeoff. Slower = better compression at same quality.",
-            "input_type":  "select",
+            "input_type": "select",
             "select_options": [
                 {"value": "ultrafast", "label": "Ultrafast"},
                 {"value": "superfast", "label": "Superfast"},
-                {"value": "veryfast",  "label": "Very Fast"},
-                {"value": "faster",    "label": "Faster"},
-                {"value": "fast",      "label": "Fast"},
-                {"value": "medium",    "label": "Medium (default)"},
-                {"value": "slow",      "label": "Slow"},
-                {"value": "slower",    "label": "Slower"},
-                {"value": "veryslow",  "label": "Very Slow"},
+                {"value": "veryfast", "label": "Very Fast"},
+                {"value": "faster", "label": "Faster"},
+                {"value": "fast", "label": "Fast"},
+                {"value": "medium", "label": "Medium (default)"},
+                {"value": "slow", "label": "Slow"},
+                {"value": "slower", "label": "Slower"},
+                {"value": "veryslow", "label": "Very Slow"},
             ],
         },
         "max_bitrate": {
-            "label":       "Max Bitrate",
+            "label": "Max Bitrate",
             "description": "Maximum video bitrate cap. Leave empty for no limit. Examples: 8000k, 15M",
-            "input_type":  "text",
+            "input_type": "text",
             "placeholder": "e.g., 8000k",
         },
         "scale_height": {
-            "label":       "Scale to Height (px)",
+            "label": "Scale to Height (px)",
             "description": "Downscale video to this height (width auto-calculated). 0 = no scaling.",
-            "input_type":  "slider",
-            "slider_min":  0,
-            "slider_max":  2160,
+            "input_type": "slider",
+            "slider_min": 0,
+            "slider_max": 2160,
             "slider_step": 120,
         },
         "audio_codec": {
-            "label":       "Audio Codec",
+            "label": "Audio Codec",
             "description": "Target audio codec. Leave empty to copy audio stream.",
-            "input_type":  "select",
+            "input_type": "select",
             "select_options": [
-                {"value": "",      "label": "Copy (no re-encode)"},
-                {"value": "aac",   "label": "AAC"},
-                {"value": "opus",  "label": "Opus"},
-                {"value": "flac",  "label": "FLAC (lossless)"},
-                {"value": "ac3",   "label": "AC3"},
-                {"value": "mp3",   "label": "MP3"},
+                {"value": "", "label": "Copy (no re-encode)"},
+                {"value": "aac", "label": "AAC"},
+                {"value": "opus", "label": "Opus"},
+                {"value": "flac", "label": "FLAC (lossless)"},
+                {"value": "ac3", "label": "AC3"},
+                {"value": "mp3", "label": "MP3"},
             ],
         },
         "audio_bitrate": {
-            "label":       "Audio Bitrate",
+            "label": "Audio Bitrate",
             "description": "Audio bitrate. Leave empty for codec default. Examples: 128k, 192k, 320k",
-            "input_type":  "text",
+            "input_type": "text",
             "placeholder": "e.g., 192k",
         },
         "output_format": {
-            "label":       "Output Container",
+            "label": "Output Container",
             "description": "Output file format. Leave empty to keep source format.",
-            "input_type":  "select",
+            "input_type": "select",
             "select_options": [
-                {"value": "",     "label": "Same as source"},
-                {"value": "mkv",  "label": "Matroska (.mkv)"},
-                {"value": "mp4",  "label": "MP4 (.mp4)"},
+                {"value": "", "label": "Same as source"},
+                {"value": "mkv", "label": "Matroska (.mkv)"},
+                {"value": "mp4", "label": "MP4 (.mp4)"},
                 {"value": "webm", "label": "WebM (.webm)"},
             ],
         },
         "extra_flags": {
-            "label":       "Extra FFmpeg Flags",
+            "label": "Extra FFmpeg Flags",
             "description": "Additional FFmpeg output arguments (advanced). Appended to command.",
-            "input_type":  "text",
+            "input_type": "text",
             "placeholder": "e.g., -map 0 -c:s copy",
         },
     }
@@ -141,15 +141,15 @@ class Settings(PluginSettings):
 CODEC_ENCODER_MAP = {
     "h264": "libx264",
     "hevc": "libx265",
-    "av1":  "libsvtav1",
-    "vp9":  "libvpx-vp9",
+    "av1": "libsvtav1",
+    "vp9": "libvpx-vp9",
 }
 
 # Preset parameter name varies by encoder
 PRESET_PARAM_MAP = {
-    "libx264":    "-preset",
-    "libx265":    "-preset",
-    "libsvtav1":  "-preset",      # SVT-AV1 uses numeric 0-13, mapped below
+    "libx264": "-preset",
+    "libx265": "-preset",
+    "libsvtav1": "-preset",  # SVT-AV1 uses numeric 0-13, mapped below
     "libaom-av1": "-cpu-used",
     "libvpx-vp9": "-cpu-used",
 }
@@ -158,33 +158,33 @@ PRESET_PARAM_MAP = {
 SVTAV1_PRESET_MAP = {
     "ultrafast": "12",
     "superfast": "10",
-    "veryfast":  "8",
-    "faster":    "7",
-    "fast":      "6",
-    "medium":    "5",
-    "slow":      "4",
-    "slower":    "2",
-    "veryslow":  "0",
+    "veryfast": "8",
+    "faster": "7",
+    "fast": "6",
+    "medium": "5",
+    "slow": "4",
+    "slower": "2",
+    "veryslow": "0",
 }
 
 # VP9/libaom cpu-used mapping (name → number)
 CPU_USED_PRESET_MAP = {
     "ultrafast": "8",
     "superfast": "7",
-    "veryfast":  "6",
-    "faster":    "5",
-    "fast":      "4",
-    "medium":    "3",
-    "slow":      "2",
-    "slower":    "1",
-    "veryslow":  "0",
+    "veryfast": "6",
+    "faster": "5",
+    "fast": "4",
+    "medium": "3",
+    "slow": "2",
+    "slower": "1",
+    "veryslow": "0",
 }
 
 # CRF parameter name varies by encoder
 CRF_PARAM_MAP = {
-    "libx264":    "-crf",
-    "libx265":    "-crf",
-    "libsvtav1":  "-crf",
+    "libx264": "-crf",
+    "libx265": "-crf",
+    "libsvtav1": "-crf",
     "libaom-av1": "-crf",
     "libvpx-vp9": "-crf",
 }
@@ -193,7 +193,7 @@ CRF_PARAM_MAP = {
 def _get_source_extension(file_path):
     """Extract file extension without the dot."""
     _, ext = os.path.splitext(file_path)
-    return ext.lstrip('.').lower()
+    return ext.lstrip(".").lower()
 
 
 def _build_ffmpeg_progress_parser(data):
@@ -202,14 +202,19 @@ def _build_ffmpeg_progress_parser(data):
     Uses duration from file_in to calculate percent.
     """
     import subprocess
+
     duration = 0
 
     try:
         probe_cmd = [
-            "ffprobe", "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
-            data.get("file_in", "")
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            data.get("file_in", ""),
         ]
         result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=30)  # noqa: S603 - trusted ffprobe command built internally
         duration = float(result.stdout.strip())
@@ -220,13 +225,13 @@ def _build_ffmpeg_progress_parser(data):
         if unset or duration <= 0:
             return {}
         # Parse time=HH:MM:SS.ss from FFmpeg output
-        match = re.search(r'time=(\d+):(\d+):(\d+\.\d+)', str(line_text))
+        match = re.search(r"time=(\d+):(\d+):(\d+\.\d+)", str(line_text))
         if match:
             h, m, s = float(match.group(1)), float(match.group(2)), float(match.group(3))
             current_time = h * 3600 + m * 60 + s
             percent = min(100, int(current_time / duration * 100))
             return {
-                'percent': str(percent),
+                "percent": str(percent),
             }
         return {}
 
@@ -240,7 +245,7 @@ def on_worker_process(data, **kwargs):
     Reads settings, constructs the FFmpeg command with appropriate codec, quality,
     preset, bitrate, scaling, and audio parameters, then sets data['exec_command'].
     """
-    settings = Settings(library_id=data.get('library_id'))
+    settings = Settings(library_id=data.get("library_id"))
     settings.get_setting()
 
     s = settings.settings_configured
@@ -334,6 +339,4 @@ def on_worker_process(data, **kwargs):
         data["current_command"].clear()
         data["current_command"].append(" ".join(cmd))
 
-    data["worker_log"].append(
-        "[Encoding Presets] Command: {}\n".format(" ".join(cmd))
-    )
+    data["worker_log"].append("[Encoding Presets] Command: {}\n".format(" ".join(cmd)))

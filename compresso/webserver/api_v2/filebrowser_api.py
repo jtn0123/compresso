@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.filebrowser_api.py
+compresso.filebrowser_api.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     13 Aug 2021, (2:37 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     13 Aug 2021, (2:37 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -45,9 +45,9 @@ class ApiFilebrowserHandler(BaseApiHandler):
 
     routes = [
         {
-            "path_pattern":      r"/filebrowser/list",
+            "path_pattern": r"/filebrowser/list",
             "supported_methods": ["POST"],
-            "call_method":       "fetch_directory_listing",
+            "call_method": "fetch_directory_listing",
         }
     ]
 
@@ -104,20 +104,20 @@ class ApiFilebrowserHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestDirectoryListingDataSchema())
 
-            directory_listing = DirectoryListing(json_request.get('list_type', 'all'))
-            path_data = directory_listing.fetch_path_data(json_request.get('current_path', '/'))
+            directory_listing = DirectoryListing(json_request.get("list_type", "all"))
+            path_data = directory_listing.fetch_path_data(json_request.get("current_path", "/"))
 
             response = self.build_response(
                 DirectoryListingResultsSchema(),
                 {
-                    'directories': path_data.get('directories', []),
-                    'files':       path_data.get('files', []),
-                }
+                    "directories": path_data.get("directories", []),
+                    "files": path_data.get("files", []),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return

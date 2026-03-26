@@ -54,6 +54,10 @@ jobs:
         # Full lint (blocking — all rules enforced)
         ruff check compresso/ tests/
 
+    - name: Check formatting with ruff
+      run: |
+        ruff format --check compresso/ tests/
+
     - name: Type check with mypy
       run: |
         mypy compresso/ --ignore-missing-imports --no-error-summary

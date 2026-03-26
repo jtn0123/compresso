@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    compresso.rate_limiter.py
+compresso.rate_limiter.py
 
-    In-memory sliding window rate limiter for API endpoints.
+In-memory sliding window rate limiter for API endpoints.
 
 """
 
@@ -25,9 +25,9 @@ class RateLimiter:
     STRICT_WINDOW = 60
 
     EXPENSIVE_PATHS = {
-        '/preview/create',
-        '/healthcheck/scan',
-        '/healthcheck/scan-library',
+        "/preview/create",
+        "/healthcheck/scan",
+        "/healthcheck/scan-library",
     }
 
     def __init__(self):
@@ -39,9 +39,7 @@ class RateLimiter:
         """Remove requests outside the current window."""
         cutoff = time.time() - window
         if ip in self._requests:
-            self._requests[ip] = [
-                (ts, path) for ts, path in self._requests[ip] if ts > cutoff
-            ]
+            self._requests[ip] = [(ts, path) for ts, path in self._requests[ip] if ts > cutoff]
 
     def is_expensive(self, path):
         """Check if a path matches an expensive endpoint."""
@@ -50,8 +48,7 @@ class RateLimiter:
     def _cleanup_stale_ips(self):
         """Remove IPs that have no requests in the last 5 minutes."""
         cutoff = time.time() - 300
-        stale = [ip for ip, reqs in self._requests.items()
-                 if not reqs or max(ts for ts, _ in reqs) < cutoff]
+        stale = [ip for ip, reqs in self._requests.items() if not reqs or max(ts for ts, _ in reqs) < cutoff]
         for ip in stale:
             del self._requests[ip]
 
@@ -81,15 +78,9 @@ class RateLimiter:
             # Count requests in current window
             cutoff = now - window
             if is_expensive:
-                recent = [
-                    (ts, p) for ts, p in self._requests[ip]
-                    if ts > cutoff and self.is_expensive(p)
-                ]
+                recent = [(ts, p) for ts, p in self._requests[ip] if ts > cutoff and self.is_expensive(p)]
             else:
-                recent = [
-                    (ts, p) for ts, p in self._requests[ip]
-                    if ts > cutoff
-                ]
+                recent = [(ts, p) for ts, p in self._requests[ip] if ts > cutoff]
 
             count = len(recent)
 

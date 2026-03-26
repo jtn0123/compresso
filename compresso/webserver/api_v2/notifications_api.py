@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.notifications_api.py
+compresso.notifications_api.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     20 Apr 2022, (1:07 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     20 Apr 2022, (1:07 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -51,29 +51,29 @@ class ApiNotificationsHandler(BaseApiHandler):
 
     routes = [
         {
-            "path_pattern":      r"/notifications/read",
+            "path_pattern": r"/notifications/read",
             "supported_methods": ["GET"],
-            "call_method":       "get_notifications",
+            "call_method": "get_notifications",
         },
         {
-            "path_pattern":      r"/notifications/remove",
+            "path_pattern": r"/notifications/remove",
             "supported_methods": ["DELETE"],
-            "call_method":       "remove_notifications",
+            "call_method": "remove_notifications",
         },
         {
-            "path_pattern":      r"/notifications/channels",
+            "path_pattern": r"/notifications/channels",
             "supported_methods": ["GET"],
-            "call_method":       "get_notification_channels",
+            "call_method": "get_notification_channels",
         },
         {
-            "path_pattern":      r"/notifications/channels/save",
+            "path_pattern": r"/notifications/channels/save",
             "supported_methods": ["POST"],
-            "call_method":       "save_notification_channels",
+            "call_method": "save_notification_channels",
         },
         {
-            "path_pattern":      r"/notifications/channels/test",
+            "path_pattern": r"/notifications/channels/test",
             "supported_methods": ["POST"],
-            "call_method":       "test_notification_channel",
+            "call_method": "test_notification_channel",
         },
     ]
 
@@ -130,12 +130,12 @@ class ApiNotificationsHandler(BaseApiHandler):
                 RequestNotificationsDataSchema(),
                 {
                     "notifications": notifications_list_reversed,
-                }
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -191,17 +191,18 @@ class ApiNotificationsHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestTableUpdateByUuidList())
 
             notifications = Notifications()
-            for notification_uuid in json_request.get('uuid_list', []):
+            for notification_uuid in json_request.get("uuid_list", []):
                 if not notifications.remove(notification_uuid):
-                    self.set_status(self.STATUS_ERROR_EXTERNAL,
-                                    reason=f"Failed to delete the notification with UUID '{notification_uuid}'")
+                    self.set_status(
+                        self.STATUS_ERROR_EXTERNAL, reason=f"Failed to delete the notification with UUID '{notification_uuid}'"
+                    )
                     self.write_error()
                     return
 
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -216,16 +217,16 @@ class ApiNotificationsHandler(BaseApiHandler):
         Shows the protocol + first 12 chars of the rest, then '***'.
         """
         if not url:
-            return ''
-        match = re.match(r'^(https?://)', url)
+            return ""
+        match = re.match(r"^(https?://)", url)
         if match:
             prefix = match.group(1)
-            rest = url[len(prefix):]
+            rest = url[len(prefix) :]
             if len(rest) > 12:
-                return prefix + rest[:12] + '***'
+                return prefix + rest[:12] + "***"
             return url
         if len(url) > 12:
-            return url[:12] + '***'
+            return url[:12] + "***"
         return url
 
     async def get_notification_channels(self):
@@ -246,9 +247,9 @@ class ApiNotificationsHandler(BaseApiHandler):
             masked = []
             for ch in channels:
                 masked_ch = dict(ch)
-                masked_ch['url'] = self._mask_url(ch.get('url', ''))
+                masked_ch["url"] = self._mask_url(ch.get("url", ""))
                 masked.append(masked_ch)
-            self.write_success({'channels': masked})
+            self.write_success({"channels": masked})
             return
         except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
@@ -278,12 +279,12 @@ class ApiNotificationsHandler(BaseApiHandler):
         """
         try:
             body = json.loads(self.request.body)
-            channels = body.get('channels')
+            channels = body.get("channels")
             if not isinstance(channels, list):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channels' must be a list")
                 self.write_error()
                 return
-            self.config.set_config_item('notification_channels', channels)
+            self.config.set_config_item("notification_channels", channels)
             self.write_success()
             return
         except (json.JSONDecodeError, TypeError) as e:
@@ -318,7 +319,7 @@ class ApiNotificationsHandler(BaseApiHandler):
         """
         try:
             body = json.loads(self.request.body)
-            channel_config = body.get('channel')
+            channel_config = body.get("channel")
             if not isinstance(channel_config, dict):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channel' must be an object")
                 self.write_error()

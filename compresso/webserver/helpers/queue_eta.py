@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    compresso.queue_eta.py
+compresso.queue_eta.py
 
-    Helper functions for estimating encoding queue ETA.
+Helper functions for estimating encoding queue ETA.
 
 """
 
@@ -40,13 +40,13 @@ def estimate_queue_eta(foreman, completed_tasks_model=None):
     num_paused_workers = 0
 
     for worker in workers_status:
-        if worker.get('paused'):
+        if worker.get("paused"):
             num_paused_workers += 1
             continue
-        if not worker.get('idle'):
+        if not worker.get("idle"):
             num_busy_workers += 1
-            subprocess_stats = worker.get('subprocess') or {}
-            eta = subprocess_stats.get('eta_seconds')
+            subprocess_stats = worker.get("subprocess") or {}
+            eta = subprocess_stats.get("eta_seconds")
             if eta is not None:
                 active_etas.append(eta)
 
@@ -54,9 +54,7 @@ def estimate_queue_eta(foreman, completed_tasks_model=None):
     active_workers_eta_seconds = max(active_etas) if active_etas else 0
 
     # Query recent completed tasks for average processing time
-    estimated_per_task_seconds, history_count = _get_avg_task_duration(
-        completed_tasks_model
-    )
+    estimated_per_task_seconds, history_count = _get_avg_task_duration(completed_tasks_model)
 
     # Get pending task count
     pending_tasks_count = _get_pending_tasks_count()
@@ -71,9 +69,7 @@ def estimate_queue_eta(foreman, completed_tasks_model=None):
     # active_eta covers the current in-progress tasks (parallel),
     # then pending tasks are distributed across available workers
     if pending_tasks_count > 0 and estimated_per_task_seconds > 0:
-        pending_eta = int(
-            (pending_tasks_count * estimated_per_task_seconds) / available_workers
-        )
+        pending_eta = int((pending_tasks_count * estimated_per_task_seconds) / available_workers)
     else:
         pending_eta = 0
 
@@ -81,21 +77,21 @@ def estimate_queue_eta(foreman, completed_tasks_model=None):
 
     # Confidence level based on historical data
     if history_count >= 10:
-        eta_confidence = 'high'
+        eta_confidence = "high"
     elif history_count >= 3:
-        eta_confidence = 'medium'
+        eta_confidence = "medium"
     else:
-        eta_confidence = 'low'
+        eta_confidence = "low"
 
     return {
-        'active_workers_eta_seconds': active_workers_eta_seconds,
-        'pending_tasks_count':        pending_tasks_count,
-        'estimated_per_task_seconds': estimated_per_task_seconds,
-        'total_queue_eta_seconds':    total_queue_eta_seconds,
-        'eta_confidence':             eta_confidence,
-        'total_workers':              total_workers,
-        'busy_workers':               num_busy_workers,
-        'paused_workers':             num_paused_workers,
+        "active_workers_eta_seconds": active_workers_eta_seconds,
+        "pending_tasks_count": pending_tasks_count,
+        "estimated_per_task_seconds": estimated_per_task_seconds,
+        "total_queue_eta_seconds": total_queue_eta_seconds,
+        "eta_confidence": eta_confidence,
+        "total_workers": total_workers,
+        "busy_workers": num_busy_workers,
+        "paused_workers": num_paused_workers,
     }
 
 
@@ -113,8 +109,7 @@ def _get_avg_task_duration(completed_tasks_model=None):
             from compresso.libs.unmodels import CompletedTasks
 
         recent_tasks = (
-            CompletedTasks
-            .select(CompletedTasks.start_time, CompletedTasks.finish_time)
+            CompletedTasks.select(CompletedTasks.start_time, CompletedTasks.finish_time)
             .where(CompletedTasks.task_success == True)  # noqa: E712
             .order_by(CompletedTasks.finish_time.desc())
             .limit(50)
@@ -147,7 +142,8 @@ def _get_pending_tasks_count():
     """
     try:
         from compresso.libs.unmodels import Tasks
-        return Tasks.select().where(Tasks.status == 'pending').count()
+
+        return Tasks.select().where(Tasks.status == "pending").count()
     except Exception:
         logger.exception("Failed to query pending tasks count")
         return 0

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    tests.unit.test_library.py
+tests.unit.test_library.py
 
-    Unit tests for compresso.libs.library.Library class.
+Unit tests for compresso.libs.library.Library class.
 """
 
 import json
@@ -24,23 +24,31 @@ LibraryTags = Libraries.tags.get_through_model()
 
 @pytest.mark.unittest
 class TestLibraryInit:
-
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='compresso_test_library_')
-        self.db_file = os.path.join(self.config_path, 'test_library.db')
+        self.config_path = tempfile.mkdtemp(prefix="compresso_test_library_")
+        self.db_file = os.path.join(self.config_path, "test_library.db")
         database_settings = {
             "TYPE": "SQLITE",
             "FILE": self.db_file,
-            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+            "MIGRATIONS_DIR": os.path.join(self.config_path, "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
-        self.db_connection.create_tables([
-            Tasks, Libraries, LibraryTags, Tags,
-            WorkerGroups, WorkerGroupTags, WorkerSchedules,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+        self.db_connection.create_tables(
+            [
+                Tasks,
+                Libraries,
+                LibraryTags,
+                Tags,
+                WorkerGroups,
+                WorkerGroupTags,
+                WorkerSchedules,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
     def teardown_class(self):
         if self.db_connection:
@@ -54,8 +62,8 @@ class TestLibraryInit:
         # Keep at least one library for tests
         Libraries.delete().execute()
         self.lib_row = Libraries.create(
-            name='Test Library',
-            path='/media/test',
+            name="Test Library",
+            path="/media/test",
             locked=False,
             enable_remote_only=False,
             enable_scanner=False,
@@ -65,50 +73,62 @@ class TestLibraryInit:
 
     def test_raises_exception_for_id_zero(self):
         from compresso.libs.library import Library
+
         with pytest.raises(Exception, match="cannot be less than 1"):
             Library(0)
 
     def test_raises_exception_for_negative_id(self):
         from compresso.libs.library import Library
+
         with pytest.raises(Exception, match="cannot be less than 1"):
             Library(-1)
 
     def test_raises_exception_for_nonexistent_id(self):
         from compresso.libs.library import Library
+
         with pytest.raises(Exception, match="Unable to fetch library"):
             Library(99999)
 
     def test_successful_init_with_valid_id(self):
         from compresso.libs.library import Library
+
         lib = Library(self.lib_row.id)
-        assert lib.get_name() == 'Test Library'
+        assert lib.get_name() == "Test Library"
 
 
 @pytest.mark.unittest
 class TestLibraryGettersSetters:
-
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='compresso_test_library_gs_')
-        self.db_file = os.path.join(self.config_path, 'test.db')
+        self.config_path = tempfile.mkdtemp(prefix="compresso_test_library_gs_")
+        self.db_file = os.path.join(self.config_path, "test.db")
         database_settings = {
             "TYPE": "SQLITE",
             "FILE": self.db_file,
-            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+            "MIGRATIONS_DIR": os.path.join(self.config_path, "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
-        self.db_connection.create_tables([
-            Tasks, Libraries, LibraryTags, Tags,
-            WorkerGroups, WorkerGroupTags, WorkerSchedules,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+        self.db_connection.create_tables(
+            [
+                Tasks,
+                Libraries,
+                LibraryTags,
+                Tags,
+                WorkerGroups,
+                WorkerGroupTags,
+                WorkerSchedules,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
     def setup_method(self):
         Libraries.delete().execute()
         self.lib_row = Libraries.create(
-            name='getter_setter_lib',
-            path='/media/gs',
+            name="getter_setter_lib",
+            path="/media/gs",
             locked=False,
             enable_remote_only=False,
             enable_scanner=False,
@@ -118,23 +138,24 @@ class TestLibraryGettersSetters:
 
     def _lib(self):
         from compresso.libs.library import Library
+
         return Library(self.lib_row.id)
 
     def test_get_name_returns_model_name(self):
-        assert self._lib().get_name() == 'getter_setter_lib'
+        assert self._lib().get_name() == "getter_setter_lib"
 
     def test_set_name_updates_model(self):
         lib = self._lib()
-        lib.set_name('new_name')
-        assert lib.get_name() == 'new_name'
+        lib.set_name("new_name")
+        assert lib.get_name() == "new_name"
 
     def test_get_path_returns_model_path(self):
-        assert self._lib().get_path() == '/media/gs'
+        assert self._lib().get_path() == "/media/gs"
 
     def test_set_path_updates_model(self):
         lib = self._lib()
-        lib.set_path('/new/path')
-        assert lib.get_path() == '/new/path'
+        lib.set_path("/new/path")
+        assert lib.get_path() == "/new/path"
 
     def test_get_locked_returns_model_locked(self):
         assert self._lib().get_locked() is False
@@ -179,40 +200,49 @@ class TestLibraryGettersSetters:
 
 @pytest.mark.unittest
 class TestLibraryCodecFiltering:
-
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='compresso_test_library_codec_')
-        self.db_file = os.path.join(self.config_path, 'test.db')
+        self.config_path = tempfile.mkdtemp(prefix="compresso_test_library_codec_")
+        self.db_file = os.path.join(self.config_path, "test.db")
         database_settings = {
             "TYPE": "SQLITE",
             "FILE": self.db_file,
-            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+            "MIGRATIONS_DIR": os.path.join(self.config_path, "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
-        self.db_connection.create_tables([
-            Tasks, Libraries, LibraryTags, Tags,
-            WorkerGroups, WorkerGroupTags, WorkerSchedules,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+        self.db_connection.create_tables(
+            [
+                Tasks,
+                Libraries,
+                LibraryTags,
+                Tags,
+                WorkerGroups,
+                WorkerGroupTags,
+                WorkerSchedules,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
     def setup_method(self):
         Libraries.delete().execute()
         self.lib_row = Libraries.create(
-            name='codec_lib',
-            path='/media/codec',
+            name="codec_lib",
+            path="/media/codec",
             locked=False,
             enable_remote_only=False,
             enable_scanner=False,
             enable_inotify=False,
             priority_score=0,
-            target_codecs='',
-            skip_codecs='',
+            target_codecs="",
+            skip_codecs="",
         )
 
     def _lib(self):
         from compresso.libs.library import Library
+
         return Library(self.lib_row.id)
 
     # --- target_codecs ---
@@ -226,14 +256,14 @@ class TestLibraryCodecFiltering:
         assert self._lib().get_target_codecs() == ["h264", "hevc"]
 
     def test_get_target_codecs_invalid_json_returns_empty_list(self):
-        self.lib_row.target_codecs = 'not json'
+        self.lib_row.target_codecs = "not json"
         self.lib_row.save()
         assert self._lib().get_target_codecs() == []
 
     def test_get_target_codecs_empty_field_returns_empty_list(self):
         # target_codecs defaults to '' which should return []
         lib = self._lib()
-        lib.model.target_codecs = ''
+        lib.model.target_codecs = ""
         assert lib.get_target_codecs() == []
 
     def test_set_target_codecs_with_list_serializes_json(self):
@@ -249,7 +279,7 @@ class TestLibraryCodecFiltering:
     def test_set_target_codecs_with_none_stores_empty_string(self):
         lib = self._lib()
         lib.set_target_codecs(None)
-        assert lib.model.target_codecs == ''
+        assert lib.model.target_codecs == ""
 
     # --- skip_codecs ---
 
@@ -262,7 +292,7 @@ class TestLibraryCodecFiltering:
         assert self._lib().get_skip_codecs() == ["mpeg4"]
 
     def test_get_skip_codecs_invalid_json_returns_empty_list(self):
-        self.lib_row.skip_codecs = 'not json'
+        self.lib_row.skip_codecs = "not json"
         self.lib_row.save()
         assert self._lib().get_skip_codecs() == []
 
@@ -274,34 +304,42 @@ class TestLibraryCodecFiltering:
     def test_set_skip_codecs_with_none_stores_empty_string(self):
         lib = self._lib()
         lib.set_skip_codecs(None)
-        assert lib.model.skip_codecs == ''
+        assert lib.model.skip_codecs == ""
 
 
 @pytest.mark.unittest
 class TestLibrarySizeGuardrails:
-
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='compresso_test_library_guard_')
-        self.db_file = os.path.join(self.config_path, 'test.db')
+        self.config_path = tempfile.mkdtemp(prefix="compresso_test_library_guard_")
+        self.db_file = os.path.join(self.config_path, "test.db")
         database_settings = {
             "TYPE": "SQLITE",
             "FILE": self.db_file,
-            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+            "MIGRATIONS_DIR": os.path.join(self.config_path, "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
-        self.db_connection.create_tables([
-            Tasks, Libraries, LibraryTags, Tags,
-            WorkerGroups, WorkerGroupTags, WorkerSchedules,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+        self.db_connection.create_tables(
+            [
+                Tasks,
+                Libraries,
+                LibraryTags,
+                Tags,
+                WorkerGroups,
+                WorkerGroupTags,
+                WorkerSchedules,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
     def setup_method(self):
         Libraries.delete().execute()
         self.lib_row = Libraries.create(
-            name='guard_lib',
-            path='/media/guard',
+            name="guard_lib",
+            path="/media/guard",
             locked=False,
             enable_remote_only=False,
             enable_scanner=False,
@@ -311,6 +349,7 @@ class TestLibrarySizeGuardrails:
 
     def _lib(self):
         from compresso.libs.library import Library
+
         return Library(self.lib_row.id)
 
     def test_get_size_guardrail_enabled_returns_bool(self):
@@ -354,29 +393,37 @@ class TestLibrarySizeGuardrails:
 
 @pytest.mark.unittest
 class TestLibraryReplacementPolicy:
-
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='compresso_test_library_policy_')
-        self.db_file = os.path.join(self.config_path, 'test.db')
+        self.config_path = tempfile.mkdtemp(prefix="compresso_test_library_policy_")
+        self.db_file = os.path.join(self.config_path, "test.db")
         database_settings = {
             "TYPE": "SQLITE",
             "FILE": self.db_file,
-            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+            "MIGRATIONS_DIR": os.path.join(self.config_path, "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
-        self.db_connection.create_tables([
-            Tasks, Libraries, LibraryTags, Tags,
-            WorkerGroups, WorkerGroupTags, WorkerSchedules,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+        self.db_connection.create_tables(
+            [
+                Tasks,
+                Libraries,
+                LibraryTags,
+                Tags,
+                WorkerGroups,
+                WorkerGroupTags,
+                WorkerSchedules,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
     def setup_method(self):
         Libraries.delete().execute()
         self.lib_row = Libraries.create(
-            name='policy_lib',
-            path='/media/policy',
+            name="policy_lib",
+            path="/media/policy",
             locked=False,
             enable_remote_only=False,
             enable_scanner=False,
@@ -386,56 +433,65 @@ class TestLibraryReplacementPolicy:
 
     def _lib(self):
         from compresso.libs.library import Library
+
         return Library(self.lib_row.id)
 
     def test_get_replacement_policy_default_empty_string(self):
-        assert self._lib().get_replacement_policy() == ''
+        assert self._lib().get_replacement_policy() == ""
 
     def test_set_replacement_policy_valid_replace(self):
         lib = self._lib()
-        lib.set_replacement_policy('replace')
-        assert lib.get_replacement_policy() == 'replace'
+        lib.set_replacement_policy("replace")
+        assert lib.get_replacement_policy() == "replace"
 
     def test_set_replacement_policy_valid_approval_required(self):
         lib = self._lib()
-        lib.set_replacement_policy('approval_required')
-        assert lib.get_replacement_policy() == 'approval_required'
+        lib.set_replacement_policy("approval_required")
+        assert lib.get_replacement_policy() == "approval_required"
 
     def test_set_replacement_policy_valid_keep_both(self):
         lib = self._lib()
-        lib.set_replacement_policy('keep_both')
-        assert lib.get_replacement_policy() == 'keep_both'
+        lib.set_replacement_policy("keep_both")
+        assert lib.get_replacement_policy() == "keep_both"
 
     def test_set_replacement_policy_invalid_falls_back_to_empty(self):
         lib = self._lib()
-        lib.set_replacement_policy('invalid_policy')
-        assert lib.get_replacement_policy() == ''
+        lib.set_replacement_policy("invalid_policy")
+        assert lib.get_replacement_policy() == ""
 
     def test_set_replacement_policy_none_stores_empty(self):
         lib = self._lib()
         lib.set_replacement_policy(None)
-        assert lib.get_replacement_policy() == ''
+        assert lib.get_replacement_policy() == ""
 
 
 @pytest.mark.unittest
 class TestLibraryDelete:
-
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='compresso_test_library_del_')
-        self.db_file = os.path.join(self.config_path, 'test.db')
+        self.config_path = tempfile.mkdtemp(prefix="compresso_test_library_del_")
+        self.db_file = os.path.join(self.config_path, "test.db")
         database_settings = {
             "TYPE": "SQLITE",
             "FILE": self.db_file,
-            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+            "MIGRATIONS_DIR": os.path.join(self.config_path, "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
-        self.db_connection.create_tables([
-            Tasks, Libraries, LibraryTags, Tags,
-            WorkerGroups, WorkerGroupTags, WorkerSchedules,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+        self.db_connection.create_tables(
+            [
+                Tasks,
+                Libraries,
+                LibraryTags,
+                Tags,
+                WorkerGroups,
+                WorkerGroupTags,
+                WorkerSchedules,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
     def setup_method(self):
         Tasks.delete().execute()
@@ -445,8 +501,8 @@ class TestLibraryDelete:
 
     def _create_library(self, **kwargs):
         defaults = dict(
-            name='lib',
-            path='/media/lib',
+            name="lib",
+            path="/media/lib",
             locked=False,
             enable_remote_only=False,
             enable_scanner=False,
@@ -458,24 +514,27 @@ class TestLibraryDelete:
 
     def test_delete_default_library_raises(self):
         from compresso.libs.library import Library
-        row = self._create_library(id=1, name='default')
+
+        row = self._create_library(id=1, name="default")
         lib = Library(row.id)
         with pytest.raises(Exception, match="Unable to remove the default library"):
             lib.delete()
 
     def test_delete_locked_library_raises(self):
         from compresso.libs.library import Library
+
         # Create default first so ID=1 exists
-        self._create_library(id=1, name='default')
-        row = self._create_library(name='locked_lib', locked=True)
+        self._create_library(id=1, name="default")
+        row = self._create_library(name="locked_lib", locked=True)
         lib = Library(row.id)
         with pytest.raises(Exception, match="Unable to remove a locked library"):
             lib.delete()
 
     def test_delete_unlocked_non_default_succeeds(self):
         from compresso.libs.library import Library
-        self._create_library(id=1, name='default')
-        row = self._create_library(name='deletable', locked=False)
+
+        self._create_library(id=1, name="default")
+        row = self._create_library(name="deletable", locked=False)
         lib = Library(row.id)
         lib.delete()
         assert Libraries.get_or_none(id=row.id) is None
@@ -483,38 +542,47 @@ class TestLibraryDelete:
 
 @pytest.mark.unittest
 class TestLibraryCreate:
-
     db_connection = None
 
     def setup_class(self):
-        self.config_path = tempfile.mkdtemp(prefix='compresso_test_library_create_')
-        self.db_file = os.path.join(self.config_path, 'test.db')
+        self.config_path = tempfile.mkdtemp(prefix="compresso_test_library_create_")
+        self.db_file = os.path.join(self.config_path, "test.db")
         database_settings = {
             "TYPE": "SQLITE",
             "FILE": self.db_file,
-            "MIGRATIONS_DIR": os.path.join(self.config_path, 'migrations'),
+            "MIGRATIONS_DIR": os.path.join(self.config_path, "migrations"),
         }
         self.db_connection = Database.select_database(database_settings)
-        self.db_connection.create_tables([
-            Tasks, Libraries, LibraryTags, Tags,
-            WorkerGroups, WorkerGroupTags, WorkerSchedules,
-            Plugins, EnabledPlugins, LibraryPluginFlow,
-        ])
+        self.db_connection.create_tables(
+            [
+                Tasks,
+                Libraries,
+                LibraryTags,
+                Tags,
+                WorkerGroups,
+                WorkerGroupTags,
+                WorkerSchedules,
+                Plugins,
+                EnabledPlugins,
+                LibraryPluginFlow,
+            ]
+        )
 
     def setup_method(self):
         Libraries.delete().execute()
 
     def test_create_removes_id_from_data(self):
         from compresso.libs.library import Library
+
         data = {
-            'id': 999,
-            'name': 'new_lib',
-            'path': '/media/new',
-            'locked': False,
-            'enable_remote_only': False,
-            'enable_scanner': False,
-            'enable_inotify': False,
-            'priority_score': 0,
+            "id": 999,
+            "name": "new_lib",
+            "path": "/media/new",
+            "locked": False,
+            "enable_remote_only": False,
+            "enable_scanner": False,
+            "enable_inotify": False,
+            "priority_score": 0,
         }
         lib = Library.create(data)
         # ID should be auto-assigned, not 999
@@ -522,30 +590,32 @@ class TestLibraryCreate:
 
     def test_create_returns_library_instance(self):
         from compresso.libs.library import Library
+
         data = {
-            'name': 'created_lib',
-            'path': '/media/created',
-            'locked': False,
-            'enable_remote_only': False,
-            'enable_scanner': False,
-            'enable_inotify': False,
-            'priority_score': 0,
+            "name": "created_lib",
+            "path": "/media/created",
+            "locked": False,
+            "enable_remote_only": False,
+            "enable_scanner": False,
+            "enable_inotify": False,
+            "priority_score": 0,
         }
         lib = Library.create(data)
-        assert lib.get_name() == 'created_lib'
+        assert lib.get_name() == "created_lib"
 
 
 @pytest.mark.unittest
 class TestGenerateRandomLibraryName:
-
     def test_returns_string_with_expected_format(self):
         from compresso.libs.library import generate_random_library_name
+
         name = generate_random_library_name()
         assert ", the " in name
         assert " library" in name
 
     def test_returns_different_names(self):
         from compresso.libs.library import generate_random_library_name
+
         names = {generate_random_library_name() for _ in range(10)}
         # With the large word lists, 10 calls should produce at least 2 unique names
         assert len(names) >= 2

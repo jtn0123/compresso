@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-    Tests for compresso.libs.unffmpeg.info.Info class.
-    All cli.* functions are mocked so no subprocess calls occur.
+Tests for compresso.libs.unffmpeg.info.Info class.
+All cli.* functions are mocked so no subprocess calls occur.
 """
 
 from unittest.mock import patch
@@ -43,17 +43,13 @@ DECODER_OUTPUT = (
     " S..... srt                  SubRip subtitle\n"
 )
 
-HWACCEL_OUTPUT = (
-    "Hardware acceleration methods:\n"
-    "vdpau\n"
-    "cuda\n"
-    "vaapi\n"
-)
+HWACCEL_OUTPUT = "Hardware acceleration methods:\nvdpau\ncuda\nvaapi\n"
 
 
 # ---------------------------------------------------------------------------
 # Info.versions
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestInfoVersions:
@@ -68,6 +64,7 @@ class TestInfoVersions:
 # ---------------------------------------------------------------------------
 # Info.file_probe
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestInfoFileProbe:
@@ -84,6 +81,7 @@ class TestInfoFileProbe:
 # ---------------------------------------------------------------------------
 # Info.get_available_ffmpeg_encoders
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestGetAvailableEncoders:
@@ -151,6 +149,7 @@ class TestGetAvailableEncoders:
 # Info.get_available_ffmpeg_decoders
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unittest
 class TestGetAvailableDecoders:
     @patch("compresso.libs.unffmpeg.info.cli.ffmpeg_available_decoders")
@@ -188,6 +187,7 @@ class TestGetAvailableDecoders:
 # Info.get_available_ffmpeg_hw_acceleration_methods
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unittest
 class TestGetHwAccelMethods:
     @patch("compresso.libs.unffmpeg.info.cli.ffmpeg_available_hw_acceleration_methods")
@@ -217,6 +217,7 @@ class TestGetHwAccelMethods:
 # ---------------------------------------------------------------------------
 # Lazy-loading wrappers: get_ffmpeg_audio/video/subtitle_encoders
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestLazyEncoderWrappers:
@@ -258,6 +259,7 @@ class TestLazyEncoderWrappers:
 # ---------------------------------------------------------------------------
 # Info.filter_available_encoders_for_codec
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestFilterAvailableEncoders:
@@ -305,6 +307,7 @@ class TestFilterAvailableEncoders:
 # ---------------------------------------------------------------------------
 # Info.get_all_supported_codecs_of_type / get_all_supported_video_codecs / get_all_supported_codecs
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestGetAllSupportedCodecs:

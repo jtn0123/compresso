@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    compresso.fileinfo_api.py
+compresso.fileinfo_api.py
 
-    API handler for file info endpoints.
+API handler for file info endpoints.
 
 """
 
@@ -23,14 +23,14 @@ from compresso.webserver.helpers import fileinfo
 class ApiFileinfoHandler(BaseApiHandler):
     routes = [
         {
-            "path_pattern":      r"/fileinfo/probe",
+            "path_pattern": r"/fileinfo/probe",
             "supported_methods": ["POST"],
-            "call_method":       "probe_file",
+            "call_method": "probe_file",
         },
         {
-            "path_pattern":      r"/fileinfo/task",
+            "path_pattern": r"/fileinfo/task",
             "supported_methods": ["POST"],
-            "call_method":       "probe_task_file",
+            "call_method": "probe_task_file",
         },
     ]
 
@@ -56,7 +56,7 @@ class ApiFileinfoHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(RequestFileInfoProbeSchema())
-            file_path = json_request.get('file_path', '')
+            file_path = json_request.get("file_path", "")
 
             if not os.path.exists(file_path):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"File not found: {file_path}")
@@ -72,22 +72,22 @@ class ApiFileinfoHandler(BaseApiHandler):
             response = self.build_response(
                 FileInfoResponseSchema(),
                 {
-                    "success":           True,
-                    "video_streams":     info.get('video_streams', []),
-                    "audio_streams":     info.get('audio_streams', []),
-                    "subtitle_streams":  info.get('subtitle_streams', []),
-                    "format":            info.get('format', {}),
-                }
+                    "success": True,
+                    "video_streams": info.get("video_streams", []),
+                    "audio_streams": info.get("audio_streams", []),
+                    "subtitle_streams": info.get("subtitle_streams", []),
+                    "format": info.get("format", {}),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -113,9 +113,10 @@ class ApiFileinfoHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(RequestFileInfoTaskSchema())
-            task_id = json_request.get('task_id')
+            task_id = json_request.get("task_id")
 
             from compresso.libs.unmodels import CompletedTasks
+
             try:
                 task = CompletedTasks.get_by_id(task_id)
             except CompletedTasks.DoesNotExist:
@@ -138,21 +139,21 @@ class ApiFileinfoHandler(BaseApiHandler):
             response = self.build_response(
                 FileInfoResponseSchema(),
                 {
-                    "success":           True,
-                    "video_streams":     info.get('video_streams', []),
-                    "audio_streams":     info.get('audio_streams', []),
-                    "subtitle_streams":  info.get('subtitle_streams', []),
-                    "format":            info.get('format', {}),
-                }
+                    "success": True,
+                    "video_streams": info.get("video_streams", []),
+                    "audio_streams": info.get("audio_streams", []),
+                    "subtitle_streams": info.get("subtitle_streams", []),
+                    "format": info.get("format", {}),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

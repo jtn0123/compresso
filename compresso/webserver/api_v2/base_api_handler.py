@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.base_api_handler.py
+compresso.base_api_handler.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     26 Oct 2020, (12:15 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     26 Oct 2020, (12:15 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import json
 import sys
 import traceback
@@ -67,25 +68,28 @@ class BaseApiHandler(RequestHandler):
     STATUS_ERROR_INTERNAL = 500
 
     def initialize(self, **kwargs):
-        self.params = kwargs.get('params', [])
+        self.params = kwargs.get("params", [])
 
     def prepare(self):
         """Check rate limits before routing to handler methods."""
         from compresso.webserver.api_v2.rate_limiter import get_rate_limiter
+
         limiter = get_rate_limiter()
         ip = self.request.remote_ip
         path = self.request.path
 
         allowed, remaining, reset_time = limiter.check_rate_limit(ip, path)
-        self.set_header('X-RateLimit-Remaining', str(remaining))
-        self.set_header('X-RateLimit-Reset', str(reset_time))
+        self.set_header("X-RateLimit-Remaining", str(remaining))
+        self.set_header("X-RateLimit-Reset", str(reset_time))
 
         if not allowed:
             self.set_status(self.STATUS_ERROR_RATE_LIMITED, reason="Too Many Requests")
-            self.finish({
-                'error': '429: Too Many Requests',
-                'messages': {'rate_limit': f'Rate limit exceeded. Try again in {reset_time} seconds.'},
-            })
+            self.finish(
+                {
+                    "error": "429: Too Many Requests",
+                    "messages": {"rate_limit": f"Rate limit exceeded. Try again in {reset_time} seconds."},
+                }
+            )
 
     def set_default_headers(self):
         """
@@ -111,7 +115,7 @@ class BaseApiHandler(RequestHandler):
             self.write_error()
             received_body: Any = self.request.body
             if isinstance(received_body, bytes):
-                received_body = received_body.decode('utf-8', errors='replace')
+                received_body = received_body.decode("utf-8", errors="replace")
             raise BaseApiError(f"Expected request body to be JSON. Received '{received_body}'") from e
 
         request_validation_errors = schema.validate(json_data)
@@ -154,7 +158,7 @@ class BaseApiHandler(RequestHandler):
         :return:
         """
         if response is None:
-            response = {'success': True}
+            response = {"success": True}
         self.set_status(self.STATUS_SUCCESS)
         self.finish(response)
 
@@ -179,13 +183,13 @@ class BaseApiHandler(RequestHandler):
         if status_code is None:
             status_code = self.get_status()
         response = {
-            'error':    f"{status_code:d}: {self._reason}",
-            'messages': {},
+            "error": f"{status_code:d}: {self._reason}",
+            "messages": {},
         }
         if self.error_messages:
-            response['messages'] = self.error_messages
+            response["messages"] = self.error_messages
         if self.settings.get("serve_traceback"):
-            exc_info = kwargs.get('exc_info')
+            exc_info = kwargs.get("exc_info")
             if not exc_info:
                 exc_info = sys.exc_info()
             # in debug mode, try to send a traceback
@@ -194,7 +198,7 @@ class BaseApiHandler(RequestHandler):
             if exc_info and exc_info[0]:
                 for line in traceback.format_exception(*exc_info):
                     traceback_lines.append(line)
-            response['traceback'] = traceback_lines
+            response["traceback"] = traceback_lines
         self.finish(response)
 
     def handle_endpoint_not_found(self):
@@ -204,9 +208,7 @@ class BaseApiHandler(RequestHandler):
 
         :return:
         """
-        response = {
-            'error': f"{self.STATUS_ERROR_ENDPOINT_NOT_FOUND:d}: Endpoint not found"
-        }
+        response = {"error": f"{self.STATUS_ERROR_ENDPOINT_NOT_FOUND:d}: Endpoint not found"}
         self.set_status(self.STATUS_ERROR_ENDPOINT_NOT_FOUND)
         self.finish(response)
 
@@ -217,9 +219,7 @@ class BaseApiHandler(RequestHandler):
 
         :return:
         """
-        response = {
-            'error': f"{self.STATUS_ERROR_METHOD_NOT_ALLOWED:d}: Method '{self.request.method}' not allowed"
-        }
+        response = {"error": f"{self.STATUS_ERROR_METHOD_NOT_ALLOWED:d}: Method '{self.request.method}' not allowed"}
         self.set_status(self.STATUS_ERROR_METHOD_NOT_ALLOWED)
         self.finish(response)
 
@@ -232,7 +232,7 @@ class BaseApiHandler(RequestHandler):
 
         :return:
         """
-        request_api_base = self.request.uri.split('api/v2')[0] + 'api/v2'
+        request_api_base = self.request.uri.split("api/v2")[0] + "api/v2"
         # request_api_endpoint = re.sub('^/(compresso/)*api/v\d', '', self.request.uri)
         matched_route_with_unsupported_method = False
         for route in self.routes:
@@ -256,17 +256,20 @@ class BaseApiHandler(RequestHandler):
                 # If we have a match and were returned some params, load that method
                 if params:
                     tornado.log.app_log.debug(
-                        "Routing API to {}.{}(*args={}, **kwargs={})".format(self.__class__.__name__,
-                                                                             route.get("call_method"), params["path_args"],
-                                                                             params["path_kwargs"]), exc_info=True)
+                        "Routing API to {}.{}(*args={}, **kwargs={})".format(
+                            self.__class__.__name__, route.get("call_method"), params["path_args"], params["path_kwargs"]
+                        ),
+                        exc_info=True,
+                    )
 
                     await getattr(self, route.get("call_method"))(*params["path_args"], **params["path_kwargs"])
                     return
 
                 # This route matches the current request URI and does not have any params.
                 # Set this route and call the configured method.
-                tornado.log.app_log.debug("Routing API to {}.{}()".format(self.__class__.__name__, route.get("call_method")),
-                                          exc_info=True)
+                tornado.log.app_log.debug(
+                    "Routing API to {}.{}()".format(self.__class__.__name__, route.get("call_method")), exc_info=True
+                )
                 self.route = route
                 await getattr(self, route.get("call_method"))()
                 return

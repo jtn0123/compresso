@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 
 """
-    compresso.process.py
+compresso.process.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     05 Mar 2021, (8:05 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     05 Mar 2021, (8:05 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -99,56 +99,53 @@ class ProcessItem(PluginType):
     :return:
     """
     data_schema = {
-        "library_id":              {
+        "library_id": {
             "required": True,
-            "type":     int,
+            "type": int,
         },
-        "task_id":                 {
-            "required": False,
-            "type":     int
-        },
-        "worker_log":              {
+        "task_id": {"required": False, "type": int},
+        "worker_log": {
             "required": True,
-            "type":     list,
+            "type": list,
         },
-        "exec_command":            {
+        "exec_command": {
             "required": True,
-            "type":     [list, str],
+            "type": [list, str],
         },
-        "current_command":         {
+        "current_command": {
             "required": True,
-            "type":     list,
+            "type": list,
         },
         "command_progress_parser": {
             "required": True,
-            "type":     ['callable', None],
+            "type": ["callable", None],
         },
-        "file_in":                 {
+        "file_in": {
             "required": True,
-            "type":     str,
+            "type": str,
         },
-        "file_out":                {
+        "file_out": {
             "required": True,
-            "type":     str,
+            "type": str,
         },
-        "original_file_path":      {
+        "original_file_path": {
             "required": False,
-            "type":     str,
+            "type": str,
         },
-        "repeat":                  {
+        "repeat": {
             "required": False,
-            "type":     bool,
+            "type": bool,
         },
     }
     test_data = {
-        'library_id':              1,
-        "task_id":                 4321,
-        'worker_log':              [],
-        'exec_command':            [],
-        'current_command':         [],
-        'command_progress_parser': None,
-        'file_in':                 '{library_path}/{test_file_in}',
-        'file_out':                '{cache_path}/{test_file_out}',
-        'original_file_path':      '{library_path}/{test_file_in}',
-        'repeat':                  False,
+        "library_id": 1,
+        "task_id": 4321,
+        "worker_log": [],
+        "exec_command": [],
+        "current_command": [],
+        "command_progress_parser": None,
+        "file_in": "{library_path}/{test_file_in}",
+        "file_out": "{cache_path}/{test_file_out}",
+        "original_file_path": "{library_path}/{test_file_in}",
+        "repeat": False,
     }

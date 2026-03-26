@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.eventmonitor.py
+compresso.eventmonitor.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     25 Feb 2021, (10:06 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     25 Feb 2021, (10:06 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 import queue
 import threading
@@ -43,15 +44,14 @@ try:
     from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
 
-    event_monitor_module = 'watchdog'
+    event_monitor_module = "watchdog"
 except ImportError:
+
     class Observer:  # type: ignore[no-redef]
         pass
 
-
     class FileSystemEventHandler:  # type: ignore[no-redef]
         pass
-
 
     event_monitor_module = None  # type: ignore[assignment]
 
@@ -92,10 +92,12 @@ class EventHandler(FileSystemEventHandler):
                 self.logger.debug("Detected event is for a directory. Ignoring...")
             else:
                 self.logger.info("Detected '%s' event on file path '%s'", event.event_type, event.src_path)
-                self.files_to_test.put({
-                    'src_path':   event.src_path,
-                    'library_id': self.library_id,
-                })
+                self.files_to_test.put(
+                    {
+                        "src_path": event.src_path,
+                        "library_id": self.library_id,
+                    }
+                )
 
 
 class EventMonitorManager(threading.Thread):
@@ -109,7 +111,7 @@ class EventMonitorManager(threading.Thread):
     """
 
     def __init__(self, data_queues, event):
-        super().__init__(name='EventMonitorManager')
+        super().__init__(name="EventMonitorManager")
         self.name = __class__.__name__
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.data_queues = data_queues
@@ -131,7 +133,7 @@ class EventMonitorManager(threading.Thread):
     def run(self):
         self.logger.info("Starting EventMonitorManager loop")
         while not self.abort_flag.is_set():
-            self.event.wait(.5)
+            self.event.wait(0.5)
 
             if not self.system_configuration_is_valid():
                 self.event.wait(2)
@@ -139,8 +141,8 @@ class EventMonitorManager(threading.Thread):
 
             if not self.files_to_test.empty():
                 item = self.files_to_test.get()
-                pathname = item.get('src_path')
-                library_id = item.get('library_id')
+                pathname = item.get("src_path")
+                library_id = item.get("library_id")
                 self.manage_event_queue(pathname, library_id)
                 continue
 
@@ -148,9 +150,9 @@ class EventMonitorManager(threading.Thread):
             enable_inotify = False
             for lib_info in Library.get_all_libraries():
                 try:
-                    library = Library(lib_info['id'])
+                    library = Library(lib_info["id"])
                 except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info['id'], e)
+                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info["id"], e)
                     continue
                 # Check if the library is configured for remote files only
                 if library.get_enable_remote_only():
@@ -199,11 +201,11 @@ class EventMonitorManager(threading.Thread):
             monitoring_path = False
             self.event_observer_thread = Observer()
             for lib_info in Library.get_all_libraries():
-                self.event.wait(.2)
+                self.event.wait(0.2)
                 try:
-                    library = Library(lib_info['id'])
+                    library = Library(lib_info["id"])
                 except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info['id'], e)
+                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info["id"], e)
                     continue
                 # Check if the library is configured for remote files only
                 if library.get_enable_remote_only():
@@ -263,7 +265,7 @@ class EventMonitorManager(threading.Thread):
             # Log any error messages
             for issue in issues:
                 if type(issue) is dict:
-                    self.logger.info(issue.get('message'))
+                    self.logger.info(issue.get("message"))
                 else:
                     self.logger.info(issue)
             # If file needs to be added, then add it
@@ -285,8 +287,10 @@ class EventMonitorManager(threading.Thread):
         :param priority_score:
         :return:
         """
-        self.data_queues.get('inotifytasks').put({
-            'pathname':       pathname,
-            'library_id':     library_id,
-            'priority_score': priority_score,
-        })
+        self.data_queues.get("inotifytasks").put(
+            {
+                "pathname": pathname,
+                "library_id": library_id,
+                "priority_score": priority_score,
+            }
+        )

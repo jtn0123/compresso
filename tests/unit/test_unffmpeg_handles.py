@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 """
-    Tests for unffmpeg handle classes:
-      - VideoCodecHandle
-      - AudioCodecHandle
-      - SubtitleHandle
-      - HardwareAccelerationHandle
+Tests for unffmpeg handle classes:
+  - VideoCodecHandle
+  - AudioCodecHandle
+  - SubtitleHandle
+  - HardwareAccelerationHandle
 """
 
 import os
@@ -21,6 +21,7 @@ from compresso.libs.unffmpeg.video_codec_handle import VideoCodecHandle
 # ===========================================================================
 # Shared probe data helpers
 # ===========================================================================
+
 
 def _probe_video(codec_name="h264", index=0, tags=None):
     stream = {"codec_type": "video", "codec_name": codec_name, "index": index}
@@ -43,6 +44,7 @@ def _probe_subtitle(codec_name="srt", index=2):
 # ===========================================================================
 # VideoCodecHandle
 # ===========================================================================
+
 
 @pytest.mark.unittest
 class TestVideoCodecHandle:
@@ -97,10 +99,12 @@ class TestVideoCodecHandle:
         assert result["streams_to_encode"] == []
 
     def test_args_multiple_video_streams(self):
-        probe = {"streams": [
-            _probe_video("mpeg4", index=0),
-            _probe_video("h264", index=1),
-        ]}
+        probe = {
+            "streams": [
+                _probe_video("mpeg4", index=0),
+                _probe_video("h264", index=1),
+            ]
+        }
         handle = VideoCodecHandle(probe)
         result = handle.args()
         # Stream 0 should encode (mpeg4 != h264), stream 1 should copy
@@ -128,6 +132,7 @@ class TestVideoCodecHandle:
 # ===========================================================================
 # AudioCodecHandle
 # ===========================================================================
+
 
 @pytest.mark.unittest
 class TestAudioCodecHandle:
@@ -264,6 +269,7 @@ class TestAudioCodecHandle:
 # SubtitleHandle
 # ===========================================================================
 
+
 @pytest.mark.unittest
 class TestSubtitleHandle:
     def _make_container(self, supports_subs=True, supported=None, unsupported=None):
@@ -332,10 +338,12 @@ class TestSubtitleHandle:
         assert result["streams_to_encode"] == []
 
     def test_multiple_subtitle_streams(self):
-        probe = {"streams": [
-            _probe_subtitle("srt", index=2),
-            _probe_subtitle("ass", index=3),
-        ]}
+        probe = {
+            "streams": [
+                _probe_subtitle("srt", index=2),
+                _probe_subtitle("ass", index=3),
+            ]
+        }
         container = self._make_container(supports_subs=True, supported=["srt", "ass"])
         handle = SubtitleHandle(probe, container)
         result = handle.args()
@@ -346,6 +354,7 @@ class TestSubtitleHandle:
 # ===========================================================================
 # HardwareAccelerationHandle
 # ===========================================================================
+
 
 @pytest.mark.unittest
 class TestHardwareAccelerationHandle:
@@ -469,6 +478,7 @@ class TestHardwareAccelerationHandle:
             device = MagicMock()
 
             call_count = [0]
+
             def c_int_factory():
                 call_count[0] += 1
                 if call_count[0] == 1:

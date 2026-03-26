@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.test_taskhandler.py
+compresso.test_taskhandler.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     08 May 2020, (12:28 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     08 May 2020, (12:28 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 import tempfile
 import threading
@@ -67,16 +68,17 @@ class TestClass:
         self.task_handler = None
 
         # Create temp config path
-        config_path = tempfile.mkdtemp(prefix='compresso_tests_')
+        config_path = tempfile.mkdtemp(prefix="compresso_tests_")
 
         # Create connection to a test DB (use temp file, not :memory:, for sqliteq compatibility)
-        self.db_file = os.path.join(config_path, 'test_taskhandler.db')
+        self.db_file = os.path.join(config_path, "test_taskhandler.db")
         database_settings = {
-            "TYPE":           "SQLITE",
-            "FILE":           self.db_file,
-            "MIGRATIONS_DIR": os.path.join(config_path, 'migrations'),
+            "TYPE": "SQLITE",
+            "FILE": self.db_file,
+            "MIGRATIONS_DIR": os.path.join(config_path, "migrations"),
         }
         from compresso.libs.unmodels.lib import Database
+
         self.db_connection = Database.select_database(database_settings)
 
         # Create required tables
@@ -85,8 +87,9 @@ class TestClass:
 
         # import config
         from compresso import config
+
         self.settings = config.Config(config_path=config_path)
-        self.settings.set_config_item('debugging', True, save_settings=False)
+        self.settings.set_config_item("debugging", True, save_settings=False)
 
     def teardown_class(self):
         """
@@ -132,13 +135,13 @@ class TestClass:
         assert not self.task_handler.is_alive()
 
     @pytest.mark.integrationtest
-    @patch('compresso.libs.taskhandler.PluginsHandler')
+    @patch("compresso.libs.taskhandler.PluginsHandler")
     def test_task_handler_can_process_scheduled_tasks_queue(self, mock_plugin_handler):
         """Scheduled tasks queue items (dicts) are added to the Tasks DB table."""
         mock_plugin_handler.return_value = MagicMock()
 
         # Create a real temp file so os.path.getsize works
-        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".mkv", delete=False) as f:
             test_path = f.name
 
         try:
@@ -146,9 +149,9 @@ class TestClass:
             time.sleep(0.2)
 
             item = {
-                'pathname': test_path,
-                'library_id': 1,
-                'priority_score': 0,
+                "pathname": test_path,
+                "library_id": 1,
+                "priority_score": 0,
             }
             self.scheduledtasks.put(item)
             self.task_handler.process_scheduledtasks_queue()
@@ -163,13 +166,13 @@ class TestClass:
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('compresso.libs.taskhandler.PluginsHandler')
+    @patch("compresso.libs.taskhandler.PluginsHandler")
     def test_task_handler_can_process_inotify_tasks_queue(self, mock_plugin_handler):
         """Inotify tasks queue items (dicts) are added to the Tasks DB table."""
         mock_plugin_handler.return_value = MagicMock()
 
         # Create a real temp file so os.path.getsize works
-        with tempfile.NamedTemporaryFile(suffix='.3gp', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".3gp", delete=False) as f:
             test_path = f.name
 
         try:
@@ -177,9 +180,9 @@ class TestClass:
             time.sleep(0.2)
 
             item = {
-                'pathname': test_path,
-                'library_id': 1,
-                'priority_score': 0,
+                "pathname": test_path,
+                "library_id": 1,
+                "priority_score": 0,
             }
             self.inotifytasks.put(item)
             self.task_handler.process_inotifytasks_queue()
@@ -194,11 +197,11 @@ class TestClass:
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('compresso.libs.taskhandler.PluginsHandler')
+    @patch("compresso.libs.taskhandler.PluginsHandler")
     def test_task_handler_skips_duplicate_scheduled_tasks(self, mock_plugin_handler):
         mock_plugin_handler.return_value = MagicMock()
 
-        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".mkv", delete=False) as f:
             test_path = f.name
 
         try:
@@ -206,9 +209,9 @@ class TestClass:
             time.sleep(0.2)
 
             item = {
-                'pathname': test_path,
-                'library_id': 1,
-                'priority_score': 0,
+                "pathname": test_path,
+                "library_id": 1,
+                "priority_score": 0,
             }
             self.scheduledtasks.put(item)
             self.scheduledtasks.put(item)
@@ -223,11 +226,11 @@ class TestClass:
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('compresso.libs.taskhandler.PluginsHandler')
+    @patch("compresso.libs.taskhandler.PluginsHandler")
     def test_task_handler_skips_duplicate_inotify_tasks(self, mock_plugin_handler):
         mock_plugin_handler.return_value = MagicMock()
 
-        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".mkv", delete=False) as f:
             test_path = f.name
 
         try:
@@ -235,9 +238,9 @@ class TestClass:
             time.sleep(0.2)
 
             item = {
-                'pathname': test_path,
-                'library_id': 1,
-                'priority_score': 0,
+                "pathname": test_path,
+                "library_id": 1,
+                "priority_score": 0,
             }
             self.inotifytasks.put(item)
             self.inotifytasks.put(item)
@@ -252,13 +255,13 @@ class TestClass:
             os.unlink(test_path)
 
     @pytest.mark.integrationtest
-    @patch('compresso.libs.taskhandler.PluginsHandler')
+    @patch("compresso.libs.taskhandler.PluginsHandler")
     def test_task_handler_restart_preserves_dedupe_and_accepts_new_work(self, mock_plugin_handler):
         mock_plugin_handler.return_value = MagicMock()
 
-        with tempfile.NamedTemporaryFile(suffix='.mkv', delete=False) as first_file:
+        with tempfile.NamedTemporaryFile(suffix=".mkv", delete=False) as first_file:
             first_path = first_file.name
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as second_file:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as second_file:
             second_path = second_file.name
 
         try:
@@ -266,9 +269,9 @@ class TestClass:
             time.sleep(0.2)
 
             first_item = {
-                'pathname': first_path,
-                'library_id': 1,
-                'priority_score': 0,
+                "pathname": first_path,
+                "library_id": 1,
+                "priority_score": 0,
             }
             self.scheduledtasks.put(first_item)
             self.task_handler.process_scheduledtasks_queue()
@@ -286,9 +289,9 @@ class TestClass:
             self.task_handler.process_scheduledtasks_queue()
 
             second_item = {
-                'pathname': second_path,
-                'library_id': 2,
-                'priority_score': 5,
+                "pathname": second_path,
+                "library_id": 2,
+                "priority_score": 5,
             }
             self.inotifytasks.put(second_item)
             self.task_handler.process_inotifytasks_queue()
@@ -305,5 +308,5 @@ class TestClass:
             os.unlink(second_path)
 
 
-if __name__ == '__main__':
-    pytest.main(['-s', '--log-cli-level=INFO', __file__])
+if __name__ == "__main__":
+    pytest.main(["-s", "--log-cli-level=INFO", __file__])

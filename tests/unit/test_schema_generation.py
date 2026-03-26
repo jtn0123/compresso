@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 """
-    tests.unit.test_schema_generation.py
+tests.unit.test_schema_generation.py
 
-    Tests for OpenAPI schema generation and Swagger output.
+Tests for OpenAPI schema generation and Swagger output.
 
 """
-
 
 from unittest.mock import MagicMock, patch
 
@@ -23,22 +22,26 @@ except ModuleNotFoundError:
 
 @pytest.mark.unittest
 class TestCompressoSpecPlugin:
-
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_operations_from_urlspec_yields_operations(self):
         from tornado.web import URLSpec
 
         from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
 
-        handler_class = type('MockHandler', (), {
-            'routes': [
-                {
-                    'path_pattern': r'/test/endpoint',
-                    'supported_methods': ['GET'],
-                    'call_method': 'get_test',
-                },
-            ],
-        })
+        handler_class = type(
+            "MockHandler",
+            (),
+            {
+                "routes": [
+                    {
+                        "path_pattern": r"/test/endpoint",
+                        "supported_methods": ["GET"],
+                        "call_method": "get_test",
+                    },
+                ],
+            },
+        )
+
         # Add a method with a YAML docstring
         def get_test(self):
             """
@@ -49,14 +52,15 @@ class TestCompressoSpecPlugin:
                 200:
                     description: Success
             """
+
         handler_class.get_test = get_test
 
-        urlspec = URLSpec(r'/test/endpoint', handler_class)
+        urlspec = URLSpec(r"/test/endpoint", handler_class)
         plugin = CompressoSpecPlugin()
         operations = list(plugin._operations_from_urlspec(urlspec))
         assert len(operations) == 1
-        assert 'get' in operations[0]
-        assert operations[0]['get']['description'] == 'A test endpoint.'
+        assert "get" in operations[0]
+        assert operations[0]["get"]["description"] == "A test endpoint."
 
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_operations_from_urlspec_no_match(self):
@@ -64,18 +68,22 @@ class TestCompressoSpecPlugin:
 
         from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
 
-        handler_class = type('MockHandler', (), {
-            'routes': [
-                {
-                    'path_pattern': r'/other/endpoint',
-                    'supported_methods': ['GET'],
-                    'call_method': 'get_other',
-                },
-            ],
-            'get_other': lambda self: None,
-        })
+        handler_class = type(
+            "MockHandler",
+            (),
+            {
+                "routes": [
+                    {
+                        "path_pattern": r"/other/endpoint",
+                        "supported_methods": ["GET"],
+                        "call_method": "get_other",
+                    },
+                ],
+                "get_other": lambda self: None,
+            },
+        )
 
-        urlspec = URLSpec(r'/test/endpoint', handler_class)
+        urlspec = URLSpec(r"/test/endpoint", handler_class)
         plugin = CompressoSpecPlugin()
         operations = list(plugin._operations_from_urlspec(urlspec))
         assert len(operations) == 0
@@ -83,15 +91,14 @@ class TestCompressoSpecPlugin:
 
 @pytest.mark.unittest
 class TestFindAllHandlers:
-
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_returns_handler_route_tuples(self):
         from compresso.webserver.api_v2.schema.swagger import find_all_handlers
 
         mock_handler = MagicMock()
         mock_handler.routes = [
-            {'path_pattern': r'/test/route', 'supported_methods': ['GET'], 'call_method': 'get_test'},
-            {'path_pattern': r'/test/other', 'supported_methods': ['POST'], 'call_method': 'post_test'},
+            {"path_pattern": r"/test/route", "supported_methods": ["GET"], "call_method": "get_test"},
+            {"path_pattern": r"/test/other", "supported_methods": ["POST"], "call_method": "post_test"},
         ]
 
         mock_module = MagicMock()
@@ -102,25 +109,25 @@ class TestFindAllHandlers:
         with patch.dict(
             find_all_handlers.__globals__,
             {
-                'list_all_handlers': MagicMock(return_value=['MockHandler']),
-                'importlib': mock_importlib,
+                "list_all_handlers": MagicMock(return_value=["MockHandler"]),
+                "importlib": mock_importlib,
             },
         ):
             result = find_all_handlers()
 
         assert len(result) == 2
-        assert result[0][0] == r'/test/route'
-        assert result[1][0] == r'/test/other'
+        assert result[0][0] == r"/test/route"
+        assert result[1][0] == r"/test/other"
 
 
 @pytest.mark.unittest
 class TestGenerateSwaggerFile:
-
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
-    @patch('compresso.webserver.api_v2.schema.swagger.find_all_handlers', return_value=[])
-    @patch('builtins.open', new_callable=MagicMock)
+    @patch("compresso.webserver.api_v2.schema.swagger.find_all_handlers", return_value=[])
+    @patch("builtins.open", new_callable=MagicMock)
     def test_generates_empty_spec_no_handlers(self, mock_open, _mock_find):
         from compresso.webserver.api_v2.schema.swagger import generate_swagger_file
+
         errors = generate_swagger_file()
         assert isinstance(errors, list)
         assert len(errors) == 0
@@ -130,13 +137,14 @@ class TestGenerateSwaggerFile:
 
 @pytest.mark.unittest
 class TestSwaggerConstants:
-
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_api_version_is_string_two(self):
         from compresso.webserver.api_v2.schema.swagger import API_VERSION
+
         assert API_VERSION == "2"
 
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_security_spec_contains_basic_auth(self):
         from compresso.webserver.api_v2.schema.swagger import OPENAPI_SPEC_SECURITY
-        assert 'BasicAuth' in OPENAPI_SPEC_SECURITY
+
+        assert "BasicAuth" in OPENAPI_SPEC_SECURITY

@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.completed_tasks.py
+compresso.completed_tasks.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     24 Jul 2021, (9:34 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     24 Jul 2021, (9:34 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 from datetime import datetime
 
@@ -41,7 +42,7 @@ def _parse_datetime_to_timestamp(value):
     if isinstance(value, datetime):
         return value.timestamp()
     if isinstance(value, str):
-        for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M'):
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
             try:
                 return datetime.strptime(value, fmt).timestamp()
             except ValueError:
@@ -57,26 +58,29 @@ def prepare_filtered_completed_tasks(params):
     :param params:
     :return:
     """
-    start = params.get('start', 0)
-    length = params.get('length', 0)
+    start = params.get("start", 0)
+    length = params.get("length", 0)
 
-    search_value = params.get('search_value', '')
-    status = params.get('status', 'all')
+    search_value = params.get("search_value", "")
+    status = params.get("status", "all")
 
-    order = params.get('order', {
-        "column": 'finish_time',
-        "dir":    'desc',
-    })
+    order = params.get(
+        "order",
+        {
+            "column": "finish_time",
+            "dir": "desc",
+        },
+    )
 
     # Define filters
     task_success = None
-    if status == 'success':
+    if status == "success":
         task_success = True
-    elif status == 'failed':
+    elif status == "failed":
         task_success = False
 
-    after_time = _parse_datetime_to_timestamp(params.get('after'))
-    before_time = _parse_datetime_to_timestamp(params.get('before'))
+    after_time = _parse_datetime_to_timestamp(params.get("after"))
+    before_time = _parse_datetime_to_timestamp(params.get("before"))
 
     # Fetch historical tasks
     history_logging = history.History()
@@ -87,28 +91,37 @@ def prepare_filtered_completed_tasks(params):
     # Get total failed count
     records_total_failed_count = history_logging.get_historic_task_list_filtered_and_sorted(task_success=False).count()
     # Get quantity after filters (without pagination)
-    records_filtered_count = history_logging.get_historic_task_list_filtered_and_sorted(order=order, start=0, length=0,
-                                                                                        search_value=search_value,
-                                                                                        task_success=task_success,
-                                                                                        after_time=after_time,
-                                                                                        before_time=before_time).count()
+    records_filtered_count = history_logging.get_historic_task_list_filtered_and_sorted(
+        order=order,
+        start=0,
+        length=0,
+        search_value=search_value,
+        task_success=task_success,
+        after_time=after_time,
+        before_time=before_time,
+    ).count()
     # Get filtered/sorted results
-    task_results = history_logging.get_historic_task_list_filtered_and_sorted(order=order, start=start, length=length,
-                                                                              search_value=search_value,
-                                                                              task_success=task_success, after_time=after_time,
-                                                                              before_time=before_time)
+    task_results = history_logging.get_historic_task_list_filtered_and_sorted(
+        order=order,
+        start=start,
+        length=length,
+        search_value=search_value,
+        task_success=task_success,
+        after_time=after_time,
+        before_time=before_time,
+    )
 
     # Build return data
     return_data = {
-        "recordsTotal":    records_total_count,
+        "recordsTotal": records_total_count,
         "recordsFiltered": records_filtered_count,
-        "successCount":    records_total_success_count,
-        "failedCount":     records_total_failed_count,
-        "results":         []
+        "successCount": records_total_success_count,
+        "failedCount": records_total_failed_count,
+        "results": [],
     }
 
     matched_paths = set()
-    task_paths = [task.get('abspath') for task in task_results if task.get('abspath')]
+    task_paths = [task.get("abspath") for task in task_results if task.get("abspath")]
     if task_paths:
         query = FileMetadataPaths.select(FileMetadataPaths.path).where(FileMetadataPaths.path.in_(task_paths))
         for row in query:
@@ -118,11 +131,11 @@ def prepare_filtered_completed_tasks(params):
     for task in task_results:
         # Set params as required in template
         item = {
-            'id':           task['id'],
-            'task_label':   task['task_label'],
-            'task_success': task['task_success'],
-            'finish_time':  task['finish_time'],
-            'has_metadata': task.get('abspath') in matched_paths,
+            "id": task["id"],
+            "task_label": task["task_label"],
+            "task_success": task["task_success"],
+            "finish_time": task["finish_time"],
+            "has_metadata": task.get("abspath") in matched_paths,
         }
         return_data["results"].append(item)
 
@@ -138,17 +151,17 @@ def get_filtered_completed_task_ids(params, exclude_ids=None):
     :param exclude_ids:
     :return:
     """
-    search_value = params.get('search_value', '')
-    status = params.get('status', 'all')
+    search_value = params.get("search_value", "")
+    status = params.get("status", "all")
 
     task_success = None
-    if status == 'success':
+    if status == "success":
         task_success = True
-    elif status == 'failed':
+    elif status == "failed":
         task_success = False
 
-    after_time = _parse_datetime_to_timestamp(params.get('after'))
-    before_time = _parse_datetime_to_timestamp(params.get('before'))
+    after_time = _parse_datetime_to_timestamp(params.get("after"))
+    before_time = _parse_datetime_to_timestamp(params.get("before"))
 
     exclude_set = set(exclude_ids or [])
 
@@ -160,12 +173,12 @@ def get_filtered_completed_task_ids(params, exclude_ids=None):
         search_value=search_value,
         task_success=task_success,
         after_time=after_time,
-        before_time=before_time
+        before_time=before_time,
     )
 
     id_list = []
     for record in query:
-        task_id = record.get('id')
+        task_id = record.get("id")
         if task_id is None:
             continue
         if task_id in exclude_set:
@@ -223,17 +236,17 @@ def add_historic_tasks_to_pending_tasks_list(historic_task_ids, library_id=None)
 
 def read_command_log_for_task(task_id):
     data = {
-        'command_log':       '',
-        'command_log_lines': [],
+        "command_log": "",
+        "command_log_lines": [],
     }
     task_handler = history.History()
     task_data = task_handler.get_historic_task_data_dictionary(task_id=task_id)
     if not task_data:
         return data
 
-    for command_log in task_data.get('completedtaskscommandlogs_set', []):
-        data['command_log'] += command_log['dump']
-        data['command_log_lines'] += format_ffmpeg_log_text(command_log['dump'].split("\n"))
+    for command_log in task_data.get("completedtaskscommandlogs_set", []):
+        data["command_log"] += command_log["dump"]
+        data["command_log_lines"] += format_ffmpeg_log_text(command_log["dump"].split("\n"))
 
     return data
 
@@ -241,37 +254,48 @@ def read_command_log_for_task(task_id):
 def format_ffmpeg_log_text(log_lines):
     return_list = []
     pre_text = False
-    headers = ['RUNNER:', 'COMMAND:', 'LOG:', 'WORKER TERMINATED!', 'PLUGIN FAILED!', 'REMOTE TASK FAILED!',
-               'REMOTE LINK MANAGER TERMINATED!']
+    headers = [
+        "RUNNER:",
+        "COMMAND:",
+        "LOG:",
+        "WORKER TERMINATED!",
+        "PLUGIN FAILED!",
+        "REMOTE TASK FAILED!",
+        "REMOTE LINK MANAGER TERMINATED!",
+    ]
     for _i, line in enumerate(log_lines):
         line_text = line
 
         # Add PRE to lines
         if line_text and pre_text and line_text.rstrip() not in headers:
-            line_text = f'<pre>{line_text}</pre>'
+            line_text = f"<pre>{line_text}</pre>"
 
         # Add bold to headers
         if line_text.rstrip() not in headers:
             line_text = line_text
         else:
-            if line_text.rstrip() in ['WORKER TERMINATED!', 'PLUGIN FAILED!', 'REMOTE TASK FAILED!',
-                                      'REMOTE LINK MANAGER TERMINATED!']:
+            if line_text.rstrip() in [
+                "WORKER TERMINATED!",
+                "PLUGIN FAILED!",
+                "REMOTE TASK FAILED!",
+                "REMOTE LINK MANAGER TERMINATED!",
+            ]:
                 line_text = f'<b><span class="terminated">{line_text}</span></b>'
             else:
-                line_text = f'<b>{line_text}</b>'
+                line_text = f"<b>{line_text}</b>"
 
         # Replace leading whitespace
         stripped = line.lstrip()
         line_text = "&nbsp;" * (len(line) - len(stripped)) + line_text
 
         # If log section is COMMAND:
-        if 'RUNNER:' in line_text:
+        if "RUNNER:" in line_text:
             # prepend a horizontal rule
             return_list.append("<hr>")
             pre_text = False
-        elif 'COMMAND:' in line_text:
+        elif "COMMAND:" in line_text:
             pre_text = True
-        elif 'LOG:' in line_text:
+        elif "LOG:" in line_text:
             pre_text = False
         return_list.append(line_text)
     return return_list

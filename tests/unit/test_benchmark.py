@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 """
-    tests.unit.test_benchmark.py
+tests.unit.test_benchmark.py
 
-    Performance benchmarks for critical Compresso operations.
-    Run with: pytest tests/unit/test_benchmark.py -v --benchmark-enable
-    Requires pytest-benchmark: pip install pytest-benchmark
+Performance benchmarks for critical Compresso operations.
+Run with: pytest tests/unit/test_benchmark.py -v --benchmark-enable
+Requires pytest-benchmark: pip install pytest-benchmark
 """
 
 import os
@@ -14,6 +14,7 @@ import pytest
 
 try:
     import pytest_benchmark  # noqa: F401
+
     HAS_BENCHMARK = True
 except ImportError:
     HAS_BENCHMARK = False
@@ -25,7 +26,6 @@ from compresso.libs import common
 @pytest.mark.benchmark
 @pytest.mark.unittest
 class TestCommonBenchmarks:
-
     def test_file_checksum_performance(self, benchmark, tmp_path):
         """Benchmark MD5 checksum on a 1MB file."""
         test_file = tmp_path / "bench.bin"

@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 """
-    compresso.frontend_push_messages.py
+compresso.frontend_push_messages.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     06 Dec 2018, (7:21 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     06 Dec 2018, (7:21 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import threading
 from queue import Empty, Queue
 
@@ -59,16 +60,16 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
     @staticmethod
     def __validate_item(item):
         # Ensure all required keys are present
-        for key in ['id', 'type', 'code', 'message', 'timeout']:
+        for key in ["id", "type", "code", "message", "timeout"]:
             if key not in item:
                 raise Exception(f"Frontend message item incorrectly formatted. Missing key: '{key}'")
 
         # Ensure the given type is valid
-        if item.get('type') not in ['error', 'warning', 'success', 'info', 'status']:
+        if item.get("type") not in ["error", "warning", "success", "info", "status"]:
             raise Exception(
                 "Frontend message item's code must be in "
                 "['error', 'warning', 'success', 'info', 'status']. "
-                "Received '{}'".format(item.get('type'))
+                "Received '{}'".format(item.get("type"))
             )
         return True
 
@@ -91,7 +92,7 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
         # Ensure received item is valid
         self.__validate_item(item)
         with self._lock:
-            item_id = item.get('id')
+            item_id = item.get("id")
             if item_id in self.all_items:
                 return
             self.all_items.add(item_id)
@@ -116,7 +117,7 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
             requeue_items = []
             # Create list of items that will be queued again
             for current_item in current_items:
-                if current_item.get('id') != item_id:
+                if current_item.get("id") != item_id:
                     requeue_items.append(current_item)
             if item_id in self.all_items:
                 self.all_items.remove(item_id)
@@ -133,7 +134,7 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
     def update(self, item):
         # Ensure received item is valid
         self.__validate_item(item)
-        item_id = item.get('id')
+        item_id = item.get("id")
         with self._lock:
             current_items = self.__get_all_items_locked()
 
@@ -141,7 +142,7 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
             replaced = False
             # Create list of items that will be queued again, replacing matching IDs
             for current_item in current_items:
-                if current_item.get('id') == item_id:
+                if current_item.get("id") == item_id:
                     requeue_items.append(item)
                     replaced = True
                 else:
