@@ -1,3 +1,29 @@
+# [1.8.0](https://github.com/jtn0123/compresso/compare/v1.7.1...v1.8.0) (2026-03-27)
+
+
+### Bug Fixes
+
+* **lint:** disable import-untyped mypy error for missing type stubs ([28c54fe](https://github.com/jtn0123/compresso/commit/28c54fe199d2ba1ad463f654d2a291fa6c14d852))
+* **lint:** resolve ruff S110 and E402 violations in db_migrate.py ([e915ff8](https://github.com/jtn0123/compresso/commit/e915ff8e125c64a2b4e7f736f53a102c413ac0a3))
+* **security:** add path validation to filebrowser and pending APIs ([1509b33](https://github.com/jtn0123/compresso/commit/1509b3363d5deb49287622c3e66ab86562db2bc8))
+* **security:** harden plugin handlers against reflected XSS ([fc431e5](https://github.com/jtn0123/compresso/commit/fc431e587189aefb2fec0898211ab89426abbf8a))
+* **security:** mitigate reflected XSS in plugin request handlers ([7806d45](https://github.com/jtn0123/compresso/commit/7806d45b7a366d65cfee71b03734a04a709126c3))
+* **security:** use tornado.escape.json_encode for XSS-safe JSON output ([b74265f](https://github.com/jtn0123/compresso/commit/b74265f7a47a36bd308b7bf50ea75b441c358c52))
+* suppress mypy method-assign, fully sanitize plugin handler inputs ([037d4b4](https://github.com/jtn0123/compresso/commit/037d4b44f639e4940ef89dd4c104ec1d13d24000))
+
+
+### Features
+
+* **lint:** enable bugbear (B) rules and fix 33 violations ([3baa094](https://github.com/jtn0123/compresso/commit/3baa094ec68a238ccbd3dd89662a42a5c5b7c262))
+* **lint:** enable complexity (C90) and line length (E501) enforcement ([0c63878](https://github.com/jtn0123/compresso/commit/0c63878721bdbc42885003e988071b6bc1b9e5ba))
+* **lint:** enable isort, pyupgrade, PIE rules and auto-fix 1046 violations ([03a7ce7](https://github.com/jtn0123/compresso/commit/03a7ce7887b6a218f0d8c3e5217f467b6e572918))
+* **lint:** enable security (S/bandit) rules with test ignores ([eaf3382](https://github.com/jtn0123/compresso/commit/eaf3382933191368e2d3fe3630d52c8c7a53ca38))
+* **lint:** enable SIM (simplify) and T20 (no-print) rules, fix 175 violations ([830424b](https://github.com/jtn0123/compresso/commit/830424b959fcb3b5518566bbb9fd359d9bdb4f76))
+* **lint:** enforce ruff format in CI, sync pre-commit versions ([d21ab41](https://github.com/jtn0123/compresso/commit/d21ab418db4256ae4d09fbcc632e86fc215bd211))
+* **lint:** make mypy type checking blocking in CI ([a8b19e6](https://github.com/jtn0123/compresso/commit/a8b19e64f3553c344a53ff688954b57bc8e0d442))
+* **ui:** Modern UI redesign with palette switching and dense layout ([#53](https://github.com/jtn0123/compresso/issues/53)) ([ea1b655](https://github.com/jtn0123/compresso/commit/ea1b655c97ac129e43047e96a0040ee692dbb70a))
+* **ui:** modern UI redesign with palette switching, icon-rail sidebar, and dense layout ([e89ecfd](https://github.com/jtn0123/compresso/commit/e89ecfd4f0898ab3b1dc9edd6f01669b39562f55))
+
 ## [1.7.1](https://github.com/jtn0123/compresso/compare/v1.7.0...v1.7.1) (2026-03-26)
 
 
