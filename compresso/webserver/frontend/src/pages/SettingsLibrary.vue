@@ -749,16 +749,16 @@ div.sub-setting {
 }
 
 .library-path-list-item {
-  background: #F2C037;
+  background: var(--q-secondary);
 }
 
 .chip {
-  border: 1px solid #00000050;
-  background-color: #00000010;
+  border: 1px solid var(--compresso-grey-5);
+  background-color: var(--compresso-grey-2);
   font-weight: 600;
   font-size: 12px;
   margin: 2px 6px 2px 0;
-  color: #0000008A;
+  color: var(--compresso-grey-7);
 }
 
 .avatar-size {

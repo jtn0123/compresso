@@ -30,6 +30,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useQuasar } from 'quasar';
 import { formatBytes } from 'src/js/formatUtils';
+import { useChartTheme } from 'src/composables/useChartTheme';
 
 export default {
   name: 'SpaceSavedTimelineChart',
@@ -40,6 +41,7 @@ export default {
   emits: ['interval-change'],
   setup(props) {
     const $q = useQuasar();
+    const { getChartColor, chartBgColor } = useChartTheme();
     const chartRef = ref(null);
     const interval = ref('day');
     let chart = null;
@@ -65,8 +67,8 @@ export default {
             datasets: [{
               label: 'Space Saved',
               data: props.data.map(d => d.space_saved),
-              borderColor: '#1a6b4a',
-              backgroundColor: 'rgba(26, 107, 74, 0.1)',
+              borderColor: getChartColor(1),
+              backgroundColor: chartBgColor(1, 0.1),
               fill: true,
               tension: 0.3,
             }],

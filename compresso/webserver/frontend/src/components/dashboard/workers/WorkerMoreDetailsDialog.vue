@@ -137,7 +137,7 @@ const props = defineProps({
   },
   workerGroupColour: {
     type: String,
-    default: '#cccccc'
+    default: 'var(--compresso-grey-4)'
   },
   state: {
     type: String,

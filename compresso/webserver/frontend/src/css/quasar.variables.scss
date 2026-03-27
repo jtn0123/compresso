@@ -1,20 +1,9 @@
 // Quasar SCSS (& Sass) Variables
 // --------------------------------------------------
-// To customize the look and feel of this app, you can override
-// the Sass/SCSS variables found in Quasar's source Sass/SCSS files.
+// NOTE: primary and secondary are modified dynamically in compressoTheme.js applyTheme()
 
-// Check documentation for full list of Quasar variables
-
-// Your own variables (that are declared here) and Quasar's own
-// ones will be available out of the box in your .vue/.scss/.sass files
-
-// It's highly recommended to change the default colors
-// to match your app's branding.
-// Tip: Use the "Theme Builder" on Quasar's documentation website.
-
-// NOTE: primary and secondary are modified dynamically in compressoGlobals.js setTheme()
 $primary   : #1a6b4a;
-$secondary : #e8a525;
+$secondary : #d49a1e;
 $accent    : #7c5cbf;
 
 $dark      : #141418;
@@ -22,11 +11,11 @@ $dark      : #141418;
 $positive  : #2e9e5a;
 $negative  : #d43545;
 $info      : #3a8fd4;
-$warning   : #e8a525;
+$warning   : #d49a1e;
 
 // Custom colours
 $header: #13291f;
 $card-head: #f4f6f5;
 
 // Typography
-$typography-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+$typography-font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;

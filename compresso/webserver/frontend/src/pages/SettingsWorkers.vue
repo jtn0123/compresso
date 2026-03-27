@@ -433,7 +433,7 @@ export default {
 }
 
 .schedule-list-item {
-  background: #F2C037;
+  background: var(--q-secondary);
 }
 
 .page-with-mobile-quick-nav {

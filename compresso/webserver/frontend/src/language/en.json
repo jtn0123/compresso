@@ -128,7 +128,8 @@
     "abPreview": "A/B Preview",
     "healthCheck": "Health Check",
     "history": "History",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "monitoring": "Monitoring"
   },
   "status": {
     "cannotLoadImage": "Cannot load image",

@@ -15,6 +15,7 @@
 <script>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useQuasar } from 'quasar';
+import { useChartTheme } from 'src/composables/useChartTheme';
 
 export default {
   name: 'ResolutionDistributionChart',
@@ -24,6 +25,7 @@ export default {
   },
   setup(props) {
     const $q = useQuasar();
+    const { getChartColor } = useChartTheme();
     const chartRef = ref(null);
     let chart = null;
 
@@ -47,7 +49,7 @@ export default {
             datasets: [{
               label: 'Files',
               data: props.resolutions.map(r => r.count),
-              backgroundColor: '#e8a525',
+              backgroundColor: getChartColor(2),
             }],
           },
           options: {

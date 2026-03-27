@@ -1,35 +1,39 @@
-// app global css in SCSS form
-// Typography: prefer Inter with system font fallback
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+// Compresso Design System
+// Typography: DM Sans with system font fallback
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 
 @import '../../node_modules/xbbcode-parser/xbbcode.css';
 
+// ============================================================
+// Grey Scale (neutral — works with all palettes)
+// ============================================================
 :root {
-  --compresso-grey-1: #f8faf9;
-  --compresso-grey-2: #f0f3f1;
-  --compresso-grey-3: #e4e8e6;
-  --compresso-grey-4: #d1d7d4;
-  --compresso-grey-5: #adb5b0;
-  --compresso-grey-6: #8a928c;
-  --compresso-grey-7: #636b66;
-  --compresso-grey-8: #4a524d;
-  --compresso-grey-9: #333a36;
-  --compresso-grey-10: #1c2320;
+  --compresso-grey-1: #f8f9fa;
+  --compresso-grey-2: #f0f1f3;
+  --compresso-grey-3: #e4e5e8;
+  --compresso-grey-4: #d1d3d6;
+  --compresso-grey-5: #adb0b4;
+  --compresso-grey-6: #8a8d92;
+  --compresso-grey-7: #636669;
+  --compresso-grey-8: #4a4d50;
+  --compresso-grey-9: #333538;
+  --compresso-grey-10: #1c1d1e;
 }
 
 .body--dark {
-  --compresso-grey-1: #1c2320;
-  --compresso-grey-2: #333a36;
-  --compresso-grey-3: #4a524d;
-  --compresso-grey-4: #636b66;
-  --compresso-grey-5: #8a928c;
-  --compresso-grey-6: #adb5b0;
-  --compresso-grey-7: #d1d7d4;
-  --compresso-grey-8: #e4e8e6;
-  --compresso-grey-9: #f0f3f1;
-  --compresso-grey-10: #f8faf9;
+  --compresso-grey-1: #1c1d1e;
+  --compresso-grey-2: #2a2b2d;
+  --compresso-grey-3: #3a3b3e;
+  --compresso-grey-4: #4d4f52;
+  --compresso-grey-5: #6b6e72;
+  --compresso-grey-6: #8a8d92;
+  --compresso-grey-7: #adb0b4;
+  --compresso-grey-8: #d1d3d6;
+  --compresso-grey-9: #e4e5e8;
+  --compresso-grey-10: #f0f1f3;
 }
 
+// Grey text utilities
 .text-grey-1 { color: var(--compresso-grey-1) !important; }
 .text-grey-2 { color: var(--compresso-grey-2) !important; }
 .text-grey-3 { color: var(--compresso-grey-3) !important; }
@@ -41,6 +45,7 @@
 .text-grey-9 { color: var(--compresso-grey-9) !important; }
 .text-grey-10 { color: var(--compresso-grey-10) !important; }
 
+// Grey background utilities
 .bg-grey-1 { background-color: var(--compresso-grey-1) !important; }
 .bg-grey-2 { background-color: var(--compresso-grey-2) !important; }
 .bg-grey-3 { background-color: var(--compresso-grey-3) !important; }
@@ -52,6 +57,59 @@
 .bg-grey-9 { background-color: var(--compresso-grey-9) !important; }
 .bg-grey-10 { background-color: var(--compresso-grey-10) !important; }
 
+// Surface utilities
+.bg-surface-0 { background-color: var(--surface-0) !important; }
+.bg-surface-1 { background-color: var(--surface-1) !important; }
+.bg-surface-2 { background-color: var(--surface-2) !important; }
+
+// ============================================================
+// Typography Scale
+// ============================================================
+.text-display { font-size: 1.5rem; font-weight: 700; line-height: 1.25; }
+.text-heading { font-size: 1.0rem; font-weight: 600; line-height: 1.3; }
+.text-subheading { font-size: 0.875rem; font-weight: 600; line-height: 1.35; }
+.text-body { font-size: 0.8125rem; font-weight: 400; line-height: 1.45; }
+.text-stat-value { font-size: 1.25rem; font-weight: 600; line-height: 1.15; }
+.text-stat-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+// Base body font size (dense)
+body {
+  font-size: 13px;
+  background: var(--surface-0);
+}
+
+// ============================================================
+// Card Treatment
+// ============================================================
+.q-card {
+  background: var(--surface-1);
+  border-radius: 6px;
+}
+
+.body--dark .q-card {
+  box-shadow: none;
+}
+
+.nested-card {
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--compresso-grey-3), transparent 40%);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.body--dark .nested-card {
+  box-shadow: none;
+}
+
+// ============================================================
+// Border Hover Effect
+// ============================================================
 .border-hover {
   border-radius: 6px;
   border: 1px solid transparent;
@@ -59,20 +117,28 @@
 }
 
 .border-hover:hover {
-  border: 1px solid rgba(26, 107, 74, 0.18);
-  box-shadow: 0 1px 4px rgba(26, 107, 74, 0.08);
+  border: 1px solid var(--compresso-primary-border);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--q-primary), transparent 92%);
 }
 
+// ============================================================
+// Header & Footer Backgrounds
+// ============================================================
 .header-background {
-  background: linear-gradient(135deg, $header 0%, #1a3d2d 100%) !important;
+  background: var(--compresso-header-bg) !important;
 }
+
 .footer-background {
-  background: $header !important;
+  background: var(--compresso-header-bg) !important;
 }
+
 .bg-card-head {
   background: var(--q-card-head) !important;
 }
 
+// ============================================================
+// Dropdown Menus
+// ============================================================
 .compresso-dropdown-menu {
   min-width: 100px;
   border: 1px solid color-mix(in srgb, var(--q-secondary), transparent 50%);
@@ -84,36 +150,50 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
-.nested-card {
-  border: 1px solid color-mix(in srgb, var(--compresso-grey-3), transparent 40%);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.body--dark .nested-card {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
-
-/* Modern stat cards with colored left accent border */
+// ============================================================
+// Stat Cards v2 — Top-line accent with tinted background
+// ============================================================
 .stat-card {
-  border-left: 4px solid var(--stat-card-accent, var(--q-primary));
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 85%);
+  background: color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 96%);
+  transition: border-color 0.2s ease;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--stat-card-accent, var(--q-primary));
+  border-radius: 6px 6px 0 0;
 }
 
 .stat-card:hover {
-  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 70%);
+}
+
+.body--dark .stat-card {
+  background: color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 93%);
 }
 
 .stat-card .stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.15;
 }
 
 .stat-card .stat-label {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
   color: var(--compresso-grey-6);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .stat-card .stat-sublabel {
@@ -146,7 +226,117 @@
 .stat-card--grey { --stat-card-accent: var(--compresso-grey-5); }
 .stat-card--grey .stat-value { color: var(--compresso-grey-6); }
 
-/* Page transition */
+// ============================================================
+// Progress Bar Enhancements
+// ============================================================
+// Critical pulse for system metrics above 90%
+.progress-critical .q-linear-progress__model {
+  box-shadow: 0 0 6px 0 var(--q-negative);
+  animation: progress-pulse 2s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+// Striped animation for active worker bars
+.worker-progress-active .q-linear-progress__model {
+  background-image: linear-gradient(
+    -45deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.08) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 50%,
+    transparent 75%,
+    rgba(255, 255, 255, 0.08) 75%
+  );
+  background-size: 20px 20px;
+  animation: progress-stripes 1s linear infinite;
+}
+
+@keyframes progress-stripes {
+  from { background-position: 20px 0; }
+  to { background-position: 0 0; }
+}
+
+// Dark mode track color
+.body--dark .q-linear-progress__track {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+// ============================================================
+// Connection Indicator
+// ============================================================
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.connection-dot--connected {
+  background: var(--q-positive);
+  box-shadow: 0 0 0 0 rgba(46, 158, 90, 0.4);
+  animation: connection-ring 3s ease-out infinite;
+}
+
+.connection-dot--disconnected {
+  background: var(--q-negative);
+}
+
+.connection-dot--connecting {
+  background: var(--q-warning);
+  animation: connection-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes connection-ring {
+  0% { box-shadow: 0 0 0 0 rgba(46, 158, 90, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(46, 158, 90, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 158, 90, 0); }
+}
+
+@keyframes connection-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+// ============================================================
+// Table Overrides
+// ============================================================
+.q-table thead th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--compresso-grey-6);
+  border-bottom: 2px solid var(--compresso-grey-3);
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+.q-table tbody td {
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--compresso-grey-3), transparent 50%);
+}
+
+.q-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--q-primary), transparent 97%);
+}
+
+.body--dark .q-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--q-primary), transparent 94%);
+}
+
+.q-table--ultra-dense tbody td {
+  padding: 3px 10px;
+  font-size: 0.78rem;
+}
+
+// ============================================================
+// Page Transition
+// ============================================================
 .page-fade-enter-active,
 .page-fade-leave-active {
   transition: opacity 0.15s ease;
@@ -157,26 +347,113 @@
   opacity: 0;
 }
 
-/* Empty state */
+// ============================================================
+// Empty States
+// ============================================================
 .empty-state {
-  padding: 24px 16px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  min-height: 120px;
 }
 
 .empty-state .empty-state-icon {
-  color: var(--compresso-grey-5);
+  font-size: 2.5rem;
+  color: var(--compresso-grey-4);
   margin-bottom: 8px;
+  opacity: 0.6;
 }
 
 .empty-state .empty-state-text {
-  color: var(--compresso-grey-5);
   font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--compresso-grey-6);
 }
 
-/* Custom Scrollbar */
+.empty-state .empty-state-subtext {
+  font-size: 0.75rem;
+  color: var(--compresso-grey-5);
+  max-width: 280px;
+  text-align: center;
+  margin-top: 4px;
+}
+
+// ============================================================
+// Settings Pages
+// ============================================================
+.settings-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--q-primary);
+  padding-left: 10px;
+  border-left: 3px solid var(--q-primary);
+  margin-bottom: 12px;
+}
+
+.settings-form .q-field {
+  margin-bottom: 8px;
+}
+
+.settings-submit-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface-1);
+  padding: 12px 0;
+  border-top: 1px solid var(--compresso-grey-3);
+  z-index: 10;
+}
+
+// ============================================================
+// Section Dividers
+// ============================================================
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--compresso-grey-3);
+}
+
+// ============================================================
+// Sidebar Navigation
+// ============================================================
+.nav-section-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--compresso-grey-5);
+  padding: 12px 16px 4px;
+}
+
+.nav-active {
+  background: color-mix(in srgb, var(--q-primary), transparent 88%) !important;
+  border-radius: 8px;
+  margin: 1px 8px;
+}
+
+.nav-active .q-icon,
+.nav-active .q-item__section--main {
+  color: var(--q-primary) !important;
+  font-weight: 600;
+}
+
+// ============================================================
+// Custom Scrollbar
+// ============================================================
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -185,7 +462,7 @@
 
 ::-webkit-scrollbar-thumb {
   background: var(--compresso-grey-4);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -198,15 +475,17 @@
 
 .body--dark {
   ::-webkit-scrollbar-thumb {
-    background: var(--compresso-grey-8);
+    background: var(--compresso-grey-4);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--compresso-grey-7);
+    background: var(--compresso-grey-5);
   }
 }
 
-// Smooth theme transitions
+// ============================================================
+// Smooth Theme Transitions
+// ============================================================
 body,
 .q-page,
 .q-card,
@@ -224,16 +503,29 @@ body,
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-// Dark mode tooltip fix: invert bg-white tooltips
+// ============================================================
+// Dark Mode Overrides
+// ============================================================
+// Invert bg-white tooltips
 .body--dark .q-tooltip.bg-white {
   background-color: var(--compresso-grey-2) !important;
 }
 
-// Dark mode: adapt Quasar's grey-N color prop for badges
+// Adapt Quasar's grey-N color prop for badges
 .body--dark .q-badge.bg-grey-7 {
   background-color: var(--compresso-grey-5) !important;
 }
 
 .body--dark .q-badge.bg-grey-8 {
   background-color: var(--compresso-grey-4) !important;
+}
+
+// Dark mode page background
+.body--dark .q-page {
+  background: var(--surface-0);
+}
+
+// Dark mode drawer background
+.body--dark .q-drawer {
+  background: var(--surface-1);
 }

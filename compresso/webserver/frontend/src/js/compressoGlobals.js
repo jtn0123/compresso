@@ -1,7 +1,8 @@
 import axios from "axios";
 import { ref, reactive } from 'vue'
-import { Notify, setCssVar } from 'quasar'
+import { Notify, LocalStorage } from 'quasar'
 import { createLogger } from 'src/composables/useLogger'
+import { applyTheme } from 'src/js/compressoTheme'
 
 const log = createLogger('Globals')
 
@@ -95,17 +96,8 @@ export const getCompressoApiUrl = function (api_version, api_endpoint) {
 }
 
 export const setTheme = function (mode) {
-  if (mode === 'dark') {
-    setCssVar('primary', '#22916a');
-    setCssVar('secondary', '#d4952a');
-    setCssVar('warning', '#d4952a');
-    document.body.style.setProperty('--q-card-head', '#1e1e22');
-  } else {
-    setCssVar('primary', '#1a6b4a');
-    setCssVar('secondary', '#e8a525');
-    setCssVar('warning', '#e8a525');
-    document.body.style.setProperty('--q-card-head', '#f4f6f5');
-  }
+  const palette = LocalStorage.getItem('palette') || 'forest'
+  applyTheme(mode, palette)
 }
 
 export default {

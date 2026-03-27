@@ -1,5 +1,5 @@
 <template>
-  <div class="row items-center q-mb-lg page-header">
+  <div class="row items-center q-mb-md page-header">
     <div class="col">
       <div class="page-header-title">{{ title }}</div>
       <div v-if="subtitle" class="page-header-subtitle">{{ subtitle }}</div>
@@ -25,18 +25,18 @@ defineProps({
 
 <style scoped>
 .page-header {
-  border-bottom: 2px solid var(--q-primary);
-  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--q-primary), transparent 70%);
+  padding-bottom: 10px;
 }
 
 .page-header-title {
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 600;
   line-height: 1.3;
 }
 
 .page-header-subtitle {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--compresso-grey-6);
   margin-top: 2px;
 }

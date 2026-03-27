@@ -5,15 +5,24 @@ vi.mock('axios', () => ({
   default: vi.fn(),
 }))
 
-// Mock quasar's setCssVar and Notify
+// Mock quasar's setCssVar, Notify, and LocalStorage
+const mockLocalStorageGetItem = vi.fn()
 vi.mock('quasar', () => ({
   setCssVar: vi.fn(),
   Notify: { create: vi.fn() },
+  LocalStorage: { getItem: (...args) => mockLocalStorageGetItem(...args) },
 }))
+
+// Mock compressoTheme so compressoGlobals.setTheme can be tested in isolation
+const mockApplyTheme = vi.fn()
+vi.mock('src/js/compressoTheme', () => ({
+  applyTheme: (...args) => mockApplyTheme(...args),
+}))
+
 
 import axios from 'axios'
 import { Notify } from 'quasar'
-import compressoGlobals, { notificationsCount, toastSettings, showEventToast, saveToastSettings } from '../compressoGlobals'
+import compressoGlobals, { notificationsCount, toastSettings, showEventToast, saveToastSettings, setTheme } from '../compressoGlobals'
 
 describe('notificationsCount', () => {
   beforeEach(() => {
@@ -151,5 +160,32 @@ describe('saveToastSettings', () => {
     )
 
     vi.restoreAllMocks()
+  })
+})
+
+// ------------------------------------------------------------------
+// setTheme (delegates to compressoTheme.applyTheme)
+// ------------------------------------------------------------------
+
+describe('setTheme', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockLocalStorageGetItem.mockReturnValue(null)
+  })
+
+  it('calls applyTheme with mode and defaults palette to forest', () => {
+    setTheme('dark')
+    expect(mockApplyTheme).toHaveBeenCalledWith('dark', 'forest')
+  })
+
+  it('passes stored palette from localStorage', () => {
+    mockLocalStorageGetItem.mockReturnValue('ember')
+    setTheme('light')
+    expect(mockApplyTheme).toHaveBeenCalledWith('light', 'ember')
+  })
+
+  it('reads palette key from LocalStorage', () => {
+    setTheme('dark')
+    expect(mockLocalStorageGetItem).toHaveBeenCalledWith('palette')
   })
 })

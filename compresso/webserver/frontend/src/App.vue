@@ -3,8 +3,8 @@
 </template>
 <script>
 import { defineComponent, onBeforeUnmount } from 'vue';
-import { LocalStorage, setCssVar, useQuasar } from "quasar";
-import { setTheme } from "src/js/compressoGlobals";
+import { LocalStorage, useQuasar } from "quasar";
+import { applyTheme } from "src/js/compressoTheme";
 
 export default defineComponent({
   name: 'App',
@@ -19,8 +19,10 @@ export default defineComponent({
       LocalStorage.set('theme', configuredTheme);
     }
 
+    const configuredPalette = LocalStorage.getItem('palette') || 'forest';
+
     const darkMode = configuredTheme === 'dark';
-    setTheme(configuredTheme);
+    applyTheme(configuredTheme, configuredPalette);
     $q.dark.set(darkMode);
 
     // Listen for runtime OS theme preference changes
@@ -29,7 +31,8 @@ export default defineComponent({
       // Only auto-switch if user hasn't explicitly stored a preference
       if (LocalStorage.getItem('theme')) return;
       const newTheme = e.matches ? 'dark' : 'light';
-      setTheme(newTheme);
+      const palette = LocalStorage.getItem('palette') || 'forest';
+      applyTheme(newTheme, palette);
       $q.dark.set(e.matches);
     };
     if (mql) {

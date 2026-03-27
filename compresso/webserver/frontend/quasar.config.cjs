@@ -97,24 +97,18 @@ module.exports = configure(function (ctx) {
         // Allow configuring the backend target via .env
         // Example: COMPRESSO_BACKEND_URL=http://localhost:8888
         const httpTarget = process.env.COMPRESSO_BACKEND_URL || 'http://localhost:8888'
-        // Derive ws target from http target (http -> ws, https -> wss)
-        const wsTarget = httpTarget.replace(/^http(s?):/i, (m, s) => (s ? 'wss:' : 'ws:'))
 
-        return {
-          '/compresso/api': {
+        return [
+          {
+            context: ['/compresso/api', '/compresso/panel', '/compresso/swagger'],
             target: httpTarget
           },
-          '/compresso/panel': {
-            target: httpTarget
-          },
-          '/compresso/swagger': {
-            target: httpTarget
-          },
-          '/compresso/websocket': {
-              target: wsTarget,
-              ws: true
+          {
+            context: ['/compresso/websocket'],
+            target: httpTarget,
+            ws: true
           }
-        }
+        ]
       })(),
       open: false // opens browser window automatically
     },

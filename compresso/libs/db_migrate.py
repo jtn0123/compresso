@@ -32,9 +32,67 @@ Copyright:
 import inspect
 import os
 import sys
+from unittest import mock
 
 from peewee import Field, SqliteDatabase
 from peewee_migrate import Migrator, Router
+
+
+def _patched_run_one(original_run_one):
+    """
+    Wrap Router.run_one to fix peewee-migrate 1.15.0 incompatibility with peewee >= 3.17.
+    peewee-migrate mocks cursor.fetch_one but peewee's get_columns() calls cursor.fetchall().
+    """
+    def wrapper(self, name, migrator, *, fake=True, downgrade=False, force=False):
+        try:
+            migrate_fn, rollback_fn = self.read(name)
+            if fake:
+                mocked_cursor = mock.Mock()
+                mocked_cursor.fetch_one.return_value = None
+                mocked_cursor.fetchone.return_value = None
+                mocked_cursor.fetchall.return_value = []
+                with (
+                    mock.patch("peewee.Model.select"),
+                    mock.patch("peewee.Database.execute_sql", return_value=mocked_cursor),
+                ):
+                    migrate_fn(migrator, self.database, fake=fake)
+
+                if force:
+                    self.model.create(name=name)
+                    self.logger.info("Done %s", name)
+
+                migrator.__ops__ = []
+                return name
+
+            with self.database.transaction():
+                if not downgrade:
+                    self.logger.info('Migrate "%s"', name)
+                    migrate_fn(migrator, self.database, fake=fake)
+                    migrator()
+                    self.model.create(name=name)
+                else:
+                    self.logger.info("Rolling back %s", name)
+                    rollback_fn(migrator, self.database, fake=fake)
+                    migrator()
+                    self.model.delete().where(self.model.name == name).execute()
+
+                self.logger.info("Done %s", name)
+                return name
+
+        except Exception:
+            try:
+                self.database.rollback()
+            except Exception:
+                pass
+            operation = "Migration" if not downgrade else "Rollback"
+            self.logger.exception("%s failed: %s", operation, name)
+            raise
+
+    return wrapper
+
+
+# Apply the patch before any Router instances are created
+Router.run_one = _patched_run_one(Router.run_one)
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.lib import BaseModel

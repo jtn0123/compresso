@@ -102,10 +102,11 @@
               <q-linear-progress
                 :value="worker.progress / 100"
                 :indeterminate="worker.indeterminate"
+                :class="{ 'worker-progress-active': !worker.indeterminate }"
                 size="20px"
                 rounded
                 color="secondary"
-                :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
+                track-color="transparent"
               >
                 <div class="absolute-full flex flex-center">
                   <span class="text-caption text-white" style="text-shadow: 0 0 3px rgba(0,0,0,0.5)">
@@ -189,7 +190,7 @@ const selectedWorkerProps = ref({
   elapsed: '',
   etc: '',
   color: 'warning',
-  workerGroupColour: '#cccccc',
+  workerGroupColour: 'var(--compresso-grey-4)',
   state: '',
   currentRunner: '',
   startTime: '',
@@ -266,7 +267,7 @@ function openWorkerDetails(worker) {
     elapsed: worker.elapsed || '',
     etc: worker.etc || '',
     color: worker.color || 'warning',
-    workerGroupColour: worker.workerGroupColour || '#cccccc',
+    workerGroupColour: worker.workerGroupColour || 'var(--compresso-grey-4)',
     state: worker.state || '',
     currentRunner: worker.currentRunner || '',
     startTime: worker.startTime || '',
@@ -344,7 +345,7 @@ onMounted(() => {
   transition: background-color 0.15s;
 }
 .worker-row:hover {
-  background-color: rgba(var(--q-primary-rgb, 25, 118, 210), 0.05);
+  background-color: color-mix(in srgb, var(--q-primary), transparent 95%);
 }
 .text-truncate {
   overflow: hidden;
@@ -356,9 +357,9 @@ onMounted(() => {
   text-align: right;
 }
 .worker-fps {
-  color: var(--q-blue-6, #1e88e5);
+  color: var(--q-info);
 }
 .worker-speed {
-  color: var(--q-grey, #9e9e9e);
+  color: var(--compresso-grey-6);
 }
 </style>

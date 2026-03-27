@@ -47,6 +47,6 @@ export default {
 
 <style>
 .profile-gradient {
-  background: linear-gradient(to bottom, #13291f, rgba(19, 41, 31, 0.7)) !important;
+  background: linear-gradient(to bottom, var(--compresso-header-bg), color-mix(in srgb, var(--compresso-header-bg), transparent 30%)) !important;
 }
 </style>

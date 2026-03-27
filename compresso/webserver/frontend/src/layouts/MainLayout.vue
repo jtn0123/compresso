@@ -1,39 +1,29 @@
 <template>
-  <q-layout view="hHh lpR lFf">
+  <q-layout view="hHh lpR fff">
 
-    <q-header
-      reveal
-      class="header-background text-white"
-      height-hint="98"
-      :style="leftMainNavDrawerOpen ? 'z-index: 3001' : ''"
-    >
-      <q-toolbar>
+    <q-header class="header-background text-white">
+      <q-toolbar style="min-height: 38px; height: 38px">
 
-        <!--SHOW DRAWER MENU BUTTON-->
+        <!-- Mobile menu toggle -->
         <q-btn
-          v-if="$route.meta.showMainNavDrawer"
-          dense
-          flat
-          round
-          :icon="leftMainNavDrawerOpen ? 'menu_open' : 'menu'"
-          @click="toggleMainNavDrawer"/>
+          v-if="$q.screen.lt.md"
+          dense flat round
+          :icon="leftDrawerOpen ? 'menu_open' : 'menu'"
+          size="sm"
+          @click="toggleDrawer"
+        />
 
-        <!--SHOW HOME BUTTON-->
+        <!-- Logo (always visible, clickable to dashboard) -->
         <q-btn
-          v-if="$route.meta.showHome"
-          dense
-          flat
-          round
-          @click="$router.push('/ui/dashboard'); leftMainNavDrawerOpen = false"
-          icon="home">
-        </q-btn>
-
-        <q-toolbar-title shrink class="row items-center no-wrap">
-          <q-avatar rounded size="2rem" font-size="82px" class="q-mr-sm">
+          flat round dense
+          size="sm"
+          @click="$router.push('/ui/dashboard')"
+          class="q-mr-xs"
+        >
+          <q-avatar rounded size="22px">
             <img src="~assets/compresso-logo-white.png">
           </q-avatar>
-          <span class="brand-wordmark gt-xs">Compresso</span>
-        </q-toolbar-title>
+        </q-btn>
 
         <div class="gt-xs">
           <SharedLinkDropdown/>
@@ -41,45 +31,58 @@
 
         <q-space/>
 
-        <div class="gt-xs">
-          <ThemeSwitch/>
-        </div>
-
-        <div
-          class="q-gutter-sm row items-center no-wrap">
+        <!-- Right-side controls -->
+        <div class="row items-center no-wrap q-gutter-xs">
+          <PaletteSwitch class="gt-xs"/>
+          <ThemeSwitch class="gt-xs"/>
           <q-btn
-            dense
-            flat
-            round
+            dense flat round
             icon="notifications"
-            @click="toggleNotificationsDrawer">
+            size="sm"
+            @click="toggleNotificationsDrawer"
+          >
             <q-badge
               v-if="notificationsCount > 0"
-              color="red" text-color="white" floating>
+              color="red" text-color="white" floating
+              style="font-size: 0.6rem; padding: 2px 4px"
+            >
               {{ notificationsCount }}
             </q-badge>
             <q-tooltip>Notifications</q-tooltip>
           </q-btn>
         </div>
       </q-toolbar>
-
     </q-header>
 
+    <!-- Sidebar -->
     <q-drawer
-      v-if="$route.meta.showMainNavDrawer"
-      v-model="leftMainNavDrawerOpen"
+      v-model="leftDrawerOpen"
       side="left"
-      :behavior="$q.screen.lt.md ? 'mobile' : 'desktop'">
-      <DrawerMainNav/>
+      :mini="!sidebarPinned && !sidebarHovered && !isMobile"
+      :mini-width="56"
+      :width="240"
+      :behavior="isMobile ? 'mobile' : 'desktop'"
+      bordered
+      @mouseover="onDrawerMouseOver"
+      @mouseout="onDrawerMouseOut"
+      class="bg-surface-1"
+    >
+      <DrawerMainNav
+        :mini="isDrawerMini"
+        :pinned="sidebarPinned"
+        @update:pinned="onPinToggle"
+      />
     </q-drawer>
 
+    <!-- Notifications drawer -->
     <q-drawer
       v-model="rightNotificationsDrawerOpen"
       side="right"
       :width="$q.screen.lt.md ? $q.screen.width : 650"
-      :overlay="$route.meta.showMainNavDrawer"
+      overlay
       bordered
-      :behavior="$q.screen.lt.md ? 'mobile' : 'desktop'">
+      :behavior="isMobile ? 'mobile' : 'desktop'"
+    >
       <DrawerNotifications/>
     </q-drawer>
 
@@ -91,15 +94,6 @@
       </router-view>
     </q-page-container>
 
-    <q-footer
-      class="footer-background text-white gt-sm">
-      <q-toolbar style="min-height: 32px">
-        <q-space />
-        <span class="text-caption" style="opacity: 0.7">v{{ compressoVersion }}</span>
-        <q-space />
-      </q-toolbar>
-    </q-footer>
-
     <!-- Keyboard shortcuts help dialog -->
     <KeyboardShortcutsDialog v-model="showShortcutsHelp"/>
 
@@ -110,11 +104,12 @@
 </template>
 
 <script>
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, computed, watch } from 'vue';
 import axios from 'axios';
+import { LocalStorage, useQuasar } from "quasar";
 import DrawerMainNav from "components/drawers/DrawerMainNav";
-import { useQuasar } from "quasar";
 import ThemeSwitch from "components/ThemeSwitch";
+import PaletteSwitch from "components/PaletteSwitch";
 import DrawerNotifications from "components/drawers/DrawerNotifications";
 import SharedLinkDropdown from "components/SharedLinkDropdown";
 import KeyboardShortcutsDialog from "components/ui/KeyboardShortcutsDialog";
@@ -128,6 +123,7 @@ export default {
     DrawerMainNav,
     DrawerNotifications,
     ThemeSwitch,
+    PaletteSwitch,
     SharedLinkDropdown,
     KeyboardShortcutsDialog,
     FirstRunWizard
@@ -136,56 +132,72 @@ export default {
     const $q = useQuasar();
     const log = createLogger('MainLayout');
 
-    const leftMainNavDrawerOpen = ref(false)
-    const rightNotificationsDrawerOpen = ref(false)
+    // Sidebar state
+    const leftDrawerOpen = ref(!$q.screen.lt.md);
+    const sidebarPinned = ref(LocalStorage.getItem('sidebar_pinned') !== false);
+    const sidebarHovered = ref(false);
+    const rightNotificationsDrawerOpen = ref(false);
 
-    const compressoVersion = ref('')
+    const isMobile = computed(() => $q.screen.lt.md);
+    const isDrawerMini = computed(() => !sidebarPinned.value && !sidebarHovered.value && !isMobile.value);
 
-    // Keyboard shortcuts
-    const { showHelp } = useKeyboardShortcuts()
-    const showShortcutsHelp = ref(false)
-
-    // Sync the composable's showHelp with our dialog ref
-    watch(showHelp, (val) => { showShortcutsHelp.value = val })
-    watch(showShortcutsHelp, (val) => { showHelp.value = val })
-
-    // Onboarding wizard
-    const showOnboarding = ref(false)
-
-    function toggleMainNavDrawer() {
-      leftMainNavDrawerOpen.value = !leftMainNavDrawerOpen.value
+    function toggleDrawer() {
+      leftDrawerOpen.value = !leftDrawerOpen.value;
     }
 
     function toggleNotificationsDrawer() {
-      rightNotificationsDrawerOpen.value = !rightNotificationsDrawerOpen.value
+      rightNotificationsDrawerOpen.value = !rightNotificationsDrawerOpen.value;
     }
 
+    function onDrawerMouseOver() {
+      if (!isMobile.value) sidebarHovered.value = true;
+    }
+
+    function onDrawerMouseOut() {
+      if (!isMobile.value) sidebarHovered.value = false;
+    }
+
+    function onPinToggle(val) {
+      sidebarPinned.value = val;
+      LocalStorage.set('sidebar_pinned', val);
+    }
+
+    // Keyboard shortcuts
+    const { showHelp } = useKeyboardShortcuts();
+    const showShortcutsHelp = ref(false);
+    watch(showHelp, (val) => { showShortcutsHelp.value = val; });
+    watch(showShortcutsHelp, (val) => { showHelp.value = val; });
+
+    // Onboarding wizard
+    const showOnboarding = ref(false);
+
     onMounted(() => {
-      // Fetch version
-      compressoGlobals.getCompressoVersion().then((version) => {
-        compressoVersion.value = version;
-      })
+      // Fetch version (used by sidebar)
+      compressoGlobals.getCompressoVersion();
 
       // Check onboarding status
       axios.get(getCompressoApiUrl('v2', 'settings/read')).then((res) => {
         if (!res.data?.settings?.onboarding_completed) {
-          showOnboarding.value = true
+          showOnboarding.value = true;
         }
       }).catch((err) => {
-        // If we can't read settings, don't block the UI
-        log.warn('Failed to fetch settings for onboarding check: ' + err)
-      })
-    })
+        log.warn('Failed to fetch settings for onboarding check: ' + err);
+      });
+    });
 
     return {
-      leftMainNavDrawerOpen,
+      leftDrawerOpen,
+      sidebarPinned,
+      sidebarHovered,
       rightNotificationsDrawerOpen,
-      toggleMainNavDrawer,
+      isMobile,
+      isDrawerMini,
+      toggleDrawer,
       toggleNotificationsDrawer,
-
+      onDrawerMouseOver,
+      onDrawerMouseOut,
+      onPinToggle,
       notificationsCount,
-      compressoVersion,
-
       showShortcutsHelp,
       showOnboarding
     }
@@ -194,11 +206,7 @@ export default {
 </script>
 
 <style scoped>
-.brand-wordmark {
-  font-size: 1.15rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.92;
+.q-toolbar {
+  padding: 0 8px;
 }
 </style>

@@ -8,11 +8,11 @@
             <span class="text-caption text-grey-7">{{ $t('systemStatus.cpu') }}</span>
             <q-linear-progress
               class="col"
+              :class="{ 'progress-critical': liveMetrics.cpu_percent > 90 }"
               :value="liveMetrics.cpu_percent / 100"
-              size="6px"
-              rounded
+              size="4px"
               :color="cpuColor"
-              :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
+              track-color="transparent"
             />
             <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
               {{ Math.round(liveMetrics.cpu_percent) }}%
@@ -26,11 +26,11 @@
             <span class="text-caption text-grey-7">{{ $t('systemStatus.memory') }}</span>
             <q-linear-progress
               class="col"
+              :class="{ 'progress-critical': liveMetrics.memory_percent > 90 }"
               :value="liveMetrics.memory_percent / 100"
-              size="6px"
-              rounded
+              size="4px"
               :color="memColor"
-              :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
+              track-color="transparent"
             />
             <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
               {{ Math.round(liveMetrics.memory_percent) }}%
@@ -44,11 +44,11 @@
             <span class="text-caption text-grey-7">{{ $t('systemStatus.disk') }}</span>
             <q-linear-progress
               class="col"
+              :class="{ 'progress-critical': liveMetrics.disk_percent > 90 }"
               :value="liveMetrics.disk_percent / 100"
-              size="6px"
-              rounded
+              size="4px"
               :color="diskColor"
-              :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
+              track-color="transparent"
             />
             <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
               {{ Math.round(liveMetrics.disk_percent) }}%
@@ -67,11 +67,11 @@
               <span class="text-caption text-grey-7">GPU{{ liveGpus.length > 1 ? gpu.index : '' }}</span>
               <q-linear-progress
                 class="col"
+                :class="{ 'progress-critical': gpu.utilization_percent > 90 }"
                 :value="gpu.utilization_percent / 100"
-                size="6px"
-                rounded
+                size="4px"
                 :color="gpuColor(gpu.utilization_percent)"
-                :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
+                track-color="transparent"
               />
               <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
                 {{ Math.round(gpu.utilization_percent) }}%
@@ -104,11 +104,13 @@
         <!-- Connection Indicator -->
         <div class="col-auto">
           <div class="row items-center no-wrap q-gutter-xs">
-            <q-icon
-              name="circle"
-              :color="connectionColor"
-              size="8px"
-              :class="{ 'pulse-animation': connectionState === 'connecting' }"
+            <div
+              :class="[
+                'connection-dot',
+                connectionState === 'connected' ? 'connection-dot--connected' :
+                connectionState === 'connecting' ? 'connection-dot--connecting' :
+                'connection-dot--disconnected'
+              ]"
             />
             <q-tooltip>
               {{ connectionState === 'connected'
@@ -126,7 +128,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
@@ -199,21 +201,8 @@ const connectionLabel = computed(() => {
 
 <style scoped>
 .system-status-bar {
-  background: rgba(26, 107, 74, 0.04);
+  background: var(--compresso-primary-soft);
   border-radius: 6px;
-  border: 1px solid rgba(26, 107, 74, 0.1);
-}
-
-.body--dark .system-status-bar {
-  background: rgba(34, 145, 106, 0.08);
-  border-color: rgba(34, 145, 106, 0.15);
-}
-
-.pulse-animation {
-  animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  border: 1px solid var(--compresso-primary-border);
 }
 </style>
