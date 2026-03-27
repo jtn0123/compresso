@@ -29,7 +29,6 @@ Copyright:
 
 """
 
-import json
 import os
 
 import tornado.escape
@@ -110,6 +109,7 @@ class DataPanelRequestHandler(tornado.web.RequestHandler):
         # Plugin runners receive sanitized inputs and generate the content, but we
         # escape on output as defense-in-depth since the data dict is mutable.
         self.set_header("Content-Type", "text/html")
+        self.set_header("X-Content-Type-Options", "nosniff")
         content = data.get("content", "")
         self.write(tornado.escape.xhtml_escape(str(content)))
 
@@ -193,10 +193,12 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
     def render_data(self, data):
         # Always force JSON content type for API responses to prevent XSS
         self.set_header("Content-Type", "application/json")
+        self.set_header("X-Content-Type-Options", "nosniff")
         self.set_status(data.get("status"))
         content = data.get("content", {})
-        # JSON-serialize all content to prevent reflected XSS
-        self.write(json.dumps(content))
+        # Use Tornado's json_encode which escapes '</' sequences to prevent
+        # script injection when JSON is embedded in HTML contexts
+        self.write(tornado.escape.json_encode(content))
 
 
 class PluginStaticFileHandler(tornado.web.StaticFileHandler):

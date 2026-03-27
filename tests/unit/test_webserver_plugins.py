@@ -149,8 +149,10 @@ class TestDataPanelRequestHandler:
 
         handler.render_data({"content_type": "text/html", "content": "<h1>test</h1>"})
 
-        handler.set_header.assert_called_with("Content-Type", "text/html")
-        handler.write.assert_called_with("<h1>test</h1>")
+        # render_data always escapes HTML content for XSS prevention
+        handler.set_header.assert_any_call("Content-Type", "text/html")
+        handler.set_header.assert_any_call("X-Content-Type-Options", "nosniff")
+        handler.write.assert_called_with("&lt;h1&gt;test&lt;/h1&gt;")
 
     @patch(f"{PLUGINS_MOD}.plugins.exec_data_panels_plugin_runner", return_value=True)
     @patch(f"{PLUGINS_MOD}.get_plugin_by_path")
@@ -263,9 +265,11 @@ class TestPluginAPIRequestHandler:
             }
         )
 
-        handler.set_header.assert_called_with("Content-Type", "application/json")
+        handler.set_header.assert_any_call("Content-Type", "application/json")
+        handler.set_header.assert_any_call("X-Content-Type-Options", "nosniff")
         handler.set_status.assert_called_with(200)
-        handler.write.assert_called_with({"key": "value"})
+        # render_data JSON-serializes content for XSS prevention
+        handler.write.assert_called_with('{"key": "value"}')
 
     @patch(f"{PLUGINS_MOD}.plugins.exec_plugin_api_plugin_runner", return_value=True)
     @patch(f"{PLUGINS_MOD}.get_plugin_by_path")
