@@ -41,17 +41,19 @@ from peewee_migrate import Migrator, Router
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.lib import BaseModel
 
-_patch_logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
-def _patched_run_one(_original_run_one):
+class PatchedRouter(Router):
     """
-    Wrap Router.run_one to fix peewee-migrate 1.15.0 incompatibility with peewee >= 3.17.
+    Subclass of peewee-migrate Router that fixes an incompatibility between
+    peewee-migrate 1.15.0 and peewee >= 3.17.
 
-    peewee-migrate mocks cursor.fetch_one but peewee's get_columns() calls cursor.fetchall().
+    peewee-migrate's run_one mocks cursor.fetch_one, but peewee's get_columns()
+    calls cursor.fetchall(). This override adds the missing mock attributes.
     """
 
-    def wrapper(self, name, migrator, *, fake=True, downgrade=False, force=False):
+    def run_one(self, name, migrator, *, fake=True, downgrade=False, force=False):
         try:
             migrate_fn, rollback_fn = self.read(name)
             if fake:
@@ -91,16 +93,10 @@ def _patched_run_one(_original_run_one):
             try:
                 self.database.rollback()
             except Exception:
-                _patch_logger.debug("Rollback failed (no active transaction)", exc_info=True)
+                _logger.debug("Rollback failed (no active transaction)", exc_info=True)
             operation = "Migration" if not downgrade else "Rollback"
             self.logger.exception("%s failed: %s", operation, name)
             raise
-
-    return wrapper
-
-
-# Apply the patch before any Router instances are created
-Router.run_one = _patched_run_one(Router.run_one)  # type: ignore[method-assign]
 
 
 class Migrations:
@@ -129,7 +125,7 @@ class Migrations:
                 ),
             )
 
-            self.router = Router(
+            self.router = PatchedRouter(
                 database=self.database,
                 migrate_table="migratehistory_{}".format(config.get("MIGRATIONS_HISTORY_VERSION")),
                 migrate_dir=config.get("MIGRATIONS_DIR"),
