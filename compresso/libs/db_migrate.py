@@ -50,6 +50,7 @@ def _patched_run_one(_original_run_one):
 
     peewee-migrate mocks cursor.fetch_one but peewee's get_columns() calls cursor.fetchall().
     """
+
     def wrapper(self, name, migrator, *, fake=True, downgrade=False, force=False):
         try:
             migrate_fn, rollback_fn = self.read(name)
