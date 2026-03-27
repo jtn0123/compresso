@@ -30,6 +30,7 @@ Copyright:
 """
 
 import inspect
+import logging
 import os
 import sys
 from unittest import mock
@@ -37,10 +38,16 @@ from unittest import mock
 from peewee import Field, SqliteDatabase
 from peewee_migrate import Migrator, Router
 
+from compresso.libs.logs import CompressoLogging
+from compresso.libs.unmodels.lib import BaseModel
 
-def _patched_run_one(original_run_one):
+_patch_logger = logging.getLogger(__name__)
+
+
+def _patched_run_one(_original_run_one):
     """
     Wrap Router.run_one to fix peewee-migrate 1.15.0 incompatibility with peewee >= 3.17.
+
     peewee-migrate mocks cursor.fetch_one but peewee's get_columns() calls cursor.fetchall().
     """
     def wrapper(self, name, migrator, *, fake=True, downgrade=False, force=False):
@@ -83,7 +90,7 @@ def _patched_run_one(original_run_one):
             try:
                 self.database.rollback()
             except Exception:
-                pass
+                _patch_logger.debug("Rollback failed (no active transaction)", exc_info=True)
             operation = "Migration" if not downgrade else "Rollback"
             self.logger.exception("%s failed: %s", operation, name)
             raise
@@ -93,9 +100,6 @@ def _patched_run_one(original_run_one):
 
 # Apply the patch before any Router instances are created
 Router.run_one = _patched_run_one(Router.run_one)
-
-from compresso.libs.logs import CompressoLogging
-from compresso.libs.unmodels.lib import BaseModel
 
 
 class Migrations:
