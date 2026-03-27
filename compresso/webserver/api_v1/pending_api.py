@@ -176,8 +176,18 @@ class ApiPendingHandler(BaseApiHandler):
         """
         request_dict = json.loads(self.request.body)
 
-        # Fetch the abspath name (realpath resolves symlinks and traversal)
-        abspath = os.path.realpath(request_dict.get("path", ""))
+        # Validate and resolve path to prevent path traversal
+        raw_path = request_dict.get("path", "")
+        if not raw_path or "\x00" in str(raw_path):
+            self.write(json.dumps({"success": False}))
+            return
+        abspath = os.path.realpath(raw_path)
+        # Ensure the resolved path is under a valid filesystem root
+        drive, _ = os.path.splitdrive(abspath)
+        fs_root = drive + os.sep if drive else os.sep
+        if not abspath.startswith(fs_root):
+            self.write(json.dumps({"success": False}))
+            return
 
         # Ensure path exists
         if not os.path.exists(abspath):

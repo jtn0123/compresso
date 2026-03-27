@@ -37,6 +37,23 @@ from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
 
+def _validate_browsable_path(user_path):
+    """Resolve and validate a user-provided filesystem path for browsing.
+
+    Returns a canonical absolute path with traversal sequences resolved.
+    Rejects null bytes and paths outside a valid filesystem root.
+    """
+    if not user_path or "\x00" in str(user_path):
+        return os.sep
+    resolved = os.path.realpath(user_path)
+    # Build the filesystem root for this path (handles drive letters on Windows)
+    drive, _ = os.path.splitdrive(resolved)
+    fs_root = drive + os.sep if drive else os.sep
+    if not resolved.startswith(fs_root):
+        return os.sep
+    return resolved
+
+
 class ApiFilebrowserHandler(BaseApiHandler):
     name = None
     params = None
@@ -67,7 +84,7 @@ class ApiFilebrowserHandler(BaseApiHandler):
         self.action_route()
 
     def fetch_directory_listing(self, *args, **kwargs):
-        current_path = os.path.realpath(self.get_argument("current_path"))
+        current_path = _validate_browsable_path(self.get_argument("current_path"))
         list_type = self.get_argument("list_type") if self.get_body_arguments("list_type") else "all"
 
         path_data = self.fetch_path_data(current_path, list_type)
@@ -104,12 +121,12 @@ class ApiFilebrowserHandler(BaseApiHandler):
         :param path:
         :return:
         """
-        path = os.path.realpath(path)
+        safe_path = _validate_browsable_path(path)
         results = []
-        if os.path.exists(path):
+        if os.path.exists(safe_path):
             # check if this is a root path or if it has a parent
-            parent_path = os.path.realpath(os.path.join(path, ".."))
-            if parent_path != path:
+            parent_path = _validate_browsable_path(os.path.join(safe_path, ".."))
+            if parent_path != safe_path:
                 # Path has a parent, Add the double dots
                 results.append(
                     {
@@ -117,8 +134,8 @@ class ApiFilebrowserHandler(BaseApiHandler):
                         "full_path": parent_path,
                     }
                 )
-            for item in sorted(os.listdir(path)):
-                abspath = os.path.realpath(os.path.join(path, item))
+            for item in sorted(os.listdir(safe_path)):
+                abspath = _validate_browsable_path(os.path.join(safe_path, item))
                 if os.path.isdir(abspath):
                     results.append(
                         {
@@ -144,11 +161,11 @@ class ApiFilebrowserHandler(BaseApiHandler):
         :param path:
         :return:
         """
-        path = os.path.realpath(path)
+        safe_path = _validate_browsable_path(path)
         results = []
-        if os.path.exists(path):
-            for item in sorted(os.listdir(path)):
-                abspath = os.path.realpath(os.path.join(path, item))
+        if os.path.exists(safe_path):
+            for item in sorted(os.listdir(safe_path)):
+                abspath = _validate_browsable_path(os.path.join(safe_path, item))
                 if os.path.isfile(abspath):
                     results.append(
                         {

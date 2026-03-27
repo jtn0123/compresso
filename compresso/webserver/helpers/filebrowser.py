@@ -40,6 +40,23 @@ def fetch_windows_drives():
     return [f"{d}:" for d in string.ascii_uppercase if os.path.exists(f"{d}:")]
 
 
+def _validate_browsable_path(user_path):
+    """Resolve and validate a user-provided filesystem path for browsing.
+
+    Returns a canonical absolute path with traversal sequences resolved.
+    Rejects null bytes and paths outside a valid filesystem root.
+    """
+    if not user_path or "\x00" in str(user_path):
+        return os.sep
+    resolved = os.path.realpath(user_path)
+    # Build the filesystem root for this path (handles drive letters on Windows)
+    drive, _ = os.path.splitdrive(resolved)
+    fs_root = drive + os.sep if drive else os.sep
+    if not resolved.startswith(fs_root):
+        return os.sep
+    return resolved
+
+
 class DirectoryListing:
     """
     DirectoryListing
@@ -60,14 +77,15 @@ class DirectoryListing:
         :param list_type:
         :return:
         """
+        safe_path = _validate_browsable_path(path)
         directories = []
         files = []
         if self.list_type == "directories" or self.list_type == "all":
-            directories = self.fetch_directories(path)
+            directories = self.fetch_directories(safe_path)
         if self.list_type == "files" or self.list_type == "all":
-            files = self.fetch_files(path)
+            files = self.fetch_files(safe_path)
         path_data = {
-            "current_path": path,
+            "current_path": safe_path,
             "list_type": self.list_type,
             "directories": directories,
             "files": files,
@@ -82,16 +100,18 @@ class DirectoryListing:
         :param path:
         :return:
         """
+        safe_path = _validate_browsable_path(path)
         results = []
-        if os.path.exists(path):
+        if os.path.exists(safe_path):
             # check if this is a root path or if it has a parent
-            parent_path = os.path.join(path, "..")
-            if os.path.exists(parent_path) and os.path.abspath(parent_path) != path:
+            parent_path = os.path.join(safe_path, "..")
+            parent_abs = _validate_browsable_path(parent_path)
+            if os.path.exists(parent_abs) and parent_abs != safe_path:
                 # Path has a parent, Add the double dots
                 results.append(
                     {
                         "name": "..",
-                        "full_path": os.path.abspath(parent_path),
+                        "full_path": parent_abs,
                     }
                 )
             elif os.name == "nt":
@@ -103,8 +123,8 @@ class DirectoryListing:
                     }
                 )
             try:
-                for item in sorted(os.listdir(path)):
-                    abspath = os.path.abspath(os.path.join(path, item))
+                for item in sorted(os.listdir(safe_path)):
+                    abspath = _validate_browsable_path(os.path.join(safe_path, item))
                     if os.path.isdir(abspath):
                         results.append(
                             {
@@ -120,7 +140,7 @@ class DirectoryListing:
                 results.append(
                     {
                         "name": drive,
-                        "full_path": os.path.abspath(os.path.join(drive, os.sep)),
+                        "full_path": _validate_browsable_path(os.path.join(drive, os.sep)),
                     }
                 )
         else:
@@ -143,10 +163,11 @@ class DirectoryListing:
         :param path:
         :return:
         """
+        safe_path = _validate_browsable_path(path)
         results = []
-        if os.path.exists(path):
-            for item in sorted(os.listdir(path)):
-                abspath = os.path.abspath(os.path.join(path, item))
+        if os.path.exists(safe_path):
+            for item in sorted(os.listdir(safe_path)):
+                abspath = _validate_browsable_path(os.path.join(safe_path, item))
                 if os.path.isfile(abspath):
                     results.append(
                         {
