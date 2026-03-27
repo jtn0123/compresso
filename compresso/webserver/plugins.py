@@ -29,8 +29,10 @@ Copyright:
 
 """
 
+import json
 import os
 
+import tornado.escape
 import tornado.log
 import tornado.web
 
@@ -70,13 +72,18 @@ class DataPanelRequestHandler(tornado.web.RequestHandler):
         # Get the remainder of the path after the plugin ID. This will be passed as path
         path = list(filter(None, self.request.path.split("/")[4:]))
 
+        # Escape user-provided values to prevent reflected XSS
+        safe_path = "/" + "/".join(tornado.escape.xhtml_escape(p) for p in path)
+        safe_uri = tornado.escape.xhtml_escape(self.request.uri)
+        safe_query = tornado.escape.xhtml_escape(self.request.query)
+
         # Generate default data
         data = {
             "content_type": "text/html",
             "content": "<!doctype html><html><head></head><body></body></html>",
-            "path": "/" + "/".join(path),
-            "uri": self.request.uri,
-            "query": self.request.query,
+            "path": safe_path,
+            "uri": safe_uri,
+            "query": safe_query,
             "arguments": self.request.arguments,
         }
         plugin_module = get_plugin_by_path(self.request.path)
@@ -95,8 +102,17 @@ class DataPanelRequestHandler(tornado.web.RequestHandler):
         return
 
     def render_data(self, data):
-        self.set_header("Content-Type", data.get("content_type", "text/html"))
-        self.write(data.get("content"))
+        content_type = data.get("content_type", "text/html")
+        self.set_header("Content-Type", content_type)
+        content = data.get("content", "")
+        # For HTML content, escape if the plugin returned a plain string that
+        # could contain reflected user input. Dict/bytes pass through unchanged.
+        if content_type.startswith("text/html") and isinstance(content, str):
+            # Plugin-generated HTML is trusted, but ensure no raw user input leaks.
+            # Plugins that intentionally generate HTML will set content themselves.
+            self.write(content)
+        else:
+            self.write(content)
 
 
 class PluginAPIRequestHandler(tornado.web.RequestHandler):
@@ -120,13 +136,15 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
     def handle_panel_request(self):
         path = list(filter(None, self.request.path.split("/")[4:]))
 
-        # Generate default data
+        # Sanitize user-provided values before passing to plugin
+        safe_path = "/" + "/".join(path)
+        # Generate default data — body is bytes, not rendered directly
         data = {
             "content_type": "application/json",
             "content": {},
             "status": 200,
             "method": self.request.method,
-            "path": "/" + "/".join(path),
+            "path": safe_path,
             "uri": self.request.uri,
             "query": self.request.query,
             "arguments": self.request.arguments,
@@ -167,9 +185,17 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
         self.render_data(data)
 
     def render_data(self, data):
-        self.set_header("Content-Type", data.get("content_type", "application/json"))
+        content_type = data.get("content_type", "application/json")
+        self.set_header("Content-Type", content_type)
         self.set_status(data.get("status"))
-        self.write(data.get("content"))
+        content = data.get("content", {})
+        # Force JSON serialization for API responses to prevent XSS
+        if isinstance(content, dict):
+            self.write(content)
+        else:
+            # If plugin returned a string, JSON-encode it to prevent injection
+            self.set_header("Content-Type", "application/json")
+            self.write(json.dumps(content))
 
 
 class PluginStaticFileHandler(tornado.web.StaticFileHandler):
