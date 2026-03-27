@@ -1,42 +1,42 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.directoryinfo.py
+compresso.directoryinfo.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     02 Jul 2021, (10:59 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     02 Jul 2021, (10:59 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
+import configparser
 import json
 import os
-import configparser
 
 
 class CompressoDirectoryInfoException(Exception):
     def __init__(self, message, path):
-        errmsg = '%s: file %s' % (message, path)
+        errmsg = f"{message}: file {path}"
         Exception.__init__(self, errmsg)
         self.message = message
         self.path = path
@@ -63,7 +63,7 @@ class CompressoDirectoryInfo:
     """
 
     def __init__(self, directory):
-        self.path = os.path.join(directory, '.compresso')
+        self.path = os.path.join(directory, ".compresso")
         self.json_data = None
         self.config_parser = None
         # If the path does not exist, do not try to read it
@@ -151,8 +151,9 @@ class CompressoDirectoryInfo:
                 self.config_parser.add_section(section)
             self.config_parser.set(section, option, value)
             return
-        raise CompressoDirectoryInfoException("Failed to set section '{}' option '{}' value '{}'".format(section, option, value),
-                                            self.path)
+        raise CompressoDirectoryInfoException(
+            f"Failed to set section '{section}' option '{option}' value '{value}'", self.path
+        )
 
     def get(self, section, option):
         """
@@ -167,7 +168,7 @@ class CompressoDirectoryInfo:
             return self.json_data.get(section, {}).get(option)
         elif self.config_parser:
             return self.config_parser.get(section, option)
-        raise CompressoDirectoryInfoException("Failed to get section '{}' option '{}'".format(section, option), self.path)
+        raise CompressoDirectoryInfoException(f"Failed to get section '{section}' option '{option}'", self.path)
 
     def save(self):
         """
@@ -176,21 +177,21 @@ class CompressoDirectoryInfo:
         :return:
         """
         if self.json_data is not None:
-            with open(self.path, 'w') as outfile:
+            with open(self.path, "w") as outfile:
                 json.dump(self.json_data, outfile, indent=2)
             return
         elif self.config_parser:
-            with open(self.path, 'w') as outfile:
+            with open(self.path, "w") as outfile:
                 self.config_parser.write(outfile)
             return
         raise CompressoDirectoryInfoException("Failed to save directory info", self.path)
 
 
-if __name__ == '__main__':
-    directory_info = CompressoDirectoryInfo('/tmp/compresso')
-    directory_info.set('test_section', 'key', 'value')
+if __name__ == "__main__":
+    directory_info = CompressoDirectoryInfo("/tmp/compresso")  # noqa: S108 — dev test block
+    directory_info.set("test_section", "key", "value")
     directory_info.save()
-    print(directory_info.get('test_section', 'key'))
+    print(directory_info.get("test_section", "key"))  # noqa: T201
     directory_info.set('"section with double quotes"', '"key with double quotes"', '"value with double quotes"')
     directory_info.save()
-    print(directory_info.get('"section with double quotes"', '"key with double quotes"'))
+    print(directory_info.get('"section with double quotes"', '"key with double quotes"'))  # noqa: T201

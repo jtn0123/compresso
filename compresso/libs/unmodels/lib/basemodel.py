@@ -1,42 +1,41 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.basemodel.py
+compresso.basemodel.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     22 Jun 2019, (1:58 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     22 Jun 2019, (1:58 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
 import logging
+from base64 import b64decode
+from datetime import datetime
 
 from peewee import *
-from playhouse.sqliteq import SqliteQueueDatabase
-from datetime import datetime
-from base64 import b64decode
 from playhouse.shortcuts import model_to_dict
+from playhouse.sqliteq import SqliteQueueDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +44,10 @@ logger = logging.getLogger(__name__)
 db = DatabaseProxy()  # Create a proxy for our db.
 
 # Stipulate date and time formats
-DATE_FORMAT = '%Y-%m-%d'
-TIME_FORMAT = '%H:%M:%S'
-TIME_FORMAT_ALT = '{}.%f'.format(TIME_FORMAT)
-DATETIME_BASE = '{}T{}'
+DATE_FORMAT = "%Y-%m-%d"
+TIME_FORMAT = "%H:%M:%S"
+TIME_FORMAT_ALT = f"{TIME_FORMAT}.%f"
+DATETIME_BASE = "{}T{}"
 DATETIME_FORMAT = DATETIME_BASE.format(DATE_FORMAT, TIME_FORMAT)
 DATETIME_FORMAT_ALT = DATETIME_BASE.format(DATE_FORMAT, TIME_FORMAT_ALT)
 
@@ -91,7 +90,6 @@ class NoSuchFieldError(TypeError):
     Indicates that the field does not exist in this model
 
     """
-    pass
 
 
 class NullError(TypeError):
@@ -99,7 +97,6 @@ class NullError(TypeError):
     Indicates that the respective field was set to NULL but must not be NULL.
 
     """
-    pass
 
 
 class Database:
@@ -111,33 +108,33 @@ class Database:
 
     @staticmethod
     def select_database(config):
-        existing_database = getattr(db, 'obj', None)
+        existing_database = getattr(db, "obj", None)
         if existing_database is not None:
             try:
-                if hasattr(existing_database, 'is_stopped') and not existing_database.is_stopped():
+                if hasattr(existing_database, "is_stopped") and not existing_database.is_stopped():
                     existing_database.stop()
             except Exception as e:
                 logger.debug("Failed to stop existing database: %s", e)
 
             try:
-                if hasattr(existing_database, 'is_closed') and not existing_database.is_closed():
+                if hasattr(existing_database, "is_closed") and not existing_database.is_closed():
                     existing_database.close()
             except Exception as e:
                 logger.debug("Failed to close existing database: %s", e)
 
         # Based on configuration, use a different database.
-        if config['TYPE'] == 'SQLITE':
+        if config["TYPE"] == "SQLITE":
             # use SqliteQueueDatabase
             database = SqliteQueueDatabase(
-                config['FILE'],
+                config["FILE"],
                 use_gevent=False,
                 autostart=True,
                 queue_max_size=None,
                 results_timeout=15.0,
                 pragmas=(
-                    ('foreign_keys', 1),
-                    ('journal_mode', 'wal'),
-                )
+                    ("foreign_keys", 1),
+                    ("journal_mode", "wal"),
+                ),
             )
 
             db.initialize(database)
@@ -182,7 +179,7 @@ class BaseModel(Model):
         """
         model_fields = self.get_fields()
 
-        if field_id not in model_fields.keys():
+        if field_id not in model_fields:
             raise NoSuchFieldError()
 
         # Set the field from model
@@ -196,16 +193,14 @@ class BaseModel(Model):
         if isinstance(field, BooleanField):
             if isinstance(value, (bool, int)):
                 return bool(value)
-            elif value.lower() in ['t', 'true', '1']:
+            elif value.lower() in ["t", "true", "1"]:
                 return True
-            elif value.lower() in ['f', 'false', '0']:
+            elif value.lower() in ["f", "false", "0"]:
                 return False
             return False
         elif isinstance(field, IntegerField):
             return int(value)
-        elif isinstance(field, FloatField):
-            return float(value)
-        elif isinstance(field, DecimalField):
+        elif isinstance(field, (FloatField, DecimalField)):
             return float(value)
         elif isinstance(field, DateTimeField):
             return strpdatetime(value)

@@ -1,38 +1,38 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.tasks.py
+compresso.tasks.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     08 May 2020, (3:27 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     08 May 2020, (3:27 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
 import datetime
 
 from peewee import *
+
 from compresso.libs.unmodels.lib import BaseModel
 
 
@@ -40,17 +40,18 @@ class Tasks(BaseModel):
     """
     Tasks
     """
+
     abspath = TextField(null=False, unique=True)
     cache_path = TextField(null=True, unique=True)
     priority = BigIntegerField(null=True, index=True)
-    type = TextField(null=False, default='local', index=True)  # (local, remote)
+    type = TextField(null=False, default="local", index=True)  # (local, remote)
     library_id = IntegerField(null=False, default=1, index=True)
     status = TextField(null=False, index=True)  # (pending, in_progress, processed, awaiting_approval, approved, complete)
     success = BooleanField(null=True)
     start_time = DateTimeField(null=True, default=datetime.datetime.now)
     finish_time = DateTimeField(null=True, default=datetime.datetime.now)
     processed_by_worker = TextField(null=True)
-    log = TextField(null=False, default='')
+    log = TextField(null=False, default="")
     source_size = BigIntegerField(null=True, default=0)
     vmaf_score = FloatField(null=True, default=None)
     ssim_score = FloatField(null=True, default=None)

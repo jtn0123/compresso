@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    Tests for compresso.libs.unffmpeg.lib.cli module.
-    Covers ffmpeg/ffprobe subprocess wrappers and convenience functions.
+Tests for compresso.libs.unffmpeg.lib.cli module.
+Covers ffmpeg/ffprobe subprocess wrappers and convenience functions.
 """
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,10 +14,10 @@ from compresso.libs.unffmpeg.exceptions.ffmpeg import FFMpegError
 from compresso.libs.unffmpeg.exceptions.ffprobe import FFProbeError
 from compresso.libs.unffmpeg.lib import cli
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_popen(stdout_bytes, returncode=0):
     """Return a MagicMock that behaves like subprocess.Popen."""
@@ -31,6 +30,7 @@ def _mock_popen(stdout_bytes, returncode=0):
 # ---------------------------------------------------------------------------
 # ffmpeg_cmd
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestFfmpegCmd:
@@ -77,6 +77,7 @@ class TestFfmpegCmd:
 # ffprobe_cmd
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unittest
 class TestFfprobeCmd:
     @patch("compresso.libs.unffmpeg.lib.cli.subprocess.Popen")
@@ -121,6 +122,7 @@ class TestFfprobeCmd:
 # ffprobe_file
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unittest
 class TestFfprobeFile:
     @patch("compresso.libs.unffmpeg.lib.cli.ffprobe_cmd")
@@ -152,6 +154,7 @@ class TestFfprobeFile:
 # ffmpeg_version_info
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unittest
 class TestFfmpegVersionInfo:
     @patch("compresso.libs.unffmpeg.lib.cli.ffprobe_cmd")
@@ -173,6 +176,7 @@ class TestFfmpegVersionInfo:
 # ---------------------------------------------------------------------------
 # ffmpeg_available_encoders / decoders / hw_acceleration
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unittest
 class TestFfmpegAvailableEncoders:

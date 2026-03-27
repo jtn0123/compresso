@@ -1,54 +1,53 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.filemetadatapaths.py
+compresso.filemetadatapaths.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     04 Feb 2026
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     04 Feb 2026
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
 import datetime
 
 from peewee import *
-from compresso.libs.unmodels.lib import BaseModel
+
 from compresso.libs.unmodels.filemetadata import FileMetadata
+from compresso.libs.unmodels.lib import BaseModel
 
 
 class FileMetadataPaths(BaseModel):
     """
     FileMetadataPaths
     """
-    file_metadata = ForeignKeyField(FileMetadata, backref='paths', on_delete='CASCADE', index=True)
+
+    file_metadata = ForeignKeyField(FileMetadata, backref="paths", on_delete="CASCADE", index=True)
     path = TextField(null=False, index=True)
-    path_type = TextField(null=False, default='destination')
+    path_type = TextField(null=False, default="destination")
     created_at = DateTimeField(null=False, default=datetime.datetime.now)
     updated_at = DateTimeField(null=False, default=datetime.datetime.now)
 
     class Meta:
-        table_name = 'file_metadata_paths'
-        indexes = (
-            (('file_metadata', 'path'), False),
-        )
+        table_name = "file_metadata_paths"
+        indexes = ((("file_metadata", "path"), False),)

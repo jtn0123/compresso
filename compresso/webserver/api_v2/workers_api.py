@@ -1,38 +1,38 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.workers_api.py
+compresso.workers_api.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     11 Aug 2021, (10:41 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     11 Aug 2021, (10:41 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
 import tornado.log
+
 from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.schemas import RequestWorkerByIdSchema, WorkerStatusSuccessSchema
 from compresso.webserver.helpers import workers
 
@@ -44,39 +44,39 @@ class ApiWorkersHandler(BaseApiHandler):
 
     routes = [
         {
-            "path_pattern":      r"/workers/worker/pause",
+            "path_pattern": r"/workers/worker/pause",
             "supported_methods": ["POST"],
-            "call_method":       "pause_worker",
+            "call_method": "pause_worker",
         },
         {
-            "path_pattern":      r"/workers/worker/pause/all",
+            "path_pattern": r"/workers/worker/pause/all",
             "supported_methods": ["POST"],
-            "call_method":       "pause_all_workers",
+            "call_method": "pause_all_workers",
         },
         {
-            "path_pattern":      r"/workers/worker/resume",
+            "path_pattern": r"/workers/worker/resume",
             "supported_methods": ["POST"],
-            "call_method":       "resume_worker",
+            "call_method": "resume_worker",
         },
         {
-            "path_pattern":      r"/workers/worker/resume/all",
+            "path_pattern": r"/workers/worker/resume/all",
             "supported_methods": ["POST"],
-            "call_method":       "resume_all_workers",
+            "call_method": "resume_all_workers",
         },
         {
-            "path_pattern":      r"/workers/worker/terminate",
+            "path_pattern": r"/workers/worker/terminate",
             "supported_methods": ["DELETE"],
-            "call_method":       "terminate_worker",
+            "call_method": "terminate_worker",
         },
         {
-            "path_pattern":      r"/workers/worker/terminate/all",
+            "path_pattern": r"/workers/worker/terminate/all",
             "supported_methods": ["DELETE"],
-            "call_method":       "terminate_all_workers",
+            "call_method": "terminate_all_workers",
         },
         {
-            "path_pattern":      r"/workers/status",
+            "path_pattern": r"/workers/status",
             "supported_methods": ["GET"],
-            "call_method":       "workers_status",
+            "call_method": "workers_status",
         },
     ]
 
@@ -85,7 +85,7 @@ class ApiWorkersHandler(BaseApiHandler):
         udq = CompressoDataQueues()
         urt = CompressoRunningThreads()
         self.compresso_data_queues = udq.get_compresso_data_queues()
-        self.foreman = urt.get_compresso_running_thread('foreman')
+        self.foreman = urt.get_compresso_running_thread("foreman")
 
     async def pause_worker(self):
         """
@@ -134,7 +134,7 @@ class ApiWorkersHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestWorkerByIdSchema())
 
-            if not workers.pause_worker_by_id(json_request.get('worker_id')):
+            if not workers.pause_worker_by_id(json_request.get("worker_id")):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to pause worker")
                 self.write_error()
                 return
@@ -142,12 +142,12 @@ class ApiWorkersHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -197,12 +197,12 @@ class ApiWorkersHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -253,7 +253,7 @@ class ApiWorkersHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestWorkerByIdSchema())
 
-            if not workers.resume_worker_by_id(json_request.get('worker_id')):
+            if not workers.resume_worker_by_id(json_request.get("worker_id")):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to resume worker")
                 self.write_error()
                 return
@@ -261,12 +261,12 @@ class ApiWorkersHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -316,12 +316,12 @@ class ApiWorkersHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -372,7 +372,7 @@ class ApiWorkersHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestWorkerByIdSchema())
 
-            if not workers.terminate_worker_by_id(json_request.get('worker_id')):
+            if not workers.terminate_worker_by_id(json_request.get("worker_id")):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to resume worker")
                 self.write_error()
                 return
@@ -380,12 +380,12 @@ class ApiWorkersHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -435,12 +435,12 @@ class ApiWorkersHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -487,17 +487,17 @@ class ApiWorkersHandler(BaseApiHandler):
             response = self.build_response(
                 WorkerStatusSuccessSchema(),
                 {
-                    'workers_status': workers_status,
-                }
+                    "workers_status": workers_status,
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

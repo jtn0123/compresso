@@ -1,46 +1,105 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.database.py
+compresso.database.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     14 Aug 2021, (12:03 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     14 Aug 2021, (12:03 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import inspect
+import logging
 import os
 import sys
+from unittest import mock
 
-from peewee import SqliteDatabase, Field
+from peewee import Field, SqliteDatabase
 from peewee_migrate import Migrator, Router
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.lib import BaseModel
 
+_logger = logging.getLogger(__name__)
 
-class Migrations(object):
+
+class PatchedRouter(Router):
+    """
+    Subclass of peewee-migrate Router that fixes an incompatibility between
+    peewee-migrate 1.15.0 and peewee >= 3.17.
+
+    peewee-migrate's run_one mocks cursor.fetch_one, but peewee's get_columns()
+    calls cursor.fetchall(). This override adds the missing mock attributes.
+    """
+
+    def run_one(self, name, migrator, *, fake=True, downgrade=False, force=False):
+        try:
+            migrate_fn, rollback_fn = self.read(name)
+            if fake:
+                mocked_cursor = mock.Mock()
+                mocked_cursor.fetch_one.return_value = None
+                mocked_cursor.fetchone.return_value = None
+                mocked_cursor.fetchall.return_value = []
+                with (
+                    mock.patch("peewee.Model.select"),
+                    mock.patch("peewee.Database.execute_sql", return_value=mocked_cursor),
+                ):
+                    migrate_fn(migrator, self.database, fake=fake)
+
+                if force:
+                    self.model.create(name=name)
+                    self.logger.info("Done %s", name)
+
+                migrator.__ops__ = []
+                return name
+
+            with self.database.transaction():
+                if not downgrade:
+                    self.logger.info('Migrate "%s"', name)
+                    migrate_fn(migrator, self.database, fake=fake)
+                    migrator()
+                    self.model.create(name=name)
+                else:
+                    self.logger.info("Rolling back %s", name)
+                    rollback_fn(migrator, self.database, fake=fake)
+                    migrator()
+                    self.model.delete().where(self.model.name == name).execute()
+
+                self.logger.info("Done %s", name)
+                return name
+
+        except Exception:
+            try:
+                self.database.rollback()
+            except Exception:
+                _logger.debug("Rollback failed (no active transaction)", exc_info=True)
+            operation = "Migration" if not downgrade else "Rollback"
+            self.logger.exception("%s failed: %s", operation, name)
+            raise
+
+
+class Migrations:
     """
     Migrations
 
@@ -53,23 +112,25 @@ class Migrations(object):
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
 
         # Based on configuration, select database to connect to.
-        if config['TYPE'] == 'SQLITE':
+        if config["TYPE"] == "SQLITE":
             # Create SQLite directory if not exists
-            db_file_directory = os.path.dirname(config['FILE'])
+            db_file_directory = os.path.dirname(config["FILE"])
             if not os.path.exists(db_file_directory):
                 os.makedirs(db_file_directory)
             self.database = SqliteDatabase(
-                config['FILE'],
+                config["FILE"],
                 pragmas=(
-                    ('foreign_keys', 1),
-                    ('journal_mode', 'wal'),
+                    ("foreign_keys", 1),
+                    ("journal_mode", "wal"),
                 ),
             )
 
-            self.router = Router(database=self.database,
-                                 migrate_table='migratehistory_{}'.format(config.get('MIGRATIONS_HISTORY_VERSION')),
-                                 migrate_dir=config.get('MIGRATIONS_DIR'),
-                                 logger=self.logger)
+            self.router = PatchedRouter(
+                database=self.database,
+                migrate_table="migratehistory_{}".format(config.get("MIGRATIONS_HISTORY_VERSION")),
+                migrate_dir=config.get("MIGRATIONS_DIR"),
+                logger=self.logger,
+            )
 
             self.migrator = Migrator(self.database)
 
@@ -90,21 +151,19 @@ class Migrations(object):
         across releases. We prefer `add_fields` when present and fall back to
         `add_columns` for compatibility with older variants.
         """
-        add_fields = getattr(self.migrator, 'add_fields', None)
+        add_fields = getattr(self.migrator, "add_fields", None)
         if callable(add_fields):
             add_fields(model, **{field_name: field})
             return
 
-        add_columns = getattr(self.migrator, 'add_columns', None)
+        add_columns = getattr(self.migrator, "add_columns", None)
         if callable(add_columns):
             add_columns(model, **{field_name: field})
             return
 
-        raise AttributeError(
-            "Migrator does not support adding columns (expected add_fields or add_columns)."
-        )
+        raise AttributeError("Migrator does not support adding columns (expected add_fields or add_columns).")
 
-    def update_schema(self):
+    def update_schema(self):  # noqa: C901
         """
         Bring the database schema up-to-date at application startup.
 
@@ -174,8 +233,8 @@ class Migrations(object):
                 for fk in field_keys:
                     field = fields.get(fk)
                     if isinstance(field, Field):
-                        column_name = getattr(field, 'column_name', field.name)
-                        if getattr(field, 'primary_key', False):
+                        column_name = getattr(field, "column_name", field.name)
+                        if getattr(field, "primary_key", False):
                             # SQLite cannot safely add primary key columns via ALTER TABLE.
                             # These must be handled explicitly in migrations if ever required.
                             if not any(f for f in self.database.get_columns(table_name) if f.name == column_name):
@@ -198,13 +257,10 @@ class Migrations(object):
                                 raise
 
         if missing_required_columns:
-            details = "; ".join(
-                "{}.{} ({})".format(table, column, reason)
-                for table, column, reason in missing_required_columns
-            )
+            details = "; ".join(f"{table}.{column} ({reason})" for table, column, reason in missing_required_columns)
             raise RuntimeError(
-                "Database schema requires non-additive migrations for: {}. "
-                "Create a migration to add these columns safely.".format(details)
+                f"Database schema requires non-additive migrations for: {details}. "
+                "Create a migration to add these columns safely."
             )
 
         # Add missing non-unique indexes declared on models
@@ -220,15 +276,8 @@ class Migrations(object):
                 self.logger.exception("Failed to fetch indexes for table %s", table_name)
                 continue
 
-            existing_index_columns = set(
-                tuple(getattr(idx, 'columns', []))
-                for idx in existing_indexes
-            )
-            existing_index_names = set(
-                getattr(idx, 'name', None)
-                for idx in existing_indexes
-                if getattr(idx, 'name', None)
-            )
+            existing_index_columns = set(tuple(getattr(idx, "columns", [])) for idx in existing_indexes)
+            existing_index_names = set(getattr(idx, "name", None) for idx in existing_indexes if getattr(idx, "name", None))
 
             declared_indexes = []
             for columns, unique in model._meta.indexes:
@@ -242,7 +291,7 @@ class Migrations(object):
                     declared_indexes.append((tuple(columns), tuple(compare_columns)))
 
             for field_name, field in model._meta.fields.items():
-                if getattr(field, 'index', False) and not getattr(field, 'unique', False):
+                if getattr(field, "index", False) and not getattr(field, "unique", False):
                     declared_indexes.append(((field_name,), (field.column_name,)))
 
             for add_columns, compare_columns in declared_indexes:

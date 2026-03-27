@@ -20,6 +20,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useQuasar } from 'quasar';
+import { useChartTheme } from 'src/composables/useChartTheme';
 
 export default {
   name: 'EncodingSpeedChart',
@@ -30,6 +31,7 @@ export default {
   setup(props) {
     const { t } = useI18n();
     const $q = useQuasar();
+    const { getChartColor, chartBgColor } = useChartTheme();
     const chartRef = ref(null);
     let chart = null;
 
@@ -70,16 +72,16 @@ export default {
               {
                 label: t('pages.compressionDashboard.avgFps'),
                 data: fpsData,
-                borderColor: '#1a6b4a',
-                backgroundColor: 'rgba(26, 107, 74, 0.1)',
+                borderColor: getChartColor(1),
+                backgroundColor: chartBgColor(1, 0.1),
                 yAxisID: 'y',
                 tension: 0.3,
               },
               {
                 label: t('pages.compressionDashboard.speedRatio'),
                 data: speedData,
-                borderColor: '#e8a525',
-                backgroundColor: 'rgba(232, 165, 37, 0.1)',
+                borderColor: getChartColor(2),
+                backgroundColor: chartBgColor(2, 0.1),
                 yAxisID: 'y1',
                 tension: 0.3,
               },

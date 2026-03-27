@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.taskhandler.py
+compresso.taskhandler.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     08 May 2020, (12:22 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     08 May 2020, (12:22 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 import queue
 import threading
@@ -50,7 +50,7 @@ class TaskHandler(threading.Thread):
     """
 
     def __init__(self, data_queues, task_queue, event):
-        super(TaskHandler, self).__init__(name='TaskHandler')
+        super().__init__(name="TaskHandler")
         self.settings = config.Config()
         self.event = event
         self.data_queues = data_queues
@@ -63,7 +63,7 @@ class TaskHandler(threading.Thread):
         # Remove all items from the task list to start with
         self.clear_tasks_on_startup()
 
-    def _log(self, message, message2='', level="info"):
+    def _log(self, message, message2="", level="info"):
         message = common.format_message(message, message2)
         getattr(self.logger, level)(message)
 
@@ -84,40 +84,40 @@ class TaskHandler(threading.Thread):
             # Do not sleep at all here. Process this loop as quick as possible
             try:
                 item = self.scheduledtasks.get_nowait()
-                pathname = item['pathname']
-                library_id = item['library_id']
-                priority_score = item.get('priority_score', 0)
+                pathname = item["pathname"]
+                library_id = item["library_id"]
+                priority_score = item.get("priority_score", 0)
                 if self.add_path_to_task_queue(pathname, library_id, priority_score=priority_score):
-                    self._log("Adding file to task queue", pathname, level='info')
+                    self._log("Adding file to task queue", pathname, level="info")
                 else:
-                    self._log("Skipping file as it is already in the queue", pathname, level='info')
+                    self._log("Skipping file as it is already in the queue", pathname, level="info")
             except queue.Empty:
                 continue
             except Exception as e:
-                self._log("Exception in processing scheduledtasks", str(e), level='exception')
+                self._log("Exception in processing scheduledtasks", str(e), level="exception")
 
     def process_inotifytasks_queue(self):
         while not self.abort_flag.is_set() and not self.inotifytasks.empty():
             # Do not sleep at all here. Process this loop as quick as possible
             try:
                 item = self.inotifytasks.get_nowait()
-                pathname = item['pathname']
-                library_id = item['library_id']
-                priority_score = item.get('priority_score', 0)
+                pathname = item["pathname"]
+                library_id = item["library_id"]
+                priority_score = item.get("priority_score", 0)
                 if self.add_path_to_task_queue(pathname, library_id, priority_score=priority_score):
-                    self._log("Adding inotify job to queue", pathname, level='info')
+                    self._log("Adding inotify job to queue", pathname, level="info")
                 else:
-                    self._log("Skipping inotify job already in the queue", pathname, level='info')
+                    self._log("Skipping inotify job already in the queue", pathname, level="info")
             except queue.Empty:
                 continue
             except Exception as e:
-                self._log("Exception in processing inotifytasks", str(e), level='exception')
+                self._log("Exception in processing inotifytasks", str(e), level="exception")
 
     def clear_tasks_on_startup(self):
         where_clause = None
         if not self.settings.get_clear_pending_tasks_on_restart():
             # Exclude all pending tasks except for those that are remote tasks... They need to be removed
-            where_clause = (Tasks.status != 'pending') | (Tasks.type == 'remote')
+            where_clause = (Tasks.status != "pending") | (Tasks.type == "remote")
         try:
             # Get all task IDs to be deleted
             select_query = Tasks.select(Tasks.id)
@@ -131,9 +131,9 @@ class TaskHandler(threading.Thread):
             if where_clause is not None:
                 delete_query = delete_query.where(where_clause)
             rows_deleted_count = delete_query.execute()
-            self._log("Deleted {} items from tasks list".format(rows_deleted_count), level='debug')
+            self._log(f"Deleted {rows_deleted_count} items from tasks list", level="debug")
         except OperationalError as error:
-            self._log("Skipping task cleanup at startup; tasks table missing", str(error), level='debug')
+            self._log("Skipping task cleanup at startup; tasks table missing", str(error), level="debug")
 
     @staticmethod
     def check_if_task_exists_matching_path(abspath):
@@ -143,10 +143,8 @@ class TaskHandler(threading.Thread):
         :param abspath:
         :return:
         """
-        existing_task_query = Tasks.select().where((Tasks.abspath == abspath)).limit(1)
-        if existing_task_query.count() > 0:
-            return True
-        return False
+        existing_task_query = Tasks.select().where(Tasks.abspath == abspath).limit(1)
+        return existing_task_query.count() > 0
 
     def add_path_to_task_queue(self, pathname, library_id, priority_score=0):
         """
@@ -167,12 +165,15 @@ class TaskHandler(threading.Thread):
             return False
         # Execute event plugin runners
         plugin_handler = PluginsHandler()
-        plugin_handler.run_event_plugins_for_plugin_type('events.task_queued', {
-            'library_id':  library_id,
-            'task_id':     new_task.get_task_id(),
-            'task_type':   new_task.get_task_type(),
-            'source_data': new_task.get_source_data(),
-        })
+        plugin_handler.run_event_plugins_for_plugin_type(
+            "events.task_queued",
+            {
+                "library_id": library_id,
+                "task_id": new_task.get_task_id(),
+                "task_type": new_task.get_task_type(),
+                "source_data": new_task.get_source_data(),
+            },
+        )
 
         return True
 

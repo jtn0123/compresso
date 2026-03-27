@@ -1,49 +1,49 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.history.py
+compresso.history.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     23 Jun 2019, (10:42 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     23 Jun 2019, (10:42 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
 import json
 
+from peewee import fn
+
 from compresso import config
 from compresso.libs.logs import CompressoLogging
-from peewee import fn
 from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, CompressionStats
 
 try:
     from json.decoder import JSONDecodeError
 except ImportError:
-    JSONDecodeError = ValueError
+    JSONDecodeError = ValueError  # type: ignore[assignment,misc]
 
 
-class History(object):
+class History:
     """
     History
 
@@ -78,10 +78,19 @@ class History(object):
         query = CompletedTasks.select().order_by(CompletedTasks.id.desc())
         return query.count()
 
-    def get_historic_task_list_filtered_and_sorted(self, order=None, start=0, length=None, search_value=None, id_list=None,
-                                                   task_success=None, after_time=None, before_time=None):
+    def get_historic_task_list_filtered_and_sorted(
+        self,
+        order=None,
+        start=0,
+        length=None,
+        search_value=None,
+        id_list=None,
+        task_success=None,
+        after_time=None,
+        before_time=None,
+    ):
         try:
-            query = (CompletedTasks.select())
+            query = CompletedTasks.select()
 
             if id_list:
                 query = query.where(CompletedTasks.id.in_(id_list))
@@ -99,16 +108,21 @@ class History(object):
                 query = query.where(CompletedTasks.finish_time <= before_time)
 
             # Get order by
-            ALLOWED_ORDER_COLUMNS = {'id', 'task_label', 'task_success', 'start_time', 'finish_time', 'processed_by_worker', 'abspath'}
+            ALLOWED_ORDER_COLUMNS = {
+                "id",
+                "task_label",
+                "task_success",
+                "start_time",
+                "finish_time",
+                "processed_by_worker",
+                "abspath",
+            }
             if order:
                 col = order.get("column", "id")
                 if col not in ALLOWED_ORDER_COLUMNS:
                     col = "id"
                 order_field = getattr(CompletedTasks, col, CompletedTasks.id)
-                if order.get("dir") == "asc":
-                    order_by = order_field.asc()
-                else:
-                    order_by = order_field.desc()
+                order_by = order_field.asc() if order.get("dir") == "asc" else order_field.desc()
 
                 query = query.order_by(order_by)
 
@@ -140,9 +154,8 @@ class History(object):
             FROM completedtasks AS "t1"
             WHERE t1.id IN ( %s)
         """
-        query = (
-            CompletedTasks.select(CompletedTasks.id, CompletedTasks.task_label, CompletedTasks.task_success,
-                                  CompletedTasks.abspath)
+        query = CompletedTasks.select(
+            CompletedTasks.id, CompletedTasks.task_label, CompletedTasks.task_success, CompletedTasks.abspath
         )
 
         if id_list:
@@ -150,8 +163,9 @@ class History(object):
 
         return query.dicts()
 
-    def get_historic_tasks_list_with_source_probe(self, order=None, start=0, length=None, search_value=None, id_list=None,
-                                                  task_success=None, abspath=None):
+    def get_historic_tasks_list_with_source_probe(
+        self, order=None, start=0, length=None, search_value=None, id_list=None, task_success=None, abspath=None
+    ):
         """
         Return a list of matching historic tasks with their source file's ffmpeg probe.
 
@@ -164,9 +178,9 @@ class History(object):
         :param abspath:
         :return:
         """
-        query = (
-            CompletedTasks.select(CompletedTasks.id, CompletedTasks.task_label, CompletedTasks.task_success,
-                                  CompletedTasks.abspath))
+        query = CompletedTasks.select(
+            CompletedTasks.id, CompletedTasks.task_label, CompletedTasks.task_success, CompletedTasks.abspath
+        )
 
         if id_list:
             query = query.where(CompletedTasks.id.in_(id_list))
@@ -212,7 +226,7 @@ class History(object):
             return False
 
         try:
-            query = (CompletedTasks.select())
+            query = CompletedTasks.select()
 
             if id_list:
                 query = query.where(CompletedTasks.id.in_(id_list))
@@ -243,9 +257,7 @@ class History(object):
             return False
 
         try:
-            query = CompletedTasksCommandLogs.delete().where(
-                CompletedTasksCommandLogs.completedtask_id.in_(id_list)
-            )
+            query = CompletedTasksCommandLogs.delete().where(CompletedTasksCommandLogs.completedtask_id.in_(id_list))
             query.execute()
             return True
         except Exception:
@@ -263,25 +275,25 @@ class History(object):
             # Create the new historical task entry
             new_historic_task = self.create_historic_task_entry(task_data)
             # Create an entry of the data from the source ffprobe
-            self.create_historic_task_ffmpeg_log_entry(new_historic_task, task_data.get('log', ''))
+            self.create_historic_task_ffmpeg_log_entry(new_historic_task, task_data.get("log", ""))
             # Create compression stats entry for successful tasks
-            source_size = task_data.get('source_size', 0)
-            destination_size = task_data.get('destination_size', 0)
-            if task_data.get('task_success', False):
+            source_size = task_data.get("source_size", 0)
+            destination_size = task_data.get("destination_size", 0)
+            if task_data.get("task_success", False):
                 self.create_compression_stats_entry(
                     new_historic_task,
                     source_size=source_size,
                     destination_size=destination_size,
-                    source_codec=task_data.get('source_codec', ''),
-                    destination_codec=task_data.get('destination_codec', ''),
-                    source_resolution=task_data.get('source_resolution', ''),
-                    library_id=task_data.get('library_id', 1),
-                    source_container=task_data.get('source_container', ''),
-                    destination_container=task_data.get('destination_container', ''),
-                    encoding_duration_seconds=task_data.get('encoding_duration_seconds', 0),
-                    avg_encoding_fps=task_data.get('avg_encoding_fps', 0),
-                    source_duration_seconds=task_data.get('source_duration_seconds', 0),
-                    encoding_speed_ratio=task_data.get('encoding_speed_ratio', 0),
+                    source_codec=task_data.get("source_codec", ""),
+                    destination_codec=task_data.get("destination_codec", ""),
+                    source_resolution=task_data.get("source_resolution", ""),
+                    library_id=task_data.get("library_id", 1),
+                    source_container=task_data.get("source_container", ""),
+                    destination_container=task_data.get("destination_container", ""),
+                    encoding_duration_seconds=task_data.get("encoding_duration_seconds", 0),
+                    avg_encoding_fps=task_data.get("avg_encoding_fps", 0),
+                    source_duration_seconds=task_data.get("source_duration_seconds", 0),
+                    encoding_speed_ratio=task_data.get("encoding_speed_ratio", 0),
                 )
         except Exception as error:
             self.logger.exception("Failed to save historic task entry to database. %s", error)
@@ -297,10 +309,7 @@ class History(object):
         :param log:
         :return:
         """
-        CompletedTasksCommandLogs.create(
-            completedtask_id=historic_task,
-            dump=log
-        )
+        CompletedTasksCommandLogs.create(completedtask_id=historic_task, dump=log)
 
     def create_historic_task_entry(self, task_data):
         """
@@ -317,24 +326,35 @@ class History(object):
         :return:
         """
         if not task_data:
-            self.logger.debug('Task data param empty: %s', json.dumps(task_data))
-            raise Exception('Task data param empty. This should not happen - Something has gone really wrong.')
+            self.logger.debug("Task data param empty: %s", json.dumps(task_data))
+            raise Exception("Task data param empty. This should not happen - Something has gone really wrong.")
 
-        new_historic_task = CompletedTasks.create(task_label=task_data['task_label'],
-                                                  abspath=task_data['abspath'],
-                                                  task_success=task_data['task_success'],
-                                                  start_time=task_data['start_time'],
-                                                  finish_time=task_data['finish_time'],
-                                                  processed_by_worker=task_data['processed_by_worker'])
+        new_historic_task = CompletedTasks.create(
+            task_label=task_data["task_label"],
+            abspath=task_data["abspath"],
+            task_success=task_data["task_success"],
+            start_time=task_data["start_time"],
+            finish_time=task_data["finish_time"],
+            processed_by_worker=task_data["processed_by_worker"],
+        )
         return new_historic_task
 
     @staticmethod
-    def create_compression_stats_entry(historic_task, source_size=0, destination_size=0,
-                                       source_codec='', destination_codec='',
-                                       source_resolution='', library_id=1,
-                                       source_container='', destination_container='',
-                                       encoding_duration_seconds=0, avg_encoding_fps=0,
-                                       source_duration_seconds=0, encoding_speed_ratio=0):
+    def create_compression_stats_entry(
+        historic_task,
+        source_size=0,
+        destination_size=0,
+        source_codec="",
+        destination_codec="",
+        source_resolution="",
+        library_id=1,
+        source_container="",
+        destination_container="",
+        encoding_duration_seconds=0,
+        avg_encoding_fps=0,
+        source_duration_seconds=0,
+        encoding_speed_ratio=0,
+    ):
         """
         Create a compression stats entry for a completed task.
 
@@ -357,12 +377,12 @@ class History(object):
             completedtask=historic_task,
             source_size=source_size,
             destination_size=destination_size,
-            source_codec=source_codec or '',
-            destination_codec=destination_codec or '',
-            source_resolution=source_resolution or '',
+            source_codec=source_codec or "",
+            destination_codec=destination_codec or "",
+            source_resolution=source_resolution or "",
             library_id=library_id,
-            source_container=source_container or '',
-            destination_container=destination_container or '',
+            source_container=source_container or "",
+            destination_container=destination_container or "",
             encoding_duration_seconds=encoding_duration_seconds or 0,
             avg_encoding_fps=avg_encoding_fps or 0,
             source_duration_seconds=source_duration_seconds or 0,
@@ -378,9 +398,9 @@ class History(object):
         """
         query = CompressionStats.select(
             CompressionStats.library_id,
-            fn.SUM(CompressionStats.source_size).alias('total_source'),
-            fn.SUM(CompressionStats.destination_size).alias('total_dest'),
-            fn.COUNT(CompressionStats.id).alias('file_count'),
+            fn.SUM(CompressionStats.source_size).alias("total_source"),
+            fn.SUM(CompressionStats.destination_size).alias("total_dest"),
+            fn.COUNT(CompressionStats.id).alias("file_count"),
         )
 
         if library_id is not None:
@@ -399,14 +419,16 @@ class History(object):
             file_count = row.file_count or 0
             avg_ratio = (total_dest / total_source) if total_source > 0 else 0
 
-            per_library.append({
-                'library_id': row.library_id,
-                'total_source_size': total_source,
-                'total_destination_size': total_dest,
-                'file_count': file_count,
-                'avg_ratio': round(avg_ratio, 4),
-                'space_saved': total_source - total_dest,
-            })
+            per_library.append(
+                {
+                    "library_id": row.library_id,
+                    "total_source_size": total_source,
+                    "total_destination_size": total_dest,
+                    "file_count": file_count,
+                    "avg_ratio": round(avg_ratio, 4),
+                    "space_saved": total_source - total_dest,
+                }
+            )
 
             grand_total_source += total_source
             grand_total_dest += total_dest
@@ -415,12 +437,12 @@ class History(object):
         grand_avg_ratio = (grand_total_dest / grand_total_source) if grand_total_source > 0 else 0
 
         return {
-            'total_source_size': grand_total_source,
-            'total_destination_size': grand_total_dest,
-            'file_count': grand_file_count,
-            'avg_ratio': round(grand_avg_ratio, 4),
-            'space_saved': grand_total_source - grand_total_dest,
-            'per_library': per_library,
+            "total_source_size": grand_total_source,
+            "total_destination_size": grand_total_dest,
+            "file_count": grand_file_count,
+            "avg_ratio": round(grand_avg_ratio, 4),
+            "space_saved": grand_total_source - grand_total_dest,
+            "per_library": per_library,
         }
 
     def get_compression_stats_for_task(self, task_id):
@@ -434,35 +456,30 @@ class History(object):
             stats = CompressionStats.get(CompressionStats.completedtask == task_id)
             ratio = (stats.destination_size / stats.source_size) if stats.source_size > 0 else 0
             return {
-                'source_size': stats.source_size,
-                'destination_size': stats.destination_size,
-                'source_codec': stats.source_codec,
-                'destination_codec': stats.destination_codec,
-                'source_resolution': stats.source_resolution,
-                'library_id': stats.library_id,
-                'ratio': round(ratio, 4),
-                'space_saved': stats.source_size - stats.destination_size,
+                "source_size": stats.source_size,
+                "destination_size": stats.destination_size,
+                "source_codec": stats.source_codec,
+                "destination_codec": stats.destination_codec,
+                "source_resolution": stats.source_resolution,
+                "library_id": stats.library_id,
+                "ratio": round(ratio, 4),
+                "space_saved": stats.source_size - stats.destination_size,
             }
         except CompressionStats.DoesNotExist:
             return None
 
-    def get_compression_stats_paginated(self, start=0, length=10, search_value=None,
-                                         library_id=None, order=None):
+    def get_compression_stats_paginated(self, start=0, length=10, search_value=None, library_id=None, order=None):
         """
         Get paginated compression stats joined with completed task labels.
 
         :return: dict with recordsTotal, recordsFiltered, results
         """
-        query = (
-            CompressionStats
-            .select(
-                CompressionStats,
-                CompletedTasks.task_label,
-                CompletedTasks.task_success,
-                CompletedTasks.finish_time,
-            )
-            .join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id))
-        )
+        query = CompressionStats.select(
+            CompressionStats,
+            CompletedTasks.task_label,
+            CompletedTasks.task_success,
+            CompletedTasks.finish_time,
+        ).join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id))
 
         if library_id is not None:
             query = query.where(CompressionStats.library_id == library_id)
@@ -474,21 +491,18 @@ class History(object):
         records_filtered = query.count()
 
         # Default order
-        ALLOWED_CS_COLUMNS = {'source_size', 'destination_size', 'library_id'}
-        ALLOWED_CT_COLUMNS = {'finish_time', 'task_label', 'task_success'}
+        ALLOWED_CS_COLUMNS = {"source_size", "destination_size", "library_id"}
+        ALLOWED_CT_COLUMNS = {"finish_time", "task_label", "task_success"}
         if order:
-            col = order.get('column', 'finish_time')
-            direction = order.get('dir', 'desc')
+            col = order.get("column", "finish_time")
+            direction = order.get("dir", "desc")
             if col in ALLOWED_CS_COLUMNS:
                 order_field = getattr(CompressionStats, col)
             elif col in ALLOWED_CT_COLUMNS:
                 order_field = getattr(CompletedTasks, col)
             else:
                 order_field = CompletedTasks.finish_time
-            if direction == 'asc':
-                query = query.order_by(order_field.asc())
-            else:
-                query = query.order_by(order_field.desc())
+            query = query.order_by(order_field.asc()) if direction == "asc" else query.order_by(order_field.desc())
         else:
             query = query.order_by(CompletedTasks.finish_time.desc())
 
@@ -500,26 +514,28 @@ class History(object):
             source_size = row.source_size or 0
             dest_size = row.destination_size or 0
             ratio = (dest_size / source_size) if source_size > 0 else 0
-            results.append({
-                'id': row.id,
-                'completedtask_id': row.completedtask_id,
-                'task_label': row.completedtask.task_label,
-                'task_success': row.completedtask.task_success,
-                'finish_time': row.completedtask.finish_time,
-                'source_size': source_size,
-                'destination_size': dest_size,
-                'source_codec': row.source_codec or '',
-                'destination_codec': row.destination_codec or '',
-                'source_resolution': row.source_resolution or '',
-                'library_id': row.library_id,
-                'ratio': round(ratio, 4),
-                'space_saved': source_size - dest_size,
-            })
+            results.append(
+                {
+                    "id": row.id,
+                    "completedtask_id": row.completedtask_id,
+                    "task_label": row.completedtask.task_label,
+                    "task_success": row.completedtask.task_success,
+                    "finish_time": row.completedtask.finish_time,
+                    "source_size": source_size,
+                    "destination_size": dest_size,
+                    "source_codec": row.source_codec or "",
+                    "destination_codec": row.destination_codec or "",
+                    "source_resolution": row.source_resolution or "",
+                    "library_id": row.library_id,
+                    "ratio": round(ratio, 4),
+                    "space_saved": source_size - dest_size,
+                }
+            )
 
         return {
-            'recordsTotal': records_total,
-            'recordsFiltered': records_filtered,
-            'results': results,
+            "recordsTotal": records_total,
+            "recordsFiltered": records_filtered,
+            "results": results,
         }
 
     def get_codec_distribution(self, library_id=None):
@@ -531,26 +547,26 @@ class History(object):
         """
         source_query = CompressionStats.select(
             CompressionStats.source_codec,
-            fn.COUNT(CompressionStats.id).alias('count'),
+            fn.COUNT(CompressionStats.id).alias("count"),
         )
         dest_query = CompressionStats.select(
             CompressionStats.destination_codec,
-            fn.COUNT(CompressionStats.id).alias('count'),
+            fn.COUNT(CompressionStats.id).alias("count"),
         )
 
         if library_id is not None:
             source_query = source_query.where(CompressionStats.library_id == library_id)
             dest_query = dest_query.where(CompressionStats.library_id == library_id)
 
-        source_query = source_query.where(CompressionStats.source_codec != '').group_by(CompressionStats.source_codec)
-        dest_query = dest_query.where(CompressionStats.destination_codec != '').group_by(CompressionStats.destination_codec)
+        source_query = source_query.where(CompressionStats.source_codec != "").group_by(CompressionStats.source_codec)
+        dest_query = dest_query.where(CompressionStats.destination_codec != "").group_by(CompressionStats.destination_codec)
 
-        source_codecs = [{'codec': row.source_codec, 'count': row.count} for row in source_query]
-        dest_codecs = [{'codec': row.destination_codec, 'count': row.count} for row in dest_query]
+        source_codecs = [{"codec": row.source_codec, "count": row.count} for row in source_query]
+        dest_codecs = [{"codec": row.destination_codec, "count": row.count} for row in dest_query]
 
         return {
-            'source_codecs': source_codecs,
-            'destination_codecs': dest_codecs,
+            "source_codecs": source_codecs,
+            "destination_codecs": dest_codecs,
         }
 
     def get_resolution_distribution(self, library_id=None):
@@ -562,15 +578,15 @@ class History(object):
         """
         query = CompressionStats.select(
             CompressionStats.source_resolution,
-            fn.COUNT(CompressionStats.id).alias('count'),
+            fn.COUNT(CompressionStats.id).alias("count"),
         )
 
         if library_id is not None:
             query = query.where(CompressionStats.library_id == library_id)
 
-        query = query.where(CompressionStats.source_resolution != '').group_by(CompressionStats.source_resolution)
+        query = query.where(CompressionStats.source_resolution != "").group_by(CompressionStats.source_resolution)
 
-        return [{'resolution': row.source_resolution, 'count': row.count} for row in query]
+        return [{"resolution": row.source_resolution, "count": row.count} for row in query]
 
     def get_container_distribution(self, library_id=None):
         """
@@ -581,29 +597,31 @@ class History(object):
         """
         source_query = CompressionStats.select(
             CompressionStats.source_container,
-            fn.COUNT(CompressionStats.id).alias('count'),
+            fn.COUNT(CompressionStats.id).alias("count"),
         )
         dest_query = CompressionStats.select(
             CompressionStats.destination_container,
-            fn.COUNT(CompressionStats.id).alias('count'),
+            fn.COUNT(CompressionStats.id).alias("count"),
         )
 
         if library_id is not None:
             source_query = source_query.where(CompressionStats.library_id == library_id)
             dest_query = dest_query.where(CompressionStats.library_id == library_id)
 
-        source_query = source_query.where(CompressionStats.source_container != '').group_by(CompressionStats.source_container)
-        dest_query = dest_query.where(CompressionStats.destination_container != '').group_by(CompressionStats.destination_container)
+        source_query = source_query.where(CompressionStats.source_container != "").group_by(CompressionStats.source_container)
+        dest_query = dest_query.where(CompressionStats.destination_container != "").group_by(
+            CompressionStats.destination_container
+        )
 
-        source_containers = [{'container': row.source_container, 'count': row.count} for row in source_query]
-        dest_containers = [{'container': row.destination_container, 'count': row.count} for row in dest_query]
+        source_containers = [{"container": row.source_container, "count": row.count} for row in source_query]
+        dest_containers = [{"container": row.destination_container, "count": row.count} for row in dest_query]
 
         return {
-            'source_containers': source_containers,
-            'destination_containers': dest_containers,
+            "source_containers": source_containers,
+            "destination_containers": dest_containers,
         }
 
-    def get_space_saved_over_time(self, library_id=None, interval='day'):
+    def get_space_saved_over_time(self, library_id=None, interval="day"):
         """
         Get space saved over time, grouped by date interval.
 
@@ -611,22 +629,18 @@ class History(object):
         :param interval: 'day', 'week', or 'month'
         :return: list of {date, space_saved, file_count}
         """
-        if interval == 'month':
-            date_trunc = fn.strftime('%Y-%m', CompletedTasks.finish_time)
-        elif interval == 'week':
-            date_trunc = fn.strftime('%Y-W%W', CompletedTasks.finish_time)
+        if interval == "month":
+            date_trunc = fn.strftime("%Y-%m", CompletedTasks.finish_time)
+        elif interval == "week":
+            date_trunc = fn.strftime("%Y-W%W", CompletedTasks.finish_time)
         else:
-            date_trunc = fn.strftime('%Y-%m-%d', CompletedTasks.finish_time)
+            date_trunc = fn.strftime("%Y-%m-%d", CompletedTasks.finish_time)
 
-        query = (
-            CompressionStats
-            .select(
-                date_trunc.alias('date_group'),
-                fn.SUM(CompressionStats.source_size - CompressionStats.destination_size).alias('space_saved'),
-                fn.COUNT(CompressionStats.id).alias('file_count'),
-            )
-            .join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id))
-        )
+        query = CompressionStats.select(
+            date_trunc.alias("date_group"),
+            fn.SUM(CompressionStats.source_size - CompressionStats.destination_size).alias("space_saved"),
+            fn.COUNT(CompressionStats.id).alias("file_count"),
+        ).join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id))
 
         if library_id is not None:
             query = query.where(CompressionStats.library_id == library_id)
@@ -635,10 +649,12 @@ class History(object):
 
         results = []
         for row in query:
-            results.append({
-                'date': row.date_group,
-                'space_saved': row.space_saved or 0,
-                'file_count': row.file_count or 0,
-            })
+            results.append(
+                {
+                    "date": row.date_group,
+                    "space_saved": row.space_saved or 0,
+                    "file_count": row.file_count or 0,
+                }
+            )
 
         return results

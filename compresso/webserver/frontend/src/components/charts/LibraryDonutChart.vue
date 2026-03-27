@@ -22,9 +22,11 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
+import { useChartTheme } from 'src/composables/useChartTheme'
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
+const { getChartColor } = useChartTheme()
 
 const props = defineProps({
   totalFiles: { type: Number, default: 0 },
@@ -56,7 +58,7 @@ async function renderChart() {
       labels: [$t('flow.optimizationProgress'), $t('dashboard.remaining')],
       datasets: [{
         data: [processed, remaining],
-        backgroundColor: ['#1a6b4a', remainingColor],
+        backgroundColor: [getChartColor(1), remainingColor],
         borderWidth: 0
       }]
     },

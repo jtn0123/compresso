@@ -1,6 +1,6 @@
 <template>
-  <q-page padding>
-    <div class="row q-col-gutter-lg">
+  <q-page padding class="q-pa-sm">
+    <div class="row q-col-gutter-md">
 
       <!-- Row 1: System Status Bar -->
       <div class="col-12">
@@ -9,9 +9,9 @@
 
       <!-- Row 2: Hero section -->
       <!-- Left: Donut + Stats -->
-      <div class="col-12 col-md-5 col-lg-4">
+      <div class="col-12 col-md-4 col-lg-3">
         <q-card flat bordered class="full-height">
-          <q-card-section>
+          <q-card-section class="q-pa-sm">
             <LibraryDonutChart
               :totalFiles="optimizationData.totalFiles"
               :processedFiles="optimizationData.processedFiles"
@@ -27,7 +27,7 @@
       </div>
 
       <!-- Right: Workers -->
-      <div class="col-12 col-md-7 col-lg-8">
+      <div class="col-12 col-md-8 col-lg-9">
         <WorkersPanel
           :workerProgressList="workerProgressList"
           @pause-all="pauseAllWorkers"
@@ -49,9 +49,9 @@
       <!-- Row 2.5: GPU Utilization -->
       <div v-if="liveMetrics.gpus && liveMetrics.gpus.length > 0" class="col-12">
         <q-card flat bordered>
-          <q-card-section class="bg-card-head">
-            <div class="text-h6 text-primary">
-              <q-icon name="memory" />
+          <q-card-section class="bg-card-head q-pa-sm">
+            <div class="text-heading text-primary">
+              <q-icon name="memory" size="18px" class="q-mr-xs" />
               {{ $t('gpu.cardTitle') }}
             </div>
           </q-card-section>
@@ -73,10 +73,9 @@
               <div class="col q-px-sm">
                 <q-linear-progress
                   :value="(gpu.memory_used_mb || 0) / (gpu.memory_total_mb || 1)"
-                  size="8px"
-                  rounded
-                  color="blue-6"
-                  :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
+                  size="6px"
+                  color="info"
+                  track-color="transparent"
                 >
                   <q-tooltip>
                     {{ $t('gpu.memory') }}: {{ gpu.memory_used_mb }}MB / {{ gpu.memory_total_mb }}MB
@@ -97,10 +96,10 @@
       </div>
 
       <!-- Row 3: Tasks -->
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-5">
         <PendingTasks v-bind="pendingTasksData" :queueEta="queueEta" />
       </div>
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-7">
         <CompletedTasks v-bind="completedTasksData" />
       </div>
 

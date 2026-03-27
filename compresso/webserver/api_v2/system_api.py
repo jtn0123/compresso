@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.system_api.py
+compresso.system_api.py
 
-    Written by:               Justin
-    Date:                     19 Mar 2026
+Written by:               Justin
+Date:                     19 Mar 2026
 
-    Exposes system-level metrics (CPU, RAM, disk, GPU, platform) via REST.
+Exposes system-level metrics (CPU, RAM, disk, GPU, platform) via REST.
 """
 
 import time
@@ -32,14 +31,14 @@ class ApiSystemHandler(BaseApiHandler):
 
     routes = [
         {
-            "path_pattern":      r"/system/status",
+            "path_pattern": r"/system/status",
             "supported_methods": ["GET"],
-            "call_method":       "get_system_status",
+            "call_method": "get_system_status",
         },
         {
-            "path_pattern":      r"/system/gpu-metrics",
+            "path_pattern": r"/system/gpu-metrics",
             "supported_methods": ["GET"],
-            "call_method":       "get_gpu_metrics",
+            "call_method": "get_gpu_metrics",
         },
     ]
 
@@ -93,43 +92,43 @@ class ApiSystemHandler(BaseApiHandler):
 
             cpu_percent = psutil.cpu_percent(interval=0.1)
             cpu_count = psutil.cpu_count()
-            cpu_brand = system_info.get('devices', {}).get('cpu_info', {}).get('brand_raw', 'Unknown')
+            cpu_brand = system_info.get("devices", {}).get("cpu_info", {}).get("brand_raw", "Unknown")
 
             mem = psutil.virtual_memory()
 
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
 
-            gpu_list = system_info.get('devices', {}).get('gpu_info', [])
+            gpu_list = system_info.get("devices", {}).get("gpu_info", [])
 
-            platform_info = system_info.get('platform', {})
+            platform_info = system_info.get("platform", {})
             platform_data = {
-                "system":  getattr(platform_info, 'system', str(platform_info)),
-                "node":    getattr(platform_info, 'node', ''),
-                "release": getattr(platform_info, 'release', ''),
+                "system": getattr(platform_info, "system", str(platform_info)),
+                "node": getattr(platform_info, "node", ""),
+                "release": getattr(platform_info, "release", ""),
             }
 
             uptime_seconds = int(time.time() - psutil.boot_time())
 
             data = {
                 "cpu": {
-                    "count":   cpu_count,
+                    "count": cpu_count,
                     "percent": cpu_percent,
-                    "brand":   cpu_brand,
+                    "brand": cpu_brand,
                 },
                 "memory": {
-                    "total_gb": round(mem.total / (1024 ** 3), 1),
-                    "used_gb":  round(mem.used / (1024 ** 3), 1),
-                    "percent":  mem.percent,
+                    "total_gb": round(mem.total / (1024**3), 1),
+                    "used_gb": round(mem.used / (1024**3), 1),
+                    "percent": mem.percent,
                 },
                 "disk": {
-                    "total_gb": round(disk.total / (1024 ** 3), 1),
-                    "used_gb":  round(disk.used / (1024 ** 3), 1),
-                    "percent":  disk.percent,
-                    "path":     "/",
+                    "total_gb": round(disk.total / (1024**3), 1),
+                    "used_gb": round(disk.used / (1024**3), 1),
+                    "percent": disk.percent,
+                    "path": "/",
                 },
-                "gpus":            gpu_list,
-                "platform":        platform_data,
-                "uptime_seconds":  uptime_seconds,
+                "gpus": gpu_list,
+                "platform": platform_data,
+                "uptime_seconds": uptime_seconds,
             }
 
             response = self.build_response(
@@ -139,12 +138,12 @@ class ApiSystemHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -188,12 +187,12 @@ class ApiSystemHandler(BaseApiHandler):
         try:
             gpu_monitor = GpuMonitor()
             data = {
-                'gpus': gpu_monitor.get_realtime_metrics(),
-                'history': gpu_monitor.get_history(),
+                "gpus": gpu_monitor.get_realtime_metrics(),
+                "history": gpu_monitor.get_history(),
             }
             self.write_success(data)
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

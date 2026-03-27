@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import json
 import os
@@ -20,7 +19,7 @@ def reset_singletons():
 @pytest.mark.unittest
 def test_safe_defaults_enabled_by_default():
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
+    config_path = tempfile.mkdtemp(prefix="compresso_tests_config_")
 
     settings = config.Config(config_path=config_path)
 
@@ -32,12 +31,15 @@ def test_safe_defaults_enabled_by_default():
 @pytest.mark.unittest
 def test_safe_defaults_can_be_disabled_from_config_file():
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
-    with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
-        json.dump({
-            'large_library_safe_defaults': False,
-            'number_of_workers': None,
-        }, infile)
+    config_path = tempfile.mkdtemp(prefix="compresso_tests_config_")
+    with open(os.path.join(config_path, "settings.json"), "w") as infile:
+        json.dump(
+            {
+                "large_library_safe_defaults": False,
+                "number_of_workers": None,
+            },
+            infile,
+        )
 
     settings = config.Config(config_path=config_path)
 
@@ -48,14 +50,17 @@ def test_safe_defaults_can_be_disabled_from_config_file():
 @pytest.mark.unittest
 def test_settings_file_overrides_environment_but_constructor_args_override_both(monkeypatch):
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
-    with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
-        json.dump({
-            'ui_port': 9001,
-            'enable_library_scanner': True,
-        }, infile)
+    config_path = tempfile.mkdtemp(prefix="compresso_tests_config_")
+    with open(os.path.join(config_path, "settings.json"), "w") as infile:
+        json.dump(
+            {
+                "ui_port": 9001,
+                "enable_library_scanner": True,
+            },
+            infile,
+        )
 
-    monkeypatch.setenv('ui_port', '9000')
+    monkeypatch.setenv("ui_port", "9000")
 
     settings = config.Config(config_path=config_path, port=9002)
 
@@ -66,12 +71,15 @@ def test_settings_file_overrides_environment_but_constructor_args_override_both(
 @pytest.mark.unittest
 def test_safe_defaults_only_fill_unset_values():
     reset_singletons()
-    config_path = tempfile.mkdtemp(prefix='compresso_tests_config_')
-    with open(os.path.join(config_path, 'settings.json'), 'w') as infile:
-        json.dump({
-            'number_of_workers': 6,
-            'concurrent_file_testers': 4,
-        }, infile)
+    config_path = tempfile.mkdtemp(prefix="compresso_tests_config_")
+    with open(os.path.join(config_path, "settings.json"), "w") as infile:
+        json.dump(
+            {
+                "number_of_workers": 6,
+                "concurrent_file_testers": 4,
+            },
+            infile,
+        )
 
     settings = config.Config(config_path=config_path)
 
@@ -82,14 +90,14 @@ def test_safe_defaults_only_fill_unset_values():
 @pytest.mark.unittest
 def test_validate_startup_environment_rejects_missing_library():
     reset_singletons()
-    base_dir = tempfile.mkdtemp(prefix='compresso_tests_startup_')
-    config_dir = os.path.join(base_dir, 'config')
-    cache_dir = os.path.join(base_dir, 'cache')
-    missing_library = os.path.join(base_dir, 'library')
+    base_dir = tempfile.mkdtemp(prefix="compresso_tests_startup_")
+    config_dir = os.path.join(base_dir, "config")
+    cache_dir = os.path.join(base_dir, "cache")
+    missing_library = os.path.join(base_dir, "library")
 
     settings = config.Config(config_path=config_dir)
-    settings.set_config_item('cache_path', cache_dir, save_settings=False)
-    settings.set_config_item('library_path', missing_library, save_settings=False)
+    settings.set_config_item("cache_path", cache_dir, save_settings=False)
+    settings.set_config_item("library_path", missing_library, save_settings=False)
 
     with pytest.raises(RuntimeError, match="library path"):
         validate_startup_environment(settings)
@@ -98,14 +106,14 @@ def test_validate_startup_environment_rejects_missing_library():
 @pytest.mark.unittest
 def test_validate_startup_environment_rejects_invalid_cache_path():
     reset_singletons()
-    base_dir = tempfile.mkdtemp(prefix='compresso_tests_startup_')
-    config_dir = os.path.join(base_dir, 'config')
-    library_dir = os.path.join(base_dir, 'library')
+    base_dir = tempfile.mkdtemp(prefix="compresso_tests_startup_")
+    config_dir = os.path.join(base_dir, "config")
+    library_dir = os.path.join(base_dir, "library")
     os.makedirs(library_dir, exist_ok=True)
 
     settings = config.Config(config_path=config_dir)
-    settings.set_config_item('library_path', library_dir, save_settings=False)
-    settings.set_config_item('cache_path', os.path.abspath(os.sep), save_settings=False)
+    settings.set_config_item("library_path", library_dir, save_settings=False)
+    settings.set_config_item("cache_path", os.path.abspath(os.sep), save_settings=False)
 
     with pytest.raises(RuntimeError, match="cache path"):
         validate_startup_environment(settings)
@@ -122,8 +130,8 @@ def test_startup_readiness_requires_all_stages():
 
     snapshot = startup_state.snapshot()
 
-    assert snapshot['ready'] is True
-    assert all(snapshot['stages'].values())
+    assert snapshot["ready"] is True
+    assert all(snapshot["stages"].values())
 
 
 @pytest.mark.unittest
@@ -131,11 +139,11 @@ def test_startup_readiness_reports_errors():
     reset_singletons()
     startup_state = StartupState()
     startup_state.reset()
-    startup_state.mark_ready('config_loaded', detail='ok')
-    startup_state.mark_error('ui_server_ready', 'bind failed')
+    startup_state.mark_ready("config_loaded", detail="ok")
+    startup_state.mark_error("ui_server_ready", "bind failed")
 
     snapshot = startup_state.snapshot()
 
-    assert snapshot['ready'] is False
-    assert snapshot['stages']['ui_server_ready'] is False
-    assert snapshot['errors'][0]['stage'] == 'ui_server_ready'
+    assert snapshot["ready"] is False
+    assert snapshot["stages"]["ui_server_ready"] is False
+    assert snapshot["errors"][0]["stage"] == "ui_server_ready"

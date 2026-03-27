@@ -54,10 +54,13 @@ jobs:
         # Full lint (blocking — all rules enforced)
         ruff check compresso/ tests/
 
+    - name: Check formatting with ruff
+      run: |
+        ruff format --check compresso/ tests/
+
     - name: Type check with mypy
       run: |
-        mypy compresso/webserver/websocket.py compresso/webserver/api_v2/base_api_handler.py compresso/webserver/api_v2/system_api.py compresso/libs/system.py --ignore-missing-imports --follow-imports=silent --no-error-summary
-        mypy compresso/ --ignore-missing-imports --no-error-summary 2>&1 || true
+        mypy compresso/ --ignore-missing-imports --no-error-summary
 
   py_unit_test:
     name: Unit Tests (${{ matrix.os }}, shard ${{ matrix.shard }}/3)

@@ -1,63 +1,136 @@
 <template>
-  <div class="column fit drawer-background">
-    <!-- Profile Section -->
-    <div :class="{'q-pt-xl' : !$q.screen.gt.sm}">
-      <DrawerUserProfileHeader/>
+  <div class="column fit">
+
+    <!-- Pin toggle (only visible when expanded) -->
+    <div v-if="!mini" class="row items-center justify-end q-px-sm q-pt-sm" style="min-height: 32px">
+      <q-btn
+        dense flat round size="xs"
+        :icon="pinned ? 'push_pin' : 'push_pin'"
+        :color="pinned ? 'primary' : 'grey-6'"
+        :style="{ transform: pinned ? 'none' : 'rotate(45deg)' }"
+        @click="$emit('update:pinned', !pinned)"
+      >
+        <q-tooltip>{{ pinned ? 'Unpin sidebar' : 'Pin sidebar' }}</q-tooltip>
+      </q-btn>
     </div>
+    <div v-else style="height: 8px" />
 
     <!-- Scrollable Navigation -->
     <q-scroll-area class="col">
-      <q-list padding>
+      <q-list dense>
 
-        <!--START DASHBOARD SELECT-->
+        <!-- Dashboard -->
         <q-item
           clickable
           to="/ui/dashboard"
           v-ripple
-          :class="{ 'nav-active': $route.path === '/ui/dashboard' }">
+          :class="{ 'nav-active': $route.path === '/ui/dashboard' }"
+        >
           <q-item-section avatar>
-            <q-icon name="dashboard"/>
+            <q-icon name="dashboard" size="20px"/>
           </q-item-section>
-          <q-item-section>
+          <q-item-section v-if="!mini">
             {{ $t('navigation.dashboard') }}
           </q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.dashboard') }}</q-tooltip>
         </q-item>
-        <!--END DASHBOARD SELECT-->
-        <!--START SETTINGS SELECT-->
-        <q-expansion-item
-          icon="settings"
-          :label="$t('navigation.settings')"
-          :default-opened="isSettingsRoute"
-          :header-class="isSettingsRoute ? 'text-primary text-weight-bold' : ''"
+
+        <q-separator class="q-my-xs q-mx-sm" />
+
+        <!-- CORE TOOLS -->
+        <q-item-label v-if="!mini" class="nav-section-label">{{ $t('navigation.tools') }}</q-item-label>
+
+        <q-item
+          clickable to="/ui/compression" v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/compression' }"
         >
-          <q-item clickable to="/ui/settings-library" v-ripple :active="$route.path === '/ui/settings-library'" dense class="q-pl-xl">
-            <q-item-section avatar><q-icon name="account_tree" size="sm"/></q-item-section>
-            <q-item-section>{{ $t('navigation.library') }}</q-item-section>
-          </q-item>
-          <q-item clickable to="/ui/settings-workers" v-ripple :active="$route.path === '/ui/settings-workers'" dense class="q-pl-xl">
-            <q-item-section avatar><q-icon name="engineering" size="sm"/></q-item-section>
-            <q-item-section>{{ $t('navigation.workers') }}</q-item-section>
-          </q-item>
-          <q-item clickable to="/ui/settings-plugins" v-ripple :active="$route.path === '/ui/settings-plugins'" dense class="q-pl-xl">
-            <q-item-section avatar><q-icon name="extension" size="sm"/></q-item-section>
-            <q-item-section>{{ $t('navigation.plugins') }}</q-item-section>
-          </q-item>
-          <q-item clickable to="/ui/settings-link" v-ripple :active="$route.path === '/ui/settings-link'" dense class="q-pl-xl">
-            <q-item-section avatar><q-icon name="link" size="sm"/></q-item-section>
-            <q-item-section>{{ $t('navigation.link') }}</q-item-section>
-          </q-item>
-          <q-item clickable to="/ui/settings-notifications" v-ripple :active="$route.path === '/ui/settings-notifications'" dense class="q-pl-xl">
-            <q-item-section avatar><q-icon name="notifications_active" size="sm"/></q-item-section>
-            <q-item-section>{{ $t('navigation.notifications') }}</q-item-section>
-          </q-item>
-        </q-expansion-item>
-        <!--END SETTINGS SELECT-->
-        <!--START DATA PANELS SELECT-->
+          <q-item-section avatar><q-icon name="compress" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.compression') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.compression') }}</q-tooltip>
+        </q-item>
+
+        <q-item
+          clickable to="/ui/approval" v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/approval' }"
+        >
+          <q-item-section avatar><q-icon name="fact_check" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">
+            {{ $t('navigation.approvalQueue') }}
+          </q-item-section>
+          <q-badge
+            v-if="approvalCount > 0"
+            color="orange"
+            floating
+            :label="approvalCount"
+          />
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.approvalQueue') }}</q-tooltip>
+        </q-item>
+
+        <q-item
+          clickable to="/ui/preview" v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/preview' }"
+        >
+          <q-item-section avatar><q-icon name="compare" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.abPreview') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.abPreview') }}</q-tooltip>
+        </q-item>
+
+        <q-separator class="q-my-xs q-mx-sm" />
+
+        <!-- MONITORING -->
+        <q-item-label v-if="!mini" class="nav-section-label">{{ $t('navigation.monitoring') || 'Monitoring' }}</q-item-label>
+
+        <q-item
+          clickable to="/ui/health" v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/health' }"
+        >
+          <q-item-section avatar><q-icon name="health_and_safety" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.healthCheck') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.healthCheck') }}</q-tooltip>
+        </q-item>
+
+        <q-item
+          clickable to="/ui/history" v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/history' }"
+        >
+          <q-item-section avatar><q-icon name="history" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.history') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.history') }}</q-tooltip>
+        </q-item>
+
+        <!-- Data Panels: expandable when not mini, popup menu when mini -->
+        <q-item
+          v-if="mini"
+          clickable v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/data-panels' }"
+        >
+          <q-item-section avatar><q-icon name="insights" size="20px"/></q-item-section>
+          <q-tooltip anchor="center right" self="center left">{{ $t('navigation.dataPanels') }}</q-tooltip>
+          <q-menu anchor="top right" self="top left" :offset="[4, 0]">
+            <q-list dense style="min-width: 150px">
+              <q-item clickable to="/ui/data-panels" v-close-popup v-ripple>
+                <q-item-section>{{ $t('navigation.dataPanels') }}</q-item-section>
+              </q-item>
+              <q-item
+                v-for="panel in availableDataPanels"
+                :key="panel.id"
+                clickable
+                @click="$router.push('/ui/data-panels?pluginId=' + panel.id)"
+                v-close-popup v-ripple
+              >
+                <q-item-section>{{ panel.label }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-item>
+
         <q-expansion-item
+          v-if="!mini"
           icon="insights"
           :label="$t('navigation.dataPanels')"
           :default-opened="isDataPanelsRoute"
           :header-class="isDataPanelsRoute ? 'text-primary text-weight-bold' : ''"
+          dense
         >
           <q-item clickable to="/ui/data-panels" v-ripple :active="$route.path === '/ui/data-panels' && !$route.query.pluginId" dense class="q-pl-xl">
             <q-item-section avatar><q-icon name="insights" size="sm"/></q-item-section>
@@ -77,156 +150,81 @@
             <q-item-section>{{ panel.label }}</q-item-section>
           </q-item>
         </q-expansion-item>
-        <!--END DATA PANELS SELECT-->
-        <q-item-label header class="text-caption text-weight-medium" style="padding: 12px 16px 4px">{{ $t('navigation.tools') }}</q-item-label>
-        <!--START COMPRESSION DASHBOARD SELECT-->
-        <q-item
-          clickable
-          to="/ui/compression"
-          v-ripple
-          :class="{ 'nav-active': $route.path === '/ui/compression' }">
-          <q-item-section avatar>
-            <q-icon name="compress"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.compression') }}
-          </q-item-section>
-        </q-item>
-        <!--END COMPRESSION DASHBOARD SELECT-->
-        <!--START APPROVAL QUEUE SELECT-->
-        <q-item
-          clickable
-          to="/ui/approval"
-          v-ripple
-          :class="{ 'nav-active': $route.path === '/ui/approval' }">
-          <q-item-section avatar>
-            <q-icon name="fact_check"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.approvalQueue') }}
-            <q-badge
-              v-if="approvalCount > 0"
-              color="orange"
-              floating
-              :label="approvalCount"/>
-          </q-item-section>
-        </q-item>
-        <!--END APPROVAL QUEUE SELECT-->
-        <!--START PREVIEW COMPARE SELECT-->
-        <q-item
-          clickable
-          to="/ui/preview"
-          v-ripple
-          :class="{ 'nav-active': $route.path === '/ui/preview' }">
-          <q-item-section avatar>
-            <q-icon name="compare"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.abPreview') }}
-          </q-item-section>
-        </q-item>
-        <!--END PREVIEW COMPARE SELECT-->
-        <!--START HEALTH CHECK SELECT-->
-        <q-item
-          clickable
-          to="/ui/health"
-          v-ripple
-          :class="{ 'nav-active': $route.path === '/ui/health' }">
-          <q-item-section avatar>
-            <q-icon name="health_and_safety"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.healthCheck') }}
-          </q-item-section>
-        </q-item>
-        <!--END HEALTH CHECK SELECT-->
-        <!--START TASK HISTORY SELECT-->
-        <q-item
-          clickable
-          to="/ui/history"
-          v-ripple
-          :class="{ 'nav-active': $route.path === '/ui/history' }">
-          <q-item-section avatar>
-            <q-icon name="history"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.history') }}
-          </q-item-section>
-        </q-item>
-        <!--END TASK HISTORY SELECT-->
 
-        <q-separator spaced/>
+        <q-separator class="q-my-xs q-mx-sm" />
 
-        <!--START THEME SELECT (MOBILE ONLY)-->
-        <q-item v-if="$q.screen.lt.sm">
-          <q-item-section avatar>
-            <q-icon name="palette"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.theme') }}
-          </q-item-section>
-          <q-item-section side>
-            <ThemeSwitch/>
-          </q-item-section>
+        <!-- SETTINGS (flat list) -->
+        <q-item-label v-if="!mini" class="nav-section-label">{{ $t('navigation.settings') }}</q-item-label>
+
+        <q-item clickable to="/ui/settings-library" v-ripple :class="{ 'nav-active': $route.path === '/ui/settings-library' }">
+          <q-item-section avatar><q-icon name="account_tree" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.library') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.library') }}</q-tooltip>
         </q-item>
-        <!--END THEME SELECT (MOBILE ONLY)-->
 
-        <q-separator spaced/>
-
-        <q-item-label header>{{ $t('navigation.documentation') }}:</q-item-label>
-        <!--START SUPPORT SELECT-->
-        <q-item
-          clickable
-          @click="showHelpSupportDialog"
-          v-ripple>
-          <q-item-section avatar>
-            <q-icon name="fa-regular fa-life-ring"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.helpAndSupport') }}
-          </q-item-section>
+        <q-item clickable to="/ui/settings-workers" v-ripple :class="{ 'nav-active': $route.path === '/ui/settings-workers' }">
+          <q-item-section avatar><q-icon name="engineering" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.workers') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.workers') }}</q-tooltip>
         </q-item>
-        <!--END SUPPORT SELECT-->
 
-        <!--START APPLICATION LOGS-->
-        <q-item
-          clickable
-          @click="showApplicationLogsDialog"
-          v-ripple>
-          <q-item-section avatar>
-            <q-icon name="article"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('navigation.applicationLogs') }}
-          </q-item-section>
+        <q-item clickable to="/ui/settings-plugins" v-ripple :class="{ 'nav-active': $route.path === '/ui/settings-plugins' }">
+          <q-item-section avatar><q-icon name="extension" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.plugins') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.plugins') }}</q-tooltip>
         </q-item>
-        <!--END APPLICATION LOGS-->
 
-        <!--START PRIVACY POLICY-->
-        <q-item
-          clickable
-          @click="showPrivacyPolicyDialog"
-          v-ripple>
-          <q-item-section avatar>
-            <q-icon name="o_shield"/>
-          </q-item-section>
-          <q-item-section>
-            {{ $t('headers.privacyPolicy') }}
-          </q-item-section>
+        <q-item clickable to="/ui/settings-link" v-ripple :class="{ 'nav-active': $route.path === '/ui/settings-link' }">
+          <q-item-section avatar><q-icon name="link" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.link') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.link') }}</q-tooltip>
         </q-item>
-        <!--END PRIVACY POLICY-->
+
+        <q-item clickable to="/ui/settings-notifications" v-ripple :class="{ 'nav-active': $route.path === '/ui/settings-notifications' }">
+          <q-item-section avatar><q-icon name="notifications_active" size="20px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.notifications') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.notifications') }}</q-tooltip>
+        </q-item>
 
       </q-list>
     </q-scroll-area>
 
-    <!-- Footer Section (Mobile Only) -->
-    <div class="lt-md">
-      <q-img src="~assets/bg-design-3.png" style="height: 80px">
-        <div class="absolute-full footer-gradient"></div>
-        <div class="absolute-full bg-transparent text-white row items-center q-px-md">
-          <FooterData/>
-        </div>
-      </q-img>
+    <!-- Bottom section -->
+    <div class="q-pa-xs">
+      <q-separator class="q-mb-xs" />
+
+      <!-- Help/Docs items -->
+      <q-list dense>
+        <q-item clickable @click="showHelpSupportDialog" v-ripple>
+          <q-item-section avatar><q-icon name="fa-regular fa-life-ring" size="18px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.helpAndSupport') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.helpAndSupport') }}</q-tooltip>
+        </q-item>
+
+        <q-item clickable @click="showApplicationLogsDialog" v-ripple>
+          <q-item-section avatar><q-icon name="article" size="18px"/></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.applicationLogs') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.applicationLogs') }}</q-tooltip>
+        </q-item>
+
+        <!-- Mobile-only theme/palette controls -->
+        <template v-if="$q.screen.lt.sm && !mini">
+          <q-item>
+            <q-item-section avatar><q-icon name="palette" size="18px"/></q-item-section>
+            <q-item-section>
+              <div class="row items-center q-gutter-xs">
+                <ThemeSwitch/>
+                <PaletteSwitch/>
+              </div>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-list>
+
+      <!-- Version -->
+      <div class="text-center q-py-xs">
+        <span class="text-caption" style="opacity: 0.4; font-size: 0.6rem">v{{ compressoVersion }}</span>
+      </div>
     </div>
 
     <!-- Dialogs -->
@@ -237,14 +235,13 @@
 </template>
 
 <script>
-
-import DrawerUserProfileHeader from "components/drawers/partials/DrawerUserProfileHeader.vue";
-import ThemeSwitch from "components/ThemeSwitch";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
 import { getCompressoApiUrl } from "src/js/compressoGlobals";
-import FooterData from "components/FooterData";
+import compressoGlobals from "src/js/compressoGlobals";
+import ThemeSwitch from "components/ThemeSwitch";
+import PaletteSwitch from "components/PaletteSwitch";
 import PrivacyPolicyDialog from "components/docs/PrivacyPolicyDialog.vue";
 import HelpSupportDialog from "components/docs/HelpSupportDialog.vue";
 import ApplicationLogsDialog from "components/docs/ApplicationLogsDialog.vue";
@@ -252,13 +249,17 @@ import ApplicationLogsDialog from "components/docs/ApplicationLogsDialog.vue";
 export default {
   name: 'DrawerMainNav',
   components: {
-    DrawerUserProfileHeader,
-    FooterData,
     ThemeSwitch,
+    PaletteSwitch,
     HelpSupportDialog,
     ApplicationLogsDialog,
     PrivacyPolicyDialog,
   },
+  props: {
+    mini: { type: Boolean, default: false },
+    pinned: { type: Boolean, default: true },
+  },
+  emits: ['update:pinned'],
   setup() {
     const route = useRoute();
     const privacyPolicyDialogRef = ref(null);
@@ -266,9 +267,9 @@ export default {
     const applicationLogsDialogRef = ref(null);
     const approvalCount = ref(0);
     const availableDataPanels = ref([]);
+    const compressoVersion = ref('');
     let approvalInterval = null;
 
-    const isSettingsRoute = computed(() => route.path.startsWith('/ui/settings'));
     const isDataPanelsRoute = computed(() => route.path === '/ui/data-panels');
 
     async function fetchDataPanelList() {
@@ -284,29 +285,23 @@ export default {
     }
 
     function showPrivacyPolicyDialog() {
-      if (privacyPolicyDialogRef.value) {
-        privacyPolicyDialogRef.value.show()
-      }
+      if (privacyPolicyDialogRef.value) privacyPolicyDialogRef.value.show();
     }
 
     function showHelpSupportDialog() {
-      if (helpSupportDialogRef.value) {
-        helpSupportDialogRef.value.show()
-      }
+      if (helpSupportDialogRef.value) helpSupportDialogRef.value.show();
     }
 
     function showApplicationLogsDialog() {
-      if (applicationLogsDialogRef.value) {
-        applicationLogsDialogRef.value.show()
-      }
+      if (applicationLogsDialogRef.value) applicationLogsDialogRef.value.show();
     }
 
     async function fetchApprovalCount() {
       try {
         const res = await axios.get('/compresso/api/v2/approval/count');
         approvalCount.value = res.data.count || 0;
-      } catch (e) {
-        // Silently ignore — endpoint may not exist if approval is disabled
+      } catch {
+        // Silently ignore
       }
     }
 
@@ -314,12 +309,13 @@ export default {
       fetchApprovalCount();
       fetchDataPanelList();
       approvalInterval = setInterval(fetchApprovalCount, 15000);
+      compressoGlobals.getCompressoVersion().then((version) => {
+        compressoVersion.value = version;
+      });
     });
 
     onUnmounted(() => {
-      if (approvalInterval) {
-        clearInterval(approvalInterval);
-      }
+      if (approvalInterval) clearInterval(approvalInterval);
     });
 
     return {
@@ -331,24 +327,21 @@ export default {
       applicationLogsDialogRef,
       approvalCount,
       availableDataPanels,
-      isSettingsRoute,
       isDataPanelsRoute,
+      compressoVersion,
     }
   },
 }
 </script>
 
 <style scoped>
-.footer-gradient {
-  background: linear-gradient(to top, #13291f, rgba(19, 41, 31, 0.7)) !important;
+.q-item {
+  border-radius: 6px;
+  margin: 1px 6px;
+  min-height: 36px;
 }
 
-.nav-active {
-  border-left: 3px solid var(--q-primary);
-  background: rgba(26, 107, 74, 0.08);
-}
-
-.body--dark .nav-active {
-  background: rgba(34, 145, 106, 0.12);
+.q-item .q-icon {
+  color: var(--compresso-grey-6);
 }
 </style>

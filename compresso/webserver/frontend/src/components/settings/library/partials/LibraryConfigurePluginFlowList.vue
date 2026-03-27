@@ -274,7 +274,7 @@ export default {
 }
 
 .library-plugin-flow-item {
-  background: #F2C037;
+  background: var(--q-secondary);
 }
 
 .ghost {

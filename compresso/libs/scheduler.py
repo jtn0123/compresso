@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.scheduler.py
+compresso.scheduler.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     11 Sep 2021, (11:15 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     11 Sep 2021, (11:15 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 import random
 import shutil
@@ -52,7 +52,7 @@ class ScheduledTasksManager(threading.Thread):
     """
 
     def __init__(self, event):
-        super(ScheduledTasksManager, self).__init__(name='ScheduledTasksManager')
+        super().__init__(name="ScheduledTasksManager")
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.event = event
         self.abort_flag = threading.Event()
@@ -123,7 +123,7 @@ class ScheduledTasksManager(threading.Thread):
 
         linked_configs = []
         for local_config in settings.get_remote_installations():
-            if local_config.get('enable_distributed_worker_count'):
+            if local_config.get("enable_distributed_worker_count"):
                 linked_configs.append(local_config)
 
         # If no remote links are configured, then return here
@@ -136,14 +136,14 @@ class ScheduledTasksManager(threading.Thread):
         # Get total tasks count of pending tasks across all linked_configs
         total_tasks = local_task_count
         for linked_config in linked_configs:
-            total_tasks += int(linked_config.get('task_count', 0))
+            total_tasks += int(linked_config.get("task_count", 0))
 
         # From the counts fetched from all linked_configs, balance out the target count (including this installation)
         allocated_worker_count = 0
         for linked_config in linked_configs:
-            if linked_config.get('task_count', 0) == 0:
+            if linked_config.get("task_count", 0) == 0:
                 continue
-            allocated_worker_count += round((int(linked_config.get('task_count', 0)) / total_tasks) * target_count)
+            allocated_worker_count += round((int(linked_config.get("task_count", 0)) / total_tasks) * target_count)
 
         # Calculate worker count for local
         target_workers_for_this_installation = 0
@@ -159,14 +159,20 @@ class ScheduledTasksManager(threading.Thread):
         #           rotation of workers when the pending task queue is close to the same.
         #       EG. If time now (seconds) > time last checked (seconds) + 10mins (600 seconds) + random seconds within 2mins
         time_now = time.time()
-        time_to_next_force_local_worker = int(self.force_local_worker_timer + 600 + random.randrange(120))
-        if time_now > time_to_next_force_local_worker:
-            if (local_task_count > 1) and (target_workers_for_this_installation < 1):
-                target_workers_for_this_installation = 1
-                self.force_local_worker_timer = time_now
+        # noqa justification: S311 — jitter for scheduling, not crypto
+        time_to_next_force_local_worker = int(
+            self.force_local_worker_timer + 600 + random.randrange(120)  # noqa: S311
+        )
+        if (
+            time_now > time_to_next_force_local_worker
+            and (local_task_count > 1)
+            and (target_workers_for_this_installation < 1)
+        ):
+            target_workers_for_this_installation = 1
+            self.force_local_worker_timer = time_now
 
         self.logger.info("Configuring worker count as %s for this installation", target_workers_for_this_installation)
-        settings.set_config_item('number_of_workers', target_workers_for_this_installation, save_settings=True)
+        settings.set_config_item("number_of_workers", target_workers_for_this_installation, save_settings=True)
 
     def manage_completed_tasks(self):
         settings = config.Config()
@@ -181,26 +187,30 @@ class ScheduledTasksManager(threading.Thread):
         before_time = date_x_days_ago.timestamp()
 
         task_success = True
-        inc_status = 'successfully'
+        inc_status = "successfully"
         if not settings.get_always_keep_failed_tasks():
-            inc_status = 'successfully or failed'
+            inc_status = "successfully or failed"
             task_success = None
 
         # Fetch completed tasks
         from compresso.libs import history
+
         history_logging = history.History()
-        count = history_logging.get_historic_task_list_filtered_and_sorted(task_success=task_success,
-                                                                           before_time=before_time).count()
-        results = history_logging.get_historic_task_list_filtered_and_sorted(task_success=task_success,
-                                                                             before_time=before_time)
+        count = history_logging.get_historic_task_list_filtered_and_sorted(
+            task_success=task_success, before_time=before_time
+        ).count()
+        results = history_logging.get_historic_task_list_filtered_and_sorted(
+            task_success=task_success, before_time=before_time
+        )
 
         if count == 0:
             self.logger.info("Found no %s completed tasks older than %s days", inc_status, max_age_in_days)
             return
 
         if compress_completed_tasks_logs:
-            self.logger.info("Found %s %s completed tasks older than %s days that should be compressed", count,
-                             inc_status, max_age_in_days)
+            self.logger.info(
+                "Found %s %s completed tasks older than %s days that should be compressed", count, inc_status, max_age_in_days
+            )
             task_ids = [historic_task.id for historic_task in results]
             if not history_logging.delete_historic_task_command_logs(task_ids):
                 self.logger.error("Failed to compress %s %s completed tasks", count, inc_status)
@@ -208,8 +218,9 @@ class ScheduledTasksManager(threading.Thread):
             self.logger.info("Compressed %s %s completed tasks", count, inc_status)
             return
 
-        self.logger.info("Found %s %s completed tasks older than %s days that should be removed", count, inc_status,
-                         max_age_in_days)
+        self.logger.info(
+            "Found %s %s completed tasks older than %s days that should be removed", count, inc_status, max_age_in_days
+        )
         if not history_logging.delete_historic_tasks_recursively(results):
             self.logger.error("Failed to delete %s %s completed tasks", count, inc_status)
             return
@@ -220,6 +231,7 @@ class ScheduledTasksManager(threading.Thread):
         """Clean up preview jobs older than 24 hours."""
         try:
             from compresso.libs.preview import PreviewManager
+
             preview_manager = PreviewManager()
             preview_manager.cleanup_old_previews()
         except Exception as e:
@@ -239,53 +251,39 @@ class ScheduledTasksManager(threading.Thread):
         cutoff = datetime.now() - timedelta(days=int(expiry_days))
 
         for entry in os.scandir(staging_path):
-            if not entry.is_dir() or not entry.name.startswith('task_'):
+            if not entry.is_dir() or not entry.name.startswith("task_"):
                 continue
             try:
-                task_id = int(entry.name.split('_')[1])
+                task_id = int(entry.name.split("_")[1])
             except (ValueError, IndexError):
                 continue
 
             # Check if the associated task still exists and is still awaiting approval
             from compresso.libs.unmodels.tasks import Tasks
+
             try:
                 task_obj = Tasks.get_by_id(task_id)
-                if task_obj.status == 'awaiting_approval':
+                if task_obj.status == "awaiting_approval":
                     # Check age by finish_time
                     if task_obj.finish_time and task_obj.finish_time < cutoff:
-                        self.logger.info(
-                            "Auto-rejecting expired staging task %s (finished %s)",
-                            task_id, task_obj.finish_time
-                        )
+                        self.logger.info("Auto-rejecting expired staging task %s (finished %s)", task_id, task_obj.finish_time)
                         task_obj.delete_instance()
                         try:
                             shutil.rmtree(entry.path)
                         except OSError as e:
-                            self.logger.warning(
-                                "Failed to remove staging dir for task %s: %s",
-                                task_id, e
-                            )
+                            self.logger.warning("Failed to remove staging dir for task %s: %s", task_id, e)
                     # Still within expiry — leave it
                 else:
                     # Task exists but isn't awaiting approval — staging is orphaned
-                    self.logger.info(
-                        "Cleaning orphaned staging dir for task %s (status=%s)",
-                        task_id, task_obj.status
-                    )
+                    self.logger.info("Cleaning orphaned staging dir for task %s (status=%s)", task_id, task_obj.status)
                     try:
                         shutil.rmtree(entry.path)
                     except OSError as e:
-                        self.logger.warning(
-                            "Failed to remove orphaned staging dir for task %s: %s",
-                            task_id, e
-                        )
+                        self.logger.warning("Failed to remove orphaned staging dir for task %s: %s", task_id, e)
             except Tasks.DoesNotExist:
                 # Task was already deleted — clean up orphaned staging
                 self.logger.info("Cleaning orphaned staging dir for deleted task %s", task_id)
                 try:
                     shutil.rmtree(entry.path)
                 except OSError as e:
-                    self.logger.warning(
-                        "Failed to remove orphaned staging dir for deleted task %s: %s",
-                        task_id, e
-                    )
+                    self.logger.warning("Failed to remove orphaned staging dir for deleted task %s: %s", task_id, e)

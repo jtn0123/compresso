@@ -1,45 +1,43 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    tests.unit.test_common.py
+tests.unit.test_common.py
 
-    Unit tests for compresso.libs.common utility functions.
+Unit tests for compresso.libs.common utility functions.
 """
 
 import json
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from compresso.libs import common
 
 
 @pytest.mark.unittest
 class TestGetHomeDir:
-
     def test_returns_home_dir_env(self, tmp_path):
-        with patch.dict(os.environ, {'HOME_DIR': str(tmp_path)}):
+        with patch.dict(os.environ, {"HOME_DIR": str(tmp_path)}):
             assert common.get_home_dir() == str(tmp_path)
 
     def test_returns_user_home_when_unset(self):
         # Keep USERPROFILE/HOMEDRIVE/HOMEPATH for Windows expanduser() support
-        keep_keys = {'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'SYSTEMROOT', 'SYSTEMDRIVE'}
+        keep_keys = {"USERPROFILE", "HOMEDRIVE", "HOMEPATH", "SYSTEMROOT", "SYSTEMDRIVE"}
         preserved = {k: v for k, v in os.environ.items() if k in keep_keys}
         with patch.dict(os.environ, preserved, clear=True):
             result = common.get_home_dir()
             assert os.path.isabs(result)
 
     def test_expands_tilde_in_home_dir(self):
-        with patch.dict(os.environ, {'HOME_DIR': '~/mydir'}):
+        with patch.dict(os.environ, {"HOME_DIR": "~/mydir"}):
             result = common.get_home_dir()
-            assert '~' not in result
+            assert "~" not in result
             assert os.path.isabs(result)
 
 
 @pytest.mark.unittest
 class TestFormatMessage:
-
     def test_simple_message(self):
         result = common.format_message("hello")
         assert result == "[FORMATTED] - hello"
@@ -61,7 +59,6 @@ class TestFormatMessage:
 
 @pytest.mark.unittest
 class TestTimeStringToSeconds:
-
     def test_converts_time_string(self):
         assert common.time_string_to_seconds("01:30:45.500000") == 5445
 
@@ -74,7 +71,6 @@ class TestTimeStringToSeconds:
 
 @pytest.mark.unittest
 class TestEnsureDir:
-
     def test_creates_directory(self, tmp_path):
         new_dir = tmp_path / "sub" / "dir"
         file_path = str(new_dir / "file.txt")
@@ -84,7 +80,6 @@ class TestEnsureDir:
 
 @pytest.mark.unittest
 class TestRandomString:
-
     def test_default_length(self):
         result = common.random_string()
         assert len(result) == 5
@@ -98,12 +93,11 @@ class TestRandomString:
 
 @pytest.mark.unittest
 class TestJsonDumpToFile:
-
     def test_writes_valid_json(self, tmp_path):
         out_file = str(tmp_path / "test.json")
         data = {"key": "value", "number": 42}
         result = common.json_dump_to_file(data, out_file)
-        assert result['success'] is True
+        assert result["success"] is True
         with open(out_file) as f:
             loaded = json.load(f)
         assert loaded == data
@@ -111,31 +105,30 @@ class TestJsonDumpToFile:
     def test_rollback_on_invalid_json(self, tmp_path):
         out_file = str(tmp_path / "test.json")
         # Write initial valid data
-        with open(out_file, 'w') as f:
+        with open(out_file, "w") as f:
             json.dump({"original": True}, f)
         # Try to write something that will pass write but we'll test rollback exists
         result = common.json_dump_to_file({"new": True}, out_file)
-        assert result['success'] is True
+        assert result["success"] is True
 
 
 @pytest.mark.unittest
 class TestExtractVideoCodecs:
-
     def test_extracts_codecs(self):
         props = {
-            'streams': [
-                {'codec_type': 'video', 'codec_name': 'h264'},
-                {'codec_type': 'audio', 'codec_name': 'aac'},
-                {'codec_type': 'video', 'codec_name': 'hevc'},
+            "streams": [
+                {"codec_type": "video", "codec_name": "h264"},
+                {"codec_type": "audio", "codec_name": "aac"},
+                {"codec_type": "video", "codec_name": "hevc"},
             ]
         }
         codecs = common.extract_video_codecs_from_file_properties(props)
-        assert codecs == ['h264', 'hevc']
+        assert codecs == ["h264", "hevc"]
 
     def test_no_video_streams(self):
         props = {
-            'streams': [
-                {'codec_type': 'audio', 'codec_name': 'aac'},
+            "streams": [
+                {"codec_type": "audio", "codec_name": "aac"},
             ]
         }
         codecs = common.extract_video_codecs_from_file_properties(props)
@@ -144,7 +137,6 @@ class TestExtractVideoCodecs:
 
 @pytest.mark.unittest
 class TestGetFileChecksum:
-
     def test_returns_consistent_checksum(self, tmp_path):
         f = tmp_path / "test.bin"
         f.write_bytes(b"hello world")
@@ -156,45 +148,48 @@ class TestGetFileChecksum:
 
 @pytest.mark.unittest
 class TestMakeTimestampHumanReadable:
-
     def test_recent_past_shows_seconds_ago(self):
         import time
+
         ts = time.time() - 5
         result = common.make_timestamp_human_readable(ts)
-        assert 'ago' in result
-        assert 'second' in result
+        assert "ago" in result
+        assert "second" in result
 
     def test_one_day_ago(self):
         import time
+
         ts = time.time() - 86400
         result = common.make_timestamp_human_readable(ts)
-        assert '1 day' in result
-        assert 'ago' in result
+        assert "1 day" in result
+        assert "ago" in result
 
     def test_multiple_days_ago(self):
         import time
+
         ts = time.time() - (2 * 86400)
         result = common.make_timestamp_human_readable(ts)
-        assert 'days' in result
-        assert 'ago' in result
+        assert "days" in result
+        assert "ago" in result
 
     def test_future_timestamp_shows_in_prefix(self):
         import time
+
         ts = time.time() + 3600
         result = common.make_timestamp_human_readable(ts)
-        assert result.startswith('in ')
+        assert result.startswith("in ")
 
     def test_one_year_ago(self):
         import time
+
         ts = time.time() - (365 * 86400)
         result = common.make_timestamp_human_readable(ts)
-        assert '1 year' in result
-        assert 'ago' in result
+        assert "1 year" in result
+        assert "ago" in result
 
 
 @pytest.mark.unittest
 class TestGetFileFingerprint:
-
     def test_full_xxhash_small_file(self, tmp_path):
         f = tmp_path / "small.bin"
         f.write_bytes(b"small file content")

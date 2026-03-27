@@ -140,12 +140,12 @@ defineExpose({
   margin: 0 0 10px;
   font-size: 13px;
   line-height: 1.428571;
-  color: #333;
+  color: var(--compresso-grey-9);
   word-break: break-all;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  background-color: #f5f5f5;
-  border: 1px solid #ccc;
+  background-color: var(--compresso-grey-2);
+  border: 1px solid var(--compresso-grey-4);
   border-radius: 4px;
   overflow: auto;
 }

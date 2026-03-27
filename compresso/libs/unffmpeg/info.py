@@ -1,47 +1,45 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.main.py
+compresso.main.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     21 Sep 2019, (2:08 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     21 Sep 2019, (2:08 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
-from . import audio_codecs
-from . import subtitle_codecs
-from . import video_codecs
+from . import audio_codecs, subtitle_codecs, video_codecs
 from .lib import cli
 
 
-class Info(object):
+class Info:
     """
     Info
 
     Provide information on FFMPEG commands and configuration
     """
+
     available_encoders = None
     available_decoders = None
 
@@ -78,39 +76,30 @@ class Info(object):
         # Sort through the lines and create a dictionary of audio, subtitle and video encoders
         for line in info.splitlines():
             line = line.rstrip().lstrip()
-            if line.startswith('A') and line != 'A..... = Audio':
+            if line.startswith("A") and line != "A..... = Audio":
                 # Audio encoder
                 data = line.split()
                 capabilities = data.pop(0)
                 codec = data.pop(0)
-                available_audio_encoders[codec] = {
-                    'capabilities': capabilities,
-                    'description':  " ".join(data)
-                }
-            elif line.startswith('S') and line != 'S..... = Subtitle':
+                available_audio_encoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
+            elif line.startswith("S") and line != "S..... = Subtitle":
                 # Subtitle encoder
                 data = line.split()
                 capabilities = data.pop(0)
                 codec = data.pop(0)
-                available_subtitle_encoders[codec] = {
-                    'capabilities': capabilities,
-                    'description':  " ".join(data)
-                }
-            elif line.startswith('V') and line != 'V..... = Video':
+                available_subtitle_encoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
+            elif line.startswith("V") and line != "V..... = Video":
                 # Video encoder
                 data = line.split()
                 capabilities = data.pop(0)
                 codec = data.pop(0)
-                available_video_encoders[codec] = {
-                    'capabilities': capabilities,
-                    'description':  " ".join(data)
-                }
+                available_video_encoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
 
         # Combine dictionaries into one
         self.available_encoders = {
-            'audio':    available_audio_encoders,
-            'subtitle': available_subtitle_encoders,
-            'video':    available_video_encoders
+            "audio": available_audio_encoders,
+            "subtitle": available_subtitle_encoders,
+            "video": available_video_encoders,
         }
 
         return self.available_encoders
@@ -129,39 +118,30 @@ class Info(object):
         # Sort through the lines and create a dictionary of audio, subtitle and video decoders
         for line in info.splitlines():
             line = line.rstrip().lstrip()
-            if line.startswith('A') and line != 'A..... = Audio':
+            if line.startswith("A") and line != "A..... = Audio":
                 # Audio decoder
                 data = line.split()
                 capabilities = data.pop(0)
                 codec = data.pop(0)
-                available_audio_decoders[codec] = {
-                    'capabilities': capabilities,
-                    'description':  " ".join(data)
-                }
-            elif line.startswith('S') and line != 'S..... = Subtitle':
+                available_audio_decoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
+            elif line.startswith("S") and line != "S..... = Subtitle":
                 # Subtitle decoder
                 data = line.split()
                 capabilities = data.pop(0)
                 codec = data.pop(0)
-                available_subtitle_decoders[codec] = {
-                    'capabilities': capabilities,
-                    'description':  " ".join(data)
-                }
-            elif line.startswith('V') and line != 'V..... = Video':
+                available_subtitle_decoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
+            elif line.startswith("V") and line != "V..... = Video":
                 # Video decoder
                 data = line.split()
                 capabilities = data.pop(0)
                 codec = data.pop(0)
-                available_video_decoders[codec] = {
-                    'capabilities': capabilities,
-                    'description':  " ".join(data)
-                }
+                available_video_decoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
 
         # Combine dictionaries into one
         self.available_decoders = {
-            'audio':    available_audio_decoders,
-            'subtitle': available_subtitle_decoders,
-            'video':    available_video_decoders
+            "audio": available_audio_decoders,
+            "subtitle": available_subtitle_decoders,
+            "video": available_video_decoders,
         }
 
         return self.available_decoders
@@ -175,7 +155,7 @@ class Info(object):
         # Sort through the lines and create a list of methods
         for line in info.splitlines():
             line = line.rstrip().lstrip()
-            if not line or line.startswith('Hardware acceleration'):
+            if not line or line.startswith("Hardware acceleration"):
                 continue
             else:
                 methods.append(line)
@@ -190,7 +170,7 @@ class Info(object):
         """
         if self.available_encoders is None:
             self.get_available_ffmpeg_encoders()
-        return self.available_encoders['audio']
+        return self.available_encoders["audio"]
 
     def get_ffmpeg_subtitle_encoders(self):
         """
@@ -200,7 +180,7 @@ class Info(object):
         """
         if self.available_encoders is None:
             self.get_available_ffmpeg_encoders()
-        return self.available_encoders['subtitle']
+        return self.available_encoders["subtitle"]
 
     def get_ffmpeg_video_encoders(self):
         """
@@ -210,7 +190,7 @@ class Info(object):
         """
         if self.available_encoders is None:
             self.get_available_ffmpeg_encoders()
-        return self.available_encoders['video']
+        return self.available_encoders["video"]
 
     def filter_available_encoders_for_codec(self, codec_encoders, codec_type):
         """
@@ -221,11 +201,11 @@ class Info(object):
         :return:
         """
         available_encoders = {}
-        if codec_type == 'audio':
+        if codec_type == "audio":
             available_encoders = self.get_ffmpeg_audio_encoders()
-        elif codec_type == 'subtitle':
+        elif codec_type == "subtitle":
             available_encoders = self.get_ffmpeg_subtitle_encoders()
-        elif codec_type == 'video':
+        elif codec_type == "video":
             available_encoders = self.get_ffmpeg_video_encoders()
         # Iterate through the list of encoders.
         for encoder in codec_encoders:
@@ -244,17 +224,17 @@ class Info(object):
         """
         codec_dict = {}
         return_codec_dict = {}
-        if codec_type == 'audio':
+        if codec_type == "audio":
             codec_dict = audio_codecs.get_all_audio_codecs()
-        elif codec_type == 'subtitle':
+        elif codec_type == "subtitle":
             codec_dict = subtitle_codecs.get_all_subtitle_codecs()
-        elif codec_type == 'video':
+        elif codec_type == "video":
             codec_dict = video_codecs.get_all_video_codecs()
         # Iterate through the list of codecs.
         for codec_name in codec_dict:
             codec = codec_dict[codec_name]
             # Get list of encoders for this codec that are available in ffmpeg
-            codec_encoders = self.filter_available_encoders_for_codec(codec['encoders'], codec_type)
+            codec_encoders = self.filter_available_encoders_for_codec(codec["encoders"], codec_type)
             # Check if any encoders were found
             if not codec_encoders:
                 continue
@@ -275,7 +255,7 @@ class Info(object):
         for codec_name in codec_dict:
             codec = codec_dict[codec_name]
             # Get list of encoders for this codec that are available in ffmpeg
-            codec_encoders = self.filter_available_encoders_for_codec(codec['encoders'], 'video')
+            codec_encoders = self.filter_available_encoders_for_codec(codec["encoders"], "video")
             # Check if any encoders were found
             if not codec_encoders:
                 continue
@@ -285,13 +265,9 @@ class Info(object):
         return return_codec_dict
 
     def get_all_supported_codecs(self):
-        supported_audio_codecs = self.get_all_supported_codecs_of_type('audio')
-        supported_subtitle_codecs = self.get_all_supported_codecs_of_type('subtitle')
-        supported_video_codecs = self.get_all_supported_codecs_of_type('video')
+        supported_audio_codecs = self.get_all_supported_codecs_of_type("audio")
+        supported_subtitle_codecs = self.get_all_supported_codecs_of_type("subtitle")
+        supported_video_codecs = self.get_all_supported_codecs_of_type("video")
 
         # Combine dictionaries into one and return
-        return {
-            'audio':    supported_audio_codecs,
-            'subtitle': supported_subtitle_codecs,
-            'video':    supported_video_codecs
-        }
+        return {"audio": supported_audio_codecs, "subtitle": supported_subtitle_codecs, "video": supported_video_codecs}

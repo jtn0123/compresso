@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.filebrowser.py
+compresso.filebrowser.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     13 Aug 2021, (2:44 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     13 Aug 2021, (2:44 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 import string
 
@@ -37,10 +37,27 @@ from compresso.libs import common
 
 def fetch_windows_drives():
     # Credit: https://stackoverflow.com/a/37761506
-    return ['%s:' % d for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
+    return [f"{d}:" for d in string.ascii_uppercase if os.path.exists(f"{d}:")]
 
 
-class DirectoryListing(object):
+def _validate_browsable_path(user_path):
+    """Resolve and validate a user-provided filesystem path for browsing.
+
+    Returns a canonical absolute path with traversal sequences resolved.
+    Rejects null bytes and paths outside a valid filesystem root.
+    """
+    if not user_path or "\x00" in str(user_path):
+        return os.sep
+    resolved = os.path.realpath(user_path)
+    # Build the filesystem root for this path (handles drive letters on Windows)
+    drive, _ = os.path.splitdrive(resolved)
+    fs_root = drive + os.sep if drive else os.sep
+    if not resolved.startswith(fs_root):
+        return os.sep
+    return resolved
+
+
+class DirectoryListing:
     """
     DirectoryListing
 
@@ -48,7 +65,7 @@ class DirectoryListing(object):
     """
 
     def __init__(self, list_type=None):
-        self.list_type = 'all'
+        self.list_type = "all"
         if list_type:
             self.list_type = list_type
 
@@ -60,17 +77,18 @@ class DirectoryListing(object):
         :param list_type:
         :return:
         """
+        safe_path = _validate_browsable_path(path)
         directories = []
         files = []
         if self.list_type == "directories" or self.list_type == "all":
-            directories = self.fetch_directories(path)
+            directories = self.fetch_directories(safe_path)
         if self.list_type == "files" or self.list_type == "all":
-            files = self.fetch_files(path)
+            files = self.fetch_files(safe_path)
         path_data = {
-            "current_path": path,
-            "list_type":    self.list_type,
-            "directories":  directories,
-            "files":        files,
+            "current_path": safe_path,
+            "list_type": self.list_type,
+            "directories": directories,
+            "files": files,
         }
         return path_data
 
@@ -82,33 +100,35 @@ class DirectoryListing(object):
         :param path:
         :return:
         """
+        safe_path = _validate_browsable_path(path)
         results = []
-        if os.path.exists(path):
+        if os.path.exists(safe_path):
             # check if this is a root path or if it has a parent
-            parent_path = os.path.join(path, '..')
-            if os.path.exists(parent_path) and os.path.abspath(parent_path) != path:
+            parent_path = os.path.join(safe_path, "..")
+            parent_abs = _validate_browsable_path(parent_path)
+            if os.path.exists(parent_abs) and parent_abs != safe_path:
                 # Path has a parent, Add the double dots
                 results.append(
                     {
-                        "name":      "..",
-                        "full_path": os.path.abspath(parent_path),
+                        "name": "..",
+                        "full_path": parent_abs,
                     }
                 )
             elif os.name == "nt":
                 # Windows allow selection of drives as parent to root directory
                 results.append(
                     {
-                        "name":      "..",
+                        "name": "..",
                         "full_path": "",
                     }
                 )
             try:
-                for item in sorted(os.listdir(path)):
-                    abspath = os.path.abspath(os.path.join(path, item))
+                for item in sorted(os.listdir(safe_path)):
+                    abspath = _validate_browsable_path(os.path.join(safe_path, item))
                     if os.path.isdir(abspath):
                         results.append(
                             {
-                                "name":      item,
+                                "name": item,
                                 "full_path": abspath,
                             }
                         )
@@ -119,8 +139,8 @@ class DirectoryListing(object):
             for drive in fetch_windows_drives():
                 results.append(
                     {
-                        "name":      drive,
-                        "full_path": os.path.abspath(os.path.join(drive, os.sep)),
+                        "name": drive,
+                        "full_path": _validate_browsable_path(os.path.join(drive, os.sep)),
                     }
                 )
         else:
@@ -129,7 +149,7 @@ class DirectoryListing(object):
             root_path = common.get_default_root_path()
             results.append(
                 {
-                    "name":      root_path,
+                    "name": root_path,
                     "full_path": root_path,
                 }
             )
@@ -143,14 +163,15 @@ class DirectoryListing(object):
         :param path:
         :return:
         """
+        safe_path = _validate_browsable_path(path)
         results = []
-        if os.path.exists(path):
-            for item in sorted(os.listdir(path)):
-                abspath = os.path.abspath(os.path.join(path, item))
+        if os.path.exists(safe_path):
+            for item in sorted(os.listdir(safe_path)):
+                abspath = _validate_browsable_path(os.path.join(safe_path, item))
                 if os.path.isfile(abspath):
                     results.append(
                         {
-                            "name":      item,
+                            "name": item,
                             "full_path": abspath,
                         }
                     )

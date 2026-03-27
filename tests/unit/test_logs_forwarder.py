@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    tests.unit.test_logs_forwarder.py
+tests.unit.test_logs_forwarder.py
 
-    Unit tests for compresso.libs.logs.ForwardLogHandler.
-    Covers batching, disk I/O, retry logic, payload creation,
-    retention cleanup, and buffer file management.
+Unit tests for compresso.libs.logs.ForwardLogHandler.
+Covers batching, disk I/O, retry logic, payload creation,
+retention cleanup, and buffer file management.
 """
 
 import json
 import logging
 import os
-from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -30,22 +29,24 @@ def reset_singletons():
 def _make_handler(tmp_path, flush_interval=5, max_chunk_size=5 * 1024 * 1024):
     """Create a ForwardLogHandler without starting background threads."""
     from compresso.libs.logs import ForwardLogHandler
-    with patch.object(ForwardLogHandler, '_load_buffer_state', return_value={}):
-        with patch.object(ForwardLogHandler, '_sync_state_with_disk'):
-            with patch('threading.Thread') as mock_thread:
-                mock_thread.return_value.start = MagicMock()
-                handler = ForwardLogHandler(
-                    buffer_path=str(tmp_path / "buffer"),
-                    installation_name="test-install",
-                    flush_interval=flush_interval,
-                    max_chunk_size=max_chunk_size,
-                )
+
+    with (
+        patch.object(ForwardLogHandler, "_load_buffer_state", return_value={}),
+        patch.object(ForwardLogHandler, "_sync_state_with_disk"),
+        patch("threading.Thread") as mock_thread,
+    ):
+        mock_thread.return_value.start = MagicMock()
+        handler = ForwardLogHandler(
+            buffer_path=str(tmp_path / "buffer"),
+            installation_name="test-install",
+            flush_interval=flush_interval,
+            max_chunk_size=max_chunk_size,
+        )
     return handler
 
 
 @pytest.mark.unittest
 class TestConfigureEndpoint:
-
     def test_configure_endpoint_sets_values(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.configure_endpoint("http://localhost:3100", "app-123")
@@ -55,7 +56,6 @@ class TestConfigureEndpoint:
 
 @pytest.mark.unittest
 class TestConfigureRetention:
-
     def test_valid_integer(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.configure_retention(7)
@@ -87,17 +87,16 @@ class TestConfigureRetention:
     def test_re_enable_spills_memory_to_disk(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler._retention_disabled = True
-        with patch.object(handler, '_spill_memory_chunks_to_disk') as mock_spill:
+        with patch.object(handler, "_spill_memory_chunks_to_disk") as mock_spill:
             handler.configure_retention(7)
         mock_spill.assert_called_once()
 
 
 @pytest.mark.unittest
 class TestHandleBatch:
-
     def test_empty_batch_does_nothing(self, tmp_path):
         handler = _make_handler(tmp_path)
-        with patch.object(handler, '_append_to_disk') as mock_disk:
+        with patch.object(handler, "_append_to_disk") as mock_disk:
             handler._handle_batch([])
         mock_disk.assert_not_called()
 
@@ -121,14 +120,13 @@ class TestHandleBatch:
     def test_retention_enabled_writes_to_disk(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler._retention_disabled = False
-        with patch.object(handler, '_append_to_disk') as mock_disk:
+        with patch.object(handler, "_append_to_disk") as mock_disk:
             handler._handle_batch([{"labels": {}, "entry": ["ts", "msg"]}])
         mock_disk.assert_called_once()
 
 
 @pytest.mark.unittest
 class TestAppendToDisk:
-
     def test_creates_buffer_dir_and_writes(self, tmp_path):
         handler = _make_handler(tmp_path)
         batch = [
@@ -158,7 +156,6 @@ class TestAppendToDisk:
 
 @pytest.mark.unittest
 class TestGetHourlyBufferFile:
-
     def test_returns_expected_format(self, tmp_path):
         handler = _make_handler(tmp_path)
         result = handler._get_hourly_buffer_file()
@@ -168,7 +165,6 @@ class TestGetHourlyBufferFile:
 
 @pytest.mark.unittest
 class TestListBufferFiles:
-
     def test_returns_empty_when_no_dir(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.buffer_path = str(tmp_path / "nonexistent")
@@ -189,7 +185,6 @@ class TestListBufferFiles:
 
 @pytest.mark.unittest
 class TestParseBufferFilenameTimestamp:
-
     def test_valid_filename(self, tmp_path):
         handler = _make_handler(tmp_path)
         result = handler._parse_buffer_filename_timestamp("log_buffer_20240315T14.jsonl")
@@ -207,7 +202,6 @@ class TestParseBufferFilenameTimestamp:
 
 @pytest.mark.unittest
 class TestCreatePayload:
-
     def test_groups_by_labels(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.app_id = "test-app"
@@ -234,7 +228,6 @@ class TestCreatePayload:
 
 @pytest.mark.unittest
 class TestTransmitBuffer:
-
     def test_returns_false_when_no_endpoint(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.endpoint = None
@@ -248,10 +241,8 @@ class TestTransmitBuffer:
         handler.app_id = "app-1"
         mock_resp = MagicMock()
         mock_resp.status_code = 204
-        with patch('requests.post', return_value=mock_resp):
-            result = handler._transmit_buffer(
-                [{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test"
-            )
+        with patch("requests.post", return_value=mock_resp):
+            result = handler._transmit_buffer([{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test")
         assert result is True
 
     def test_returns_false_on_non_204(self, tmp_path):
@@ -261,24 +252,23 @@ class TestTransmitBuffer:
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         mock_resp.text = "Internal Server Error"
-        with patch('requests.post', return_value=mock_resp):
-            with patch('compresso.libs.logs.Notifications'):
-                with patch('compresso.libs.logs.FrontendPushMessages'):
-                    result = handler._transmit_buffer(
-                        [{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test"
-                    )
+        with (
+            patch("requests.post", return_value=mock_resp),
+            patch("compresso.libs.logs.Notifications"),
+            patch("compresso.libs.logs.FrontendPushMessages"),
+        ):
+            result = handler._transmit_buffer([{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test")
         assert result is False
         assert handler.previous_connection_failed is True
 
     def test_connection_error_returns_false(self, tmp_path):
         import requests as req
+
         handler = _make_handler(tmp_path)
         handler.endpoint = "http://localhost:3100"
         handler.app_id = "app-1"
-        with patch('requests.post', side_effect=req.exceptions.ConnectionError()):
-            result = handler._transmit_buffer(
-                [{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test"
-            )
+        with patch("requests.post", side_effect=req.exceptions.ConnectionError()):
+            result = handler._transmit_buffer([{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test")
         assert result is False
 
     def test_empty_entries_returns_true(self, tmp_path):
@@ -293,17 +283,14 @@ class TestTransmitBuffer:
         handler._notified_failures.add("500")
         mock_resp = MagicMock()
         mock_resp.status_code = 204
-        with patch('requests.post', return_value=mock_resp):
-            handler._transmit_buffer(
-                [{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test"
-            )
+        with patch("requests.post", return_value=mock_resp):
+            handler._transmit_buffer([{"labels": {"job": "test"}, "entry": ["1", "msg"]}], "test")
         assert handler.previous_connection_failed is False
         assert len(handler._notified_failures) == 0
 
 
 @pytest.mark.unittest
 class TestCleanupRetention:
-
     def test_no_cleanup_when_retention_not_set(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.buffer_retention_max_days = None
@@ -322,16 +309,14 @@ class TestCleanupRetention:
         handler._buffer_state["log_buffer_20200101T00.jsonl"] = 0
         # _parse_buffer_filename_timestamp returns naive datetime, but _cleanup_retention
         # compares with timezone-aware threshold. Patch to return tz-aware datetime.
-        old_ts = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        with patch.object(handler, '_parse_buffer_filename_timestamp', return_value=old_ts):
+        old_ts = datetime(2020, 1, 1, 0, 0, 0, tzinfo=UTC)
+        with patch.object(handler, "_parse_buffer_filename_timestamp", return_value=old_ts):
             handler._cleanup_retention()
         assert not old_file.exists()
 
 
-
 @pytest.mark.unittest
 class TestSendFromMemory:
-
     def test_returns_false_when_empty(self, tmp_path):
         handler = _make_handler(tmp_path)
         result = handler._send_from_memory()
@@ -343,7 +328,7 @@ class TestSendFromMemory:
         handler.app_id = "app"
         chunk = [{"labels": {"job": "test"}, "entry": ["1", "msg"]}]
         handler._in_memory_chunks.put(chunk)
-        with patch.object(handler, '_transmit_buffer', return_value=True):
+        with patch.object(handler, "_transmit_buffer", return_value=True):
             result = handler._send_from_memory()
         assert result is True
 
@@ -353,14 +338,13 @@ class TestSendFromMemory:
         handler.app_id = "app"
         chunk = [{"labels": {"job": "test"}, "entry": ["1", "msg"]}]
         handler._in_memory_chunks.put(chunk)
-        with patch.object(handler, '_transmit_buffer', return_value=False):
+        with patch.object(handler, "_transmit_buffer", return_value=False):
             handler._send_from_memory()
         assert not handler._in_memory_chunks.empty()
 
 
 @pytest.mark.unittest
 class TestSendNextDiskBatch:
-
     def test_returns_false_when_no_endpoint(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.endpoint = None
@@ -370,13 +354,12 @@ class TestSendNextDiskBatch:
         handler = _make_handler(tmp_path)
         handler.endpoint = "http://localhost"
         handler.app_id = "app"
-        with patch.object(handler, '_read_next_disk_chunk', return_value=None):
+        with patch.object(handler, "_read_next_disk_chunk", return_value=None):
             assert handler._send_next_disk_batch() is False
 
 
 @pytest.mark.unittest
 class TestReadFileChunk:
-
     def test_reads_entries_from_file(self, tmp_path):
         handler = _make_handler(tmp_path)
         buf_dir = tmp_path / "buffer"
@@ -407,7 +390,6 @@ class TestReadFileChunk:
 
 @pytest.mark.unittest
 class TestClose:
-
     def test_close_sets_stop_event(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler.writer_thread = MagicMock()
@@ -420,17 +402,16 @@ class TestClose:
 
 @pytest.mark.unittest
 class TestLoadBufferState:
-
     def test_load_from_valid_file(self, tmp_path):
         from compresso.libs.logs import ForwardLogHandler
+
         buf_dir = tmp_path / "buffer"
         buf_dir.mkdir()
         state_file = buf_dir / ForwardLogHandler.STATE_FILENAME
         state_file.write_text(json.dumps({"files": {"log_buffer_20240101T00.jsonl": 100}}))
-        with patch.object(ForwardLogHandler, '_sync_state_with_disk'):
-            with patch('threading.Thread') as mock_thread:
-                mock_thread.return_value.start = MagicMock()
-                handler = ForwardLogHandler(str(buf_dir), "test")
+        with patch.object(ForwardLogHandler, "_sync_state_with_disk"), patch("threading.Thread") as mock_thread:
+            mock_thread.return_value.start = MagicMock()
+            handler = ForwardLogHandler(str(buf_dir), "test")
         assert handler._buffer_state.get("log_buffer_20240101T00.jsonl") == 100
 
     def test_load_returns_empty_on_missing_file(self, tmp_path):
@@ -439,13 +420,13 @@ class TestLoadBufferState:
         # Test the method directly
         handler._buffer_state_path = str(tmp_path / "nonexistent" / "state.json")
         from compresso.libs.logs import ForwardLogHandler
+
         result = ForwardLogHandler._load_buffer_state(handler)
         assert result == {}
 
 
 @pytest.mark.unittest
 class TestEmit:
-
     def test_emit_enqueues_log_entry(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler._retention_disabled = False
@@ -481,24 +462,22 @@ class TestEmit:
 
 @pytest.mark.unittest
 class TestSpillMemoryChunksToDisk:
-
     def test_spills_pending_chunks(self, tmp_path):
         handler = _make_handler(tmp_path)
         handler._in_memory_chunks.put({"labels": {"job": "test"}, "entry": ["1", "msg"]})
-        with patch.object(handler, '_append_to_disk') as mock_disk:
+        with patch.object(handler, "_append_to_disk") as mock_disk:
             handler._spill_memory_chunks_to_disk()
         mock_disk.assert_called_once()
 
     def test_noop_when_empty(self, tmp_path):
         handler = _make_handler(tmp_path)
-        with patch.object(handler, '_append_to_disk') as mock_disk:
+        with patch.object(handler, "_append_to_disk") as mock_disk:
             handler._spill_memory_chunks_to_disk()
         mock_disk.assert_not_called()
 
 
 @pytest.mark.unittest
 class TestSliceEntriesForSend:
-
     def test_returns_all_when_under_limit(self, tmp_path):
         handler = _make_handler(tmp_path, max_chunk_size=1024 * 1024)
         entries = [{"labels": {"job": "test"}, "entry": ["1", "small"]}]

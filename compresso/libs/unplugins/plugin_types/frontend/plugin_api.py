@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.plugin_api.py
+compresso.plugin_api.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     05 Mar 2022, (11:38 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     05 Mar 2022, (11:38 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -56,49 +55,49 @@ class PluginAPI(PluginType):
     data_schema = {
         "content_type": {
             "required": True,
-            "type":     str,
+            "type": str,
         },
-        "content":      {
+        "content": {
             "required": True,
-            "type":     dict,
+            "type": dict,
         },
-        "status":      {
+        "status": {
             "required": True,
-            "type":     int,
+            "type": int,
         },
-        "method":      {
+        "method": {
             "required": False,
-            "type":     str,
+            "type": str,
         },
-        "path":         {
+        "path": {
             "required": False,
-            "type":     str,
+            "type": str,
         },
-        "uri":          {
+        "uri": {
             "required": False,
-            "type":     str,
+            "type": str,
         },
-        "query":        {
+        "query": {
             "required": False,
-            "type":     str,
+            "type": str,
         },
-        "arguments":    {
+        "arguments": {
             "required": False,
-            "type":     dict,
+            "type": dict,
         },
-        "body":         {
+        "body": {
             "required": False,
-            "type":     bytes,
+            "type": bytes,
         },
     }
     test_data = {
-        'content_type': 'application/json',
-        'content':      {},
-        'status':       200,
-        'method':       "GET",
-        'path':         "/webhook",
-        'uri':          "/compresso/plugin_api/test_plugin/webhook?param=true&foo=ba",
-        'query':        "param=true&foo=ba",
-        'arguments':    {'param': [b'true'], 'foo': [b'ba']},
-        'body':         b'{"param": "true", "foo": "ba"}',
+        "content_type": "application/json",
+        "content": {},
+        "status": 200,
+        "method": "GET",
+        "path": "/webhook",
+        "uri": "/compresso/plugin_api/test_plugin/webhook?param=true&foo=ba",
+        "query": "param=true&foo=ba",
+        "arguments": {"param": [b"true"], "foo": [b"ba"]},
+        "body": b'{"param": "true", "foo": "ba"}',
     }

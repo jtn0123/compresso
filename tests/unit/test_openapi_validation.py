@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    tests.unit.test_openapi_validation.py
+tests.unit.test_openapi_validation.py
 
-    Validates that the OpenAPI schema generation produces
-    a structurally valid OpenAPI 3.0 spec.
-    Requires apispec: pip install apispec apispec-webframeworks
+Validates that the OpenAPI schema generation produces
+a structurally valid OpenAPI 3.0 spec.
+Requires apispec: pip install apispec apispec-webframeworks
 """
 
 import pytest
@@ -14,6 +13,7 @@ import pytest
 try:
     from apispec import APISpec
     from apispec.ext.marshmallow import MarshmallowPlugin
+
     HAS_APISPEC = True
 except ImportError:
     HAS_APISPEC = False
@@ -21,7 +21,6 @@ except ImportError:
 
 @pytest.mark.unittest
 class TestSwaggerSpecGeneration:
-
     @pytest.mark.skipif(not HAS_APISPEC, reason="apispec not installed")
     def test_apispec_produces_valid_spec(self):
         """Verify apispec produces a valid OpenAPI 3.0 structure."""
@@ -31,10 +30,10 @@ class TestSwaggerSpecGeneration:
             openapi_version="3.0.0",
         )
         d = spec.to_dict()
-        assert d['info']['title'] == "Compresso API"
-        assert d['openapi'] == "3.0.0"
-        assert 'paths' in d
-        assert 'info' in d
+        assert d["info"]["title"] == "Compresso API"
+        assert d["openapi"] == "3.0.0"
+        assert "paths" in d
+        assert "info" in d
 
     @pytest.mark.skipif(not HAS_APISPEC, reason="apispec not installed")
     def test_marshmallow_plugin_loadable(self):
@@ -50,4 +49,5 @@ class TestSwaggerSpecGeneration:
     def test_schema_modules_importable(self):
         """Verify our schema modules can be imported."""
         from compresso.webserver.api_v2.schema import schemas
-        assert hasattr(schemas, 'RequestTableDataSchema')
+
+        assert hasattr(schemas, "RequestTableDataSchema")

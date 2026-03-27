@@ -1003,7 +1003,7 @@ video {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.8);
-  color: #ff5252;
+  color: var(--q-negative);
   display: flex;
   align-items: center;
   justify-content: center;

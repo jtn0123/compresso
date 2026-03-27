@@ -1,114 +1,114 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.executor.py
+compresso.executor.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     05 Mar 2021, (6:55 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     05 Mar 2021, (6:55 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import copy
+import importlib
+import importlib.util
 import inspect
 import os
-import importlib.util
-import importlib
 import sys
 
-from . import plugin_types
 from compresso.libs import common
-from ..logs import CompressoLogging
-from ..task import TaskDataStore
 from compresso.libs.metadata import CompressoFileMetadata
 
+from ..logs import CompressoLogging
+from ..task import TaskDataStore
+from . import plugin_types
 
-class PluginExecutor(object):
 
+class PluginExecutor:
     def __init__(self, plugins_directory=None):
         # Set plugins directory
         if not plugins_directory:
             home_directory = common.get_home_dir()
-            plugins_directory = os.path.join(home_directory, '.compresso', 'plugins')
+            plugins_directory = os.path.join(home_directory, ".compresso", "plugins")
         self.plugins_directory = plugins_directory
         # NOTE: List plugin types in order that they are run against a library
         #       This is listing them in order helps the frontend. Don't order alphabetically
         self.plugin_types = [
             {
-                'id':       'frontend.panel',
-                'has_flow': False,
+                "id": "frontend.panel",
+                "has_flow": False,
             },
             {
-                'id':       'frontend.plugin_api',
-                'has_flow': False,
+                "id": "frontend.plugin_api",
+                "has_flow": False,
             },
             {
-                'id':       'library_management.file_test',
-                'has_flow': True,
+                "id": "library_management.file_test",
+                "has_flow": True,
             },
             {
-                'id':       'events.file_queued',
-                'has_flow': False,
+                "id": "events.file_queued",
+                "has_flow": False,
             },
             {
-                'id':       'events.task_queued',
-                'has_flow': False,
+                "id": "events.task_queued",
+                "has_flow": False,
             },
             {
-                'id':       'events.scan_complete',
-                'has_flow': False,
+                "id": "events.scan_complete",
+                "has_flow": False,
             },
             {
-                'id':       'events.task_scheduled',
-                'has_flow': False,
+                "id": "events.task_scheduled",
+                "has_flow": False,
             },
             {
-                'id':       'events.worker_process_started',
-                'has_flow': False,
+                "id": "events.worker_process_started",
+                "has_flow": False,
             },
             {
-                'id':       'worker.process',
-                'has_flow': True,
+                "id": "worker.process",
+                "has_flow": True,
             },
             {
-                'id':       'events.worker_process_complete',
-                'has_flow': False,
+                "id": "events.worker_process_complete",
+                "has_flow": False,
             },
             {
-                'id':       'events.postprocessor_started',
-                'has_flow': False,
+                "id": "events.postprocessor_started",
+                "has_flow": False,
             },
             {
-                'id':       'postprocessor.file_move',
-                'has_flow': True,
+                "id": "postprocessor.file_move",
+                "has_flow": True,
             },
             {
-                'id':       'postprocessor.task_result',
-                'has_flow': True,
+                "id": "postprocessor.task_result",
+                "has_flow": True,
             },
             {
-                'id':       'events.postprocessor_complete',
-                'has_flow': False,
+                "id": "events.postprocessor_complete",
+                "has_flow": False,
             },
         ]
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
@@ -124,7 +124,7 @@ class PluginExecutor(object):
 
     @staticmethod
     def __include_plugin_site_packages(path):
-        plugin_site_packages_dir = os.path.join(path, 'site-packages')
+        plugin_site_packages_dir = os.path.join(path, "site-packages")
         if os.path.exists(plugin_site_packages_dir) and plugin_site_packages_dir not in sys.path:
             sys.path.append(plugin_site_packages_dir)
 
@@ -143,10 +143,10 @@ class PluginExecutor(object):
         :return:
         """
         # Set the module name
-        module_name = '{}.plugin'.format(plugin_id)
+        module_name = f"{plugin_id}.plugin"
 
         # Get main module file
-        plugin_module_path = os.path.join(path, 'plugin.py')
+        plugin_module_path = os.path.join(path, "plugin.py")
 
         # Ensure the Compresso plugins directory to sys path prior to loading it
         self.__include_plugin_directory(self.plugins_directory)
@@ -185,7 +185,7 @@ class PluginExecutor(object):
         :return:
         """
         # Set the module name
-        module_name = '{}.plugin'.format(plugin_id)
+        module_name = f"{plugin_id}.plugin"
         # self.logger.debug("Reloading module '{}'".format(module_name))
 
         if module_name in sys.modules:
@@ -218,7 +218,7 @@ class PluginExecutor(object):
         :return:
         """
         # Set the module name
-        module_name = '{}.plugin'.format(plugin_id)
+        module_name = f"{plugin_id}.plugin"
 
         if module_name in sys.modules:
             del sys.modules[module_name]
@@ -241,13 +241,13 @@ class PluginExecutor(object):
 
         for plugin_type in self.get_all_plugin_types():
             # Get the called runner function for the given plugin type
-            plugin_type_meta = self.get_plugin_type_meta(plugin_type.get('id'))
+            plugin_type_meta = self.get_plugin_type_meta(plugin_type.get("id"))
             plugin_runner = plugin_type_meta.plugin_runner()
 
             # Check if this module contains the given plugin type runner function
             if hasattr(plugin_module, plugin_runner):
                 # If it does, add it to the plugin_modules list
-                return_plugin_types.append(plugin_type.get('id'))
+                return_plugin_types.append(plugin_type.get("id"))
 
         return return_plugin_types
 
@@ -305,10 +305,7 @@ class PluginExecutor(object):
             def supports_kwarg(name):
                 if name in params:
                     return True
-                for param in params.values():
-                    if param.kind == inspect.Parameter.VAR_KEYWORD:
-                        return True
-                return False
+                return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
             def has_required_positional_after_data():
                 positional = []
@@ -317,10 +314,7 @@ class PluginExecutor(object):
                         positional.append(param)
                 # First positional is expected to be `data`
                 remaining = positional[1:]
-                for param in remaining:
-                    if param.default is inspect._empty:
-                        return True
-                return False
+                return any(param.default is inspect._empty for param in remaining)
 
             kwargs = {}
             if supports_kwarg("task_data_store"):
@@ -379,14 +373,14 @@ class PluginExecutor(object):
 
         for plugin_data in plugins_list:
             # Get plugin ID
-            plugin_id = plugin_data.get('plugin_id')
+            plugin_id = plugin_data.get("plugin_id")
 
             # Get plugin metadata
-            plugin_name = plugin_data.get('name')
-            plugin_author = plugin_data.get('author')
-            plugin_version = plugin_data.get('version')
-            plugin_icon = plugin_data.get('icon')
-            plugin_description = plugin_data.get('description')
+            plugin_name = plugin_data.get("name")
+            plugin_author = plugin_data.get("author")
+            plugin_version = plugin_data.get("version")
+            plugin_icon = plugin_data.get("icon")
+            plugin_description = plugin_data.get("description")
 
             # Get the path for this plugin
             plugin_path = self.__get_plugin_directory(plugin_id)
@@ -398,14 +392,14 @@ class PluginExecutor(object):
             if hasattr(plugin_module, plugin_runner):
                 # If it does, add it to the plugin_modules list
                 plugin_runner_data = {
-                    "plugin_id":     plugin_id,
-                    "name":          plugin_name,
-                    "author":        plugin_author,
-                    "version":       plugin_version,
-                    "icon":          plugin_icon,
-                    "description":   plugin_description,
+                    "plugin_id": plugin_id,
+                    "name": plugin_name,
+                    "author": plugin_author,
+                    "version": plugin_version,
+                    "icon": plugin_icon,
+                    "description": plugin_description,
                     "plugin_module": plugin_module,
-                    "plugin_path":   plugin_path,
+                    "plugin_path": plugin_path,
                 }
                 plugin_modules.append(plugin_runner_data)
 
@@ -443,7 +437,7 @@ class PluginExecutor(object):
         # Load this plugin module
         plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
 
-        if not hasattr(plugin_module, 'Settings'):
+        if not hasattr(plugin_module, "Settings"):
             # This plugin does not have a settings class
             return {}, {}
 
@@ -528,9 +522,9 @@ class PluginExecutor(object):
         changelog = []
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
-        plugin_changelog = os.path.join(plugin_path, 'changelog.md')
+        plugin_changelog = os.path.join(plugin_path, "changelog.md")
         if os.path.exists(plugin_changelog):
-            with open(plugin_changelog, 'r') as f:
+            with open(plugin_changelog) as f:
                 changelog = f.readlines()
 
         return changelog
@@ -545,9 +539,9 @@ class PluginExecutor(object):
         description = []
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
-        plugin_description = os.path.join(plugin_path, 'description.md')
+        plugin_description = os.path.join(plugin_path, "description.md")
         if os.path.exists(plugin_description):
-            with open(plugin_description, 'r') as f:
+            with open(plugin_description) as f:
                 description = f.readlines()
 
         return description
@@ -572,7 +566,7 @@ class PluginExecutor(object):
             errors = plugin_type_meta.run_data_schema_tests(plugin_id, plugin_module, test_data=test_data)
         except Exception as e:
             self.logger.exception("Exception while testing plugin runner for plugin '%s' %s", plugin_id, e)
-            errors = ["Exception encountered while testing runner - {}".format(str(e))]
+            errors = [f"Exception encountered while testing runner - {str(e)}"]
 
         return errors
 

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    tests.unit.test_session_api.py
+tests.unit.test_session_api.py
 
-    Tests for the session API handler endpoints.
-    Covers: get_session_state, session_reload, session_logout,
-    get_app_auth_code, get_funding_proposals.
+Tests for the session API handler endpoints.
+Covers: get_session_state, session_reload, session_logout,
+get_app_auth_code, get_funding_proposals.
 """
+
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
 
 from compresso.libs.singleton import SingletonType
-from tests.unit.api_test_base import ApiTestBase
 from compresso.webserver.api_v2.session_api import ApiSessionHandler
+from tests.unit.api_test_base import ApiTestBase
 
 
 @pytest.fixture(autouse=True)
@@ -28,10 +28,10 @@ def _mock_initialize(self, **kwargs):
     self.session = MagicMock()
     self.session.created = 1700000000.0
     self.session.level = 1
-    self.session.picture_uri = 'https://example.com/pic.png'
-    self.session.name = 'TestUser'
-    self.session.email = 'test@example.com'
-    self.session.uuid = 'uuid-1234'
+    self.session.picture_uri = "https://example.com/pic.png"
+    self.session.name = "TestUser"
+    self.session.email = "test@example.com"
+    self.session.uuid = "uuid-1234"
     self.session.token_poll_task = None
     self.logger = MagicMock()
     self.params = kwargs.get("params")
@@ -42,36 +42,38 @@ def _mock_initialize(self, **kwargs):
 # Session state
 # ------------------------------------------------------------------
 
+
 @pytest.mark.unittest
-@patch.object(ApiSessionHandler, 'initialize', _mock_initialize)
+@patch.object(ApiSessionHandler, "initialize", _mock_initialize)
 class TestSessionApiState(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
 
     def test_get_session_state_success(self):
-        resp = self.get_json('/session/state')
+        resp = self.get_json("/session/state")
         assert resp.code == 200
         data = self.parse_response(resp)
-        assert data['name'] == 'TestUser'
-        assert data['email'] == 'test@example.com'
-        assert data['uuid'] == 'uuid-1234'
+        assert data["name"] == "TestUser"
+        assert data["email"] == "test@example.com"
+        assert data["uuid"] == "uuid-1234"
 
     def test_get_session_state_not_created(self):
         def _mock_init_no_session(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.created = 0
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_no_session):
-            resp = self.get_json('/session/state')
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_no_session):
+            resp = self.get_json("/session/state")
             assert resp.code == 500
 
     def test_get_session_state_exception(self):
         def _mock_init_error(self, **kwargs):
             class BrokenSession:
                 created = 1700000000.0
-                picture_uri = 'https://example.com/pic.png'
-                name = 'TestUser'
-                email = 'test@example.com'
-                uuid = 'uuid-1234'
+                picture_uri = "https://example.com/pic.png"
+                name = "TestUser"
+                email = "test@example.com"
+                uuid = "uuid-1234"
                 token_poll_task = None
 
                 @property
@@ -83,8 +85,8 @@ class TestSessionApiState(ApiTestBase):
             self.params = kwargs.get("params")
             self.compresso_data_queues = {}
 
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_error):
-            resp = self.get_json('/session/state')
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_error):
+            resp = self.get_json("/session/state")
             assert resp.code == 500
 
 
@@ -92,30 +94,33 @@ class TestSessionApiState(ApiTestBase):
 # Session reload
 # ------------------------------------------------------------------
 
+
 @pytest.mark.unittest
-@patch.object(ApiSessionHandler, 'initialize', _mock_initialize)
+@patch.object(ApiSessionHandler, "initialize", _mock_initialize)
 class TestSessionApiReload(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
 
     def test_session_reload_success(self):
-        resp = self.post_json('/session/reload', {})
+        resp = self.post_json("/session/reload", {})
         assert resp.code == 200
 
     def test_session_reload_failure(self):
         def _mock_init_fail(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.register_compresso.return_value = False
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_fail):
-            resp = self.post_json('/session/reload', {})
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_fail):
+            resp = self.post_json("/session/reload", {})
             assert resp.code == 500
 
     def test_session_reload_exception(self):
         def _mock_init_error(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.register_compresso.side_effect = Exception("error")
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_error):
-            resp = self.post_json('/session/reload', {})
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_error):
+            resp = self.post_json("/session/reload", {})
             assert resp.code == 500
 
 
@@ -123,30 +128,33 @@ class TestSessionApiReload(ApiTestBase):
 # Session logout
 # ------------------------------------------------------------------
 
+
 @pytest.mark.unittest
-@patch.object(ApiSessionHandler, 'initialize', _mock_initialize)
+@patch.object(ApiSessionHandler, "initialize", _mock_initialize)
 class TestSessionApiLogout(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
 
     def test_session_logout_success(self):
-        resp = self.get_json('/session/logout')
+        resp = self.get_json("/session/logout")
         assert resp.code == 200
 
     def test_session_logout_failure(self):
         def _mock_init_fail(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.sign_out.return_value = False
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_fail):
-            resp = self.get_json('/session/logout')
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_fail):
+            resp = self.get_json("/session/logout")
             assert resp.code == 500
 
     def test_session_logout_exception(self):
         def _mock_init_error(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.sign_out.side_effect = Exception("error")
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_error):
-            resp = self.get_json('/session/logout')
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_error):
+            resp = self.get_json("/session/logout")
             assert resp.code == 500
 
 
@@ -154,8 +162,9 @@ class TestSessionApiLogout(ApiTestBase):
 # Get funding proposals
 # ------------------------------------------------------------------
 
+
 @pytest.mark.unittest
-@patch.object(ApiSessionHandler, 'initialize', _mock_initialize)
+@patch.object(ApiSessionHandler, "initialize", _mock_initialize)
 class TestSessionApiFunding(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
@@ -163,43 +172,44 @@ class TestSessionApiFunding(ApiTestBase):
     def test_get_funding_proposals_success(self):
         def _mock_init_funding(self, **kwargs):
             _mock_initialize(self, **kwargs)
-            self.session.get_credit_portal_funding_proposals.return_value = (
-                {'proposals': []}, 200
-            )
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_funding):
-            resp = self.get_json('/session/funding_proposals')
+            self.session.get_credit_portal_funding_proposals.return_value = ({"proposals": []}, 200)
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_funding):
+            resp = self.get_json("/session/funding_proposals")
             assert resp.code == 200
 
     def test_get_funding_proposals_401(self):
         def _mock_init_401(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.get_credit_portal_funding_proposals.return_value = (None, 401)
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_401):
-            resp = self.get_json('/session/funding_proposals')
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_401):
+            resp = self.get_json("/session/funding_proposals")
             assert resp.code == 400
 
     def test_get_funding_proposals_server_error(self):
         def _mock_init_500(self, **kwargs):
             _mock_initialize(self, **kwargs)
-            self.session.get_credit_portal_funding_proposals.return_value = (
-                {'messages': ['Service unavailable']}, 503
-            )
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_500):
-            resp = self.get_json('/session/funding_proposals')
+            self.session.get_credit_portal_funding_proposals.return_value = ({"messages": ["Service unavailable"]}, 503)
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_500):
+            resp = self.get_json("/session/funding_proposals")
             assert resp.code == 500
 
     def test_get_funding_proposals_exception(self):
         def _mock_init_error(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.get_credit_portal_funding_proposals.side_effect = Exception("error")
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_error):
-            resp = self.get_json('/session/funding_proposals')
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_error):
+            resp = self.get_json("/session/funding_proposals")
             assert resp.code == 500
 
     def test_get_funding_proposals_empty_response(self):
         def _mock_init_empty(self, **kwargs):
             _mock_initialize(self, **kwargs)
             self.session.get_credit_portal_funding_proposals.return_value = (None, 500)
-        with patch.object(ApiSessionHandler, 'initialize', _mock_init_empty):
-            resp = self.get_json('/session/funding_proposals')
+
+        with patch.object(ApiSessionHandler, "initialize", _mock_init_empty):
+            resp = self.get_json("/session/funding_proposals")
             assert resp.code == 500

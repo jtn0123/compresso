@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.healthcheck_api.py
+compresso.healthcheck_api.py
 
-    API handler for health check endpoints.
+API handler for health check endpoints.
 
 """
 
@@ -12,16 +11,16 @@ import tornado.log
 
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.healthcheck_schemas import (
-    RequestHealthCheckScanSchema,
+    HealthCheckLibraryScanResponseSchema,
+    HealthCheckReadinessResponseSchema,
+    HealthCheckScanResponseSchema,
+    HealthCheckStatusResponseSchema,
+    HealthCheckSummaryResponseSchema,
+    HealthCheckWorkersResponseSchema,
     RequestHealthCheckLibraryScanSchema,
+    RequestHealthCheckScanSchema,
     RequestHealthCheckStatusSchema,
     RequestHealthCheckWorkersSchema,
-    HealthCheckScanResponseSchema,
-    HealthCheckLibraryScanResponseSchema,
-    HealthCheckSummaryResponseSchema,
-    HealthCheckStatusResponseSchema,
-    HealthCheckWorkersResponseSchema,
-    HealthCheckReadinessResponseSchema,
 )
 from compresso.webserver.helpers import healthcheck
 
@@ -29,44 +28,44 @@ from compresso.webserver.helpers import healthcheck
 class ApiHealthcheckHandler(BaseApiHandler):
     routes = [
         {
-            "path_pattern":      r"/healthcheck/scan",
+            "path_pattern": r"/healthcheck/scan",
             "supported_methods": ["POST"],
-            "call_method":       "scan_file",
+            "call_method": "scan_file",
         },
         {
-            "path_pattern":      r"/healthcheck/scan-library",
+            "path_pattern": r"/healthcheck/scan-library",
             "supported_methods": ["POST"],
-            "call_method":       "scan_library",
+            "call_method": "scan_library",
         },
         {
-            "path_pattern":      r"/healthcheck/summary",
+            "path_pattern": r"/healthcheck/summary",
             "supported_methods": ["GET"],
-            "call_method":       "get_summary",
+            "call_method": "get_summary",
         },
         {
-            "path_pattern":      r"/healthcheck/status",
+            "path_pattern": r"/healthcheck/status",
             "supported_methods": ["POST"],
-            "call_method":       "get_status_list",
+            "call_method": "get_status_list",
         },
         {
-            "path_pattern":      r"/healthcheck/cancel-scan",
+            "path_pattern": r"/healthcheck/cancel-scan",
             "supported_methods": ["POST"],
-            "call_method":       "cancel_scan",
+            "call_method": "cancel_scan",
         },
         {
-            "path_pattern":      r"/healthcheck/workers",
+            "path_pattern": r"/healthcheck/workers",
             "supported_methods": ["GET"],
-            "call_method":       "get_workers",
+            "call_method": "get_workers",
         },
         {
-            "path_pattern":      r"/healthcheck/workers",
+            "path_pattern": r"/healthcheck/workers",
             "supported_methods": ["POST"],
-            "call_method":       "set_workers",
+            "call_method": "set_workers",
         },
         {
-            "path_pattern":      r"/healthcheck/readiness",
+            "path_pattern": r"/healthcheck/readiness",
             "supported_methods": ["GET"],
-            "call_method":       "get_readiness",
+            "call_method": "get_readiness",
         },
     ]
 
@@ -93,25 +92,25 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckScanSchema())
 
-            healthcheck.validate_library_exists(json_request.get('library_id'))
+            healthcheck.validate_library_exists(json_request.get("library_id"))
 
             result = healthcheck.check_single_file(
-                filepath=json_request.get('file_path'),
-                library_id=json_request.get('library_id', 1),
-                mode=json_request.get('mode', 'quick'),
+                filepath=json_request.get("file_path"),
+                library_id=json_request.get("library_id", 1),
+                mode=json_request.get("mode", "quick"),
             )
 
             response = self.build_response(
                 HealthCheckScanResponseSchema(),
                 {
-                    "success":       True,
-                    "abspath":       result.get('abspath', ''),
-                    "status":        result.get('status', ''),
-                    "check_mode":    result.get('check_mode', ''),
-                    "error_detail":  result.get('error_detail', ''),
-                    "last_checked":  result.get('last_checked', ''),
-                    "error_count":   result.get('error_count', 0),
-                }
+                    "success": True,
+                    "abspath": result.get("abspath", ""),
+                    "status": result.get("status", ""),
+                    "check_mode": result.get("check_mode", ""),
+                    "error_detail": result.get("error_detail", ""),
+                    "last_checked": result.get("last_checked", ""),
+                    "error_count": result.get("error_count", 0),
+                },
             )
             self.write_success(response)
             return
@@ -120,12 +119,12 @@ class ApiHealthcheckHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -152,17 +151,14 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckLibraryScanSchema())
 
-            healthcheck.validate_library_exists(json_request.get('library_id'))
+            healthcheck.validate_library_exists(json_request.get("library_id"))
 
             started = healthcheck.scan_library(
-                library_id=json_request.get('library_id'),
-                mode=json_request.get('mode', 'quick'),
+                library_id=json_request.get("library_id"),
+                mode=json_request.get("mode", "quick"),
             )
 
-            if started:
-                message = "Library scan started"
-            else:
-                message = "A scan is already in progress"
+            message = "Library scan started" if started else "A scan is already in progress"
 
             response = self.build_response(
                 HealthCheckLibraryScanResponseSchema(),
@@ -170,7 +166,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
                     "success": True,
                     "started": started,
                     "message": message,
-                }
+                },
             )
             self.write_success(response)
             return
@@ -179,12 +175,12 @@ class ApiHealthcheckHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -210,17 +206,17 @@ class ApiHealthcheckHandler(BaseApiHandler):
                     "success": True,
                     "started": False,
                     "message": "Scan cancellation requested" if cancelled else "No scan is currently running",
-                }
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -238,7 +234,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
                             HealthCheckSummaryResponseSchema
         """
         try:
-            library_id = self.get_argument('library_id', None)
+            library_id = self.get_argument("library_id", None)
             if library_id is not None:
                 try:
                     library_id = int(library_id)
@@ -251,26 +247,26 @@ class ApiHealthcheckHandler(BaseApiHandler):
             response = self.build_response(
                 HealthCheckSummaryResponseSchema(),
                 {
-                    "success":        True,
-                    "healthy":        summary.get('healthy', 0),
-                    "corrupted":      summary.get('corrupted', 0),
-                    "warning":        summary.get('warning', 0),
-                    "unchecked":      summary.get('unchecked', 0),
-                    "checking":       summary.get('checking', 0),
-                    "total":          summary.get('total', 0),
-                    "scanning":       progress.get('scanning', False),
-                    "scan_progress":  progress.get('progress', {}),
-                }
+                    "success": True,
+                    "healthy": summary.get("healthy", 0),
+                    "corrupted": summary.get("corrupted", 0),
+                    "warning": summary.get("warning", 0),
+                    "unchecked": summary.get("unchecked", 0),
+                    "checking": summary.get("checking", 0),
+                    "total": summary.get("total", 0),
+                    "scanning": progress.get("scanning", False),
+                    "scan_progress": progress.get("progress", {}),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -292,26 +288,26 @@ class ApiHealthcheckHandler(BaseApiHandler):
             response = self.build_response(
                 HealthCheckReadinessResponseSchema(),
                 {
-                    "success": readiness.get('ready', False),
-                    "ready":   readiness.get('ready', False),
-                    "stages":  readiness.get('stages', {}),
-                    "details": readiness.get('details', {}),
-                    "errors":  readiness.get('errors', []),
-                }
+                    "success": readiness.get("ready", False),
+                    "ready": readiness.get("ready", False),
+                    "stages": readiness.get("stages", {}),
+                    "details": readiness.get("details", {}),
+                    "errors": readiness.get("errors", []),
+                },
             )
-            if readiness.get('ready', False):
+            if readiness.get("ready", False):
                 self.write_success(response)
             else:
                 self.set_status(503, reason="Service Unavailable")
                 self.finish(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -339,36 +335,36 @@ class ApiHealthcheckHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestHealthCheckStatusSchema())
 
             params = {
-                'start':         json_request.get('start', 0),
-                'length':        json_request.get('length', 10),
-                'search_value':  json_request.get('search_value', ''),
-                'library_id':    json_request.get('library_id'),
-                'status_filter': json_request.get('status_filter'),
-                'order':         {
-                    "column": json_request.get('order_by', 'last_checked'),
-                    "dir":    json_request.get('order_direction', 'desc'),
-                }
+                "start": json_request.get("start", 0),
+                "length": json_request.get("length", 10),
+                "search_value": json_request.get("search_value", ""),
+                "library_id": json_request.get("library_id"),
+                "status_filter": json_request.get("status_filter"),
+                "order": {
+                    "column": json_request.get("order_by", "last_checked"),
+                    "dir": json_request.get("order_direction", "desc"),
+                },
             }
             statuses = healthcheck.get_health_statuses_paginated(params)
 
             response = self.build_response(
                 HealthCheckStatusResponseSchema(),
                 {
-                    "success":         True,
-                    "recordsTotal":    statuses.get('recordsTotal', 0),
-                    "recordsFiltered": statuses.get('recordsFiltered', 0),
-                    "results":         statuses.get('results', []),
-                }
+                    "success": True,
+                    "recordsTotal": statuses.get("recordsTotal", 0),
+                    "recordsFiltered": statuses.get("recordsFiltered", 0),
+                    "results": statuses.get("results", []),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -391,21 +387,21 @@ class ApiHealthcheckHandler(BaseApiHandler):
             response = self.build_response(
                 HealthCheckWorkersResponseSchema(),
                 {
-                    "success":       True,
-                    "worker_count":  workers_info.get('worker_count', 1),
-                    "scanning":      workers_info.get('scanning', False),
-                    "scan_progress": workers_info.get('progress', {}),
-                }
+                    "success": True,
+                    "worker_count": workers_info.get("worker_count", 1),
+                    "scanning": workers_info.get("scanning", False),
+                    "scan_progress": workers_info.get("progress", {}),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -432,26 +428,26 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckWorkersSchema())
 
-            worker_count = healthcheck.set_scan_workers(json_request.get('worker_count', 1))
+            worker_count = healthcheck.set_scan_workers(json_request.get("worker_count", 1))
             workers_info = healthcheck.get_scan_workers()
 
             response = self.build_response(
                 HealthCheckWorkersResponseSchema(),
                 {
-                    "success":       True,
-                    "worker_count":  worker_count,
-                    "scanning":      workers_info.get('scanning', False),
-                    "scan_progress": workers_info.get('progress', {}),
-                }
+                    "success": True,
+                    "worker_count": worker_count,
+                    "scanning": workers_info.get("scanning", False),
+                    "scan_progress": workers_info.get("progress", {}),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

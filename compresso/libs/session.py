@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.session.py
+compresso.session.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     10 Mar 2021, (5:20 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     10 Mar 2021, (5:20 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import datetime
 import time
 
@@ -37,7 +37,7 @@ from compresso.libs.singleton import SingletonType
 from compresso.libs.unmodels import Installation
 
 
-class Session(object, metaclass=SingletonType):
+class Session(metaclass=SingletonType):
     """
     Session
 
@@ -53,9 +53,9 @@ class Session(object, metaclass=SingletonType):
     library_count = 999999
     link_count = 999999
 
-    picture_uri = ''
-    name = ''
-    email = ''
+    picture_uri = ""
+    name = ""
+    email = ""
     created = None
     last_check = None
     uuid = None
@@ -64,7 +64,7 @@ class Session(object, metaclass=SingletonType):
 
     def __init__(self, *args, **kwargs):
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
-        self.logger.info('Initialising new session object (all features unlocked)')
+        self.logger.info("Initialising new session object (all features unlocked)")
         self.created = time.time()
         self.last_check = time.time()
 
@@ -127,7 +127,6 @@ class Session(object, metaclass=SingletonType):
 
     def fetch_user_data(self):
         """No-op — no remote user data."""
-        pass
 
     def init_device_auth_flow(self):
         """No-op — no device auth needed."""
@@ -175,7 +174,7 @@ class Session(object, metaclass=SingletonType):
         try:
             current_installation = db_installation.select().order_by(Installation.id.asc()).limit(1).get()
         except Exception:
-            self.logger.debug('Compresso session does not yet exist... Creating.')
+            self.logger.debug("Compresso session does not yet exist... Creating.")
             db_installation.delete().execute()
             current_installation = db_installation.create()
 

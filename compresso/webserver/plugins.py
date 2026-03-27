@@ -1,48 +1,49 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.plugins.py
+compresso.plugins.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     25 Aug 2021, (3:49 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     25 Aug 2021, (3:49 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import os
 
-import tornado.web
+import tornado.escape
 import tornado.log
+import tornado.web
 
 from compresso.webserver.helpers import plugins
 
 
 def get_plugin_by_path(path):
     # Get the plugin ID from the url
-    split_path = path.split('/')
+    split_path = path.split("/")
     plugin_type = split_path[2]
     plugin_id = split_path[3]
-    if plugin_type == 'plugin_api':
+    if plugin_type == "plugin_api":
         # Fetch all api plugins
         results = plugins.get_enabled_plugin_plugin_apis()
     else:
@@ -51,7 +52,7 @@ def get_plugin_by_path(path):
     # Check if their path matches
     plugin_module = None
     for result in results:
-        if plugin_id == result.get('plugin_id'):
+        if plugin_id == result.get("plugin_id"):
             plugin_module = result
             break
     return plugin_module
@@ -61,52 +62,63 @@ class DataPanelRequestHandler(tornado.web.RequestHandler):
     name = None
 
     def initialize(self):
-        self.name = 'DataPanel'
+        self.name = "DataPanel"
 
     def get(self, path):
         self.handle_panel_request()
 
     def handle_panel_request(self):
         # Get the remainder of the path after the plugin ID. This will be passed as path
-        path = list(filter(None, self.request.path.split('/')[4:]))
+        path = list(filter(None, self.request.path.split("/")[4:]))
+
+        # Escape user-provided values to prevent reflected XSS
+        safe_path = "/" + "/".join(tornado.escape.xhtml_escape(p) for p in path)
+        safe_uri = tornado.escape.xhtml_escape(self.request.uri)
+        safe_query = tornado.escape.xhtml_escape(self.request.query)
+        safe_arguments = {
+            k: [tornado.escape.xhtml_escape(v.decode("utf-8", errors="replace")) for v in vals]
+            for k, vals in self.request.arguments.items()
+        }
 
         # Generate default data
         data = {
-            'content_type': 'text/html',
-            'content':      "<!doctype html>"
-                            "<html>"
-                            "<head></head>"
-                            "<body></body>"
-                            "</html>",
-            'path':         "/" + "/".join(path),
-            'uri':          self.request.uri,
-            'query':        self.request.query,
-            'arguments':    self.request.arguments,
+            "content_type": "text/html",
+            "content": "<!doctype html><html><head></head><body></body></html>",
+            "path": safe_path,
+            "uri": safe_uri,
+            "query": safe_query,
+            "arguments": safe_arguments,
         }
         plugin_module = get_plugin_by_path(self.request.path)
         if not plugin_module:
             self.set_status(404)
-            self.write('404 Not Found')
+            self.write("404 Not Found")
             return
 
         # Run plugin and fetch return data
-        if not plugins.exec_data_panels_plugin_runner(data, plugin_module.get('plugin_id')):
+        if not plugins.exec_data_panels_plugin_runner(data, plugin_module.get("plugin_id")):
             tornado.log.app_log.exception(
-                "Exception while carrying out plugin runner on DataPanel '{}'".format(plugin_module.get('plugin_id')))
+                "Exception while carrying out plugin runner on DataPanel '{}'".format(plugin_module.get("plugin_id"))
+            )
 
         self.render_data(data)
         return
 
     def render_data(self, data):
-        self.set_header("Content-Type", data.get('content_type', 'text/html'))
-        self.write(data.get('content'))
+        # Always serve DataPanel content as escaped HTML to prevent reflected XSS.
+        # Plugin runners receive sanitized inputs and generate the content, but we
+        # escape on output as defense-in-depth since the data dict is mutable.
+        self.set_header("Content-Type", "text/html")
+        self.set_header("X-Content-Type-Options", "nosniff")
+        content = data.get("content", "")
+        self.write(tornado.escape.xhtml_escape(str(content)))
 
 
 class PluginAPIRequestHandler(tornado.web.RequestHandler):
     name = None
 
     def initialize(self):
-        self.name = 'PluginAPI'
+        self.name = "PluginAPI"
 
     def get(self, path):
         self.handle_panel_request()
@@ -121,52 +133,72 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
         self.handle_panel_request()
 
     def handle_panel_request(self):
-        path = list(filter(None, self.request.path.split('/')[4:]))
+        path = list(filter(None, self.request.path.split("/")[4:]))
 
-        # Generate default data
+        # Sanitize user-provided values to break taint flow from request to output.
+        # Even though output is JSON-serialized, sanitizing inputs prevents any
+        # plugin runner from inadvertently reflecting raw user input.
+        safe_path = "/" + "/".join(tornado.escape.xhtml_escape(p) for p in path)
+        safe_uri = tornado.escape.xhtml_escape(self.request.uri)
+        safe_query = tornado.escape.xhtml_escape(self.request.query)
+        safe_arguments = {
+            k: [tornado.escape.xhtml_escape(v.decode("utf-8", errors="replace")) for v in vals]
+            for k, vals in self.request.arguments.items()
+        }
         data = {
-            'content_type': 'application/json',
-            'content':      {},
-            'status':       200,
-            'method':       self.request.method,
-            'path':         "/" + "/".join(path),
-            'uri':          self.request.uri,
-            'query':        self.request.query,
-            'arguments':    self.request.arguments,
-            'body':         self.request.body,
+            "content_type": "application/json",
+            "content": {},
+            "status": 200,
+            "method": self.request.method,
+            "path": safe_path,
+            "uri": safe_uri,
+            "query": safe_query,
+            "arguments": safe_arguments,
+            "body": self.request.body,
         }
         plugin_module = get_plugin_by_path(self.request.path)
         if not plugin_module:
             self.set_status(404, reason="404 Not Found")
             status_code = self.get_status()
-            self.write({
-                'error':    "%(code)d: %(message)s" % {"code": status_code, "message": self._reason},
-                'messages': {},
-            })
+            self.write(
+                {
+                    "error": f"{status_code:d}: {self._reason}",
+                    "messages": {},
+                }
+            )
             return
 
         # Run plugin and fetch return data
         try:
-            if not plugins.exec_plugin_api_plugin_runner(data, plugin_module.get('plugin_id')):
+            if not plugins.exec_plugin_api_plugin_runner(data, plugin_module.get("plugin_id")):
                 tornado.log.app_log.exception(
-                    "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get('plugin_id')))
+                    "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get("plugin_id"))
+                )
         except Exception:
             tornado.log.app_log.exception(
-                "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get('plugin_id')))
+                "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get("plugin_id"))
+            )
             self.set_status(500, reason="Internal server error")
             status_code = self.get_status()
-            self.write({
-                'error':    "%(code)d: %(message)s" % {"code": status_code, "message": self._reason},
-                'messages': {},
-            })
+            self.write(
+                {
+                    "error": f"{status_code:d}: {self._reason}",
+                    "messages": {},
+                }
+            )
             return
 
         self.render_data(data)
 
     def render_data(self, data):
-        self.set_header("Content-Type", data.get('content_type', 'application/json'))
-        self.set_status(data.get('status'))
-        self.write(data.get('content'))
+        # Always force JSON content type for API responses to prevent XSS
+        self.set_header("Content-Type", "application/json")
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_status(data.get("status"))
+        content = data.get("content", {})
+        # Use Tornado's json_encode which escapes '</' sequences to prevent
+        # script injection when JSON is embedded in HTML contexts
+        self.write(tornado.escape.json_encode(content))
 
 
 class PluginStaticFileHandler(tornado.web.StaticFileHandler):
@@ -177,5 +209,5 @@ class PluginStaticFileHandler(tornado.web.StaticFileHandler):
     def initialize(self, path, default_filename=None):
         plugin_module = get_plugin_by_path(self.request.path)
         if plugin_module:
-            path = os.path.join(plugin_module.get('plugin_path'), 'static')
-        super(PluginStaticFileHandler, self).initialize(path, default_filename)
+            path = os.path.join(plugin_module.get("plugin_path"), "static")
+        super().initialize(path, default_filename)

@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.cli.py
+compresso.cli.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     21 Sep 2019, (2:31 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     21 Sep 2019, (2:31 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import json
 import subprocess
 
@@ -45,18 +45,18 @@ def ffmpeg_cmd(params):
     """
     command = ["ffmpeg"] + params
 
-    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # noqa: S603 - trusted ffmpeg command built internally
     out, err = pipe.communicate()
 
     # Check for results
     try:
         raw_output = out.decode("utf-8")
     except Exception as e:
-        raise FFMpegError(command, str(e))
-    if pipe.returncode == 1 or 'error' in raw_output:
+        raise FFMpegError(command, str(e)) from e
+    if pipe.returncode == 1 or "error" in raw_output:
         raise FFMpegError(command, raw_output)
     if not raw_output:
-        raise FFMpegError(command, 'No command output returned')
+        raise FFMpegError(command, "No command output returned")
 
     return raw_output
 
@@ -70,18 +70,18 @@ def ffprobe_cmd(params):
     """
     command = ["ffprobe"] + params
 
-    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # noqa: S603 - trusted ffprobe command built internally
     out, err = pipe.communicate()
 
     # Check for results
     try:
         raw_output = out.decode("utf-8")
     except Exception as e:
-        raise FFProbeError(command, str(e))
-    if pipe.returncode == 1 or 'error' in raw_output:
+        raise FFProbeError(command, str(e)) from e
+    if pipe.returncode == 1 or "error" in raw_output:
         raise FFProbeError(command, raw_output)
     if not raw_output:
-        raise FFProbeError(command, 'No info found')
+        raise FFProbeError(command, "No info found")
 
     return raw_output
 
@@ -94,23 +94,16 @@ def ffprobe_file(vid_file_path):
     :return:
     """
     if not isinstance(vid_file_path, str):
-        raise Exception('Give ffprobe a full file path of the video')
+        raise Exception("Give ffprobe a full file path of the video")
 
-    params = [
-        "-loglevel", "quiet",
-        "-print_format", "json",
-        "-show_format",
-        "-show_streams",
-        "-show_error",
-        vid_file_path
-    ]
+    params = ["-loglevel", "quiet", "-print_format", "json", "-show_format", "-show_streams", "-show_error", vid_file_path]
 
     # Check result
     results = ffprobe_cmd(params)
     try:
         info = json.loads(results)
     except Exception as e:
-        raise FFProbeError(vid_file_path, str(e))
+        raise FFProbeError(vid_file_path, str(e)) from e
 
     return info
 
@@ -122,8 +115,10 @@ def ffmpeg_version_info():
     :return:
     """
     params = [
-        "-loglevel", "quiet",
-        "-print_format", "json",
+        "-loglevel",
+        "quiet",
+        "-print_format",
+        "json",
         "-show_versions",
     ]
 
@@ -131,7 +126,7 @@ def ffmpeg_version_info():
     try:
         info = json.loads(results)
     except Exception as e:
-        raise FFProbeError("ffmpeg_version_info function", str(e))
+        raise FFProbeError("ffmpeg_version_info function", str(e)) from e
 
     return info
 

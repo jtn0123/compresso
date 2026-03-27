@@ -37,15 +37,17 @@ This migration is required for legacy installations.
 The old system had a ffmpeg_log column which had a NOT NULL contraint on it.
 If this column is left as is, no items will be able to be added to the task queue.
 """
+
+
 def migrate(migrator, database, fake=False, **kwargs):
     """Write your migrations here."""
     # Rename 'ffmpeg_log' field to 'log'' in Tasks model
-    if any(cm for cm in database.get_columns('tasks') if cm.name == 'ffmpeg_log'):
-        migrator.ops.append(migrator.migrator.rename_column('tasks', 'ffmpeg_log', 'log'))
+    if any(cm for cm in database.get_columns("tasks") if cm.name == "ffmpeg_log"):
+        migrator.ops.append(migrator.migrator.rename_column("tasks", "ffmpeg_log", "log"))
 
 
 def rollback(migrator, database, fake=False, **kwargs):
     """Write your rollback migrations here."""
     # Reverse rename 'ffmpeg_log' field to 'log'' in Tasks model
-    if any(cm for cm in database.get_columns('tasks') if cm.name == 'log'):
-        migrator.ops.append(migrator.migrator.rename_column('tasks', 'log', 'ffmpeg_log'))
+    if any(cm for cm in database.get_columns("tasks") if cm.name == "log"):
+        migrator.ops.append(migrator.migrator.rename_column("tasks", "log", "ffmpeg_log"))

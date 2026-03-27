@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.plugins.py
+compresso.plugins.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     01 Aug 2021, (9:35 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     01 Aug 2021, (9:35 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import hashlib
 
 from compresso.libs.logs import CompressoLogging
@@ -46,17 +46,20 @@ def prepare_filtered_plugins(params):
     :param params:
     :return:
     """
-    start = params.get('start', 0)
-    length = params.get('length', 0)
+    start = params.get("start", 0)
+    length = params.get("length", 0)
 
-    search_value = params.get('search_value', '')
+    search_value = params.get("search_value", "")
 
     # Note that plugins can be ordered in multiple ways. So this must be a list
     order = [
-        params.get('order', {
-            "column": 'name',
-            "dir":    'desc',
-        })
+        params.get(
+            "order",
+            {
+                "column": "name",
+                "dir": "desc",
+            },
+        )
     ]
 
     # Fetch Plugins
@@ -65,42 +68,40 @@ def prepare_filtered_plugins(params):
     # Get total count
     records_total_count = plugins.get_total_plugin_list_count()
     # Get quantity after filters (without pagination)
-    records_filtered_count = plugins.get_plugin_list_filtered_and_sorted(order=order, start=0, length=0,
-                                                                         search_value=search_value).count()
+    records_filtered_count = plugins.get_plugin_list_filtered_and_sorted(
+        order=order, start=0, length=0, search_value=search_value
+    ).count()
     # Get filtered/sorted results
-    plugin_results = plugins.get_plugin_list_filtered_and_sorted(order=order, start=start, length=length,
-                                                                 search_value=search_value)
+    plugin_results = plugins.get_plugin_list_filtered_and_sorted(
+        order=order, start=start, length=length, search_value=search_value
+    )
 
     # Build return data
-    return_data = {
-        "recordsTotal":    records_total_count,
-        "recordsFiltered": records_filtered_count,
-        "results":         []
-    }
+    return_data = {"recordsTotal": records_total_count, "recordsFiltered": records_filtered_count, "results": []}
 
     # Iterate over plugins and append them to the plugin data
     for plugin_result in plugin_results:
         # Set plugin status
         plugin_status = {
-            "update_available": plugin_result.get('update_available'),
+            "update_available": plugin_result.get("update_available"),
         }
         # Check if plugin is able to be configured
         has_config = False
-        plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_result.get('plugin_id'))
+        plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_result.get("plugin_id"))
         if plugin_settings:
             has_config = True
         # Set params as required in template
         item = {
-            'id':          plugin_result.get('id'),
-            'plugin_id':   plugin_result.get('plugin_id'),
-            'icon':        plugin_result.get('icon'),
-            'name':        plugin_result.get('name'),
-            'description': plugin_result.get('description'),
-            'tags':        plugin_result.get('tags'),
-            'author':      plugin_result.get('author'),
-            'version':     plugin_result.get('version'),
-            'status':      plugin_status,
-            'has_config':  has_config,
+            "id": plugin_result.get("id"),
+            "plugin_id": plugin_result.get("plugin_id"),
+            "icon": plugin_result.get("icon"),
+            "name": plugin_result.get("name"),
+            "description": plugin_result.get("description"),
+            "tags": plugin_result.get("tags"),
+            "author": plugin_result.get("author"),
+            "version": plugin_result.get("version"),
+            "status": plugin_status,
+            "has_config": has_config,
         }
         return_data["results"].append(item)
 
@@ -136,7 +137,7 @@ def get_enabled_plugin_data_panels():
     :return:
     """
     plugin_handler = PluginsHandler()
-    return plugin_handler.get_enabled_plugin_modules_by_type('frontend.panel')
+    return plugin_handler.get_enabled_plugin_modules_by_type("frontend.panel")
 
 
 def exec_data_panels_plugin_runner(data, plugin_id):
@@ -148,7 +149,7 @@ def exec_data_panels_plugin_runner(data, plugin_id):
     :return:
     """
     plugin_handler = PluginsHandler()
-    return plugin_handler.exec_plugin_runner(data, plugin_id, 'frontend.panel')
+    return plugin_handler.exec_plugin_runner(data, plugin_id, "frontend.panel")
 
 
 def get_enabled_plugin_plugin_apis():
@@ -158,7 +159,7 @@ def get_enabled_plugin_plugin_apis():
     :return:
     """
     plugin_handler = PluginsHandler()
-    return plugin_handler.get_enabled_plugin_modules_by_type('frontend.plugin_api')
+    return plugin_handler.get_enabled_plugin_modules_by_type("frontend.plugin_api")
 
 
 def exec_plugin_api_plugin_runner(data, plugin_id):
@@ -170,7 +171,7 @@ def exec_plugin_api_plugin_runner(data, plugin_id):
     :return:
     """
     plugin_handler = PluginsHandler()
-    return plugin_handler.exec_plugin_runner(data, plugin_id, 'frontend.plugin_api')
+    return plugin_handler.exec_plugin_runner(data, plugin_id, "frontend.plugin_api")
 
 
 def save_enabled_plugin_flows_for_plugin_type(plugin_type, library_id, plugin_flow):
@@ -220,6 +221,7 @@ def get_plugin_settings(plugin_id: str, library_id=None):
 
     # Fetch level from session
     from compresso.libs.session import Session
+
     s = Session()
     s.register_compresso()
 
@@ -229,27 +231,27 @@ def get_plugin_settings(plugin_id: str, library_id=None):
     if plugin_settings:
         for key in plugin_settings:
             form_input = {
-                "key_id":         hashlib.md5(key.encode('utf8')).hexdigest(),
-                "key":            key,
-                "value":          plugin_settings.get(key),
-                "input_type":     None,
-                "label":          None,
-                "description":    None,
-                "tooltip":        None,
+                "key_id": hashlib.md5(key.encode("utf8")).hexdigest(),  # noqa: S324 — used for deterministic ID generation, not security
+                "key": key,
+                "value": plugin_settings.get(key),
+                "input_type": None,
+                "label": None,
+                "description": None,
+                "tooltip": None,
                 "select_options": [],
                 "slider_options": {},
-                "display":        "visible",
-                "sub_setting":    False,
+                "display": "visible",
+                "sub_setting": False,
             }
 
             plugin_setting_meta = plugin_settings_meta.get(key, {})
 
             # Set input type for form
-            form_input['input_type'] = plugin_setting_meta.get('input_type', None)
-            if not form_input['input_type']:
-                form_input['input_type'] = "text"
-                if isinstance(form_input['value'], bool):
-                    form_input['input_type'] = "checkbox"
+            form_input["input_type"] = plugin_setting_meta.get("input_type", None)
+            if not form_input["input_type"]:
+                form_input["input_type"] = "text"
+                if isinstance(form_input["value"], bool):
+                    form_input["input_type"] = "checkbox"
 
             # Handle unsupported input types (where they may be supported in future versions of Compresso)
             supported_input_types = [
@@ -264,49 +266,49 @@ def get_plugin_settings(plugin_id: str, library_id=None):
                 "section_details",
                 "section_admonition",
             ]
-            if form_input['input_type'] not in supported_input_types:
-                form_input['input_type'] = "text"
+            if form_input["input_type"] not in supported_input_types:
+                form_input["input_type"] = "text"
 
             # Set input display options
-            form_input['display'] = plugin_setting_meta.get('display', 'visible')
-            form_input['sub_setting'] = plugin_setting_meta.get('sub_setting', False)
+            form_input["display"] = plugin_setting_meta.get("display", "visible")
+            form_input["sub_setting"] = plugin_setting_meta.get("sub_setting", False)
 
             # Set input label text
-            form_input['label'] = plugin_setting_meta.get('label', None)
-            if not form_input['label']:
-                form_input['label'] = key
+            form_input["label"] = plugin_setting_meta.get("label", None)
+            if not form_input["label"]:
+                form_input["label"] = key
 
             # Set input description text
-            form_input['description'] = plugin_setting_meta.get('description', '')
+            form_input["description"] = plugin_setting_meta.get("description", "")
 
             # Usability level
-            req_lev = plugin_setting_meta.get('req_lev', 0)
+            req_lev = plugin_setting_meta.get("req_lev", 0)
             if s.level < req_lev:
-                form_input['display'] = "disabled"
-                form_input['description'] += " (This option is reserved for supporters of the project)"
+                form_input["display"] = "disabled"
+                form_input["description"] += " (This option is reserved for supporters of the project)"
 
             # Set input tooltip text
-            form_input['tooltip'] = plugin_setting_meta.get('tooltip', '')
+            form_input["tooltip"] = plugin_setting_meta.get("tooltip", "")
 
             # Set options if form input is select
-            if form_input['input_type'] == 'select':
-                form_input['select_options'] = plugin_setting_meta.get('select_options', [])
-                if not form_input['select_options']:
+            if form_input["input_type"] == "select":
+                form_input["select_options"] = plugin_setting_meta.get("select_options", [])
+                if not form_input["select_options"]:
                     # No options are given. Revert back to text input
-                    form_input['input_type'] = 'text'
+                    form_input["input_type"] = "text"
 
             # Set options if form input is slider
-            if form_input['input_type'] == 'slider':
-                slider_options = plugin_setting_meta.get('slider_options')
+            if form_input["input_type"] == "slider":
+                slider_options = plugin_setting_meta.get("slider_options")
                 if not slider_options:
                     # No options are given. Revert back to text input
-                    form_input['input_type'] = 'text'
+                    form_input["input_type"] = "text"
                 else:
-                    form_input['slider_options'] = {
-                        'min':    slider_options.get('min', '0'),
-                        'max':    slider_options.get('max', '1'),
-                        'step':   slider_options.get('step', '1'),
-                        'suffix': slider_options.get('suffix', ''),
+                    form_input["slider_options"] = {
+                        "min": slider_options.get("min", "0"),
+                        "max": slider_options.get("max", "1"),
+                        "step": slider_options.get("step", "1"),
+                        "suffix": slider_options.get("suffix", ""),
                     }
 
             settings.append(form_input)
@@ -359,9 +361,9 @@ def prepare_plugin_info_and_settings(plugin_id, prefer_local=True, library_id=No
         # Try to fetch it from the repository
         plugin_list = plugins_handler.get_installable_plugins_list()
         for plugin in plugin_list:
-            if plugin.get('plugin_id') == plugin_id:
+            if plugin.get("plugin_id") == plugin_id:
                 # Create changelog text from remote changelog text file
-                plugin['changelog'] = plugins_handler.read_remote_changelog_file(plugin.get('changelog_url'))
+                plugin["changelog"] = plugins_handler.read_remote_changelog_file(plugin.get("changelog_url"))
                 # Create list as the 'plugin_results' var above will also have returned a list if any results were found.
                 plugin_results = [plugin]
                 break
@@ -371,28 +373,27 @@ def prepare_plugin_info_and_settings(plugin_id, prefer_local=True, library_id=No
     for plugin_result in plugin_results:
         # Set plugin status
         plugin_status = {
-            "installed":        plugin_result.get('installed', False),
-            "update_available": plugin_result.get('update_available', False),
+            "installed": plugin_result.get("installed", False),
+            "update_available": plugin_result.get("update_available", False),
         }
         # Set params as required in template
         plugin_data = {
-            'id':          plugin_result.get('id'),
-            'plugin_id':   plugin_result.get('plugin_id'),
-            'icon':        plugin_result.get('icon'),
-            'name':        plugin_result.get('name'),
-            'description': plugin_result.get('description'),
-            'tags':        plugin_result.get('tags'),
-            'author':      plugin_result.get('author'),
-            'version':     plugin_result.get('version'),
-            'changelog':   plugin_result.get('changelog', ''),
-            'status':      plugin_status,
-            'settings':    [],
+            "id": plugin_result.get("id"),
+            "plugin_id": plugin_result.get("plugin_id"),
+            "icon": plugin_result.get("icon"),
+            "name": plugin_result.get("name"),
+            "description": plugin_result.get("description"),
+            "tags": plugin_result.get("tags"),
+            "author": plugin_result.get("author"),
+            "version": plugin_result.get("version"),
+            "changelog": plugin_result.get("changelog", ""),
+            "status": plugin_status,
+            "settings": [],
         }
         if plugin_installed:
-            plugin_data['settings'] = get_plugin_settings(plugin_result.get('plugin_id'), library_id=library_id)
-            plugin_data['changelog'] = "".join(get_plugin_changelog(plugin_result.get('plugin_id')))
-            plugin_data['description'] += "\n\n" + "".join(
-                get_plugin_long_description(plugin_result.get('plugin_id')))
+            plugin_data["settings"] = get_plugin_settings(plugin_result.get("plugin_id"), library_id=library_id)
+            plugin_data["changelog"] = "".join(get_plugin_changelog(plugin_result.get("plugin_id")))
+            plugin_data["description"] += "\n\n" + "".join(get_plugin_long_description(plugin_result.get("plugin_id")))
         break
 
     return plugin_data
@@ -436,30 +437,30 @@ def update_plugin_settings(plugin_id, settings, library_id=None):
     # Loop over all plugin settings in order to find matches in the posted params
     settings_to_save = {}
     for s in settings:
-        key = s.get('key')
-        input_type = s.get('input_type')
+        key = s.get("key")
+        input_type = s.get("input_type")
 
         # Skip section headers
-        if input_type in ['section_header', 'section_subheader', 'section_details', 'section_admonition']:
+        if input_type in ["section_header", "section_subheader", "section_details", "section_admonition"]:
             continue
 
         # Check if setting is in params
-        value = s.get('value')
+        value = s.get("value")
         # Check if value should be boolean
-        if input_type == 'checkbox':
+        if input_type == "checkbox":
             if isinstance(value, str):
-                value = True if value.lower() == 'true' else False
+                value = value.lower() == "true"
             elif isinstance(value, int):
-                value = True if value > 0 else False
+                value = value > 0
         # Add that to our dictionary of settings to save
         settings_to_save[key] = value
 
     # If we found settings that need to be saved, save them...
     if settings_to_save:
         plugin_executor = PluginExecutor()
-        saved_all_settings = plugin_executor.save_plugin_settings(plugin_data.get('plugin_id'),
-                                                                  settings_to_save,
-                                                                  library_id=library_id)
+        saved_all_settings = plugin_executor.save_plugin_settings(
+            plugin_data.get("plugin_id"), settings_to_save, library_id=library_id
+        )
         # If the save function was successful
         if saved_all_settings:
             # Update settings in plugin data that will be returned
@@ -485,7 +486,7 @@ def reset_plugin_settings(plugin_id, library_id=None):
 
     # Reset the plugin settings
     plugin_executor = PluginExecutor()
-    return plugin_executor.reset_plugin_settings(plugin_data.get('plugin_id'), library_id=library_id)
+    return plugin_executor.reset_plugin_settings(plugin_data.get("plugin_id"), library_id=library_id)
 
 
 def prepare_installable_plugins_list():
@@ -540,17 +541,17 @@ def prepare_plugin_repos_list():
 
     # Append metadata from repo cache files
     for repo in return_repos:
-        repo_path = repo.get('path')
+        repo_path = repo.get("path")
         repo_id = plugins.get_plugin_repo_id(repo_path)
         repo_data = plugins.read_repo_data(repo_id)
-        repo_metadata = repo_data.get('repo', {})
-        repo['id'] = repo_metadata.get('id') or repo_metadata.get('repo_id') or ''
-        repo['icon'] = repo_metadata.get('icon') or repo_metadata.get('repo_icon_url') or ''
-        repo['name'] = repo_metadata.get('name') or repo_metadata.get('repo_name') or ''
-        repo['repo_html_url'] = repo_metadata.get('repo_html_url') or ''
-        if not repo['name']:
-            logger.warning("Repo metadata missing name for repo path '%s'", repo.get('path'))
-            repo['name'] = "Unknown Repo"
+        repo_metadata = repo_data.get("repo", {})
+        repo["id"] = repo_metadata.get("id") or repo_metadata.get("repo_id") or ""
+        repo["icon"] = repo_metadata.get("icon") or repo_metadata.get("repo_icon_url") or ""
+        repo["name"] = repo_metadata.get("name") or repo_metadata.get("repo_name") or ""
+        repo["repo_html_url"] = repo_metadata.get("repo_html_url") or ""
+        if not repo["name"]:
+            logger.warning("Repo metadata missing name for repo path '%s'", repo.get("path"))
+            repo["name"] = "Unknown Repo"
 
     return return_repos
 

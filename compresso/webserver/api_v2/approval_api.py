@@ -1,54 +1,53 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.approval_api.py
+compresso.approval_api.py
 
-    API handler for the approval workflow.
-    Provides endpoints to list, approve, reject, and inspect tasks
-    that are awaiting user approval before file replacement.
+API handler for the approval workflow.
+Provides endpoints to list, approve, reject, and inspect tasks
+that are awaiting user approval before file replacement.
 """
 
 import tornado.log
 
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.approval_schemas import (
-    RequestApprovalTasksSchema,
+    ApprovalCountResponseSchema,
+    ApprovalDetailResponseSchema,
     ApprovalTasksResponseSchema,
     RequestApprovalActionSchema,
-    RequestRejectActionSchema,
     RequestApprovalDetailSchema,
-    ApprovalDetailResponseSchema,
-    ApprovalCountResponseSchema,
+    RequestApprovalTasksSchema,
+    RequestRejectActionSchema,
 )
 
 
 class ApiApprovalHandler(BaseApiHandler):
     routes = [
         {
-            "path_pattern":      r"/approval/tasks",
+            "path_pattern": r"/approval/tasks",
             "supported_methods": ["POST"],
-            "call_method":       "get_approval_tasks",
+            "call_method": "get_approval_tasks",
         },
         {
-            "path_pattern":      r"/approval/approve",
+            "path_pattern": r"/approval/approve",
             "supported_methods": ["POST"],
-            "call_method":       "approve_tasks",
+            "call_method": "approve_tasks",
         },
         {
-            "path_pattern":      r"/approval/reject",
+            "path_pattern": r"/approval/reject",
             "supported_methods": ["POST"],
-            "call_method":       "reject_tasks",
+            "call_method": "reject_tasks",
         },
         {
-            "path_pattern":      r"/approval/detail",
+            "path_pattern": r"/approval/detail",
             "supported_methods": ["POST"],
-            "call_method":       "get_task_detail",
+            "call_method": "get_task_detail",
         },
         {
-            "path_pattern":      r"/approval/count",
+            "path_pattern": r"/approval/count",
             "supported_methods": ["GET"],
-            "call_method":       "get_approval_count",
+            "call_method": "get_approval_count",
         },
     ]
 
@@ -76,24 +75,25 @@ class ApiApprovalHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestApprovalTasksSchema())
 
             from compresso.webserver.helpers import approval
+
             result = approval.prepare_filtered_approval_tasks(
                 params={
-                    'start':           json_request.get('start', 0),
-                    'length':          json_request.get('length', 10),
-                    'search_value':    json_request.get('search_value', ''),
-                    'library_ids':     json_request.get('library_ids', []),
-                    'order_by':        json_request.get('order_by', 'finish_time'),
-                    'order_direction': json_request.get('order_direction', 'desc'),
+                    "start": json_request.get("start", 0),
+                    "length": json_request.get("length", 10),
+                    "search_value": json_request.get("search_value", ""),
+                    "library_ids": json_request.get("library_ids", []),
+                    "order_by": json_request.get("order_by", "finish_time"),
+                    "order_direction": json_request.get("order_direction", "desc"),
                 },
-                include_library=json_request.get('include_library', False),
+                include_library=json_request.get("include_library", False),
             )
 
-            result['success'] = True
+            result["success"] = True
             response = self.build_response(ApprovalTasksResponseSchema(), result)
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -126,19 +126,20 @@ class ApiApprovalHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestApprovalActionSchema())
 
             from compresso.webserver.helpers import approval
-            if json_request.get('all_matching', False):
+
+            if json_request.get("all_matching", False):
                 ids = approval.get_all_matching_task_ids(
-                    search_value=json_request.get('search_value', ''),
-                    library_ids=json_request.get('library_ids', []),
+                    search_value=json_request.get("search_value", ""),
+                    library_ids=json_request.get("library_ids", []),
                 )
             else:
-                ids = json_request.get('id_list', [])
+                ids = json_request.get("id_list", [])
             approval.approve_tasks(ids)
 
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -171,22 +172,23 @@ class ApiApprovalHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestRejectActionSchema())
 
             from compresso.webserver.helpers import approval
-            if json_request.get('all_matching', False):
+
+            if json_request.get("all_matching", False):
                 ids = approval.get_all_matching_task_ids(
-                    search_value=json_request.get('search_value', ''),
-                    library_ids=json_request.get('library_ids', []),
+                    search_value=json_request.get("search_value", ""),
+                    library_ids=json_request.get("library_ids", []),
                 )
             else:
-                ids = json_request.get('id_list', [])
+                ids = json_request.get("id_list", [])
             approval.reject_tasks(
                 task_ids=ids,
-                requeue=json_request.get('requeue', False),
+                requeue=json_request.get("requeue", False),
             )
 
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -218,19 +220,20 @@ class ApiApprovalHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestApprovalDetailSchema())
 
             from compresso.webserver.helpers import approval
-            detail = approval.get_approval_task_detail(json_request.get('id'))
+
+            detail = approval.get_approval_task_detail(json_request.get("id"))
 
             if detail is None:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Task not found or not awaiting approval")
                 self.write_error()
                 return
 
-            detail['success'] = True
+            detail["success"] = True
             response = self.build_response(ApprovalDetailResponseSchema(), detail)
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -253,16 +256,14 @@ class ApiApprovalHandler(BaseApiHandler):
         """
         try:
             from compresso.webserver.helpers import approval
+
             count = approval.get_approval_count()
 
-            response = self.build_response(
-                ApprovalCountResponseSchema(),
-                {"success": True, "count": count}
-            )
+            response = self.build_response(ApprovalCountResponseSchema(), {"success": True, "count": count})
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return

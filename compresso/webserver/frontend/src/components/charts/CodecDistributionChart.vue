@@ -24,11 +24,7 @@
 <script>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useQuasar } from 'quasar';
-
-const CHART_COLORS = [
-  '#1a6b4a', '#e8a525', '#7c5cbf', '#d43545', '#2e9e5a',
-  '#3a8fd4', '#e67e22', '#1abc9c', '#34495e', '#95a5a6',
-];
+import { useChartTheme } from 'src/composables/useChartTheme';
 
 export default {
   name: 'CodecDistributionChart',
@@ -39,6 +35,7 @@ export default {
   },
   setup(props) {
     const $q = useQuasar();
+    const { getChartColors } = useChartTheme();
     const sourceChartRef = ref(null);
     const destChartRef = ref(null);
     let sourceChart = null;
@@ -63,7 +60,7 @@ export default {
             labels: props.sourceCodecs.map(c => c.codec),
             datasets: [{
               data: props.sourceCodecs.map(c => c.count),
-              backgroundColor: CHART_COLORS.slice(0, props.sourceCodecs.length),
+              backgroundColor: getChartColors().slice(0, props.sourceCodecs.length),
             }],
           },
           options: {
@@ -86,7 +83,7 @@ export default {
             labels: props.destinationCodecs.map(c => c.codec),
             datasets: [{
               data: props.destinationCodecs.map(c => c.count),
-              backgroundColor: CHART_COLORS.slice(0, props.destinationCodecs.length),
+              backgroundColor: getChartColors().slice(0, props.destinationCodecs.length),
             }],
           },
           options: {

@@ -1,53 +1,54 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.plugin_type_base.py
+compresso.plugin_type_base.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     05 Mar 2021, (8:09 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     05 Mar 2021, (8:09 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import inspect
 import json
 from copy import deepcopy
 
-from compresso.libs.task import TaskDataStore
 from compresso.libs.metadata import CompressoFileMetadata
+from compresso.libs.task import TaskDataStore
 
 
-class PluginType(object):
+class PluginType:
     """
     PluginType
 
     Generic configuration and methods used across all plugin types
     """
-    name = ''
-    runner = ''
-    runner_docstring = ''
-    data_schema = {}
-    test_data = {}
+
+    name = ""
+    runner = ""
+    runner_docstring = ""
+    data_schema: dict = {}
+    test_data: dict = {}
 
     def plugin_type_name(self):
         """
@@ -122,7 +123,7 @@ class PluginType(object):
             # Everything else should be tested with the isinstance function
             if provided_data is None and expected_data_type is None:
                 return True
-            elif expected_data_type == 'callable':
+            elif expected_data_type == "callable":
                 if callable(provided_data):
                     return True
             elif isinstance(provided_data, expected_data_type):
@@ -132,23 +133,20 @@ class PluginType(object):
         errors = []
         if not isinstance(result_data, dict):
             # This runner function is not returning anything
-            error = "Plugin '{0} - {1}()' has failed to return any output data.".format(plugin_id,
-                                                                                        plugin_runner, )
+            error = f"Plugin '{plugin_id} - {plugin_runner}()' has failed to return any output data."
             errors.append(error)
             return errors
         for key in data_schema:
             schema_meta = data_schema.get(key)
-            if schema_meta.get('required'):
-                # Ensure the required item is present in result_data
-                if key not in result_data:
-                    error = "Plugin '{0} - {1}()' is missing required key '{2}{3}' in the output data.".format(plugin_id,
-                                                                                                               plugin_runner,
-                                                                                                               data_tree, key)
-                    errors.append(error)
+            if schema_meta.get("required") and key not in result_data:
+                error = (
+                    f"Plugin '{plugin_id} - {plugin_runner}()' is missing required key '{data_tree}{key}' in the output data."
+                )
+                errors.append(error)
 
             # Ensure that data present is of the correct type
             # Recursively check for children elements
-            data_type = schema_meta.get('type')
+            data_type = schema_meta.get("type")
             if key in result_data:
                 child_data = result_data.get(key)
 
@@ -166,17 +164,20 @@ class PluginType(object):
 
                 # If data is not of the correct type, then append the error message
                 if not correct_type:
-                    error = "Plugin '{0} - {1}()' output data returned incorrect data type in key '{2}{3}'. " \
-                            "Expected '{4}', but received '{5}'.".format(plugin_id, plugin_runner,
-                                                                         data_tree, key, data_type,
-                                                                         type(result_data.get(key)))
+                    error = (
+                        f"Plugin '{plugin_id} - {plugin_runner}()' output data returned"
+                        f" incorrect data type in key '{data_tree}{key}'."
+                        f" Expected '{data_type}', but received"
+                        f" '{type(result_data.get(key))}'."
+                    )
                     errors.append(error)
                 # Check if data_schema has children
-                children_data_schema = schema_meta.get('children')
+                children_data_schema = schema_meta.get("children")
                 if children_data_schema:
-                    child_data_tree = "{}{}>".format(data_tree, key)
-                    errors += self.__data_schema_test_data(plugin_id, plugin_runner, child_data, children_data_schema,
-                                                           data_tree=child_data_tree)
+                    child_data_tree = f"{data_tree}{key}>"
+                    errors += self.__data_schema_test_data(
+                        plugin_id, plugin_runner, child_data, children_data_schema, data_tree=child_data_tree
+                    )
 
         return errors
 
@@ -223,13 +224,10 @@ class PluginType(object):
 
             params = plugin_runner_sig.parameters
 
-            def supports_kwarg(name):
+            def supports_kwarg(name, params=params):
                 if name in params:
                     return True
-                for param in params.values():
-                    if param.kind == inspect.Parameter.VAR_KEYWORD:
-                        return True
-                return False
+                return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
             kwargs = {}
             if supports_kwarg("task_data_store"):
@@ -254,7 +252,7 @@ class PluginType(object):
                 else:
                     plugin_runner_function(test_data_copy)
             # break loop if the plugin did not request to be run again
-            if not test_data_copy.get('repeat', False):
+            if not test_data_copy.get("repeat", False):
                 break
             run_count += 1
 

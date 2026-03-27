@@ -14,23 +14,32 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed, defineProps } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useQuasar } from 'quasar';
+import { useChartTheme } from 'src/composables/useChartTheme';
+
+const { getChartColor, chartBgColor } = useChartTheme();
 
 const GPU_COLORS = {
-  nvidia: { border: '#1a6b4a', bg: 'rgba(26, 107, 74, 0.1)' },
+  nvidia: { border: '#76b900', bg: 'rgba(118, 185, 0, 0.1)' },
   intel: { border: '#3498db', bg: 'rgba(52, 152, 219, 0.1)' },
   amd: { border: '#e74c3c', bg: 'rgba(231, 76, 60, 0.1)' },
-  default: { border: '#9b59b6', bg: 'rgba(155, 89, 182, 0.1)' },
 };
 
 const TEMP_COLORS = {
   nvidia: '#2ecc71',
   intel: '#85c1e9',
   amd: '#f1948a',
-  default: '#c39bd3',
 };
+
+function getGpuColor(type) {
+  return GPU_COLORS[type] || { border: getChartColor(3), bg: chartBgColor(3, 0.1) };
+}
+
+function getTempColor(type) {
+  return TEMP_COLORS[type] || getChartColor(4);
+}
 
 function gpuTypeColor(gpuName) {
   const lower = (gpuName || '').toLowerCase();
@@ -81,8 +90,8 @@ async function renderChart() {
 
     const gpuName = points[0]?.gpu_name || t('gpu.gpuFallbackLabel', { index: gpuIndex });
     const type = gpuTypeColor(gpuName);
-    const colors = GPU_COLORS[type];
-    const tempColor = TEMP_COLORS[type];
+    const colors = getGpuColor(type);
+    const tempColor = getTempColor(type);
 
     const labels = points.map(p => formatTime(p.timestamp));
     if (labels.length > allLabels.length) allLabels = labels;

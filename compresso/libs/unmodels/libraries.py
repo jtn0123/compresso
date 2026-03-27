@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.libraries.py
+compresso.libraries.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     06 Feb 2022, (9:44 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     06 Feb 2022, (9:44 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -40,6 +39,7 @@ class Libraries(BaseModel):
     """
     Libraries
     """
+
     name = TextField(null=False, unique=True)
     path = TextField(null=False)
     locked = BooleanField(null=False, default=False)
@@ -48,16 +48,16 @@ class Libraries(BaseModel):
     enable_inotify = BooleanField(null=False, default=False)
     priority_score = BigIntegerField(null=False, default=0)
     # Flow settings — codec filtering
-    target_codecs = TextField(default='')
-    skip_codecs = TextField(default='')
+    target_codecs = TextField(default="")
+    skip_codecs = TextField(default="")
     # Flow settings — size guardrails
     size_guardrail_enabled = BooleanField(default=False)
     size_guardrail_min_pct = IntegerField(default=20)
     size_guardrail_max_pct = IntegerField(default=80)
     # Flow settings — per-library replacement policy
-    replacement_policy = TextField(default='')
+    replacement_policy = TextField(default="")
     # ManyToMany Linking field. Does not create a column in the DB. See linking table below
-    tags = ManyToManyField(Tags, backref='tags')
+    tags = ManyToManyField(Tags, backref="tags")
 
 
 # Generate linking table for the 'tags' field above

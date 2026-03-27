@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.plugins_api.py
+compresso.plugins_api.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     01 Aug 2021, (9:30 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     01 Aug 2021, (9:30 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 
@@ -35,16 +34,29 @@ import os
 import time
 
 import tornado.log
+
 from compresso import config as compresso_config
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler, BaseApiError
-from compresso.webserver.api_v2.schema.schemas import PluginFlowResultsSchema, PluginReposListResultsSchema, \
-    PluginTypesResultsSchema, PluginsDataPanelTypesDataSchema, PluginsDataSchema, PluginsInfoResultsSchema, \
-    PluginsInstallableResultsSchema, RequestPluginsByIdSchema, RequestPluginsFlowByPluginTypeSchema, \
-    RequestPluginsInfoSchema, RequestPluginsSettingsResetSchema, RequestPluginsSettingsSaveSchema, \
-    RequestPluginsTableDataSchema, \
-    RequestSavingPluginsFlowByPluginTypeSchema, RequestTableUpdateByIdList, RequestUpdatePluginReposListSchema
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.schema.schemas import (
+    PluginFlowResultsSchema,
+    PluginReposListResultsSchema,
+    PluginsDataPanelTypesDataSchema,
+    PluginsDataSchema,
+    PluginsInfoResultsSchema,
+    PluginsInstallableResultsSchema,
+    PluginTypesResultsSchema,
+    RequestPluginsByIdSchema,
+    RequestPluginsFlowByPluginTypeSchema,
+    RequestPluginsInfoSchema,
+    RequestPluginsSettingsResetSchema,
+    RequestPluginsSettingsSaveSchema,
+    RequestPluginsTableDataSchema,
+    RequestSavingPluginsFlowByPluginTypeSchema,
+    RequestTableUpdateByIdList,
+    RequestUpdatePluginReposListSchema,
+)
 from compresso.webserver.helpers import plugins
 
 
@@ -56,94 +68,94 @@ class ApiPluginsHandler(BaseApiHandler):
 
     routes = [
         {
-            "path_pattern":      r"/plugins/installed",
+            "path_pattern": r"/plugins/installed",
             "supported_methods": ["POST"],
-            "call_method":       "get_installed_plugins",
+            "call_method": "get_installed_plugins",
         },
         {
-            "path_pattern":      r"/plugins/enable",
+            "path_pattern": r"/plugins/enable",
             "supported_methods": ["POST"],
-            "call_method":       "enable_plugins",
+            "call_method": "enable_plugins",
         },
         {
-            "path_pattern":      r"/plugins/disable",
+            "path_pattern": r"/plugins/disable",
             "supported_methods": ["POST"],
-            "call_method":       "disable_plugins",
+            "call_method": "disable_plugins",
         },
         {
-            "path_pattern":      r"/plugins/update",
+            "path_pattern": r"/plugins/update",
             "supported_methods": ["POST"],
-            "call_method":       "update_plugins",
+            "call_method": "update_plugins",
         },
         {
-            "path_pattern":      r"/plugins/remove",
+            "path_pattern": r"/plugins/remove",
             "supported_methods": ["DELETE"],
-            "call_method":       "remove_plugins",
+            "call_method": "remove_plugins",
         },
         {
-            "path_pattern":      r"/plugins/info",
+            "path_pattern": r"/plugins/info",
             "supported_methods": ["POST"],
-            "call_method":       "get_plugin_info",
+            "call_method": "get_plugin_info",
         },
         {
-            "path_pattern":      r"/plugins/settings/update",
+            "path_pattern": r"/plugins/settings/update",
             "supported_methods": ["POST"],
-            "call_method":       "update_plugin_settings",
+            "call_method": "update_plugin_settings",
         },
         {
-            "path_pattern":      r"/plugins/settings/reset",
+            "path_pattern": r"/plugins/settings/reset",
             "supported_methods": ["POST"],
-            "call_method":       "reset_plugin_settings",
+            "call_method": "reset_plugin_settings",
         },
         {
-            "path_pattern":      r"/plugins/installable",
+            "path_pattern": r"/plugins/installable",
             "supported_methods": ["GET"],
-            "call_method":       "get_installable_plugin_list",
+            "call_method": "get_installable_plugin_list",
         },
         {
-            "path_pattern":      r"/plugins/install",
+            "path_pattern": r"/plugins/install",
             "supported_methods": ["POST"],
-            "call_method":       "install_plugin_by_id",
+            "call_method": "install_plugin_by_id",
         },
         {
-            "path_pattern":      r"/plugins/flow",
+            "path_pattern": r"/plugins/flow",
             "supported_methods": ["POST"],
-            "call_method":       "get_enabled_plugins_flow_by_type",
+            "call_method": "get_enabled_plugins_flow_by_type",
         },
         {
-            "path_pattern":      r"/plugins/flow/types",
+            "path_pattern": r"/plugins/flow/types",
             "supported_methods": ["GET"],
-            "call_method":       "get_plugin_types_with_flows",
+            "call_method": "get_plugin_types_with_flows",
         },
         {
-            "path_pattern":      r"/plugins/flow/save",
+            "path_pattern": r"/plugins/flow/save",
             "supported_methods": ["POST"],
-            "call_method":       "save_enabled_plugin_flow",
+            "call_method": "save_enabled_plugin_flow",
         },
         {
-            "path_pattern":      r"/plugins/repos/update",
+            "path_pattern": r"/plugins/repos/update",
             "supported_methods": ["POST"],
-            "call_method":       "update_repo_list",
+            "call_method": "update_repo_list",
         },
         {
-            "path_pattern":      r"/plugins/repos/list",
+            "path_pattern": r"/plugins/repos/list",
             "supported_methods": ["GET"],
-            "call_method":       "get_repo_list",
+            "call_method": "get_repo_list",
         },
         {
-            "path_pattern":      r"/plugins/repos/community",
+            "path_pattern": r"/plugins/repos/community",
             "supported_methods": ["GET"],
-            "call_method":       "get_community_repos",
+            "call_method": "get_community_repos",
         },
         {
-            "path_pattern":      r"/plugins/repos/reload",
+            "path_pattern": r"/plugins/repos/reload",
             "supported_methods": ["POST"],
-            "call_method":       "reload_repo_data",
+            "call_method": "reload_repo_data",
         },
         {
-            "path_pattern":      r"/plugins/panels/enabled",
+            "path_pattern": r"/plugins/panels/enabled",
             "supported_methods": ["GET"],
-            "call_method":       "get_enabled_panel_plugins_list",
+            "call_method": "get_enabled_panel_plugins_list",
         },
     ]
 
@@ -201,33 +213,33 @@ class ApiPluginsHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestPluginsTableDataSchema())
 
             params = {
-                'start':        json_request.get('start', '0'),
-                'length':       json_request.get('length', '10'),
-                'search_value': json_request.get('search_value', ''),
-                'order':        {
-                    "column": json_request.get('order_by', 'name'),
-                    "dir":    json_request.get('order_direction', 'asc'),
-                }
+                "start": json_request.get("start", "0"),
+                "length": json_request.get("length", "10"),
+                "search_value": json_request.get("search_value", ""),
+                "order": {
+                    "column": json_request.get("order_by", "name"),
+                    "dir": json_request.get("order_direction", "asc"),
+                },
             }
             plugins_list = plugins.prepare_filtered_plugins(params)
 
             response = self.build_response(
                 PluginsDataSchema(),
                 {
-                    "recordsTotal":    plugins_list.get('recordsTotal'),
-                    "recordsFiltered": plugins_list.get('recordsFiltered'),
-                    "results":         plugins_list.get('results'),
-                }
+                    "recordsTotal": plugins_list.get("recordsTotal"),
+                    "recordsFiltered": plugins_list.get("recordsFiltered"),
+                    "results": plugins_list.get("results"),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -275,7 +287,7 @@ class ApiPluginsHandler(BaseApiHandler):
                         schema:
                             InternalErrorSchema
         """
-        self.set_status(410, reason='Endpoint is deprecated. Plugins are now enabled by assigning them to a library')
+        self.set_status(410, reason="Endpoint is deprecated. Plugins are now enabled by assigning them to a library")
         self.write_error()
         return
 
@@ -299,7 +311,7 @@ class ApiPluginsHandler(BaseApiHandler):
                         schema:
                             InternalErrorSchema
         """
-        self.set_status(410, reason='Endpoint is deprecated. Plugins are now enabled by assigning them to a library')
+        self.set_status(410, reason="Endpoint is deprecated. Plugins are now enabled by assigning them to a library")
         self.write_error()
         return
 
@@ -350,7 +362,7 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestTableUpdateByIdList())
 
-            if not plugins.update_plugins(json_request.get('id_list', [])):
+            if not plugins.update_plugins(json_request.get("id_list", [])):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to update the plugins by their IDs")
                 self.write_error()
                 return
@@ -358,12 +370,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -414,7 +426,7 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestTableUpdateByIdList())
 
-            if not plugins.remove_plugins(json_request.get('id_list', [])):
+            if not plugins.remove_plugins(json_request.get("id_list", [])):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to remove the plugins by their IDs")
                 self.write_error()
                 return
@@ -422,12 +434,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -478,38 +490,38 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsInfoSchema())
 
-            plugin_id = json_request.get('plugin_id')
-            prefer_local = json_request.get('prefer_local')
-            library_id = json_request.get('library_id')
+            plugin_id = json_request.get("plugin_id")
+            prefer_local = json_request.get("prefer_local")
+            library_id = json_request.get("library_id")
 
-            plugins_info = plugins.prepare_plugin_info_and_settings(plugin_id,
-                                                                    prefer_local=prefer_local,
-                                                                    library_id=library_id)
+            plugins_info = plugins.prepare_plugin_info_and_settings(
+                plugin_id, prefer_local=prefer_local, library_id=library_id
+            )
 
             response = self.build_response(
                 PluginsInfoResultsSchema(),
                 {
-                    "plugin_id":   plugins_info.get('plugin_id'),
-                    "icon":        plugins_info.get('icon'),
-                    "name":        plugins_info.get('name'),
-                    "description": plugins_info.get('description'),
-                    "tags":        plugins_info.get('tags'),
-                    "author":      plugins_info.get('author'),
-                    "version":     plugins_info.get('version'),
-                    "changelog":   plugins_info.get('changelog'),
-                    "status":      plugins_info.get('status'),
-                    "settings":    plugins_info.get('settings'),
-                }
+                    "plugin_id": plugins_info.get("plugin_id"),
+                    "icon": plugins_info.get("icon"),
+                    "name": plugins_info.get("name"),
+                    "description": plugins_info.get("description"),
+                    "tags": plugins_info.get("tags"),
+                    "author": plugins_info.get("author"),
+                    "version": plugins_info.get("version"),
+                    "changelog": plugins_info.get("changelog"),
+                    "status": plugins_info.get("status"),
+                    "settings": plugins_info.get("settings"),
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -560,9 +572,9 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsSettingsSaveSchema())
 
-            plugin_id = json_request.get('plugin_id')
-            settings = json_request.get('settings')
-            library_id = json_request.get('library_id')
+            plugin_id = json_request.get("plugin_id")
+            settings = json_request.get("settings")
+            library_id = json_request.get("library_id")
 
             if not plugins.update_plugin_settings(plugin_id, settings, library_id=library_id):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to save plugins settings")
@@ -572,12 +584,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -628,8 +640,8 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsSettingsResetSchema())
 
-            plugin_id = json_request.get('plugin_id')
-            library_id = json_request.get('library_id')
+            plugin_id = json_request.get("plugin_id")
+            library_id = json_request.get("library_id")
 
             if not plugins.reset_plugin_settings(plugin_id, library_id=library_id):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to reset plugins settings")
@@ -639,12 +651,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -688,21 +700,16 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             installable_plugins_list = plugins.prepare_installable_plugins_list()
 
-            response = self.build_response(
-                PluginsInstallableResultsSchema(),
-                {
-                    "plugins": installable_plugins_list
-                }
-            )
+            response = self.build_response(PluginsInstallableResultsSchema(), {"plugins": installable_plugins_list})
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -753,7 +760,7 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsByIdSchema())
 
-            if not plugins.install_plugin_by_id(json_request.get('plugin_id'), json_request.get('repo_id')):
+            if not plugins.install_plugin_by_id(json_request.get("plugin_id"), json_request.get("repo_id")):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to install/update plugin")
                 self.write_error()
                 return
@@ -761,12 +768,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -813,17 +820,17 @@ class ApiPluginsHandler(BaseApiHandler):
                 PluginTypesResultsSchema(),
                 {
                     "results": results,
-                }
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -874,23 +881,24 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsFlowByPluginTypeSchema())
 
-            results = plugins.get_enabled_plugin_flows_for_plugin_type(json_request.get('plugin_type'),
-                                                                       json_request.get('library_id'))
+            results = plugins.get_enabled_plugin_flows_for_plugin_type(
+                json_request.get("plugin_type"), json_request.get("library_id")
+            )
             response = self.build_response(
                 PluginFlowResultsSchema(),
                 {
                     "results": results,
-                }
+                },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -941,9 +949,9 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestSavingPluginsFlowByPluginTypeSchema())
 
-            if not plugins.save_enabled_plugin_flows_for_plugin_type(json_request.get('plugin_type'),
-                                                                     json_request.get('library_id'),
-                                                                     json_request.get('plugin_flow')):
+            if not plugins.save_enabled_plugin_flows_for_plugin_type(
+                json_request.get("plugin_type"), json_request.get("library_id"), json_request.get("plugin_flow")
+            ):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to update plugin flow by type")
                 self.write_error()
                 return
@@ -951,12 +959,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -1007,7 +1015,7 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestUpdatePluginReposListSchema())
 
-            if not plugins.save_plugin_repos_list(json_request.get('repos_list')):
+            if not plugins.save_plugin_repos_list(json_request.get("repos_list")):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to update plugin repo list")
                 self.write_error()
                 return
@@ -1015,12 +1023,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -1064,21 +1072,16 @@ class ApiPluginsHandler(BaseApiHandler):
         try:
             plugin_repos_list = plugins.prepare_plugin_repos_list()
 
-            response = self.build_response(
-                PluginReposListResultsSchema(),
-                {
-                    "repos": plugin_repos_list
-                }
-            )
+            response = self.build_response(PluginReposListResultsSchema(), {"repos": plugin_repos_list})
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -1128,12 +1131,12 @@ class ApiPluginsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -1158,49 +1161,47 @@ class ApiPluginsHandler(BaseApiHandler):
             cache_ttl_seconds = 2 * 60 * 60
             cache_root = compresso_config.Config().get_plugins_path()
             os.makedirs(cache_root, exist_ok=True)
-            cache_path = os.path.join(cache_root, 'community-repos-cache.json')
+            cache_path = os.path.join(cache_root, "community-repos-cache.json")
 
-            if not self.settings.get("serve_traceback"):
-                if os.path.exists(cache_path):
-                    try:
-                        with open(cache_path) as f:
-                            cached = json.load(f)
-                        cached_at = cached.get('cached_at', 0)
-                        cached_response = cached.get('response')
-                        repos = cached_response.get('repos') if cached_response else None
-                        if repos:
-                            # Validate cached schema (repo_* keys) to avoid serving stale/old-format data.
-                            if not isinstance(repos, list) or not repos or not repos[0].get('repo_id'):
-                                repos = None
-                        if cached_response and repos and (time.time() - cached_at) < cache_ttl_seconds:
-                            self.write_success(cached_response)
-                            return
-                    except Exception:
-                        tornado.log.app_log.warning("Failed to read community repos cache", exc_info=True)
+            if not self.settings.get("serve_traceback") and os.path.exists(cache_path):
+                try:
+                    with open(cache_path) as f:
+                        cached = json.load(f)
+                    cached_at = cached.get("cached_at", 0)
+                    cached_response = cached.get("response")
+                    repos = cached_response.get("repos") if cached_response else None
+                    # Validate cached schema (repo_* keys) to avoid serving stale/old-format data.
+                    if repos and (not isinstance(repos, list) or not repos or not repos[0].get("repo_id")):
+                        repos = None
+                    if cached_response and repos and (time.time() - cached_at) < cache_ttl_seconds:
+                        self.write_success(cached_response)
+                        return
+                except Exception:
+                    tornado.log.app_log.warning("Failed to read community repos cache", exc_info=True)
 
             uuid = self.session.get_installation_uuid()
             level = self.session.get_supporter_level()
-            api_path = f'plugin_repos/community_forks/uuid/{uuid}/level/{level}'
-            response, status_code = self.session.api_get('compresso-api', 2, api_path)
+            api_path = f"plugin_repos/community_forks/uuid/{uuid}/level/{level}"
+            response, status_code = self.session.api_get("compresso-api", 2, api_path)
             if status_code != 200:
                 self.set_status(status_code)
                 self.finish(response)
                 return
             if not self.settings.get("serve_traceback"):
                 try:
-                    with open(cache_path, 'w') as f:
-                        json.dump({'cached_at': time.time(), 'response': response}, f)
+                    with open(cache_path, "w") as f:
+                        json.dump({"cached_at": time.time(), "response": response}, f)
                 except Exception:
                     tornado.log.app_log.warning("Failed to write community repos cache", exc_info=True)
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -1249,29 +1250,24 @@ class ApiPluginsHandler(BaseApiHandler):
             for data_panel_plugin in data_panel_plugins:
                 plugin_list.append(
                     {
-                        "plugin_id":   data_panel_plugin.get("plugin_id"),
-                        "name":        data_panel_plugin.get("name", ""),
-                        "author":      data_panel_plugin.get("author", ""),
+                        "plugin_id": data_panel_plugin.get("plugin_id"),
+                        "name": data_panel_plugin.get("name", ""),
+                        "author": data_panel_plugin.get("author", ""),
                         "description": data_panel_plugin.get("description", ""),
-                        "version":     data_panel_plugin.get("version", ""),
-                        "icon":        data_panel_plugin.get("icon", ""),
+                        "version": data_panel_plugin.get("version", ""),
+                        "icon": data_panel_plugin.get("icon", ""),
                     }
                 )
 
-            response = self.build_response(
-                PluginsDataPanelTypesDataSchema(),
-                {
-                    "results": plugin_list
-                }
-            )
+            response = self.build_response(PluginsDataPanelTypesDataSchema(), {"results": plugin_list})
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
+            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get('call_method'))
+            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

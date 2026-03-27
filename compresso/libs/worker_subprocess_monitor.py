@@ -1,34 +1,35 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.worker_subprocess_monitor.py
+compresso.worker_subprocess_monitor.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     11 Aug 2021, (12:06 PM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     11 Aug 2021, (12:06 PM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
+import contextlib
 import re
 import threading
 import time
@@ -40,7 +41,7 @@ from compresso.libs.logs import CompressoLogging
 
 class WorkerCommandError(Exception):
     def __init__(self, command):
-        Exception.__init__(self, "Worker command returned non 0 status. Command: {}".format(command))
+        Exception.__init__(self, f"Worker command returned non 0 status. Command: {command}")
         self.command = command
 
 
@@ -91,8 +92,10 @@ class WorkerSubprocessMonitor(threading.Thread):
                 self.subprocess_elapsed = 0
             if self.redundant_flag.is_set():
                 # If the redundant flag is set then we should terminate any set procs straight away as the worker needs to stop
-                self.logger.debug("A new subprocess was spawned, but the worker is trying to terminate. Subprocess PID %s",
-                                  self.subprocess_pid)
+                self.logger.debug(
+                    "A new subprocess was spawned, but the worker is trying to terminate. Subprocess PID %s",
+                    self.subprocess_pid,
+                )
                 self.terminate_proc()
 
         except Exception:
@@ -197,27 +200,21 @@ class WorkerSubprocessMonitor(threading.Thread):
 
             # Resume all suspended processes so they can handle signals
             for p in all_procs:
-                try:
+                with contextlib.suppress(psutil.NoSuchProcess, NotImplementedError):
                     p.resume()
-                except (psutil.NoSuchProcess, NotImplementedError):
-                    pass
 
             # Attempt graceful shutdown
             for p in all_procs:
-                try:
+                with contextlib.suppress(psutil.NoSuchProcess):
                     p.terminate()
-                except psutil.NoSuchProcess:
-                    pass
 
             # Wait up to 3s for them to exit
             gone, alive = psutil.wait_procs(all_procs, timeout=3, callback=self.__log_proc_terminated)
 
             # Force-kill any remaining processes
             for p in alive:
-                try:
+                with contextlib.suppress(psutil.NoSuchProcess):
                     p.kill()
-                except psutil.NoSuchProcess:
-                    pass
 
             # Final wait to reap
             psutil.wait_procs(alive, timeout=3, callback=self.__log_proc_terminated)
@@ -253,42 +250,46 @@ class WorkerSubprocessMonitor(threading.Thread):
                 eta_seconds = int((elapsed / percent) * (100 - percent))
 
             return {
-                'pid':            str(self.subprocess_pid),
-                'percent':        str(self.subprocess_percent),
-                'elapsed':        elapsed,
-                'cpu_percent':    str(self.subprocess_cpu_percent),
-                'mem_percent':    str(self.subprocess_mem_percent),
-                'rss_bytes':      str(self.subprocess_rss_bytes),
-                'vms_bytes':      str(self.subprocess_vms_bytes),
-                'eta_seconds':    eta_seconds,
-                'encoding_fps':   self.last_encoding_fps,
-                'encoding_speed': self.last_encoding_speed,
+                "pid": str(self.subprocess_pid),
+                "percent": str(self.subprocess_percent),
+                "elapsed": elapsed,
+                "cpu_percent": str(self.subprocess_cpu_percent),
+                "mem_percent": str(self.subprocess_mem_percent),
+                "rss_bytes": str(self.subprocess_rss_bytes),
+                "vms_bytes": str(self.subprocess_vms_bytes),
+                "eta_seconds": eta_seconds,
+                "encoding_fps": self.last_encoding_fps,
+                "encoding_speed": self.last_encoding_speed,
             }
         except Exception:
             self.logger.exception("Exception in get_subprocess_stats()")
             # Return something minimal so UI won't break
             return {
-                'pid':            '0', 'percent': '0', 'elapsed': '0',
-                'cpu_percent':    '0', 'mem_percent': '0',
-                'rss_bytes':      '0', 'vms_bytes': '0',
-                'eta_seconds':    None,
-                'encoding_fps':   0,
-                'encoding_speed': 0,
+                "pid": "0",
+                "percent": "0",
+                "elapsed": "0",
+                "cpu_percent": "0",
+                "mem_percent": "0",
+                "rss_bytes": "0",
+                "vms_bytes": "0",
+                "eta_seconds": None,
+                "encoding_fps": 0,
+                "encoding_speed": 0,
             }
 
     def parse_ffmpeg_speed(self, line_text):
         """Parse FFmpeg progress output for fps and speed values."""
         try:
             line = str(line_text).strip()
-            if 'fps=' not in line and 'speed=' not in line:
+            if "fps=" not in line and "speed=" not in line:
                 return
-            fps_match = re.search(r'fps=\s*([\d.]+)', line)
+            fps_match = re.search(r"fps=\s*([\d.]+)", line)
             if fps_match:
                 fps_val = float(fps_match.group(1))
                 if fps_val > 0:
                     self.last_encoding_fps = fps_val
                     self._fps_samples.append(fps_val)
-            speed_match = re.search(r'speed=\s*([\d.]+)x', line)
+            speed_match = re.search(r"speed=\s*([\d.]+)x", line)
             if speed_match:
                 speed_val = float(speed_match.group(1))
                 if speed_val > 0:
@@ -306,8 +307,8 @@ class WorkerSubprocessMonitor(threading.Thread):
         if self._speed_samples:
             avg_speed = sum(self._speed_samples) / len(self._speed_samples)
         return {
-            'avg_encoding_fps': round(avg_fps, 2),
-            'encoding_speed_ratio': round(avg_speed, 2),
+            "avg_encoding_fps": round(avg_fps, 2),
+            "encoding_speed_ratio": round(avg_speed, 2),
         }
 
     def reset_encoding_speed_stats(self):
@@ -336,9 +337,9 @@ class WorkerSubprocessMonitor(threading.Thread):
             # Here we provide a plugin with the ability to unset a subprocess (indicating that it completed)
             self.unset_proc()
             return {
-                'killed':  self.redundant_flag.is_set(),
-                'paused':  self.paused,
-                'percent': str(self.subprocess_percent),
+                "killed": self.redundant_flag.is_set(),
+                "paused": self.paused,
+                "percent": str(self.subprocess_percent),
             }
         try:
             if pid is not None:
@@ -352,16 +353,16 @@ class WorkerSubprocessMonitor(threading.Thread):
             except (TypeError, ValueError):
                 pass
             return {
-                'killed':  self.redundant_flag.is_set(),
-                'paused':  self.paused,
-                'percent': str(self.subprocess_percent),
+                "killed": self.redundant_flag.is_set(),
+                "paused": self.paused,
+                "percent": str(self.subprocess_percent),
             }
         except Exception:
             self.logger.exception("Exception in default_progress_parser()")
             return {
-                'killed':  self.redundant_flag.is_set(),
-                'paused':  self.paused,
-                'percent': str(self.subprocess_percent),
+                "killed": self.redundant_flag.is_set(),
+                "paused": self.paused,
+                "percent": str(self.subprocess_percent),
             }
 
     def run(self):

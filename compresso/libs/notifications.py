@@ -1,37 +1,37 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.notifications.py
+compresso.notifications.py
 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     03 Jul 2022, (7:49 AM)
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     03 Jul 2022, (7:49 AM)
 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
 
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
 
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
 import threading
 import uuid
-from queue import Queue, Empty
+from queue import Empty, Queue
 
 from compresso.libs.singleton import SingletonType
 
@@ -100,16 +100,16 @@ class Notifications(Queue, metaclass=SingletonType):
     @staticmethod
     def __validate_item(item):
         # Ensure all required keys are present
-        for key in ['type', 'icon', 'label', 'message', 'navigation']:
+        for key in ["type", "icon", "label", "message", "navigation"]:
             if key not in item:
-                raise Exception("Frontend message item incorrectly formatted. Missing key: '{}'".format(key))
+                raise Exception(f"Frontend message item incorrectly formatted. Missing key: '{key}'")
 
         # Ensure the given type is valid
-        if item.get('type') not in ['error', 'warning', 'success', 'info']:
+        if item.get("type") not in ["error", "warning", "success", "info"]:
             raise Exception(
-                "Frontend message item's code must be in ['error', 'warning', 'success', 'info', 'status']. Received '{}'".format(
-                    item.get('type')
-                )
+                "Frontend message item's code must be in "
+                "['error', 'warning', 'success', 'info', 'status']. "
+                "Received '{}'".format(item.get("type"))
             )
         return True
 
@@ -133,12 +133,12 @@ class Notifications(Queue, metaclass=SingletonType):
         self.__validate_item(item)
         with self._lock:
             # Generate uuid if one is not provided
-            if not item.get('uuid'):
-                item['uuid'] = str(uuid.uuid4())
+            if not item.get("uuid"):
+                item["uuid"] = str(uuid.uuid4())
             # If it is not already in message list, add it to the list and the queue
-            if item['uuid'] in self.all_items:
+            if item["uuid"] in self.all_items:
                 return
-            self.all_items.add(item['uuid'])
+            self.all_items.add(item["uuid"])
             self.__add_to_queue_locked(item)
 
     def remove(self, item_uuid):
@@ -155,7 +155,7 @@ class Notifications(Queue, metaclass=SingletonType):
             # Create list of items that will be queued again
             requeue_items = []
             for current_item in current_items:
-                if current_item.get('uuid') != item_uuid:
+                if current_item.get("uuid") != item_uuid:
                     requeue_items.append(current_item)
                 else:
                     success = True
@@ -179,23 +179,23 @@ class Notifications(Queue, metaclass=SingletonType):
         self.__validate_item(item)
         with self._lock:
             # Generate uuid if one is not provided
-            if not item.get('uuid'):
-                item['uuid'] = str(uuid.uuid4())
+            if not item.get("uuid"):
+                item["uuid"] = str(uuid.uuid4())
             current_items = self.__get_all_items_locked()
             requeue_items = []
             replaced = False
             for current_item in current_items:
-                if current_item.get('uuid') == item['uuid']:
+                if current_item.get("uuid") == item["uuid"]:
                     requeue_items.append(item)
                     replaced = True
                 else:
                     requeue_items.append(current_item)
             if not replaced:
-                self.all_items.add(item['uuid'])
+                self.all_items.add(item["uuid"])
                 # Restore original queue state before adding new item
                 self.__requeue_items_locked(current_items)
                 self.__add_to_queue_locked(item)
                 return
-            self.all_items.add(item['uuid'])
+            self.all_items.add(item["uuid"])
             # Add all requeue_items items back into the queue
             self.__requeue_items_locked(requeue_items)
