@@ -100,7 +100,7 @@ def _patched_run_one(_original_run_one):
 
 
 # Apply the patch before any Router instances are created
-Router.run_one = _patched_run_one(Router.run_one)
+Router.run_one = _patched_run_one(Router.run_one)  # type: ignore[method-assign]
 
 
 class Migrations:

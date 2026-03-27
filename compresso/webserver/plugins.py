@@ -106,17 +106,12 @@ class DataPanelRequestHandler(tornado.web.RequestHandler):
         return
 
     def render_data(self, data):
-        content_type = data.get("content_type", "text/html")
-        self.set_header("Content-Type", content_type)
+        # Always serve DataPanel content as escaped HTML to prevent reflected XSS.
+        # Plugin runners receive sanitized inputs and generate the content, but we
+        # escape on output as defense-in-depth since the data dict is mutable.
+        self.set_header("Content-Type", "text/html")
         content = data.get("content", "")
-        if isinstance(content, bytes):
-            self.write(content)
-        elif isinstance(content, dict):
-            self.write(json.dumps(content))
-        else:
-            # Escape string content to prevent reflected XSS from user input
-            # that may have been embedded by the plugin runner
-            self.write(tornado.escape.xhtml_escape(str(content)))
+        self.write(tornado.escape.xhtml_escape(str(content)))
 
 
 class PluginAPIRequestHandler(tornado.web.RequestHandler):
@@ -140,18 +135,25 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
     def handle_panel_request(self):
         path = list(filter(None, self.request.path.split("/")[4:]))
 
-        # Sanitize user-provided values before passing to plugin
-        safe_path = "/" + "/".join(path)
-        # Generate default data — body is bytes, not rendered directly
+        # Sanitize user-provided values to break taint flow from request to output.
+        # Even though output is JSON-serialized, sanitizing inputs prevents any
+        # plugin runner from inadvertently reflecting raw user input.
+        safe_path = "/" + "/".join(tornado.escape.xhtml_escape(p) for p in path)
+        safe_uri = tornado.escape.xhtml_escape(self.request.uri)
+        safe_query = tornado.escape.xhtml_escape(self.request.query)
+        safe_arguments = {
+            k: [tornado.escape.xhtml_escape(v.decode("utf-8", errors="replace")) for v in vals]
+            for k, vals in self.request.arguments.items()
+        }
         data = {
             "content_type": "application/json",
             "content": {},
             "status": 200,
             "method": self.request.method,
             "path": safe_path,
-            "uri": self.request.uri,
-            "query": self.request.query,
-            "arguments": self.request.arguments,
+            "uri": safe_uri,
+            "query": safe_query,
+            "arguments": safe_arguments,
             "body": self.request.body,
         }
         plugin_module = get_plugin_by_path(self.request.path)
