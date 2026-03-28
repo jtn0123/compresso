@@ -274,7 +274,7 @@ class Task:
         """
         allowed = ["pending", "in_progress", "processed", "awaiting_approval", "approved", "complete"]
         if status not in allowed:
-            raise Exception('Unable to set status to "{}". Status must be one of [{}].'.format(status, ", ".join(allowed)))
+            raise Exception(f'Unable to set status to "{status}". Status must be one of [{", ".join(allowed)}].')
         if not self.task:
             raise Exception("Unable to set status. Task has not been set!")
         self.task.status = status

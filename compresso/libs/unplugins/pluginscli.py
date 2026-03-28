@@ -238,7 +238,7 @@ class PluginsCLI:
             selected_details.append(plugin_type_details)
 
         if invalid_tokens:
-            return None, ["Invalid runner types: {}".format(", ".join(invalid_tokens))]
+            return None, [f"Invalid runner types: {', '.join(invalid_tokens)}"]
 
         return selected_details, []
 
@@ -292,7 +292,7 @@ class PluginsCLI:
             "from compresso.libs.unplugins.settings import PluginSettings",
             "",
             "# Configure plugin logger",
-            'logger = logging.getLogger("Compresso.Plugin.{}")'.format(plugin_details.get("plugin_id")),
+            f'logger = logging.getLogger("Compresso.Plugin.{plugin_details.get("plugin_id")}")',
             "",
             "",
             "class Settings(PluginSettings):",
@@ -374,7 +374,7 @@ class PluginsCLI:
             self.logger.error("Exception while saving plugin info to DB. - %s", e)
             return
 
-        print("Plugin created - '{}'".format(plugin_details.get("plugin_id")))
+        print(f"Plugin created - '{plugin_details.get('plugin_id')}'")
 
     def create_new_plugins(self):
         plugin_details, plugin_type_details_list = self._collect_new_plugin_details()
@@ -399,7 +399,7 @@ class PluginsCLI:
             plugin_details_by_runner,
         )
         if errors:
-            print("ERROR! {}".format(" ".join(errors)))
+            print(f"ERROR! {' '.join(errors)}")
             return
 
         self.create_new_plugin_files(plugin_details, plugin_type_details_list)
@@ -410,7 +410,7 @@ class PluginsCLI:
 
         # Build choice selection list from installed plugins
         for plugin in plugin_results:
-            print("Reloading Plugin - '{}'".format(plugin.get("plugin_id")))
+            print(f"Reloading Plugin - '{plugin.get('plugin_id')}'")
             plugin_path = os.path.join(self.plugins_directory, plugin.get("plugin_id"))
             # Read plugin info.json
             info_file = os.path.join(plugin_path, "info.json")
@@ -515,7 +515,7 @@ class PluginsCLI:
 
         plugin_results = self.__get_installed_plugins(plugin_id=plugin_id)
         for plugin_result in plugin_results:
-            print("{}Testing plugin: '{}'{}".format(BColours.HEADER, plugin_result.get("name"), BColours.ENDC))
+            print(f"{BColours.HEADER}Testing plugin: '{plugin_result.get('name')}'{BColours.ENDC}")
             plugin_id = plugin_result.get("plugin_id")
 
             # Reload the plugin
@@ -618,7 +618,7 @@ class PluginsCLI:
         runner_selection = {**inquirer.prompt([test_files_inquirer]), **runner_selection}
         self.test_data_modifiers["{test_file_in}"] = runner_selection.get("selected_file")
         split_file_in = os.path.splitext(runner_selection.get("selected_file"))
-        self.test_data_modifiers["{test_file_out}"] = "{}-{}{}".format(split_file_in[0], "WORKING-1", split_file_in[1])
+        self.test_data_modifiers["{test_file_out}"] = f"{split_file_in[0]}-WORKING-1{split_file_in[1]}"
 
     def install_test_data(self):
         sample_files = {
@@ -645,7 +645,7 @@ class PluginsCLI:
                             f.write(chunk)
 
             split_file_in = os.path.splitext(key)
-            cache_file = os.path.join(dev_cache_directory, "{}-{}{}".format(split_file_in[0], "WORKING-1", split_file_in[1]))
+            cache_file = os.path.join(dev_cache_directory, f"{split_file_in[0]}-WORKING-1{split_file_in[1]}")
             shutil.copyfile(library_file, cache_file)
 
     def main(self, arg):

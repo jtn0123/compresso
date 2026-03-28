@@ -289,7 +289,7 @@ class PreviewManager:
             ]
             result = subprocess.run(extract_cmd, capture_output=True, text=True, timeout=120)  # noqa: S603 - trusted ffmpeg segment extraction command
             if result.returncode != 0:
-                raise RuntimeError("Segment extraction failed: {}".format(result.stderr[-500:] if result.stderr else ""))
+                raise RuntimeError(f"Segment extraction failed: {result.stderr[-500:] if result.stderr else ''}")
 
             # Step 2: Re-encode source to browser-playable MP4 (high quality reference)
             self._check_timeout(job_id)
@@ -313,7 +313,7 @@ class PreviewManager:
             ]
             result = subprocess.run(source_web_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg encode command
             if result.returncode != 0:
-                raise RuntimeError("Source web encode failed: {}".format(result.stderr[-500:] if result.stderr else ""))
+                raise RuntimeError(f"Source web encode failed: {result.stderr[-500:] if result.stderr else ''}")
 
             # Step 3: Encode using library's plugin pipeline
             self._check_timeout(job_id)
@@ -345,7 +345,7 @@ class PreviewManager:
                 ]
                 result = subprocess.run(encoded_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg fallback encode command
                 if result.returncode != 0:
-                    raise RuntimeError("Encoded preview failed: {}".format(result.stderr[-500:] if result.stderr else ""))
+                    raise RuntimeError(f"Encoded preview failed: {result.stderr[-500:] if result.stderr else ''}")
 
             job["encoded_by_pipeline"] = pipeline_success
 

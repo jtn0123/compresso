@@ -117,9 +117,6 @@ class ScheduledTasksManager(threading.Thread):
 
         # Get target count
         target_count = int(settings.get_distributed_worker_count_target())
-        # # TODO: Check if we should be aiming for one less than the target
-        # if target_count > 1:
-        #     target_count -= 1
 
         linked_configs = []
         for local_config in settings.get_remote_installations():

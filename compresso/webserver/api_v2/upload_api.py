@@ -134,7 +134,7 @@ class ApiUploadHandler(BaseApiHandler):
                     )
 
                 chunk = chunk[len(self.meta["header"]) :]
-                self.fp = open(os.path.join(self.cache_directory, self.meta["filename"]), "wb")  # noqa: SIM115
+                self.fp = open(os.path.join(self.cache_directory, self.meta["filename"]), "wb")  # noqa: SIM115 — file closed in on_finish(); context manager incompatible with streaming chunks
                 self.fp.write(chunk)
             else:
                 self.fp.write(chunk)
@@ -240,7 +240,7 @@ class ApiUploadHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             if self.frontend_messages:
                 self.frontend_messages.remove_item("receivingRemoteFile")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
@@ -325,7 +325,7 @@ class ApiUploadHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             if self.frontend_messages:
                 self.frontend_messages.remove_item("receivingRemoteFile")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))

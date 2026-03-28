@@ -110,7 +110,7 @@ def _get_avg_task_duration(completed_tasks_model=None):
 
         recent_tasks = (
             CompletedTasks.select(CompletedTasks.start_time, CompletedTasks.finish_time)
-            .where(CompletedTasks.task_success == True)  # noqa: E712
+            .where(CompletedTasks.task_success == True)  # noqa: E712 — peewee ORM requires == for SQL generation
             .order_by(CompletedTasks.finish_time.desc())
             .limit(50)
         )

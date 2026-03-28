@@ -210,7 +210,7 @@ class UIServer(threading.Thread):
             self.server.listen(int(self.config.get_ui_port()), address=self.config.get_ui_address())
             StartupState().mark_ready(
                 "ui_server_ready",
-                detail="{}:{}".format(self.config.get_ui_address() or "0.0.0.0", self.config.get_ui_port()),  # noqa: S104
+                detail=f"{self.config.get_ui_address() or '0.0.0.0'}:{self.config.get_ui_port()}",  # noqa: S104
             )
             self._log(f"UI_SERVER_READY port={self.config.get_ui_port()}", level="info")
 

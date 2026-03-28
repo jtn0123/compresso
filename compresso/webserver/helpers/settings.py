@@ -37,7 +37,7 @@ from compresso.webserver.helpers import plugins
 logger = CompressoLogging.get_logger(name="SettingsHelper")
 
 
-def save_library_config(library_id, library_config=None, plugin_config=None):  # noqa: C901
+def save_library_config(library_id, library_config=None, plugin_config=None):  # noqa: C901 — complex validation logic; refactor tracked in JTN-7
     """
     Save a complete library configuration
 
@@ -117,7 +117,7 @@ def save_library_config(library_id, library_config=None, plugin_config=None):  #
                 if not plugins.install_plugin_by_id(ep.get("plugin_id")):
                     if new_library:
                         library.delete()
-                    raise Exception("Failed to install plugin by plugin ID '{}'".format(ep.get("plugin_id")))
+                    raise Exception(f"Failed to install plugin by plugin ID '{ep.get('plugin_id')}'")
         # Enable the plugins against this library
         library.set_enabled_plugins(enabled_plugins)
         # Import settings

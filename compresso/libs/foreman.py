@@ -267,8 +267,8 @@ class Foreman(threading.Thread):
 
             # Create threads as required
             for i in range(worker_group.get("number_of_workers")):
-                worker_id = "{}-{}".format(worker_group.get("name"), i)
-                worker_name = "{}-Worker-{}".format(worker_group.get("name"), (i + 1))
+                worker_id = f"{worker_group.get('name')}-{i}"
+                worker_name = f"{worker_group.get('name')}-Worker-{i + 1}"
                 # Add this name to a list. If the name changes, we can remove old incorrectly named workers
                 worker_group_names.append(worker_name)
                 if worker_id not in self.worker_threads:
@@ -277,7 +277,7 @@ class Foreman(threading.Thread):
 
             # Remove any workers that do not belong. The max number of supported workers is 12
             for i in range(worker_group.get("number_of_workers"), 12):
-                worker_id = "{}-{}".format(worker_group.get("name"), i)
+                worker_id = f"{worker_group.get('name')}-{i}"
                 # Only remove threads that are idle (never terminate a task just to reduce worker count)
                 if worker_id in self.worker_threads and self.worker_threads[worker_id].idle:
                     self.mark_worker_thread_as_redundant(worker_id)
@@ -648,7 +648,7 @@ class Foreman(threading.Thread):
         # Mark this as the last time run
         self.link_heartbeat_last_run = time_now
 
-    def run(self):  # noqa: C901
+    def run(self):  # noqa: C901 — main orchestration loop; refactor tracked in JTN-8
         self.logger.info("Starting Foreman Monitor loop")
 
         # Flag to force checking for idle remote workers when set to False.

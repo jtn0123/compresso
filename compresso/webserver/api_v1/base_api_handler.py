@@ -56,7 +56,7 @@ class BaseApiHandler(RequestHandler):
             # If the route does not have any params an it matches the current request URI, then route to that method.
             if list(filter(None, request_api_endpoint.split("/"))) == list(filter(None, route.get("path_pattern").split("/"))):
                 tornado.log.app_log.debug(
-                    "Routing API to {}.{}()".format(self.__class__.__name__, route.get("call_method")), exc_info=True
+                    f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True
                 )
                 getattr(self, route.get("call_method"))()
                 return

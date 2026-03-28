@@ -99,7 +99,7 @@ class SubtitleHandle:
                 # Map this stream if it was marked above as compatible with the destination
                 self.subtitle_args["streams_to_map"] = self.subtitle_args["streams_to_map"] + [
                     "-map",
-                    "0:{}".format(stream["index"]),
+                    f"0:{stream['index']}",
                 ]
 
         return self.subtitle_args

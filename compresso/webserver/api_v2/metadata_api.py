@@ -160,7 +160,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -174,7 +174,7 @@ class ApiMetadataHandler(BaseApiHandler):
             task_id = json_request.get("task_id")
             await self._get_metadata_by_task_id(task_id)
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -186,7 +186,7 @@ class ApiMetadataHandler(BaseApiHandler):
         try:
             await self._get_metadata_by_task_id(int(task_id))
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -276,7 +276,7 @@ class ApiMetadataHandler(BaseApiHandler):
             response = self.build_response(BaseSuccessSchema(), {"success": True})
             self.write_success(response)
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -299,7 +299,7 @@ class ApiMetadataHandler(BaseApiHandler):
             response = self.build_response(BaseSuccessSchema(), {"success": True})
             self.write_success(response)
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -347,7 +347,7 @@ class ApiMetadataHandler(BaseApiHandler):
             )
             self.write_success(response)
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return

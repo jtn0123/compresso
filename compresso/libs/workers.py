@@ -271,7 +271,7 @@ class Worker(threading.Thread):
         # Set the finish time in the statistics data
         self.current_task.task.finish_time = self.finish_time
 
-    def __exec_worker_runners_on_set_task(self):  # noqa: C901
+    def __exec_worker_runners_on_set_task(self):  # noqa: C901 — multi-phase plugin runner with file lifecycle management
         """
         Executes the configured plugin runners against the set task.
 
@@ -418,7 +418,7 @@ class Worker(threading.Thread):
                     overall_success = False
                     # Append long entry to say the worker was terminated
                     self.worker_log.append("\n\nPLUGIN FAILED!")
-                    self.worker_log.append("\nFailed to execute Plugin '{}'".format(plugin_module.get("name")))
+                    self.worker_log.append(f"\nFailed to execute Plugin '{plugin_module.get('name')}'")
                     self.worker_log.append("\nCheck Compresso logs for more information")
                     self.current_command_ref = None
                     data["current_command"] = []
@@ -471,7 +471,7 @@ class Worker(threading.Thread):
                             # the plugin set it to the same path as the 'file_in'.
                             # To avoid this, run x3 tests.
                             # First, check current 'file_in' is not the original file.
-                            if (  # noqa: SIM102
+                            if (  # noqa: SIM102 — nested ifs are clearer here for safety-critical file deletion
                                 os.path.abspath(data.get("file_in")) != os.path.abspath(original_abspath)
                                 and "compresso_file_conversion" in os.path.abspath(data.get("file_in"))
                             ):
@@ -646,7 +646,7 @@ class Worker(threading.Thread):
                     errors="replace",
                 )
             elif isinstance(exec_command, str):
-                sub_proc = subprocess.Popen(  # noqa: S602
+                sub_proc = subprocess.Popen(  # noqa: S602 — shell=True required for string-type plugin exec_command
                     exec_command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,

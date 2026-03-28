@@ -156,7 +156,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -236,7 +236,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -314,9 +314,7 @@ class ApiHistoryHandler(BaseApiHandler):
                 failed_ids = ""
                 for task_id in errors:
                     failed_ids += f" {task_id}"
-                    tornado.log.app_log.error(
-                        "ApiHistoryHandler.{}: {}".format(self.route.get("call_method"), errors.get(task_id))
-                    )
+                    tornado.log.app_log.error(f"ApiHistoryHandler.{self.route.get('call_method')}: {errors.get(task_id)}")
                 self.set_status(
                     self.STATUS_ERROR_INTERNAL,
                     reason=f"Failed to add the provided completed tasks to the pending task list: '{failed_ids}'",
@@ -327,7 +325,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -394,7 +392,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return

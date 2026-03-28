@@ -339,4 +339,4 @@ def on_worker_process(data, **kwargs):
         data["current_command"].clear()
         data["current_command"].append(" ".join(cmd))
 
-    data["worker_log"].append("[Encoding Presets] Command: {}\n".format(" ".join(cmd)))
+    data["worker_log"].append(f"[Encoding Presets] Command: {' '.join(cmd)}\n")

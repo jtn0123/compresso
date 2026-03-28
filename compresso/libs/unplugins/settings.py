@@ -81,7 +81,7 @@ class PluginSettings:
         # TODO(v2.0): Remove this migration shim
         if not os.path.exists(os.path.join(profile_directory, "settings.json")) and os.path.exists(
             os.path.join(plugin_directory, "settings.json")
-        ):  # noqa: E501
+        ):  # noqa: E501 — long path condition; splitting reduces readability
             import shutil
 
             shutil.move(os.path.join(plugin_directory, "settings.json"), os.path.join(profile_directory, "settings.json"))

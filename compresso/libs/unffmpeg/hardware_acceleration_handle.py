@@ -111,7 +111,7 @@ class HardwareAccelerationHandle:
                 #   REF: https://trac.ffmpeg.org/wiki/Hardware/VAAPI#Encoding
                 self.main_options = [
                     "-init_hw_device",
-                    "vaapi=vaapi0:{}".format(self.hardware_device.get("hwaccel_device")),
+                    f"vaapi=vaapi0:{self.hardware_device.get('hwaccel_device')}",
                     "-hwaccel",
                     "vaapi",
                     "-hwaccel_output_format",
