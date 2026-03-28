@@ -9,10 +9,10 @@ import tornado.web
 from compresso.libs.installation_link import Links
 
 _BLOCKED_NETWORKS = [
-    ipaddress.ip_network("127.0.0.0/8"),       # Loopback
-    ipaddress.ip_network("::1/128"),            # IPv6 loopback
-    ipaddress.ip_network("169.254.0.0/16"),     # Link-local / cloud metadata
-    ipaddress.ip_network("fe80::/10"),          # IPv6 link-local
+    ipaddress.ip_network("127.0.0.0/8"),  # Loopback
+    ipaddress.ip_network("::1/128"),  # IPv6 loopback
+    ipaddress.ip_network("169.254.0.0/16"),  # Link-local / cloud metadata
+    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
 ]
 
 

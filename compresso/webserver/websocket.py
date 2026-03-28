@@ -55,22 +55,24 @@ from compresso.webserver.proxy import resolve_proxy_target
 class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
     # Explicit allowlist of WS command names that map to handler methods.
     # Only commands in this set can be dispatched via on_message.
-    ALLOWED_COMMANDS = frozenset({
-        "default_failure_response",
-        "start_frontend_messages",
-        "stop_frontend_messages",
-        "start_system_logs",
-        "stop_system_logs",
-        "start_workers_info",
-        "stop_workers_info",
-        "start_pending_tasks_info",
-        "stop_pending_tasks_info",
-        "start_completed_tasks_info",
-        "stop_completed_tasks_info",
-        "start_system_status",
-        "stop_system_status",
-        "dismiss_message",
-    })
+    ALLOWED_COMMANDS = frozenset(
+        {
+            "default_failure_response",
+            "start_frontend_messages",
+            "stop_frontend_messages",
+            "start_system_logs",
+            "stop_system_logs",
+            "start_workers_info",
+            "stop_workers_info",
+            "start_pending_tasks_info",
+            "stop_pending_tasks_info",
+            "start_completed_tasks_info",
+            "stop_completed_tasks_info",
+            "start_system_status",
+            "stop_system_status",
+            "dismiss_message",
+        }
+    )
 
     STREAM_POLL_INTERVALS = {
         "frontend_message": 0.5,

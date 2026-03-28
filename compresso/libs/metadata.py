@@ -122,10 +122,7 @@ class CompressoFileMetadata:
         if len(cls._task_cache) <= cls.CACHE_MAX_ENTRIES:
             return
         now = time.time()
-        stale_ids = [
-            tid for tid, ts in cls._task_cache_timestamps.items()
-            if (now - ts) > cls.CACHE_TTL_SECONDS
-        ]
+        stale_ids = [tid for tid, ts in cls._task_cache_timestamps.items() if (now - ts) > cls.CACHE_TTL_SECONDS]
         for tid in stale_ids:
             cls._task_cache.pop(tid, None)
             cls._task_cache_timestamps.pop(tid, None)

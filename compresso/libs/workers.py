@@ -620,13 +620,15 @@ class Worker(threading.Thread):
             current_command_ref.append(command_string)
 
         # Append start of command to worker subprocess stdout
-        self.worker_log.extend([
-            "\n\n",
-            "COMMAND:\n",
-            command_string,
-            "\n\n",
-            "LOG:\n",
-        ])
+        self.worker_log.extend(
+            [
+                "\n\n",
+                "COMMAND:\n",
+                command_string,
+                "\n\n",
+                "LOG:\n",
+            ]
+        )
 
         # Create output path if file_out is present and the path does not exists
         if data.get("file_out"):
