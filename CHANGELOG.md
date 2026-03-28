@@ -1,3 +1,11 @@
+## [1.8.1](https://github.com/jtn0123/compresso/compare/v1.8.0...v1.8.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* address security, stability, and logic bugs found during code review ([247347b](https://github.com/jtn0123/compresso/commit/247347b2f16e15703e7d394c5fc0e7fa82fe5ff2))
+* security, stability, and logic bugs from code review ([#54](https://github.com/jtn0123/compresso/issues/54)) ([1f22275](https://github.com/jtn0123/compresso/commit/1f222756f449043bc2d919a08688ee66373191b2))
+
 # [1.8.0](https://github.com/jtn0123/compresso/compare/v1.7.1...v1.8.0) (2026-03-27)
 
 
