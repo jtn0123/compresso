@@ -1,0 +1,14 @@
+# npm-bundled transitive dependencies (minimatch, tar)
+# These are internal to npm's own node_modules and only used during
+# package installation, not at application runtime. They will be fixed
+# when Node.js ships a release with updated npm.
+
+# minimatch: DoS via crafted glob patterns (npm-internal)
+CVE-2026-26996
+CVE-2026-27903
+CVE-2026-27904
+
+# tar: file overwrite via malicious archive (npm-internal)
+CVE-2026-26960
+CVE-2026-29786
+CVE-2026-31802

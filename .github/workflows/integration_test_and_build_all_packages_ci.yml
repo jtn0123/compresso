@@ -392,6 +392,7 @@ jobs:
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          trivyignores: .trivyignore
 
   build_docker_arm64:
     name: Build Docker (arm64)
