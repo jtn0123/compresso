@@ -99,7 +99,7 @@ class VideoCodecHandle:
                 # Map this video stream to be processed
                 self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + [
                     "-map",
-                    "0:{}".format(stream["index"]),
+                    f"0:{stream['index']}",
                 ]
 
         return self.encoding_args

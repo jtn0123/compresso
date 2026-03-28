@@ -325,10 +325,10 @@ class RootService:
         self.logger.info("Stopping all threads")
         self.event.set()
         for thread in self.threads:
-            self.logger.info("Sending thread {} abort signal".format(thread["name"]))
+            self.logger.info(f"Sending thread {thread['name']} abort signal")
             thread["thread"].stop()
         for thread in self.threads:
-            self.logger.info("Waiting for thread {} to stop".format(thread["name"]))
+            self.logger.info(f"Waiting for thread {thread['name']} to stop")
             thread["thread"].join(10)
             if thread["thread"].is_alive():
                 self.logger.error("WORKER_THREAD_STOP_TIMEOUT name=%s", thread["name"])
@@ -451,9 +451,7 @@ class RootService:
 
 def main():
     parser = argparse.ArgumentParser(description="Compresso")
-    parser.add_argument(
-        "--version", action="version", version="%(prog)s {version}".format(version=metadata.read_version_string("long"))
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {metadata.read_version_string('long')}")
     parser.add_argument(
         "--manage-plugins", "--manage_plugins", action="store_true", dest="manage_plugins", help="manage installed plugins"
     )

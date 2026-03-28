@@ -687,7 +687,7 @@ class PluginsHandler(metaclass=SingletonType):
                 PluginExecutor.unload_plugin_module(record.get("plugin_id"))
             except Exception as e:
                 self._log(
-                    "Exception while unloading python module {}:".format(record.get("plugin_id")),
+                    f"Exception while unloading python module {record.get('plugin_id')}:",
                     message2=str(e),
                     level="exception",
                 )
@@ -863,7 +863,7 @@ class PluginsHandler(metaclass=SingletonType):
                 except Exception as e:
                     plugin_info = None
                     self._log(
-                        "Exception while fetching plugin info for {}:".format(record.get("plugin_id")),
+                        f"Exception while fetching plugin info for {record.get('plugin_id')}:",
                         message2=str(e),
                         level="exception",
                     )
@@ -873,7 +873,7 @@ class PluginsHandler(metaclass=SingletonType):
                     continue
 
                 self._log(
-                    "Incompatible plugin detected: {} ({})".format(record.get("name"), record.get("plugin_id")),
+                    f"Incompatible plugin detected: {record.get('name')} ({record.get('plugin_id')})",
                     level="warning",
                 )
                 incompatible_list.append(

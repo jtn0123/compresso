@@ -92,7 +92,7 @@ def build_tasks_query(status, sort_by="id", sort_order="asc", local_only=False, 
     if library_tags is not None:
         query = query.join(LibraryTags, join_type="LEFT OUTER JOIN")
         query = query.join(Tags, join_type="LEFT OUTER JOIN")
-        if library_tags:  # noqa: SIM102, SIM108
+        if library_tags:  # noqa: SIM102, SIM108 — conditional query building reads clearer as if/else
             query = query.where(Tags.name.in_(library_tags))
         else:
             # Handle a query where the list is empty. In this case we want to match for only libraries that have no tags

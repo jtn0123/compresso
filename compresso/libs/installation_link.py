@@ -130,7 +130,7 @@ class Links(metaclass=SingletonType):
             from compresso.libs.frontend_push_messages import FrontendPushMessages
 
             msg_type = "warning" if new_status != "connected" else "success"
-            label = "Remote link {}".format("reconnected" if new_status == "connected" else "disconnected")
+            label = f"Remote link {'reconnected' if new_status == 'connected' else 'disconnected'}"
             FrontendPushMessages().update(
                 {
                     "id": f"link_status_{uuid}",
@@ -408,7 +408,7 @@ class Links(metaclass=SingletonType):
             if res.status_code in [400, 404, 405, 500]:
                 json_data = res.json()
                 self._log(
-                    "Error while fetching remote installation config. Message: '{}'".format(json_data.get("error")),
+                    f"Error while fetching remote installation config. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
                     level="error",
                 )
@@ -422,7 +422,7 @@ class Links(metaclass=SingletonType):
             if res.status_code in [400, 404, 405, 500]:
                 json_data = res.json()
                 self._log(
-                    "Error while fetching remote installation settings. Message: '{}'".format(json_data.get("error")),
+                    f"Error while fetching remote installation settings. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
                     level="error",
                 )
@@ -436,7 +436,7 @@ class Links(metaclass=SingletonType):
             if res.status_code in [400, 404, 405, 500]:
                 json_data = res.json()
                 self._log(
-                    "Error while fetching remote installation version. Message: '{}'".format(json_data.get("error")),
+                    f"Error while fetching remote installation version. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
                     level="error",
                 )
@@ -450,7 +450,7 @@ class Links(metaclass=SingletonType):
             if res.status_code in [400, 404, 405, 500]:
                 json_data = res.json()
                 self._log(
-                    "Error while fetching remote installation session state. Message: '{}'".format(json_data.get("error")),
+                    f"Error while fetching remote installation session state. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
                     level="error",
                 )
@@ -465,7 +465,7 @@ class Links(metaclass=SingletonType):
             if res.status_code in [400, 404, 405, 500]:
                 json_data = res.json()
                 self._log(
-                    "Error while fetching remote installation pending task list. Message: '{}'".format(json_data.get("error")),
+                    f"Error while fetching remote installation pending task list. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
                     level="error",
                 )
@@ -486,7 +486,7 @@ class Links(metaclass=SingletonType):
             "task_count": int(tasks_data.get("recordsTotal", 0)),
         }
 
-    def update_all_remote_installation_links(self):  # noqa: C901
+    def update_all_remote_installation_links(self):  # noqa: C901 — multi-step remote link sync with error recovery
         """
         Updates the link status and configuration of linked remote installations
 
@@ -518,7 +518,7 @@ class Links(metaclass=SingletonType):
             # Check if this link is in backoff period
             # Derive a stable per-link key even when uuid is not yet synced
             raw_uuid = local_config.get("uuid", "???")
-            link_uuid = "_addr_{}".format(local_config.get("address", "unknown")) if raw_uuid == "???" else raw_uuid
+            link_uuid = f"_addr_{local_config.get('address', 'unknown')}" if raw_uuid == "???" else raw_uuid
             if self._should_skip_link(link_uuid):
                 # Still in backoff -- keep existing config but mark unavailable
                 updated_config = self.__generate_default_config(local_config)
@@ -648,7 +648,7 @@ class Links(metaclass=SingletonType):
                             import_data["library_config"]["enable_inotify"] = False
                             # Import library on remote installation
                             self._log(
-                                "Importing remote library config '{}'".format(library.get("name")),
+                                f"Importing remote library config '{library.get('name')}'",
                                 message2=import_data,
                                 level="debug",
                             )
@@ -657,10 +657,10 @@ class Links(metaclass=SingletonType):
                                 # There was a connection issue of some kind. This was already logged.
                                 continue
                             if result.get("success"):
-                                self._log("Successfully imported library '{}'".format(library.get("name")), level="debug")
+                                self._log(f"Successfully imported library '{library.get('name')}'", level="debug")
                                 continue
                             self._log(
-                                "Failed to import library config '{}'".format(library.get("name")),
+                                f"Failed to import library config '{library.get('name')}'",
                                 message2=result.get("error"),
                                 level="error",
                             )
@@ -786,7 +786,7 @@ class Links(metaclass=SingletonType):
         elif res.status_code in [400, 404, 405, 500]:
             json_data = res.json()
             self._log(
-                "Error while fetching remote installation link config. Message: '{}'".format(json_data.get("error")),
+                f"Error while fetching remote installation link config. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
                 level="error",
             )
@@ -838,7 +838,7 @@ class Links(metaclass=SingletonType):
         elif res.status_code in [400, 404, 405, 500]:
             json_data = res.json()
             self._log(
-                "Error while pushing remote installation link config. Message: '{}'".format(json_data.get("error")),
+                f"Error while pushing remote installation link config. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
                 level="error",
             )
@@ -939,7 +939,7 @@ class Links(metaclass=SingletonType):
 
             except Exception as e:
                 self._log(
-                    "Failed to contact remote installation '{}'".format(local_config.get("address")),
+                    f"Failed to contact remote installation '{local_config.get('address')}'",
                     message2=str(e),
                     level="warning",
                 )
@@ -984,7 +984,7 @@ class Links(metaclass=SingletonType):
             elif res.status_code in [404, 405, 500]:
                 json_data = res.json()
                 self._log(
-                    "Error while creating new remote pending task. Message: '{}'".format(json_data.get("error")),
+                    f"Error while creating new remote pending task. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
                     level="error",
                 )
@@ -1203,9 +1203,7 @@ class Links(metaclass=SingletonType):
             link_info = self.remote_api_get(remote_config, f"/compresso/api/v2/pending/download/data/id/{remote_task_id}")
             if link_info.get("link_id"):
                 # Download the data file
-                res = self.remote_api_get_download(
-                    remote_config, "/compresso/downloads/{}".format(link_info.get("link_id")), path
-                )
+                res = self.remote_api_get_download(remote_config, f"/compresso/downloads/{link_info.get('link_id')}", path)
                 if res and os.path.exists(path):
                     with open(path) as f:
                         task_data = json.load(f)
@@ -1231,9 +1229,7 @@ class Links(metaclass=SingletonType):
             link_info = self.remote_api_get(remote_config, f"/compresso/api/v2/pending/download/file/id/{remote_task_id}")
             if link_info.get("link_id"):
                 # Download the file
-                res = self.remote_api_get_download(
-                    remote_config, "/compresso/downloads/{}".format(link_info.get("link_id")), path
-                )
+                res = self.remote_api_get_download(remote_config, f"/compresso/downloads/{link_info.get('link_id')}", path)
                 if res and os.path.exists(path):
                     return True
         except requests.exceptions.Timeout:

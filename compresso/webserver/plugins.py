@@ -175,11 +175,11 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
         try:
             if not plugins.exec_plugin_api_plugin_runner(data, plugin_module.get("plugin_id")):
                 tornado.log.app_log.exception(
-                    "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get("plugin_id"))
+                    f"Exception while carrying out plugin runner on PluginAPI '{plugin_module.get('plugin_id')}'"
                 )
         except Exception:
             tornado.log.app_log.exception(
-                "Exception while carrying out plugin runner on PluginAPI '{}'".format(plugin_module.get("plugin_id"))
+                f"Exception while carrying out plugin runner on PluginAPI '{plugin_module.get('plugin_id')}'"
             )
             self.set_status(500, reason="Internal server error")
             status_code = self.get_status()

@@ -127,7 +127,7 @@ class Migrations:
 
             self.router = PatchedRouter(
                 database=self.database,
-                migrate_table="migratehistory_{}".format(config.get("MIGRATIONS_HISTORY_VERSION")),
+                migrate_table=f"migratehistory_{config.get('MIGRATIONS_HISTORY_VERSION')}",
                 migrate_dir=config.get("MIGRATIONS_DIR"),
                 logger=self.logger,
             )
@@ -163,7 +163,7 @@ class Migrations:
 
         raise AttributeError("Migrator does not support adding columns (expected add_fields or add_columns).")
 
-    def update_schema(self):  # noqa: C901
+    def update_schema(self):  # noqa: C901 — migration logic with many conditional branches
         """
         Bring the database schema up-to-date at application startup.
 
@@ -297,7 +297,7 @@ class Migrations:
             for add_columns, compare_columns in declared_indexes:
                 if compare_columns in existing_index_columns:
                     continue
-                index_name = "{}_{}".format(table_name, "_".join(compare_columns))
+                index_name = f"{table_name}_{'_'.join(compare_columns)}"
                 if index_name in existing_index_names:
                     continue
                 try:

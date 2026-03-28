@@ -93,7 +93,7 @@ class RemoteTaskManager(threading.Thread):
     def run(self):
         # A manager should only run for a single task and connection to a single worker.
         # If either of these become unavailable, then the manager should exit
-        self._log("Starting remote task manager {} - {}".format(self.thread_id, self.installation_info.get("address")))
+        self._log(f"Starting remote task manager {self.thread_id} - {self.installation_info.get('address')}")
         # Pull task
         next_task = None
         try:
@@ -123,7 +123,7 @@ class RemoteTaskManager(threading.Thread):
                 except Exception:
                     self._log("Failed to requeue task after exception", level="error")
 
-        self._log("Stopping remote task manager {} - {}".format(self.thread_id, self.installation_info.get("address")))
+        self._log(f"Stopping remote task manager {self.thread_id} - {self.installation_info.get('address')}")
 
     def __set_current_task(self, current_task):
         """Sets the given task to the worker class"""
@@ -218,7 +218,7 @@ class RemoteTaskManager(threading.Thread):
         self.worker_log.append(f"\nRelevant logs will be prefixed with 'ERROR:Compresso.{self.name}'")
         self.current_task.save_command_log(self.worker_log)
 
-    def __send_task_to_remote_worker_and_monitor(self):  # noqa: C901
+    def __send_task_to_remote_worker_and_monitor(self):  # noqa: C901 — multi-step remote task lifecycle with progress tracking
         """
         Sends the task file to the remote installation to process.
         Monitors progress and then fetches the results.
@@ -551,7 +551,7 @@ class RemoteTaskManager(threading.Thread):
                 f"Remote task #{remote_task_id} was successful, proceeding to download the completed file '{task_label}'",
                 level="debug",
             )
-            self._log("Remote task abspath {} to be transferred".format(data.get("abspath")), level="debug")
+            self._log(f"Remote task abspath {data.get('abspath')} to be transferred", level="debug")
             if os.path.exists(data.get("abspath")):
                 # /library/tvshows/show_name/season/compresso_remote_pending_library/file.mkv
                 task_cache_path = data.get("abspath")
@@ -637,7 +637,7 @@ class RemoteTaskManager(threading.Thread):
                     )
                     self.links.release_network_transfer_lock(lock_key)
                     if not success:
-                        self._log("Failed to download file '{}'".format(os.path.basename(data.get("abspath"))), level="error")
+                        self._log(f"Failed to download file '{os.path.basename(data.get('abspath'))}'", level="error")
                         # Send request to terminate the remote worker then return
                         self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                         self.__write_failure_to_worker_log()

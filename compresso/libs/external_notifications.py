@@ -124,9 +124,9 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
             scores = context["quality_scores"]
             score_parts = []
             if scores.get("vmaf") is not None:
-                score_parts.append("VMAF: {}".format(scores["vmaf"]))
+                score_parts.append(f"VMAF: {scores['vmaf']}")
             if scores.get("ssim") is not None:
-                score_parts.append("SSIM: {}".format(scores["ssim"]))
+                score_parts.append(f"SSIM: {scores['ssim']}")
             if score_parts:
                 fields.append({"name": "Quality", "value": " | ".join(score_parts), "inline": False})
         if context.get("message"):
@@ -166,22 +166,22 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
 
         detail_parts = []
         if context.get("file_name"):
-            detail_parts.append("*File:* {}".format(context["file_name"]))
+            detail_parts.append(f"*File:* {context['file_name']}")
         if context.get("codec"):
-            detail_parts.append("*Codec:* {}".format(context["codec"]))
+            detail_parts.append(f"*Codec:* {context['codec']}")
         if context.get("size_saved"):
-            detail_parts.append("*Size Saved:* {}".format(context["size_saved"]))
+            detail_parts.append(f"*Size Saved:* {context['size_saved']}")
         if context.get("quality_scores"):
             scores = context["quality_scores"]
             score_parts = []
             if scores.get("vmaf") is not None:
-                score_parts.append("VMAF: {}".format(scores["vmaf"]))
+                score_parts.append(f"VMAF: {scores['vmaf']}")
             if scores.get("ssim") is not None:
-                score_parts.append("SSIM: {}".format(scores["ssim"]))
+                score_parts.append(f"SSIM: {scores['ssim']}")
             if score_parts:
-                detail_parts.append("*Quality:* {}".format(" | ".join(score_parts)))
+                detail_parts.append(f"*Quality:* {' | '.join(score_parts)}")
         if context.get("message"):
-            detail_parts.append("*Details:* {}".format(context["message"]))
+            detail_parts.append(f"*Details:* {context['message']}")
 
         if detail_parts:
             blocks.append(
@@ -200,7 +200,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": "Compresso | {}".format(time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())),
+                        "text": f"Compresso | {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
                     },
                 ],
             }

@@ -268,7 +268,7 @@ class BaseApiHandler(RequestHandler):
                 # This route matches the current request URI and does not have any params.
                 # Set this route and call the configured method.
                 tornado.log.app_log.debug(
-                    "Routing API to {}.{}()".format(self.__class__.__name__, route.get("call_method")), exc_info=True
+                    f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True
                 )
                 self.route = route
                 await getattr(self, route.get("call_method"))()

@@ -571,7 +571,7 @@ class PostProcessor(threading.Thread):
                     ):
                         file_move_processes_success = False
                 else:
-                    self._log("Plugin did not request a file copy ({})".format(plugin_module.get("plugin_id")), level="debug")
+                    self._log(f"Plugin did not request a file copy ({plugin_module.get('plugin_id')})", level="debug")
 
             # Compresso's default file movement process
             # Only carry out final post-processor file moments if all others were successful
@@ -602,7 +602,7 @@ class PostProcessor(threading.Thread):
             if file_move_processes_success and data.get("remove_source_file"):
                 # Only carry out a source removal if the file exists and the final copy was also successful
                 if file_move_processes_success and os.path.exists(source_data.get("abspath")):
-                    self._log("Removing source: {}".format(source_data.get("abspath")))
+                    self._log(f"Removing source: {source_data.get('abspath')}")
                     try:
                         tracker.safe_remove(source_data.get("abspath"))
                     except (OSError, PermissionError, shutil.Error) as e:
@@ -694,14 +694,12 @@ class PostProcessor(threading.Thread):
 
         # Remove the source
         if os.path.exists(source_data.get("abspath")) and remove_source_file:
-            self._log("Removing remote source: {}".format(source_data.get("abspath")))
+            self._log(f"Removing remote source: {source_data.get('abspath')}")
             os.remove(source_data.get("abspath"))
         elif os.path.exists(source_data.get("abspath")) and not remove_source_file:
-            self._log(
-                "Keep remote source: {}, remote file source is in library and not cache.".format(source_data.get("abspath"))
-            )
+            self._log(f"Keep remote source: {source_data.get('abspath')}, remote file source is in library and not cache.")
         else:
-            self._log("Remote source file '{}' does not exist!".format(source_data.get("abspath")), level="warning")
+            self._log(f"Remote source file '{source_data.get('abspath')}' does not exist!", level="warning")
 
         # Copy final cache file to original directory
         random_string = f"{common.random_string()}-{int(time.time())}"

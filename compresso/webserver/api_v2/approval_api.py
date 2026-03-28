@@ -93,7 +93,7 @@ class ApiApprovalHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -139,7 +139,7 @@ class ApiApprovalHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -188,7 +188,7 @@ class ApiApprovalHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -233,7 +233,7 @@ class ApiApprovalHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return
@@ -263,7 +263,7 @@ class ApiApprovalHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get("call_method"), str(bae)))
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
             self.write_error()
             return

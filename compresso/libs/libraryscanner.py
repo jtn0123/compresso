@@ -220,7 +220,7 @@ class LibraryScannerManager(threading.Thread):
                 return True
         return False
 
-    def scan_library_path(self, library_name, library_path, library_id):  # noqa: C901
+    def scan_library_path(self, library_name, library_path, library_id):  # noqa: C901 — recursive scan with multiple filter stages
         """
         Run a scan of the given library path
 
@@ -312,7 +312,7 @@ class LibraryScannerManager(threading.Thread):
                     percent_completed = int(100 - percent_remaining)
                     percent_completed_string = f"{percent_completed}% - Testing: {current_file}"
                 elif current_file:
-                    percent_completed_string = "{}% - Testing: {}".format("???", current_file)
+                    percent_completed_string = f"???% - Testing: {current_file}"
 
             # Fetch frontend messages from queue
             if not status_updates.empty():

@@ -68,7 +68,7 @@ class AudioCodecHandle:
             "copy",
         ]
         # Map this stream
-        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", "0:{}".format(stream["index"])]
+        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", f"0:{stream['index']}"]
         self.audio_tracks_count += 1
 
     def transcode_stream(self, stream):
@@ -83,7 +83,7 @@ class AudioCodecHandle:
             self.audio_encoder_transcoding,
         ]
         # Map this stream
-        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", "0:{}".format(stream["index"])]
+        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", f"0:{stream['index']}"]
         self.audio_tracks_count += 1
 
     def clone_stereo_stream(self, stream):
@@ -99,7 +99,7 @@ class AudioCodecHandle:
             audio_tag = "Stereo"
 
         # Map a duplicated stream
-        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", " 0:{}".format(stream["index"])]
+        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", f" 0:{stream['index']}"]
 
         self.encoding_args["streams_to_encode"] = self.encoding_args["streams_to_encode"] + [
             f"-c:a:{self.audio_tracks_count}",

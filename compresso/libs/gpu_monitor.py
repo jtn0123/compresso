@@ -221,7 +221,7 @@ class GpuMonitor(metaclass=SingletonType):
                 busy_path = card_dir / "device" / "gpu_busy_percent"
                 try:  # noqa: SIM105 — gpu_busy_percent may be absent or unreadable
                     utilization = float(busy_path.read_text().strip())
-                except Exception:  # noqa: S110
+                except Exception:  # noqa: S110 — gpu_busy_percent sysfs may be absent
                     pass
 
                 # Read VRAM usage if available
@@ -328,7 +328,7 @@ class GpuMonitor(metaclass=SingletonType):
         """
         now = time.time()
         for gpu in gpus:
-            idx = "{}:{}".format(gpu.get("type", "unknown"), gpu["index"])
+            idx = f"{gpu.get('type', 'unknown')}:{gpu['index']}"
             if idx not in self._history:
                 self._history[idx] = deque(maxlen=HISTORY_MAX_SAMPLES)
             self._history[idx].append(
