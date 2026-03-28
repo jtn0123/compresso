@@ -26,6 +26,7 @@ export default {
       const themeName = compressoDarkMode.value ? 'dark' : 'light';
       const palette = LocalStorage.getItem('palette') || 'forest';
       LocalStorage.set('theme', themeName);
+      LocalStorage.set('theme_explicit', true);
       $q.dark.set(compressoDarkMode.value);
       applyTheme(themeName, palette);
     }

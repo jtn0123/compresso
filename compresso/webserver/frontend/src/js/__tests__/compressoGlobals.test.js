@@ -7,10 +7,14 @@ vi.mock('axios', () => ({
 
 // Mock quasar's setCssVar, Notify, and LocalStorage
 const mockLocalStorageGetItem = vi.fn()
+const mockLocalStorageSet = vi.fn()
 vi.mock('quasar', () => ({
   setCssVar: vi.fn(),
   Notify: { create: vi.fn() },
-  LocalStorage: { getItem: (...args) => mockLocalStorageGetItem(...args) },
+  LocalStorage: {
+    getItem: (...args) => mockLocalStorageGetItem(...args),
+    set: (...args) => mockLocalStorageSet(...args),
+  },
 }))
 
 // Mock compressoTheme so compressoGlobals.setTheme can be tested in isolation
@@ -147,19 +151,16 @@ describe('showEventToast', () => {
 
 describe('saveToastSettings', () => {
   it('persists to localStorage without throwing', () => {
-    const mockStorage = { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() }
-    vi.spyOn(globalThis, 'localStorage', 'get').mockReturnValue(mockStorage)
+    mockLocalStorageSet.mockClear()
 
     toastSettings.enabled = false
     toastSettings.verbosity = 'important'
     saveToastSettings()
 
-    expect(mockStorage.setItem).toHaveBeenCalledWith(
+    expect(mockLocalStorageSet).toHaveBeenCalledWith(
       'compresso-toast-settings',
-      JSON.stringify({ enabled: false, verbosity: 'important' })
+      { enabled: false, verbosity: 'important' }
     )
-
-    vi.restoreAllMocks()
   })
 })
 

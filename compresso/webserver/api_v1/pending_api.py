@@ -84,7 +84,11 @@ class ApiPendingHandler(BaseApiHandler):
         self.action_route()
 
     def manage_pending_tasks_list(self, *args, **kwargs):
-        request_dict = json.loads(self.request.body)
+        try:
+            request_dict = json.loads(self.request.body)
+        except (json.JSONDecodeError, ValueError):
+            self.write(json.dumps({"success": False}))
+            return
 
         # Delete a list of tasks.
         #   (on success will continue to return the current list of tasks)
@@ -174,7 +178,11 @@ class ApiPendingHandler(BaseApiHandler):
         :param pathname:
         :return:
         """
-        request_dict = json.loads(self.request.body)
+        try:
+            request_dict = json.loads(self.request.body)
+        except (json.JSONDecodeError, ValueError):
+            self.write(json.dumps({"success": False}))
+            return
 
         # Validate and resolve path to prevent path traversal
         raw_path = request_dict.get("path", "")

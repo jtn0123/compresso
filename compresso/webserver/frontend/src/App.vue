@@ -13,10 +13,10 @@ export default defineComponent({
 
     // Detect system preference if no stored theme
     let configuredTheme = LocalStorage.getItem('theme');
+    const userExplicitlyChoseTheme = !!configuredTheme;
     if (!configuredTheme) {
       const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       configuredTheme = prefersDark ? 'dark' : 'light';
-      LocalStorage.set('theme', configuredTheme);
     }
 
     const configuredPalette = LocalStorage.getItem('palette') || 'forest';
@@ -28,8 +28,8 @@ export default defineComponent({
     // Listen for runtime OS theme preference changes
     const mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
     const onThemeChange = (e) => {
-      // Only auto-switch if user hasn't explicitly stored a preference
-      if (LocalStorage.getItem('theme')) return;
+      // Only auto-switch if user hasn't explicitly chosen via ThemeSwitch
+      if (LocalStorage.getItem('theme_explicit')) return;
       const newTheme = e.matches ? 'dark' : 'light';
       const palette = LocalStorage.getItem('palette') || 'forest';
       applyTheme(newTheme, palette);

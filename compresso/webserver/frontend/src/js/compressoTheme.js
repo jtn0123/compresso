@@ -131,7 +131,7 @@ export function applyTheme(mode, palette) {
 export function getChartColors() {
   const style = getComputedStyle(document.body)
   return Array.from({ length: 10 }, (_, i) =>
-    style.getPropertyValue(`--compresso-chart-${i + 1}`).trim()
+    style.getPropertyValue(`--compresso-chart-${i + 1}`).trim() || '#808080'
   )
 }
 
@@ -143,7 +143,7 @@ export function getChartColors() {
 export function getChartColor(index) {
   return getComputedStyle(document.body)
     .getPropertyValue(`--compresso-chart-${index}`)
-    .trim()
+    .trim() || '#808080'
 }
 
 /**

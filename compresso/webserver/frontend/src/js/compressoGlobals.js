@@ -19,8 +19,8 @@ export const notificationsCount = ref(0)
 const TOAST_SETTINGS_KEY = 'compresso-toast-settings'
 function loadToastSettings() {
   try {
-    const stored = localStorage.getItem(TOAST_SETTINGS_KEY)
-    if (stored) return JSON.parse(stored)
+    const stored = LocalStorage.getItem(TOAST_SETTINGS_KEY)
+    if (stored) return stored
   } catch { /* ignore parse errors */ }
   return { enabled: true, verbosity: 'all' }
 }
@@ -28,10 +28,10 @@ export const toastSettings = reactive(loadToastSettings())
 
 export function saveToastSettings() {
   try {
-    localStorage.setItem(TOAST_SETTINGS_KEY, JSON.stringify({
+    LocalStorage.set(TOAST_SETTINGS_KEY, {
       enabled: toastSettings.enabled,
       verbosity: toastSettings.verbosity,
-    }))
+    })
   } catch { /* ignore storage errors */ }
 }
 

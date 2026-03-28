@@ -41,6 +41,8 @@ from compresso.webserver.helpers import plugins
 def get_plugin_by_path(path):
     # Get the plugin ID from the url
     split_path = path.split("/")
+    if len(split_path) < 4:
+        return None
     plugin_type = split_path[2]
     plugin_id = split_path[3]
     if plugin_type == "plugin_api":
@@ -97,9 +99,10 @@ class DataPanelRequestHandler(tornado.web.RequestHandler):
 
         # Run plugin and fetch return data
         if not plugins.exec_data_panels_plugin_runner(data, plugin_module.get("plugin_id")):
-            tornado.log.app_log.exception(
-                "Exception while carrying out plugin runner on DataPanel '{}'".format(plugin_module.get("plugin_id"))
-            )
+            tornado.log.app_log.error("Failed to execute plugin runner on DataPanel '%s'", plugin_module.get("plugin_id"))
+            self.set_status(500)
+            self.write("Plugin execution failed")
+            return
 
         self.render_data(data)
         return

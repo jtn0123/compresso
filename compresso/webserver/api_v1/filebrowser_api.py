@@ -84,8 +84,8 @@ class ApiFilebrowserHandler(BaseApiHandler):
         self.action_route()
 
     def fetch_directory_listing(self, *args, **kwargs):
-        current_path = _validate_browsable_path(self.get_argument("current_path"))
-        list_type = self.get_argument("list_type") if self.get_body_arguments("list_type") else "all"
+        current_path = _validate_browsable_path(self.get_argument("current_path", "/"))
+        list_type = self.get_argument("list_type", "all")
 
         path_data = self.fetch_path_data(current_path, list_type)
 
@@ -134,15 +134,18 @@ class ApiFilebrowserHandler(BaseApiHandler):
                         "full_path": parent_path,
                     }
                 )
-            for item in sorted(os.listdir(safe_path)):
-                abspath = _validate_browsable_path(os.path.join(safe_path, item))
-                if os.path.isdir(abspath):
-                    results.append(
-                        {
-                            "name": item,
-                            "full_path": abspath,
-                        }
-                    )
+            try:
+                for item in sorted(os.listdir(safe_path)):
+                    abspath = _validate_browsable_path(os.path.join(safe_path, item))
+                    if os.path.isdir(abspath):
+                        results.append(
+                            {
+                                "name": item,
+                                "full_path": abspath,
+                            }
+                        )
+            except OSError:
+                pass
         else:
             # Path doesn't exist!
             # Just return the root dir as the first directory option
@@ -164,13 +167,16 @@ class ApiFilebrowserHandler(BaseApiHandler):
         safe_path = _validate_browsable_path(path)
         results = []
         if os.path.exists(safe_path):
-            for item in sorted(os.listdir(safe_path)):
-                abspath = _validate_browsable_path(os.path.join(safe_path, item))
-                if os.path.isfile(abspath):
-                    results.append(
-                        {
-                            "name": item,
-                            "full_path": abspath,
-                        }
-                    )
+            try:
+                for item in sorted(os.listdir(safe_path)):
+                    abspath = _validate_browsable_path(os.path.join(safe_path, item))
+                    if os.path.isfile(abspath):
+                        results.append(
+                            {
+                                "name": item,
+                                "full_path": abspath,
+                            }
+                        )
+            except OSError:
+                pass
         return results
