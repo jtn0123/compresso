@@ -1,3 +1,10 @@
+## [1.8.2](https://github.com/jtn0123/compresso/compare/v1.8.1...v1.8.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* address 13 issues from comprehensive code review ([#55](https://github.com/jtn0123/compresso/issues/55)) ([38d1eb0](https://github.com/jtn0123/compresso/commit/38d1eb005abdb7267b27f3af6158e68b4667f410))
+
 ## [1.8.1](https://github.com/jtn0123/compresso/compare/v1.8.0...v1.8.1) (2026-03-28)
 
 
