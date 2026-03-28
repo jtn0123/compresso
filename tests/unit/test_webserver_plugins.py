@@ -135,12 +135,14 @@ class TestDataPanelRequestHandler:
     def test_handle_panel_request_plugin_failure(self, mock_get_plugin, mock_exec):
         handler = self._make_handler()
         mock_get_plugin.return_value = {"plugin_id": "test_plugin"}
-        handler.render_data = MagicMock()
+        handler.set_status = MagicMock()
+        handler.write = MagicMock()
 
         handler.handle_panel_request()
 
-        # Should still render data even on plugin failure
-        handler.render_data.assert_called_once()
+        # Should return 500 error on plugin failure
+        handler.set_status.assert_called_with(500)
+        handler.write.assert_called_with("Plugin execution failed")
 
     def test_render_data(self):
         handler = self._make_handler()

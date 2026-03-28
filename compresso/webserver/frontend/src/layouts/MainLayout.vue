@@ -134,7 +134,7 @@ export default {
 
     // Sidebar state
     const leftDrawerOpen = ref(!$q.screen.lt.md);
-    const sidebarPinned = ref(LocalStorage.getItem('sidebar_pinned') !== false);
+    const sidebarPinned = ref(LocalStorage.getItem('sidebar_pinned') === true);
     const sidebarHovered = ref(false);
     const rightNotificationsDrawerOpen = ref(false);
 
