@@ -805,7 +805,7 @@ class TestRemoteTaskManagerTaskManagement:
         with patch("compresso.libs.remote_task_manager.PluginsHandler"):
             mgr._RemoteTaskManager__set_current_task(mock_task)
         assert mgr.current_task is mock_task
-        assert mgr.worker_log == []
+        assert len(mgr.worker_log) == 0
 
     def test_unset_current_task(self):
         mgr = self._make_rtm()
@@ -815,7 +815,7 @@ class TestRemoteTaskManagerTaskManagement:
         mgr._RemoteTaskManager__unset_current_task()
         assert mgr.current_task is None
         assert mgr.worker_runners_info == {}
-        assert mgr.worker_log == []
+        assert len(mgr.worker_log) == 0
 
 
 # ==================================================================

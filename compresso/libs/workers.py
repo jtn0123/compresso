@@ -36,6 +36,7 @@ import shutil
 import subprocess
 import threading
 import time
+from collections import deque
 
 import psutil
 
@@ -126,7 +127,7 @@ class Worker(threading.Thread):
             return
         # Set the task
         self.current_task = new_task
-        self.worker_log = []
+        self.worker_log = deque(maxlen=500)
         self.idle = False
 
     def get_status(self):
@@ -179,9 +180,9 @@ class Worker(threading.Thread):
             # Append the worker log tail
             try:
                 if self.worker_log and len(self.worker_log) > 40:
-                    status["worker_log_tail"] = self.worker_log[-39:]
+                    status["worker_log_tail"] = list(self.worker_log)[-39:]
                 else:
-                    status["worker_log_tail"] = self.worker_log
+                    status["worker_log_tail"] = list(self.worker_log)
             except (AttributeError, TypeError, IndexError) as e:
                 self.logger.exception("Exception in fetching log tail of worker: %s", e)
 
@@ -195,7 +196,7 @@ class Worker(threading.Thread):
     def __unset_current_task(self):
         self.current_task = None
         self.worker_runners_info = {}
-        self.worker_log = []
+        self.worker_log = deque(maxlen=500)
 
     def __process_task_queue_item(self):
         """
@@ -619,13 +620,13 @@ class Worker(threading.Thread):
             current_command_ref.append(command_string)
 
         # Append start of command to worker subprocess stdout
-        self.worker_log += [
+        self.worker_log.extend([
             "\n\n",
             "COMMAND:\n",
             command_string,
             "\n\n",
             "LOG:\n",
-        ]
+        ])
 
         # Create output path if file_out is present and the path does not exists
         if data.get("file_out"):
@@ -713,7 +714,11 @@ class Worker(threading.Thread):
 
             # Get the final output and the exit status
             if not self.redundant_flag.is_set():
-                sub_proc.communicate()
+                try:
+                    sub_proc.communicate(timeout=30)
+                except subprocess.TimeoutExpired:
+                    self.logger.warning("Subprocess communicate() timed out after 30s, terminating")
+                    self.worker_subprocess_monitor.terminate_proc()
 
             # If the process is still running, kill it
             self.worker_subprocess_monitor.terminate_proc()

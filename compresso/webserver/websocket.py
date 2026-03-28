@@ -53,24 +53,24 @@ from compresso.webserver.proxy import resolve_proxy_target
 
 
 class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
-    ALLOWED_COMMANDS = frozenset(
-        {
-            "default_failure_response",
-            "start_frontend_messages",
-            "stop_frontend_messages",
-            "start_system_logs",
-            "stop_system_logs",
-            "start_workers_info",
-            "stop_workers_info",
-            "start_pending_tasks_info",
-            "stop_pending_tasks_info",
-            "start_completed_tasks_info",
-            "stop_completed_tasks_info",
-            "start_system_status",
-            "stop_system_status",
-            "dismiss_message",
-        }
-    )
+    # Explicit allowlist of WS command names that map to handler methods.
+    # Only commands in this set can be dispatched via on_message.
+    ALLOWED_COMMANDS = frozenset({
+        "default_failure_response",
+        "start_frontend_messages",
+        "stop_frontend_messages",
+        "start_system_logs",
+        "stop_system_logs",
+        "start_workers_info",
+        "stop_workers_info",
+        "start_pending_tasks_info",
+        "stop_pending_tasks_info",
+        "start_completed_tasks_info",
+        "stop_completed_tasks_info",
+        "start_system_status",
+        "stop_system_status",
+        "dismiss_message",
+    })
 
     STREAM_POLL_INTERVALS = {
         "frontend_message": 0.5,
@@ -157,12 +157,14 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     tornado.log.app_log.warning("Rejected unknown WS command: %s", command)
                     self.write_message({"success": False, "error": "Unknown command"})
                     return
-                getattr(self, command)(params=message_data.get("params", {}))
+                handler = getattr(self, command, None)
+                if handler is None:
+                    tornado.log.app_log.error("WS command method not found: %s", command)
+                    self.write_message({"success": False, "error": "Command not available"})
+                    return
+                handler(params=message_data.get("params", {}))
         except json.decoder.JSONDecodeError:
             tornado.log.app_log.error(f"Received incorrectly formatted message - {message}", exc_info=False)
-        except AttributeError:
-            tornado.log.app_log.error("WS command method not found: %s", message_data.get("command"))
-            self.write_message({"success": False, "error": "Command not available"})
 
     def on_close(self):
         tornado.log.app_log.info("WS Closed")

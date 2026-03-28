@@ -60,6 +60,7 @@ class CompressoFileMetadata:
     _main_pid = os.getpid()
 
     _task_cache: dict = {}
+    _task_cache_timestamps: dict = {}
     _path_cache: OrderedDict = OrderedDict()
     _last_prune = 0
 
@@ -116,9 +117,31 @@ class CompressoFileMetadata:
             raise ValueError(f"Plugin metadata exceeds size limit ({cls.MAX_PLUGIN_JSON_BYTES} bytes)")
 
     @classmethod
+    def _prune_task_cache(cls):
+        """Evict stale entries from _task_cache when it exceeds CACHE_MAX_ENTRIES."""
+        if len(cls._task_cache) <= cls.CACHE_MAX_ENTRIES:
+            return
+        now = time.time()
+        stale_ids = [
+            tid for tid, ts in cls._task_cache_timestamps.items()
+            if (now - ts) > cls.CACHE_TTL_SECONDS
+        ]
+        for tid in stale_ids:
+            cls._task_cache.pop(tid, None)
+            cls._task_cache_timestamps.pop(tid, None)
+        # If still over max, evict oldest entries
+        if len(cls._task_cache) > cls.CACHE_MAX_ENTRIES:
+            sorted_entries = sorted(cls._task_cache_timestamps.items(), key=lambda x: x[1])
+            to_evict = len(cls._task_cache) - cls.CACHE_MAX_ENTRIES
+            for tid, _ in sorted_entries[:to_evict]:
+                cls._task_cache.pop(tid, None)
+                cls._task_cache_timestamps.pop(tid, None)
+
+    @classmethod
     def _ensure_task_cache_entry(cls, task_id):
         entry = cls._task_cache.get(task_id)
         if entry is None:
+            cls._prune_task_cache()
             entry = {
                 "staged": {},
                 "staged_loaded": False,
@@ -133,6 +156,7 @@ class CompressoFileMetadata:
                 "source_path_at_set": None,
             }
             cls._task_cache[task_id] = entry
+        cls._task_cache_timestamps[task_id] = time.time()
         return entry
 
     @classmethod
@@ -371,6 +395,7 @@ class CompressoFileMetadata:
                 except Exception as e:
                     cls._logger.debug("Could not clean up task metadata for task %s: %s", task_id, e)
                 cls._task_cache.pop(task_id, None)
+                cls._task_cache_timestamps.pop(task_id, None)
                 return 0
 
             cls._ensure_task_cache_entry(task_id)
@@ -410,6 +435,9 @@ class CompressoFileMetadata:
                 if source_path_at_set not in group["paths"]:
                     group["paths"].append(source_path_at_set)
 
+        # NOTE: SqliteQueueDatabase does not support atomic() transactions.
+        # Write serialization is provided by the queue database's single writer thread.
+        # The cls._lock protects in-memory cache consistency across app threads.
         with cls._lock:
             for fingerprint, data in fingerprint_groups.items():
                 algo = data["algo"]
@@ -449,6 +477,7 @@ class CompressoFileMetadata:
 
             TaskMetadata.delete().where(TaskMetadata.task == task_id).execute()
             cls._task_cache.pop(task_id, None)
+            cls._task_cache_timestamps.pop(task_id, None)
         return len(fingerprint_groups)
 
     @classmethod

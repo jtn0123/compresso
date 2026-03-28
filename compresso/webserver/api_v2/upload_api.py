@@ -116,7 +116,7 @@ class ApiUploadHandler(BaseApiHandler):
                 self.meta["boundary"] = SEPARATOR + split_chunk[0] + b"--" + SEPARATOR
                 self.meta["header"] = SEPARATOR.join(split_chunk[0:3])
                 self.meta["header"] += SEPARATOR * 2
-                self.meta["filename"] = split_chunk[1].split(b"=")[-1].replace(b'"', b"").decode()
+                self.meta["filename"] = split_chunk[1].split(b"=")[-1].replace(b'"', b"").decode("utf-8", errors="replace")
                 # Sanitize filename to prevent path traversal
                 self.meta["filename"] = os.path.basename(self.meta["filename"])
                 if not self.meta["filename"] or self.meta["filename"] in {".", ".."}:

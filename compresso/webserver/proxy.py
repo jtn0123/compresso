@@ -1,9 +1,45 @@
 import base64
+import ipaddress
+import socket
+from urllib.parse import urlparse
 
 import tornado.httpclient
 import tornado.web
 
 from compresso.libs.installation_link import Links
+
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),       # Loopback
+    ipaddress.ip_network("::1/128"),            # IPv6 loopback
+    ipaddress.ip_network("169.254.0.0/16"),     # Link-local / cloud metadata
+    ipaddress.ip_network("fe80::/10"),          # IPv6 link-local
+]
+
+
+def _is_blocked_address(hostname):
+    """
+    Check if a hostname resolves to a loopback, link-local, or cloud metadata IP.
+    LAN addresses (10.x, 172.16-31.x, 192.168.x) are allowed since remote
+    installations are typically other machines on the local network.
+    Returns True if the address should be blocked (fail-closed on DNS errors).
+    """
+    try:
+        addr_infos = socket.getaddrinfo(hostname, None)
+    except (socket.gaierror, OSError):
+        # Fail closed: if we can't resolve, don't allow the request
+        return True
+    for _family, _type, _proto, _canonname, sockaddr in addr_infos:
+        ip_str = sockaddr[0]
+        try:
+            addr = ipaddress.ip_address(ip_str)
+        except ValueError:
+            continue
+        if addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return True
+        for net in _BLOCKED_NETWORKS:
+            if addr in net:
+                return True
+    return False
 
 
 def resolve_proxy_target(target_id):
@@ -52,6 +88,12 @@ def resolve_proxy_target(target_id):
     url_base = target_config.get("address", "").rstrip("/")
     if not url_base.startswith("http"):
         url_base = "http://" + url_base
+
+    # Validate target is not a private/internal address (SSRF protection)
+    parsed = urlparse(url_base)
+    hostname = parsed.hostname
+    if not hostname or _is_blocked_address(hostname):
+        return None
 
     # Auth
     auth_headers = {}
