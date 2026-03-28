@@ -46,6 +46,7 @@ from compresso.libs.singleton import SingletonType
 
 class Links(metaclass=SingletonType):
     _network_transfer_lock: dict = {}
+    _transfer_lock = threading.RLock()
 
     def __init__(self, *args, **kwargs):
         self.settings = config.Config()
@@ -193,7 +194,7 @@ class Links(metaclass=SingletonType):
         :return:
         """
         time_now = time.time()
-        lock = threading.RLock()
+        lock = self._transfer_lock
         # Limit maximum transfer limit to 5
         if transfer_limit > 5:
             transfer_limit = 5
@@ -218,7 +219,7 @@ class Links(metaclass=SingletonType):
         :param lock_key:
         :return:
         """
-        lock = threading.RLock()
+        lock = self._transfer_lock
         with lock:
             # Expire the lock for this address
             self._network_transfer_lock[lock_key] = {}

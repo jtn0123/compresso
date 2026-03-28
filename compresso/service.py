@@ -335,6 +335,13 @@ class RootService:
             else:
                 self.logger.info("WORKER_THREAD_STOPPED name=%s", thread["name"])
         self.threads = []
+        # Shut down the notification executor
+        try:
+            from compresso.libs.external_notifications import ExternalNotificationDispatcher
+
+            ExternalNotificationDispatcher().shutdown()
+        except Exception:  # noqa: S110 — best-effort cleanup on shutdown
+            pass
 
     def sig_handle(self, signum, frame):
         self.logger.info(f"Received {signum}")

@@ -274,7 +274,7 @@ class TestWorkerUnsetCurrentTask:
         worker._Worker__unset_current_task()
         assert worker.current_task is None
         assert worker.worker_runners_info == {}
-        assert worker.worker_log == []
+        assert len(worker.worker_log) == 0
 
 
 # ==================================================================
@@ -323,7 +323,7 @@ class TestWorkerSetTaskEdge:
         worker.worker_log = None
         mock_task = MagicMock()
         worker.set_task(mock_task)
-        assert worker.worker_log == []
+        assert len(worker.worker_log) == 0
 
     def test_set_task_does_nothing_when_already_set(self):
         worker = _make_worker()

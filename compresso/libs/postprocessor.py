@@ -149,13 +149,11 @@ class PostProcessor(threading.Thread):
                             if ratio_pct < min_pct or ratio_pct > max_pct:
                                 rejection_msg = f"Size guardrail REJECTED: {ratio_pct:.1f}% (allowed {min_pct}-{max_pct}%)"
                                 self._log(rejection_msg)
-                                db = self.current_task.task._meta.database
-                                with db.atomic():
-                                    self.current_task.task.success = False
-                                    # Write rejection reason into task log so retry logic can detect it
-                                    existing_log = self.current_task.task.log or ""
-                                    self.current_task.task.log = (existing_log + "\n" + rejection_msg).strip()
-                                    self.current_task.task.save()
+                                self.current_task.task.success = False
+                                # Write rejection reason into task log so retry logic can detect it
+                                existing_log = self.current_task.task.log or ""
+                                self.current_task.task.log = (existing_log + "\n" + rejection_msg).strip()
+                                self.current_task.task.save()
                 except (OSError, ZeroDivisionError, peewee.PeeweeException) as e:
                     self._log("Exception in size guardrail check", message2=str(e), level="warning")
                 except Exception as e:
@@ -228,14 +226,12 @@ class PostProcessor(threading.Thread):
             delay_seconds = 30 * (4**retry_count)
             deferred_until = datetime.datetime.now() + datetime.timedelta(seconds=delay_seconds)
 
-            db = self.current_task.task._meta.database
-            with db.atomic():
-                self.current_task.task.retry_count = retry_count + 1
-                self.current_task.task.deferred_until = deferred_until
-                self.current_task.task.status = "pending"
-                self.current_task.task.success = None
-                self.current_task.task.log = ""
-                self.current_task.task.save()
+            self.current_task.task.retry_count = retry_count + 1
+            self.current_task.task.deferred_until = deferred_until
+            self.current_task.task.status = "pending"
+            self.current_task.task.success = None
+            self.current_task.task.log = ""
+            self.current_task.task.save()
 
             source_path = self.current_task.get_source_abspath()
             filename = os.path.basename(source_path)
@@ -305,11 +301,9 @@ class PostProcessor(threading.Thread):
                 source_path = self.current_task.get_source_abspath()
                 scores = compute_quality_scores(source_path, staged_path, duration_limit=30)
                 if scores:
-                    db = self.current_task.task._meta.database
-                    with db.atomic():
-                        self.current_task.task.vmaf_score = scores.get("vmaf_score")
-                        self.current_task.task.ssim_score = scores.get("ssim_score")
-                        self.current_task.task.save()
+                    self.current_task.task.vmaf_score = scores.get("vmaf_score")
+                    self.current_task.task.ssim_score = scores.get("ssim_score")
+                    self.current_task.task.save()
                     self._log(
                         "Quality scores computed - VMAF: {}, SSIM: {}".format(
                             scores.get("vmaf_score"), scores.get("ssim_score")

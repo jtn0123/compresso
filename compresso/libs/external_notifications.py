@@ -52,6 +52,10 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
     def __init__(self):
         self._executor = ThreadPoolExecutor(max_workers=2)
 
+    def shutdown(self):
+        """Shut down the thread pool executor gracefully."""
+        self._executor.shutdown(wait=False)
+
     def dispatch(self, event_type, context):
         """
         Main entry point. Fans out notifications to all channels

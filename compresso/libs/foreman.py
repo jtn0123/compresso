@@ -238,12 +238,10 @@ class Foreman(threading.Thread):
 
                 # Check if it should run
                 if (
-                    repetition == "daily"
-                    or repetition == "weekday"
-                    and days[day_of_week] not in ["saturday", "sunday"]
-                    or repetition == "weekend"
-                    and days[day_of_week] in ["saturday", "sunday"]
-                    or repetition == days[day_of_week]
+                    (repetition == "daily")
+                    or (repetition == "weekday" and days[day_of_week] not in ["saturday", "sunday"])
+                    or (repetition == "weekend" and days[day_of_week] in ["saturday", "sunday"])
+                    or (repetition == days[day_of_week])
                 ):
                     self.run_task(
                         time_now,
@@ -285,7 +283,7 @@ class Foreman(threading.Thread):
                     self.mark_worker_thread_as_redundant(worker_id)
 
         # Remove workers for groups that no longer exist
-        for thread in self.worker_threads:
+        for thread in list(self.worker_threads):
             worker_group_id = self.worker_threads[thread].worker_group_id
             worker_name = self.worker_threads[thread].name
             # Only remove threads that are idle (never terminate a task just to reduce worker count)

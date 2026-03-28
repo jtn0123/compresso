@@ -392,8 +392,8 @@ class TestAttemptRetry:
         """If retry logic throws, it should catch the exception and return False."""
         pp = _make_postprocessor()
         task_obj = self._make_mock_task(retry_count=0, max_retries=3, log="error")
-        # Make _meta.database.atomic() raise
-        task_obj._meta.database.atomic.side_effect = Exception("DB error")
+        # Make save() raise to simulate a DB error during retry
+        task_obj.save.side_effect = Exception("DB error")
 
         mock_current_task = MagicMock()
         mock_current_task.task = task_obj

@@ -53,6 +53,8 @@ from compresso.webserver.proxy import resolve_proxy_target
 
 
 class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
+    # Explicit allowlist of WS command names that map to handler methods.
+    # Only commands in this set can be dispatched via on_message.
     ALLOWED_COMMANDS = frozenset(
         {
             "default_failure_response",
@@ -157,12 +159,14 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     tornado.log.app_log.warning("Rejected unknown WS command: %s", command)
                     self.write_message({"success": False, "error": "Unknown command"})
                     return
-                getattr(self, command)(params=message_data.get("params", {}))
+                handler = getattr(self, command, None)
+                if handler is None:
+                    tornado.log.app_log.error("WS command method not found: %s", command)
+                    self.write_message({"success": False, "error": "Command not available"})
+                    return
+                handler(params=message_data.get("params", {}))
         except json.decoder.JSONDecodeError:
             tornado.log.app_log.error(f"Received incorrectly formatted message - {message}", exc_info=False)
-        except AttributeError:
-            tornado.log.app_log.error("WS command method not found: %s", message_data.get("command"))
-            self.write_message({"success": False, "error": "Command not available"})
 
     def on_close(self):
         tornado.log.app_log.info("WS Closed")

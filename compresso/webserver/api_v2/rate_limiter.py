@@ -17,6 +17,12 @@ class RateLimiter:
 
     Default: 60 requests/minute for normal endpoints.
     Strict: 5 requests/minute for expensive endpoints.
+
+    SECURITY NOTE: Rate limiting is keyed by request.remote_ip. If Tornado's
+    xheaders option is ever enabled (e.g. behind a reverse proxy), clients can
+    spoof their IP via X-Real-Ip / X-Forwarded-For headers unless a trusted
+    proxy configuration is also in place. Do not enable xheaders without
+    configuring trusted proxy validation.
     """
 
     DEFAULT_LIMIT = 60
