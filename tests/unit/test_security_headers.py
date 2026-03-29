@@ -13,9 +13,7 @@ import tornado.testing
 import tornado.web
 
 from compresso.webserver.api_v2.base_api_handler import BaseApiHandler as V2BaseApiHandler
-from compresso.webserver.main import MainUIRequestHandler
 from compresso.webserver.security_headers import SecurityHeadersMixin, check_websocket_origin
-
 
 # --- Unit tests for the mixin itself ---
 
