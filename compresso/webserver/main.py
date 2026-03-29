@@ -33,9 +33,10 @@ import tornado.web
 import tornado.websocket
 
 from compresso.libs import session
+from compresso.webserver.security_headers import SecurityHeadersMixin
 
 
-class MainUIRequestHandler(tornado.web.RequestHandler):
+class MainUIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
     name = None
     config = None
     session = None
@@ -49,6 +50,7 @@ class MainUIRequestHandler(tornado.web.RequestHandler):
 
     def get(self, path):
         self.set_header("Content-Type", "text/html")
+        self.set_html_security_headers()
         self.render("index.html")
 
     def handle_ajax_call(self, query):

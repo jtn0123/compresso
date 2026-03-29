@@ -36,6 +36,7 @@ import tornado.log
 import tornado.web
 
 from compresso.webserver.helpers import plugins
+from compresso.webserver.security_headers import SecurityHeadersMixin
 
 
 def get_plugin_by_path(path):
@@ -60,7 +61,7 @@ def get_plugin_by_path(path):
     return plugin_module
 
 
-class DataPanelRequestHandler(tornado.web.RequestHandler):
+class DataPanelRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
     name = None
 
     def initialize(self):
@@ -112,12 +113,12 @@ class DataPanelRequestHandler(tornado.web.RequestHandler):
         # Plugin runners receive sanitized inputs and generate the content, but we
         # escape on output as defense-in-depth since the data dict is mutable.
         self.set_header("Content-Type", "text/html")
-        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_security_headers()
         content = data.get("content", "")
         self.write(tornado.escape.xhtml_escape(str(content)))
 
 
-class PluginAPIRequestHandler(tornado.web.RequestHandler):
+class PluginAPIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
     name = None
 
     def initialize(self):
@@ -196,7 +197,7 @@ class PluginAPIRequestHandler(tornado.web.RequestHandler):
     def render_data(self, data):
         # Always force JSON content type for API responses to prevent XSS
         self.set_header("Content-Type", "application/json")
-        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_security_headers()
         self.set_status(data.get("status"))
         content = data.get("content", {})
         # Use Tornado's json_encode which escapes '</' sequences to prevent
