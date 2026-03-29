@@ -31,7 +31,15 @@ Copyright:
 
 import datetime
 
-from peewee import *
+from peewee import (  # noqa: F401 — IntegrityError re-exported for compresso.libs.task
+    BigIntegerField,
+    BooleanField,
+    DateTimeField,
+    FloatField,
+    IntegerField,
+    IntegrityError,
+    TextField,
+)
 
 from compresso.libs.unmodels.lib import BaseModel
 

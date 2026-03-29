@@ -29,7 +29,7 @@ Copyright:
 
 """
 
-from peewee import *
+from peewee import TextField
 
 from compresso.libs.unmodels.lib import BaseModel
 

@@ -29,7 +29,7 @@ Copyright:
 
 """
 
-from peewee import *
+from peewee import BooleanField, IntegerField, TextField
 
 from compresso.libs.unmodels.lib import BaseModel
 

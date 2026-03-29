@@ -29,7 +29,7 @@ Copyright:
 
 """
 
-from peewee import *
+from peewee import ForeignKeyField, TextField
 
 from compresso.libs.unmodels.completedtasks import CompletedTasks
 from compresso.libs.unmodels.lib import BaseModel

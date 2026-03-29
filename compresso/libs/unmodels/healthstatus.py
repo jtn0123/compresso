@@ -7,7 +7,7 @@ Health status model for tracking file health check results.
 
 """
 
-from peewee import *
+from peewee import DateTimeField, IntegerField, TextField
 
 from compresso.libs.unmodels.lib import BaseModel
 

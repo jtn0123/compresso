@@ -8,7 +8,7 @@ during transcoding operations.
 
 """
 
-from peewee import *
+from peewee import BigIntegerField, FloatField, ForeignKeyField, IntegerField, TextField
 
 from compresso.libs.unmodels.completedtasks import CompletedTasks
 from compresso.libs.unmodels.lib import BaseModel
