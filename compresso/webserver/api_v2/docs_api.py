@@ -33,6 +33,7 @@ import os
 import subprocess
 
 import tornado.log
+from tornado.ioloop import IOLoop
 
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
@@ -145,6 +146,12 @@ class ApiDocsHandler(BaseApiHandler):
     session = None
     config = None
     params = None
+
+    @staticmethod
+    def _read_file_lines(path):
+        with open(path) as f:
+            return f.readlines()
+
     compresso_data_queues = None
 
     routes = [
@@ -211,8 +218,8 @@ class ApiDocsHandler(BaseApiHandler):
             if not changelog_content:
                 privacy_policy_file = os.path.join(os.path.dirname(__file__), "..", "docs", "privacy_policy.md")
                 if os.path.exists(privacy_policy_file):
-                    with open(privacy_policy_file) as f:
-                        changelog_content = f.readlines()
+                    loop = IOLoop.current()
+                    changelog_content = await loop.run_in_executor(None, self._read_file_lines, privacy_policy_file)
 
             if not changelog_content:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Unable to generate changelog.")
@@ -277,9 +284,16 @@ class ApiDocsHandler(BaseApiHandler):
         try:
             log_files_zip_path = documents.generate_log_files_zip()
 
-            with open(log_files_zip_path, "rb") as f:
-                for chunk in iter(lambda: f.read(8192), b""):
+            loop = IOLoop.current()
+            f = await loop.run_in_executor(None, open, log_files_zip_path, "rb")
+            try:
+                while True:
+                    chunk = await loop.run_in_executor(None, f.read, 8192)
+                    if not chunk:
+                        break
                     self.write(chunk)
+            finally:
+                await loop.run_in_executor(None, f.close)
 
             self.set_header("Content-Type", "application/octet-stream")
             self.set_header("Content-Disposition", "attachment; filename=CompressoLogs.zip")

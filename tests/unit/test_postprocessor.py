@@ -45,9 +45,8 @@ def _make_postprocessor(abort_immediately=False):
 class TestSystemConfigurationIsValid:
     """Tests for PostProcessor.system_configuration_is_valid()."""
 
-    @patch("compresso.libs.postprocessor.Library.within_library_count_limits", return_value=True)
     @patch("compresso.libs.postprocessor.PluginsHandler")
-    def test_valid_when_no_incompatible_plugins_and_within_limits(self, mock_ph_class, mock_limits):
+    def test_valid_when_no_incompatible_plugins(self, mock_ph_class):
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = []
         mock_ph_class.return_value = mock_ph
@@ -55,21 +54,10 @@ class TestSystemConfigurationIsValid:
         pp = _make_postprocessor()
         assert pp.system_configuration_is_valid() is True
 
-    @patch("compresso.libs.postprocessor.Library.within_library_count_limits", return_value=True)
     @patch("compresso.libs.postprocessor.PluginsHandler")
-    def test_invalid_when_incompatible_plugins(self, mock_ph_class, mock_limits):
+    def test_invalid_when_incompatible_plugins(self, mock_ph_class):
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = ["bad_plugin"]
-        mock_ph_class.return_value = mock_ph
-
-        pp = _make_postprocessor()
-        assert pp.system_configuration_is_valid() is False
-
-    @patch("compresso.libs.postprocessor.Library.within_library_count_limits", return_value=False)
-    @patch("compresso.libs.postprocessor.PluginsHandler")
-    def test_invalid_when_outside_library_limits(self, mock_ph_class, mock_limits):
-        mock_ph = MagicMock()
-        mock_ph.get_incompatible_enabled_plugins.return_value = []
         mock_ph_class.return_value = mock_ph
 
         pp = _make_postprocessor()

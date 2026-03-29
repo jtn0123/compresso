@@ -551,10 +551,20 @@ class RemoteTaskManager(threading.Thread):
                 f"Remote task #{remote_task_id} was successful, proceeding to download the completed file '{task_label}'",
                 level="debug",
             )
-            self._log(f"Remote task abspath {data.get('abspath')} to be transferred", level="debug")
-            if os.path.exists(data.get("abspath")):
+            remote_abspath = data.get("abspath", "")
+            self._log(f"Remote task abspath {remote_abspath} to be transferred", level="debug")
+            resolved_abspath = os.path.realpath(remote_abspath)
+            resolved_cache_dir = os.path.realpath(cache_directory)
+            if not resolved_abspath.startswith(resolved_cache_dir + os.sep) and resolved_abspath != resolved_cache_dir:
+                self._log(
+                    f"Remote abspath '{remote_abspath}' resolves outside cache directory — rejecting",
+                    level="error",
+                )
+                self.__write_failure_to_worker_log()
+                return False
+            if os.path.exists(resolved_abspath):
                 # /library/tvshows/show_name/season/compresso_remote_pending_library/file.mkv
-                task_cache_path = data.get("abspath")
+                task_cache_path = resolved_abspath
                 self.current_task.cache_path = task_cache_path
                 self._log(f"abspath exists - task cache path: '{task_cache_path}'", level="debug")
                 # need to get the file into the local instance /tmp/compresso/compresso_file_conversion... location

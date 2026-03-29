@@ -175,10 +175,6 @@ class Foreman(threading.Thread):
             )
             valid = False
 
-        # Ensure library config is within limits
-        if not Library.within_library_count_limits():
-            valid = False
-
         return valid
 
     def run_task(self, time_now, task, worker_count, worker_group):

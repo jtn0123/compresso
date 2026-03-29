@@ -73,34 +73,20 @@ class TestAbortIsSet:
 
 @pytest.mark.unittest
 class TestSystemConfigurationIsValid:
-    @patch("compresso.libs.libraryscanner.Library")
     @patch("compresso.libs.libraryscanner.PluginsHandler")
-    def test_valid_config(self, mock_handler_cls, mock_library_cls):
+    def test_valid_config(self, mock_handler_cls):
         mgr = _make_scanner()
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = []
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         assert mgr.system_configuration_is_valid() is True
 
-    @patch("compresso.libs.libraryscanner.Library")
     @patch("compresso.libs.libraryscanner.PluginsHandler")
-    def test_incompatible_plugins(self, mock_handler_cls, mock_library_cls):
+    def test_incompatible_plugins(self, mock_handler_cls):
         mgr = _make_scanner()
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = ["bad_plugin"]
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
-        assert mgr.system_configuration_is_valid() is False
-
-    @patch("compresso.libs.libraryscanner.Library")
-    @patch("compresso.libs.libraryscanner.PluginsHandler")
-    def test_library_count_exceeded(self, mock_handler_cls, mock_library_cls):
-        mgr = _make_scanner()
-        mock_handler = MagicMock()
-        mock_handler.get_incompatible_enabled_plugins.return_value = []
-        mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = False
         assert mgr.system_configuration_is_valid() is False
 
 
@@ -192,7 +178,6 @@ class TestScheduledJob:
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = ["bad"]
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         mgr.scheduled_job()
         mock_library_cls.get_all_libraries.assert_not_called()
 
@@ -203,7 +188,6 @@ class TestScheduledJob:
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = []
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         mock_library_cls.get_all_libraries.return_value = []
         mgr.scheduled_job()
 
@@ -214,7 +198,6 @@ class TestScheduledJob:
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = []
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         mock_library_cls.get_all_libraries.return_value = [{"id": 1}]
         mock_lib = MagicMock()
         mock_lib.get_enable_remote_only.return_value = True
@@ -230,7 +213,6 @@ class TestScheduledJob:
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = []
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         mock_library_cls.get_all_libraries.return_value = [{"id": 1}]
         mock_lib = MagicMock()
         mock_lib.get_enable_remote_only.return_value = False
@@ -247,7 +229,6 @@ class TestScheduledJob:
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = []
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         mock_library_cls.get_all_libraries.return_value = [{"id": 1}]
         mock_lib = MagicMock()
         mock_lib.get_enable_remote_only.return_value = False
@@ -267,7 +248,6 @@ class TestScheduledJob:
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = []
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         mock_library_cls.get_all_libraries.return_value = [{"id": 1}]
         mock_library_cls.side_effect = Exception("DB error")
         # Should not raise
