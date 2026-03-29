@@ -705,9 +705,7 @@ class Foreman(threading.Thread):
         any_workers_busy = any(
             not self.worker_threads[t].idle for t in self.worker_threads if self.worker_threads[t].is_alive()
         )
-        any_remote_workers_busy = any(
-            self.remote_task_manager_threads[t].is_alive() for t in self.remote_task_manager_threads
-        )
+        any_remote_workers_busy = any(self.remote_task_manager_threads[t].is_alive() for t in self.remote_task_manager_threads)
         queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
         if was_active and not queue_is_active:
             try:
@@ -821,17 +819,13 @@ class Foreman(threading.Thread):
                 if not self._sync_and_validate_workers():
                     continue
 
-                last_metrics_time, metrics_interval = self._record_worker_metrics(
-                    last_metrics_time, metrics_interval
-                )
+                last_metrics_time, metrics_interval = self._record_worker_metrics(last_metrics_time, metrics_interval)
 
                 was_queue_active = self._check_queue_idle_transition(was_queue_active)
 
                 self.manage_event_schedules()
 
-                allow_local_idle_worker_check = self._find_and_assign_pending_task(
-                    allow_local_idle_worker_check
-                )
+                allow_local_idle_worker_check = self._find_and_assign_pending_task(allow_local_idle_worker_check)
             except Exception:
                 self.logger.exception("Unhandled exception in Foreman main loop")
                 self.event.wait(5)
