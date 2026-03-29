@@ -96,7 +96,7 @@ class PluginFlowMixin:
                 content:
                     application/json:
                         schema:
-                            PluginsInstallableResultsSchema
+                            PluginFlowResultsSchema
             400:
                 description: Bad request; Check `messages` for any validation errors
                 content:
@@ -160,11 +160,11 @@ class PluginFlowMixin:
                         RequestSavingPluginsFlowByPluginTypeSchema
         responses:
             200:
-                description: 'Sample response: Save the plugin flow for a requested plugin type.'
+                description: 'Successful request; Returns success status'
                 content:
                     application/json:
                         schema:
-                            PluginsInstallableResultsSchema
+                            BaseSuccessSchema
             400:
                 description: Bad request; Check `messages` for any validation errors
                 content:
