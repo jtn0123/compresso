@@ -76,6 +76,16 @@ class TestPluginPaths:
         assert os.path.isdir(plugin_path)
         assert plugin_path.endswith("my_plugin")
 
+    def test_get_plugin_path_rejects_traversal(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        with pytest.raises(ValueError, match="path traversal detected"):
+            handler.get_plugin_path("../../etc")
+
+    def test_get_plugin_path_rejects_absolute_traversal(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        with pytest.raises(ValueError, match="path traversal detected"):
+            handler.get_plugin_path("../../../tmp/evil")
+
     def test_get_plugin_download_cache_path(self, tmp_path):
         handler = _make_handler(tmp_path)
         path = handler.get_plugin_download_cache_path("my_plugin", "1.0.0")
