@@ -1,111 +1,39 @@
 #!/usr/bin/env python3
 
 """
-compresso.workers_api.py
+compresso.settings_library_mixin.py
 
-Written by:               Josh.5 <jsunnex@gmail.com>
-Date:                     11 Aug 2021, (10:41 AM)
-
-Copyright:
-       Copyright (C) Josh Sunnex - All Rights Reserved
-
-       Permission is hereby granted, free of charge, to any person obtaining a copy
-       of this software and associated documentation files (the "Software"), to deal
-       in the Software without restriction, including without limitation the rights
-       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-       copies of the Software, and to permit persons to whom the Software is
-       furnished to do so, subject to the following conditions:
-
-       The above copyright notice and this permission notice shall be included in all
-       copies or substantial portions of the Software.
-
-       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-       OR OTHER DEALINGS IN THE SOFTWARE.
-
+Mixin providing library configuration endpoints for ApiSettingsHandler.
 """
 
 import tornado.log
 
-from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.worker_schemas import RequestWorkerByIdSchema, WorkerStatusSuccessSchema
-from compresso.webserver.helpers import workers
+from compresso.libs.library import Library
+from compresso.webserver.api_v2.base_api_handler import BaseApiError
+from compresso.webserver.api_v2.schema.settings_schemas import (
+    RequestLibraryByIdSchema,
+    SettingsLibrariesListSchema,
+    SettingsLibraryConfigReadAndWriteSchema,
+    SettingsLibraryPluginConfigExportSchema,
+    SettingsLibraryPluginConfigImportSchema,
+)
 
 
-class ApiWorkersHandler(BaseApiHandler):
-    config = None
-    params = None
-    compresso_data_queues = None
+class LibrarySettingsMixin:
+    """Mixin for library configuration CRUD endpoints."""
 
-    routes = [
-        {
-            "path_pattern": r"/workers/worker/pause",
-            "supported_methods": ["POST"],
-            "call_method": "pause_worker",
-        },
-        {
-            "path_pattern": r"/workers/worker/pause/all",
-            "supported_methods": ["POST"],
-            "call_method": "pause_all_workers",
-        },
-        {
-            "path_pattern": r"/workers/worker/resume",
-            "supported_methods": ["POST"],
-            "call_method": "resume_worker",
-        },
-        {
-            "path_pattern": r"/workers/worker/resume/all",
-            "supported_methods": ["POST"],
-            "call_method": "resume_all_workers",
-        },
-        {
-            "path_pattern": r"/workers/worker/terminate",
-            "supported_methods": ["DELETE"],
-            "call_method": "terminate_worker",
-        },
-        {
-            "path_pattern": r"/workers/worker/terminate/all",
-            "supported_methods": ["DELETE"],
-            "call_method": "terminate_all_workers",
-        },
-        {
-            "path_pattern": r"/workers/status",
-            "supported_methods": ["GET"],
-            "call_method": "workers_status",
-        },
-    ]
-
-    def initialize(self, **kwargs):
-        self.params = kwargs.get("params")
-        udq = CompressoDataQueues()
-        urt = CompressoRunningThreads()
-        self.compresso_data_queues = udq.get_compresso_data_queues()
-        self.foreman = urt.get_compresso_running_thread("foreman")
-
-    async def pause_worker(self):
+    async def get_all_libraries(self):
         """
-        Workers - Pause worker by ID
+        Settings - get list of all libraries
         ---
-        description: Pauses a worker by its ID.
-        requestBody:
-            description: Requested a worker be paused by its ID.
-            required: True
-            content:
-                application/json:
-                    schema:
-                        RequestWorkerByIdSchema
+        description: Returns a list of all libraries.
         responses:
             200:
-                description: 'Successful request; Returns success status'
+                description: 'Sample response: Returns a list of all libraries.'
                 content:
                     application/json:
                         schema:
-                            BaseSuccessSchema
+                            SettingsLibrariesListSchema
             400:
                 description: Bad request; Check `messages` for any validation errors
                 content:
@@ -132,362 +60,11 @@ class ApiWorkersHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            json_request = self.read_json_request(RequestWorkerByIdSchema())
-
-            if not workers.pause_worker_by_id(json_request.get("worker_id")):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to pause worker")
-                self.write_error()
-                return
-
-            self.write_success()
-            return
-        except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
-            return
-        except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
-
-    async def pause_all_workers(self):
-        """
-        Workers - Pause all workers
-        ---
-        description: Pause all workers.
-        responses:
-            200:
-                description: 'Successful request; Returns success status'
-                content:
-                    application/json:
-                        schema:
-                            BaseSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
-        """
-        try:
-            if not workers.pause_all_workers():
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to pause all workers")
-                self.write_error()
-                return
-
-            self.write_success()
-            return
-        except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
-            return
-        except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
-
-    async def resume_worker(self):
-        """
-        Workers - Resume worker by ID
-        ---
-        description: Resumes a worker by its ID.
-        requestBody:
-            description: Requested a worker be resumed by its ID.
-            required: True
-            content:
-                application/json:
-                    schema:
-                        RequestWorkerByIdSchema
-        responses:
-            200:
-                description: 'Successful request; Returns success status'
-                content:
-                    application/json:
-                        schema:
-                            BaseSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
-        """
-        try:
-            json_request = self.read_json_request(RequestWorkerByIdSchema())
-
-            if not workers.resume_worker_by_id(json_request.get("worker_id")):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to resume worker")
-                self.write_error()
-                return
-
-            self.write_success()
-            return
-        except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
-            return
-        except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
-
-    async def resume_all_workers(self):
-        """
-        Workers - Resume all workers
-        ---
-        description: Resumes all workers.
-        responses:
-            200:
-                description: 'Successful request; Returns success status'
-                content:
-                    application/json:
-                        schema:
-                            BaseSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
-        """
-        try:
-            if not workers.resume_all_workers():
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to resume all workers")
-                self.write_error()
-                return
-
-            self.write_success()
-            return
-        except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
-            return
-        except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
-
-    async def terminate_worker(self):
-        """
-        Workers - Terminate worker by ID
-        ---
-        description: Terminates a worker by its ID.
-        requestBody:
-            description: Requested a worker be terminated by its ID.
-            required: True
-            content:
-                application/json:
-                    schema:
-                        RequestWorkerByIdSchema
-        responses:
-            200:
-                description: 'Successful request; Returns success status'
-                content:
-                    application/json:
-                        schema:
-                            BaseSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
-        """
-        try:
-            json_request = self.read_json_request(RequestWorkerByIdSchema())
-
-            if not workers.terminate_worker_by_id(json_request.get("worker_id")):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to resume worker")
-                self.write_error()
-                return
-
-            self.write_success()
-            return
-        except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
-            return
-        except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
-
-    async def terminate_all_workers(self):
-        """
-        Workers - Terminate all workers
-        ---
-        description: Terminate all workers.
-        responses:
-            200:
-                description: 'Successful request; Returns success status'
-                content:
-                    application/json:
-                        schema:
-                            BaseSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
-        """
-        try:
-            if not workers.terminate_all_workers():
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to terminate all workers")
-                self.write_error()
-                return
-
-            self.write_success()
-            return
-        except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
-            return
-        except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
-
-    async def workers_status(self):
-        """
-        Workers - Return the status of all workers
-        ---
-        description: Returns the status of all workers.
-        responses:
-            200:
-                description: 'Sample response: Returns the status of all workers.'
-                content:
-                    application/json:
-                        schema:
-                            WorkerStatusSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
-        """
-        try:
-            workers_status = self.foreman.get_all_worker_status()
-
+            libraries = Library.get_all_libraries()
             response = self.build_response(
-                WorkerStatusSuccessSchema(),
+                SettingsLibrariesListSchema(),
                 {
-                    "workers_status": workers_status,
+                    "libraries": libraries,
                 },
             )
             self.write_success(response)
@@ -498,6 +75,373 @@ class ApiWorkersHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def read_library_config(self):
+        """
+        Settings - read the configuration of one library
+        ---
+        description: Read the configuration of one library
+        requestBody:
+            description: The ID of the library
+            required: True
+            content:
+                application/json:
+                    schema:
+                        RequestLibraryByIdSchema
+        responses:
+            200:
+                description: 'Sample response: Returns the remote installation link configuration.'
+                content:
+                    application/json:
+                        schema:
+                            SettingsLibraryConfigReadAndWriteSchema
+            400:
+                description: Bad request; Check `messages` for any validation errors
+                content:
+                    application/json:
+                        schema:
+                            BadRequestSchema
+            404:
+                description: Bad request; Requested endpoint not found
+                content:
+                    application/json:
+                        schema:
+                            BadEndpointSchema
+            405:
+                description: Bad request; Requested method is not allowed
+                content:
+                    application/json:
+                        schema:
+                            BadMethodSchema
+            500:
+                description: Internal error; Check `error` for exception
+                content:
+                    application/json:
+                        schema:
+                            InternalErrorSchema
+        """
+        try:
+            json_request = self.read_json_request(RequestLibraryByIdSchema())
+
+            library_settings = {
+                "library_config": {
+                    "id": 0,
+                    "name": "",
+                    "path": "/",
+                    "enable_remote_only": False,
+                    "enable_scanner": False,
+                    "enable_inotify": False,
+                    "priority_score": 0,
+                },
+                "plugins": {
+                    "enabled_plugins": [],
+                },
+            }
+            if json_request.get("id"):
+                # Read the library
+                library_config = Library(json_request.get("id"))
+                library_settings = {
+                    "library_config": {
+                        "id": library_config.get_id(),
+                        "name": library_config.get_name(),
+                        "path": library_config.get_path(),
+                        "locked": library_config.get_locked(),
+                        "enable_remote_only": library_config.get_enable_remote_only(),
+                        "enable_scanner": library_config.get_enable_scanner(),
+                        "enable_inotify": library_config.get_enable_inotify(),
+                        "priority_score": library_config.get_priority_score(),
+                        "tags": library_config.get_tags(),
+                        "target_codecs": library_config.get_target_codecs(),
+                        "skip_codecs": library_config.get_skip_codecs(),
+                        "size_guardrail_enabled": library_config.get_size_guardrail_enabled(),
+                        "size_guardrail_min_pct": library_config.get_size_guardrail_min_pct(),
+                        "size_guardrail_max_pct": library_config.get_size_guardrail_max_pct(),
+                        "replacement_policy": library_config.get_replacement_policy(),
+                    },
+                    "plugins": {
+                        "enabled_plugins": library_config.get_enabled_plugins(),
+                    },
+                }
+
+            response = self.build_response(SettingsLibraryConfigReadAndWriteSchema(), library_settings)
+
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def write_library_config(self):
+        """
+        Settings - write the configuration of one library
+        ---
+        description: Write the configuration of one library
+        requestBody:
+            description: Requested a dictionary of settings to save.
+            required: True
+            content:
+                application/json:
+                    schema:
+                        SettingsLibraryConfigReadAndWriteSchema
+        responses:
+            200:
+                description: 'Successful request; Returns success status'
+                content:
+                    application/json:
+                        schema:
+                            BaseSuccessSchema
+            400:
+                description: Bad request; Check `messages` for any validation errors
+                content:
+                    application/json:
+                        schema:
+                            BadRequestSchema
+            404:
+                description: Bad request; Requested endpoint not found
+                content:
+                    application/json:
+                        schema:
+                            BadEndpointSchema
+            405:
+                description: Bad request; Requested method is not allowed
+                content:
+                    application/json:
+                        schema:
+                            BadMethodSchema
+            500:
+                description: Internal error; Check `error` for exception
+                content:
+                    application/json:
+                        schema:
+                            InternalErrorSchema
+        """
+        try:
+            json_request = self.read_json_request(SettingsLibraryConfigReadAndWriteSchema())
+
+            # Save settings
+            from compresso.webserver.helpers import settings
+
+            library_config = json_request["library_config"]
+            plugin_config = json_request.get("plugins", {})
+            library_id = library_config.get("id", 0)
+            if not settings.save_library_config(library_id, library_config=library_config, plugin_config=plugin_config):
+                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to write library config")
+                self.write_error()
+                return
+
+            self.write_success()
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def remove_library(self):
+        """
+        Settings - remove a library
+        ---
+        description: Remove a library
+        requestBody:
+            description: Requested a library to remove.
+            required: True
+            content:
+                application/json:
+                    schema:
+                        RequestLibraryByIdSchema
+        responses:
+            200:
+                description: 'Successful request; Returns success status'
+                content:
+                    application/json:
+                        schema:
+                            BaseSuccessSchema
+            400:
+                description: Bad request; Check `messages` for any validation errors
+                content:
+                    application/json:
+                        schema:
+                            BadRequestSchema
+            404:
+                description: Bad request; Requested endpoint not found
+                content:
+                    application/json:
+                        schema:
+                            BadEndpointSchema
+            405:
+                description: Bad request; Requested method is not allowed
+                content:
+                    application/json:
+                        schema:
+                            BadMethodSchema
+            500:
+                description: Internal error; Check `error` for exception
+                content:
+                    application/json:
+                        schema:
+                            InternalErrorSchema
+        """
+        try:
+            json_request = self.read_json_request(RequestLibraryByIdSchema())
+
+            # Fetch existing library by ID
+            library = Library(json_request.get("id"))
+
+            # Delete the library
+            if not library.delete():
+                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to remove library by its ID")
+                self.write_error()
+                return
+
+            self.write_success()
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def export_library_plugin_config(self):
+        """
+        Settings - export the plugin configuration of one library
+        ---
+        description: Export the plugin configuration of one library
+        requestBody:
+            description: The ID of the library
+            required: True
+            content:
+                application/json:
+                    schema:
+                        RequestLibraryByIdSchema
+        responses:
+            200:
+                description: 'Sample response: Returns the remote installation link configuration.'
+                content:
+                    application/json:
+                        schema:
+                            SettingsLibraryPluginConfigExportSchema
+            400:
+                description: Bad request; Check `messages` for any validation errors
+                content:
+                    application/json:
+                        schema:
+                            BadRequestSchema
+            404:
+                description: Bad request; Requested endpoint not found
+                content:
+                    application/json:
+                        schema:
+                            BadEndpointSchema
+            405:
+                description: Bad request; Requested method is not allowed
+                content:
+                    application/json:
+                        schema:
+                            BadMethodSchema
+            500:
+                description: Internal error; Check `error` for exception
+                content:
+                    application/json:
+                        schema:
+                            InternalErrorSchema
+        """
+        try:
+            json_request = self.read_json_request(RequestLibraryByIdSchema())
+
+            # Fetch library config
+            library_config = Library.export(json_request.get("id"))
+
+            response = self.build_response(SettingsLibraryPluginConfigExportSchema(), library_config)
+
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def import_library_plugin_config(self):
+        """
+        Settings - import the plugin configuration of one library
+        ---
+        description: Import the configuration of one library
+        requestBody:
+            description: Requested a dictionary of settings to save.
+            required: True
+            content:
+                application/json:
+                    schema:
+                        SettingsLibraryPluginConfigImportSchema
+        responses:
+            200:
+                description: 'Successful request; Returns success status'
+                content:
+                    application/json:
+                        schema:
+                            BaseSuccessSchema
+            400:
+                description: Bad request; Check `messages` for any validation errors
+                content:
+                    application/json:
+                        schema:
+                            BadRequestSchema
+            404:
+                description: Bad request; Requested endpoint not found
+                content:
+                    application/json:
+                        schema:
+                            BadEndpointSchema
+            405:
+                description: Bad request; Requested method is not allowed
+                content:
+                    application/json:
+                        schema:
+                            BadMethodSchema
+            500:
+                description: Internal error; Check `error` for exception
+                content:
+                    application/json:
+                        schema:
+                            InternalErrorSchema
+        """
+        try:
+            json_request = self.read_json_request(SettingsLibraryPluginConfigImportSchema())
+
+            # Save settings
+            from compresso.webserver.helpers import settings
+
+            library_config = json_request.get("library_config")
+            plugin_config = json_request.get("plugins", {})
+            library_id = json_request.get("library_id")
+            if not settings.save_library_config(library_id, library_config=library_config, plugin_config=plugin_config):
+                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to import library config")
+                self.write_error()
+                return
+
+            self.write_success()
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

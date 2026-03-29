@@ -36,7 +36,7 @@ from compresso.libs import session
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import SessionAuthCodeSchema, SessionStateSuccessSchema
+from compresso.webserver.api_v2.schema.session_schemas import SessionAuthCodeSchema, SessionStateSuccessSchema
 
 
 class ApiSessionHandler(BaseApiHandler):
