@@ -31,7 +31,7 @@ Copyright:
 
 import datetime
 
-from peewee import *
+from peewee import DateTimeField, ForeignKeyField, TextField
 
 from compresso.libs.unmodels.lib import BaseModel
 from compresso.libs.unmodels.tasks import Tasks

@@ -29,7 +29,7 @@ Copyright:
 
 """
 
-from peewee import *
+from peewee import ForeignKeyField, IntegerField, TextField
 
 from compresso.libs.unmodels import WorkerGroups
 from compresso.libs.unmodels.lib import BaseModel

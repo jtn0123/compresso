@@ -33,7 +33,18 @@ import logging
 from base64 import b64decode
 from datetime import datetime
 
-from peewee import *
+from peewee import (
+    BlobField,
+    BooleanField,
+    DatabaseProxy,
+    DateField,
+    DateTimeField,
+    DecimalField,
+    FloatField,
+    IntegerField,
+    Model,
+    TimeField,
+)
 from playhouse.shortcuts import model_to_dict
 from playhouse.sqliteq import SqliteQueueDatabase
 

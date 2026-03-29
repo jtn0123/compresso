@@ -32,7 +32,7 @@ Copyright:
 import datetime
 import uuid
 
-from peewee import *
+from peewee import DateTimeField, IntegerField, TextField, UUIDField
 
 from compresso.libs.unmodels.lib import BaseModel
 

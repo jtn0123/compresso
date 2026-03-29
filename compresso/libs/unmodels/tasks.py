@@ -31,7 +31,7 @@ Copyright:
 
 import datetime
 
-from peewee import *
+from peewee import BigIntegerField, BooleanField, DateTimeField, FloatField, IntegerField, IntegrityError, TextField
 
 from compresso.libs.unmodels.lib import BaseModel
 
