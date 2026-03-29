@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/jtn0123/compresso/compare/v1.10.0...v1.10.1) (2026-03-29)
+
+
+### Bug Fixes
+
+* resolve 5 SonarCloud blockers + 11 critical wildcard imports ([#64](https://github.com/jtn0123/compresso/issues/64)) ([3af8786](https://github.com/jtn0123/compresso/commit/3af87864fb8e82e352d7d98ff52820238c4a4b32))
+
 # [1.10.0](https://github.com/jtn0123/compresso/compare/v1.9.0...v1.10.0) (2026-03-29)
 
 
