@@ -118,18 +118,16 @@ class TestCheckQueueIdleTransition:
         fm = _make_foreman()
         fm.task_queue.task_list_pending_is_empty.return_value = True
 
-        with patch("compresso.libs.foreman.ExternalNotificationDispatcher", create=True) as mock_cls:
-            # Patch at the import location used by the method
-            with patch(
-                "compresso.libs.external_notifications.ExternalNotificationDispatcher"
-            ) as mock_dispatcher_cls:
-                mock_dispatcher = MagicMock()
-                mock_dispatcher_cls.return_value = mock_dispatcher
+        with patch(
+            "compresso.libs.external_notifications.ExternalNotificationDispatcher"
+        ) as mock_dispatcher_cls:
+            mock_dispatcher = MagicMock()
+            mock_dispatcher_cls.return_value = mock_dispatcher
 
-                result = fm._check_queue_idle_transition(was_active=True)
+            result = fm._check_queue_idle_transition(was_active=True)
 
-                assert result is False
-                mock_dispatcher.dispatch.assert_called_once_with("queue_empty", {})
+            assert result is False
+            mock_dispatcher.dispatch.assert_called_once_with("queue_empty", {})
 
     def test_idle_to_idle_does_not_dispatch(self):
         fm = _make_foreman()
