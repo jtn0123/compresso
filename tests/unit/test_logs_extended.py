@@ -336,7 +336,7 @@ class TestCompressoLogging:
         instance._logger.setLevel(CompressoLogging.DATA)
 
         ts = datetime(2024, 1, 15, 12, 0, 0)
-        CompressoLogging.metric("cpu_usage", timestamp=ts, value=85.5)
+        CompressoLogging.log_metric("cpu_usage", timestamp=ts, value=85.5)
 
         assert len(captured) >= 1
         record = captured[-1]
@@ -363,7 +363,7 @@ class TestCompressoLogging:
         instance._logger.setLevel(CompressoLogging.DATA)
 
         ts = datetime(2024, 1, 15, 12, 0, 0)
-        CompressoLogging.data("file-abc123", data_search_key="video.mkv", timestamp=ts, status="processed")
+        CompressoLogging.log_data("file-abc123", data_search_key="video.mkv", timestamp=ts, status="processed")
 
         assert len(captured) >= 1
         record = captured[-1]
@@ -390,7 +390,7 @@ class TestCompressoLogging:
         instance._logger.addHandler(capture)
         instance._logger.setLevel(CompressoLogging.DATA)
 
-        CompressoLogging.metric("test_metric", value=1)
+        CompressoLogging.log_metric("test_metric", value=1)
         assert len(captured) >= 1
         assert hasattr(captured[-1], "metric_timestamp")
 
@@ -411,7 +411,7 @@ class TestCompressoLogging:
         instance._logger.addHandler(capture)
         instance._logger.setLevel(CompressoLogging.DATA)
 
-        CompressoLogging.data("pk-1")
+        CompressoLogging.log_data("pk-1")
         assert len(captured) >= 1
         assert hasattr(captured[-1], "data_timestamp")
 

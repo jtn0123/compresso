@@ -142,7 +142,7 @@ class TestCompressoLoggingMetricData:
         handler = _CaptureHandler()
         instance._logger.addHandler(handler)
         try:
-            CompressoLogging.metric("test_metric", value=42)
+            CompressoLogging.log_metric("test_metric", value=42)
             metric_records = [r for r in handler.records if r.levelno == 9]
             assert len(metric_records) >= 1
         finally:
@@ -156,7 +156,7 @@ class TestCompressoLoggingMetricData:
         instance._logger.addHandler(handler)
         try:
             ts = datetime(2024, 1, 15, 12, 0, 0)
-            CompressoLogging.metric("cpu_usage", timestamp=ts, value=85)
+            CompressoLogging.log_metric("cpu_usage", timestamp=ts, value=85)
             metric_records = [r for r in handler.records if r.levelno == 9]
             assert len(metric_records) >= 1
             record = metric_records[0]
@@ -172,7 +172,7 @@ class TestCompressoLoggingMetricData:
         handler = _CaptureHandler()
         instance._logger.addHandler(handler)
         try:
-            CompressoLogging.data("primary_key_1", data_search_key="search_1")
+            CompressoLogging.log_data("primary_key_1", data_search_key="search_1")
             data_records = [r for r in handler.records if r.levelno == 8]
             assert len(data_records) >= 1
         finally:
@@ -185,7 +185,7 @@ class TestCompressoLoggingMetricData:
         handler = _CaptureHandler()
         instance._logger.addHandler(handler)
         try:
-            CompressoLogging.data("pk_test", data_search_key="sk_test")
+            CompressoLogging.log_data("pk_test", data_search_key="sk_test")
             data_records = [r for r in handler.records if r.levelno == 8]
             assert len(data_records) >= 1
             record = data_records[0]
