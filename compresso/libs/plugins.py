@@ -413,8 +413,7 @@ class PluginsHandler(metaclass=SingletonType):
             plugin_directory = self.get_plugin_path(plugin_info.get("plugin_id"))
             result = self.write_plugin_data_to_db(plugin_info, plugin_directory)
             if result:
-                sanitized_id = "".join(ch for ch in str(plugin_info.get("plugin_id", "")) if ch.isprintable())
-                self.logger.info("Installed plugin '%s'", sanitized_id)
+                self.logger.info("Installed plugin '%s'", os.path.basename(plugin_directory))
 
             # Ensure the plugin module is reloaded (if it was previously loaded)
             plugin_executor = PluginExecutor()

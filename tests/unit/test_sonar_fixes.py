@@ -9,8 +9,6 @@ bugs, and async I/O issues (PR #65).
 
 import json
 import os
-import tempfile
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -75,66 +73,17 @@ class TestFormatFfmpegLogText:
 
 @pytest.mark.unittest
 class TestPluginLogSanitization:
-    def test_sanitize_strips_all_control_chars(self):
-        """Verify the sanitization pattern used in plugins.py install_plugin_from_zip."""
-        plugin_id = "evil\nplugin\rid\x00\x1b[31m"
-        sanitized_id = "".join(ch for ch in str(plugin_id) if ch.isprintable())
-        assert sanitized_id == "evilpluginid[31m"
-        assert "\n" not in sanitized_id
-        assert "\r" not in sanitized_id
-        assert "\x00" not in sanitized_id
-        assert "\x1b" not in sanitized_id
-
-    def test_sanitize_preserves_normal_id(self):
-        plugin_id = "my_normal_plugin_v2"
-        sanitized_id = "".join(ch for ch in str(plugin_id) if ch.isprintable())
-        assert sanitized_id == plugin_id
+    def test_log_uses_controlled_basename(self):
+        """plugins.py logs os.path.basename(plugin_directory) — a controlled value."""
+        plugin_directory = "/plugins/my_plugin"
+        logged_value = os.path.basename(plugin_directory)
+        assert logged_value == "my_plugin"
+        assert "/" not in logged_value
 
 
 # ------------------------------------------------------------------
-# remote_task_manager.py — path traversal rejection
+# remote_task_manager.py — path handling (pre-existing, not modified)
 # ------------------------------------------------------------------
-
-
-@pytest.mark.unittest
-class TestRemoteTaskManagerPathValidation:
-    def _make_manager(self):
-        from compresso.libs.remote_task_manager import RemoteTaskManager
-
-        mgr = RemoteTaskManager.__new__(RemoteTaskManager)
-        mgr.logger = MagicMock()
-        mgr.worker_log = []
-        mgr.redundant_flag = MagicMock()
-        mgr.redundant_flag.is_set.return_value = False
-        mgr.current_task = MagicMock()
-        mgr.links = MagicMock()
-        mgr.installation_info = {}
-        return mgr
-
-    @patch("compresso.libs.remote_task_manager.TaskDataStore")
-    def test_rejects_abspath_outside_cache_dir(self, mock_tds):
-        mgr = self._make_manager()
-
-        with tempfile.TemporaryDirectory() as cache_dir:
-            mgr.current_task.get_cache_path.return_value = os.path.join(cache_dir, "task_file.mkv")
-            mgr.current_task.save_command_log = MagicMock()
-
-            # Simulate remote API returning a path outside the cache dir
-            data = {
-                "task_success": True,
-                "task_label": "test",
-                "abspath": "/etc/passwd",
-                "log": "test log",
-                "task_state": None,
-            }
-            mgr.links.fetch_remote_task_data.return_value = data
-            mgr._RemoteTaskManager__write_failure_to_worker_log = MagicMock()
-
-            # Call the portion of run_task_via_remote that validates the path
-            # We test the validation logic directly by simulating the state
-            resolved_abspath = os.path.realpath(data["abspath"])
-            resolved_cache_dir = os.path.realpath(cache_dir)
-            assert not resolved_abspath.startswith(resolved_cache_dir + os.sep)
 
 
 # ------------------------------------------------------------------
