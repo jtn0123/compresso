@@ -50,6 +50,7 @@ from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
 from compresso.webserver.helpers import completed_tasks, pending_tasks
 from compresso.webserver.helpers.queue_eta import estimate_queue_eta
 from compresso.webserver.proxy import resolve_proxy_target
+from compresso.webserver.security_headers import check_websocket_origin
 
 
 class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
@@ -113,6 +114,9 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         self._stream_state: dict[str, dict[str, Any]] = {}
         self._gpu_history_tick = 0
         super().__init__(*args, **kwargs)
+
+    def check_origin(self, origin):
+        return check_websocket_origin(self, origin)
 
     async def open(self):
         tornado.log.app_log.info("WS Opened")

@@ -41,6 +41,8 @@ import tornado.web
 from marshmallow import Schema, exceptions
 from tornado.web import RequestHandler
 
+from compresso.webserver.security_headers import SecurityHeadersMixin
+
 
 class BaseApiError(Exception):
     """
@@ -51,7 +53,7 @@ class BaseApiError(Exception):
         Exception.__init__(self, errmsg)
 
 
-class BaseApiHandler(RequestHandler):
+class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
     api_version = 2
     routes: list[dict[str, Any]] = []
     route: dict[str, Any] = {}
@@ -99,6 +101,7 @@ class BaseApiHandler(RequestHandler):
         :return:
         """
         self.set_header("Content-Type", 'application/json; charset="utf-8"')
+        self.set_security_headers()
 
     def read_json_request(self, schema: Schema):
         """

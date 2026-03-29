@@ -36,9 +36,15 @@ import tornado.routing
 import tornado.web
 from tornado.web import RequestHandler
 
+from compresso.webserver.security_headers import SecurityHeadersMixin
 
-class BaseApiHandler(RequestHandler):
+
+class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
     routes: list = []
+
+    def set_default_headers(self):
+        self.set_header("Content-Type", 'application/json; charset="utf-8"')
+        self.set_security_headers()
 
     def handle_404(self):
         self.set_status(404)
