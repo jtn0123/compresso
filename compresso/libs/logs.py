@@ -837,7 +837,7 @@ class CompressoLogging:
             self._configured = True
 
     @staticmethod
-    def metric(name: str, timestamp: datetime | None = None, **kwargs):
+    def log_metric(name: str, timestamp: datetime | None = None, **kwargs):
         """
         Custom log method for the METRIC level.
         Logs directly to the remote_handler, if enabled.
@@ -857,7 +857,7 @@ class CompressoLogging:
         instance._emit_structured_log(instance.METRIC, log_message, log_record)
 
     @staticmethod
-    def data(data_primary_key: str, data_search_key: str | None = None, timestamp: datetime | None = None, **kwargs):
+    def log_data(data_primary_key: str, data_search_key: str | None = None, timestamp: datetime | None = None, **kwargs):
         """
         Custom log method for the DATA level.
         Logs directly to the remote_handler, if enabled.

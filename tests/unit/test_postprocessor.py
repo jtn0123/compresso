@@ -401,7 +401,7 @@ class TestWriteHistoryLog:
 
         mock_history = MagicMock()
         mock_history_class.return_value = mock_history
-        mock_logging_class.data = MagicMock()
+        mock_logging_class.log_data = MagicMock()
 
         pp.write_history_log()
 
@@ -442,7 +442,7 @@ class TestWriteHistoryLog:
         pp.current_task = mock_task
 
         mock_history_class.return_value = MagicMock()
-        mock_logging_class.data = MagicMock()
+        mock_logging_class.log_data = MagicMock()
         mock_notif = MagicMock()
         mock_notif_class.return_value = mock_notif
 
@@ -505,7 +505,7 @@ class TestLogCompletedTaskData:
         mock_task.get_task_type.return_value = "local"
         pp.current_task = mock_task
 
-        mock_logging_class.data = MagicMock()
+        mock_logging_class.log_data = MagicMock()
 
         task_dump = {"task_success": True, "start_time": "t1", "finish_time": "t2", "log": ""}
         source_data = {"abspath": "/src.mkv", "basename": "src.mkv"}
@@ -513,8 +513,8 @@ class TestLogCompletedTaskData:
 
         pp._log_completed_task_data(task_dump, source_data, dest_data)
 
-        mock_logging_class.data.assert_called_once()
-        call_kwargs = mock_logging_class.data.call_args
+        mock_logging_class.log_data.assert_called_once()
+        call_kwargs = mock_logging_class.log_data.call_args
         assert call_kwargs[1]["status"] == "success"
 
     @patch("compresso.libs.postprocessor.CompressoLogging")
@@ -527,7 +527,7 @@ class TestLogCompletedTaskData:
         mock_task.get_task_type.return_value = "local"
         pp.current_task = mock_task
 
-        mock_logging_class.data = MagicMock()
+        mock_logging_class.log_data = MagicMock()
 
         task_dump = {"task_success": False, "start_time": "t1", "finish_time": "t2", "log": "error line\nanother"}
         source_data = {"abspath": "/src.mkv", "basename": "src.mkv"}
@@ -535,7 +535,7 @@ class TestLogCompletedTaskData:
 
         pp._log_completed_task_data(task_dump, source_data, dest_data)
 
-        call_kwargs = mock_logging_class.data.call_args
+        call_kwargs = mock_logging_class.log_data.call_args
         assert call_kwargs[1]["status"] == "failed"
 
 

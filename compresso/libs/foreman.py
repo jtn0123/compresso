@@ -683,7 +683,7 @@ class Foreman(threading.Thread):
         now = time.time()
         if now - last_metrics_time >= metrics_interval:
             for worker_info in workers_info:
-                CompressoLogging.metric(
+                CompressoLogging.log_metric(
                     "worker_info",
                     worker_name=worker_info.get("name"),
                     idle=worker_info.get("idle"),

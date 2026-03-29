@@ -998,7 +998,7 @@ class PostProcessor(threading.Thread):
             library_id = None
             library_name = None
 
-        CompressoLogging.data(
+        CompressoLogging.log_data(
             "completed_task",
             data_search_key=f"{library_id} | {finish_time} | {source_data.get('abspath', '')}",
             task_id=self.current_task.get_task_id(),

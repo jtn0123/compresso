@@ -89,7 +89,7 @@ class RootService:
         self.dev_api = None
 
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
-        CompressoLogging.metric("root_service_started")
+        CompressoLogging.log_metric("root_service_started")
 
         self.event = threading.Event()
         self.startup_state = startup.StartupState()
@@ -200,7 +200,7 @@ class RootService:
                     # Calculate uptime in seconds
                     uptime = int(time.time() - start_time)
 
-                    CompressoLogging.metric(
+                    CompressoLogging.log_metric(
                         "root_service_resources",
                         pid=pid,
                         uptime=uptime,

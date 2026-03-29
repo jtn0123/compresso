@@ -296,8 +296,8 @@ class TestScanLibraryPath:
         mock_frontend = MagicMock()
         mock_frontend_cls.return_value = mock_frontend
         mock_walk.return_value = []
-        mock_logging.metric = MagicMock()
-        mock_logging.data = MagicMock()
+        mock_logging.log_metric = MagicMock()
+        mock_logging.log_data = MagicMock()
         mock_handler = MagicMock()
         mock_plugins.return_value = mock_handler
 

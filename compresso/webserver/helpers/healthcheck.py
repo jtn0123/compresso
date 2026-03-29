@@ -17,17 +17,17 @@ logger = CompressoLogging.get_logger("healthcheck_helper")
 def validate_library_exists(library_id):
     """
     Validate that a library ID exists in the database.
-    Returns True if valid, raises ValueError if not.
+    Raises ValueError if the library does not exist.
+    Returns True on success (including when library_id is None).
     """
-    if library_id is None:
-        return True
-    try:
-        from compresso.libs.unmodels import Libraries
+    if library_id is not None:
+        try:
+            from compresso.libs.unmodels import Libraries
 
-        Libraries.get_by_id(library_id)
-        return True
-    except Exception:
-        raise ValueError(f"Library with ID {library_id} does not exist") from None
+            Libraries.get_by_id(library_id)
+        except Exception:
+            raise ValueError(f"Library with ID {library_id} does not exist") from None
+    return True
 
 
 def check_single_file(filepath, library_id=1, mode="quick"):

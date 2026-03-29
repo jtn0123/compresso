@@ -340,7 +340,7 @@ class LibraryScannerManager(threading.Thread):
         scan_end_time = time.time()
         scan_duration = str(scan_end_time - scan_start_time)
         self.logger.warning("Library scan completed in %s seconds", scan_duration)
-        CompressoLogging.metric(
+        CompressoLogging.log_metric(
             "library_scan_completed",
             library_name=library_name,
             library_path=library_path,
@@ -349,7 +349,7 @@ class LibraryScannerManager(threading.Thread):
             scan_end_time=scan_end_time,
             scan_duration=scan_duration,
         )
-        CompressoLogging.data(
+        CompressoLogging.log_data(
             "last_library_scan",
             data_search_key=library_id,  # Key this metric by the library_id
             library_name=library_name,
