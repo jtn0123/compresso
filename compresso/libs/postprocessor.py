@@ -157,7 +157,7 @@ class PostProcessor(threading.Thread):
                 except (OSError, ZeroDivisionError, peewee.PeeweeException) as e:
                     self._log("Exception in size guardrail check", message2=str(e), level="warning")
                 except Exception as e:
-                    self._log("Unexpected error in size guardrail check", message2=str(e), level="warning")
+                    self._log(f"GuardrailRejectionError: {e}", level="warning")
 
             # Determine replacement policy (per-library with global fallback)
             try:
@@ -167,7 +167,7 @@ class PostProcessor(threading.Thread):
                 self._log("Could not determine replacement policy for library", message2=str(e), level="warning")
                 policy = ""
             except Exception as e:
-                self._log("Unexpected error determining replacement policy", message2=str(e), level="warning")
+                self._log(f"PolicyResolutionError: {e}", level="warning")
                 policy = ""
             if not policy:
                 policy = "approval_required" if self.settings.get_approval_required() else "replace"
@@ -201,9 +201,7 @@ class PostProcessor(threading.Thread):
         try:
             task_log = self.current_task.task.log or ""
             return "Size guardrail REJECTED" in task_log
-        except (AttributeError, TypeError):
-            return False
-        except Exception:
+        except (AttributeError, TypeError, Exception):
             return False
 
     def _attempt_retry(self):
@@ -354,19 +352,19 @@ class PostProcessor(threading.Thread):
         except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception in post-processing local task file", message2=str(e), level="exception")
         except Exception as e:
-            self._log("Unexpected error in post-processing local task file", message2=str(e), level="exception")
+            self._log(f"FileOperationError: {e}", level="exception")
         try:
             self.write_history_log()
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in writing history log", message2=str(e), level="exception")
         except Exception as e:
-            self._log("Unexpected error in writing history log", message2=str(e), level="exception")
+            self._log(f"TaskMetadataError in history log: {e}", level="exception")
         try:
             self.commit_task_metadata()
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in committing task metadata", message2=str(e), level="exception")
         except Exception as e:
-            self._log("Unexpected error in committing task metadata", message2=str(e), level="exception")
+            self._log(f"TaskMetadataError in commit: {e}", level="exception")
         try:
             # Clean up the staging directory for this task if it exists
             self._cleanup_staging_files()
@@ -437,7 +435,7 @@ class PostProcessor(threading.Thread):
                     self._log("Failed to extract codec from cache path", message2=str(e), level="warning")
                     codec = "transcoded"
                 except Exception as e:
-                    self._log("Unexpected error extracting codec from cache path", message2=str(e), level="warning")
+                    self._log(f"QualityMetricsError extracting codec: {e}", level="warning")
                     codec = "transcoded"
                 new_path = f"{base}.{codec}{ext}"
                 counter = 1
@@ -456,19 +454,19 @@ class PostProcessor(threading.Thread):
         except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception in post-processing remote task file", message2=str(e), level="exception")
         except Exception as e:
-            self._log("Unexpected error in post-processing remote task file", message2=str(e), level="exception")
+            self._log(f"FileOperationError in remote task: {e}", level="exception")
         try:
             self.dump_history_log()
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in dumping history log for remote task", message2=str(e), level="exception")
         except Exception as e:
-            self._log("Unexpected error in dumping history log for remote task", message2=str(e), level="exception")
+            self._log(f"TaskMetadataError in remote history: {e}", level="exception")
         try:
             self.current_task.set_status("complete")
         except (AttributeError, TypeError) as e:
             self._log("Exception in marking remote task as complete", message2=str(e), level="exception")
         except Exception as e:
-            self._log("Unexpected error in marking remote task as complete", message2=str(e), level="exception")
+            self._log(f"TaskMetadataError marking complete: {e}", level="exception")
 
     def _cleanup_staging_files(self):
         """Remove the staging directory for the current task if it exists."""
