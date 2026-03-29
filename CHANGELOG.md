@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/jtn0123/compresso/compare/v1.8.2...v1.9.0) (2026-03-29)
+
+
+### Features
+
+* add security headers to all HTTP handlers (JTN-6) ([#58](https://github.com/jtn0123/compresso/issues/58)) ([e9dba66](https://github.com/jtn0123/compresso/commit/e9dba6635c2b93984e0289803246015414afc9db))
+
 ## [1.8.2](https://github.com/jtn0123/compresso/compare/v1.8.1...v1.8.2) (2026-03-28)
 
 
