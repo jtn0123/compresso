@@ -82,7 +82,7 @@ class PluginsHandler(metaclass=SingletonType):
     def get_plugin_path(self, plugin_id):
         base_path = os.path.realpath(self.settings.get_plugins_path())
         plugin_directory = os.path.realpath(os.path.join(base_path, plugin_id))
-        if not plugin_directory.startswith(base_path + os.sep) and plugin_directory != base_path:
+        if not plugin_directory.startswith(base_path + os.sep):
             raise ValueError(f"Invalid plugin_id: path traversal detected in '{plugin_id}'")
         if not os.path.exists(plugin_directory):
             os.makedirs(plugin_directory)
@@ -413,7 +413,7 @@ class PluginsHandler(metaclass=SingletonType):
             plugin_directory = self.get_plugin_path(plugin_info.get("plugin_id"))
             result = self.write_plugin_data_to_db(plugin_info, plugin_directory)
             if result:
-                sanitized_id = str(plugin_info.get("plugin_id", "")).replace("\n", "").replace("\r", "")
+                sanitized_id = "".join(ch for ch in str(plugin_info.get("plugin_id", "")) if ch.isprintable())
                 self.logger.info("Installed plugin '%s'", sanitized_id)
 
             # Ensure the plugin module is reloaded (if it was previously loaded)

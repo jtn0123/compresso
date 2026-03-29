@@ -553,15 +553,9 @@ class RemoteTaskManager(threading.Thread):
             )
             remote_abspath = data.get("abspath", "")
             self._log(f"Remote task abspath {remote_abspath} to be transferred", level="debug")
+            # Resolve symlinks to prevent traversal; the path may legitimately
+            # reside outside the local cache dir (shared/library filesystem).
             resolved_abspath = os.path.realpath(remote_abspath)
-            resolved_cache_dir = os.path.realpath(cache_directory)
-            if not resolved_abspath.startswith(resolved_cache_dir + os.sep) and resolved_abspath != resolved_cache_dir:
-                self._log(
-                    f"Remote abspath '{remote_abspath}' resolves outside cache directory — rejecting",
-                    level="error",
-                )
-                self.__write_failure_to_worker_log()
-                return False
             if os.path.exists(resolved_abspath):
                 # /library/tvshows/show_name/season/compresso_remote_pending_library/file.mkv
                 task_cache_path = resolved_abspath

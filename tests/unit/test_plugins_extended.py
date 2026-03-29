@@ -86,6 +86,16 @@ class TestPluginPaths:
         with pytest.raises(ValueError, match="path traversal detected"):
             handler.get_plugin_path("../../../tmp/evil")
 
+    def test_get_plugin_path_rejects_empty_id(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        with pytest.raises(ValueError, match="path traversal detected"):
+            handler.get_plugin_path("")
+
+    def test_get_plugin_path_rejects_dot_id(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        with pytest.raises(ValueError, match="path traversal detected"):
+            handler.get_plugin_path(".")
+
     def test_get_plugin_download_cache_path(self, tmp_path):
         handler = _make_handler(tmp_path)
         path = handler.get_plugin_download_cache_path("my_plugin", "1.0.0")

@@ -75,17 +75,19 @@ class TestFormatFfmpegLogText:
 
 @pytest.mark.unittest
 class TestPluginLogSanitization:
-    def test_sanitize_strips_newlines(self):
+    def test_sanitize_strips_all_control_chars(self):
         """Verify the sanitization pattern used in plugins.py install_plugin_from_zip."""
-        plugin_id = "evil\nplugin\rid"
-        sanitized_id = str(plugin_id).replace("\n", "").replace("\r", "")
-        assert sanitized_id == "evilpluginid"
+        plugin_id = "evil\nplugin\rid\x00\x1b[31m"
+        sanitized_id = "".join(ch for ch in str(plugin_id) if ch.isprintable())
+        assert sanitized_id == "evilpluginid[31m"
         assert "\n" not in sanitized_id
         assert "\r" not in sanitized_id
+        assert "\x00" not in sanitized_id
+        assert "\x1b" not in sanitized_id
 
     def test_sanitize_preserves_normal_id(self):
         plugin_id = "my_normal_plugin_v2"
-        sanitized_id = str(plugin_id).replace("\n", "").replace("\r", "")
+        sanitized_id = "".join(ch for ch in str(plugin_id) if ch.isprintable())
         assert sanitized_id == plugin_id
 
 
