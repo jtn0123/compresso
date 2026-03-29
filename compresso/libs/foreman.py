@@ -648,189 +648,184 @@ class Foreman(threading.Thread):
         # Mark this as the last time run
         self.link_heartbeat_last_run = time_now
 
-    def run(self):  # noqa: C901 — main orchestration loop; refactor tracked in JTN-8
+    def _drain_completed_tasks(self):
+        """Move all finished tasks from the complete_queue to 'processed' status."""
+        while not self.abort_flag.is_set() and not self.complete_queue.empty():
+            self.event.wait(0.5)
+            try:
+                task_item = self.complete_queue.get_nowait()
+                task_item.set_status("processed")
+            except queue.Empty:
+                continue
+            except (AttributeError, KeyError, TypeError) as e:
+                self.logger.exception("Exception when fetching completed task report from worker: %s", str(e))
+
+    def _sync_and_validate_workers(self):
+        """Ensure correct worker count and valid config. Returns True if config is valid."""
+        if not self.abort_flag.is_set():
+            self.init_worker_threads()
+
+        valid_config = self.validate_worker_config()
+        if not valid_config:
+            self.pause_all_worker_threads(record_paused=True)
+            return False
+
+        if self.paused_worker_threads:
+            self.resume_all_worker_threads(recorded_paused_only=True)
+            self.paused_worker_threads = []
+        return True
+
+    def _record_worker_metrics(self, last_metrics_time, metrics_interval):
+        """Emit worker metrics, adjusting interval based on activity. Returns (last_time, interval)."""
+        workers_info = self.get_all_worker_status()
+        any_busy = any(not worker_info.get("idle") for worker_info in workers_info)
+        metrics_interval = 2 if any_busy else 10
+        now = time.time()
+        if now - last_metrics_time >= metrics_interval:
+            for worker_info in workers_info:
+                CompressoLogging.metric(
+                    "worker_info",
+                    worker_name=worker_info.get("name"),
+                    idle=worker_info.get("idle"),
+                    paused=worker_info.get("paused"),
+                    start_time=worker_info.get("start_time"),
+                    current_task=worker_info.get("current_task"),
+                    current_file=worker_info.get("current_file"),
+                    current_command=worker_info.get("current_command"),
+                    worker_log_tail=worker_info.get("worker_log_tail"),
+                    runners_info=worker_info.get("runners_info"),
+                    subprocess=worker_info.get("subprocess"),
+                )
+            last_metrics_time = now
+        return last_metrics_time, metrics_interval
+
+    def _check_queue_idle_transition(self, was_active):
+        """Detect queue transition from active→idle and dispatch notification. Returns current active state."""
+        queue_has_tasks = not self.task_queue.task_list_pending_is_empty()
+        any_workers_busy = any(
+            not self.worker_threads[t].idle for t in self.worker_threads if self.worker_threads[t].is_alive()
+        )
+        any_remote_workers_busy = any(self.remote_task_manager_threads[t].is_alive() for t in self.remote_task_manager_threads)
+        queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
+        if was_active and not queue_is_active:
+            try:
+                from compresso.libs.external_notifications import ExternalNotificationDispatcher
+
+                ExternalNotificationDispatcher().dispatch("queue_empty", {})
+            except Exception as e:
+                self.logger.debug("Failed to dispatch queue_empty notification: %s", e)
+        return queue_is_active
+
+    def _find_and_assign_pending_task(self, allow_local_check):
+        """Find an idle worker and assign the next pending task. Returns updated allow_local_check flag."""
+        if self.abort_flag.is_set() or self.task_queue.task_list_pending_is_empty():
+            return allow_local_check
+
+        self.link_manager_tread_heartbeat()
+
+        # Gate: don't assign if pending task queues haven't been consumed yet
+        if self.workers_pending_task_queue.full() or self.remote_workers_pending_task_queue.full():
+            return allow_local_check
+
+        # Determine which worker type to use
+        worker_ids = []
+        process_local = False
+        get_local_pending_tasks_only = False
+
+        if allow_local_check and self.check_for_idle_workers():
+            process_local = True
+            get_local_pending_tasks_only = False
+            worker_ids = self.fetch_available_worker_ids()
+            if not worker_ids:
+                return allow_local_check
+        elif self.check_for_idle_remote_workers():
+            allow_local_check = True
+            process_local = False
+            get_local_pending_tasks_only = True
+        else:
+            allow_local_check = True
+            self.event.wait(1)
+            return allow_local_check
+
+        # Check if postprocessor task queue is full
+        if self.postprocessor_queue_full():
+            self.event.wait(5)
+            return allow_local_check
+
+        # Fetch the next task matching available worker
+        available_worker_id = None
+        next_item_to_process = None
+        if process_local:
+            for worker_id in worker_ids:
+                try:
+                    library_tags = self.get_tags_configured_for_worker(worker_id)
+                except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
+                    self.logger.debug("Error while fetching the tags for the configured worker: %s", str(e))
+                    break
+                next_item_to_process = self.task_queue.get_next_pending_tasks(
+                    local_only=get_local_pending_tasks_only, library_tags=library_tags
+                )
+                if next_item_to_process:
+                    available_worker_id = worker_id
+                    break
+            if not available_worker_id:
+                self.event.wait(1)
+                return False  # Force remote worker check on next iteration
+        else:
+            remote_library_names = self.get_available_remote_library_names()
+            next_item_to_process = self.task_queue.get_next_pending_tasks(
+                local_only=get_local_pending_tasks_only, library_names=remote_library_names
+            )
+
+        if next_item_to_process:
+            try:
+                source_abspath = next_item_to_process.get_source_abspath()
+                task_library_name = next_item_to_process.get_task_library_name()
+            except (AttributeError, KeyError, TypeError) as e:
+                self.logger.exception("Exception in fetching task details: %s", str(e))
+                self.event.wait(3)
+                return allow_local_check
+
+            self.logger.info("Processing item - %s", str(source_abspath))
+            success = self.hand_task_to_workers(
+                next_item_to_process,
+                local=process_local,
+                library_name=task_library_name,
+                worker_id=available_worker_id,
+            )
+            if not success:
+                self.logger.warning(
+                    "Re-queueing tasks. Unable to find worker capable of processing task '%s'",
+                    next_item_to_process.get_source_abspath(),
+                )
+                self.task_queue.requeue_tasks_at_bottom(next_item_to_process.get_task_id())
+
+        return allow_local_check
+
+    def run(self):
         self.logger.info("Starting Foreman Monitor loop")
 
-        # Flag to force checking for idle remote workers when set to False.
-        # This will prevent always looping on idle local workers when the local worker's
-        # tags prevent them from taking up tasks
         allow_local_idle_worker_check = True
-
         last_metrics_time = 0
         metrics_interval = 2
-        _was_queue_active = False
+        was_queue_active = False
 
         while not self.abort_flag.is_set():
             self.event.wait(2)
 
             try:
-                # Fetch all completed tasks from workers
-                while not self.abort_flag.is_set() and not self.complete_queue.empty():
-                    self.event.wait(0.5)
-                    try:
-                        task_item = self.complete_queue.get_nowait()
-                        task_item.set_status("processed")
-                    except queue.Empty:
-                        continue
-                    except (AttributeError, KeyError, TypeError) as e:
-                        self.logger.exception("Exception when fetching completed task report from worker: %s", str(e))
+                self._drain_completed_tasks()
 
-                # Set up the correct number of workers
-                if not self.abort_flag.is_set():
-                    self.init_worker_threads()
-
-                # If the worker config is not valid, then pause all workers until it is
-                valid_config = self.validate_worker_config()
-                if not valid_config:
-                    # Pause all workers
-                    self.pause_all_worker_threads(record_paused=True)
+                if not self._sync_and_validate_workers():
                     continue
-                elif self.paused_worker_threads:
-                    # for thread in self.worker_threads:
-                    self.resume_all_worker_threads(recorded_paused_only=True)
-                    # Reset pause worker list
-                    self.paused_worker_threads = []
 
-                # Record metrics for each worker (slow down when all workers are idle)
-                workers_info = self.get_all_worker_status()
-                any_busy = any(not worker_info.get("idle") for worker_info in workers_info)
-                metrics_interval = 2 if any_busy else 10
-                now = time.time()
-                if now - last_metrics_time >= metrics_interval:
-                    for worker_info in workers_info:
-                        CompressoLogging.metric(
-                            "worker_info",
-                            worker_name=worker_info.get("name"),
-                            idle=worker_info.get("idle"),
-                            paused=worker_info.get("paused"),
-                            start_time=worker_info.get("start_time"),
-                            current_task=worker_info.get("current_task"),
-                            current_file=worker_info.get("current_file"),
-                            current_command=worker_info.get("current_command"),
-                            worker_log_tail=worker_info.get("worker_log_tail"),
-                            runners_info=worker_info.get("runners_info"),
-                            subprocess=worker_info.get("subprocess"),
-                        )
-                    last_metrics_time = now
+                last_metrics_time, metrics_interval = self._record_worker_metrics(last_metrics_time, metrics_interval)
 
-                # Detect queue transition from active to idle and dispatch notification
-                queue_has_tasks = not self.task_queue.task_list_pending_is_empty()
-                any_workers_busy = any(
-                    not self.worker_threads[t].idle for t in self.worker_threads if self.worker_threads[t].is_alive()
-                )
-                any_remote_workers_busy = any(
-                    self.remote_task_manager_threads[t].is_alive() for t in self.remote_task_manager_threads
-                )
-                queue_is_active = queue_has_tasks or any_workers_busy or any_remote_workers_busy
-                if _was_queue_active and not queue_is_active:
-                    try:
-                        from compresso.libs.external_notifications import ExternalNotificationDispatcher
+                was_queue_active = self._check_queue_idle_transition(was_queue_active)
 
-                        ExternalNotificationDispatcher().dispatch("queue_empty", {})
-                    except Exception as e:
-                        self.logger.debug("Failed to dispatch queue_empty notification: %s", e)
-                _was_queue_active = queue_is_active
-
-                # Manage worker event schedules
                 self.manage_event_schedules()
 
-                if not self.abort_flag.is_set() and not self.task_queue.task_list_pending_is_empty():
-                    # Check the status of all link manager threads (close dead ones)
-                    self.link_manager_tread_heartbeat()
-
-                    # Check if we are able to start up a worker for another encoding job
-                    # These queues holds only one task at a time and is used to hand tasks to the workers
-                    if self.workers_pending_task_queue.full() or self.remote_workers_pending_task_queue.full():
-                        # In order to simplify the process and run the foreman management in a single thread, if either of
-                        # these are full, it means the thread that is assigned to pick up the item has not done so.
-                        # In order to prevent a second thread starting and taking the first thread's task, we should not
-                        # process any more pending tasks until that first thread is ready and has taken its task out of the
-                        # queue.
-                        continue
-
-                    # Check if there are any free workers
-                    worker_ids = []
-                    if allow_local_idle_worker_check and self.check_for_idle_workers():
-                        # Local workers are available
-                        process_local = True
-                        # For local workers, process either local tasks or tasks provided from a remote installation
-                        get_local_pending_tasks_only = False
-                        # Specify the worker ID that will handle the next task
-                        worker_ids = self.fetch_available_worker_ids()
-                        # If not workers were available (possibly due to being recycled), just continue loop
-                        if not worker_ids:
-                            continue
-                    elif self.check_for_idle_remote_workers():
-                        allow_local_idle_worker_check = True
-                        # Remote workers are available
-                        process_local = False
-                        # For remote workers, only process local tasks. Don't hand remote tasks to another remote installation
-                        get_local_pending_tasks_only = True
-                    else:
-                        allow_local_idle_worker_check = True
-                        # All workers are currently busy
-                        self.event.wait(1)
-                        continue
-
-                    # Check if postprocessor task queue is full
-                    if self.postprocessor_queue_full():
-                        self.event.wait(5)
-                        continue
-
-                    # Fetch the next item in the queue
-                    available_worker_id = None
-                    next_item_to_process = None
-                    if process_local:
-                        # For local processing, ensure tags match the available library and worker
-                        for worker_id in worker_ids:
-                            try:
-                                library_tags = self.get_tags_configured_for_worker(worker_id)
-                            except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-                                # This will happen if the worker group is deleted
-                                self.logger.debug("Error while fetching the tags for the configured worker: %s", str(e))
-                                # Break this fore loop. The main while loop wil clean up these workers on the next pass
-                                break
-                            next_item_to_process = self.task_queue.get_next_pending_tasks(
-                                local_only=get_local_pending_tasks_only, library_tags=library_tags
-                            )
-                            if next_item_to_process:
-                                available_worker_id = worker_id
-                                break
-                        # If no local worker ID was assigned to the given item, then try again in 2 seconds
-                        if not available_worker_id:
-                            allow_local_idle_worker_check = False
-                            self.event.wait(1)
-                            continue
-                    else:
-                        # For remote items, run a search matching an available remote installation library
-                        remote_library_names = self.get_available_remote_library_names()
-                        next_item_to_process = self.task_queue.get_next_pending_tasks(
-                            local_only=get_local_pending_tasks_only, library_names=remote_library_names
-                        )
-
-                    if next_item_to_process:
-                        try:
-                            source_abspath = next_item_to_process.get_source_abspath()
-                            task_library_name = next_item_to_process.get_task_library_name()
-                        except (AttributeError, KeyError, TypeError) as e:
-                            self.logger.exception("Exception in fetching task details: %s", str(e))
-                            self.event.wait(3)
-                            continue
-
-                        self.logger.info("Processing item - %s", str(source_abspath))
-                        success = self.hand_task_to_workers(
-                            next_item_to_process,
-                            local=process_local,
-                            library_name=task_library_name,
-                            worker_id=available_worker_id,
-                        )
-                        if not success:
-                            self.logger.warning(
-                                "Re-queueing tasks. Unable to find worker capable of processing task '%s'",
-                                next_item_to_process.get_source_abspath(),
-                            )
-                            # Re-queue item at the bottom
-                            self.task_queue.requeue_tasks_at_bottom(next_item_to_process.get_task_id())
+                allow_local_idle_worker_check = self._find_and_assign_pending_task(allow_local_idle_worker_check)
             except Exception:
                 self.logger.exception("Unhandled exception in Foreman main loop")
                 self.event.wait(5)
