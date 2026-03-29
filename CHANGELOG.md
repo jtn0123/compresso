@@ -1,3 +1,12 @@
+## [1.10.3](https://github.com/jtn0123/compresso/compare/v1.10.2...v1.10.3) (2026-03-29)
+
+
+### Bug Fixes
+
+* address CodeRabbit and CodeQL review comments ([534c491](https://github.com/jtn0123/compresso/commit/534c4913246c0db3245b7748f46646178a4c3295))
+* resolve SonarCloud security rating on new code ([fae7c79](https://github.com/jtn0123/compresso/commit/fae7c790ac29dff3acfb4ab75a25da59999a11a1))
+* resolve SonarCloud security vulns, bugs, and async I/O issues ([814948c](https://github.com/jtn0123/compresso/commit/814948ca2483b3c4e20d609e8391ad5b99f6eb01))
+
 ## [1.10.2](https://github.com/jtn0123/compresso/compare/v1.10.1...v1.10.2) (2026-03-29)
 
 
