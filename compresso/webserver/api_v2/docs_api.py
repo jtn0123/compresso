@@ -37,7 +37,7 @@ import tornado.log
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import DocumentContentSuccessSchema
+from compresso.webserver.api_v2.schema.docs_schemas import DocumentContentSuccessSchema
 from compresso.webserver.helpers import documents
 
 GITHUB_RELEASES_URL = "https://github.com/jtn0123/compresso/releases"

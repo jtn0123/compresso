@@ -37,8 +37,7 @@ from peewee import fn
 from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.unmodels import CompletedTasks, FileMetadata, FileMetadataPaths
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import (
-    BaseSuccessSchema,
+from compresso.webserver.api_v2.schema.history_schemas import (
     MetadataSearchResultsSchema,
     RequestMetadataByFingerprintSchema,
     RequestMetadataByTaskSchema,
@@ -46,6 +45,7 @@ from compresso.webserver.api_v2.schema.schemas import (
     RequestMetadataSearchSchema,
     RequestMetadataUpdateSchema,
 )
+from compresso.webserver.api_v2.schema.schemas import BaseSuccessSchema
 
 
 class ApiMetadataHandler(BaseApiHandler):

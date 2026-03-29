@@ -20,7 +20,7 @@ from compresso.libs.gpu_monitor import GpuMonitor
 from compresso.libs.system import System
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import SystemStatusSuccessSchema
+from compresso.webserver.api_v2.schema.system_schemas import SystemStatusSuccessSchema
 
 
 class ApiSystemHandler(BaseApiHandler):

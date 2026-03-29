@@ -30,6 +30,8 @@ def _mock_initialize(self, **kwargs):
 
 
 SETTINGS_API = "compresso.webserver.api_v2.settings_api"
+SETTINGS_LIBRARY_MIXIN = "compresso.webserver.api_v2.settings_library_mixin"
+SETTINGS_LINK_MIXIN = "compresso.webserver.api_v2.settings_link_mixin"
 
 
 @pytest.mark.unittest
@@ -71,7 +73,7 @@ class TestSettingsApiRead(ApiTestBase):
         data = self.parse_response(resp)
         assert "configuration" in data
 
-    @patch(SETTINGS_API + ".Library")
+    @patch(SETTINGS_LIBRARY_MIXIN + ".Library")
     def test_read_libraries(self, mock_library_cls):
         """GET /settings/libraries returns 200 with libraries key."""
         mock_library_cls.get_all_libraries.return_value = [
@@ -92,7 +94,7 @@ class TestSettingsApiRead(ApiTestBase):
         assert "libraries" in data
         assert len(data["libraries"]) == 1
 
-    @patch(SETTINGS_API + ".Links")
+    @patch(SETTINGS_LINK_MIXIN + ".Links")
     def test_link_read(self, mock_links_cls):
         """POST /settings/link/read returns 200 with link config."""
         mock_links = MagicMock()
@@ -125,7 +127,7 @@ class TestSettingsApiRead(ApiTestBase):
         data = self.parse_response(resp)
         assert "link_config" in data
 
-    @patch(SETTINGS_API + ".Links")
+    @patch(SETTINGS_LINK_MIXIN + ".Links")
     def test_link_write(self, mock_links_cls):
         """POST /settings/link/write returns 200 on success."""
         mock_links = MagicMock()

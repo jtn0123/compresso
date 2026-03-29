@@ -37,7 +37,7 @@ from compresso.libs import session
 from compresso.libs.library import Library
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import (
+from compresso.webserver.api_v2.schema.pending_schemas import (
     PendingTasksSchema,
     PendingTasksTableResultsSchema,
     PendingTaskTestResultSchema,
@@ -47,9 +47,9 @@ from compresso.webserver.api_v2.schema.schemas import (
     RequestPendingTasksLibraryUpdateSchema,
     RequestPendingTasksReorderSchema,
     RequestPendingTaskTestSchema,
-    RequestTableUpdateByIdList,
     TaskDownloadLinkSchema,
 )
+from compresso.webserver.api_v2.schema.schemas import RequestTableUpdateByIdList
 from compresso.webserver.downloads import DownloadsLinks
 from compresso.webserver.helpers import pending_tasks
 

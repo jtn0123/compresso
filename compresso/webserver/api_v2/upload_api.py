@@ -39,7 +39,7 @@ from compresso import config
 from compresso.libs import common, session
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import PendingTasksTableResultsSchema
+from compresso.webserver.api_v2.schema.pending_schemas import PendingTasksTableResultsSchema
 from compresso.webserver.helpers import pending_tasks
 
 # CONST

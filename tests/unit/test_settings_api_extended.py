@@ -25,6 +25,9 @@ def reset_singletons():
 
 
 SETTINGS_API = "compresso.webserver.api_v2.settings_api"
+SETTINGS_LIBRARY_MIXIN = "compresso.webserver.api_v2.settings_library_mixin"
+SETTINGS_LINK_MIXIN = "compresso.webserver.api_v2.settings_link_mixin"
+SETTINGS_WORKER_GROUPS_MIXIN = "compresso.webserver.api_v2.settings_worker_groups_mixin"
 
 
 def _mock_initialize(self, **kwargs):
@@ -52,7 +55,7 @@ class TestSettingsApiWorkerGroups(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.WorkerGroup")
+    @patch(f"{SETTINGS_WORKER_GROUPS_MIXIN}.WorkerGroup")
     def test_get_all_worker_groups(self, mock_wg_cls):
         """GET /settings/worker_groups returns 200 with worker_groups key."""
         mock_wg_cls.get_all_worker_groups.return_value = [
@@ -71,7 +74,7 @@ class TestSettingsApiWorkerGroups(ApiTestBase):
         data = self.parse_response(resp)
         assert "worker_groups" in data
 
-    @patch(f"{SETTINGS_API}.WorkerGroup")
+    @patch(f"{SETTINGS_WORKER_GROUPS_MIXIN}.WorkerGroup")
     def test_read_worker_group_config(self, mock_wg_cls):
         """POST /settings/worker_group/read returns 200."""
         mock_wg = MagicMock()
@@ -107,7 +110,7 @@ class TestSettingsApiWorkerGroups(ApiTestBase):
         assert resp.code == 200
         mock_save_wg.assert_called_once()
 
-    @patch(f"{SETTINGS_API}.WorkerGroup")
+    @patch(f"{SETTINGS_WORKER_GROUPS_MIXIN}.WorkerGroup")
     def test_remove_worker_group_success(self, mock_wg_cls):
         """DELETE /settings/worker_group/remove returns 200."""
         mock_wg = MagicMock()
@@ -123,7 +126,7 @@ class TestSettingsApiWorkerGroups(ApiTestBase):
         )
         assert resp.code == 200
 
-    @patch(f"{SETTINGS_API}.WorkerGroup")
+    @patch(f"{SETTINGS_WORKER_GROUPS_MIXIN}.WorkerGroup")
     def test_remove_worker_group_failure(self, mock_wg_cls):
         """DELETE /settings/worker_group/remove returns 500 on failure."""
         mock_wg = MagicMock()
@@ -151,7 +154,7 @@ class TestSettingsApiLibraryConfig(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_read_library_config(self, mock_lib_cls):
         """POST /settings/library/read returns 200 with library config."""
         mock_lib = MagicMock()
@@ -225,7 +228,7 @@ class TestSettingsApiLibraryConfig(ApiTestBase):
         )
         assert resp.code == 500
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_remove_library_success(self, mock_lib_cls):
         """DELETE /settings/library/remove returns 200."""
         mock_lib = MagicMock()
@@ -241,7 +244,7 @@ class TestSettingsApiLibraryConfig(ApiTestBase):
         )
         assert resp.code == 200
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_remove_library_failure(self, mock_lib_cls):
         """DELETE /settings/library/remove returns 500 on failure."""
         mock_lib = MagicMock()
@@ -269,7 +272,7 @@ class TestSettingsApiLibraryExportImport(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_export_library_plugin_config(self, mock_lib_cls):
         """POST /settings/library/export returns 200."""
         mock_lib_cls.export.return_value = {
@@ -316,7 +319,7 @@ class TestSettingsApiValidateRemote(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.Links")
+    @patch(f"{SETTINGS_LINK_MIXIN}.Links")
     def test_validate_remote_installation(self, mock_links_cls):
         """POST /settings/link/validate returns 200."""
         mock_links = MagicMock()
@@ -340,7 +343,7 @@ class TestSettingsApiValidateRemote(ApiTestBase):
         data = self.parse_response(resp)
         assert "installation" in data
 
-    @patch(f"{SETTINGS_API}.Links")
+    @patch(f"{SETTINGS_LINK_MIXIN}.Links")
     def test_validate_remote_installation_failure(self, mock_links_cls):
         """POST /settings/link/validate returns 500 on failure."""
         mock_links = MagicMock()
@@ -370,7 +373,7 @@ class TestSettingsApiLinkRemove(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.Links")
+    @patch(f"{SETTINGS_LINK_MIXIN}.Links")
     def test_remove_link_success(self, mock_links_cls):
         """DELETE /settings/link/remove returns 200."""
         mock_links = MagicMock()
@@ -386,7 +389,7 @@ class TestSettingsApiLinkRemove(ApiTestBase):
         )
         assert resp.code == 200
 
-    @patch(f"{SETTINGS_API}.Links")
+    @patch(f"{SETTINGS_LINK_MIXIN}.Links")
     def test_remove_link_failure(self, mock_links_cls):
         """DELETE /settings/link/remove returns 500 on failure."""
         mock_links = MagicMock()

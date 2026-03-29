@@ -19,6 +19,9 @@ from compresso.webserver.api_v2.settings_api import ApiSettingsHandler
 from tests.unit.api_test_base import ApiTestBase
 
 SETTINGS_API = "compresso.webserver.api_v2.settings_api"
+SETTINGS_LIBRARY_MIXIN = "compresso.webserver.api_v2.settings_library_mixin"
+SETTINGS_LINK_MIXIN = "compresso.webserver.api_v2.settings_link_mixin"
+SETTINGS_WORKER_GROUPS_MIXIN = "compresso.webserver.api_v2.settings_worker_groups_mixin"
 
 
 @pytest.fixture(autouse=True)
@@ -138,13 +141,13 @@ class TestSettingsApiWorkerGroupErrors(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.WorkerGroup")
+    @patch(f"{SETTINGS_WORKER_GROUPS_MIXIN}.WorkerGroup")
     def test_get_worker_groups_exception(self, mock_wg_cls):
         mock_wg_cls.get_all_worker_groups.side_effect = Exception("error")
         resp = self.get_json("/settings/worker_groups")
         assert resp.code == 500
 
-    @patch(f"{SETTINGS_API}.WorkerGroup")
+    @patch(f"{SETTINGS_WORKER_GROUPS_MIXIN}.WorkerGroup")
     def test_read_worker_group_exception(self, mock_wg_cls):
         mock_wg_cls.side_effect = Exception("not found")
         resp = self.post_json("/settings/worker_group/read", {"id": 999})
@@ -167,7 +170,7 @@ class TestSettingsApiWorkerGroupErrors(ApiTestBase):
         )
         assert resp.code == 500
 
-    @patch(f"{SETTINGS_API}.WorkerGroup")
+    @patch(f"{SETTINGS_WORKER_GROUPS_MIXIN}.WorkerGroup")
     def test_remove_worker_group_exception(self, mock_wg_cls):
         mock_wg_cls.side_effect = Exception("error")
         resp = self.fetch(
@@ -191,19 +194,19 @@ class TestSettingsApiLibraryErrors(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_get_libraries_exception(self, mock_lib_cls):
         mock_lib_cls.get_all_libraries.side_effect = Exception("error")
         resp = self.get_json("/settings/libraries")
         assert resp.code == 500
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_read_library_config_exception(self, mock_lib_cls):
         mock_lib_cls.side_effect = Exception("not found")
         resp = self.post_json("/settings/library/read", {"id": 999})
         assert resp.code == 500
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_remove_library_exception(self, mock_lib_cls):
         mock_lib_cls.side_effect = Exception("error")
         resp = self.fetch(
@@ -227,13 +230,13 @@ class TestSettingsApiLinkErrors(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.Links")
+    @patch(f"{SETTINGS_LINK_MIXIN}.Links")
     def test_read_link_config_exception(self, mock_links_cls):
         mock_links_cls.return_value.read_remote_installation_link_config.side_effect = Exception("error")
         resp = self.post_json("/settings/link/read", {"uuid": "abc-123"})
         assert resp.code == 500
 
-    @patch(f"{SETTINGS_API}.Links")
+    @patch(f"{SETTINGS_LINK_MIXIN}.Links")
     def test_write_link_config_exception(self, mock_links_cls):
         mock_links_cls.return_value.update_single_remote_installation_link_config.side_effect = Exception("error")
         resp = self.post_json(
@@ -273,7 +276,7 @@ class TestSettingsApiExportError(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(f"{SETTINGS_API}.Library")
+    @patch(f"{SETTINGS_LIBRARY_MIXIN}.Library")
     def test_export_library_exception(self, mock_lib_cls):
         mock_lib_cls.export.side_effect = Exception("export error")
         resp = self.post_json("/settings/library/export", {"id": 1})

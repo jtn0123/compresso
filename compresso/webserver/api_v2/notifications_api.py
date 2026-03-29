@@ -40,7 +40,8 @@ from compresso.libs.external_notifications import ExternalNotificationDispatcher
 from compresso.libs.notifications import Notifications
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.schemas import RequestNotificationsDataSchema, RequestTableUpdateByUuidList
+from compresso.webserver.api_v2.schema.notification_schemas import RequestNotificationsDataSchema
+from compresso.webserver.api_v2.schema.schemas import RequestTableUpdateByUuidList
 
 
 class ApiNotificationsHandler(BaseApiHandler):
