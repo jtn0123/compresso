@@ -1,3 +1,10 @@
+## [1.10.2](https://github.com/jtn0123/compresso/compare/v1.10.1...v1.10.2) (2026-03-29)
+
+
+### Bug Fixes
+
+* add noqa for IntegrityError re-export in tasks.py ([7bfe289](https://github.com/jtn0123/compresso/commit/7bfe2892e722656fdfb78b05765a9674b708ba38))
+
 ## [1.10.1](https://github.com/jtn0123/compresso/compare/v1.10.0...v1.10.1) (2026-03-29)
 
 
