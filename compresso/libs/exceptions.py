@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-compresso.exceptions.py
+compresso.libs.exceptions.py
 
 Custom exception hierarchy for the post-processing pipeline.
 Replaces bare ``except Exception`` blocks in postprocessor.py with

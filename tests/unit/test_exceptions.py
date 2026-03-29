@@ -58,8 +58,9 @@ class TestExceptionHierarchy:
                 raise exc_cls("test")
 
     def test_exception_preserves_message(self):
-        err = FileOperationError("copy failed: /src -> /dst")
-        assert "copy failed" in str(err)
+        message = "copy failed: /src -> /dst"
+        err = FileOperationError(message)
+        assert str(err) == message
 
     def test_exception_chaining(self):
         """Verify from-clause chaining works correctly."""

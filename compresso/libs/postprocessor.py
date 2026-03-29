@@ -201,7 +201,8 @@ class PostProcessor(threading.Thread):
         try:
             task_log = self.current_task.task.log or ""
             return "Size guardrail REJECTED" in task_log
-        except (AttributeError, TypeError, Exception):
+        except Exception as e:
+            self._log("Guardrail rejection check unavailable", message2=str(e), level="debug")
             return False
 
     def _attempt_retry(self):

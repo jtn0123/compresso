@@ -26,7 +26,7 @@ LibraryTags = Libraries.tags.get_through_model()
 
 @pytest.fixture
 def model_db(tmp_path):
-    """Create an in-memory DB with all tables needed for model tests."""
+    """Create a temporary SQLite DB file with all tables needed for model tests."""
     db_file = os.path.join(str(tmp_path), "models_test.db")
     database_settings = {
         "TYPE": "SQLITE",
