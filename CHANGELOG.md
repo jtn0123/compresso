@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/jtn0123/compresso/compare/v1.9.0...v1.10.0) (2026-03-29)
+
+
+### Features
+
+* custom exception hierarchy + ORM model tests (JTN-9 + JTN-12) ([#59](https://github.com/jtn0123/compresso/issues/59)) ([ebd6812](https://github.com/jtn0123/compresso/commit/ebd68123201f141ca247c93c327a049873dc9970))
+
 # [1.9.0](https://github.com/jtn0123/compresso/compare/v1.8.2...v1.9.0) (2026-03-29)
 
 
