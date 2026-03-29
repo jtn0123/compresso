@@ -424,7 +424,7 @@ class RootService:
             self.logger.error(message)
             if not self.startup_state.snapshot().get("errors"):
                 self.startup_state.mark_error("threads_ready", message)
-            raise
+            raise RuntimeError(message) from e
 
         # Watch for the term signal
         if os.name == "nt":

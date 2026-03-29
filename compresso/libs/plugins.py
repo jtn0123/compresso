@@ -80,9 +80,9 @@ class PluginsHandler(metaclass=SingletonType):
         return os.path.join(plugins_directory, f"repo-{repo_id}.json")
 
     def get_plugin_path(self, plugin_id):
-        base_path = os.path.abspath(self.settings.get_plugins_path())
-        plugin_directory = os.path.abspath(os.path.join(base_path, plugin_id))
-        if not plugin_directory.startswith(base_path + os.sep) and plugin_directory != base_path:
+        base_path = os.path.realpath(self.settings.get_plugins_path())
+        plugin_directory = os.path.realpath(os.path.join(base_path, plugin_id))
+        if not plugin_directory.startswith(base_path + os.sep):
             raise ValueError(f"Invalid plugin_id: path traversal detected in '{plugin_id}'")
         if not os.path.exists(plugin_directory):
             os.makedirs(plugin_directory)
@@ -413,7 +413,7 @@ class PluginsHandler(metaclass=SingletonType):
             plugin_directory = self.get_plugin_path(plugin_info.get("plugin_id"))
             result = self.write_plugin_data_to_db(plugin_info, plugin_directory)
             if result:
-                self.logger.info("Installed plugin '%s'", plugin_info.get("plugin_id"))
+                self.logger.info("Installed plugin '%s'", os.path.basename(plugin_directory))
 
             # Ensure the plugin module is reloaded (if it was previously loaded)
             plugin_executor = PluginExecutor()

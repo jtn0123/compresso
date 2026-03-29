@@ -108,10 +108,9 @@ class TestConfigurationChanged:
 
 @pytest.mark.unittest
 class TestValidateWorkerConfig:
-    @patch("compresso.libs.foreman.Library")
     @patch("compresso.libs.foreman.FrontendPushMessages")
     @patch("compresso.libs.foreman.PluginsHandler")
-    def test_invalid_when_incompatible_plugins(self, mock_ph_cls, mock_fpm_cls, mock_lib_cls):
+    def test_invalid_when_incompatible_plugins(self, mock_ph_cls, mock_fpm_cls):
         foreman = _make_foreman()
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = ["bad_plugin"]
@@ -119,14 +118,12 @@ class TestValidateWorkerConfig:
         foreman.links = MagicMock()
         foreman.links.within_enabled_link_limits.return_value = True
         foreman.configuration_changed = MagicMock(return_value=False)
-        mock_lib_cls.within_library_count_limits.return_value = True
         result = foreman.validate_worker_config()
         assert result is False
 
-    @patch("compresso.libs.foreman.Library")
     @patch("compresso.libs.foreman.FrontendPushMessages")
     @patch("compresso.libs.foreman.PluginsHandler")
-    def test_invalid_when_link_limits_exceeded(self, mock_ph_cls, mock_fpm_cls, mock_lib_cls):
+    def test_invalid_when_link_limits_exceeded(self, mock_ph_cls, mock_fpm_cls):
         foreman = _make_foreman()
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = []
@@ -134,14 +131,12 @@ class TestValidateWorkerConfig:
         foreman.links = MagicMock()
         foreman.links.within_enabled_link_limits.return_value = False
         foreman.configuration_changed = MagicMock(return_value=False)
-        mock_lib_cls.within_library_count_limits.return_value = True
         result = foreman.validate_worker_config()
         assert result is False
 
-    @patch("compresso.libs.foreman.Library")
     @patch("compresso.libs.foreman.FrontendPushMessages")
     @patch("compresso.libs.foreman.PluginsHandler")
-    def test_invalid_when_configuration_changed(self, mock_ph_cls, mock_fpm_cls, mock_lib_cls):
+    def test_invalid_when_configuration_changed(self, mock_ph_cls, mock_fpm_cls):
         foreman = _make_foreman()
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = []
@@ -149,14 +144,12 @@ class TestValidateWorkerConfig:
         foreman.links = MagicMock()
         foreman.links.within_enabled_link_limits.return_value = True
         foreman.configuration_changed = MagicMock(return_value=True)
-        mock_lib_cls.within_library_count_limits.return_value = True
         result = foreman.validate_worker_config()
         assert result is False
 
-    @patch("compresso.libs.foreman.Library")
     @patch("compresso.libs.foreman.FrontendPushMessages")
     @patch("compresso.libs.foreman.PluginsHandler")
-    def test_invalid_when_library_limits_exceeded(self, mock_ph_cls, mock_fpm_cls, mock_lib_cls):
+    def test_valid_when_all_checks_pass(self, mock_ph_cls, mock_fpm_cls):
         foreman = _make_foreman()
         mock_ph = MagicMock()
         mock_ph.get_incompatible_enabled_plugins.return_value = []
@@ -164,22 +157,6 @@ class TestValidateWorkerConfig:
         foreman.links = MagicMock()
         foreman.links.within_enabled_link_limits.return_value = True
         foreman.configuration_changed = MagicMock(return_value=False)
-        mock_lib_cls.within_library_count_limits.return_value = False
-        result = foreman.validate_worker_config()
-        assert result is False
-
-    @patch("compresso.libs.foreman.Library")
-    @patch("compresso.libs.foreman.FrontendPushMessages")
-    @patch("compresso.libs.foreman.PluginsHandler")
-    def test_valid_when_all_checks_pass(self, mock_ph_cls, mock_fpm_cls, mock_lib_cls):
-        foreman = _make_foreman()
-        mock_ph = MagicMock()
-        mock_ph.get_incompatible_enabled_plugins.return_value = []
-        mock_ph_cls.return_value = mock_ph
-        foreman.links = MagicMock()
-        foreman.links.within_enabled_link_limits.return_value = True
-        foreman.configuration_changed = MagicMock(return_value=False)
-        mock_lib_cls.within_library_count_limits.return_value = True
         result = foreman.validate_worker_config()
         assert result is True
 

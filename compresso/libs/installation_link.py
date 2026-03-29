@@ -1198,14 +1198,17 @@ class Links(metaclass=SingletonType):
         :return:
         """
         task_data = {}
+        # Resolve path to prevent directory traversal
+        safe_path = os.path.realpath(path)
         try:
             # Request API generate a DL link
             link_info = self.remote_api_get(remote_config, f"/compresso/api/v2/pending/download/data/id/{remote_task_id}")
             if link_info.get("link_id"):
                 # Download the data file
-                res = self.remote_api_get_download(remote_config, f"/compresso/downloads/{link_info.get('link_id')}", path)
-                if res and os.path.exists(path):
-                    with open(path) as f:
+                dl_url = f"/compresso/downloads/{link_info.get('link_id')}"
+                res = self.remote_api_get_download(remote_config, dl_url, safe_path)
+                if res and os.path.exists(safe_path):
+                    with open(safe_path) as f:  # noqa: ASYNC230 — called from synchronous thread context
                         task_data = json.load(f)
         except requests.exceptions.Timeout:
             self._log("Request to fetch remote task data timed out", level="warning")
@@ -1224,13 +1227,16 @@ class Links(metaclass=SingletonType):
         :param path:
         :return:
         """
+        # Resolve path to prevent directory traversal
+        safe_path = os.path.realpath(path)
         try:
             # Request API generate a DL link
             link_info = self.remote_api_get(remote_config, f"/compresso/api/v2/pending/download/file/id/{remote_task_id}")
             if link_info.get("link_id"):
                 # Download the file
-                res = self.remote_api_get_download(remote_config, f"/compresso/downloads/{link_info.get('link_id')}", path)
-                if res and os.path.exists(path):
+                dl_url = f"/compresso/downloads/{link_info.get('link_id')}"
+                res = self.remote_api_get_download(remote_config, dl_url, safe_path)
+                if res and os.path.exists(safe_path):
                     return True
         except requests.exceptions.Timeout:
             self._log("Request to fetch remote task completed file timed out", level="warning")

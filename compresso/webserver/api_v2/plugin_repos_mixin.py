@@ -9,8 +9,10 @@ Mixin providing plugin repository management endpoints for ApiPluginsHandler.
 import json
 import os
 import time
+from functools import partial
 
 import tornado.log
+from tornado.ioloop import IOLoop
 
 from compresso import config as compresso_config
 from compresso.webserver.api_v2.base_api_handler import BaseApiError
@@ -23,6 +25,16 @@ from compresso.webserver.helpers import plugins
 
 class PluginReposMixin:
     """Mixin for plugin repository management endpoints."""
+
+    @staticmethod
+    def _read_json_file(path):
+        with open(path) as f:
+            return json.load(f)
+
+    @staticmethod
+    def _write_json_file(path, data):
+        with open(path, "w") as f:
+            json.dump(data, f)
 
     async def update_repo_list(self):
         """
@@ -221,8 +233,7 @@ class PluginReposMixin:
 
             if not self.settings.get("serve_traceback") and os.path.exists(cache_path):
                 try:
-                    with open(cache_path) as f:
-                        cached = json.load(f)
+                    cached = await IOLoop.current().run_in_executor(None, self._read_json_file, cache_path)
                     cached_at = cached.get("cached_at", 0)
                     cached_response = cached.get("response")
                     repos = cached_response.get("repos") if cached_response else None
@@ -245,8 +256,9 @@ class PluginReposMixin:
                 return
             if not self.settings.get("serve_traceback"):
                 try:
-                    with open(cache_path, "w") as f:
-                        json.dump({"cached_at": time.time(), "response": response}, f)
+                    await IOLoop.current().run_in_executor(
+                        None, partial(self._write_json_file, cache_path, {"cached_at": time.time(), "response": response})
+                    )
                 except Exception:
                     tornado.log.app_log.warning("Failed to write community repos cache", exc_info=True)
             self.write_success(response)

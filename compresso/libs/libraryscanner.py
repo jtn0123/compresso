@@ -174,13 +174,8 @@ class LibraryScannerManager(threading.Thread):
 
         :return:
         """
-        valid = True
         plugin_handler = PluginsHandler()
-        if plugin_handler.get_incompatible_enabled_plugins():
-            valid = False
-        if not Library.within_library_count_limits():
-            valid = False
-        return valid
+        return not plugin_handler.get_incompatible_enabled_plugins()
 
     def add_path_to_queue(self, pathname, library_id, priority_score):
         self.scheduledtasks.put(

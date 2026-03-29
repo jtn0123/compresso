@@ -254,15 +254,13 @@ def read_command_log_for_task(task_id):
 def format_ffmpeg_log_text(log_lines):
     return_list = []
     pre_text = False
-    headers = [
-        "RUNNER:",
-        "COMMAND:",
-        "LOG:",
+    termination_headers = {
         "WORKER TERMINATED!",
         "PLUGIN FAILED!",
         "REMOTE TASK FAILED!",
         "REMOTE LINK MANAGER TERMINATED!",
-    ]
+    }
+    headers = {"RUNNER:", "COMMAND:", "LOG:"} | termination_headers
     for _i, line in enumerate(log_lines):
         line_text = line
 
@@ -271,18 +269,10 @@ def format_ffmpeg_log_text(log_lines):
             line_text = f"<pre>{line_text}</pre>"
 
         # Add bold to headers
-        if line_text.rstrip() not in headers:
-            line_text = line_text
-        else:
-            if line_text.rstrip() in [
-                "WORKER TERMINATED!",
-                "PLUGIN FAILED!",
-                "REMOTE TASK FAILED!",
-                "REMOTE LINK MANAGER TERMINATED!",
-            ]:
-                line_text = f'<b><span class="terminated">{line_text}</span></b>'
-            else:
-                line_text = f"<b>{line_text}</b>"
+        if line_text.rstrip() in termination_headers:
+            line_text = f'<b><span class="terminated">{line_text}</span></b>'
+        elif line_text.rstrip() in headers:
+            line_text = f"<b>{line_text}</b>"
 
         # Replace leading whitespace
         stripped = line.lstrip()

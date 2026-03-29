@@ -149,34 +149,20 @@ class TestEventMonitorManagerInit:
 
 @pytest.mark.unittest
 class TestEventMonitorSystemConfig:
-    @patch("compresso.libs.eventmonitor.Library")
     @patch("compresso.libs.eventmonitor.PluginsHandler")
-    def test_valid_config(self, mock_handler_cls, mock_library_cls):
+    def test_valid_config(self, mock_handler_cls):
         mgr = _make_event_monitor()
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = []
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
         assert mgr.system_configuration_is_valid() is True
 
-    @patch("compresso.libs.eventmonitor.Library")
     @patch("compresso.libs.eventmonitor.PluginsHandler")
-    def test_invalid_plugins(self, mock_handler_cls, mock_library_cls):
+    def test_invalid_plugins(self, mock_handler_cls):
         mgr = _make_event_monitor()
         mock_handler = MagicMock()
         mock_handler.get_incompatible_enabled_plugins.return_value = ["bad"]
         mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = True
-        assert mgr.system_configuration_is_valid() is False
-
-    @patch("compresso.libs.eventmonitor.Library")
-    @patch("compresso.libs.eventmonitor.PluginsHandler")
-    def test_library_limits_exceeded(self, mock_handler_cls, mock_library_cls):
-        mgr = _make_event_monitor()
-        mock_handler = MagicMock()
-        mock_handler.get_incompatible_enabled_plugins.return_value = []
-        mock_handler_cls.return_value = mock_handler
-        mock_library_cls.within_library_count_limits.return_value = False
         assert mgr.system_configuration_is_valid() is False
 
 

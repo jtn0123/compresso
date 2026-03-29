@@ -37,6 +37,7 @@ import uuid
 
 import tornado.log
 from tornado import iostream, web
+from tornado.ioloop import IOLoop
 
 from compresso.libs.singleton import SingletonType
 
@@ -132,9 +133,11 @@ class DownloadsHandler(web.RequestHandler):
         )
 
         # Serve file download in 1MB chunks
-        with open(abspath, "rb") as f:
+        loop = IOLoop.current()
+        f = await loop.run_in_executor(None, open, abspath, "rb")
+        try:
             while True:
-                data = f.read(1024 * 1024)
+                data = await loop.run_in_executor(None, f.read, 1024 * 1024)
                 if not data:
                     break
                 try:
@@ -144,3 +147,5 @@ class DownloadsHandler(web.RequestHandler):
                     break
                 finally:
                     del data
+        finally:
+            await loop.run_in_executor(None, f.close)
