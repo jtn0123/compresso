@@ -142,3 +142,29 @@ jobs:
         name: coverage-report
         path: coverage-shard-*.xml
         retention-days: 30
+
+  sonarcloud:
+    name: SonarCloud Scan
+    needs: [py_unit_test]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # full history for blame/new code detection
+
+    - name: Download unit test coverage
+      uses: actions/download-artifact@v8
+      with:
+        pattern: coverage-ubuntu-*
+        merge-multiple: true
+      continue-on-error: true
+
+    - name: List coverage files
+      run: ls -la coverage*.xml lcov.info 2>/dev/null || echo "No coverage files found"
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarqube-scan-action@v5
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
