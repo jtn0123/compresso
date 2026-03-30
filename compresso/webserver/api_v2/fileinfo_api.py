@@ -11,7 +11,7 @@ import os
 
 import tornado.log
 
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.fileinfo_schemas import (
     FileInfoResponseSchema,
     RequestFileInfoProbeSchema,
@@ -87,7 +87,7 @@ class ApiFileinfoHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -154,6 +154,6 @@ class ApiFileinfoHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

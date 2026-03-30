@@ -45,6 +45,10 @@ from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.tasks import IntegrityError, Tasks  # type: ignore[attr-defined]
 
+_ERR_NO_TASK_LIBRARY = "Unable to fetch task library ID. Task has not been set!"
+_ERR_NO_TASK_STATUS = "Unable to set status. Task has not been set!"
+_ERR_NO_TASK_ID = "Task ID not provided or bound"
+
 
 def prepare_file_destination_data(pathname, file_extension):
     basename = os.path.basename(pathname)
@@ -123,18 +127,18 @@ class Task:
 
     def get_task_library_id(self):
         if not self.task:
-            raise Exception("Unable to fetch task library ID. Task has not been set!")
+            raise Exception(_ERR_NO_TASK_LIBRARY)
         return self.task.library_id
 
     def get_task_library_name(self):
         if not self.task:
-            raise Exception("Unable to fetch task library ID. Task has not been set!")
+            raise Exception(_ERR_NO_TASK_LIBRARY)
         library = Library(self.task.library_id)
         return library.get_name()
 
     def get_task_library_priority_score(self):
         if not self.task:
-            raise Exception("Unable to fetch task library ID. Task has not been set!")
+            raise Exception(_ERR_NO_TASK_LIBRARY)
         library = Library(self.task.library_id)
         return library.get_priority_score()
 
@@ -276,7 +280,7 @@ class Task:
         if status not in allowed:
             raise Exception(f'Unable to set status to "{status}". Status must be one of [{", ".join(allowed)}].')
         if not self.task:
-            raise Exception("Unable to set status. Task has not been set!")
+            raise Exception(_ERR_NO_TASK_STATUS)
         self.task.status = status
         self.save()
         if status == "complete":
@@ -290,7 +294,7 @@ class Task:
         :return:
         """
         if not self.task:
-            raise Exception("Unable to set status. Task has not been set!")
+            raise Exception(_ERR_NO_TASK_STATUS)
         if success:
             self.task.success = True
         else:
@@ -317,7 +321,7 @@ class Task:
         :return:
         """
         if not self.task:
-            raise Exception("Unable to set status. Task has not been set!")
+            raise Exception(_ERR_NO_TASK_STATUS)
         self.task.log += "".join(log)
         self.save()
 
@@ -641,7 +645,7 @@ class TaskDataStore:
         """
         tid = task_id if task_id is not None else getattr(cls._ctx, "task_id", None)
         if tid is None:
-            raise RuntimeError("Task ID not provided or bound")
+            raise RuntimeError(_ERR_NO_TASK_ID)
         with cls._lock:
             existing = cls._task_state.get(tid, {})
             new_t = dict(existing)
@@ -661,7 +665,7 @@ class TaskDataStore:
         """
         tid = task_id if task_id is not None else getattr(cls._ctx, "task_id", None)
         if tid is None:
-            raise RuntimeError("Task ID not provided or bound")
+            raise RuntimeError(_ERR_NO_TASK_ID)
         with cls._lock:
             return cls._task_state.get(tid, {}).get(key, default)
 
@@ -676,7 +680,7 @@ class TaskDataStore:
         """
         tid = task_id if task_id is not None else getattr(cls._ctx, "task_id", None)
         if tid is None:
-            raise RuntimeError("Task ID not provided or bound")
+            raise RuntimeError(_ERR_NO_TASK_ID)
         with cls._lock:
             t = cls._task_state.get(tid, {})
             t.pop(key, None)

@@ -43,6 +43,8 @@ from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
+_REMOTE_LIBRARIES_API = "/compresso/api/v2/settings/libraries"
+
 
 class Links(metaclass=SingletonType):
     _network_transfer_lock: dict = {}
@@ -627,7 +629,7 @@ class Links(metaclass=SingletonType):
                 # Push library configurations for missing remote libraries (if configured to do so)
                 if local_config.get("enable_sending_tasks") and local_config.get("enable_config_missing_libraries"):
                     # Fetch remote installation library name list
-                    results = self.remote_api_get(local_config, "/compresso/api/v2/settings/libraries")
+                    results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
                     existing_library_names = []
                     for library in results.get("libraries", []):
                         existing_library_names.append(library.get("name"))
@@ -899,7 +901,7 @@ class Links(metaclass=SingletonType):
                     continue
 
                 # Fetch remote installation library name list
-                results = self.remote_api_get(local_config, "/compresso/api/v2/settings/libraries")
+                results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
                 library_names = []
                 for library in results.get("libraries", []):
                     library_names.append(library.get("name"))
@@ -1050,7 +1052,7 @@ class Links(metaclass=SingletonType):
         """
         try:
             # Fetch remote installation libraries
-            results = self.remote_api_get(remote_config, "/compresso/api/v2/settings/libraries", timeout=4)
+            results = self.remote_api_get(remote_config, _REMOTE_LIBRARIES_API, timeout=4)
             for library in results.get("libraries", []):
                 if library.get("name") == library_name:
                     return library

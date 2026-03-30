@@ -45,6 +45,8 @@ except ImportError:
 
 logger = CompressoLogging.get_logger(name="Config")
 
+_APP_DIR_NAME = ".compresso"
+
 # Default configuration constants
 DEFAULT_UI_PORT = 8888
 DEFAULT_SCAN_INTERVAL_MINUTES = 1440  # 24 hours
@@ -71,10 +73,10 @@ class Config(metaclass=SingletonType):
 
         # Set default directories
         home_directory = common.get_home_dir()
-        self.config_path = os.path.join(home_directory, ".compresso", "config")
-        self.log_path = os.path.join(home_directory, ".compresso", "logs")
-        self.plugins_path = os.path.join(home_directory, ".compresso", "plugins")
-        self.userdata_path = os.path.join(home_directory, ".compresso", "userdata")
+        self.config_path = os.path.join(home_directory, _APP_DIR_NAME, "config")
+        self.log_path = os.path.join(home_directory, _APP_DIR_NAME, "logs")
+        self.plugins_path = os.path.join(home_directory, _APP_DIR_NAME, "plugins")
+        self.userdata_path = os.path.join(home_directory, _APP_DIR_NAME, "userdata")
 
         # Configure debugging
         self.debugging = False
@@ -116,7 +118,7 @@ class Config(metaclass=SingletonType):
 
         # Approval workflow settings
         self.approval_required = False
-        self.staging_path = os.path.join(home_directory, ".compresso", "staging")
+        self.staging_path = os.path.join(home_directory, _APP_DIR_NAME, "staging")
 
         # Task retry settings
         self.default_max_retries = 3
@@ -640,7 +642,7 @@ class Config(metaclass=SingletonType):
 
     def set_staging_path(self, staging_path):
         if staging_path == "":
-            staging_path = os.path.join(common.get_home_dir(), ".compresso", "staging")
+            staging_path = os.path.join(common.get_home_dir(), _APP_DIR_NAME, "staging")
         self.staging_path = staging_path
 
     def get_remote_installations(self):

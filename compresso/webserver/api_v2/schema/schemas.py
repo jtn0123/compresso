@@ -31,6 +31,8 @@ Copyright:
 
 from marshmallow import Schema, fields, validate
 
+_DESC_STATUS_REASON = "Return status code and reason"
+
 
 class BaseSchema(Schema):
     pass
@@ -50,7 +52,7 @@ class BaseSuccessSchema(BaseSchema):
 class BaseErrorSchema(BaseSchema):
     error = fields.Str(
         required=True,
-        metadata={"description": "Return status code and reason"},
+        metadata={"description": _DESC_STATUS_REASON},
     )
     messages = fields.Dict(
         required=True,
@@ -78,7 +80,7 @@ class BadRequestSchema(BaseErrorSchema):
 
     error = fields.Str(
         required=True,
-        metadata={"description": "Return status code and reason", "example": "400: Failed request schema validation"},
+        metadata={"description": _DESC_STATUS_REASON, "example": "400: Failed request schema validation"},
     )
 
 
@@ -87,7 +89,7 @@ class BadEndpointSchema(BaseSchema):
 
     error = fields.Str(
         required=True,
-        metadata={"description": "Return status code and reason", "example": "404: Endpoint not found"},
+        metadata={"description": _DESC_STATUS_REASON, "example": "404: Endpoint not found"},
     )
 
 
@@ -96,7 +98,7 @@ class BadMethodSchema(BaseSchema):
 
     error = fields.Str(
         required=True,
-        metadata={"description": "Return status code and reason", "example": "405: Method 'GET' not allowed"},
+        metadata={"description": _DESC_STATUS_REASON, "example": "405: Method 'GET' not allowed"},
     )
 
 
@@ -105,7 +107,7 @@ class InternalErrorSchema(BaseErrorSchema):
 
     error = fields.Str(
         required=True,
-        metadata={"description": "Return status code and reason", "example": "500: Caught exception message"},
+        metadata={"description": _DESC_STATUS_REASON, "example": "500: Caught exception message"},
     )
 
 

@@ -15,7 +15,7 @@ import tornado.log
 from tornado.ioloop import IOLoop
 
 from compresso import config as compresso_config
-from compresso.webserver.api_v2.base_api_handler import BaseApiError
+from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError
 from compresso.webserver.api_v2.schema.plugin_schemas import (
     PluginReposListResultsSchema,
     RequestUpdatePluginReposListSchema,
@@ -96,7 +96,7 @@ class PluginReposMixin:
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -149,7 +149,7 @@ class PluginReposMixin:
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -204,7 +204,7 @@ class PluginReposMixin:
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -269,6 +269,6 @@ class PluginReposMixin:
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

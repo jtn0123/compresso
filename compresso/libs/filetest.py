@@ -67,9 +67,6 @@ class FileTest:
         # List of filed tasks
         self.failed_paths: list = []
 
-    def set_file(self):
-        pass
-
     def file_failed_in_history(self, path):
         """
         Check if file has already failed in history

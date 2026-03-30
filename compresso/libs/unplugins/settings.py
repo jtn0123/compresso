@@ -36,6 +36,8 @@ import sys
 
 from compresso import config
 
+_SETTINGS_FILENAME = "settings.json"
+
 
 class PluginSettings:
     """
@@ -79,19 +81,22 @@ class PluginSettings:
         profile_directory = self.get_profile_directory()
         # Legacy migration: move settings.json from plugin dir to profile dir
         # TODO(v2.0): Remove this migration shim
-        if not os.path.exists(os.path.join(profile_directory, "settings.json")) and os.path.exists(
-            os.path.join(plugin_directory, "settings.json")
+        if not os.path.exists(os.path.join(profile_directory, _SETTINGS_FILENAME)) and os.path.exists(
+            os.path.join(plugin_directory, _SETTINGS_FILENAME)
         ):  # noqa: E501 — long path condition; splitting reduces readability
             import shutil
 
-            shutil.move(os.path.join(plugin_directory, "settings.json"), os.path.join(profile_directory, "settings.json"))
+            shutil.move(
+                os.path.join(plugin_directory, _SETTINGS_FILENAME),
+                os.path.join(profile_directory, _SETTINGS_FILENAME),
+            )
         # If provided with a library ID, then the settings file will be different
-        plugin_settings_file = os.path.join(profile_directory, "settings.json")
+        plugin_settings_file = os.path.join(profile_directory, _SETTINGS_FILENAME)
         if self.library_id:
             plugin_settings_file = os.path.join(profile_directory, f"settings.{self.library_id}.json")
             if not os.path.exists(plugin_settings_file) and not force_library_settings:
                 # If the library file does not yet exist, then resort to using the default settings file
-                plugin_settings_file = os.path.join(profile_directory, "settings.json")
+                plugin_settings_file = os.path.join(profile_directory, _SETTINGS_FILENAME)
         return plugin_settings_file
 
     def __export_configured_settings(self):
@@ -146,7 +151,7 @@ class PluginSettings:
 
         # If the settings file returned is the global settings file and this was called on a library config,
         # do not reset the config.
-        if self.library_id is not None and os.path.basename(plugin_settings_file) == "settings.json":
+        if self.library_id is not None and os.path.basename(plugin_settings_file) == _SETTINGS_FILENAME:
             return False
 
         # if the file does not yet exist, create it

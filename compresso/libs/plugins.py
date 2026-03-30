@@ -52,6 +52,9 @@ from compresso.libs.singleton import SingletonType
 from compresso.libs.unmodels import EnabledPlugins, LibraryPluginFlow, PluginRepos, Plugins
 from compresso.libs.unplugins import PluginExecutor
 
+_PLUGIN_INFO_FILENAME = "info.json"
+_LOGGER_NAME = "Compresso.PluginsHandler"
+
 
 class PluginsHandler(metaclass=SingletonType):
     """
@@ -217,7 +220,7 @@ class PluginsHandler(metaclass=SingletonType):
     def get_plugin_info(self, plugin_id):
         plugin_info = {}
         plugin_directory = os.path.join(self.settings.get_plugins_path(), plugin_id)
-        info_file = os.path.join(plugin_directory, "info.json")
+        info_file = os.path.join(plugin_directory, _PLUGIN_INFO_FILENAME)
         if os.path.exists(info_file):
             # Read plugin info.json
             with open(info_file) as json_file:
@@ -483,7 +486,7 @@ class PluginsHandler(metaclass=SingletonType):
         # Read plugin ID from zip contents info.json if no plugin_id was provided
         if not plugin_id:
             with zipfile.ZipFile(zip_file, "r") as zip_ref:
-                plugin_info = json.loads(zip_ref.read("info.json"))
+                plugin_info = json.loads(zip_ref.read(_PLUGIN_INFO_FILENAME))
             plugin_id = plugin_info.get("id")
         # Create plugin destination directory based on plugin ID
         plugin_directory = self.get_plugin_path(plugin_id)
@@ -535,9 +538,7 @@ class PluginsHandler(metaclass=SingletonType):
                 timeout=300,
             )
         except subprocess.TimeoutExpired:
-            logging.getLogger("Compresso.PluginsHandler").error(
-                "Timed out installing pip requirements for plugin at %s", requirements_file
-            )
+            logging.getLogger(_LOGGER_NAME).error("Timed out installing pip requirements for plugin at %s", requirements_file)
 
     @staticmethod
     def install_npm_modules(plugin_path):
@@ -547,12 +548,12 @@ class PluginsHandler(metaclass=SingletonType):
         try:
             subprocess.call(["npm", "install"], cwd=plugin_path, timeout=300)  # noqa: S603, S607 - trusted npm install for plugin dependencies
         except subprocess.TimeoutExpired:
-            logging.getLogger("Compresso.PluginsHandler").error("Timed out running npm install for plugin at %s", plugin_path)
+            logging.getLogger(_LOGGER_NAME).error("Timed out running npm install for plugin at %s", plugin_path)
             return
         try:
             subprocess.call(["npm", "run", "build"], cwd=plugin_path, timeout=300)  # noqa: S603, S607 - trusted npm build for plugin dependencies
         except subprocess.TimeoutExpired:
-            logging.getLogger("Compresso.PluginsHandler").error("Timed out running npm build for plugin at %s", plugin_path)
+            logging.getLogger(_LOGGER_NAME).error("Timed out running npm build for plugin at %s", plugin_path)
 
     @staticmethod
     def write_plugin_data_to_db(plugin, plugin_directory):
@@ -701,7 +702,7 @@ class PluginsHandler(metaclass=SingletonType):
             try:
                 # Delete the info file first to prevent any other process trying to read the plugin.
                 # Without the info file, the plugin is effectivly uninstalled
-                info_file = os.path.join(plugin_directory, "info.json")
+                info_file = os.path.join(plugin_directory, _PLUGIN_INFO_FILENAME)
                 if os.path.exists(info_file):
                     os.remove(info_file)
                 # Cleanup the rest of the plugin directory

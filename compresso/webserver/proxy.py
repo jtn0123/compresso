@@ -8,6 +8,8 @@ import tornado.web
 
 from compresso.libs.installation_link import Links
 
+_HTTP_SCHEME = "http://"
+
 _BLOCKED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),  # Loopback
     ipaddress.ip_network("::1/128"),  # IPv6 loopback
@@ -59,8 +61,8 @@ def resolve_proxy_target(target_id):
         # Priority 1: Address (normalized)
         for r in search_list:
             addr = str(r.get("address", "")).strip().lower().rstrip("/")
-            addr_bare = addr.replace("http://", "").replace("https://", "")
-            t_id_bare = t_id.replace("http://", "").replace("https://", "")
+            addr_bare = addr.replace(_HTTP_SCHEME, "").replace("https://", "")
+            t_id_bare = t_id.replace(_HTTP_SCHEME, "").replace("https://", "")
             if addr == t_id or addr == t_id.rstrip("/") or addr_bare == t_id_bare:
                 return r
         # Priority 2: UUID
@@ -87,7 +89,7 @@ def resolve_proxy_target(target_id):
     # Construct URL base
     url_base = target_config.get("address", "").rstrip("/")
     if not url_base.startswith("http"):
-        url_base = "http://" + url_base
+        url_base = _HTTP_SCHEME + url_base
 
     # Validate target is not a private/internal address (SSRF protection)
     parsed = urlparse(url_base)
@@ -112,7 +114,7 @@ class ProxyHandler(tornado.web.RequestHandler):
     SUPPORTED_METHODS = ("GET", "HEAD", "POST", "DELETE", "PATCH", "PUT", "OPTIONS")
 
     async def prepare(self):
-        pass
+        """No-op — base handler prepare is sufficient."""
 
     async def _handle_request(self, method):
         target_id = self.request.headers.get("X-Compresso-Target-Installation")

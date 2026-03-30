@@ -19,6 +19,7 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
 HISTORY_MAX_SAMPLES = 120  # 10 minutes at 5-second intervals
+_DRM_SYSFS_PATH = "/sys/class/drm"
 INTEL_VENDOR_ID = "0x8086"
 AMD_VENDOR_ID = "0x1002"
 
@@ -42,7 +43,7 @@ class GpuMonitor(metaclass=SingletonType):
         if sys.platform == "linux":
             # Check for Intel GPU via sysfs vendor ID (0x8086)
             try:
-                for vendor_path in Path("/sys/class/drm").glob("card*/device/vendor"):
+                for vendor_path in Path(_DRM_SYSFS_PATH).glob("card*/device/vendor"):
                     vendor_id = vendor_path.read_text().strip()
                     if vendor_id == INTEL_VENDOR_ID:
                         caps["intel"] = True
@@ -52,7 +53,7 @@ class GpuMonitor(metaclass=SingletonType):
 
             # Check for AMD GPU via sysfs vendor ID (0x1002)
             try:
-                for vendor_path in Path("/sys/class/drm").glob("card*/device/vendor"):
+                for vendor_path in Path(_DRM_SYSFS_PATH).glob("card*/device/vendor"):
                     vendor_id = vendor_path.read_text().strip()
                     if vendor_id == AMD_VENDOR_ID:
                         caps["amd"] = True
@@ -138,7 +139,7 @@ class GpuMonitor(metaclass=SingletonType):
 
         gpus = []
         try:
-            drm_path = Path("/sys/class/drm")
+            drm_path = Path(_DRM_SYSFS_PATH)
             for card_dir in sorted(drm_path.glob("card[0-9]*")):
                 vendor_path = card_dir / "device" / "vendor"
                 if not vendor_path.exists():
@@ -201,7 +202,7 @@ class GpuMonitor(metaclass=SingletonType):
 
         gpus = []
         try:
-            drm_path = Path("/sys/class/drm")
+            drm_path = Path(_DRM_SYSFS_PATH)
             for card_dir in sorted(drm_path.glob("card[0-9]*")):
                 vendor_path = card_dir / "device" / "vendor"
                 if not vendor_path.exists():
