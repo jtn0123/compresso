@@ -49,9 +49,14 @@ from compresso.libs.unplugins.child_process import kill_all_plugin_processes, se
 from ..logs import CompressoLogging
 from . import plugin_types
 
+_APP_DIR_NAME = ".compresso"
+_TEST_FILE_IN_KEY = "{test_file_in}"
+_TEST_FILE_OUT_KEY = "{test_file_out}"
+_GO_BACK_LABEL = "Go Back"
+
 home_directory = common.get_home_dir()
-dev_cache_directory = os.path.join(home_directory, ".compresso", "dev", "cache")
-dev_library_directory = os.path.join(home_directory, ".compresso", "dev", "library")
+dev_cache_directory = os.path.join(home_directory, _APP_DIR_NAME, "dev", "cache")
+dev_library_directory = os.path.join(home_directory, _APP_DIR_NAME, "dev", "library")
 
 menus = {
     "main": [
@@ -133,7 +138,7 @@ class PluginsCLI:
         # Set plugins directory
         if not plugins_directory:
             home_directory = common.get_home_dir()
-            plugins_directory = os.path.join(home_directory, ".compresso", "plugins")
+            plugins_directory = os.path.join(home_directory, _APP_DIR_NAME, "plugins")
         self.plugins_directory = plugins_directory
         # Only log to stdout
         CompressoLogging.update_stream_formatter(
@@ -157,8 +162,8 @@ class PluginsCLI:
         self.test_data_modifiers = {
             "{cache_path}": dev_cache_directory,
             "{library_path}": dev_library_directory,
-            "{test_file_in}": "Big_Buck_Bunny_1080_10s_30MB_h264.mkv",
-            "{test_file_out}": "Big_Buck_Bunny_1080_10s_30MB_h264-1616571944.7296877-WORKING-1.mkv",
+            _TEST_FILE_IN_KEY: "Big_Buck_Bunny_1080_10s_30MB_h264.mkv",
+            _TEST_FILE_OUT_KEY: "Big_Buck_Bunny_1080_10s_30MB_h264-1616571944.7296877-WORKING-1.mkv",
         }
 
     def _get_plugin_type_choices(self):
@@ -441,7 +446,7 @@ class PluginsCLI:
             choices.append(plugin.get("plugin_id"))
             table_ids[plugin.get("plugin_id")] = plugin.get("id")
         # Append a "return" option
-        choices.append("Go Back")
+        choices.append(_GO_BACK_LABEL)
 
         # Generate menu menu
         remove_plugin_inquirer = inquirer.List(
@@ -454,7 +459,7 @@ class PluginsCLI:
         selection = inquirer.prompt([remove_plugin_inquirer])
 
         # If the 'Go Back' option was given, just return to previous menu
-        if not selection or selection.get("cli_action") == "Go Back":
+        if not selection or selection.get("cli_action") == _GO_BACK_LABEL:
             return
 
         # Remove the selected Plugin by ID
@@ -565,7 +570,7 @@ class PluginsCLI:
         for plugin_details in plugin_results:
             choices.append(plugin_details.get("plugin_id"))
             all_plugin_details[plugin_details.get("plugin_id")] = plugin_details
-        choices.append("Go Back")
+        choices.append(_GO_BACK_LABEL)
 
         print()
         default_selection = None
@@ -579,7 +584,7 @@ class PluginsCLI:
             selection = inquirer.prompt([plugin_test_inquirer])
 
             # If the 'Go Back' option was given, just return to previous menu
-            if not selection or selection.get("selected_plugin") == "Go Back":
+            if not selection or selection.get("selected_plugin") == _GO_BACK_LABEL:
                 return
 
             # Configure test file
@@ -616,9 +621,9 @@ class PluginsCLI:
         )
         runner_selection = {}
         runner_selection = {**inquirer.prompt([test_files_inquirer]), **runner_selection}
-        self.test_data_modifiers["{test_file_in}"] = runner_selection.get("selected_file")
+        self.test_data_modifiers[_TEST_FILE_IN_KEY] = runner_selection.get("selected_file")
         split_file_in = os.path.splitext(runner_selection.get("selected_file"))
-        self.test_data_modifiers["{test_file_out}"] = f"{split_file_in[0]}-WORKING-1{split_file_in[1]}"
+        self.test_data_modifiers[_TEST_FILE_OUT_KEY] = f"{split_file_in[0]}-WORKING-1{split_file_in[1]}"
 
     def install_test_data(self):
         sample_files = {
@@ -666,9 +671,9 @@ class PluginsCLI:
 
     def run_from_args(self, args):
         if args.test_file_in:
-            self.test_data_modifiers["{test_file_in}"] = args.test_file_in
+            self.test_data_modifiers[_TEST_FILE_IN_KEY] = args.test_file_in
         if args.test_file_out:
-            self.test_data_modifiers["{test_file_out}"] = args.test_file_out
+            self.test_data_modifiers[_TEST_FILE_OUT_KEY] = args.test_file_out
         if args.create_plugin:
             self.create_new_plugins_from_args(
                 plugin_id=args.plugin_id,

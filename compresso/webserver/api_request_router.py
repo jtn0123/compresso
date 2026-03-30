@@ -40,7 +40,7 @@ from compresso import config
 
 class Handle404(tornado.web.RequestHandler):
     def initialize(self, **kwargs):
-        pass
+        """No-op — 404 handler requires no initialization."""
 
     def get(self, *args, **kwargs):
         self.set_status(404)

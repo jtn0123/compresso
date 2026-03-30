@@ -43,6 +43,9 @@ except ImportError:
     JSONDecodeError = ValueError  # type: ignore[assignment,misc]
 
 
+_MSG_NO_HISTORIC_TASKS = "No historic tasks exist yet."
+
+
 class History:
     """
     History
@@ -69,7 +72,7 @@ class History:
                 historic_tasks = CompletedTasks.select().order_by(CompletedTasks.id.desc())
         except CompletedTasks.DoesNotExist:
             # No historic entries exist yet
-            self.logger.warning("No historic tasks exist yet.")
+            self.logger.warning(_MSG_NO_HISTORIC_TASKS)
             historic_tasks = []
 
         return historic_tasks.dicts()
@@ -131,7 +134,7 @@ class History:
 
         except CompletedTasks.DoesNotExist:
             # No historic entries exist yet
-            self.logger.warning("No historic tasks exist yet.")
+            self.logger.warning(_MSG_NO_HISTORIC_TASKS)
             query = []
 
         return query.dicts()
@@ -243,7 +246,7 @@ class History:
 
         except CompletedTasks.DoesNotExist:
             # No historic entries exist yet
-            self.logger.warning("No historic tasks exist yet.")
+            self.logger.warning(_MSG_NO_HISTORIC_TASKS)
 
     def delete_historic_task_command_logs(self, id_list=None):
         """

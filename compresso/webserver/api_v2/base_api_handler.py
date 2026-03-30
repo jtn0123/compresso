@@ -43,6 +43,9 @@ from tornado.web import RequestHandler
 
 from compresso.webserver.security_headers import SecurityHeadersMixin
 
+LOG_UNHANDLED_ERROR = "Unhandled error in %s.%s"
+LOG_BASE_API_ERROR = "BaseApiError.%s: %s"
+
 
 class BaseApiError(Exception):
     """

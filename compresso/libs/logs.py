@@ -45,6 +45,9 @@ from json_log_formatter import JSONFormatter
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.notifications import Notifications
 
+_FORWARD_HANDLER_NAME = "Compresso.ForwardLogHandler"
+_LOG_FILE_EXT = ".jsonl"
+
 
 class ForwardJSONFormatter(JSONFormatter):
     """
@@ -139,7 +142,7 @@ class ForwardLogHandler(logging.Handler):
             max_days_int = int(max_days)
         except (TypeError, ValueError):
             if max_days is not None:
-                logging.getLogger("Compresso.ForwardLogHandler").warning(
+                logging.getLogger(_FORWARD_HANDLER_NAME).warning(
                     "Invalid log buffer retention value %r. Falling back to default.", max_days
                 )
             max_days_int = None
@@ -192,7 +195,7 @@ class ForwardLogHandler(logging.Handler):
             with contextlib.suppress(Full):
                 self.log_queue.put_nowait({"labels": labels, "entry": [ts, log_entry]})
         except (ValueError, TypeError, AttributeError, OSError) as e:
-            logging.getLogger("Compresso.ForwardLogHandler").error("Failed to enqueue log: %s", e)
+            logging.getLogger(_FORWARD_HANDLER_NAME).error("Failed to enqueue log: %s", e)
 
     def _writer_loop(self):
         """Drain the queue into either the disk-backed buffer or the in-memory queue."""
@@ -257,7 +260,7 @@ class ForwardLogHandler(logging.Handler):
                     handle.write("\n")
             self._ensure_state_entry(os.path.basename(buffer_file))
         except (OSError, PermissionError, json.JSONDecodeError, UnicodeEncodeError) as exc:
-            logging.getLogger("Compresso.ForwardLogHandler").error("Failed to save logs to disk: %s", exc)
+            logging.getLogger(_FORWARD_HANDLER_NAME).error("Failed to save logs to disk: %s", exc)
 
     def _ensure_state_entry(self, filename):
         """Register a new buffer file with an initial offset of zero."""
@@ -357,7 +360,7 @@ class ForwardLogHandler(logging.Handler):
                     try:
                         entry = json.loads(stripped.decode("utf-8"))
                     except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
-                        logging.getLogger("Compresso.ForwardLogHandler").warning(
+                        logging.getLogger(_FORWARD_HANDLER_NAME).warning(
                             "Skipping corrupt log entry in %s.",
                             filename,
                         )
@@ -368,7 +371,7 @@ class ForwardLogHandler(logging.Handler):
                     payload, payload_size = self._build_payload(entries)
                     if payload_size > self.max_chunk_size:
                         if len(entries) == 1:
-                            logging.getLogger("Compresso.ForwardLogHandler").warning(
+                            logging.getLogger(_FORWARD_HANDLER_NAME).warning(
                                 "Single log entry in %s exceeds max chunk size (%s bytes). Sending anyway.",
                                 filename,
                                 payload_size,
@@ -388,7 +391,7 @@ class ForwardLogHandler(logging.Handler):
             self._remove_state_entry(filename)
             return None
         except (OSError, PermissionError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-            logging.getLogger("Compresso.ForwardLogHandler").exception(
+            logging.getLogger(_FORWARD_HANDLER_NAME).exception(
                 "Failed reading log buffer %s: %s",
                 filename,
                 exc,
@@ -498,7 +501,7 @@ class ForwardLogHandler(logging.Handler):
             payload, payload_size = self._build_payload(chunk)
             if payload_size > self.max_chunk_size:
                 if len(chunk) == 1:
-                    logging.getLogger("Compresso.ForwardLogHandler").warning(
+                    logging.getLogger(_FORWARD_HANDLER_NAME).warning(
                         "Single in-memory log entry exceeds max chunk size (%s bytes). Sending anyway.",
                         payload_size,
                     )
@@ -515,7 +518,7 @@ class ForwardLogHandler(logging.Handler):
         """Return the JSONL filename for the current UTC hour."""
         current_hour = datetime.now(tz=UTC).replace(minute=0, second=0, microsecond=0)
         timestamp = current_hour.strftime("%Y%m%dT%H")
-        return os.path.join(self.buffer_path, f"log_buffer_{timestamp}.jsonl")
+        return os.path.join(self.buffer_path, f"log_buffer_{timestamp}{_LOG_FILE_EXT}")
 
     def _list_buffer_files(self):
         """Return all buffer filenames sorted chronologically."""
@@ -532,7 +535,7 @@ class ForwardLogHandler(logging.Handler):
     def _parse_buffer_filename_timestamp(self, filename):
         """Parse the UTC hour encoded in a JSONL buffer filename."""
         prefix = "log_buffer_"
-        suffix = ".jsonl"
+        suffix = _LOG_FILE_EXT
         if not filename.startswith(prefix) or not filename.endswith(suffix):
             return None
         timestamp_str = filename[len(prefix) : -len(suffix)]
@@ -564,7 +567,7 @@ class ForwardLogHandler(logging.Handler):
             with open(self._buffer_state_path, encoding="utf-8") as handle:
                 data = json.load(handle)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError, PermissionError):
-            logging.getLogger("Compresso.ForwardLogHandler").warning("Failed to load log buffer state. Starting fresh.")
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning("Failed to load log buffer state. Starting fresh.")
             return {}
 
         files = data.get("files", {})
@@ -585,7 +588,7 @@ class ForwardLogHandler(logging.Handler):
                 json.dump({"files": self._buffer_state}, handle)
             os.replace(temp_path, self._buffer_state_path)
         except (OSError, PermissionError) as exc:
-            logging.getLogger("Compresso.ForwardLogHandler").warning(
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning(
                 "Failed to persist log buffer state: %s",
                 exc,
             )
@@ -607,7 +610,7 @@ class ForwardLogHandler(logging.Handler):
         if not os.path.isdir(self.buffer_path):
             return
         existing = {
-            name for name in os.listdir(self.buffer_path) if name.startswith("log_buffer_") and name.endswith(".jsonl")
+            name for name in os.listdir(self.buffer_path) if name.startswith("log_buffer_") and name.endswith(_LOG_FILE_EXT)
         }
         with self._state_lock:
             changed = False
@@ -644,7 +647,7 @@ class ForwardLogHandler(logging.Handler):
                 if self.previous_connection_failed:
                     self.previous_connection_failed = False
                     self._notified_failures.clear()
-                    logging.getLogger("Compresso.ForwardLogHandler").info("Successfully flushed log buffer after retry.")
+                    logging.getLogger(_FORWARD_HANDLER_NAME).info("Successfully flushed log buffer after retry.")
                 return True
 
             self.previous_connection_failed = True
@@ -677,17 +680,17 @@ class ForwardLogHandler(logging.Handler):
                         "timeout": 20000,
                     }
                 )
-                logging.getLogger("Compresso.ForwardLogHandler").error(message_text)
+                logging.getLogger(_FORWARD_HANDLER_NAME).error(message_text)
                 self._notified_failures.add(status_key)
         except requests.exceptions.ConnectionError:
-            logging.getLogger("Compresso.ForwardLogHandler").warning(
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning(
                 "ConnectionError on remote endpoint %s while sending %s. Ensure this URL is reachable by Compresso.",
                 self.endpoint,
                 buffer_label,
             )
             self.previous_connection_failed = True
         except (requests.RequestException, OSError, ValueError) as exc:
-            logging.getLogger("Compresso.ForwardLogHandler").exception(
+            logging.getLogger(_FORWARD_HANDLER_NAME).exception(
                 "Exception while trying to forward logs from %s: %s",
                 buffer_label,
                 exc,

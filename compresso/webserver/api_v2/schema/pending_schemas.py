@@ -15,6 +15,8 @@ from compresso.webserver.api_v2.schema.schemas import (
     TableRecordsSuccessSchema,
 )
 
+_EXAMPLE_FILE_PATH = "/library/TEST_FILE.mkv"
+
 
 class RequestPendingTableDataSchema(RequestTableDataSchema):
     """Schema for requesting pending tasks from the table"""
@@ -132,7 +134,7 @@ class RequestPendingTaskCreateSchema(BaseSchema):
 
     path = fields.Str(
         required=True,
-        metadata={"description": "The absolute path to a file", "example": "/library/TEST_FILE.mkv"},
+        metadata={"description": "The absolute path to a file", "example": _EXAMPLE_FILE_PATH},
     )
     library_id = fields.Int(
         required=False,
@@ -163,7 +165,7 @@ class RequestPendingTaskTestSchema(BaseSchema):
         required=True,
         metadata={
             "description": "The path to a file (absolute or relative to the selected library)",
-            "example": "/library/TEST_FILE.mkv",
+            "example": _EXAMPLE_FILE_PATH,
         },
     )
     library_id = fields.Int(
@@ -181,7 +183,7 @@ class PendingTaskTestResultSchema(BaseSchema):
 
     path = fields.Str(
         required=True,
-        metadata={"description": "The absolute path to the tested file", "example": "/library/TEST_FILE.mkv"},
+        metadata={"description": "The absolute path to the tested file", "example": _EXAMPLE_FILE_PATH},
     )
     library_id = fields.Int(
         required=True,

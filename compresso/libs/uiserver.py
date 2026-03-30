@@ -64,7 +64,7 @@ class CompressoDataQueues(metaclass=SingletonType):
     _compresso_data_queues: dict = {}
 
     def __init__(self):
-        pass
+        """Singleton — class-level attributes initialized at definition."""
 
     def set_compresso_data_queues(self, compresso_data_queues):
         self._compresso_data_queues = compresso_data_queues
@@ -77,7 +77,7 @@ class CompressoRunningThreads(metaclass=SingletonType):
     _compresso_threads: dict = {}
 
     def __init__(self):
-        pass
+        """Singleton — class-level attributes initialized at definition."""
 
     def set_compresso_running_threads(self, compresso_threads):
         self._compresso_threads = compresso_threads

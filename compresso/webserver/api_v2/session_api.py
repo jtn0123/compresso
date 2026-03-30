@@ -35,7 +35,7 @@ from tornado.ioloop import IOLoop
 from compresso.libs import session
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import LOG_BASE_API_ERROR, LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.session_schemas import SessionAuthCodeSchema, SessionStateSuccessSchema
 
 
@@ -138,10 +138,10 @@ class ApiSessionHandler(BaseApiHandler):
                 self.write_success(response)
                 return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
+            self.logger.error(LOG_BASE_API_ERROR, self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -191,10 +191,10 @@ class ApiSessionHandler(BaseApiHandler):
                 self.write_success()
                 return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
+            self.logger.error(LOG_BASE_API_ERROR, self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -244,10 +244,10 @@ class ApiSessionHandler(BaseApiHandler):
                 self.write_success()
                 return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
+            self.logger.error(LOG_BASE_API_ERROR, self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -325,7 +325,7 @@ class ApiSessionHandler(BaseApiHandler):
             return
 
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -385,9 +385,9 @@ class ApiSessionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            self.logger.error("BaseApiError.%s: %s", self.route.get("call_method"), str(bae))
+            self.logger.error(LOG_BASE_API_ERROR, self.route.get("call_method"), str(bae))
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

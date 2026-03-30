@@ -29,4 +29,4 @@ def migrate(migrator, database, fake=False, **kwargs):
 
 
 def rollback(migrator, database, fake=False, **kwargs):
-    pass
+    """Rollback not required — added columns with defaults can remain unused."""

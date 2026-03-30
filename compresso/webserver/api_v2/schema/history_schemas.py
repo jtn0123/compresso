@@ -10,6 +10,8 @@ from marshmallow import fields, validate
 
 from compresso.webserver.api_v2.schema.schemas import BaseSchema, RequestTableDataSchema, TableRecordsSuccessSchema
 
+_DESC_FILE_FINGERPRINT = "File fingerprint"
+
 
 class RequestHistoryTableDataSchema(RequestTableDataSchema):
     """Schema for requesting completed tasks from the table"""
@@ -133,7 +135,7 @@ class MetadataEntrySchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        metadata={"description": "File fingerprint", "example": "abc123"},
+        metadata={"description": _DESC_FILE_FINGERPRINT, "example": "abc123"},
     )
     fingerprint_algo = fields.Str(
         required=True,
@@ -184,7 +186,7 @@ class RequestMetadataUpdateSchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        metadata={"description": "File fingerprint", "example": "abc123"},
+        metadata={"description": _DESC_FILE_FINGERPRINT, "example": "abc123"},
     )
     plugin_id = fields.Str(
         required=True,
@@ -201,7 +203,7 @@ class RequestMetadataByFingerprintSchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        metadata={"description": "File fingerprint", "example": "abc123"},
+        metadata={"description": _DESC_FILE_FINGERPRINT, "example": "abc123"},
     )
 
 
@@ -210,7 +212,7 @@ class RequestMetadataDeleteSchema(BaseSchema):
 
     fingerprint = fields.Str(
         required=True,
-        metadata={"description": "File fingerprint", "example": "abc123"},
+        metadata={"description": _DESC_FILE_FINGERPRINT, "example": "abc123"},
     )
     plugin_id = fields.Str(
         required=False,

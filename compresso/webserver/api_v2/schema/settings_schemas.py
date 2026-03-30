@@ -10,6 +10,11 @@ from marshmallow import fields, validate
 
 from compresso.webserver.api_v2.schema.schemas import BaseSchema
 
+_EXAMPLE_LIBRARY_PATH = "/library"
+_EXAMPLE_PLUGIN_NAME_AC3 = "Audio Encoder AC3"
+_EXAMPLE_PLUGIN_DESC_AC3 = "Ensure all audio streams are encoded with the AC3 codec using the native FFmpeg ac3 encoder."
+_EXAMPLE_PLUGIN_ICON_AC3 = "https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png"
+
 
 class SettingsReadAndWriteSchema(BaseSchema):
     """Schema to request the current settings"""
@@ -23,7 +28,7 @@ class SettingsReadAndWriteSchema(BaseSchema):
                 "ui_port": 8888,
                 "debugging": False,
                 "log_buffer_retention": 0,
-                "library_path": "/library",
+                "library_path": _EXAMPLE_LIBRARY_PATH,
                 "enable_library_scanner": False,
                 "schedule_full_scan_minutes": 1440,
                 "follow_symlinks": True,
@@ -209,7 +214,7 @@ class LibraryResultsSchema(BaseSchema):
     )
     path = fields.Str(
         required=True,
-        metadata={"description": "The library path", "example": "/library"},
+        metadata={"description": "The library path", "example": _EXAMPLE_LIBRARY_PATH},
     )
     locked = fields.Boolean(
         required=True,
@@ -295,7 +300,7 @@ class SettingsLibraryConfigReadAndWriteSchema(BaseSchema):
             "example": {
                 "id": 1,
                 "name": "Default",
-                "path": "/library",
+                "path": _EXAMPLE_LIBRARY_PATH,
                 "enable_scanner": False,
                 "enable_inotify": False,
                 "priority_score": 0,
@@ -335,33 +340,30 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
                     {
                         "library_id": 1,
                         "plugin_id": "encoder_audio_ac3",
-                        "name": "Audio Encoder AC3",
-                        "description": "Ensure all audio streams are encoded with the AC3 codec"
-                        " using the native FFmpeg ac3 encoder.",
-                        "icon": "https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png",
+                        "name": _EXAMPLE_PLUGIN_NAME_AC3,
+                        "description": _EXAMPLE_PLUGIN_DESC_AC3,
+                        "icon": _EXAMPLE_PLUGIN_ICON_AC3,
                     }
                 ],
                 "plugin_flow": {
                     "library_management.file_test": [
                         {
                             "plugin_id": "encoder_audio_ac3",
-                            "name": "Audio Encoder AC3",
+                            "name": _EXAMPLE_PLUGIN_NAME_AC3,
                             "author": "Josh.5",
-                            "description": "Ensure all audio streams are encoded with the AC3 codec"
-                            " using the native FFmpeg ac3 encoder.",
+                            "description": _EXAMPLE_PLUGIN_DESC_AC3,
                             "version": "0.0.2",
-                            "icon": "https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png",
+                            "icon": _EXAMPLE_PLUGIN_ICON_AC3,
                         }
                     ],
                     "worker.process": [
                         {
                             "plugin_id": "encoder_audio_ac3",
-                            "name": "Audio Encoder AC3",
+                            "name": _EXAMPLE_PLUGIN_NAME_AC3,
                             "author": "Josh.5",
-                            "description": "Ensure all audio streams are encoded with the AC3 codec"
-                            " using the native FFmpeg ac3 encoder.",
+                            "description": _EXAMPLE_PLUGIN_DESC_AC3,
                             "version": "0.0.2",
-                            "icon": "https://raw.githubusercontent.com/Josh5/compresso.plugin.encoder_audio_ac3/master/icon.png",
+                            "icon": _EXAMPLE_PLUGIN_ICON_AC3,
                         }
                     ],
                     "postprocessor.file_move": [],
@@ -378,7 +380,7 @@ class SettingsLibraryPluginConfigExportSchema(BaseSchema):
             "example": {
                 "id": 1,
                 "name": "Default",
-                "path": "/library",
+                "path": _EXAMPLE_LIBRARY_PATH,
                 "enable_scanner": False,
                 "enable_inotify": False,
                 "priority_score": 0,

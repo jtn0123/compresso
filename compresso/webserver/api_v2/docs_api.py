@@ -42,6 +42,7 @@ from compresso.webserver.api_v2.schema.docs_schemas import DocumentContentSucces
 from compresso.webserver.helpers import documents
 
 GITHUB_RELEASES_URL = "https://github.com/jtn0123/compresso/releases"
+_GIT_LOG_FORMAT = "--pretty=format:- %s (%h)"
 
 
 def _generate_changelog_from_git():
@@ -88,7 +89,7 @@ def _generate_changelog_from_git():
         # Get commits from HEAD to the first tag (unreleased)
         if tags:
             unreleased_result = subprocess.run(  # noqa: S603 - trusted git command with internal tag data
-                ["git", "log", f"{tags[0][0]}..HEAD", "--pretty=format:- %s (%h)", "--no-merges"],  # noqa: S607 - git resolved from PATH intentionally
+                ["git", "log", f"{tags[0][0]}..HEAD", _GIT_LOG_FORMAT, "--no-merges"],  # noqa: S607 - git resolved from PATH intentionally
                 capture_output=True,
                 text=True,
                 cwd=repo_root,
@@ -111,7 +112,7 @@ def _generate_changelog_from_git():
                 log_range = tag
 
             commits_result = subprocess.run(  # noqa: S603 - trusted git command with internal tag data
-                ["git", "log", log_range, "--pretty=format:- %s (%h)", "--no-merges"],  # noqa: S607 - git resolved from PATH intentionally
+                ["git", "log", log_range, _GIT_LOG_FORMAT, "--no-merges"],  # noqa: S607 - git resolved from PATH intentionally
                 capture_output=True,
                 text=True,
                 cwd=repo_root,
@@ -126,8 +127,8 @@ def _generate_changelog_from_git():
         # If no tags at all, just show recent commits
         if not tags:
             lines.append("## Recent Changes\n\n")
-            all_result = subprocess.run(
-                ["git", "log", "--pretty=format:- %s (%h)", "--no-merges", "-50"],  # noqa: S607 - git resolved from PATH intentionally
+            all_result = subprocess.run(  # noqa: S603 - trusted git command with internal data
+                ["git", "log", _GIT_LOG_FORMAT, "--no-merges", "-50"],  # noqa: S607 - git resolved from PATH intentionally
                 capture_output=True,
                 text=True,
                 cwd=repo_root,

@@ -33,7 +33,7 @@ import tornado.log
 
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.plugin_flow_mixin import PluginFlowMixin
 from compresso.webserver.api_v2.plugin_repos_mixin import PluginReposMixin
 from compresso.webserver.api_v2.schema.plugin_schemas import (
@@ -230,7 +230,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -366,7 +366,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -430,7 +430,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -512,7 +512,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -580,7 +580,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -647,7 +647,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -700,7 +700,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -764,7 +764,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -831,6 +831,6 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception("Unhandled error in %s.%s", self.__class__.__name__, self.route.get("call_method"))
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
