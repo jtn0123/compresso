@@ -1,3 +1,12 @@
+## [1.10.4](https://github.com/jtn0123/compresso/compare/v1.10.3...v1.10.4) (2026-03-30)
+
+
+### Bug Fixes
+
+* align sonar-project.properties with actual artifact availability ([f80611e](https://github.com/jtn0123/compresso/commit/f80611e4307d176823eeac7950267045d216e035))
+* override cov-fail-under for integration tests ([8d5124f](https://github.com/jtn0123/compresso/commit/8d5124fcb9228a363a5b04fe93c7dc37060e7eff))
+* update package-lock.json for @vitest/coverage-v8 ([ad42a2c](https://github.com/jtn0123/compresso/commit/ad42a2cc8ba1bc8370f67e9bb4a1ef0620f912f7))
+
 ## [1.10.3](https://github.com/jtn0123/compresso/compare/v1.10.2...v1.10.3) (2026-03-29)
 
 
