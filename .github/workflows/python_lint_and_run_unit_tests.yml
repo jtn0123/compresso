@@ -165,6 +165,6 @@ jobs:
       run: ls -la coverage*.xml lcov.info 2>/dev/null || echo "No coverage files found"
 
     - name: SonarCloud Scan
-      uses: SonarSource/sonarqube-scan-action@v5
+      uses: SonarSource/sonarqube-scan-action@v6
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
