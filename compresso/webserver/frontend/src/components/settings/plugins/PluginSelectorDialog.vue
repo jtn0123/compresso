@@ -1,9 +1,5 @@
 <template>
-  <CompressoDialogPopup
-    ref="dialogRef"
-    :title="dialogTitle"
-    @hide="onDialogHide"
-  >
+  <CompressoDialogPopup ref="dialogRef" :title="dialogTitle" @hide="onDialogHide">
     <div class="q-pa-md">
       <q-card flat>
         <q-card-section>
@@ -15,11 +11,10 @@
                 icon-right="add"
                 outline
                 class="full-width"
-                :label="t('components.plugins.installPluginFromRepo')"/>
+                :label="t('components.plugins.installPluginFromRepo')"
+              />
             </div>
-            <div
-              class="col-12 col-sm-auto"
-              :style="isMobile ? '' : 'max-width: 240px'">
+            <div class="col-12 col-sm-auto" :style="isMobile ? '' : 'max-width: 240px'">
               <q-input
                 outlined
                 dense
@@ -27,9 +22,10 @@
                 color="secondary"
                 class="full-width"
                 v-model="filter"
-                :placeholder="t('navigation.search')">
-                <template v-slot:append>
-                  <q-icon name="search"/>
+                :placeholder="t('navigation.search')"
+              >
+                <template #append>
+                  <q-icon name="search" />
                 </template>
               </q-input>
             </div>
@@ -40,23 +36,18 @@
           <q-card flat>
             <q-card-section class="q-pa-none">
               <q-list bordered padding>
-                <q-separator spaced inset/>
-                <div
-                  v-for="(plugin, index) in plugins"
-                  :key="index">
-                  <q-item
-                    clickable
-                    v-ripple
-                    @click="selectPlugin(plugin)">
+                <q-separator spaced inset />
+                <div v-for="(plugin, index) in plugins" :key="index">
+                  <q-item clickable v-ripple @click="selectPlugin(plugin)">
                     <q-item-section avatar>
-                      <q-img :src="plugin.icon"/>
+                      <q-img :src="plugin.icon" />
                     </q-item-section>
                     <q-item-section>
                       <q-item-label>{{ plugin.name }}</q-item-label>
                       <q-item-label caption lines="2">{{ plugin.description }}</q-item-label>
                     </q-item-section>
                   </q-item>
-                  <q-separator spaced inset/>
+                  <q-separator spaced inset />
                 </div>
               </q-list>
             </q-card-section>
@@ -66,10 +57,7 @@
     </div>
   </CompressoDialogPopup>
 
-  <PluginInstallerDialog
-    ref="pluginInstallerDialog"
-    @hide="onPluginInstallerHide"
-  />
+  <PluginInstallerDialog ref="pluginInstallerDialog" @hide="onPluginInstallerHide" />
 </template>
 
 <script setup>
@@ -84,12 +72,12 @@ import PluginInstallerDialog from 'components/settings/plugins/PluginInstallerDi
 const props = defineProps({
   title: {
     type: String,
-    default: ''
+    default: '',
   },
   hidePlugins: {
     type: Array,
-    default: () => []
-  }
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['hide', 'selected'])
@@ -116,7 +104,7 @@ const fetchPluginsList = () => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'plugins/installed'),
-    data: data
+    data: data,
   }).then((response) => {
     const results = response.data.results || []
     const pluginList = results
@@ -174,12 +162,15 @@ watch(filter, () => {
   fetchPluginsList()
 })
 
-watch(() => props.hidePlugins, () => {
-  fetchPluginsList()
-})
+watch(
+  () => props.hidePlugins,
+  () => {
+    fetchPluginsList()
+  },
+)
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>

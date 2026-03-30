@@ -126,9 +126,7 @@ function mockFetchEmpty() {
     }
     return Promise.resolve({ data: {} })
   })
-  axios.get.mockImplementation(() =>
-    Promise.resolve({ data: { settings: { approval_required: true } } }),
-  )
+  axios.get.mockImplementation(() => Promise.resolve({ data: { settings: { approval_required: true } } }))
 }
 
 async function mountApprovalQueue(mockFn = mockFetchSuccess) {
@@ -233,9 +231,7 @@ describe('ApprovalQueue.vue', () => {
       await wrapper.vm.approveSelected()
       await flushPromises()
 
-      const approveCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('approval/approve'),
-      )
+      const approveCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/approve'))
       expect(approveCalls.length).toBe(1)
       expect(approveCalls[0][1]).toEqual({ id_list: [1, 2] })
     })
@@ -261,9 +257,7 @@ describe('ApprovalQueue.vue', () => {
       await wrapper.vm.approveSelected()
       await flushPromises()
 
-      const taskCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('approval/tasks'),
-      )
+      const taskCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/tasks'))
       expect(taskCalls.length).toBeGreaterThanOrEqual(1)
     })
   })
@@ -301,9 +295,7 @@ describe('ApprovalQueue.vue', () => {
       await wrapper.vm.confirmReject()
       await flushPromises()
 
-      const rejectCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('approval/reject'),
-      )
+      const rejectCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/reject'))
       expect(rejectCalls.length).toBe(1)
       expect(rejectCalls[0][1]).toEqual({ id_list: [1], requeue: false })
     })
@@ -317,9 +309,7 @@ describe('ApprovalQueue.vue', () => {
       await wrapper.vm.confirmReject()
       await flushPromises()
 
-      const rejectCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('approval/reject'),
-      )
+      const rejectCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/reject'))
       expect(rejectCalls[0][1]).toEqual({ id_list: [2], requeue: true })
     })
   })
@@ -337,9 +327,7 @@ describe('ApprovalQueue.vue', () => {
       await flushPromises()
 
       expect(wrapper.vm.pagination.page).toBe(1)
-      const taskCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('approval/tasks'),
-      )
+      const taskCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/tasks'))
       expect(taskCalls.length).toBeGreaterThanOrEqual(1)
       expect(taskCalls[0][1].search_value).toBe('movie')
     })
@@ -390,9 +378,7 @@ describe('ApprovalQueue.vue', () => {
       await wrapper.vm.approveFromDetail()
       await flushPromises()
 
-      const approveCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('approval/approve'),
-      )
+      const approveCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/approve'))
       expect(approveCalls.length).toBe(1)
       expect(approveCalls[0][1]).toEqual({ id_list: [1] })
       expect(wrapper.vm.showDetailDialog).toBe(false)
@@ -450,9 +436,7 @@ describe('ApprovalQueue.vue', () => {
         }
         return Promise.resolve({ data: {} })
       })
-      axios.get.mockImplementation(() =>
-        Promise.resolve({ data: { settings: { approval_required: true } } }),
-      )
+      axios.get.mockImplementation(() => Promise.resolve({ data: { settings: { approval_required: true } } }))
 
       const wrapper = shallowMountWithQuasar(ApprovalQueue)
       await flushPromises()

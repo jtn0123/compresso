@@ -2,10 +2,10 @@
   <q-dialog
     ref="dialogRef"
     backdrop-filter="grayscale(80%) blur(0.7px)"
-    :position="mini ? 'standard' : (isMobile ? 'left' : 'standard')"
+    :position="mini ? 'standard' : isMobile ? 'left' : 'standard'"
     :maximized="mini ? false : isMobile"
-    :transition-show="mini ? 'scale' : (isMobile ? 'slide-right' : 'scale')"
-    :transition-hide="mini ? 'scale' : (isMobile ? 'slide-left' : 'scale')"
+    :transition-show="mini ? 'scale' : isMobile ? 'slide-right' : 'scale'"
+    :transition-hide="mini ? 'scale' : isMobile ? 'slide-left' : 'scale'"
     :persistent="mini || persistent"
     @shake="onShake"
     @hide="onDialogHide"
@@ -19,17 +19,18 @@
       <!-- HEADER -->
       <q-card-section class="bg-card-head col-auto dialog-sticky-header q-py-sm">
         <div class="row items-center no-wrap">
-
           <!-- MOBILE/TABLET (lt-md OR mobile platform): Back/Close Left -->
           <template v-if="!mini && isMobile">
             <q-btn
-              outline dense round
+              outline
+              dense
+              round
               icon="arrow_back"
               color="grey-7"
               :class="{ 'dialog-attention': attentionActive }"
               @click="hide"
             >
-              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none;">
+              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none">
                 {{ closeTooltip || $t('tooltips.close') }}
               </q-tooltip>
             </q-btn>
@@ -51,7 +52,7 @@
                   @click="triggerAction(action)"
                 >
                   <q-item-section v-if="action.icon" avatar>
-                    <q-icon :name="action.icon" :color="action.color || 'secondary'"/>
+                    <q-icon :name="action.icon" :color="action.color || 'secondary'" />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ action.label }}</q-item-label>
@@ -72,7 +73,7 @@
               :class="[
                 { 'dialog-attention': attentionActive },
                 index > 0 ? 'q-ml-xs' : 'q-ml-sm',
-                index === actions.length - 1 ? 'q-mr-sm' : ''
+                index === actions.length - 1 ? 'q-mr-sm' : '',
               ]"
               @click="triggerAction(action)"
             >
@@ -109,7 +110,7 @@
                   @click="triggerAction(action)"
                 >
                   <q-item-section v-if="action.icon" avatar>
-                    <q-icon :name="action.icon" :color="action.color || 'secondary'"/>
+                    <q-icon :name="action.icon" :color="action.color || 'secondary'" />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ action.label }}</q-item-label>
@@ -130,7 +131,7 @@
               :class="[
                 { 'dialog-attention': attentionActive },
                 index === 0 ? 'q-mr-sm' : 'q-ml-xs',
-                index === actions.length - 1 ? 'q-mr-sm' : ''
+                index === actions.length - 1 ? 'q-mr-sm' : '',
               ]"
               @click="triggerAction(action)"
             >
@@ -140,18 +141,19 @@
             </q-btn>
 
             <q-btn
-              outline dense round
+              outline
+              dense
+              round
               icon="close"
               color="grey-7"
               :class="{ 'dialog-attention': attentionActive }"
               @click="hide"
             >
-              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none;">
+              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none">
                 {{ closeTooltip || $t('tooltips.close') }}
               </q-tooltip>
             </q-btn>
           </template>
-
         </div>
       </q-card-section>
 
@@ -172,28 +174,28 @@ import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStan
 const props = defineProps({
   title: {
     type: String,
-    default: ''
+    default: '',
   },
   width: {
     type: String,
-    default: '700px'
+    default: '700px',
   },
   closeTooltip: {
     type: String,
-    default: ''
+    default: '',
   },
   persistent: {
     type: Boolean,
-    default: false
+    default: false,
   },
   mini: {
     type: Boolean,
-    default: false
+    default: false,
   },
   actions: {
     type: Array,
-    default: () => []
-  }
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['ok', 'hide', 'action'])
@@ -249,7 +251,7 @@ const useActionMenu = computed(() => $q.screen.lt.sm && props.actions.length > 1
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

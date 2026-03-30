@@ -22,9 +22,9 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
-import { useQuasar } from 'quasar';
-import { useChartTheme } from 'src/composables/useChartTheme';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useQuasar } from 'quasar'
+import { useChartTheme } from 'src/composables/useChartTheme'
 
 export default {
   name: 'CodecDistributionChart',
@@ -34,34 +34,36 @@ export default {
     loading: { type: Boolean, default: false },
   },
   setup(props) {
-    const $q = useQuasar();
-    const { getChartColors } = useChartTheme();
-    const sourceChartRef = ref(null);
-    const destChartRef = ref(null);
-    let sourceChart = null;
-    let destChart = null;
+    const $q = useQuasar()
+    const { getChartColors } = useChartTheme()
+    const sourceChartRef = ref(null)
+    const destChartRef = ref(null)
+    let sourceChart = null
+    let destChart = null
 
     async function renderCharts() {
-      const { Chart, DoughnutController, ArcElement, Tooltip, Legend } = await import('chart.js');
-      Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
+      const { Chart, DoughnutController, ArcElement, Tooltip, Legend } = await import('chart.js')
+      Chart.register(DoughnutController, ArcElement, Tooltip, Legend)
 
-      await nextTick();
+      await nextTick()
 
-      if (sourceChart) sourceChart.destroy();
-      if (destChart) destChart.destroy();
+      if (sourceChart) sourceChart.destroy()
+      if (destChart) destChart.destroy()
 
-      const isDark = $q.dark.isActive;
-      const labelColor = isDark ? '#ccc' : '#666';
+      const isDark = $q.dark.isActive
+      const labelColor = isDark ? '#ccc' : '#666'
 
       if (sourceChartRef.value && props.sourceCodecs.length > 0) {
         sourceChart = new Chart(sourceChartRef.value, {
           type: 'doughnut',
           data: {
-            labels: props.sourceCodecs.map(c => c.codec),
-            datasets: [{
-              data: props.sourceCodecs.map(c => c.count),
-              backgroundColor: getChartColors().slice(0, props.sourceCodecs.length),
-            }],
+            labels: props.sourceCodecs.map((c) => c.codec),
+            datasets: [
+              {
+                data: props.sourceCodecs.map((c) => c.count),
+                backgroundColor: getChartColors().slice(0, props.sourceCodecs.length),
+              },
+            ],
           },
           options: {
             responsive: true,
@@ -73,18 +75,20 @@ export default {
               },
             },
           },
-        });
+        })
       }
 
       if (destChartRef.value && props.destinationCodecs.length > 0) {
         destChart = new Chart(destChartRef.value, {
           type: 'doughnut',
           data: {
-            labels: props.destinationCodecs.map(c => c.codec),
-            datasets: [{
-              data: props.destinationCodecs.map(c => c.count),
-              backgroundColor: getChartColors().slice(0, props.destinationCodecs.length),
-            }],
+            labels: props.destinationCodecs.map((c) => c.codec),
+            datasets: [
+              {
+                data: props.destinationCodecs.map((c) => c.count),
+                backgroundColor: getChartColors().slice(0, props.destinationCodecs.length),
+              },
+            ],
           },
           options: {
             responsive: true,
@@ -96,25 +100,35 @@ export default {
               },
             },
           },
-        });
+        })
       }
     }
 
-    watch(() => [props.sourceCodecs, props.destinationCodecs], () => {
-      if (!props.loading) renderCharts();
-    }, { deep: true });
-    watch(() => $q.dark.isActive, renderCharts);
+    watch(
+      () => [props.sourceCodecs, props.destinationCodecs],
+      () => {
+        if (!props.loading) renderCharts()
+      },
+      { deep: true },
+    )
+    watch(() => $q.dark.isActive, renderCharts)
 
     onMounted(() => {
-      if (!props.loading) renderCharts();
-    });
+      if (!props.loading) renderCharts()
+    })
 
     onBeforeUnmount(() => {
-      if (sourceChart) { sourceChart.destroy(); sourceChart = null; }
-      if (destChart) { destChart.destroy(); destChart = null; }
-    });
+      if (sourceChart) {
+        sourceChart.destroy()
+        sourceChart = null
+      }
+      if (destChart) {
+        destChart.destroy()
+        destChart = null
+      }
+    })
 
-    return { sourceChartRef, destChartRef };
+    return { sourceChartRef, destChartRef }
   },
-};
+}
 </script>

@@ -1,17 +1,9 @@
 <template>
-  <CompressoDialogWindow
-    ref="dialogRef"
-    :title="$t('headers.completedTaskDetails')"
-    width="92vw"
-    @hide="onDialogHide"
-  >
+  <CompressoDialogWindow ref="dialogRef" :title="$t('headers.completedTaskDetails')" width="92vw" @hide="onDialogHide">
     <div class="completed-task-details-body column full-height">
       <q-scroll-area class="col full-height q-pa-md">
         <div class="completed-task-details-dialog-content">
-          <p
-            v-for="(line, index) in taskDetails"
-            v-bind:key="index"
-            v-html="line"></p>
+          <p v-for="(line, index) in taskDetails" :key="index" v-html="line"></p>
         </div>
       </q-scroll-area>
     </div>
@@ -20,17 +12,17 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from "axios"
-import { getCompressoApiUrl } from "src/js/compressoGlobals"
+import axios from 'axios'
+import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { sanitizeHtml } from 'src/js/sanitize'
-import CompressoDialogWindow from "components/ui/dialogs/CompressoDialogWindow.vue"
+import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
   completedTaskId: {
     type: String,
-    required: true
+    required: true,
   },
 })
 
@@ -59,19 +51,21 @@ const fetchCompletedTaskLog = () => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'history/task/log'),
-    data: data
-  }).then((response) => {
-    const lines = Array.isArray(response.data.command_log_lines) ? response.data.command_log_lines : []
-    taskDetails.value = lines.map(sanitizeHtml)
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: $t('components.completedTasks.errorGettingDetails'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    data: data,
   })
+    .then((response) => {
+      const lines = Array.isArray(response.data.command_log_lines) ? response.data.command_log_lines : []
+      taskDetails.value = lines.map(sanitizeHtml)
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: $t('components.completedTasks.errorGettingDetails'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 onMounted(() => {
@@ -80,7 +74,7 @@ onMounted(() => {
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

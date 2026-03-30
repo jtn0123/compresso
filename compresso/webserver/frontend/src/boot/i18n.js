@@ -8,7 +8,7 @@ import { LocalStorage } from 'quasar'
 function loadLocaleInfo() {
   const locales = require.context('src/language', true, /(^|\/)[A-Za-z0-9_,\s-]+\.json$/i)
   const messages = {}
-  locales.keys().forEach(key => {
+  locales.keys().forEach((key) => {
     const matched = key.match(/([A-Za-z0-9_-]+)\./i)
     if (matched && matched.length > 1) {
       const locale = matched[1]
@@ -24,9 +24,8 @@ const { id, messages } = loadLocaleInfo()
 let configuredLocale = LocalStorage.getItem('locale')
 if (configuredLocale === null) {
   // Default to English
-  configuredLocale = 'en';
+  configuredLocale = 'en'
 }
-
 
 export default boot(({ app }) => {
   const i18n = createI18n({
@@ -34,7 +33,7 @@ export default boot(({ app }) => {
     locale: 'en',
     fallbackLocale: 'en',
     silentTranslationWarn: true,
-    messages
+    messages,
   })
   // Set i18n instance on app
   app.use(i18n)
