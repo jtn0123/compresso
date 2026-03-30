@@ -34,8 +34,16 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run tests
-      run: npx vitest run
+    - name: Run tests with coverage
+      run: npx vitest run --coverage
+
+    - name: Upload frontend coverage
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: frontend-coverage
+        path: compresso/webserver/frontend/coverage/lcov.info
+        retention-days: 30
 
     - name: Lint frontend
       run: npm run lint
