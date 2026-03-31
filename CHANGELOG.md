@@ -1,3 +1,17 @@
+## [1.10.5](https://github.com/jtn0123/compresso/compare/v1.10.4...v1.10.5) (2026-03-31)
+
+
+### Bug Fixes
+
+* override cov-fail-under for CI shards ([f9dd9b1](https://github.com/jtn0123/compresso/commit/f9dd9b17af49e48400bad86a645c975b6cf809f8))
+* update npm dependencies to resolve security vulnerabilities ([a2bc41e](https://github.com/jtn0123/compresso/commit/a2bc41e2ecb0863e052c418f3baf43cc35fb24b9))
+* update npm in Docker base image to resolve picomatch CVE-2026-33671 ([32f2d5b](https://github.com/jtn0123/compresso/commit/32f2d5b30adde72f39089a55dececd03cb5ff55f))
+
+
+### Reverts
+
+* remove frontend formatting from this PR ([667b869](https://github.com/jtn0123/compresso/commit/667b869bab4a547c74e0449e644b26382165f291))
+
 ## [1.10.4](https://github.com/jtn0123/compresso/compare/v1.10.3...v1.10.4) (2026-03-30)
 
 
