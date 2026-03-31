@@ -230,6 +230,7 @@ import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { bbCodeToHTML } from 'src/js/markupParser'
+import { sanitizeHtml } from 'src/js/sanitize'
 import { useI18n } from 'vue-i18n'
 import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog.vue'
 import PluginInstallerDialog from 'components/settings/plugins/PluginInstallerDialog'
@@ -407,7 +408,7 @@ export default {
       // Only show first line in multi-line description text.
       description_text = description_text.split('\n')[0]
       // Parse BBCode
-      return bbCodeToHTML(description_text)
+      return sanitizeHtml(bbCodeToHTML(description_text))
     }
 
     function onRequest(props) {

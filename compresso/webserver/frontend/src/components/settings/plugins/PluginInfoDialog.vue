@@ -263,7 +263,7 @@
 
                         <q-item-section v-if="item.input_type === 'section_admonition'">
                           <AdmonitionBanner :type="item.label.toLowerCase()" :title="item.label">
-                            <span v-html="item.description"></span>
+                            <span v-html="sanitizeHtml(item.description)"></span>
                           </AdmonitionBanner>
                         </q-item-section>
                       </q-item>
@@ -293,6 +293,7 @@ import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { markdownToHTML } from 'src/js/markupParser'
+import { sanitizeHtml } from 'src/js/sanitize'
 import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
@@ -408,8 +409,8 @@ const fetchPluginData = () => {
     author.value = response.data.author
     version.value = response.data.version
     status.value = response.data.status
-    changelog.value = markdownToHTML(response.data.changelog)
-    description.value = markdownToHTML(response.data.description)
+    changelog.value = sanitizeHtml(markdownToHTML(response.data.changelog))
+    description.value = sanitizeHtml(markdownToHTML(response.data.description))
 
     if (!props.viewingRemoteInfo) {
       isHydratingSettings.value = true

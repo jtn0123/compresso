@@ -14,6 +14,7 @@ import { ref } from 'vue'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import compressoGlobals from 'src/js/compressoGlobals'
 import { markdownToHTML } from 'src/js/markupParser'
+import { sanitizeHtml } from 'src/js/sanitize'
 
 const emit = defineEmits(['hide'])
 
@@ -31,7 +32,7 @@ const show = () => {
   compressoGlobals
     .getCompressoPrivacyPolicy()
     .then((privacyPolicy) => {
-      privacyPolicyHtml.value = markdownToHTML(privacyPolicy)
+      privacyPolicyHtml.value = sanitizeHtml(markdownToHTML(privacyPolicy))
     })
     .finally(() => {
       isLoading.value = false
