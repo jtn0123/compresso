@@ -1,3 +1,13 @@
+## [1.10.6](https://github.com/jtn0123/compresso/compare/v1.10.5...v1.10.6) (2026-03-31)
+
+
+### Bug Fixes
+
+* add missing lang and title attributes for SonarCloud reliability ([7c2a895](https://github.com/jtn0123/compresso/commit/7c2a8950eb848f160da5cde26c2dafdd07346e84))
+* exclude frontend from SonarCloud analysis ([ae5b338](https://github.com/jtn0123/compresso/commit/ae5b338fe009a823f6ad397abc6e544a08301b8f))
+* exclude frontend from SonarCloud coverage/duplication analysis ([2b314bc](https://github.com/jtn0123/compresso/commit/2b314bc251c39f4fa36d2bd5879ba960b7af88f1))
+* sanitize v-html content to resolve SonarCloud security hotspots ([e2face5](https://github.com/jtn0123/compresso/commit/e2face54565f05fe557684b4d51df3f5f038d82c))
+
 ## [1.10.5](https://github.com/jtn0123/compresso/compare/v1.10.4...v1.10.5) (2026-03-31)
 
 
