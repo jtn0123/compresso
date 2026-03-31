@@ -1,24 +1,16 @@
 <template>
-  <CompressoDialogPopup
-    ref="dialogRef"
-    :title="dialogTitle"
-    @hide="onDialogHide"
-  >
+  <CompressoDialogPopup ref="dialogRef" :title="dialogTitle" @hide="onDialogHide">
     <div class="q-pa-md">
       <q-card flat>
         <q-card-section>
-          <q-input
-            disable
-            readonly
-            borderless
-            v-model="currentPath">
-            <template v-slot:before>
-              <q-icon name="folder_open"/>
+          <q-input disable readonly borderless v-model="currentPath">
+            <template #before>
+              <q-icon name="folder_open" />
             </template>
           </q-input>
         </q-card-section>
 
-        <q-separator/>
+        <q-separator />
 
         <q-card-section class="q-pa-none">
           <q-list bordered padding>
@@ -27,9 +19,10 @@
               :key="index"
               clickable
               v-ripple
-              @click="fetchDirectoryListing(directory.full_path)">
+              @click="fetchDirectoryListing(directory.full_path)"
+            >
               <q-item-section avatar>
-                <q-icon color="primary" name="folder_open"/>
+                <q-icon color="primary" name="folder_open" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ directory.name }}</q-item-label>
@@ -52,16 +45,16 @@ import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue
 const props = defineProps({
   title: {
     type: String,
-    default: ''
+    default: '',
   },
   initialPath: {
     type: String,
-    default: ''
+    default: '',
   },
   listType: {
     type: String,
-    default: 'directories'
-  }
+    default: 'directories',
+  },
 })
 
 const emit = defineEmits(['hide', 'selected'])
@@ -85,7 +78,7 @@ const fetchDirectoryListing = (path) => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'filebrowser/list'),
-    data: data
+    data: data,
   }).then((response) => {
     directories.value = response.data.directories
     files.value = response.data.files
@@ -113,15 +106,18 @@ const onDialogHide = () => {
   emit('hide')
 }
 
-watch(() => props.initialPath, (value) => {
-  if (!value || !isOpen.value) {
-    return
-  }
-  fetchDirectoryListing(value)
-})
+watch(
+  () => props.initialPath,
+  (value) => {
+    if (!value || !isOpen.value) {
+      return
+    }
+    fetchDirectoryListing(value)
+  },
+)
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>

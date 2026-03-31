@@ -10,7 +10,11 @@
           <div v-if="showActionsToggle" class="col-12 row items-center justify-end">
             <CompressoListActionButton
               :icon="actionsExpanded ? 'expand_less' : 'expand_more'"
-              :tooltip="actionsExpanded ? $t('components.completedTasks.hideActions') : $t('components.completedTasks.showActions')"
+              :tooltip="
+                actionsExpanded
+                  ? $t('components.completedTasks.hideActions')
+                  : $t('components.completedTasks.showActions')
+              "
               @click="toggleActionsExpanded"
             />
           </div>
@@ -27,15 +31,15 @@
                     :label-color="searchLabelColor"
                     :placeholder="$t('navigation.search')"
                   >
-                    <template v-slot:append>
-                      <q-icon name="search" :color="searchLabelColor"/>
+                    <template #append>
+                      <q-icon name="search" :color="searchLabelColor" />
                     </template>
                   </q-input>
                 </div>
 
                 <div class="col-12">
                   <div class="row items-center q-col-gutter-sm completed-tasks-action-row">
-                    <q-space/>
+                    <q-space />
 
                     <div class="col-auto">
                       <CompressoStandardButtonDropdown
@@ -47,7 +51,7 @@
                           <q-item clickable v-close-popup @click="deleteSelected">
                             <q-item-section>
                               <q-item-label>
-                                <q-icon name="delete_outline"/>
+                                <q-icon name="delete_outline" />
                                 {{ $t('components.completedTasks.metadataBrowserRemoveSelected') }}
                               </q-item-label>
                             </q-item-section>
@@ -75,7 +79,7 @@
           </q-slide-transition>
         </div>
 
-        <q-separator class="q-mt-sm"/>
+        <q-separator class="q-mt-sm" />
       </div>
 
       <div
@@ -103,14 +107,14 @@
               :columns="columns"
               class="completed-tasks-table"
             >
-              <template v-slot:body="props">
+              <template #body="props">
                 <q-tr :props="props" class="completed-task-row">
                   <q-td auto-width class="completed-task-select">
                     <div class="completed-task-cell-center">
                       <q-checkbox
                         color="secondary"
                         :model-value="isRowSelected(props.row)"
-                        @update:model-value="value => toggleRowSelection(props.row, value)"
+                        @update:model-value="(value) => toggleRowSelection(props.row, value)"
                       />
                     </div>
                   </q-td>
@@ -136,7 +140,7 @@
                         v-if="$q.screen.gt.xs"
                         @click="openMetadataDialog(props.row.fingerprint)"
                         :label="$t('components.completedTasks.metadata')"
-                        style="min-width: 120px;"
+                        style="min-width: 120px"
                       />
                       <CompressoListActionButton
                         v-else
@@ -167,7 +171,7 @@
     </div>
 
     <q-inner-loading :showing="loading">
-      <q-spinner-dots size="42px" color="secondary"/>
+      <q-spinner-dots size="42px" color="secondary" />
     </q-inner-loading>
   </CompressoDialogWindow>
 
@@ -215,41 +219,38 @@ const searchValue = ref('')
 const actionsExpanded = ref(true)
 const selectedFingerprints = ref([])
 
-const columns = computed(() => ([
+const columns = computed(() => [
   {
     name: 'select',
     label: '',
     field: 'fingerprint',
-    sortable: false
+    sortable: false,
   },
   {
     name: 'fingerprint',
     label: $t('components.completedTasks.metadataFingerprint'),
     field: 'fingerprint',
-    sortable: false
+    sortable: false,
   },
   {
     name: 'paths',
     label: $t('components.completedTasks.metadataPathsTitle'),
     field: 'paths',
-    sortable: false
+    sortable: false,
   },
   {
     name: 'actions',
     label: '',
     field: 'actions',
-    sortable: false
+    sortable: false,
   },
-]))
+])
 
 const filterSortActiveColor = 'warning'
 const filterSortButtonSize = computed(() => ($q.screen.width < 450 ? 'sm' : 'md'))
 const searchLabelColor = computed(() => (searchValue.value.trim().length > 0 ? filterSortActiveColor : 'secondary'))
 
-const showActionsToggle = computed(() => (
-  $q.screen.width < 1024 ||
-  ($q.screen.width >= 1024 && $q.screen.height < 800)
-))
+const showActionsToggle = computed(() => $q.screen.width < 1024 || ($q.screen.width >= 1024 && $q.screen.height < 800))
 
 const allPageSelected = computed(() => {
   if (rows.value.length === 0) {
@@ -354,30 +355,33 @@ const fetchMetadata = ({ reset = false, silent = false } = {}) => {
     method: 'post',
     url: getCompressoApiUrl('v2', 'metadata/search'),
     data: payload,
-  }).then((response) => {
-    const results = response.data.results || []
-    totalCount.value = response.data.total_count || results.length
-    const mapped = results.map((entry) => ({
-      fingerprint: entry.fingerprint,
-      paths: entry.paths || [],
-    }))
-    if (offset.value === 0) {
-      rows.value = mapped
-    } else {
-      rows.value = rows.value.concat(mapped)
-    }
-    offset.value = rows.value.length
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: $t('components.completedTasks.metadataErrorFetch'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
-  }).finally(() => {
-    loading.value = false
   })
+    .then((response) => {
+      const results = response.data.results || []
+      totalCount.value = response.data.total_count || results.length
+      const mapped = results.map((entry) => ({
+        fingerprint: entry.fingerprint,
+        paths: entry.paths || [],
+      }))
+      if (offset.value === 0) {
+        rows.value = mapped
+      } else {
+        rows.value = rows.value.concat(mapped)
+      }
+      offset.value = rows.value.length
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: $t('components.completedTasks.metadataErrorFetch'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
+    .finally(() => {
+      loading.value = false
+    })
 }
 
 const loadMore = (index, done) => {
@@ -398,26 +402,28 @@ const deleteSelected = () => {
     return
   }
 
-  const requests = selectedFingerprints.value.map((fingerprint) => (
+  const requests = selectedFingerprints.value.map((fingerprint) =>
     axios({
       method: 'delete',
       url: getCompressoApiUrl('v2', 'metadata'),
-      data: { fingerprint }
-    })
-  ))
+      data: { fingerprint },
+    }),
+  )
 
-  Promise.all(requests).then(() => {
-    resetSelection()
-    fetchMetadata({ reset: true, silent: true })
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: $t('components.completedTasks.metadataErrorDelete'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+  Promise.all(requests)
+    .then(() => {
+      resetSelection()
+      fetchMetadata({ reset: true, silent: true })
     })
-  })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: $t('components.completedTasks.metadataErrorDelete'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 const openMetadataDialog = (fingerprint) => {

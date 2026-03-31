@@ -1,12 +1,5 @@
 <template>
-  <q-btn
-    outline
-    dense
-    round
-    color="secondary"
-    icon="add"
-    @click="$emit('click', $event)"
-  >
+  <q-btn outline dense round color="secondary" icon="add" @click="$emit('click', $event)">
     <q-tooltip v-if="tooltip" class="bg-white text-primary">
       {{ tooltip }}
     </q-tooltip>
@@ -17,8 +10,8 @@
 defineProps({
   tooltip: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
 
 defineEmits(['click'])

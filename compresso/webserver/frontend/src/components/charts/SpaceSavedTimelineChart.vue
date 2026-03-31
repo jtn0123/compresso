@@ -27,10 +27,10 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
-import { useQuasar } from 'quasar';
-import { formatBytes } from 'src/js/formatUtils';
-import { useChartTheme } from 'src/composables/useChartTheme';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useQuasar } from 'quasar'
+import { formatBytes } from 'src/js/formatUtils'
+import { useChartTheme } from 'src/composables/useChartTheme'
 
 export default {
   name: 'SpaceSavedTimelineChart',
@@ -40,38 +40,41 @@ export default {
   },
   emits: ['interval-change'],
   setup(props) {
-    const $q = useQuasar();
-    const { getChartColor, chartBgColor } = useChartTheme();
-    const chartRef = ref(null);
-    const interval = ref('day');
-    let chart = null;
+    const $q = useQuasar()
+    const { getChartColor, chartBgColor } = useChartTheme()
+    const chartRef = ref(null)
+    const interval = ref('day')
+    let chart = null
 
     async function renderChart() {
-      const { Chart, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler } = await import('chart.js');
-      Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
+      const { Chart, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler } =
+        await import('chart.js')
+      Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler)
 
-      await nextTick();
+      await nextTick()
 
-      if (chart) chart.destroy();
+      if (chart) chart.destroy()
 
       if (chartRef.value && props.data.length > 0) {
-        const isDark = $q.dark.isActive;
-        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-        const labelColor = isDark ? '#ccc' : '#666';
-        const titleColor = isDark ? '#eee' : '#333';
+        const isDark = $q.dark.isActive
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+        const labelColor = isDark ? '#ccc' : '#666'
+        const titleColor = isDark ? '#eee' : '#333'
 
         chart = new Chart(chartRef.value, {
           type: 'line',
           data: {
-            labels: props.data.map(d => d.date),
-            datasets: [{
-              label: 'Space Saved',
-              data: props.data.map(d => d.space_saved),
-              borderColor: getChartColor(1),
-              backgroundColor: chartBgColor(1, 0.1),
-              fill: true,
-              tension: 0.3,
-            }],
+            labels: props.data.map((d) => d.date),
+            datasets: [
+              {
+                label: 'Space Saved',
+                data: props.data.map((d) => d.space_saved),
+                borderColor: getChartColor(1),
+                backgroundColor: chartBgColor(1, 0.1),
+                fill: true,
+                tension: 0.3,
+              },
+            ],
           },
           options: {
             responsive: true,
@@ -102,24 +105,31 @@ export default {
               },
             },
           },
-        });
+        })
       }
     }
 
-    watch(() => props.data, () => {
-      if (!props.loading) renderChart();
-    }, { deep: true });
-    watch(() => $q.dark.isActive, renderChart);
+    watch(
+      () => props.data,
+      () => {
+        if (!props.loading) renderChart()
+      },
+      { deep: true },
+    )
+    watch(() => $q.dark.isActive, renderChart)
 
     onMounted(() => {
-      if (!props.loading) renderChart();
-    });
+      if (!props.loading) renderChart()
+    })
 
     onBeforeUnmount(() => {
-      if (chart) { chart.destroy(); chart = null; }
-    });
+      if (chart) {
+        chart.destroy()
+        chart = null
+      }
+    })
 
-    return { chartRef, interval };
+    return { chartRef, interval }
   },
-};
+}
 </script>

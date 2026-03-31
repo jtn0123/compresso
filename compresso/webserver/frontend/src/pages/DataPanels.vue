@@ -1,43 +1,34 @@
 <template>
   <q-page>
     <div class="iframe-container">
-
-      <iframe
-        v-if="(iframeSrc !== null)"
-        id="data-panel-iframe"
-        :src="iframeSrc">
+      <iframe v-if="iframeSrc !== null" id="data-panel-iframe" :src="iframeSrc" title="Plugin data panel">
         Your browser is not supported. Sorry.
       </iframe>
 
       <div v-else>
         <div class="full-width row flex-center text-negative q-gutter-sm">
-          <q-icon size="2em" name="sentiment_dissatisfied"/>
+          <q-icon size="2em" name="sentiment_dissatisfied" />
           <q-item-label>{{ $t('components.dataPanels.noDataPanelsEnabled') }}</q-item-label>
-          <q-icon size="2em" name="priority_high"/>
+          <q-icon size="2em" name="priority_high" />
         </div>
 
-        <div class="text-caption text-grey q-mt-md" style="max-width: 400px; margin: 0 auto;">
+        <div class="text-caption text-grey q-mt-md" style="max-width: 400px; margin: 0 auto">
           {{ $t('pages.dataPanels.bannerText') }}
         </div>
 
         <div class="full-width row flex-center text-negative absolute-center">
-          <q-icon
-            size="512px"
-            name="warning_amber"
-          />
+          <q-icon size="512px" name="warning_amber" />
         </div>
       </div>
-
     </div>
   </q-page>
 </template>
 
 <script>
-
-import { ref } from "vue";
-import axios from "axios";
-import { getCompressoApiUrl } from "src/js/compressoGlobals";
-import { LocalStorage } from "quasar";
+import { ref } from 'vue'
+import axios from 'axios'
+import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { LocalStorage } from 'quasar'
 
 export default {
   data() {
@@ -46,51 +37,53 @@ export default {
       page: '',
       iframeSrc,
       iframeHeight: '0px',
-    };
+    }
   },
   created() {
     //window.addEventListener('message', this.resizeIframe);
     if (typeof this.$route.query !== 'undefined' && typeof this.$route.query.pluginId !== 'undefined') {
-      this.setPageFromParams(this.$route.query.pluginId);
+      this.setPageFromParams(this.$route.query.pluginId)
     } else {
-      this.setPageAsFirstEnabledPanel();
+      this.setPageAsFirstEnabledPanel()
     }
   },
   methods: {
     setPageFromParams(pluginId) {
       if (typeof pluginId !== 'undefined') {
-        let theme = LocalStorage.getItem('theme');
-        this.iframeSrc = '/compresso/panel/' + pluginId + '/?theme=' + theme;
+        let theme = LocalStorage.getItem('theme')
+        this.iframeSrc = '/compresso/panel/' + pluginId + '/?theme=' + theme
       }
     },
     setPageAsFirstEnabledPanel() {
       axios({
         method: 'get',
         url: getCompressoApiUrl('v2', 'plugins/panels/enabled'),
-      }).then((response) => {
-        // Success
-        if (response.data.results.length > 0) {
-          let first = response.data.results[0];
-          this.setPageFromParams(first.plugin_id);
-        }
-      }).catch(() => {
-        this.$q.notify({
-          color: 'negative',
-          position: 'top',
-          message: this.$t('notifications.failedToFetchEnabledDataPanelPlugins'),
-          icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }]
-        })
       })
-    }
+        .then((response) => {
+          // Success
+          if (response.data.results.length > 0) {
+            let first = response.data.results[0]
+            this.setPageFromParams(first.plugin_id)
+          }
+        })
+        .catch(() => {
+          this.$q.notify({
+            color: 'negative',
+            position: 'top',
+            message: this.$t('notifications.failedToFetchEnabledDataPanelPlugins'),
+            icon: 'report_problem',
+            actions: [{ icon: 'close', color: 'white' }],
+          })
+        })
+    },
   },
   watch: {
     $route(to, from) {
       if (typeof to.query !== 'undefined') {
-        this.setPageFromParams(to.query.pluginId);
+        this.setPageFromParams(to.query.pluginId)
       }
-    }
-  }
+    },
+  },
 }
 </script>
 

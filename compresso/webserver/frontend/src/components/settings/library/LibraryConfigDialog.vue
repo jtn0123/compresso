@@ -3,15 +3,13 @@
     ref="dialogRef"
     :title="$t('headers.configureLibrary')"
     :persistent="isDirty"
-    :closeTooltip="$t('components.settings.common.closeWithoutSaving')"
+    :close-tooltip="$t('components.settings.common.closeWithoutSaving')"
     :actions="saveActions"
     @save="save"
     @hide="onDialogHide"
   >
     <div class="q-pa-md">
-      <div
-        v-if="isDirty"
-        :class="isMobile ? 'unsaved-indicator-mobile' : 'unsaved-indicator'">
+      <div v-if="isDirty" :class="isMobile ? 'unsaved-indicator-mobile' : 'unsaved-indicator'">
         {{ $t('components.settings.common.unsavedChanges') }}
       </div>
       <div :class="isMobile ? 'q-px-none' : ''">
@@ -34,86 +32,45 @@
                 </div>
               </div>
               <div class="col-auto q-gutter-xs">
-                <q-btn
-                  round
-                  outline
-                  color="secondary"
-                  icon="download"
-                  @click="exportPluginConfig">
-                  <q-tooltip class="bg-white text-primary">{{
-                      $t('components.settings.library.exportLibraryConfig')
-                    }}
+                <q-btn round outline color="secondary" icon="download" @click="exportPluginConfig">
+                  <q-tooltip class="bg-white text-primary"
+                    >{{ $t('components.settings.library.exportLibraryConfig') }}
                   </q-tooltip>
                 </q-btn>
-                <q-btn
-                  round
-                  outline
-                  color="secondary"
-                  icon="publish"
-                  @click="importPluginConfig">
-                  <q-tooltip class="bg-white text-primary">{{
-                      $t('components.settings.library.importLibraryConfig')
-                    }}
+                <q-btn round outline color="secondary" icon="publish" @click="importPluginConfig">
+                  <q-tooltip class="bg-white text-primary"
+                    >{{ $t('components.settings.library.importLibraryConfig') }}
                   </q-tooltip>
                 </q-btn>
-                <q-btn
-                  round
-                  outline
-                  color="secondary"
-                  icon="content_copy"
-                  @click="cloneLibrary">
-                  <q-tooltip class="bg-white text-primary">{{
-                      $t('components.settings.library.cloneLibrary')
-                    }}
+                <q-btn round outline color="secondary" icon="content_copy" @click="cloneLibrary">
+                  <q-tooltip class="bg-white text-primary"
+                    >{{ $t('components.settings.library.cloneLibrary') }}
                   </q-tooltip>
                 </q-btn>
-                <q-btn
-                  v-if="locked"
-                  round
-                  outline
-                  color="negative"
-                  icon="lock"
-                  @click="locked = false">
-                  <q-tooltip class="bg-white text-primary">{{
-                      $t('components.settings.library.locked')
-                    }}
-                  </q-tooltip>
+                <q-btn v-if="locked" round outline color="negative" icon="lock" @click="locked = false">
+                  <q-tooltip class="bg-white text-primary">{{ $t('components.settings.library.locked') }} </q-tooltip>
                 </q-btn>
-                <q-btn
-                  v-else
-                  round
-                  outline
-                  color="secondary"
-                  icon="lock_open"
-                  @click="locked = true">
-                  <q-tooltip class="bg-white text-primary">{{
-                      $t('components.settings.library.unlocked')
-                    }}
-                  </q-tooltip>
+                <q-btn v-else round outline color="secondary" icon="lock_open" @click="locked = true">
+                  <q-tooltip class="bg-white text-primary">{{ $t('components.settings.library.unlocked') }} </q-tooltip>
                 </q-btn>
               </div>
             </div>
 
             <div class="q-pb-sm">
-              <q-skeleton
-                v-if="name === null"
-                type="QInput"/>
+              <q-skeleton v-if="name === null" type="QInput" />
               <q-input
                 v-if="name !== null"
                 outlined
                 color="primary"
                 v-model="name"
                 :label="$t('components.settings.library.name')"
-                :placeholder="name">
+                :placeholder="name"
+              >
               </q-input>
             </div>
 
-            <div
-              v-if="enableReceiveRemoteFilesOnly !== true"
-              class="q-pb-sm">
-              <q-skeleton
-                v-if="path === null"
-                type="QInput"/>
+            <div v-if="enableReceiveRemoteFilesOnly !== true" class="q-pb-sm">
+              <q-skeleton v-if="path === null" type="QInput" />
               <q-input
                 v-else
                 readonly
@@ -123,104 +80,91 @@
                 label-slot
                 :placeholder="path"
                 :disable="enableReceiveRemoteFilesOnly === true"
-                @click="updateLibraryWithDirectoryBrowser">
-                <template v-slot:label>
+                @click="updateLibraryWithDirectoryBrowser"
+              >
+                <template #label>
                   <div class="row items-center all-pointer-events">
                     {{ $t('components.settings.library.path') }}
                   </div>
                 </template>
-                <template v-slot:append>
-                  <q-icon
-                    @click="updateLibraryWithDirectoryBrowser"
-                    class="cursor-pointer"
-                    name="folder_open"/>
+                <template #append>
+                  <q-icon @click="updateLibraryWithDirectoryBrowser" class="cursor-pointer" name="folder_open" />
                 </template>
               </q-input>
               <q-tooltip
                 v-if="enableReceiveRemoteFilesOnly === true"
                 class="bg-white text-primary"
                 anchor="bottom left"
-                self="bottom left">
+                self="bottom left"
+              >
                 {{ $t('components.settings.library.pathDisabledReceiveRemoteFilesOnly') }}
               </q-tooltip>
             </div>
 
             <div class="q-pb-sm">
-              <q-skeleton
-                v-if="enableReceiveRemoteFilesOnly === null"
-                type="QToggle"/>
-              <q-item
-                v-else
-                tag="label"
-                class="border-hover"
-                style="padding-left:12px">
+              <q-skeleton v-if="enableReceiveRemoteFilesOnly === null" type="QToggle" />
+              <q-item v-else tag="label" class="border-hover" style="padding-left: 12px">
                 <q-item-section>
                   <q-item-label>{{ $t('components.settings.library.enableReceiveRemoteFilesOnly') }}</q-item-label>
                 </q-item-section>
                 <q-item-section avatar>
-                  <q-toggle v-model="enableReceiveRemoteFilesOnly"/>
+                  <q-toggle v-model="enableReceiveRemoteFilesOnly" />
                 </q-item-section>
               </q-item>
             </div>
-            <div
-              v-if="enableReceiveRemoteFilesOnly !== true"
-              class="q-pb-sm">
-              <q-skeleton
-                v-if="enableScanner === null"
-                type="QToggle"/>
+            <div v-if="enableReceiveRemoteFilesOnly !== true" class="q-pb-sm">
+              <q-skeleton v-if="enableScanner === null" type="QToggle" />
               <q-item
                 v-else
                 tag="label"
                 class="border-hover"
-                style="padding-left:12px"
-                :disable="enableReceiveRemoteFilesOnly === true">
+                style="padding-left: 12px"
+                :disable="enableReceiveRemoteFilesOnly === true"
+              >
                 <q-item-section>
                   <q-item-label>{{ $t('components.settings.library.enableScanner') }}</q-item-label>
                 </q-item-section>
                 <q-item-section avatar>
-                  <q-toggle v-model="enableScanner" :disable="enableReceiveRemoteFilesOnly === true"/>
+                  <q-toggle v-model="enableScanner" :disable="enableReceiveRemoteFilesOnly === true" />
                 </q-item-section>
               </q-item>
               <q-tooltip
                 v-if="enableReceiveRemoteFilesOnly === true"
                 class="bg-white text-primary"
                 anchor="bottom left"
-                self="bottom left">
+                self="bottom left"
+              >
                 {{ $t('components.settings.library.pathDisabledReceiveRemoteFilesOnly') }}
               </q-tooltip>
             </div>
-            <div
-              v-if="enableReceiveRemoteFilesOnly !== true"
-              class="q-pb-sm">
-              <q-skeleton
-                v-if="enableInotify === null"
-                type="QToggle"/>
+            <div v-if="enableReceiveRemoteFilesOnly !== true" class="q-pb-sm">
+              <q-skeleton v-if="enableInotify === null" type="QToggle" />
               <q-item
                 v-else
                 tag="label"
                 class="border-hover"
-                style="padding-left:12px"
-                :disable="enableReceiveRemoteFilesOnly === true">
+                style="padding-left: 12px"
+                :disable="enableReceiveRemoteFilesOnly === true"
+              >
                 <q-item-section>
                   <q-item-label>{{ $t('components.settings.library.enableInotify') }}</q-item-label>
                 </q-item-section>
                 <q-item-section avatar>
-                  <q-toggle v-model="enableInotify" :disable="enableReceiveRemoteFilesOnly === true"/>
+                  <q-toggle v-model="enableInotify" :disable="enableReceiveRemoteFilesOnly === true" />
                 </q-item-section>
               </q-item>
               <q-tooltip
                 v-if="enableReceiveRemoteFilesOnly === true"
                 class="bg-white text-primary"
                 anchor="bottom left"
-                self="bottom left">
+                self="bottom left"
+              >
                 {{ $t('components.settings.library.pathDisabledReceiveRemoteFilesOnly') }}
               </q-tooltip>
             </div>
 
             <div class="q-pb-sm">
-              <q-skeleton
-                v-if="priorityScore === null"
-                type="QInput"/>
+              <q-skeleton v-if="priorityScore === null" type="QInput" />
               <q-input
                 v-if="priorityScore !== null"
                 outlined
@@ -232,9 +176,7 @@
             </div>
 
             <div class="q-pb-sm">
-              <q-skeleton
-                v-if="tags === null"
-                type="QInput"/>
+              <q-skeleton v-if="tags === null" type="QInput" />
               <q-select
                 filled
                 use-input
@@ -249,7 +191,7 @@
             </div>
           </q-card-section>
 
-          <q-separator/>
+          <q-separator />
 
           <!-- Codec Filter Section -->
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
@@ -281,14 +223,14 @@
             </div>
           </q-card-section>
 
-          <q-separator/>
+          <q-separator />
 
           <!-- Size Guardrails Section -->
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
             <div class="text-h6 q-mb-sm">{{ $t('flow.sizeGuardrails') }}</div>
             <div class="text-caption text-grey q-mb-md">{{ $t('flow.sizeGuardrailsHelp') }}</div>
 
-            <q-item tag="label" class="border-hover" style="padding-left:12px">
+            <q-item tag="label" class="border-hover" style="padding-left: 12px">
               <q-item-section>
                 <q-item-label>{{ $t('flow.sizeGuardrails') }}</q-item-label>
               </q-item-section>
@@ -325,7 +267,7 @@
             </div>
           </q-card-section>
 
-          <q-separator/>
+          <q-separator />
 
           <!-- Replacement Policy Section -->
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
@@ -341,7 +283,7 @@
             />
           </q-card-section>
 
-          <q-separator/>
+          <q-separator />
 
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
             <div class="row items-center no-wrap q-mb-md">
@@ -353,20 +295,13 @@
             </div>
 
             <div class="q-gutter-sm">
-              <q-skeleton
-                v-if="enabledPlugins === null"
-                type="text"/>
+              <q-skeleton v-if="enabledPlugins === null" type="text" />
 
-              <q-list
-                bordered
-                separator
-                class="rounded-borders">
-                <div
-                  v-for="(plugin, index) in enabledPlugins"
-                  v-bind:key="index">
+              <q-list bordered separator class="rounded-borders">
+                <div v-for="(plugin, index) in enabledPlugins" :key="index">
                   <q-item>
                     <q-item-section avatar>
-                      <q-img :src="plugin.icon"/>
+                      <q-img :src="plugin.icon" />
                     </q-item-section>
 
                     <q-item-section>
@@ -374,7 +309,7 @@
                       <q-item-label caption lines="2">{{ plugin.description }}</q-item-label>
                     </q-item-section>
 
-                    <q-separator inset vertical class="q-mx-sm"/>
+                    <q-separator inset vertical class="q-mx-sm" />
 
                     <q-item-section center side>
                       <div class="text-grey-8 q-gutter-xs">
@@ -398,7 +333,7 @@
               </q-list>
 
               <q-bar class="bg-transparent q-mb-sm">
-                <q-space/>
+                <q-space />
                 <CompressoListAddButton
                   :tooltip="$t('components.settings.library.addPluginToThisLibrary')"
                   @click="selectPluginFromList"
@@ -410,7 +345,7 @@
               {{ $t('components.settings.library.pluginFlow') }}
             </div>
 
-            <LibraryConfigurePluginFlowList :libraryId="libraryId" :key="componentKey"/>
+            <LibraryConfigurePluginFlowList :library-id="libraryId" :key="componentKey" />
           </q-card-section>
         </q-card>
       </div>
@@ -418,15 +353,15 @@
 
     <SelectDirectoryDialog
       ref="selectDirectoryDialogRef"
-      :initialPath="selectDirectoryInitialPath"
-      :listType="selectDirectoryListType"
+      :initial-path="selectDirectoryInitialPath"
+      :list-type="selectDirectoryListType"
       @selected="onDirectorySelected"
     />
 
     <PluginSelectorDialog
       ref="pluginSelectorDialogRef"
       :title="$t('headers.selectPlugin')"
-      :hidePlugins="pluginSelectorHidePlugins"
+      :hide-plugins="pluginSelectorHidePlugins"
       @selected="onPluginSelected"
     />
   </CompressoDialogMenu>
@@ -446,8 +381,8 @@ import LibraryConfigurePluginFlowList from 'components/settings/library/partials
 import FlowSummaryBar from 'components/settings/library/partials/FlowSummaryBar.vue'
 import JsonImportExportDialog from 'components/settings/library/JsonImportExportDialog.vue'
 import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog'
-import CompressoListActionButton from "components/ui/buttons/CompressoListActionButton.vue"
-import CompressoListAddButton from "components/ui/buttons/CompressoListAddButton.vue"
+import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
+import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
 import { createLogger } from 'src/composables/useLogger'
 
 const log = createLogger('LibraryConfig')
@@ -455,8 +390,8 @@ const log = createLogger('LibraryConfig')
 const props = defineProps({
   libraryId: {
     type: Number,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const emit = defineEmits(['ok', 'hide', 'saved'])
@@ -510,7 +445,7 @@ const saveAction = computed(() => {
       ? t('components.settings.library.saveLibraryConfig')
       : t('components.settings.common.noChangesToSave'),
     emit: 'save',
-    disabled: !hasChanges
+    disabled: !hasChanges,
   }
 })
 
@@ -532,7 +467,7 @@ const currentSnapshot = computed(() => {
   const pluginSnapshot = enabledPlugins.value.map((plugin) => ({
     plugin_id: plugin.plugin_id,
     name: plugin.name,
-    has_config: plugin.has_config
+    has_config: plugin.has_config,
   }))
   return JSON.stringify({
     locked: locked.value,
@@ -549,7 +484,7 @@ const currentSnapshot = computed(() => {
     sizeGuardrailMinPct: sizeGuardrailMinPct.value,
     sizeGuardrailMaxPct: sizeGuardrailMaxPct.value,
     replacementPolicy: replacementPolicy.value,
-    enabledPlugins: pluginSnapshot
+    enabledPlugins: pluginSnapshot,
   })
 })
 
@@ -571,7 +506,7 @@ const fetchLibraryConfig = (libraryId) => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/library/read'),
-    data: data
+    data: data,
   }).then((response) => {
     const libraryConfig = response.data.library_config
     currentID.value = libraryConfig.id
@@ -615,20 +550,20 @@ const saveLibraryConfig = async ({ hideOnSuccess = false } = {}) => {
     },
     plugins: {
       enabled_plugins: enabledPlugins.value,
-    }
+    },
   }
   try {
     await axios({
       method: 'post',
       url: getCompressoApiUrl('v2', 'settings/library/write'),
-      data: data
+      data: data,
     })
     $q.notify({
       color: 'positive',
       position: 'top',
       icon: 'cloud_done',
       message: t('notifications.saved'),
-      timeout: 200
+      timeout: 200,
     })
     componentKey.value += 1
     updateSnapshot()
@@ -643,7 +578,7 @@ const saveLibraryConfig = async ({ hideOnSuccess = false } = {}) => {
       position: 'top',
       message: t('notifications.failedToSaveSettings'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return false
   }
@@ -666,7 +601,7 @@ const onDirectorySelected = (payload) => {
 }
 
 const selectPluginFromList = () => {
-  pluginSelectorHidePlugins.value = enabledPlugins.value.map(p => p.plugin_id)
+  pluginSelectorHidePlugins.value = enabledPlugins.value.map((p) => p.plugin_id)
   if (pluginSelectorDialogRef.value) {
     pluginSelectorDialogRef.value.show()
   }
@@ -697,7 +632,7 @@ const openPluginInfo = (pluginId, tab) => {
       position: 'top',
       message: t('components.plugins.failedToOpenPluginInfo'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return
   }
@@ -705,7 +640,7 @@ const openPluginInfo = (pluginId, tab) => {
     component: PluginInfoDialog,
     componentProps: {
       pluginId: pluginId,
-      startTab: (tab === 'settings') ? 'settings' : 'info',
+      startTab: tab === 'settings' ? 'settings' : 'info',
       libraryId: currentID.value,
     },
   })
@@ -716,25 +651,27 @@ const exportPluginConfig = () => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/library/export'),
-    data: data
-  }).then((response) => {
-    $q.dialog({
-      component: JsonImportExportDialog,
-      componentProps: {
-        dialogHeader: t('components.settings.library.exportLibraryConfig'),
-        jsonData: JSON.stringify(response.data, null, 2),
-        mode: 'export',
-      }
-    })
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('notifications.failedToSaveSettings'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    data: data,
   })
+    .then((response) => {
+      $q.dialog({
+        component: JsonImportExportDialog,
+        componentProps: {
+          dialogHeader: t('components.settings.library.exportLibraryConfig'),
+          jsonData: JSON.stringify(response.data, null, 2),
+          mode: 'export',
+        },
+      })
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('notifications.failedToSaveSettings'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 const importData = (importString, silent) => {
@@ -767,30 +704,32 @@ const importData = (importString, silent) => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/library/import'),
-    data: data
-  }).then(() => {
-    $q.notify({
-      color: 'positive',
-      position: 'top',
-      icon: 'cloud_done',
-      message: t('notifications.saved'),
-      timeout: 200
-    })
-    showLoading.value = false
-    Loading.hide()
-    componentKey.value += 1
-    fetchLibraryConfig(currentID.value)
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('notifications.failedToSaveSettings'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
-    showLoading.value = false
-    Loading.hide()
+    data: data,
   })
+    .then(() => {
+      $q.notify({
+        color: 'positive',
+        position: 'top',
+        icon: 'cloud_done',
+        message: t('notifications.saved'),
+        timeout: 200,
+      })
+      showLoading.value = false
+      Loading.hide()
+      componentKey.value += 1
+      fetchLibraryConfig(currentID.value)
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('notifications.failedToSaveSettings'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+      showLoading.value = false
+      Loading.hide()
+    })
 }
 
 const importPluginConfig = () => {
@@ -800,7 +739,7 @@ const importPluginConfig = () => {
       dialogHeader: t('components.settings.library.importLibraryConfig'),
       jsonData: '',
       mode: 'import',
-    }
+    },
   }).onOk((payload) => {
     if (payload.importString !== undefined && payload.importString !== null) {
       importData(payload.importString)
@@ -813,34 +752,36 @@ const cloneLibrary = () => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/library/export'),
-    data: data
-  }).then((response) => {
-    const configData = response.data
-    const randomString = (Math.random() + 1).toString(36).substring(7)
-    const newName = name.value + ' (' + t('navigation.copy') + ' - ' + randomString + ')'
-    configData.library_config = {
-      name: newName,
-      path: path.value,
-      enable_remote_only: enableReceiveRemoteFilesOnly.value,
-      enable_scanner: enableScanner.value,
-      enable_inotify: enableInotify.value,
-      priority_score: priorityScore.value,
-      tags: tags.value,
-    }
-    const importString = JSON.stringify(configData, null, 2)
-    currentID.value = 0
-    importData(importString, true)
-    currentID.value = props.libraryId
-    hide()
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('notifications.failedToSaveSettings'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    data: data,
   })
+    .then((response) => {
+      const configData = response.data
+      const randomString = (Math.random() + 1).toString(36).substring(7)
+      const newName = name.value + ' (' + t('navigation.copy') + ' - ' + randomString + ')'
+      configData.library_config = {
+        name: newName,
+        path: path.value,
+        enable_remote_only: enableReceiveRemoteFilesOnly.value,
+        enable_scanner: enableScanner.value,
+        enable_inotify: enableInotify.value,
+        priority_score: priorityScore.value,
+        tags: tags.value,
+      }
+      const importString = JSON.stringify(configData, null, 2)
+      currentID.value = 0
+      importData(importString, true)
+      currentID.value = props.libraryId
+      hide()
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('notifications.failedToSaveSettings'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 const show = () => {
@@ -875,17 +816,21 @@ const resetLibraryConfig = () => {
   originalSnapshot.value = null
 }
 
-watch(() => props.libraryId, (value) => {
-  if (!value || value <= 0) {
-    return
-  }
-  resetLibraryConfig()
-  fetchLibraryConfig(value)
-}, { immediate: true })
+watch(
+  () => props.libraryId,
+  (value) => {
+    if (!value || value <= 0) {
+      return
+    }
+    resetLibraryConfig()
+    fetchLibraryConfig(value)
+  },
+  { immediate: true },
+)
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

@@ -5,11 +5,11 @@
 </template>
 
 <script>
-import { onMounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import axios from "axios";
-import { getCompressoApiUrl } from "src/js/compressoGlobals";
-import { createLogger } from "src/composables/useLogger";
+import { onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import axios from 'axios'
+import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { createLogger } from 'src/composables/useLogger'
 
 export default {
   setup() {
@@ -24,12 +24,14 @@ export default {
     function reloadSession() {
       axios({
         method: 'post',
-        url: getCompressoApiUrl('v2', 'session/reload')
-      }).then((response) => {
-        navigateToDashboard();
-      }).catch(() => {
-        log.error("Failed to reload session.")
+        url: getCompressoApiUrl('v2', 'session/reload'),
       })
+        .then((response) => {
+          navigateToDashboard()
+        })
+        .catch(() => {
+          log.error('Failed to reload session.')
+        })
     }
 
     onMounted(() => {
@@ -41,6 +43,6 @@ export default {
     })
 
     return {}
-  }
+  },
 }
 </script>

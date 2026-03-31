@@ -1,36 +1,33 @@
 <template>
-  <CompressoDialogWindow
-    ref="dialogRef"
-    :title="t('headers.pluginInstaller')"
-    width="2000px"
-    @hide="onDialogHide"
-  >
+  <CompressoDialogWindow ref="dialogRef" :title="t('headers.pluginInstaller')" width="2000px" @hide="onDialogHide">
     <div class="plugin-installer-dialog">
       <div class="plugin-table-actions-bar q-pa-sm">
         <div class="row q-col-gutter-sm items-center">
           <div class="col-12 col-md-auto text-right">
-            <PluginInstallerManageRepos v-on:repoReloaded="reloadPluginsPostRepoReloaded"/>
+            <PluginInstallerManageRepos @repo-reloaded="reloadPluginsPostRepoReloaded" />
           </div>
 
-          <q-space v-if="$q.screen.gt.sm"/>
+          <q-space v-if="$q.screen.gt.sm" />
 
           <div class="col-12 col-md-auto">
             <q-input
-              outlined dense
+              outlined
+              dense
               color="secondary"
               class="shadow-1 full-width"
               debounce="300"
               v-model="filter"
               :placeholder="t('navigation.search')"
             >
-              <template v-slot:append>
-                <q-icon name="search"/>
+              <template #append>
+                <q-icon name="search" />
               </template>
             </q-input>
           </div>
           <div class="col-12 col-md-auto">
             <q-select
-              outlined dense
+              outlined
+              dense
               color="secondary"
               class="shadow-1 full-width"
               @update:model-value="loadInstallablePlugins"
@@ -39,8 +36,8 @@
               :options="tags"
               :style="$q.screen.gt.sm ? 'min-width: 300px' : ''"
             >
-              <template v-slot:append>
-                <q-icon name="style"/>
+              <template #append>
+                <q-icon name="style" />
               </template>
             </q-select>
           </div>
@@ -60,15 +57,15 @@
           hide-pagination
           class="plugin-table"
         >
-          <template v-slot:no-data>
+          <template #no-data>
             <div class="full-width row flex-center text-accent q-gutter-sm">
-              <q-icon size="2em" name="sentiment_dissatisfied"/>
+              <q-icon size="2em" name="sentiment_dissatisfied" />
               <q-item-label>{{ t('headers.listEmpty') }}</q-item-label>
-              <q-icon size="2em" name="priority_high"/>
+              <q-icon size="2em" name="priority_high" />
             </div>
           </template>
 
-          <template v-slot:item="props">
+          <template #item="props">
             <div class="q-pa-xs col-xs-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
               <q-card class="plugin-card nested-card">
                 <q-card-section class="plugin-card-header">
@@ -79,17 +76,17 @@
                   </div>
                 </q-card-section>
 
-                <q-separator v-if="props.row.update_available" color="warning"/>
-                <q-separator v-else-if="props.row.installed" color="positive"/>
-                <q-separator v-else/>
+                <q-separator v-if="props.row.update_available" color="warning" />
+                <q-separator v-else-if="props.row.installed" color="positive" />
+                <q-separator v-else />
 
                 <q-card-section class="plugin-card-body">
                   <div class="row q-col-gutter-md no-wrap">
                     <div class="col-auto">
-                      <q-skeleton v-if="!props.row.icon" class="plugin-card-icon"/>
+                      <q-skeleton v-if="!props.row.icon" class="plugin-card-icon" />
                       <q-avatar v-else rounded class="bg-transparent plugin-card-icon">
                         <q-img :src="props.row.icon" fit="contain" class="plugin-card-icon">
-                          <template v-slot:error>
+                          <template #error>
                             <div class="absolute-full flex flex-center bg-negative text-white text-caption text-center">
                               {{ t('status.cannotLoadImage') }}
                             </div>
@@ -201,7 +198,7 @@
                 </q-card-section>
 
                 <q-inner-loading :showing="pluginInstalling[props.row.repo_id + props.row.plugin_id]">
-                  <q-spinner size="100px" color="secondary"/>
+                  <q-spinner size="100px" color="secondary" />
                 </q-inner-loading>
               </q-card>
             </div>
@@ -212,9 +209,9 @@
 
     <PluginInfoDialog
       ref="pluginInfoDialogRef"
-      :pluginId="selectedPluginId"
-      :startTab="pluginInfoTab"
-      :viewingRemoteInfo="true"
+      :plugin-id="selectedPluginId"
+      :start-tab="pluginInfoTab"
+      :viewing-remote-info="true"
     />
   </CompressoDialogWindow>
 </template>
@@ -247,20 +244,20 @@ const filter = ref('')
 const rows = ref([])
 const pagination = ref({
   page: 1,
-  rowsPerPage: 0
+  rowsPerPage: 0,
 })
 const tags = ref([])
 const tagFilter = ref(t('status.all'))
 const pluginInstalling = ref({})
 
-const columns = computed(() => ([
+const columns = computed(() => [
   {
     name: 'icon',
     required: true,
     label: '',
     align: 'left',
     field: 'icon',
-    sortable: true
+    sortable: true,
   },
   {
     name: 'name',
@@ -268,23 +265,23 @@ const columns = computed(() => ([
     label: t('components.plugins.name'),
     align: 'left',
     field: 'name',
-    sortable: true
+    sortable: true,
   },
   {
     name: 'author',
     align: 'center',
     label: t('components.plugins.author'),
     field: 'author',
-    sortable: false
+    sortable: false,
   },
   {
     name: 'version',
     align: 'center',
     label: t('components.plugins.version'),
     field: 'version',
-    sortable: false
-  }
-]))
+    sortable: false,
+  },
+])
 
 const show = () => {
   dialogRef.value.show()
@@ -311,42 +308,44 @@ const installPlugin = (pluginId, repoId) => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'plugins/install'),
-    data: data
-  }).then(() => {
-    $q.notify({
-      color: 'positive',
-      position: 'top',
-      message: t('notifications.installed'),
-      icon: 'check_circle',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
-
-    for (let i = 0; i < rows.value.length; i++) {
-      const plugin = rows.value[i]
-      if (plugin.plugin_id === pluginId) {
-        plugin.installed = true
-        plugin.update_available = false
-      }
-    }
-
-    pluginInstalling.value[installKey] = false
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('notifications.failedToInstallPlugin'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
-
-    pluginInstalling.value[installKey] = false
+    data: data,
   })
+    .then(() => {
+      $q.notify({
+        color: 'positive',
+        position: 'top',
+        message: t('notifications.installed'),
+        icon: 'check_circle',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+
+      for (let i = 0; i < rows.value.length; i++) {
+        const plugin = rows.value[i]
+        if (plugin.plugin_id === pluginId) {
+          plugin.installed = true
+          plugin.update_available = false
+        }
+      }
+
+      pluginInstalling.value[installKey] = false
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('notifications.failedToInstallPlugin'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+
+      pluginInstalling.value[installKey] = false
+    })
 }
 
 const loadInstallablePlugins = () => {
   axios({
     method: 'get',
-    url: getCompressoApiUrl('v2', 'plugins/installable')
+    url: getCompressoApiUrl('v2', 'plugins/installable'),
   }).then((response) => {
     const allPluginsList = response.data.plugins
     const pluginList = []
@@ -412,13 +411,13 @@ const openPluginInfo = (pluginId, tab) => {
       position: 'top',
       message: t('components.plugins.failedToOpenPluginInfo'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return
   }
 
   selectedPluginId.value = pluginId
-  pluginInfoTab.value = (tab === 'settings') ? 'settings' : 'info'
+  pluginInfoTab.value = tab === 'settings' ? 'settings' : 'info'
   if (pluginInfoDialogRef.value) {
     pluginInfoDialogRef.value.show()
   }
@@ -430,7 +429,7 @@ onMounted(() => {
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

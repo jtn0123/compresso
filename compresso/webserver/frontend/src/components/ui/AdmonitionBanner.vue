@@ -22,13 +22,13 @@ const props = defineProps({
   type: {
     type: String,
     default: 'note',
-    validator: (value) => ['note', 'tip', 'warning', 'caution', 'important'].includes(value)
+    validator: (value) => ['note', 'tip', 'warning', 'caution', 'important'].includes(value),
   },
   title: {
     type: String,
     required: false,
-    default: null
-  }
+    default: null,
+  },
 })
 
 const { t } = useI18n()

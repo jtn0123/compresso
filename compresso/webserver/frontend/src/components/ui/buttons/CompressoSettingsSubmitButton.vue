@@ -1,11 +1,5 @@
 <template>
-  <q-btn
-    outline
-    color="secondary"
-    class="full-width"
-    :label="t('navigation.submit')"
-    type="submit"
-  />
+  <q-btn outline color="secondary" class="full-width" :label="t('navigation.submit')" type="submit" />
 </template>
 
 <script setup>

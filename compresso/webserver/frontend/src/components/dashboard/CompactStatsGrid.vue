@@ -2,10 +2,7 @@
   <div>
     <div class="row q-col-gutter-xs">
       <div class="col-6" v-for="stat in mainStats" :key="stat.key">
-        <div
-          class="stat-cell cursor-pointer q-pa-sm text-center"
-          @click="navigateTo(stat.link)"
-        >
+        <div class="stat-cell cursor-pointer q-pa-sm text-center" @click="navigateTo(stat.link)">
           <q-skeleton v-if="stat.loading" type="text" width="60%" class="q-mx-auto" />
           <div v-else class="text-h6 text-weight-bold">
             {{ stat.value }}
@@ -27,7 +24,11 @@
         <q-badge v-if="healthStat.healthy > 0" color="positive" :label="healthStat.healthy" />
         <q-badge v-if="healthStat.warning > 0" color="warning" text-color="dark" :label="healthStat.warning" />
         <q-badge v-if="healthStat.corrupted > 0" color="negative" :label="healthStat.corrupted" />
-        <span v-if="healthStat.healthy === 0 && healthStat.warning === 0 && healthStat.corrupted === 0" class="text-caption text-grey">-</span>
+        <span
+          v-if="healthStat.healthy === 0 && healthStat.warning === 0 && healthStat.corrupted === 0"
+          class="text-caption text-grey"
+          >-</span
+        >
       </div>
       <div class="text-caption text-grey">{{ healthStat.label }}</div>
     </div>
@@ -72,14 +73,14 @@ const loading = ref({
   compression: true,
   pending: true,
   health: true,
-  approval: true
+  approval: true,
 })
 
 const errors = ref({
   compression: false,
   pending: false,
   health: false,
-  approval: false
+  approval: false,
 })
 
 const mainStats = computed(() => [
@@ -89,7 +90,7 @@ const mainStats = computed(() => [
     value: compressionSummary.value ? formatBytes(compressionSummary.value.space_saved || 0) : '-',
     loading: loading.value.compression,
     error: errors.value.compression,
-    link: '/ui/compression'
+    link: '/ui/compression',
   },
   {
     key: 'filesProcessed',
@@ -97,7 +98,7 @@ const mainStats = computed(() => [
     value: compressionSummary.value ? String(compressionSummary.value.file_count || 0) : '-',
     loading: loading.value.compression,
     error: errors.value.compression,
-    link: '/ui/compression'
+    link: '/ui/compression',
   },
   {
     key: 'avgRatio',
@@ -105,7 +106,7 @@ const mainStats = computed(() => [
     value: compressionSummary.value ? (compressionSummary.value.avg_ratio || 0).toFixed(1) + '%' : '-',
     loading: loading.value.compression,
     error: errors.value.compression,
-    link: '/ui/compression'
+    link: '/ui/compression',
   },
   {
     key: 'queueDepth',
@@ -113,8 +114,8 @@ const mainStats = computed(() => [
     value: pendingEstimate.value ? String(pendingEstimate.value.pending_count || 0) : '-',
     loading: loading.value.pending,
     error: errors.value.pending,
-    link: '/ui/dashboard'
-  }
+    link: '/ui/dashboard',
+  },
 ])
 
 const healthStat = computed(() => ({
@@ -123,13 +124,13 @@ const healthStat = computed(() => ({
   warning: healthSummary.value?.warning || 0,
   corrupted: healthSummary.value?.corrupted || 0,
   loading: loading.value.health,
-  error: errors.value.health
+  error: errors.value.health,
 }))
 
 const approvalStat = computed(() => ({
   label: $t('dashboardStats.pendingApprovals'),
   value: approvalCount.value !== null ? String(approvalCount.value) : '-',
-  loading: loading.value.approval
+  loading: loading.value.approval,
 }))
 
 function navigateTo(path) {
@@ -138,18 +139,51 @@ function navigateTo(path) {
 
 async function fetchAll() {
   const requests = [
-    axios.get(getCompressoApiUrl('v2', 'compression/summary'))
-      .then(r => { compressionSummary.value = r.data; loading.value.compression = false; errors.value.compression = false })
-      .catch(() => { loading.value.compression = false; errors.value.compression = true }),
-    axios.get(getCompressoApiUrl('v2', 'compression/pending-estimate'))
-      .then(r => { pendingEstimate.value = r.data; loading.value.pending = false; errors.value.pending = false })
-      .catch(() => { loading.value.pending = false; errors.value.pending = true }),
-    axios.get(getCompressoApiUrl('v2', 'healthcheck/summary'))
-      .then(r => { healthSummary.value = r.data; loading.value.health = false; errors.value.health = false })
-      .catch(() => { loading.value.health = false; errors.value.health = true }),
-    axios.get(getCompressoApiUrl('v2', 'approval/count'))
-      .then(r => { approvalCount.value = r.data.count ?? 0; loading.value.approval = false; errors.value.approval = false })
-      .catch(() => { approvalCount.value = 0; loading.value.approval = false; errors.value.approval = true })
+    axios
+      .get(getCompressoApiUrl('v2', 'compression/summary'))
+      .then((r) => {
+        compressionSummary.value = r.data
+        loading.value.compression = false
+        errors.value.compression = false
+      })
+      .catch(() => {
+        loading.value.compression = false
+        errors.value.compression = true
+      }),
+    axios
+      .get(getCompressoApiUrl('v2', 'compression/pending-estimate'))
+      .then((r) => {
+        pendingEstimate.value = r.data
+        loading.value.pending = false
+        errors.value.pending = false
+      })
+      .catch(() => {
+        loading.value.pending = false
+        errors.value.pending = true
+      }),
+    axios
+      .get(getCompressoApiUrl('v2', 'healthcheck/summary'))
+      .then((r) => {
+        healthSummary.value = r.data
+        loading.value.health = false
+        errors.value.health = false
+      })
+      .catch(() => {
+        loading.value.health = false
+        errors.value.health = true
+      }),
+    axios
+      .get(getCompressoApiUrl('v2', 'approval/count'))
+      .then((r) => {
+        approvalCount.value = r.data.count ?? 0
+        loading.value.approval = false
+        errors.value.approval = false
+      })
+      .catch(() => {
+        approvalCount.value = 0
+        loading.value.approval = false
+        errors.value.approval = true
+      }),
   ]
   await Promise.allSettled(requests)
   lastUpdated.value = Date.now()
@@ -170,7 +204,9 @@ onUnmounted(() => {
 <style scoped>
 .stat-cell {
   border-radius: 4px;
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
 }
 .stat-cell:hover {
   background-color: rgba(var(--q-primary-rgb, 25, 118, 210), 0.08);

@@ -30,14 +30,14 @@
           <div class="trial-welcome-section-title text-primary">
             {{ $t('components.docs.trialWelcome.centralTitle') }}
           </div>
-          <p class="text-body2 q-mt-xs">
+          <div class="text-body2 q-mt-xs">
             {{ $t('components.docs.trialWelcome.centralBody') }}
             <ul class="trial-welcome-list">
-                <li>{{ $t('components.docs.trialWelcome.centralPoints.logs') }}</li>
-                <li>{{ $t('components.docs.trialWelcome.centralPoints.grafana') }}</li>
-                <li>{{ $t('components.docs.trialWelcome.centralPoints.dashboards') }}</li>
+              <li>{{ $t('components.docs.trialWelcome.centralPoints.logs') }}</li>
+              <li>{{ $t('components.docs.trialWelcome.centralPoints.grafana') }}</li>
+              <li>{{ $t('components.docs.trialWelcome.centralPoints.dashboards') }}</li>
             </ul>
-          </p>
+          </div>
           <CompressoStandardButton
             class="q-mt-sm"
             :label="$t('components.docs.trialWelcome.centralLinkLabel')"
@@ -126,13 +126,13 @@ const onDialogHide = () => {
   // Mark as viewed in settings
   const data = {
     settings: {
-      trial_welcome_viewed: true
-    }
+      trial_welcome_viewed: true,
+    },
   }
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/write'),
-    data: data
+    data: data,
   }).catch((error) => {
     log.error('Failed to save trial_welcome_viewed setting: ' + error)
   })
@@ -159,7 +159,6 @@ const checkAndShow = async () => {
 
     // 3. Show Dialog
     show()
-
   } catch (error) {
     log.error('Error checking trial welcome eligibility: ' + error)
   }
@@ -171,7 +170,7 @@ onMounted(() => {
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

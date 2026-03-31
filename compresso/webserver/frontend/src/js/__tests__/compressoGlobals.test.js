@@ -23,10 +23,15 @@ vi.mock('src/js/compressoTheme', () => ({
   applyTheme: (...args) => mockApplyTheme(...args),
 }))
 
-
 import axios from 'axios'
 import { Notify } from 'quasar'
-import compressoGlobals, { notificationsCount, toastSettings, showEventToast, saveToastSettings, setTheme } from '../compressoGlobals'
+import compressoGlobals, {
+  notificationsCount,
+  toastSettings,
+  showEventToast,
+  saveToastSettings,
+  setTheme,
+} from '../compressoGlobals'
 
 describe('notificationsCount', () => {
   beforeEach(() => {
@@ -157,10 +162,10 @@ describe('saveToastSettings', () => {
     toastSettings.verbosity = 'important'
     saveToastSettings()
 
-    expect(mockLocalStorageSet).toHaveBeenCalledWith(
-      'compresso-toast-settings',
-      { enabled: false, verbosity: 'important' }
-    )
+    expect(mockLocalStorageSet).toHaveBeenCalledWith('compresso-toast-settings', {
+      enabled: false,
+      verbosity: 'important',
+    })
   })
 })
 

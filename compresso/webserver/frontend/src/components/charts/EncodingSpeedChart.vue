@@ -17,10 +17,10 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useQuasar } from 'quasar';
-import { useChartTheme } from 'src/composables/useChartTheme';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useQuasar } from 'quasar'
+import { useChartTheme } from 'src/composables/useChartTheme'
 
 export default {
   name: 'EncodingSpeedChart',
@@ -29,40 +29,61 @@ export default {
     loading: { type: Boolean, default: false },
   },
   setup(props) {
-    const { t } = useI18n();
-    const $q = useQuasar();
-    const { getChartColor, chartBgColor } = useChartTheme();
-    const chartRef = ref(null);
-    let chart = null;
+    const { t } = useI18n()
+    const $q = useQuasar()
+    const { getChartColor, chartBgColor } = useChartTheme()
+    const chartRef = ref(null)
+    let chart = null
 
     async function renderChart() {
-      const { Chart, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, BarController, BarElement } = await import('chart.js');
-      Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, BarController, BarElement);
+      const {
+        Chart,
+        LineController,
+        LineElement,
+        PointElement,
+        CategoryScale,
+        LinearScale,
+        Tooltip,
+        Legend,
+        BarController,
+        BarElement,
+      } = await import('chart.js')
+      Chart.register(
+        LineController,
+        LineElement,
+        PointElement,
+        CategoryScale,
+        LinearScale,
+        Tooltip,
+        Legend,
+        BarController,
+        BarElement,
+      )
 
-      await nextTick();
+      await nextTick()
 
-      if (chart) chart.destroy();
+      if (chart) chart.destroy()
 
       if (chartRef.value && props.data.length > 0) {
-        const isDark = $q.dark.isActive;
-        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-        const labelColor = isDark ? '#ccc' : '#666';
-        const titleColor = isDark ? '#eee' : '#333';
+        const isDark = $q.dark.isActive
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+        const labelColor = isDark ? '#ccc' : '#666'
+        const titleColor = isDark ? '#eee' : '#333'
 
         // Group by date, averaging across codecs
-        const dateMap = {};
+        const dateMap = {}
         for (const d of props.data) {
           if (!dateMap[d.date]) {
-            dateMap[d.date] = { fps_sum: 0, speed_sum: 0, count: 0 };
+            dateMap[d.date] = { fps_sum: 0, speed_sum: 0, count: 0 }
           }
-          dateMap[d.date].fps_sum += d.avg_fps * d.count;
-          dateMap[d.date].speed_sum += d.avg_speed_ratio * d.count;
-          dateMap[d.date].count += d.count;
+          dateMap[d.date].fps_sum += d.avg_fps * d.count
+          dateMap[d.date].speed_sum += d.avg_speed_ratio * d.count
+          dateMap[d.date].count += d.count
         }
 
-        const dates = Object.keys(dateMap).sort();
-        const fpsData = dates.map(d => dateMap[d].count > 0 ? dateMap[d].fps_sum / dateMap[d].count : 0);
-        const speedData = dates.map(d => dateMap[d].count > 0 ? dateMap[d].speed_sum / dateMap[d].count : 0);
+        const dates = Object.keys(dateMap).sort()
+        const fpsData = dates.map((d) => (dateMap[d].count > 0 ? dateMap[d].fps_sum / dateMap[d].count : 0))
+        const speedData = dates.map((d) => (dateMap[d].count > 0 ? dateMap[d].speed_sum / dateMap[d].count : 0))
 
         chart = new Chart(chartRef.value, {
           type: 'line',
@@ -98,8 +119,8 @@ export default {
               tooltip: {
                 callbacks: {
                   label: (ctx) => {
-                    if (ctx.datasetIndex === 0) return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + ' fps';
-                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + 'x';
+                    if (ctx.datasetIndex === 0) return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + ' fps'
+                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + 'x'
                   },
                 },
               },
@@ -130,25 +151,28 @@ export default {
               },
             },
           },
-        });
+        })
       }
     }
 
-    watch(() => props.data, renderChart, { deep: true });
-    watch(() => props.loading, (val) => {
-      if (!val) renderChart();
-    });
-    watch(() => $q.dark.isActive, renderChart);
+    watch(() => props.data, renderChart, { deep: true })
+    watch(
+      () => props.loading,
+      (val) => {
+        if (!val) renderChart()
+      },
+    )
+    watch(() => $q.dark.isActive, renderChart)
 
     onMounted(() => {
-      if (!props.loading && props.data.length > 0) renderChart();
-    });
+      if (!props.loading && props.data.length > 0) renderChart()
+    })
 
     onBeforeUnmount(() => {
-      if (chart) chart.destroy();
-    });
+      if (chart) chart.destroy()
+    })
 
-    return { chartRef };
+    return { chartRef }
   },
-};
+}
 </script>

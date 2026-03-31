@@ -33,7 +33,11 @@ describe('bbCodeToHTML', () => {
     // xbbcode-parser wraps output in a div container even for empty input
     expect(result).not.toContain('xbbcode-')
     // Strip wrapper tags and verify no text content remains
-    const textContent = result.split('>').map(s => s.split('<')[0]).join('').trim()
+    const textContent = result
+      .split('>')
+      .map((s) => s.split('<')[0])
+      .join('')
+      .trim()
     expect(textContent).toBe('')
   })
 

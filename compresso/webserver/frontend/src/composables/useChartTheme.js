@@ -13,7 +13,9 @@ export function useChartTheme() {
    */
   function chartBgColor(index, alpha = 0.1) {
     const hex = getChartColor(index)
-    const alphaHex = Math.round(alpha * 255).toString(16).padStart(2, '0')
+    const alphaHex = Math.round(alpha * 255)
+      .toString(16)
+      .padStart(2, '0')
     return hex + alphaHex
   }
 
