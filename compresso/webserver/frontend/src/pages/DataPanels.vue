@@ -1,7 +1,7 @@
 <template>
   <q-page>
     <div class="iframe-container">
-      <iframe v-if="iframeSrc !== null" id="data-panel-iframe" :src="iframeSrc">
+      <iframe v-if="iframeSrc !== null" id="data-panel-iframe" :src="iframeSrc" title="Plugin data panel">
         Your browser is not supported. Sorry.
       </iframe>
 
