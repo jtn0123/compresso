@@ -12,6 +12,16 @@ RUN \
         && WHEEL_PATH="$(ls -1 /src/*.whl | sort | tail -n 1)" \
         && echo "Installing ${WHEEL_PATH}" \
         && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir "${WHEEL_PATH}" \
+    && \
+    echo "**** Patch picomatch CVE-2026-33671 in bundled npm ****" \
+        && PICO_DIR="/usr/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch" \
+        && if [ -d "$PICO_DIR" ]; then \
+            cd "$PICO_DIR" \
+            && npm pack picomatch@4.0.4 2>/dev/null \
+            && tar -xzf picomatch-*.tgz --strip-components=1 \
+            && rm -f picomatch-*.tgz \
+            && cd /; \
+        fi \
         && \
         echo "**** Make default paths for compresso library ****" \
             && mkdir -p /library

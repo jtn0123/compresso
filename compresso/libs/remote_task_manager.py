@@ -297,8 +297,9 @@ class RemoteTaskManager(threading.Thread):
                 self.__write_failure_to_worker_log()
                 return False
 
-            # Set the remote task ID
-            remote_task_id = info.get("id")
+            # Set the remote task ID (only when info is valid, i.e. we did not fall back to send_file)
+            if not send_file:
+                remote_task_id = info.get("id")
 
         if send_file:
             initial_checksum = None
