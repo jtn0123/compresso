@@ -1,16 +1,14 @@
 <template>
-  <CompressoDialogWindow
-    ref="dialogRef"
-    :title="t('headers.pendingTasks')"
-    @hide="onDialogHide"
-  >
+  <CompressoDialogWindow ref="dialogRef" :title="t('headers.pendingTasks')" @hide="onDialogHide">
     <div class="pending-tasks-dialog">
       <div class="pending-tasks-table-actions-bar q-pa-sm">
         <div class="row q-col-gutter-sm items-center pending-tasks-toolbar">
           <div v-if="showActionsToggle" class="col-12 row items-center justify-end">
             <CompressoListActionButton
               :icon="actionsExpanded ? 'expand_less' : 'expand_more'"
-              :tooltip="actionsExpanded ? t('components.pendingTasks.hideActions') : t('components.pendingTasks.showActions')"
+              :tooltip="
+                actionsExpanded ? t('components.pendingTasks.hideActions') : t('components.pendingTasks.showActions')
+              "
               @click="toggleActionsExpanded"
             />
           </div>
@@ -28,8 +26,8 @@
                     v-model="searchValue"
                     :placeholder="t('navigation.search')"
                   >
-                    <template v-slot:append>
-                      <q-icon name="search" :color="searchLabelColor"/>
+                    <template #append>
+                      <q-icon name="search" :color="searchLabelColor" />
                     </template>
                   </q-input>
                 </div>
@@ -46,7 +44,7 @@
                       />
                     </div>
 
-                    <q-space/>
+                    <q-space />
                     <div class="col-auto">
                       <CompressoStandardButtonDropdown
                         class="pending-tasks-options-button"
@@ -57,18 +55,18 @@
                           <q-item clickable v-close-popup @click="rescanLibrary">
                             <q-item-section>
                               <q-item-label>
-                                <q-icon name="search"/>
+                                <q-icon name="search" />
                                 {{ t('components.pendingTasks.rescanLibrary') }}
                               </q-item-label>
                             </q-item-section>
                           </q-item>
 
-                          <q-separator/>
+                          <q-separator />
 
                           <q-item clickable v-close-popup @click="moveToTop">
                             <q-item-section>
                               <q-item-label>
-                                <q-icon name="arrow_upward"/>
+                                <q-icon name="arrow_upward" />
                                 {{ t('components.pendingTasks.moveToTop') }}
                               </q-item-label>
                             </q-item-section>
@@ -77,18 +75,18 @@
                           <q-item clickable v-close-popup @click="moveToBottom">
                             <q-item-section>
                               <q-item-label>
-                                <q-icon name="arrow_downward"/>
+                                <q-icon name="arrow_downward" />
                                 {{ t('components.pendingTasks.moveToBottom') }}
                               </q-item-label>
                             </q-item-section>
                           </q-item>
 
-                          <q-separator/>
+                          <q-separator />
 
                           <q-item clickable v-close-popup @click="deleteSelected">
                             <q-item-section>
                               <q-item-label>
-                                <q-icon name="delete_outline"/>
+                                <q-icon name="delete_outline" />
                                 {{ t('components.pendingTasks.removeSelected') }}
                               </q-item-label>
                             </q-item-section>
@@ -102,7 +100,7 @@
                 <div v-if="activeFilterChips.length" class="col-12">
                   <div class="row items-center q-col-gutter-sm pending-tasks-filter-indicator">
                     <div class="col-auto text-secondary pending-tasks-filter-indicator__label">
-                      <q-icon name="filter_list" class="q-mr-xs"/>
+                      <q-icon name="filter_list" class="q-mr-xs" />
                       {{ t('components.pendingTasks.filtersActive') }}
                     </div>
                     <div class="col">
@@ -139,7 +137,7 @@
           </q-slide-transition>
         </div>
 
-        <q-separator class="q-mt-sm"/>
+        <q-separator class="q-mt-sm" />
       </div>
 
       <q-slide-transition>
@@ -202,14 +200,14 @@
               :columns="columns"
               class="pending-tasks-table"
             >
-              <template v-slot:body="props">
+              <template #body="props">
                 <q-tr :props="props" class="pending-task-row">
                   <q-td auto-width class="pending-task-select">
                     <div class="pending-task-cell-center">
                       <q-checkbox
                         color="secondary"
                         :model-value="isRowSelected(props.row)"
-                        @update:model-value="value => toggleRowSelection(props.row, value)"
+                        @update:model-value="(value) => toggleRowSelection(props.row, value)"
                       />
                     </div>
                   </q-td>
@@ -219,27 +217,25 @@
                       {{ props.row.name }}
                     </div>
                     <div class="text-caption">
-                      <span class="text-weight-medium">
-                        {{ t('components.pendingTasks.columns.library') }}:
-                      </span>
+                      <span class="text-weight-medium"> {{ t('components.pendingTasks.columns.library') }}: </span>
                       {{ props.row.libraryName }}
                     </div>
                   </q-td>
                 </q-tr>
               </template>
 
-              <template v-slot:no-data>
+              <template #no-data>
                 <div class="full-width row flex-center text-accent q-gutter-sm">
-                  <q-icon size="2em" name="sentiment_dissatisfied"/>
+                  <q-icon size="2em" name="sentiment_dissatisfied" />
                   <q-item-label>{{ t('headers.listEmpty') }}</q-item-label>
-                  <q-icon size="2em" name="priority_high"/>
+                  <q-icon size="2em" name="priority_high" />
                 </div>
               </template>
             </q-table>
 
-            <template v-slot:loading>
+            <template #loading>
               <div class="row flex-center q-my-md">
-                <q-spinner-dots size="32px" color="secondary"/>
+                <q-spinner-dots size="32px" color="secondary" />
               </div>
             </template>
           </q-infinite-scroll>
@@ -253,7 +249,7 @@
           </div>
 
           <q-inner-loading :showing="loading && rows.length === 0">
-            <q-spinner-dots size="42px" color="secondary"/>
+            <q-spinner-dots size="42px" color="secondary" />
           </q-inner-loading>
 
           <div v-show="showScrollTop" class="pending-tasks-scroll-top">
@@ -279,7 +275,7 @@
           </div>
         </q-card-section>
 
-        <q-separator/>
+        <q-separator />
 
         <q-card-section class="pending-tasks-dialog-body scroll q-pa-lg q-gutter-md">
           <div class="text-subtitle2 text-secondary">
@@ -376,7 +372,7 @@ const excludedIds = ref([])
 
 let reloadInterval = null
 
-const columns = computed(() => ([
+const columns = computed(() => [
   {
     name: 'select',
     label: '',
@@ -395,7 +391,7 @@ const columns = computed(() => ([
     field: 'libraryName',
     sortable: false,
   },
-]))
+])
 
 const showActionsToggle = computed(() => {
   const isNarrow = $q.screen.lt.md
@@ -405,33 +401,28 @@ const showActionsToggle = computed(() => {
 
 const filterSortActiveColor = 'warning'
 
-const searchLabelColor = computed(() => (
-  searchValue.value.trim().length > 0 ? filterSortActiveColor : 'secondary'
-))
+const searchLabelColor = computed(() => (searchValue.value.trim().length > 0 ? filterSortActiveColor : 'secondary'))
 
 const hasSearch = computed(() => searchValue.value.trim().length > 0)
 const hasFilters = computed(() => libraryFilters.value.length > 0)
 
-const filterButtonColor = computed(() => (
-  hasFilters.value ? filterSortActiveColor : 'secondary'
-))
+const filterButtonColor = computed(() => (hasFilters.value ? filterSortActiveColor : 'secondary'))
 
 const filterButtonSize = computed(() => ($q.screen.width < 450 ? 'sm' : 'md'))
 
-const libraryNameById = computed(() => (
+const libraryNameById = computed(() =>
   libraryOptions.value.reduce((acc, option) => {
     acc[option.value] = option.label
     return acc
-  }, {})
-))
+  }, {}),
+)
 
-const activeFilterChips = computed(() => (
-  libraryFilters.value
-    .map((id) => ({
-      key: `library-${id}`,
-      label: t('components.pendingTasks.filterLibraryChip', { library: libraryNameById.value[id] || id }),
-    }))
-))
+const activeFilterChips = computed(() =>
+  libraryFilters.value.map((id) => ({
+    key: `library-${id}`,
+    label: t('components.pendingTasks.filterLibraryChip', { library: libraryNameById.value[id] || id }),
+  })),
+)
 
 const showLibraryChips = computed(() => draftLibraryFilters.value.length > 0)
 
@@ -439,11 +430,8 @@ const libraryFilterDisplay = computed(() => {
   if (draftLibraryFilters.value.length === 0) {
     return t('components.pendingTasks.allLibraries')
   }
-  return draftLibraryFilters.value
-    .map((id) => libraryNameById.value[id] || id)
-    .join(', ')
+  return draftLibraryFilters.value.map((id) => libraryNameById.value[id] || id).join(', ')
 })
-
 
 const allLoaded = computed(() => {
   if (totalCount.value === 0) {
@@ -452,9 +440,7 @@ const allLoaded = computed(() => {
   return rows.value.length >= totalCount.value
 })
 
-const allPageSelected = computed(() => (
-  rows.value.length > 0 && rows.value.every((row) => isRowSelected(row))
-))
+const allPageSelected = computed(() => rows.value.length > 0 && rows.value.every((row) => isRowSelected(row)))
 
 const selectedCount = computed(() => {
   if (selectAllMatching.value) {
@@ -463,13 +449,13 @@ const selectedCount = computed(() => {
   return selectedIds.value.length
 })
 
-const showSelectAllMatchingPrompt = computed(() => (
-  !selectAllMatching.value && allPageSelected.value && totalCount.value > rows.value.length
-))
+const showSelectAllMatchingPrompt = computed(
+  () => !selectAllMatching.value && allPageSelected.value && totalCount.value > rows.value.length,
+)
 
-const selectionBannerPageText = computed(() => (
-  t('components.pendingTasks.selectionBanner.pageSelected', { count: rows.value.length })
-))
+const selectionBannerPageText = computed(() =>
+  t('components.pendingTasks.selectionBanner.pageSelected', { count: rows.value.length }),
+)
 
 const selectionBannerSelectAllLabel = computed(() => {
   if (hasSearch.value) {
@@ -512,22 +498,24 @@ const toggleActionsExpanded = () => {
 const fetchLibraryOptions = () => {
   return axios({
     method: 'get',
-    url: getCompressoApiUrl('v2', 'settings/libraries')
-  }).then((response) => {
-    const options = response.data.libraries.map((library) => ({
-      label: library.name,
-      value: library.id,
-    }))
-    libraryOptions.value = options
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('notifications.failedToFetchLibraryList'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    url: getCompressoApiUrl('v2', 'settings/libraries'),
   })
+    .then((response) => {
+      const options = response.data.libraries.map((library) => ({
+        label: library.name,
+        value: library.id,
+      }))
+      libraryOptions.value = options
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('notifications.failedToFetchLibraryList'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 const openFilterDialog = () => {
@@ -641,24 +629,26 @@ const getSelectionPayload = () => {
 const rescanLibrary = () => {
   axios({
     method: 'post',
-    url: getCompressoApiUrl('v2', 'pending/rescan')
-  }).then(() => {
-    $q.notify({
-      color: 'positive',
-      position: 'top',
-      message: t('notifications.rescanLibraryScheduled'),
-      icon: 'check_circle',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('notifications.rescanLibraryError'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    url: getCompressoApiUrl('v2', 'pending/rescan'),
   })
+    .then(() => {
+      $q.notify({
+        color: 'positive',
+        position: 'top',
+        message: t('notifications.rescanLibraryScheduled'),
+        icon: 'check_circle',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('notifications.rescanLibraryError'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 const moveToTop = () => {
@@ -668,7 +658,7 @@ const moveToTop = () => {
       position: 'top',
       message: t('components.pendingTasks.nothingSelected'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return
   }
@@ -682,7 +672,7 @@ const moveToBottom = () => {
       position: 'top',
       message: t('components.pendingTasks.nothingSelected'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return
   }
@@ -698,19 +688,21 @@ const moveTo = (position) => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'pending/reorder'),
-    data
-  }).then(() => {
-    resetSelection()
-    fetchPendingTasks({ reset: true })
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('components.pendingTasks.errorReorder'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    data,
   })
+    .then(() => {
+      resetSelection()
+      fetchPendingTasks({ reset: true })
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('components.pendingTasks.errorReorder'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 const deleteSelected = () => {
@@ -720,7 +712,7 @@ const deleteSelected = () => {
       position: 'top',
       message: t('components.pendingTasks.nothingSelected'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return
   }
@@ -729,19 +721,21 @@ const deleteSelected = () => {
   axios({
     method: 'delete',
     url: getCompressoApiUrl('v2', 'pending/tasks'),
-    data
-  }).then(() => {
-    resetSelection()
-    fetchPendingTasks({ reset: true })
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('components.pendingTasks.errorDeleteSelected'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    data,
   })
+    .then(() => {
+      resetSelection()
+      fetchPendingTasks({ reset: true })
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('components.pendingTasks.errorDeleteSelected'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 const fetchPendingTasks = ({ reset = false, silent = false, refreshTop = false } = {}) => {
@@ -769,53 +763,56 @@ const fetchPendingTasks = ({ reset = false, silent = false, refreshTop = false }
   return axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'pending/tasks'),
-    data
-  }).then((response) => {
-    totalCount.value = response.data.recordsFiltered
+    data,
+  })
+    .then((response) => {
+      totalCount.value = response.data.recordsFiltered
 
-    const returnedData = response.data.results.map((results) => ({
-      id: results.id,
-      name: results.abspath,
-      libraryName: results.library_name,
-    }))
+      const returnedData = response.data.results.map((results) => ({
+        id: results.id,
+        name: results.abspath,
+        libraryName: results.library_name,
+      }))
 
-    if (refreshTop) {
-      if (rows.value.length === 0) {
+      if (refreshTop) {
+        if (rows.value.length === 0) {
+          rows.value = returnedData
+          offset.value = rows.value.length
+        } else {
+          const updated = [...rows.value]
+          for (let i = 0; i < returnedData.length; i++) {
+            updated[i] = returnedData[i]
+          }
+          rows.value = updated
+        }
+      } else if (reset) {
         rows.value = returnedData
         offset.value = rows.value.length
       } else {
-        const updated = [...rows.value]
-        for (let i = 0; i < returnedData.length; i++) {
-          updated[i] = returnedData[i]
-        }
-        rows.value = updated
+        rows.value = [...rows.value, ...returnedData]
+        offset.value = rows.value.length
       }
-    } else if (reset) {
-      rows.value = returnedData
-      offset.value = rows.value.length
-    } else {
-      rows.value = [...rows.value, ...returnedData]
-      offset.value = rows.value.length
-    }
 
-    if (totalCount.value > 0 && rows.value.length > totalCount.value) {
-      rows.value = rows.value.slice(0, totalCount.value)
-      offset.value = rows.value.length
-    }
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: t('components.pendingTasks.errorFetchingList'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      if (totalCount.value > 0 && rows.value.length > totalCount.value) {
+        rows.value = rows.value.slice(0, totalCount.value)
+        offset.value = rows.value.length
+      }
     })
-  }).finally(() => {
-    if (!silent) {
-      loading.value = false
-    }
-    loadingMore.value = false
-  })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('components.pendingTasks.errorFetchingList'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
+    .finally(() => {
+      if (!silent) {
+        loading.value = false
+      }
+      loadingMore.value = false
+    })
 }
 
 const loadMore = (index, done) => {
@@ -868,7 +865,7 @@ onBeforeUnmount(() => {
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

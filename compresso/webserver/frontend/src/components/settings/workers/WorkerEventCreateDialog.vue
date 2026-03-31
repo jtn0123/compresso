@@ -16,18 +16,13 @@
         class="q-mb-md"
       />
 
-      <q-input
-        filled
-        v-model="scheduleTime"
-        mask="time"
-        class="q-mb-md"
-      >
-        <template v-slot:append>
+      <q-input filled v-model="scheduleTime" mask="time" class="q-mb-md">
+        <template #append>
           <q-icon name="access_time" class="cursor-pointer">
             <q-popup-proxy transition-show="scale" transition-hide="scale">
               <q-time v-model="scheduleTime">
                 <div class="row items-center justify-end">
-                  <q-btn v-close-popup :label="t('navigation.close')" color="primary" flat/>
+                  <q-btn v-close-popup :label="t('navigation.close')" color="primary" flat />
                 </div>
               </q-time>
             </q-popup-proxy>
@@ -82,7 +77,7 @@ const repetitionOptions = [
   { label: t('components.settings.workers.scheduleLabels.thursday'), value: 'thursday' },
   { label: t('components.settings.workers.scheduleLabels.friday'), value: 'friday' },
   { label: t('components.settings.workers.scheduleLabels.saturday'), value: 'saturday' },
-  { label: t('components.settings.workers.scheduleLabels.sunday'), value: 'sunday' }
+  { label: t('components.settings.workers.scheduleLabels.sunday'), value: 'sunday' },
 ]
 
 const scheduleTime = ref('00:00')
@@ -90,7 +85,7 @@ const scheduleTask = ref('')
 const scheduleTaskOptions = [
   { label: t('components.settings.workers.scheduleLabels.count'), value: 'count' },
   { label: t('components.settings.workers.scheduleLabels.pause'), value: 'pause' },
-  { label: t('components.settings.workers.scheduleLabels.resume'), value: 'resume' }
+  { label: t('components.settings.workers.scheduleLabels.resume'), value: 'resume' },
 ]
 
 const scheduleWorkerCount = ref(1)
@@ -100,8 +95,8 @@ const dialogActions = [
     label: t('components.settings.workers.addEvent'),
     icon: 'add',
     color: 'positive',
-    emit: 'add'
-  }
+    emit: 'add',
+  },
 ]
 
 const show = () => {
@@ -124,7 +119,7 @@ const addNewScheduledEvent = () => {
       position: 'top',
       message: t('notifications.invalidWorkerEvent'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return
   }
@@ -133,13 +128,13 @@ const addNewScheduledEvent = () => {
     repetition: repetition.value.value,
     scheduleTime: scheduleTime.value,
     scheduleTask: scheduleTask.value.value,
-    scheduleWorkerCount: scheduleWorkerCount.value
+    scheduleWorkerCount: scheduleWorkerCount.value,
   })
   hide()
 }
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>

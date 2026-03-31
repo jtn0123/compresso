@@ -130,9 +130,7 @@ function mockFetchEmpty() {
     }
     return Promise.resolve({ data: {} })
   })
-  axios.get.mockImplementation(() =>
-    Promise.resolve({ data: { libraries: [] } }),
-  )
+  axios.get.mockImplementation(() => Promise.resolve({ data: { libraries: [] } }))
 }
 
 async function mountTaskHistory(mockFn = mockFetchSuccess) {
@@ -211,9 +209,7 @@ describe('TaskHistory.vue', () => {
   describe('fetch on mount', () => {
     it('calls history/tasks endpoint on mount', async () => {
       await mountTaskHistory()
-      const taskCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('history/tasks'),
-      )
+      const taskCalls = axios.post.mock.calls.filter(([url]) => url.includes('history/tasks'))
       // At least 1 call for fetchTasks, plus 1 for fetchCodecs
       expect(taskCalls.length).toBeGreaterThanOrEqual(1)
     })
@@ -394,9 +390,7 @@ describe('TaskHistory.vue', () => {
       await wrapper.vm.confirmReprocess()
       await flushPromises()
 
-      const reprocessCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('history/reprocess'),
-      )
+      const reprocessCalls = axios.post.mock.calls.filter(([url]) => url.includes('history/reprocess'))
       expect(reprocessCalls.length).toBe(1)
       expect(reprocessCalls[0][1]).toEqual({
         selection_mode: 'explicit',
@@ -478,9 +472,7 @@ describe('TaskHistory.vue', () => {
       expect(wrapper.vm.pagination.page).toBe(2)
       expect(wrapper.vm.pagination.rowsPerPage).toBe(25)
 
-      const taskCalls = axios.post.mock.calls.filter(
-        ([url]) => url.includes('history/tasks'),
-      )
+      const taskCalls = axios.post.mock.calls.filter(([url]) => url.includes('history/tasks'))
       expect(taskCalls.length).toBeGreaterThanOrEqual(1)
     })
 

@@ -1,11 +1,7 @@
 <template>
   <q-page class="q-pa-md">
-
     <!-- Header -->
-    <PageHeader
-      :title="$t('pages.approvalQueue.title')"
-      :subtitle="$t('pages.approvalQueue.caption')"
-    >
+    <PageHeader :title="$t('pages.approvalQueue.title')" :subtitle="$t('pages.approvalQueue.caption')">
       <template #actions>
         <q-btn
           color="positive"
@@ -13,17 +9,16 @@
           :label="$t('pages.approvalQueue.approveSelected')"
           :disable="selectedIds.length === 0"
           :loading="approving"
-          @click="approveSelected"/>
+          @click="approveSelected"
+        />
         <q-btn
           color="negative"
           icon="cancel"
           :label="$t('pages.approvalQueue.rejectSelected')"
           :disable="selectedIds.length === 0"
-          @click="showRejectDialog = true"/>
-        <q-btn
-          flat
-          icon="refresh"
-          @click="fetchTasks"/>
+          @click="showRejectDialog = true"
+        />
+        <q-btn flat icon="refresh" @click="fetchTasks" />
       </template>
     </PageHeader>
 
@@ -34,8 +29,8 @@
     <!-- New items banner -->
     <q-banner v-if="newItemCount > 0" class="bg-info text-white q-mb-md" rounded dense>
       {{ $t('pages.approvalQueue.newItemsArrived', { count: newItemCount }) }}
-      <template v-slot:action>
-        <q-btn flat :label="$t('pages.approvalQueue.refresh')" @click="acknowledgeNewItems"/>
+      <template #action>
+        <q-btn flat :label="$t('pages.approvalQueue.refresh')" @click="acknowledgeNewItems" />
       </template>
     </q-banner>
 
@@ -60,7 +55,9 @@
               <q-skeleton v-if="loading && tasks.length === 0" type="text" width="60px" />
               <template v-else>{{ formatSize(totalSpaceSaved) }}</template>
             </div>
-            <div class="stat-sublabel" v-if="!loading || tasks.length > 0">{{ $t('pages.approvalQueue.ifAllApproved') }}</div>
+            <div class="stat-sublabel" v-if="!loading || tasks.length > 0">
+              {{ $t('pages.approvalQueue.ifAllApproved') }}
+            </div>
           </q-card-section>
         </q-card>
       </div>
@@ -103,28 +100,44 @@
     <div class="row q-col-gutter-sm q-mb-md items-center">
       <div class="col-12 col-sm-6 col-md-4">
         <q-input
-          outlined dense
+          outlined
+          dense
           debounce="300"
           v-model="searchValue"
           :placeholder="$t('navigation.search')"
           clearable
           @update:model-value="onSearchChange"
         >
-          <template v-slot:append>
-            <q-icon name="search"/>
+          <template #append>
+            <q-icon name="search" />
           </template>
         </q-input>
       </div>
       <div class="col-auto">
-        <q-btn-dropdown flat icon="filter_list" :color="hasActiveFilters ? 'primary' : undefined" :label="$t('pages.approvalQueue.filters')">
+        <q-btn-dropdown
+          flat
+          icon="filter_list"
+          :color="hasActiveFilters ? 'primary' : undefined"
+          :label="$t('pages.approvalQueue.filters')"
+        >
           <q-list style="min-width: 250px">
             <q-item-label header>{{ $t('pages.approvalQueue.codecFilter') }}</q-item-label>
             <q-item>
-              <q-select outlined dense v-model="filterCodec" :options="codecOptions" clearable :label="$t('pages.approvalQueue.codecFilter')" emit-value map-options style="width: 100%"/>
+              <q-select
+                outlined
+                dense
+                v-model="filterCodec"
+                :options="codecOptions"
+                clearable
+                :label="$t('pages.approvalQueue.codecFilter')"
+                emit-value
+                map-options
+                style="width: 100%"
+              />
             </q-item>
             <q-item-label header>{{ $t('pages.approvalQueue.qualityThreshold') }}</q-item-label>
             <q-item>
-              <q-slider v-model="filterQualityMin" :min="0" :max="100" :step="5" label/>
+              <q-slider v-model="filterQualityMin" :min="0" :max="100" :step="5" label />
             </q-item>
           </q-list>
         </q-btn-dropdown>
@@ -133,22 +146,39 @@
 
     <!-- Select All Across Pages Banner -->
     <q-banner
-      v-if="selected.length > 0 && selected.length === tasks.length && pagination.rowsNumber > tasks.length && !selectAllMode"
-      class="q-mb-sm" :class="$q.dark.isActive ? 'bg-blue-10 text-blue-3' : 'bg-blue-1 text-primary'" dense rounded
+      v-if="
+        selected.length > 0 &&
+        selected.length === tasks.length &&
+        pagination.rowsNumber > tasks.length &&
+        !selectAllMode
+      "
+      class="q-mb-sm"
+      :class="$q.dark.isActive ? 'bg-blue-10 text-blue-3' : 'bg-blue-1 text-primary'"
+      dense
+      rounded
     >
       {{ $t('pages.approvalQueue.allOnPageSelected', { count: selected.length }) }}
-      <template v-slot:action>
-        <q-btn flat color="primary" :label="$t('pages.approvalQueue.selectAllMatching', { count: pagination.rowsNumber })"
-          @click="selectAllMode = true"/>
+      <template #action>
+        <q-btn
+          flat
+          color="primary"
+          :label="$t('pages.approvalQueue.selectAllMatching', { count: pagination.rowsNumber })"
+          @click="selectAllMode = true"
+        />
       </template>
     </q-banner>
     <q-banner
       v-if="selectAllMode"
-      class="q-mb-sm" :class="$q.dark.isActive ? 'bg-blue-10 text-blue-3' : 'bg-blue-1 text-primary'" dense rounded
+      class="q-mb-sm"
+      :class="$q.dark.isActive ? 'bg-blue-10 text-blue-3' : 'bg-blue-1 text-primary'"
+      dense
+      rounded
     >
       {{ $t('pages.approvalQueue.selectAllMatching', { count: pagination.rowsNumber }) }} selected.
-      <template v-slot:action>
-        <q-btn flat color="primary" label="Clear" @click="selectAllMode = false; selected = []"/>
+      <template #action>
+        <!-- prettier-ignore -->
+        <q-btn flat color="primary" label="Clear"
+          @click="selectAllMode = false; selected = []" />
       </template>
     </q-banner>
 
@@ -168,7 +198,7 @@
       dense
     >
       <!-- Loading skeleton -->
-      <template v-slot:loading>
+      <template #loading>
         <q-tr v-for="n in 5" :key="'skel-' + n">
           <q-td><q-skeleton type="QCheckbox" /></q-td>
           <q-td><q-skeleton type="text" width="200px" /></q-td>
@@ -184,11 +214,8 @@
       </template>
 
       <!-- Row class for visual border hints -->
-      <template v-slot:body="props">
-        <q-tr
-          :props="props"
-          :class="rowBorderClass(props.row)"
-        >
+      <template #body="props">
+        <q-tr :props="props" :class="rowBorderClass(props.row)">
           <q-td auto-width>
             <q-checkbox v-model="props.selected" dense />
           </q-td>
@@ -203,14 +230,25 @@
           </q-td>
           <!-- Codec -->
           <q-td key="codec" :props="props">
-            <span v-if="props.row.source_codec && props.row.staged_codec && props.row.source_codec !== props.row.staged_codec">
+            <span
+              v-if="
+                props.row.source_codec && props.row.staged_codec && props.row.source_codec !== props.row.staged_codec
+              "
+            >
               {{ props.row.source_codec }} &rarr; {{ props.row.staged_codec }}
             </span>
             <span v-else-if="props.row.source_codec">
               {{ props.row.source_codec }}
             </span>
             <span v-else class="text-grey">—</span>
-            <div v-if="props.row.source_resolution && props.row.staged_resolution && props.row.source_resolution !== props.row.staged_resolution" class="text-caption text-grey">
+            <div
+              v-if="
+                props.row.source_resolution &&
+                props.row.staged_resolution &&
+                props.row.source_resolution !== props.row.staged_resolution
+              "
+              class="text-caption text-grey"
+            >
               {{ props.row.source_resolution }} &rarr; {{ props.row.staged_resolution }}
             </div>
           </q-td>
@@ -231,8 +269,10 @@
           </q-td>
           <!-- Savings -->
           <q-td key="savings" :props="props" class="text-center">
-            <span v-if="props.row.source_size > 0"
-              :class="savingsNum(props.row) > 0 ? 'text-positive' : savingsNum(props.row) < 0 ? 'text-negative' : ''">
+            <span
+              v-if="props.row.source_size > 0"
+              :class="savingsNum(props.row) > 0 ? 'text-positive' : savingsNum(props.row) < 0 ? 'text-negative' : ''"
+            >
               {{ savingsPercent(props.row) }}%
             </span>
             <span v-else>—</span>
@@ -247,7 +287,7 @@
               <q-tooltip>
                 VMAF: {{ props.row.vmaf_score.toFixed(1) }}
                 <template v-if="props.row.ssim_score != null">
-                  <br/>SSIM: {{ (props.row.ssim_score * 100).toFixed(1) }}%
+                  <br />SSIM: {{ (props.row.ssim_score * 100).toFixed(1) }}%
                 </template>
               </q-tooltip>
             </q-badge>
@@ -275,15 +315,15 @@
                 <q-menu>
                   <q-list dense>
                     <q-item clickable v-close-popup @click="approveSingle(props.row.id)">
-                      <q-item-section avatar><q-icon name="check" color="positive"/></q-item-section>
+                      <q-item-section avatar><q-icon name="check" color="positive" /></q-item-section>
                       <q-item-section>{{ $t('pages.approvalQueue.tooltipApprove') }}</q-item-section>
                     </q-item>
                     <q-item clickable v-close-popup @click="rejectSingle(props.row.id)">
-                      <q-item-section avatar><q-icon name="close" color="negative"/></q-item-section>
+                      <q-item-section avatar><q-icon name="close" color="negative" /></q-item-section>
                       <q-item-section>{{ $t('pages.approvalQueue.tooltipReject') }}</q-item-section>
                     </q-item>
                     <q-item clickable v-close-popup @click="showDetail(props.row.id)">
-                      <q-item-section avatar><q-icon name="info" color="info"/></q-item-section>
+                      <q-item-section avatar><q-icon name="info" color="info" /></q-item-section>
                       <q-item-section>{{ $t('pages.approvalQueue.tooltipDetails') }}</q-item-section>
                     </q-item>
                   </q-list>
@@ -295,9 +335,9 @@
       </template>
 
       <!-- No data — context-aware empty state -->
-      <template v-slot:no-data>
+      <template #no-data>
         <div class="full-width column items-center q-pa-lg text-grey">
-          <q-icon name="check_circle_outline" size="3rem" class="q-mb-sm"/>
+          <q-icon name="check_circle_outline" size="3rem" class="q-mb-sm" />
           <template v-if="approvalEnabled === true">
             <div class="text-h6">{{ $t('pages.approvalQueue.allClear') }}</div>
             <div class="text-caption">
@@ -328,12 +368,7 @@
     </q-table>
 
     <!-- Detail Dialog -->
-    <q-dialog
-      v-model="showDetailDialog"
-      persistent
-      :maximized="$q.screen.lt.md"
-      :full-width="previewActive"
-    >
+    <q-dialog v-model="showDetailDialog" persistent :maximized="$q.screen.lt.md" :full-width="previewActive">
       <q-card :style="previewActive ? 'max-width: 1200px; width: 100%' : 'min-width: 500px; max-width: 700px'">
         <!-- Header: file name -->
         <q-card-section>
@@ -352,8 +387,12 @@
                   <div class="text-caption text-weight-bold">{{ $t('pages.approvalQueue.original') }}</div>
                   <div class="row q-gutter-xs q-mt-xs">
                     <q-badge v-if="detailData.source_codec" color="grey-7">{{ detailData.source_codec }}</q-badge>
-                    <q-badge v-if="detailData.source_resolution" color="grey-7">{{ detailData.source_resolution }}</q-badge>
-                    <q-badge v-if="detailData.source_container" color="grey-7">.{{ detailData.source_container }}</q-badge>
+                    <q-badge v-if="detailData.source_resolution" color="grey-7">{{
+                      detailData.source_resolution
+                    }}</q-badge>
+                    <q-badge v-if="detailData.source_container" color="grey-7"
+                      >.{{ detailData.source_container }}</q-badge
+                    >
                   </div>
                   <div class="text-body1 q-mt-xs">{{ formatSize(detailData.source_size) }}</div>
                 </q-card-section>
@@ -365,8 +404,12 @@
                   <div class="text-caption text-weight-bold">{{ $t('pages.approvalQueue.transcoded') }}</div>
                   <div class="row q-gutter-xs q-mt-xs">
                     <q-badge v-if="detailData.staged_codec" color="grey-7">{{ detailData.staged_codec }}</q-badge>
-                    <q-badge v-if="detailData.staged_resolution" color="grey-7">{{ detailData.staged_resolution }}</q-badge>
-                    <q-badge v-if="detailData.staged_container" color="grey-7">.{{ detailData.staged_container }}</q-badge>
+                    <q-badge v-if="detailData.staged_resolution" color="grey-7">{{
+                      detailData.staged_resolution
+                    }}</q-badge>
+                    <q-badge v-if="detailData.staged_container" color="grey-7"
+                      >.{{ detailData.staged_container }}</q-badge
+                    >
                   </div>
                   <div class="text-body1 q-mt-xs">{{ formatSize(detailData.staged_size) }}</div>
                 </q-card-section>
@@ -375,17 +418,21 @@
           </div>
           <!-- Savings summary -->
           <div class="text-center q-mb-md">
-            <span
-              v-if="detailData.size_delta < 0"
-              class="text-h6 text-positive"
-            >
-              {{ $t('pages.approvalQueue.spaceSavedDetail', { size: formatSize(Math.abs(detailData.size_delta)), percent: detailSavingsPercent }) }}
+            <span v-if="detailData.size_delta < 0" class="text-h6 text-positive">
+              {{
+                $t('pages.approvalQueue.spaceSavedDetail', {
+                  size: formatSize(Math.abs(detailData.size_delta)),
+                  percent: detailSavingsPercent,
+                })
+              }}
             </span>
-            <span
-              v-else-if="detailData.size_delta > 0"
-              class="text-h6 text-negative"
-            >
-              {{ $t('pages.approvalQueue.fileBiggerBy', { size: formatSize(detailData.size_delta), percent: detailSavingsPercent }) }}
+            <span v-else-if="detailData.size_delta > 0" class="text-h6 text-negative">
+              {{
+                $t('pages.approvalQueue.fileBiggerBy', {
+                  size: formatSize(detailData.size_delta),
+                  percent: detailSavingsPercent,
+                })
+              }}
             </span>
             <span v-else class="text-h6 text-grey">{{ $t('pages.approvalQueue.noSizeChange') }}</span>
           </div>
@@ -395,10 +442,7 @@
             <div class="text-subtitle2 q-mb-sm">{{ $t('pages.approvalQueue.qualityScores') }}</div>
             <div class="row q-gutter-md">
               <div v-if="detailData.vmaf_score != null" class="col-auto">
-                <q-badge
-                  :color="vmafColor(detailData.vmaf_score)"
-                  class="text-body2 q-pa-sm"
-                >
+                <q-badge :color="vmafColor(detailData.vmaf_score)" class="text-body2 q-pa-sm">
                   VMAF: {{ detailData.vmaf_score.toFixed(1) }}
                 </q-badge>
                 <div class="text-caption text-grey q-mt-xs">
@@ -406,10 +450,7 @@
                 </div>
               </div>
               <div v-if="detailData.ssim_score != null" class="col-auto">
-                <q-badge
-                  color="info"
-                  class="text-body2 q-pa-sm"
-                >
+                <q-badge color="info" class="text-body2 q-pa-sm">
                   SSIM: {{ (detailData.ssim_score * 100).toFixed(1) }}%
                 </q-badge>
                 <div class="text-caption text-grey q-mt-xs">
@@ -447,7 +488,9 @@
                 </div>
                 <div v-if="detailData.log" class="q-mt-md">
                   <q-expansion-item :label="$t('pages.approvalQueue.processingLog')" dense default-closed>
-                    <pre class="text-caption" style="max-height: 200px; overflow-y: auto; white-space: pre-wrap">{{ logTail }}</pre>
+                    <pre class="text-caption" style="max-height: 200px; overflow-y: auto; white-space: pre-wrap">{{
+                      logTail
+                    }}</pre>
                   </q-expansion-item>
                 </div>
               </q-card-section>
@@ -468,19 +511,19 @@
               {{ $t('pages.approvalQueue.previewCaption') }}
             </div>
             <div v-if="previewLoading" class="q-pa-md text-center">
-              <q-spinner color="primary" size="2em" class="q-mr-sm"/>
+              <q-spinner color="primary" size="2em" class="q-mr-sm" />
               {{ $t('pages.approvalQueue.generatingPreview', { status: previewStatus }) }}
             </div>
             <div v-if="previewActive && previewData">
               <VideoCompare
-                :sourceUrl="previewData.source_url"
-                :encodedUrl="previewData.encoded_url"
-                :sourceSize="previewData.source_size || 0"
-                :encodedSize="previewData.encoded_size || 0"
-                :sourceCodec="previewData.source_codec || ''"
-                :encodedCodec="previewData.encoded_codec || ''"
-                :vmafScore="previewData.vmaf_score"
-                :ssimScore="previewData.ssim_score"
+                :source-url="previewData.source_url"
+                :encoded-url="previewData.encoded_url"
+                :source-size="previewData.source_size || 0"
+                :encoded-size="previewData.encoded_size || 0"
+                :source-codec="previewData.source_codec || ''"
+                :encoded-codec="previewData.encoded_codec || ''"
+                :vmaf-score="previewData.vmaf_score"
+                :ssim-score="previewData.ssim_score"
               />
             </div>
           </div>
@@ -501,18 +544,16 @@
             :label="$t('pages.approvalQueue.approve')"
             :loading="approving"
             class="col"
-            @click="approveFromDetail"/>
+            @click="approveFromDetail"
+          />
           <q-btn
             color="negative"
             icon="cancel"
             :label="$t('pages.approvalQueue.reject')"
             class="col"
-            @click="rejectFromDetail"/>
-          <q-btn
-            flat
-            :label="$t('pages.approvalQueue.close')"
-            class="col-auto"
-            @click="closeDetail"/>
+            @click="rejectFromDetail"
+          />
+          <q-btn flat :label="$t('pages.approvalQueue.close')" class="col-auto" @click="closeDetail" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -521,74 +562,72 @@
     <q-dialog v-model="showRejectDialog">
       <q-card style="min-width: 400px">
         <q-card-section>
-          <div class="text-h6">{{ $t('pages.approvalQueue.rejectTitle', { count: rejectTargetIds.length || selectedIds.length }) }}</div>
+          <div class="text-h6">
+            {{ $t('pages.approvalQueue.rejectTitle', { count: rejectTargetIds.length || selectedIds.length }) }}
+          </div>
         </q-card-section>
         <q-card-section>
           <div class="text-subtitle2 q-mb-sm">{{ $t('pages.approvalQueue.whatHappensToRejected') }}</div>
-          <q-option-group
-            v-model="rejectAction"
-            :options="rejectOptions"
-            type="radio"
-          />
+          <q-option-group v-model="rejectAction" :options="rejectOptions" type="radio" />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat :label="$t('pages.approvalQueue.cancel')" v-close-popup/>
+          <q-btn flat :label="$t('pages.approvalQueue.cancel')" v-close-popup />
           <q-btn
             flat
             color="negative"
             :label="$t('pages.approvalQueue.reject')"
             :loading="rejecting"
-            @click="confirmReject"/>
+            @click="confirmReject"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
-
   </q-page>
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { useQuasar } from 'quasar';
-import { useI18n } from 'vue-i18n';
-import axios from 'axios';
-import { getCompressoApiUrl } from 'src/js/compressoGlobals';
-import VideoCompare from 'components/preview/VideoCompare.vue';
-import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue';
-import PageHeader from 'components/ui/PageHeader.vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useQuasar } from 'quasar'
+import { useI18n } from 'vue-i18n'
+import axios from 'axios'
+import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import VideoCompare from 'components/preview/VideoCompare.vue'
+import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
+import PageHeader from 'components/ui/PageHeader.vue'
 
 export default {
   name: 'ApprovalQueue',
   components: { VideoCompare, AdmonitionBanner, PageHeader },
   setup() {
-    const $q = useQuasar();
-    const { t: $t } = useI18n();
-    const tasks = ref([]);
-    const selected = ref([]);
-    const loading = ref(false);
-    const approving = ref(false);
-    const rejecting = ref(false);
-    const showDetailDialog = ref(false);
-    const showRejectDialog = ref(false);
-    const detailData = ref(null);
-    const rejectAction = ref('discard');
-    const rejectTargetIds = ref([]);
-    const approvalEnabled = ref(null);
-    const newItemCount = ref(0);
-    const allTasks = ref([]);  // All tasks for summary cards (not just current page)
-    const searchValue = ref('');
-    const filterCodec = ref(null);
-    const filterQualityMin = ref(0);
-    const selectAllMode = ref(false);
-    let lastKnownIds = new Set();
-    let refreshInterval = null;
+    const $q = useQuasar()
+    const { t: $t } = useI18n()
+    const tasks = ref([])
+    const selected = ref([])
+    const loading = ref(false)
+    const approving = ref(false)
+    const rejecting = ref(false)
+    const showDetailDialog = ref(false)
+    const showRejectDialog = ref(false)
+    const detailData = ref(null)
+    const rejectAction = ref('discard')
+    const rejectTargetIds = ref([])
+    const approvalEnabled = ref(null)
+    const newItemCount = ref(0)
+    const allTasks = ref([]) // All tasks for summary cards (not just current page)
+    const searchValue = ref('')
+    const filterCodec = ref(null)
+    const filterQualityMin = ref(0)
+    const selectAllMode = ref(false)
+    let lastKnownIds = new Set()
+    let refreshInterval = null
 
     // Preview state
-    const previewActive = ref(false);
-    const previewLoading = ref(false);
-    const previewStatus = ref('');
-    const previewData = ref(null);
-    let previewJobId = null;
-    let previewPollInterval = null;
+    const previewActive = ref(false)
+    const previewLoading = ref(false)
+    const previewStatus = ref('')
+    const previewData = ref(null)
+    let previewJobId = null
+    let previewPollInterval = null
 
     const pagination = ref({
       page: 1,
@@ -596,176 +635,234 @@ export default {
       rowsNumber: 0,
       sortBy: 'finish_time',
       descending: true,
-    });
+    })
 
     const columns = computed(() => [
-      { name: 'abspath', label: $t('pages.approvalQueue.columnFile'), field: 'abspath', align: 'left', sortable: false },
-      { name: 'codec', label: $t('pages.approvalQueue.columnCodec'), field: 'source_codec', align: 'left', sortable: false },
-      { name: 'source_size', label: $t('pages.approvalQueue.columnOriginal'), field: 'source_size', align: 'right', sortable: true },
-      { name: 'staged_size', label: $t('pages.approvalQueue.columnNew'), field: 'staged_size', align: 'right', sortable: true },
-      { name: 'size_delta', label: $t('pages.approvalQueue.columnChange'), field: 'size_delta', align: 'center', sortable: true },
-      { name: 'savings', label: $t('pages.approvalQueue.columnSpaceSaved'), field: 'source_size', align: 'center', sortable: true },
-      { name: 'quality', label: $t('pages.approvalQueue.columnQuality'), field: 'vmaf_score', align: 'center', sortable: true },
-      { name: 'finish_time', label: $t('pages.approvalQueue.columnCompleted'), field: 'finish_time', align: 'left', sortable: true },
-      { name: 'actions', label: $t('pages.approvalQueue.columnActions'), field: 'id', align: 'center', sortable: false },
-    ]);
+      {
+        name: 'abspath',
+        label: $t('pages.approvalQueue.columnFile'),
+        field: 'abspath',
+        align: 'left',
+        sortable: false,
+      },
+      {
+        name: 'codec',
+        label: $t('pages.approvalQueue.columnCodec'),
+        field: 'source_codec',
+        align: 'left',
+        sortable: false,
+      },
+      {
+        name: 'source_size',
+        label: $t('pages.approvalQueue.columnOriginal'),
+        field: 'source_size',
+        align: 'right',
+        sortable: true,
+      },
+      {
+        name: 'staged_size',
+        label: $t('pages.approvalQueue.columnNew'),
+        field: 'staged_size',
+        align: 'right',
+        sortable: true,
+      },
+      {
+        name: 'size_delta',
+        label: $t('pages.approvalQueue.columnChange'),
+        field: 'size_delta',
+        align: 'center',
+        sortable: true,
+      },
+      {
+        name: 'savings',
+        label: $t('pages.approvalQueue.columnSpaceSaved'),
+        field: 'source_size',
+        align: 'center',
+        sortable: true,
+      },
+      {
+        name: 'quality',
+        label: $t('pages.approvalQueue.columnQuality'),
+        field: 'vmaf_score',
+        align: 'center',
+        sortable: true,
+      },
+      {
+        name: 'finish_time',
+        label: $t('pages.approvalQueue.columnCompleted'),
+        field: 'finish_time',
+        align: 'left',
+        sortable: true,
+      },
+      {
+        name: 'actions',
+        label: $t('pages.approvalQueue.columnActions'),
+        field: 'id',
+        align: 'center',
+        sortable: false,
+      },
+    ])
 
-    const selectedIds = computed(() => selected.value.map(s => s.id));
+    const selectedIds = computed(() => selected.value.map((s) => s.id))
 
     const visibleColumns = computed(() => {
-      const all = columns.value.map(c => c.name);
+      const all = columns.value.map((c) => c.name)
       if ($q.screen.lt.md) {
-        return all.filter(n => n !== 'finish_time');
+        return all.filter((n) => n !== 'finish_time')
       }
-      return all;
-    });
+      return all
+    })
 
-    const detailCardBg = computed(() => $q.dark.isActive ? 'bg-grey-9' : 'bg-grey-2');
+    const detailCardBg = computed(() => ($q.dark.isActive ? 'bg-grey-9' : 'bg-grey-2'))
 
     const logTail = computed(() => {
-      if (!detailData.value || !detailData.value.log) return '';
-      const lines = detailData.value.log.split('\n');
-      return lines.slice(-20).join('\n');
-    });
+      if (!detailData.value || !detailData.value.log) return ''
+      const lines = detailData.value.log.split('\n')
+      return lines.slice(-20).join('\n')
+    })
 
     const detailSavingsPercent = computed(() => {
-      if (!detailData.value || !detailData.value.source_size) return '0';
-      const pct = ((detailData.value.source_size - detailData.value.staged_size) / detailData.value.source_size) * 100;
-      return Math.abs(pct).toFixed(1);
-    });
+      if (!detailData.value || !detailData.value.source_size) return '0'
+      const pct = ((detailData.value.source_size - detailData.value.staged_size) / detailData.value.source_size) * 100
+      return Math.abs(pct).toFixed(1)
+    })
 
     const rejectOptions = computed(() => [
       { label: $t('pages.approvalQueue.discardOption'), value: 'discard' },
       { label: $t('pages.approvalQueue.requeueOption'), value: 'requeue' },
-    ]);
+    ])
 
     const codecOptions = computed(() => {
-      const codecs = new Set();
-      allTasks.value.forEach(t => {
-        if (t.source_codec) codecs.add(t.source_codec);
-        if (t.staged_codec) codecs.add(t.staged_codec);
-      });
-      return Array.from(codecs).sort().map(c => ({ label: c, value: c }));
-    });
+      const codecs = new Set()
+      allTasks.value.forEach((t) => {
+        if (t.source_codec) codecs.add(t.source_codec)
+        if (t.staged_codec) codecs.add(t.staged_codec)
+      })
+      return Array.from(codecs)
+        .sort()
+        .map((c) => ({ label: c, value: c }))
+    })
 
     const hasActiveFilters = computed(() => {
-      return filterCodec.value !== null || filterQualityMin.value > 0;
-    });
+      return filterCodec.value !== null || filterQualityMin.value > 0
+    })
 
     function onSearchChange() {
-      pagination.value.page = 1;
-      selectAllMode.value = false;
-      fetchTasks();
+      pagination.value.page = 1
+      selectAllMode.value = false
+      fetchTasks()
     }
 
     watch([filterCodec, filterQualityMin], () => {
-      pagination.value.page = 1;
-      selectAllMode.value = false;
-      fetchTasks();
-    });
+      pagination.value.page = 1
+      selectAllMode.value = false
+      fetchTasks()
+    })
 
     // Summary card computations (use allTasks so they reflect the full queue, not just current page)
     const totalSpaceSaved = computed(() => {
       return allTasks.value.reduce((sum, t) => {
-        const delta = t.size_delta || 0;
-        return delta < 0 ? sum + Math.abs(delta) : sum;
-      }, 0);
-    });
+        const delta = t.size_delta || 0
+        return delta < 0 ? sum + Math.abs(delta) : sum
+      }, 0)
+    })
 
     const avgSavingsPercent = computed(() => {
-      const valid = allTasks.value.filter(t => t.source_size > 0);
-      if (valid.length === 0) return '0.0';
+      const valid = allTasks.value.filter((t) => t.source_size > 0)
+      if (valid.length === 0) return '0.0'
       const totalPct = valid.reduce((sum, t) => {
-        return sum + ((t.source_size - t.staged_size) / t.source_size) * 100;
-      }, 0);
-      return (totalPct / valid.length).toFixed(1);
-    });
+        return sum + ((t.source_size - t.staged_size) / t.source_size) * 100
+      }, 0)
+      return (totalPct / valid.length).toFixed(1)
+    })
 
     const largestFileName = computed(() => {
-      if (allTasks.value.length === 0) return '—';
-      let largest = allTasks.value[0];
+      if (allTasks.value.length === 0) return '—'
+      let largest = allTasks.value[0]
       for (const t of allTasks.value) {
         if (Math.abs(t.size_delta || 0) > Math.abs(largest.size_delta || 0)) {
-          largest = t;
+          largest = t
         }
       }
-      return fileName(largest.abspath);
-    });
+      return fileName(largest.abspath)
+    })
 
     const largestFileSavings = computed(() => {
-      if (allTasks.value.length === 0) return '';
-      let largest = allTasks.value[0];
+      if (allTasks.value.length === 0) return ''
+      let largest = allTasks.value[0]
       for (const t of allTasks.value) {
         if (Math.abs(t.size_delta || 0) > Math.abs(largest.size_delta || 0)) {
-          largest = t;
+          largest = t
         }
       }
-      return formatSize(Math.abs(largest.size_delta || 0)) + ' ' + $t('pages.approvalQueue.saved');
-    });
+      return formatSize(Math.abs(largest.size_delta || 0)) + ' ' + $t('pages.approvalQueue.saved')
+    })
 
     function fileName(abspath) {
-      if (!abspath) return '';
-      return abspath.split('/').pop();
+      if (!abspath) return ''
+      return abspath.split('/').pop()
     }
 
     function formatSize(bytes) {
-      if (!bytes || bytes === 0) return '0 B';
-      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-      let i = 0;
-      let size = Math.abs(bytes);
+      if (!bytes || bytes === 0) return '0 B'
+      const units = ['B', 'KB', 'MB', 'GB', 'TB']
+      let i = 0
+      let size = Math.abs(bytes)
       while (size >= 1024 && i < units.length - 1) {
-        size /= 1024;
-        i++;
+        size /= 1024
+        i++
       }
-      return size.toFixed(1) + ' ' + units[i];
+      return size.toFixed(1) + ' ' + units[i]
     }
 
     function formatSizeDelta(delta) {
-      if (delta === 0) return '0 B';
-      const prefix = delta < 0 ? '' : '+';
-      return prefix + formatSize(Math.abs(delta));
+      if (delta === 0) return '0 B'
+      const prefix = delta < 0 ? '' : '+'
+      return prefix + formatSize(Math.abs(delta))
     }
 
     function savingsNum(row) {
-      if (!row.source_size) return 0;
-      return ((row.source_size - row.staged_size) / row.source_size) * 100;
+      if (!row.source_size) return 0
+      return ((row.source_size - row.staged_size) / row.source_size) * 100
     }
 
     function savingsPercent(row) {
-      return savingsNum(row).toFixed(1);
+      return savingsNum(row).toFixed(1)
     }
 
     function rowBorderClass(row) {
-      if (row.size_delta > 0) return 'row-border-negative';
-      if (row.source_size > 0 && ((row.source_size - row.staged_size) / row.source_size) > 0.2) return 'row-border-positive';
-      return '';
+      if (row.size_delta > 0) return 'row-border-negative'
+      if (row.source_size > 0 && (row.source_size - row.staged_size) / row.source_size > 0.2)
+        return 'row-border-positive'
+      return ''
     }
 
     function vmafColor(score) {
-      if (score == null) return 'grey';
-      if (score >= 90) return 'positive';
-      if (score >= 70) return 'warning';
-      return 'negative';
+      if (score == null) return 'grey'
+      if (score >= 90) return 'positive'
+      if (score >= 70) return 'warning'
+      return 'negative'
     }
 
     function vmafLabel(score) {
-      if (score == null) return '';
-      if (score >= 90) return $t('pages.approvalQueue.qualityExcellent');
-      if (score >= 70) return $t('pages.approvalQueue.qualityGood');
-      return $t('pages.approvalQueue.qualityPoor');
+      if (score == null) return ''
+      if (score >= 90) return $t('pages.approvalQueue.qualityExcellent')
+      if (score >= 70) return $t('pages.approvalQueue.qualityGood')
+      return $t('pages.approvalQueue.qualityPoor')
     }
 
     const avgVmafScore = computed(() => {
-      const withVmaf = allTasks.value.filter(t => t.vmaf_score != null);
-      if (withVmaf.length === 0) return null;
-      const sum = withVmaf.reduce((acc, t) => acc + t.vmaf_score, 0);
-      return sum / withVmaf.length;
-    });
+      const withVmaf = allTasks.value.filter((t) => t.vmaf_score != null)
+      if (withVmaf.length === 0) return null
+      const sum = withVmaf.reduce((acc, t) => acc + t.vmaf_score, 0)
+      return sum / withVmaf.length
+    })
 
     async function fetchApprovalSetting() {
       try {
-        const res = await axios.get(getCompressoApiUrl('v2', 'settings/read'));
-        approvalEnabled.value = res.data.settings.approval_required === true || res.data.settings.approval_required === 'true';
+        const res = await axios.get(getCompressoApiUrl('v2', 'settings/read'))
+        approvalEnabled.value =
+          res.data.settings.approval_required === true || res.data.settings.approval_required === 'true'
       } catch {
         // ignore
       }
@@ -778,17 +875,17 @@ export default {
           length: 1000,
           search_value: '',
           include_library: false,
-        });
-        allTasks.value = res.data.results || [];
+        })
+        allTasks.value = res.data.results || []
       } catch {
         // Summary cards will just show current page data as fallback
       }
     }
 
     async function fetchTasks(props) {
-      loading.value = true;
-      const pg = props ? props.pagination : pagination.value;
-      const start = (pg.page - 1) * pg.rowsPerPage;
+      loading.value = true
+      const pg = props ? props.pagination : pagination.value
+      const start = (pg.page - 1) * pg.rowsPerPage
 
       try {
         const res = await axios.post(getCompressoApiUrl('v2', 'approval/tasks'), {
@@ -798,238 +895,280 @@ export default {
           order_by: pg.sortBy || 'finish_time',
           order_direction: pg.descending ? 'desc' : 'asc',
           include_library: false,
-        });
-        const data = res.data;
-        const newTasks = data.results || [];
-        const newCount = data.recordsFiltered || 0;
+        })
+        const data = res.data
+        const newTasks = data.results || []
+        const newCount = data.recordsFiltered || 0
 
         // Smart refresh: detect new items
-        const newIds = new Set(newTasks.map(t => t.id));
+        const newIds = new Set(newTasks.map((t) => t.id))
         if (lastKnownIds.size > 0) {
-          let addedCount = 0;
+          let addedCount = 0
           for (const id of newIds) {
-            if (!lastKnownIds.has(id)) addedCount++;
+            if (!lastKnownIds.has(id)) addedCount++
           }
           if (addedCount > 0 && tasks.value.length > 0) {
-            newItemCount.value += addedCount;
+            newItemCount.value += addedCount
           }
         }
 
         // Preserve selection across refresh
-        const selectedIdSet = new Set(selectedIds.value);
-        tasks.value = newTasks;
-        lastKnownIds = newIds;
-        pagination.value.rowsNumber = newCount;
-        pagination.value.page = pg.page;
-        pagination.value.rowsPerPage = pg.rowsPerPage;
-        pagination.value.sortBy = pg.sortBy;
-        pagination.value.descending = pg.descending;
+        const selectedIdSet = new Set(selectedIds.value)
+        tasks.value = newTasks
+        lastKnownIds = newIds
+        pagination.value.rowsNumber = newCount
+        pagination.value.page = pg.page
+        pagination.value.rowsPerPage = pg.rowsPerPage
+        pagination.value.sortBy = pg.sortBy
+        pagination.value.descending = pg.descending
 
         // Restore selection
-        selected.value = newTasks.filter(t => selectedIdSet.has(t.id));
+        selected.value = newTasks.filter((t) => selectedIdSet.has(t.id))
       } catch (e) {
-        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToFetchTasks'), timeout: 3000, position: 'top' });
+        $q.notify({
+          type: 'negative',
+          message: $t('pages.approvalQueue.failedToFetchTasks'),
+          timeout: 3000,
+          position: 'top',
+        })
       } finally {
-        loading.value = false;
+        loading.value = false
       }
     }
 
     function acknowledgeNewItems() {
-      newItemCount.value = 0;
-      fetchTasks();
+      newItemCount.value = 0
+      fetchTasks()
     }
 
     function onRequest(props) {
-      fetchTasks(props);
+      fetchTasks(props)
     }
 
     async function approveSelected() {
-      await doApprove(selectedIds.value);
+      await doApprove(selectedIds.value)
     }
 
     async function approveSingle(id) {
-      await doApprove([id]);
+      await doApprove([id])
     }
 
     async function doApprove(ids) {
-      approving.value = true;
+      approving.value = true
       try {
         const payload = selectAllMode.value
           ? { all_matching: true, search_value: searchValue.value || '' }
-          : { id_list: ids };
-        await axios.post(getCompressoApiUrl('v2', 'approval/approve'), payload);
-        const count = selectAllMode.value ? pagination.value.rowsNumber : ids.length;
-        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.approvedCount', { count }), timeout: 3000, position: 'top' });
-        selected.value = [];
-        selectAllMode.value = false;
-        await fetchTasks();
+          : { id_list: ids }
+        await axios.post(getCompressoApiUrl('v2', 'approval/approve'), payload)
+        const count = selectAllMode.value ? pagination.value.rowsNumber : ids.length
+        $q.notify({
+          type: 'positive',
+          message: $t('pages.approvalQueue.approvedCount', { count }),
+          timeout: 3000,
+          position: 'top',
+        })
+        selected.value = []
+        selectAllMode.value = false
+        await fetchTasks()
       } catch (e) {
-        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToApprove'), timeout: 3000, position: 'top' });
+        $q.notify({
+          type: 'negative',
+          message: $t('pages.approvalQueue.failedToApprove'),
+          timeout: 3000,
+          position: 'top',
+        })
       } finally {
-        approving.value = false;
+        approving.value = false
       }
     }
 
     function rejectSingle(id) {
-      rejectTargetIds.value = [id];
-      rejectAction.value = 'discard';
-      showRejectDialog.value = true;
+      rejectTargetIds.value = [id]
+      rejectAction.value = 'discard'
+      showRejectDialog.value = true
     }
 
     async function confirmReject() {
-      const ids = rejectTargetIds.value.length > 0 ? rejectTargetIds.value : selectedIds.value;
-      rejecting.value = true;
+      const ids = rejectTargetIds.value.length > 0 ? rejectTargetIds.value : selectedIds.value
+      rejecting.value = true
       try {
-        const payload = selectAllMode.value && rejectTargetIds.value.length === 0
-          ? { all_matching: true, search_value: searchValue.value || '', requeue: rejectAction.value === 'requeue' }
-          : { id_list: ids, requeue: rejectAction.value === 'requeue' };
-        await axios.post(getCompressoApiUrl('v2', 'approval/reject'), payload);
-        const count = selectAllMode.value && rejectTargetIds.value.length === 0 ? pagination.value.rowsNumber : ids.length;
-        $q.notify({ type: 'positive', message: $t('pages.approvalQueue.rejectedCount', { count }), timeout: 3000, position: 'top' });
-        selected.value = [];
-        selectAllMode.value = false;
-        rejectTargetIds.value = [];
-        showRejectDialog.value = false;
-        await fetchTasks();
+        const payload =
+          selectAllMode.value && rejectTargetIds.value.length === 0
+            ? { all_matching: true, search_value: searchValue.value || '', requeue: rejectAction.value === 'requeue' }
+            : { id_list: ids, requeue: rejectAction.value === 'requeue' }
+        await axios.post(getCompressoApiUrl('v2', 'approval/reject'), payload)
+        const count =
+          selectAllMode.value && rejectTargetIds.value.length === 0 ? pagination.value.rowsNumber : ids.length
+        $q.notify({
+          type: 'positive',
+          message: $t('pages.approvalQueue.rejectedCount', { count }),
+          timeout: 3000,
+          position: 'top',
+        })
+        selected.value = []
+        selectAllMode.value = false
+        rejectTargetIds.value = []
+        showRejectDialog.value = false
+        await fetchTasks()
       } catch (e) {
-        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToReject'), timeout: 3000, position: 'top' });
+        $q.notify({
+          type: 'negative',
+          message: $t('pages.approvalQueue.failedToReject'),
+          timeout: 3000,
+          position: 'top',
+        })
       } finally {
-        rejecting.value = false;
+        rejecting.value = false
       }
     }
 
     async function showDetail(id) {
-      detailData.value = null;
-      previewActive.value = false;
-      previewLoading.value = false;
-      previewData.value = null;
-      showDetailDialog.value = true;
+      detailData.value = null
+      previewActive.value = false
+      previewLoading.value = false
+      previewData.value = null
+      showDetailDialog.value = true
       try {
-        const res = await axios.post(getCompressoApiUrl('v2', 'approval/detail'), { id: id });
-        detailData.value = res.data;
+        const res = await axios.post(getCompressoApiUrl('v2', 'approval/detail'), { id: id })
+        detailData.value = res.data
       } catch (e) {
-        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToFetchDetail'), timeout: 3000, position: 'top' });
-        showDetailDialog.value = false;
+        $q.notify({
+          type: 'negative',
+          message: $t('pages.approvalQueue.failedToFetchDetail'),
+          timeout: 3000,
+          position: 'top',
+        })
+        showDetailDialog.value = false
       }
     }
 
     async function approveFromDetail() {
       if (detailData.value) {
-        await doApprove([detailData.value.id]);
-        closeDetail();
+        await doApprove([detailData.value.id])
+        closeDetail()
       }
     }
 
     function rejectFromDetail() {
       if (detailData.value) {
-        rejectTargetIds.value = [detailData.value.id];
-        rejectAction.value = 'discard';
-        showDetailDialog.value = false;
-        cleanupPreview();
-        showRejectDialog.value = true;
+        rejectTargetIds.value = [detailData.value.id]
+        rejectAction.value = 'discard'
+        showDetailDialog.value = false
+        cleanupPreview()
+        showRejectDialog.value = true
       }
     }
 
     function closeDetail() {
-      showDetailDialog.value = false;
-      cleanupPreview();
+      showDetailDialog.value = false
+      cleanupPreview()
     }
 
     // Preview functions
     async function startPreview() {
-      if (!detailData.value) return;
-      previewLoading.value = true;
-      previewStatus.value = 'Starting...';
+      if (!detailData.value) return
+      previewLoading.value = true
+      previewStatus.value = 'Starting...'
       try {
         const res = await axios.post(getCompressoApiUrl('v2', 'preview/create'), {
           source_path: detailData.value.abspath,
           start_time: 0,
           duration: 10,
           library_id: detailData.value.library_id || 1,
-        });
-        previewJobId = res.data.job_id;
-        previewStatus.value = 'Processing...';
-        pollPreviewStatus();
+        })
+        previewJobId = res.data.job_id
+        previewStatus.value = 'Processing...'
+        pollPreviewStatus()
       } catch (e) {
-        previewLoading.value = false;
-        $q.notify({ type: 'negative', message: $t('pages.approvalQueue.failedToCreatePreview'), timeout: 3000, position: 'top' });
+        previewLoading.value = false
+        $q.notify({
+          type: 'negative',
+          message: $t('pages.approvalQueue.failedToCreatePreview'),
+          timeout: 3000,
+          position: 'top',
+        })
       }
     }
 
     function pollPreviewStatus() {
       previewPollInterval = setInterval(async () => {
         try {
-          const res = await axios.post(getCompressoApiUrl('v2', 'preview/status'), { job_id: previewJobId });
-          const status = res.data.status;
-          previewStatus.value = status;
+          const res = await axios.post(getCompressoApiUrl('v2', 'preview/status'), { job_id: previewJobId })
+          const status = res.data.status
+          previewStatus.value = status
           if (status === 'complete') {
-            clearInterval(previewPollInterval);
-            previewPollInterval = null;
-            previewData.value = res.data;
-            previewLoading.value = false;
-            previewActive.value = true;
+            clearInterval(previewPollInterval)
+            previewPollInterval = null
+            previewData.value = res.data
+            previewLoading.value = false
+            previewActive.value = true
           } else if (status === 'error' || status === 'failed') {
-            clearInterval(previewPollInterval);
-            previewPollInterval = null;
-            previewLoading.value = false;
-            $q.notify({ type: 'negative', message: $t('pages.approvalQueue.previewFailed', { error: res.data.error || '' }), timeout: 3000, position: 'top' });
+            clearInterval(previewPollInterval)
+            previewPollInterval = null
+            previewLoading.value = false
+            $q.notify({
+              type: 'negative',
+              message: $t('pages.approvalQueue.previewFailed', { error: res.data.error || '' }),
+              timeout: 3000,
+              position: 'top',
+            })
           }
         } catch {
-          clearInterval(previewPollInterval);
-          previewPollInterval = null;
-          previewLoading.value = false;
+          clearInterval(previewPollInterval)
+          previewPollInterval = null
+          previewLoading.value = false
         }
-      }, 2000);
+      }, 2000)
     }
 
     async function cleanupPreview() {
       if (previewPollInterval) {
-        clearInterval(previewPollInterval);
-        previewPollInterval = null;
+        clearInterval(previewPollInterval)
+        previewPollInterval = null
       }
       if (previewJobId) {
         try {
-          await axios.post(getCompressoApiUrl('v2', 'preview/cleanup'), { job_id: previewJobId });
+          await axios.post(getCompressoApiUrl('v2', 'preview/cleanup'), { job_id: previewJobId })
         } catch {
           // ignore cleanup errors
         }
-        previewJobId = null;
+        previewJobId = null
       }
-      previewActive.value = false;
-      previewLoading.value = false;
-      previewData.value = null;
+      previewActive.value = false
+      previewLoading.value = false
+      previewData.value = null
     }
 
     function handleKeydown(e) {
       if (showDetailDialog.value) {
         if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
-          e.preventDefault();
-          approveFromDetail();
+          e.preventDefault()
+          approveFromDetail()
         }
         if (e.key === 'Escape') {
-          closeDetail();
+          closeDetail()
         }
       }
     }
 
     onMounted(() => {
-      fetchApprovalSetting();
-      fetchTasks();
-      fetchAllTasksForSummary();
+      fetchApprovalSetting()
+      fetchTasks()
+      fetchAllTasksForSummary()
       refreshInterval = setInterval(() => {
-        fetchTasks();
-        fetchAllTasksForSummary();
-      }, 10000);
-      window.addEventListener('keydown', handleKeydown);
-    });
+        fetchTasks()
+        fetchAllTasksForSummary()
+      }, 10000)
+      window.addEventListener('keydown', handleKeydown)
+    })
 
     onUnmounted(() => {
       if (refreshInterval) {
-        clearInterval(refreshInterval);
+        clearInterval(refreshInterval)
       }
-      cleanupPreview();
-      window.removeEventListener('keydown', handleKeydown);
-    });
+      cleanupPreview()
+      window.removeEventListener('keydown', handleKeydown)
+    })
 
     return {
       tasks,
@@ -1088,9 +1227,9 @@ export default {
       hasActiveFilters,
       selectAllMode,
       onSearchChange,
-    };
+    }
   },
-};
+}
 </script>
 
 <style scoped>

@@ -24,9 +24,13 @@
             <q-card-section>
               <div class="row q-col-gutter-sm">
                 <div class="col-6 col-sm-4"><strong>Format:</strong> {{ fileInfo.format.format_name }}</div>
-                <div class="col-6 col-sm-4"><strong>Duration:</strong> {{ formatDuration(fileInfo.format.duration) }}</div>
+                <div class="col-6 col-sm-4">
+                  <strong>Duration:</strong> {{ formatDuration(fileInfo.format.duration) }}
+                </div>
                 <div class="col-6 col-sm-4"><strong>Size:</strong> {{ formatBytes(fileInfo.format.size) }}</div>
-                <div class="col-6 col-sm-4"><strong>Bitrate:</strong> {{ formatBitrate(fileInfo.format.bit_rate) }}</div>
+                <div class="col-6 col-sm-4">
+                  <strong>Bitrate:</strong> {{ formatBitrate(fileInfo.format.bit_rate) }}
+                </div>
                 <div class="col-6 col-sm-4"><strong>Streams:</strong> {{ fileInfo.format.nb_streams }}</div>
               </div>
             </q-card-section>
@@ -45,7 +49,9 @@
               <div class="row items-center q-mb-sm">
                 <span class="text-subtitle2">Stream #{{ stream.index }}</span>
                 <q-badge class="q-ml-sm" color="primary">{{ stream.codec_name }}</q-badge>
-                <q-badge v-if="stream.resolution_label" class="q-ml-sm" color="secondary">{{ stream.resolution_label }}</q-badge>
+                <q-badge v-if="stream.resolution_label" class="q-ml-sm" color="secondary">{{
+                  stream.resolution_label
+                }}</q-badge>
                 <q-badge v-if="stream.hdr" class="q-ml-sm" color="amber" text-color="black">HDR</q-badge>
               </div>
               <div class="row q-col-gutter-sm">
@@ -55,8 +61,12 @@
                 <div class="col-6 col-sm-3"><strong>Bitrate:</strong> {{ formatBitrate(stream.bit_rate) }}</div>
                 <div class="col-6 col-sm-3"><strong>Frame Rate:</strong> {{ stream.r_frame_rate }}</div>
                 <div class="col-6 col-sm-3"><strong>Pixel Format:</strong> {{ stream.pix_fmt }}</div>
-                <div v-if="stream.color_space" class="col-6 col-sm-3"><strong>Color Space:</strong> {{ stream.color_space }}</div>
-                <div v-if="stream.color_transfer" class="col-6 col-sm-3"><strong>Color Transfer:</strong> {{ stream.color_transfer }}</div>
+                <div v-if="stream.color_space" class="col-6 col-sm-3">
+                  <strong>Color Space:</strong> {{ stream.color_space }}
+                </div>
+                <div v-if="stream.color_transfer" class="col-6 col-sm-3">
+                  <strong>Color Transfer:</strong> {{ stream.color_transfer }}
+                </div>
               </div>
             </q-card-section>
           </q-card>
@@ -78,8 +88,12 @@
               </div>
               <div class="row q-col-gutter-sm">
                 <div class="col-6 col-sm-3"><strong>Codec:</strong> {{ stream.codec_long_name }}</div>
-                <div class="col-6 col-sm-3"><strong>Channels:</strong> {{ stream.channels }} ({{ stream.channel_layout || 'N/A' }})</div>
-                <div class="col-6 col-sm-3"><strong>Sample Rate:</strong> {{ stream.sample_rate ? stream.sample_rate + ' Hz' : 'N/A' }}</div>
+                <div class="col-6 col-sm-3">
+                  <strong>Channels:</strong> {{ stream.channels }} ({{ stream.channel_layout || 'N/A' }})
+                </div>
+                <div class="col-6 col-sm-3">
+                  <strong>Sample Rate:</strong> {{ stream.sample_rate ? stream.sample_rate + ' Hz' : 'N/A' }}
+                </div>
                 <div class="col-6 col-sm-3"><strong>Bitrate:</strong> {{ formatBitrate(stream.bit_rate) }}</div>
                 <div v-if="stream.title" class="col-6 col-sm-3"><strong>Title:</strong> {{ stream.title }}</div>
               </div>
@@ -107,9 +121,7 @@
 
         <!-- Health Badge (if available) -->
         <div v-if="healthStatus" class="q-mt-md">
-          <q-badge :color="healthBadgeColor" class="text-body2 q-pa-sm">
-            Health: {{ healthStatus }}
-          </q-badge>
+          <q-badge :color="healthBadgeColor" class="text-body2 q-pa-sm"> Health: {{ healthStatus }} </q-badge>
         </div>
       </q-card-section>
     </q-card>
@@ -117,10 +129,14 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue';
-import axios from 'axios';
-import { getCompressoApiUrl } from 'src/js/compressoGlobals';
-import { formatBytes as sharedFormatBytes, formatBitrate as sharedFormatBitrate, formatDuration as sharedFormatDuration } from 'src/js/formatUtils';
+import { ref, computed } from 'vue'
+import axios from 'axios'
+import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import {
+  formatBytes as sharedFormatBytes,
+  formatBitrate as sharedFormatBitrate,
+  formatDuration as sharedFormatDuration,
+} from 'src/js/formatUtils'
 
 export default {
   name: 'FileInfoDialog',
@@ -128,83 +144,83 @@ export default {
     healthStatus: { type: String, default: '' },
   },
   setup(props) {
-    const dialogVisible = ref(false);
-    const loading = ref(false);
-    const error = ref('');
-    const fileInfo = ref(null);
+    const dialogVisible = ref(false)
+    const loading = ref(false)
+    const error = ref('')
+    const fileInfo = ref(null)
 
     const healthBadgeColor = computed(() => {
-      if (props.healthStatus === 'healthy') return 'positive';
-      if (props.healthStatus === 'corrupted') return 'negative';
-      if (props.healthStatus === 'checking') return 'warning';
-      return 'grey';
-    });
+      if (props.healthStatus === 'healthy') return 'positive'
+      if (props.healthStatus === 'corrupted') return 'negative'
+      if (props.healthStatus === 'checking') return 'warning'
+      return 'grey'
+    })
 
     function show() {
-      dialogVisible.value = true;
+      dialogVisible.value = true
     }
 
     function hide() {
-      dialogVisible.value = false;
+      dialogVisible.value = false
     }
 
     async function probeByPath(filePath) {
-      loading.value = true;
-      error.value = '';
-      fileInfo.value = null;
-      show();
+      loading.value = true
+      error.value = ''
+      fileInfo.value = null
+      show()
 
       try {
         const response = await axios.post(getCompressoApiUrl('v2', 'fileinfo/probe'), {
           file_path: filePath,
-        });
+        })
         if (response.data && response.data.success) {
-          fileInfo.value = response.data;
+          fileInfo.value = response.data
         } else {
-          error.value = 'Failed to probe file';
+          error.value = 'Failed to probe file'
         }
       } catch (err) {
-        error.value = err.response?.data?.error || err.message || 'Failed to probe file';
+        error.value = err.response?.data?.error || err.message || 'Failed to probe file'
       } finally {
-        loading.value = false;
+        loading.value = false
       }
     }
 
     async function probeByTaskId(taskId) {
-      loading.value = true;
-      error.value = '';
-      fileInfo.value = null;
-      show();
+      loading.value = true
+      error.value = ''
+      fileInfo.value = null
+      show()
 
       try {
         const response = await axios.post(getCompressoApiUrl('v2', 'fileinfo/task'), {
           task_id: taskId,
-        });
+        })
         if (response.data && response.data.success) {
-          fileInfo.value = response.data;
+          fileInfo.value = response.data
         } else {
-          error.value = 'Failed to probe task file';
+          error.value = 'Failed to probe task file'
         }
       } catch (err) {
-        error.value = err.response?.data?.error || err.message || 'Failed to probe task file';
+        error.value = err.response?.data?.error || err.message || 'Failed to probe task file'
       } finally {
-        loading.value = false;
+        loading.value = false
       }
     }
 
     function formatBytes(bytes) {
-      if (!bytes || bytes === 0) return 'N/A';
-      return sharedFormatBytes(bytes);
+      if (!bytes || bytes === 0) return 'N/A'
+      return sharedFormatBytes(bytes)
     }
 
     function formatBitrate(bps) {
-      if (!bps || bps === 0) return 'N/A';
-      return sharedFormatBitrate(bps);
+      if (!bps || bps === 0) return 'N/A'
+      return sharedFormatBitrate(bps)
     }
 
     function formatDuration(seconds) {
-      if (!seconds || seconds === 0) return 'N/A';
-      return sharedFormatDuration(seconds);
+      if (!seconds || seconds === 0) return 'N/A'
+      return sharedFormatDuration(seconds)
     }
 
     return {
@@ -220,7 +236,7 @@ export default {
       formatBytes,
       formatBitrate,
       formatDuration,
-    };
+    }
   },
-};
+}
 </script>

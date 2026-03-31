@@ -1,23 +1,16 @@
 <template>
   <q-card flat bordered>
     <q-card-section class="bg-card-head completed-tasks-card-head">
-
       <div class="row items-center no-wrap completed-tasks-header">
         <div class="col">
           <div class="text-h6 text-primary">
-            <q-icon name="fas fa-list-ul"/>
+            <q-icon name="fas fa-list-ul" />
             {{ $t('headers.completedTasks') }}
           </div>
         </div>
 
         <div class="col-auto">
-          <q-btn
-            @click="openDetails"
-            color="secondary"
-            dense
-            round
-            flat
-            icon="open_in_full">
+          <q-btn @click="openDetails" color="secondary" dense round flat icon="open_in_full">
             <q-tooltip class="bg-white text-primary">{{ $t('navigation.showMore') }}</q-tooltip>
           </q-btn>
         </div>
@@ -27,9 +20,7 @@
     <!--MINIMAL SCREEN-->
     <q-card-section class="completed-tasks-card-body">
       <div class="completed-tasks-list-wrap">
-        <q-list
-          separator>
-
+        <q-list separator>
           <q-item v-if="!taskList || !taskList.length">
             <q-item-section>
               <div class="empty-state">
@@ -38,22 +29,10 @@
               </div>
             </q-item-section>
           </q-item>
-          <q-item
-            v-else
-            v-for="task in taskList"
-            :key="task.id"
-            v-bind="task">
+          <q-item v-else v-for="task in taskList" :key="task.id" v-bind="task">
             <q-item-section avatar>
-              <q-icon
-                v-if="task.success"
-                name="check_circle"
-                class="text-secondary"
-                style="opacity: 0.8;"/>
-              <q-icon
-                v-else
-                name="cancel"
-                class="text-negative"
-                style="opacity: 0.8;"/>
+              <q-icon v-if="task.success" name="check_circle" class="text-secondary" style="opacity: 0.8" />
+              <q-icon v-else name="cancel" class="text-negative" style="opacity: 0.8" />
             </q-item-section>
             <q-item-section>
               <q-item-label>{{ task.label }}</q-item-label>
@@ -61,22 +40,16 @@
             <q-item-section side top>
               <div class="row">
                 <div class="column justify-center">
-                  <q-item-label
-                    caption>
+                  <q-item-label caption>
                     {{ task.dateTimeSinceCompleted }}
                   </q-item-label>
                 </div>
                 <div class="column justify-center">
-                  <q-icon
-                    class="q-ml-sm"
-                    name="event"
-                    size="18px"/>
+                  <q-icon class="q-ml-sm" name="event" size="18px" />
                 </div>
               </div>
-
             </q-item-section>
           </q-item>
-
         </q-list>
       </div>
     </q-card-section>
@@ -84,35 +57,31 @@
     <!--FULL SCREEN-->
     <CompletedTasksListDialog
       ref="completedTasksDetailsDialogRef"
-      :initStatusFilter="completedTasksPopupInitStatusFilter"
+      :init-status-filter="completedTasksPopupInitStatusFilter"
     />
-
   </q-card>
 </template>
 
 <script>
-import { defineComponent, ref } from "vue";
-import CompletedTasksListDialog from "components/dashboard/completed/CompletedTasksListDialog.vue";
+import { defineComponent, ref } from 'vue'
+import CompletedTasksListDialog from 'components/dashboard/completed/CompletedTasksListDialog.vue'
 
 export default defineComponent({
   name: 'CompletedTasks',
   components: { CompletedTasksListDialog },
   setup() {
-    const completedTasksDetailsDialogRef = ref(null);
+    const completedTasksDetailsDialogRef = ref(null)
 
     return {
-      completedTasksDetailsDialogRef
+      completedTasksDetailsDialogRef,
     }
   },
   mounted() {
     // Add listeners
-    this.$global.$on(
-      'completedTasksShowFailed',
-      () => {
-        this.completedTasksPopupInitStatusFilter = 'failed'
-        this.openDetails()
-      }
-    )
+    this.$global.$on('completedTasksShowFailed', () => {
+      this.completedTasksPopupInitStatusFilter = 'failed'
+      this.openDetails()
+    })
   },
   data() {
     return {
@@ -122,15 +91,15 @@ export default defineComponent({
   props: {
     taskList: {
       type: Array,
-      required: true
-    }
+      required: true,
+    },
   },
   methods: {
     openDetails() {
-      this.completedTasksDetailsDialogRef.show();
-    }
-  }
-});
+      this.completedTasksDetailsDialogRef.show()
+    },
+  },
+})
 </script>
 
 <style scoped>

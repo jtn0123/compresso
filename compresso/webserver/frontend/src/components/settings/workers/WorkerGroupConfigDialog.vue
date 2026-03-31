@@ -3,15 +3,13 @@
     ref="dialogRef"
     :title="$t('headers.configureWorkerGroup')"
     :persistent="isDirty"
-    :closeTooltip="$t('components.settings.common.closeWithoutSaving')"
+    :close-tooltip="$t('components.settings.common.closeWithoutSaving')"
     :actions="saveActions"
     @save="save"
     @hide="onDialogHide"
   >
     <div class="q-pa-md">
-      <div
-        v-if="isDirty"
-        :class="isMobile ? 'unsaved-indicator-mobile' : 'unsaved-indicator'">
+      <div v-if="isDirty" :class="isMobile ? 'unsaved-indicator-mobile' : 'unsaved-indicator'">
         {{ $t('components.settings.common.unsavedChanges') }}
       </div>
       <div :class="isMobile ? 'q-px-none' : ''">
@@ -24,26 +22,12 @@
                 </div>
               </div>
               <div class="col-auto">
-                <q-btn
-                  v-if="locked"
-                  outline
-                  dense
-                  round
-                  color="secondary"
-                  icon="lock"
-                  @click="locked = false">
+                <q-btn v-if="locked" outline dense round color="secondary" icon="lock" @click="locked = false">
                   <q-tooltip class="bg-white text-primary">
                     {{ $t('components.settings.workers.locked') }}
                   </q-tooltip>
                 </q-btn>
-                <q-btn
-                  v-else
-                  outline
-                  dense
-                  round
-                  color="secondary"
-                  icon="lock_open"
-                  @click="locked = true">
+                <q-btn v-else outline dense round color="secondary" icon="lock_open" @click="locked = true">
                   <q-tooltip class="bg-white text-primary">
                     {{ $t('components.settings.workers.unlocked') }}
                   </q-tooltip>
@@ -52,7 +36,7 @@
             </div>
 
             <div class="q-pb-sm">
-              <q-skeleton v-if="name === null" type="QInput"/>
+              <q-skeleton v-if="name === null" type="QInput" />
               <q-input
                 v-if="name !== null"
                 outlined
@@ -70,7 +54,7 @@
                 toggle-color="primary"
                 :options="[
                   { label: t('workers.workerTypeCpu'), value: 'cpu' },
-                  { label: t('workers.workerTypeGpu'), value: 'gpu' }
+                  { label: t('workers.workerTypeGpu'), value: 'gpu' },
                 ]"
               />
               <div v-if="workerType === 'gpu' && detectedGpus.length > 0" class="q-mt-sm">
@@ -89,7 +73,7 @@
             </div>
 
             <div class="q-gutter-sm">
-              <q-skeleton v-if="workerCount === null" type="QInput"/>
+              <q-skeleton v-if="workerCount === null" type="QInput" />
               <q-input
                 v-if="workerCount !== null"
                 readonly
@@ -99,18 +83,12 @@
                 :label="$t('components.settings.workers.workerCount')"
                 :placeholder="workerCount"
               />
-              <q-skeleton v-if="workerCount === null" type="QSlider"/>
-              <q-slider
-                v-if="workerCount !== null"
-                v-model="workerCount"
-                :min="0"
-                :max="12"
-                color="primary"
-              />
+              <q-skeleton v-if="workerCount === null" type="QSlider" />
+              <q-slider v-if="workerCount !== null" v-model="workerCount" :min="0" :max="12" color="primary" />
             </div>
 
             <div class="q-pb-sm">
-              <q-skeleton v-if="tags === null" type="QInput"/>
+              <q-skeleton v-if="tags === null" type="QInput" />
               <q-select
                 filled
                 use-input
@@ -126,31 +104,26 @@
             </div>
           </q-card-section>
 
-          <q-separator/>
+          <q-separator />
 
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
             <h5 class="q-mb-none">{{ $t('components.settings.workers.schedule') }}</h5>
             <div class="q-gutter-sm">
-              <q-skeleton v-if="schedules === null" type="text"/>
+              <q-skeleton v-if="schedules === null" type="text" />
 
-              <q-list
-                bordered
-                separator
-                class="rounded-borders">
+              <q-list bordered separator class="rounded-borders">
                 <draggable
                   class="schedule-list-group"
                   item-key="order"
                   :component-data="{ tag: 'ul', name: 'flip-list', type: 'transition' }"
                   v-model="schedules"
-                  v-bind="dragOptions">
+                  v-bind="dragOptions"
+                >
                   <template #item="{ element, index }">
-                    <q-item
-                      :key="index"
-                      class="q-pa-none rounded-borders"
-                      active-class="schedule-list-item">
+                    <q-item :key="index" class="q-pa-none rounded-borders" active-class="schedule-list-item">
                       <q-item-section avatar class="q-px-sm q-mx-sm">
                         <q-avatar rounded>
-                          <q-icon name="drag_handle" style="max-width: 30px;">
+                          <q-icon name="drag_handle" style="max-width: 30px">
                             <q-tooltip class="bg-white text-primary">
                               {{ $t('tooltips.move') }}
                             </q-tooltip>
@@ -158,28 +131,22 @@
                         </q-avatar>
                       </q-item-section>
 
-                      <q-separator inset vertical class="q-mr-sm"/>
+                      <q-separator inset vertical class="q-mr-sm" />
 
                       <q-item-section class="q-px-sm q-mx-sm">
                         <q-item-label lines="1">
                           {{ element.repetitionLabel }} @ {{ element.scheduleTime }}
                         </q-item-label>
-                        <q-item-label
-                          v-if="element.scheduleTask === 'count'"
-                          caption
-                          lines="2">
+                        <q-item-label v-if="element.scheduleTask === 'count'" caption lines="2">
                           <span class="text-weight-bold">{{ element.scheduleTaskLabel }}</span>
                           = {{ element.scheduleWorkerCount }}
                         </q-item-label>
-                        <q-item-label
-                          v-else
-                          caption
-                          lines="2">
+                        <q-item-label v-else caption lines="2">
                           <span class="text-weight-bold">{{ element.scheduleTaskLabel }}</span>
                         </q-item-label>
                       </q-item-section>
 
-                      <q-separator inset vertical class="q-mx-sm"/>
+                      <q-separator inset vertical class="q-mx-sm" />
 
                       <q-item-section center side>
                         <div class="text-grey-8 q-gutter-xs">
@@ -190,7 +157,8 @@
                             size="12px"
                             color="negative"
                             icon="delete"
-                            @click="deleteSchedule(index)">
+                            @click="deleteSchedule(index)"
+                          >
                             <q-tooltip class="bg-white text-primary">
                               {{ $t('tooltips.delete') }}
                             </q-tooltip>
@@ -203,21 +171,15 @@
               </q-list>
 
               <q-bar class="bg-transparent">
-                <q-space/>
-                <CompressoListAddButton
-                  :tooltip="$t('tooltips.add')"
-                  @click="addNewScheduledEvent"
-                />
+                <q-space />
+                <CompressoListAddButton :tooltip="$t('tooltips.add')" @click="addNewScheduledEvent" />
               </q-bar>
             </div>
           </q-card-section>
         </q-card>
       </div>
     </div>
-    <WorkerEventCreateDialog
-      ref="workerEventCreateDialogRef"
-      @ok="onWorkerEventCreated"
-    />
+    <WorkerEventCreateDialog ref="workerEventCreateDialogRef" @ok="onWorkerEventCreated" />
   </CompressoDialogMenu>
 </template>
 
@@ -231,13 +193,13 @@ import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
 import WorkerEventCreateDialog from 'components/settings/workers/WorkerEventCreateDialog.vue'
-import CompressoListAddButton from "components/ui/buttons/CompressoListAddButton.vue";
+import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
 
 const props = defineProps({
   workerGroupId: {
     type: Number,
-    default: 0
-  }
+    default: 0,
+  },
 })
 
 const emit = defineEmits(['hide', 'saved'])
@@ -270,7 +232,7 @@ const saveAction = computed(() => {
       ? t('components.settings.workers.saveWorkerConfig')
       : t('components.settings.common.noChangesToSave'),
     emit: 'save',
-    disabled: !hasChanges
+    disabled: !hasChanges,
   }
 })
 
@@ -292,7 +254,7 @@ const currentSnapshot = computed(() => {
     workerType: workerType.value,
     workerCount: workerCount.value,
     tags: [...tags.value],
-    schedules: scheduleSnapshot
+    schedules: scheduleSnapshot,
   })
 })
 
@@ -347,7 +309,7 @@ const fetchWorkerGroupConfig = (workerGroupId) => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/worker_group/read'),
-    data: data
+    data: data,
   }).then((response) => {
     currentID.value = response.data.id
     locked.value = response.data.locked
@@ -388,14 +350,14 @@ const saveWorkerGroupConfig = async () => {
     await axios({
       method: 'post',
       url: getCompressoApiUrl('v2', 'settings/worker_group/write'),
-      data: data
+      data: data,
     })
     $q.notify({
       color: 'positive',
       position: 'top',
       icon: 'cloud_done',
       message: t('notifications.saved'),
-      timeout: 200
+      timeout: 200,
     })
     return true
   } catch (error) {
@@ -404,7 +366,7 @@ const saveWorkerGroupConfig = async () => {
       position: 'top',
       message: t('notifications.failedToSaveSettings'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return false
   }
@@ -446,8 +408,8 @@ const onWorkerEventCreated = (payload) => {
       scheduleTime: payload.scheduleTime,
       scheduleTask: payload.scheduleTask,
       scheduleTaskLabel: t(`components.settings.workers.scheduleLabels.${payload.scheduleTask}`),
-      scheduleWorkerCount: payload.scheduleWorkerCount
-    }
+      scheduleWorkerCount: payload.scheduleWorkerCount,
+    },
   ]
 }
 
@@ -486,19 +448,22 @@ const onDialogHide = () => {
   emit('hide')
 }
 
-watch(() => props.workerGroupId, (value) => {
-  if (value === null || value === undefined) {
-    return
-  }
-  if (isOpen.value) {
-    resetState()
-    fetchWorkerGroupConfig(value)
-  }
-})
+watch(
+  () => props.workerGroupId,
+  (value) => {
+    if (value === null || value === undefined) {
+      return
+    }
+    if (isOpen.value) {
+      resetState()
+      fetchWorkerGroupConfig(value)
+    }
+  },
+)
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

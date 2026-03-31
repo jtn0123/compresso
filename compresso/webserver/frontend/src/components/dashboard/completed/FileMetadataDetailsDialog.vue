@@ -5,7 +5,7 @@
     width="92vw"
     :actions="dialogActions"
     :persistent="isDirty"
-    :closeTooltip="isDirty ? $t('components.completedTasks.metadataUnsaved') : ''"
+    :close-tooltip="isDirty ? $t('components.completedTasks.metadataUnsaved') : ''"
     @save="saveAll"
     @delete="confirmDeleteAll"
     @hide="onDialogHide"
@@ -59,7 +59,7 @@
                 <q-card flat bordered v-for="entry in editorEntries" :key="entry.pluginId" class="nested-card">
                   <q-card-section class="bg-card-head text-primary row items-center justify-between">
                     <div class="row items-center q-gutter-xs">
-                      <q-icon name="extension"/>
+                      <q-icon name="extension" />
                       <span>{{ entry.pluginId }}</span>
                     </div>
                     <CompressoListActionButton
@@ -96,7 +96,7 @@
     </div>
 
     <q-inner-loading :showing="loading">
-      <q-spinner-dots size="42px" color="secondary"/>
+      <q-spinner-dots size="42px" color="secondary" />
     </q-inner-loading>
   </CompressoDialogWindow>
 
@@ -125,11 +125,11 @@ import CompressoDialogConfirm from 'components/ui/dialogs/CompressoDialogConfirm
 const props = defineProps({
   completedTaskId: {
     type: String,
-    default: ''
+    default: '',
   },
   fingerprint: {
     type: String,
-    default: ''
+    default: '',
   },
 })
 
@@ -156,12 +156,12 @@ const selectedEntry = computed(() => {
   return metadataResults.value.find((entry) => entry.fingerprint === selectedFingerprint.value) || null
 })
 
-const metadataOptions = computed(() => (
+const metadataOptions = computed(() =>
   metadataResults.value.map((entry) => ({
     label: entry.paths?.[0]?.path || entry.fingerprint,
     value: entry.fingerprint,
-  }))
-))
+  })),
+)
 
 const selectedEntryPaths = computed(() => {
   const entry = selectedEntry.value
@@ -190,7 +190,9 @@ const dialogActions = computed(() => {
     color: isDirty.value ? 'positive' : 'grey-6',
     emit: 'save',
     disabled: !isDirty.value || saving.value,
-    tooltip: isDirty.value ? $t('components.completedTasks.metadataSave') : $t('components.completedTasks.metadataNoChanges'),
+    tooltip: isDirty.value
+      ? $t('components.completedTasks.metadataSave')
+      : $t('components.completedTasks.metadataNoChanges'),
   })
   return actions
 })
@@ -237,22 +239,25 @@ const fetchMetadata = () => {
     method: 'post',
     url: getCompressoApiUrl('v2', endpoint),
     data: payload,
-  }).then((response) => {
-    metadataResults.value = response.data.results || []
-    selectedFingerprint.value = metadataResults.value[0]?.fingerprint || null
-    buildEditorEntries()
-    isDirty.value = false
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: $t('components.completedTasks.metadataErrorFetch'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
-  }).finally(() => {
-    loading.value = false
   })
+    .then((response) => {
+      metadataResults.value = response.data.results || []
+      selectedFingerprint.value = metadataResults.value[0]?.fingerprint || null
+      buildEditorEntries()
+      isDirty.value = false
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: $t('components.completedTasks.metadataErrorFetch'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
+    .finally(() => {
+      loading.value = false
+    })
 }
 
 const buildEditorEntries = () => {
@@ -298,37 +303,42 @@ const saveAll = () => {
       saving.value = false
       return
     }
-    requests.push(axios({
-      method: 'post',
-      url: getCompressoApiUrl('v2', 'metadata/update'),
-      data: {
-        fingerprint: selectedEntry.value.fingerprint,
-        plugin_id: entry.pluginId,
-        json_blob: parsed,
-      }
-    }))
+    requests.push(
+      axios({
+        method: 'post',
+        url: getCompressoApiUrl('v2', 'metadata/update'),
+        data: {
+          fingerprint: selectedEntry.value.fingerprint,
+          plugin_id: entry.pluginId,
+          json_blob: parsed,
+        },
+      }),
+    )
   }
 
-  Promise.all(requests).then(() => {
-    $q.notify({
-      color: 'positive',
-      position: 'top',
-      message: $t('components.completedTasks.metadataSaved'),
-      icon: 'check',
-      actions: [{ icon: 'close', color: 'white' }]
+  Promise.all(requests)
+    .then(() => {
+      $q.notify({
+        color: 'positive',
+        position: 'top',
+        message: $t('components.completedTasks.metadataSaved'),
+        icon: 'check',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+      fetchMetadata()
     })
-    fetchMetadata()
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: $t('components.completedTasks.metadataErrorSave'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: $t('components.completedTasks.metadataErrorSave'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
     })
-  }).finally(() => {
-    saving.value = false
-  })
+    .finally(() => {
+      saving.value = false
+    })
 }
 
 const confirmDeletePlugin = (pluginId) => {
@@ -374,41 +384,46 @@ const deleteMetadata = (pluginId) => {
     data: {
       fingerprint: selectedEntry.value.fingerprint,
       plugin_id: pluginId,
-    }
-  }).then(() => {
-    $q.notify({
-      color: 'positive',
-      position: 'top',
-      message: $t('components.completedTasks.metadataDeleted'),
-      icon: 'check',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
-    fetchMetadata()
-  }).catch(() => {
-    $q.notify({
-      color: 'negative',
-      position: 'top',
-      message: $t('components.completedTasks.metadataErrorDelete'),
-      icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
-    })
+    },
   })
+    .then(() => {
+      $q.notify({
+        color: 'positive',
+        position: 'top',
+        message: $t('components.completedTasks.metadataDeleted'),
+        icon: 'check',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+      fetchMetadata()
+    })
+    .catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: $t('components.completedTasks.metadataErrorDelete'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }],
+      })
+    })
 }
 
 watch(selectedEntry, () => {
   buildEditorEntries()
 })
 
-watch(() => props.fingerprint, (value) => {
-  if (!value) {
-    return
-  }
-  fetchMetadata()
-})
+watch(
+  () => props.fingerprint,
+  (value) => {
+    if (!value) {
+      return
+    }
+    fetchMetadata()
+  },
+)
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 

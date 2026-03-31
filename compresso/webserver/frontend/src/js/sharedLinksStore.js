@@ -16,7 +16,7 @@ export const sharedLinksStore = reactive({
       this.availableLinks = response.data.settings.remote_installations || []
       this.localName = response.data.settings.installation_name || ''
     } catch (e) {
-      log.error("Failed to fetch shared links", e)
+      log.error('Failed to fetch shared links', e)
       this.availableLinks = []
     }
   },
@@ -26,5 +26,5 @@ export const sharedLinksStore = reactive({
     localStorage.setItem('compresso-installation-target', newTarget)
 
     location.reload()
-  }
+  },
 })

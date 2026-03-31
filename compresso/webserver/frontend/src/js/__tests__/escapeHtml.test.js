@@ -31,13 +31,11 @@ describe('escapeHtml', () => {
   })
 
   it('escapes single quotes', () => {
-    expect(escapeHtml("it's")).toBe("it&#039;s")
+    expect(escapeHtml("it's")).toBe('it&#039;s')
   })
 
   it('escapes all special characters together', () => {
-    expect(escapeHtml('<a href="test">&</a>')).toBe(
-      '&lt;a href=&quot;test&quot;&gt;&amp;&lt;/a&gt;'
-    )
+    expect(escapeHtml('<a href="test">&</a>')).toBe('&lt;a href=&quot;test&quot;&gt;&amp;&lt;/a&gt;')
   })
 
   it('neutralizes a script injection payload', () => {

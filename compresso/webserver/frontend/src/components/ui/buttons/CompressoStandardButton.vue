@@ -9,7 +9,7 @@
     :dense="dense"
     @click="$emit('click', $event)"
   >
-    <slot/>
+    <slot />
   </q-btn>
 </template>
 
@@ -17,20 +17,20 @@
 defineProps({
   label: {
     type: String,
-    default: ''
+    default: '',
   },
   icon: {
     type: String,
-    default: ''
+    default: '',
   },
   iconRight: {
     type: String,
-    default: ''
+    default: '',
   },
   dense: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 })
 
 defineEmits(['click'])

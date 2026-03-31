@@ -3,15 +3,13 @@
     ref="dialogRef"
     :title="$t('headers.configureRemoteInstallationLink')"
     :persistent="isDirty"
-    :closeTooltip="$t('components.settings.common.closeWithoutSaving')"
+    :close-tooltip="$t('components.settings.common.closeWithoutSaving')"
     :actions="saveActions"
     @save="save"
     @hide="onDialogHide"
   >
     <div class="q-pa-md">
-      <div
-        v-if="isDirty"
-        :class="isMobile ? 'unsaved-indicator-mobile' : 'unsaved-indicator'">
+      <div v-if="isDirty" :class="isMobile ? 'unsaved-indicator-mobile' : 'unsaved-indicator'">
         {{ $t('components.settings.common.unsavedChanges') }}
       </div>
       <q-card flat>
@@ -30,7 +28,7 @@
           </div>
         </q-card-section>
 
-        <q-separator/>
+        <q-separator />
 
         <q-card-section :class="isMobile ? 'q-px-none' : ''">
           <div class="row items-center no-wrap q-mb-md">
@@ -48,9 +46,7 @@
               v-model="address"
               :label="$t('components.settings.link.address')"
               :placeholder="address"
-              :rules="[
-                val => validateAddress(val) || t('components.settings.link.addressMustStartWithHttp')
-              ]"
+              :rules="[(val) => validateAddress(val) || t('components.settings.link.addressMustStartWithHttp')]"
             />
           </div>
 
@@ -64,12 +60,7 @@
           </div>
 
           <div v-if="authType !== 'None'" class="sub-setting q-pt-none q-mt-sm">
-            <q-input
-              outlined
-              color="primary"
-              v-model="username"
-              :label="$t('components.settings.link.username')"
-            />
+            <q-input outlined color="primary" v-model="username" :label="$t('components.settings.link.username')" />
           </div>
 
           <div v-if="authType !== 'None'" class="sub-setting q-pt-none q-pb-sm">
@@ -80,7 +71,7 @@
               :type="showPassword ? 'password' : 'text'"
               :label="$t('components.settings.link.password')"
             >
-              <template v-slot:append>
+              <template #append>
                 <q-icon
                   :name="showPassword ? 'visibility_off' : 'visibility'"
                   class="cursor-pointer"
@@ -91,7 +82,7 @@
           </div>
         </q-card-section>
 
-        <q-separator/>
+        <q-separator />
 
         <q-card-section :class="isMobile ? 'q-px-none' : ''">
           <div class="row items-center no-wrap q-mb-md">
@@ -103,7 +94,7 @@
           </div>
 
           <div class="q-gutter-sm">
-            <q-skeleton v-if="enableReceivingTasks === null" type="QToggle"/>
+            <q-skeleton v-if="enableReceivingTasks === null" type="QToggle" />
             <q-toggle
               v-else
               v-model="enableReceivingTasks"
@@ -112,7 +103,7 @@
           </div>
 
           <div class="q-gutter-sm">
-            <q-skeleton v-if="enableSendingTasks === null" type="QToggle"/>
+            <q-skeleton v-if="enableSendingTasks === null" type="QToggle" />
             <q-toggle
               v-else
               v-model="enableSendingTasks"
@@ -123,7 +114,7 @@
 
           <div v-if="enableSendingTasks" class="sub-setting">
             <div class="q-gutter-sm">
-              <q-skeleton v-if="enableTaskPreloading === null" type="QToggle"/>
+              <q-skeleton v-if="enableTaskPreloading === null" type="QToggle" />
               <q-toggle
                 v-else
                 v-model="enableTaskPreloading"
@@ -132,7 +123,7 @@
             </div>
             <div v-if="enableTaskPreloading" class="sub-setting">
               <div class="q-gutter-sm">
-                <q-skeleton v-if="preloadingCount === null" type="QInput"/>
+                <q-skeleton v-if="preloadingCount === null" type="QInput" />
                 <q-input
                   v-if="preloadingCount !== null"
                   readonly
@@ -142,7 +133,7 @@
                   :label="$t('components.settings.link.preloadingCount')"
                   :placeholder="preloadingCount"
                 />
-                <q-skeleton v-if="preloadingCount === null" type="QSlider"/>
+                <q-skeleton v-if="preloadingCount === null" type="QSlider" />
                 <q-slider
                   v-if="preloadingCount !== null"
                   v-model="preloadingCount"
@@ -156,7 +147,7 @@
 
           <div v-if="enableSendingTasks" class="sub-setting">
             <div class="q-gutter-sm">
-              <q-skeleton v-if="enableChecksumValidation === null" type="QToggle"/>
+              <q-skeleton v-if="enableChecksumValidation === null" type="QToggle" />
               <q-toggle
                 v-else
                 v-model="enableChecksumValidation"
@@ -167,7 +158,7 @@
 
           <div v-if="enableSendingTasks" class="sub-setting">
             <div class="q-gutter-sm">
-              <q-skeleton v-if="enableConfigMissingLibraries === null" type="QToggle"/>
+              <q-skeleton v-if="enableConfigMissingLibraries === null" type="QToggle" />
               <q-toggle
                 v-else
                 v-model="enableConfigMissingLibraries"
@@ -177,7 +168,7 @@
           </div>
         </q-card-section>
 
-        <q-separator/>
+        <q-separator />
 
         <q-card-section :class="isMobile ? 'q-px-none' : ''">
           <div class="row items-center no-wrap q-mb-md">
@@ -189,7 +180,7 @@
           </div>
 
           <div class="q-gutter-sm">
-            <q-skeleton v-if="enableDistributedWorkerCount === null" type="QToggle"/>
+            <q-skeleton v-if="enableDistributedWorkerCount === null" type="QToggle" />
             <q-toggle
               v-else
               v-model="enableDistributedWorkerCount"
@@ -199,7 +190,7 @@
 
           <div v-if="enableDistributedWorkerCount" class="sub-setting">
             <div class="q-gutter-sm">
-              <q-skeleton v-if="distributedWorkerCountTarget === null" type="QSlider"/>
+              <q-skeleton v-if="distributedWorkerCountTarget === null" type="QSlider" />
               <div class="q-pl-lg" style="width: 80%">
                 <q-slider
                   v-if="distributedWorkerCountTarget !== null"
@@ -232,8 +223,8 @@ import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
 const props = defineProps({
   uuid: {
     type: String,
-    default: ''
-  }
+    default: '',
+  },
 })
 
 const emit = defineEmits(['hide', 'saved'])
@@ -284,7 +275,7 @@ const saveAction = computed(() => {
       ? t('components.settings.link.saveLinkConfig')
       : t('components.settings.common.noChangesToSave'),
     emit: 'save',
-    disabled: !hasChanges || !valid
+    disabled: !hasChanges || !valid,
   }
 })
 
@@ -317,7 +308,7 @@ const currentSnapshot = computed(() => {
     enableChecksumValidation: enableChecksumValidation.value,
     enableConfigMissingLibraries: enableConfigMissingLibraries.value,
     enableDistributedWorkerCount: enableDistributedWorkerCount.value,
-    distributedWorkerCountTarget: distributedWorkerCountTarget.value
+    distributedWorkerCountTarget: distributedWorkerCountTarget.value,
   })
 })
 
@@ -360,7 +351,7 @@ const fetchInstallationLinkConfig = (uuid) => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/link/read'),
-    data: data
+    data: data,
   }).then((response) => {
     const linkConfig = response.data.link_config
     currentUuid.value = uuid
@@ -405,14 +396,14 @@ const saveInstallationLinkConfig = async () => {
     await axios({
       method: 'post',
       url: getCompressoApiUrl('v2', 'settings/link/write'),
-      data: data
+      data: data,
     })
     $q.notify({
       color: 'positive',
       position: 'top',
       icon: 'cloud_done',
       message: t('notifications.saved'),
-      timeout: 200
+      timeout: 200,
     })
     updateSnapshot()
     return true
@@ -422,7 +413,7 @@ const saveInstallationLinkConfig = async () => {
       position: 'top',
       message: t('notifications.failedToSaveSettings'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }]
+      actions: [{ icon: 'close', color: 'white' }],
     })
     return false
   }
@@ -459,19 +450,22 @@ const onDialogHide = () => {
   emit('hide')
 }
 
-watch(() => props.uuid, (value) => {
-  if (!value) {
-    return
-  }
-  if (isOpen.value) {
-    resetState()
-    fetchInstallationLinkConfig(value)
-  }
-})
+watch(
+  () => props.uuid,
+  (value) => {
+    if (!value) {
+      return
+    }
+    if (isOpen.value) {
+      resetState()
+      fetchInstallationLinkConfig(value)
+    }
+  },
+)
 
 defineExpose({
   show,
-  hide
+  hide,
 })
 </script>
 
