@@ -10,7 +10,11 @@
         <!-- Step 1: Library Path -->
         <q-step :name="1" :title="t('onboarding.stepLibraryTitle')" icon="folder" :done="step > 1">
           <div class="q-mb-md">{{ t('onboarding.stepLibraryPrompt') }}</div>
-          <q-input v-model="libraryPath" :label="t('onboarding.stepLibraryLabel')" outlined />
+          <q-input
+            v-model="libraryPath"
+            :label="t('onboarding.stepLibraryLabel')"
+            outlined
+          />
           <div class="text-caption text-grey q-mt-xs">
             {{ t('onboarding.stepLibraryHint') }}
           </div>
@@ -19,7 +23,11 @@
         <!-- Step 2: Approval Workflow -->
         <q-step :name="2" :title="t('onboarding.stepApprovalTitle')" icon="verified" :done="step > 2">
           <div class="q-mb-md">{{ t('onboarding.stepApprovalPrompt') }}</div>
-          <q-option-group v-model="approvalMode" :options="approvalOptions" type="radio" />
+          <q-option-group
+            v-model="approvalMode"
+            :options="approvalOptions"
+            type="radio"
+          />
           <div class="text-caption text-grey q-mt-sm">
             {{ t('onboarding.stepApprovalHint') }}
           </div>
@@ -28,7 +36,15 @@
         <!-- Step 3: Workers -->
         <q-step :name="3" :title="t('onboarding.stepWorkersTitle')" icon="memory" :done="step > 3">
           <div class="q-mb-md">{{ t('onboarding.stepWorkersPrompt') }}</div>
-          <q-slider v-model="workerCount" :min="1" :max="4" :step="1" label snap markers />
+          <q-slider
+            v-model="workerCount"
+            :min="1"
+            :max="4"
+            :step="1"
+            label
+            snap
+            markers
+          />
           <div class="text-caption text-grey q-mt-xs">
             {{ t('onboarding.stepWorkersHint', { count: workerCount }) }}
           </div>
@@ -36,8 +52,13 @@
       </q-stepper>
 
       <q-card-actions align="right" class="q-pa-md">
-        <q-btn v-if="step > 1" flat :label="t('onboarding.back')" @click="step--" />
-        <q-space />
+        <q-btn
+          v-if="step > 1"
+          flat
+          :label="t('onboarding.back')"
+          @click="step--"
+        />
+        <q-space/>
         <q-btn
           v-if="step < 3"
           color="primary"
@@ -69,8 +90,8 @@ const log = createLogger('FirstRun')
 const props = defineProps({
   modelValue: {
     type: Boolean,
-    default: false,
-  },
+    default: false
+  }
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -85,12 +106,9 @@ const libraryPath = ref('')
 const approvalMode = ref(false)
 const workerCount = ref(1)
 
-watch(
-  () => props.modelValue,
-  (val) => {
-    dialogVisible.value = val
-  },
-)
+watch(() => props.modelValue, (val) => {
+  dialogVisible.value = val
+})
 
 const approvalOptions = computed(() => [
   { label: t('onboarding.approvalEnabled'), value: true },
@@ -98,18 +116,14 @@ const approvalOptions = computed(() => [
 ])
 
 // Pre-fill defaults from current settings
-axios
-  .get(getCompressoApiUrl('v2', 'settings/read'))
-  .then((res) => {
-    const settings = res.data?.settings || {}
-    if (settings.library_path) libraryPath.value = settings.library_path
-    if (settings.approval_required !== undefined) approvalMode.value = !!settings.approval_required
-    if (settings.number_of_workers)
-      workerCount.value = Math.min(4, Math.max(1, parseInt(settings.number_of_workers) || 1))
-  })
-  .catch((err) => {
-    log.warn('Failed to fetch initial settings, using defaults: ' + err)
-  })
+axios.get(getCompressoApiUrl('v2', 'settings/read')).then((res) => {
+  const settings = res.data?.settings || {}
+  if (settings.library_path) libraryPath.value = settings.library_path
+  if (settings.approval_required !== undefined) approvalMode.value = !!settings.approval_required
+  if (settings.number_of_workers) workerCount.value = Math.min(4, Math.max(1, parseInt(settings.number_of_workers) || 1))
+}).catch((err) => {
+  log.warn('Failed to fetch initial settings, using defaults: ' + err)
+})
 
 async function completeOnboarding() {
   if (!libraryPath.value.trim()) {
@@ -124,7 +138,7 @@ async function completeOnboarding() {
         approval_required: approvalMode.value,
         number_of_workers: workerCount.value,
         onboarding_completed: true,
-      },
+      }
     })
     dialogVisible.value = false
     emit('update:modelValue', false)

@@ -118,7 +118,9 @@ describe('useSystemStatus', () => {
       startLiveMetrics(ws)
 
       expect(ws.send).toHaveBeenCalledOnce()
-      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ command: 'start_system_status', params: {} }))
+      expect(ws.send).toHaveBeenCalledWith(
+        JSON.stringify({ command: 'start_system_status', params: {} }),
+      )
     })
 
     it('does nothing when ws is null', () => {
@@ -139,7 +141,9 @@ describe('useSystemStatus', () => {
       stopLiveMetrics(ws)
 
       expect(ws.send).toHaveBeenCalledOnce()
-      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ command: 'stop_system_status', params: {} }))
+      expect(ws.send).toHaveBeenCalledWith(
+        JSON.stringify({ command: 'stop_system_status', params: {} }),
+      )
     })
 
     it('does nothing when ws is null', () => {

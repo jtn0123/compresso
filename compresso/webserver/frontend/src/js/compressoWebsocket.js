@@ -7,12 +7,8 @@ const log = createLogger('WebSocket')
 
 export function escapeHtml(str) {
   if (!str) return ''
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;')
 }
 
 /**
@@ -102,26 +98,27 @@ export const CompressoWebsocketHandler = function ($t) {
    * @returns {null|WebSocket|*}
    */
   const initWebsocket = function () {
+
     function showWebsocketConnectionWarning() {
       // Ensure the websocket is actually missing
       if (typeof $compresso.ws !== 'undefined' && $compresso.ws !== null) {
-        return
+        return;
       }
       if (clearConnectionWarning === null) {
-        log.debug('Display websocket disconnect warning')
+        log.debug("Display websocket disconnect warning")
         clearConnectionWarning = Notify.create({
           timeout: 0,
           spinner: true,
           color: 'warning',
           position: 'top',
           message: $t('notifications.backendConnectionWarning'),
-          icon: 'report_problem',
-        })
+          icon: 'report_problem'
+        });
         if (connectionCheckInterval) clearInterval(connectionCheckInterval)
         connectionCheckInterval = setInterval(() => {
           if (typeof $compresso.ws !== 'undefined' && $compresso.ws !== null) {
             if ($compresso.ws.readyState === WebSocket.OPEN) {
-              log.debug('Websocket has reconnected. Clearing warning.')
+              log.debug("Websocket has reconnected. Clearing warning.")
               clearConnectionWarning()
               clearConnectionWarning = null
               clearInterval(connectionCheckInterval)
@@ -136,18 +133,18 @@ export const CompressoWebsocketHandler = function ($t) {
       if (typeof $compresso.ws === 'undefined' || $compresso.ws === null) {
         // Build WS path
         let loc = window.location,
-          new_uri
+          new_uri;
         if (loc.protocol === 'https:') {
-          new_uri = 'wss:'
+          new_uri = 'wss:';
         } else {
-          new_uri = 'ws:'
+          new_uri = 'ws:';
         }
-        new_uri += '//' + loc.host + '/compresso/websocket'
+        new_uri += '//' + loc.host + '/compresso/websocket';
 
         // Check for Shared Link Target
-        const target = localStorage.getItem('compresso-installation-target')
+        const target = localStorage.getItem('compresso-installation-target');
         if (target && target !== 'local') {
-          new_uri += '?target_id=' + encodeURIComponent(target)
+          new_uri += '?target_id=' + encodeURIComponent(target);
         }
 
         // Open WS connection
@@ -176,9 +173,9 @@ export const CompressoWebsocketHandler = function ($t) {
         return
       }
       if (typeof $compresso.frontendMessage[message_id] === 'function') {
-        $compresso.frontendMessage[message_id]()
+        $compresso.frontendMessage[message_id]();
         if (typeof $compresso.ws !== 'undefined' && $compresso.ws !== null) {
-          $compresso.ws.send(JSON.stringify({ command: 'dismiss_message', params: { message_id: message_id } }))
+          $compresso.ws.send(JSON.stringify({ command: 'dismiss_message', params: { message_id: message_id } }));
         }
       }
       if (typeof $compresso.frontendMessage[message_id] !== 'undefined') {
@@ -193,27 +190,29 @@ export const CompressoWebsocketHandler = function ($t) {
       let notificationString = $t(notificationStringId)
       // If i18n doesnt have this string ID, then revert to default
       if (notificationString === notificationStringId) {
-        notificationString = $t('notifications.serverMessages.defaults.' + type)
+        notificationString = $t('notifications.serverMessages.defaults.' + type);
       }
       // If the message is not empty, concatenate it to the end of the notification string
       if (message) {
-        notificationString = notificationString + '<br>' + escapeHtml(message)
+        notificationString = notificationString + '<br>' + escapeHtml(message);
       } else {
         // Check if a preset message is available
         let messageStringId = 'notifications.serverMessages.' + code + 'Message'
         let messageString = $t(messageStringId)
         // If i18n doesnt have this string ID, then revert to default
         if (messageString !== messageStringId) {
-          message = $t('notifications.serverMessages.' + code + 'Message')
+          message = $t('notifications.serverMessages.' + code + 'Message');
           // Concatenate it to the end
-          notificationString = notificationString + '<br>' + message
+          notificationString = notificationString + '<br>' + message;
         }
       }
 
-      notificationString =
-        '' + '<span style="display:block;min-height:50px;white-space:pre;">' + notificationString + '</span>'
+      notificationString = '' +
+        '<span style="display:block;min-height:50px;white-space:pre;">' +
+        notificationString +
+        '</span>'
 
-      let icon = 'announcement'
+      let icon = 'announcement';
 
       if (!(message_id in $compresso.frontendMessage)) {
         $compresso.frontendMessage[message_id] = Notify.create({
@@ -239,25 +238,25 @@ export const CompressoWebsocketHandler = function ($t) {
         let notificationString = $t(notificationStringId)
         // If i18n doesnt have this string ID, then revert to default
         if (notificationString === notificationStringId) {
-          notificationString = $t('notifications.serverMessages.defaults.' + type)
+          notificationString = $t('notifications.serverMessages.defaults.' + type);
         }
         // If the message is not empty, concatenate it to the end of the notification string
         if (message) {
-          notificationString = notificationString + ' - ' + escapeHtml(message)
+          notificationString = notificationString + ' - ' + escapeHtml(message);
         }
 
         // Format notification based on message type
-        let color = 'info'
-        let icon = 'announcement'
+        let color = 'info';
+        let icon = 'announcement';
         if (type === 'error') {
-          color = 'negative'
-          icon = 'error'
+          color = 'negative';
+          icon = 'error';
         } else if (type === 'warning') {
-          color = 'warning'
-          icon = 'warning'
+          color = 'warning';
+          icon = 'warning';
         } else if (type === 'success') {
-          color = 'positive'
-          icon = 'thumb_up'
+          color = 'positive';
+          icon = 'thumb_up';
         }
 
         $compresso.frontendMessage[message_id] = Notify.create({
@@ -271,17 +270,17 @@ export const CompressoWebsocketHandler = function ($t) {
               icon: 'close',
               color: 'white',
               handler: () => {
-                dismissMessages(message_id)
-              },
-            },
-          ],
+                dismissMessages(message_id);
+              }
+            }
+          ]
         })
       }
     }
 
     function displayMessages(data) {
       if (typeof $compresso.frontendMessage === 'undefined') {
-        $compresso.frontendMessage = {}
+        $compresso.frontendMessage = {};
       }
       let current_ids = []
       for (let i = 0; i < data.length; i++) {
@@ -291,24 +290,24 @@ export const CompressoWebsocketHandler = function ($t) {
         let message = data[i].message
         let timeout = data[i].timeout
         if (type === 'status') {
-          displayStatus($t, message_id, type, code, message, timeout)
+          displayStatus($t, message_id, type, code, message, timeout);
         } else {
-          displayNotice($t, message_id, type, code, message, timeout)
+          displayNotice($t, message_id, type, code, message, timeout);
         }
         current_ids[current_ids.length] = message_id
       }
       for (let message_id in $compresso.frontendMessage) {
-        if (!current_ids.includes(message_id)) {
-          dismissMessages(message_id)
+        if (!(current_ids.includes(message_id))) {
+          dismissMessages(message_id);
         }
       }
     }
 
     // Ensure the websocket is open
     if (typeof $compresso.ws === 'undefined' || $compresso.ws === null) {
-      log.debug('Starting connection to websocket server')
+      log.debug("Starting connection to websocket server")
       // Open WS connection
-      openWS()
+      openWS();
 
       // Add event listener to request frontend messages from server
       addWebsocketEventListener('open', 'start_frontend_messages', function () {
@@ -357,18 +356,9 @@ export const CompressoWebsocketHandler = function ($t) {
                       if (connectionAge > 5000) {
                         const filename = task.abspath ? task.abspath.split('/').pop() : $t('toasts.unknownFile')
                         if (task.success) {
-                          const savings =
-                            task.source_size && task.source_size > 0
-                              ? ' (' +
-                                Math.round(
-                                  ((task.source_size - (task.destination_size || task.source_size)) /
-                                    task.source_size) *
-                                    100,
-                                ) +
-                                '% ' +
-                                $t('toasts.smaller') +
-                                ')'
-                              : ''
+                          const savings = task.source_size && task.source_size > 0
+                            ? ' (' + Math.round(((task.source_size - (task.destination_size || task.source_size)) / task.source_size) * 100) + '% ' + $t('toasts.smaller') + ')'
+                            : ''
                           showEventToast('success', $t('toasts.taskCompleted') + ': ' + filename + savings)
                         } else {
                           // Retry notifications are delivered via frontend_message (not completed_tasks)
@@ -445,7 +435,7 @@ export const CompressoWebsocketHandler = function ($t) {
     autoReconnectSocket = false
     removeOwnedListeners()
     if (typeof $compresso.ws !== 'undefined' && $compresso.ws !== null) {
-      log.debug('Closing connection to websocket server')
+      log.debug("Closing connection to websocket server")
       // Clear any connection check interval
       if (connectionCheckInterval) {
         clearInterval(connectionCheckInterval)
@@ -465,7 +455,7 @@ export const CompressoWebsocketHandler = function ($t) {
   return {
     serverId,
     init: function () {
-      return initWebsocket()
+      return initWebsocket();
     },
     close: function () {
       closeWebsocket()
@@ -475,7 +465,7 @@ export const CompressoWebsocketHandler = function ($t) {
     },
     removeEventListener: function (key) {
       removeRegisteredListener(key)
-    },
+    }
   }
 }
 

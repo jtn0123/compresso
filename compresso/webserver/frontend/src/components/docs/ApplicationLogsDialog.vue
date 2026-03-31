@@ -1,12 +1,18 @@
 <template>
-  <CompressoDialogWindow ref="dialogRef" :title="$t('navigation.applicationLogs')" @hide="onDialogHide">
+  <CompressoDialogWindow
+    ref="dialogRef"
+    :title="$t('navigation.applicationLogs')"
+    @hide="onDialogHide"
+  >
     <div class="q-pa-md application-logs-dialog-content">
-      <div class="q-pb-md" style="max-width: 700px">
+      <div class="q-pb-md" style="max-width: 700px;">
         <h5 class="q-mb-none q-mt-sm">{{ $t('components.settings.support.logs') }}</h5>
         <div class="column">
           <div class="row q-gutter-sm items-stretch">
             <div class="col-12">
-              <q-skeleton v-if="debugging === null" type="QToggle" />
+              <q-skeleton
+                v-if="debugging === null"
+                type="QToggle"/>
               <q-toggle
                 v-else
                 v-model="debugging"
@@ -33,7 +39,7 @@
                       <q-item-label>{{ label }}</q-item-label>
                     </q-item-section>
                     <q-item-section side v-if="currentRetention === val">
-                      <q-icon name="check" />
+                      <q-icon name="check"/>
                     </q-item-section>
                   </q-item>
                 </q-list>
@@ -43,16 +49,22 @@
         </div>
       </div>
 
-      <q-card flat bordered class="application-logs-card" style="width: 2000px; max-width: 100%">
+      <q-card flat bordered class="application-logs-card" style="width: 2000px; max-width: 100%;">
         <q-card-section class="col-auto">
           <div class="row items-center">
             <div class="col-sm-6 col-xs-12">
               <div class="text-h6">{{ $t('components.settings.support.currentSystemLogs') }}:</div>
               <div class="text-subtitle2">{{ logsPath }}</div>
             </div>
-            <q-space class="gt-xs" />
+            <q-space class="gt-xs"/>
             <div class="col-12 col-sm-auto q-mt-sm q-mt-sm-none q-gutter-sm row">
-              <q-btn @click="clearLogs" outline color="warning" icon-right="delete_sweep" label="Clear" />
+              <q-btn
+                @click="clearLogs"
+                outline
+                color="warning"
+                icon-right="delete_sweep"
+                label="Clear"
+              />
               <q-btn
                 @click="downloadLogs"
                 outline
@@ -64,12 +76,25 @@
           </div>
         </q-card-section>
 
-        <q-separator />
+        <q-separator/>
 
         <q-card-section class="system-log-section">
-          <q-skeleton v-if="currentLog.length === 0" style="width: 100%" type="text" />
-          <div ref="logContainerRef" v-else :class="$q.platform.is.mobile ? '' : 'q-px-lg'" class="system-log-content">
-            <p v-for="(line, index) in currentLog" :key="index" v-html="line"></p>
+          <q-skeleton
+            v-if="currentLog.length === 0"
+            style="width: 100%"
+            type="text"
+          />
+          <div
+            ref="logContainerRef"
+            v-else
+            :class="$q.platform.is.mobile ? '' : 'q-px-lg'"
+            class="system-log-content"
+          >
+            <p
+              v-for="(line, index) in currentLog"
+              :key="index"
+              v-html="line"
+            ></p>
           </div>
         </q-card-section>
       </q-card>
@@ -105,7 +130,7 @@ const retentionOptions = {
   '3 days': 3,
   '5 days': 5,
   '7 days': 7,
-  '14 days': 14,
+  '14 days': 14
 }
 
 const MAX_LOG_LINES = 2000
@@ -122,18 +147,9 @@ const requestSystemLogs = () => {
 const styleLogLine = (logLine) => {
   let styledLine = logLine
   styledLine = styledLine.replace(/\/[\/|.|\s|\w|-]+/, "<span style='color:var(--q-secondary);'>$&</span>")
-  styledLine = styledLine.replace(
-    /[\d(\-|T|\:)]+\:DEBUG:[\w(\.|\-)]+/,
-    "<span style='color:var(--q-primary);'>$&</span>",
-  )
-  styledLine = styledLine.replace(
-    /[\d(\-|T|\:)]+\:WARNING:[\w(\.|\-)]+/,
-    "<span style='color:var(--q-warning);'>$&</span>",
-  )
-  styledLine = styledLine.replace(
-    /[\d(\-|T|\:)]+\:ERROR:[\w(\.|\-)]+/,
-    "<span style='color:var(--q-negative);'>$&</span>",
-  )
+  styledLine = styledLine.replace(/[\d(\-|T|\:)]+\:DEBUG:[\w(\.|\-)]+/, "<span style='color:var(--q-primary);'>$&</span>")
+  styledLine = styledLine.replace(/[\d(\-|T|\:)]+\:WARNING:[\w(\.|\-)]+/, "<span style='color:var(--q-warning);'>$&</span>")
+  styledLine = styledLine.replace(/[\d(\-|T|\:)]+\:ERROR:[\w(\.|\-)]+/, "<span style='color:var(--q-negative);'>$&</span>")
   return styledLine
 }
 
@@ -157,8 +173,8 @@ const getOverlapCount = (existingLogs, incomingLogs) => {
 const updateServerLogs = (data) => {
   const incomingLogs = Array.isArray(data.system_logs) ? data.system_logs : []
   const logContainer = logContainerRef.value
-  const shouldTail =
-    !logContainer || logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < 24
+  const shouldTail = !logContainer
+    || (logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight) < 24
 
   if (currentRawLog.value.length === 0) {
     currentRawLog.value = [...incomingLogs]
@@ -219,22 +235,20 @@ const closeCompressoWebsocket = () => {
 const fetchSettings = () => {
   axios({
     method: 'get',
-    url: getCompressoApiUrl('v2', 'settings/read'),
+    url: getCompressoApiUrl('v2', 'settings/read')
+  }).then((response) => {
+    debugging.value = response.data.settings.debugging
+    logsPath.value = response.data.settings.log_path
+    currentRetention.value = response.data.settings.log_buffer_retention
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: $t('notifications.failedToFetchSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
   })
-    .then((response) => {
-      debugging.value = response.data.settings.debugging
-      logsPath.value = response.data.settings.log_path
-      currentRetention.value = response.data.settings.log_buffer_retention
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: $t('notifications.failedToFetchSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
 }
 
 const toggleDebugging = (value) => {
@@ -243,29 +257,27 @@ const toggleDebugging = (value) => {
     url: getCompressoApiUrl('v2', 'settings/write'),
     data: {
       settings: {
-        debugging: value,
-      },
-    },
+        debugging: value
+      }
+    }
+  }).then(() => {
+    fetchSettings()
+    $q.notify({
+      color: 'positive',
+      position: 'top',
+      icon: 'cloud_done',
+      message: $t('notifications.saved'),
+      timeout: 200
+    })
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: $t('notifications.failedToSaveSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
   })
-    .then(() => {
-      fetchSettings()
-      $q.notify({
-        color: 'positive',
-        position: 'top',
-        icon: 'cloud_done',
-        message: $t('notifications.saved'),
-        timeout: 200,
-      })
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: $t('notifications.failedToSaveSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
 }
 
 const setLogRetention = (value) => {
@@ -278,29 +290,27 @@ const setLogRetention = (value) => {
     url: getCompressoApiUrl('v2', 'settings/write'),
     data: {
       settings: {
-        log_buffer_retention: retention,
-      },
-    },
+        log_buffer_retention: retention
+      }
+    }
+  }).then(() => {
+    fetchSettings()
+    $q.notify({
+      color: 'positive',
+      position: 'top',
+      icon: 'cloud_done',
+      message: $t('notifications.saved'),
+      timeout: 200
+    })
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: $t('notifications.failedToSaveSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
   })
-    .then(() => {
-      fetchSettings()
-      $q.notify({
-        color: 'positive',
-        position: 'top',
-        icon: 'cloud_done',
-        message: $t('notifications.saved'),
-        timeout: 200,
-      })
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: $t('notifications.failedToSaveSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
 }
 
 const clearLogs = () => {
@@ -312,26 +322,24 @@ const downloadLogs = () => {
   axios({
     method: 'get',
     url: getCompressoApiUrl('v2', 'docs/logs/zip'),
-    responseType: 'blob',
+    responseType: 'blob'
+  }).then((response) => {
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'CompressoLogs.zip')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: $t('notifications.failedToSaveSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
   })
-    .then((response) => {
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', 'CompressoLogs.zip')
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: $t('notifications.failedToSaveSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
 }
 
 const show = () => {
@@ -359,7 +367,7 @@ const onDialogHide = () => {
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 

@@ -1,9 +1,10 @@
 <template>
   <q-page padding class="q-pa-sm">
     <div class="row q-col-gutter-md">
+
       <!-- Row 1: System Status Bar -->
       <div class="col-12">
-        <SystemStatusBar :system-info="systemInfo" :live-metrics="liveMetrics" />
+        <SystemStatusBar :systemInfo="systemInfo" :liveMetrics="liveMetrics" />
       </div>
 
       <!-- Row 2: Hero section -->
@@ -12,8 +13,8 @@
         <q-card flat bordered class="full-height">
           <q-card-section class="q-pa-sm">
             <LibraryDonutChart
-              :total-files="optimizationData.totalFiles"
-              :processed-files="optimizationData.processedFiles"
+              :totalFiles="optimizationData.totalFiles"
+              :processedFiles="optimizationData.processedFiles"
               :percent="optimizationData.percent"
               :loading="optimizationData.loading"
             />
@@ -28,7 +29,7 @@
       <!-- Right: Workers -->
       <div class="col-12 col-md-8 col-lg-9">
         <WorkersPanel
-          :worker-progress-list="workerProgressList"
+          :workerProgressList="workerProgressList"
           @pause-all="pauseAllWorkers"
           @resume-all="resumeAllWorkers"
           @terminate-all="terminateAllWorkers"
@@ -37,7 +38,7 @@
         <!-- Stale data warning -->
         <div v-if="workersStale" class="q-mt-sm">
           <q-banner dense class="bg-warning text-dark text-caption" rounded>
-            <template #avatar>
+            <template v-slot:avatar>
               <q-icon name="warning" color="dark" />
             </template>
             {{ $t('common.dataStale') }}
@@ -61,13 +62,11 @@
               class="row items-center no-wrap q-py-xs q-col-gutter-sm"
             >
               <div class="col-auto text-caption text-weight-medium" style="min-width: 140px">
-                {{ gpu.name || 'GPU ' + gpu.index }}
+                {{ gpu.name || ('GPU ' + gpu.index) }}
               </div>
               <div class="col-auto">
                 <q-badge
-                  :color="
-                    gpu.utilization_percent > 80 ? 'negative' : gpu.utilization_percent > 50 ? 'warning' : 'positive'
-                  "
+                  :color="gpu.utilization_percent > 80 ? 'negative' : gpu.utilization_percent > 50 ? 'warning' : 'positive'"
                   :label="Math.round(gpu.utilization_percent) + '%'"
                 />
               </div>
@@ -84,19 +83,21 @@
                 </q-linear-progress>
               </div>
               <div class="col-auto text-caption text-grey" style="min-width: 50px; text-align: right">
-                <template v-if="gpu.temperature_c != null"> {{ gpu.temperature_c }}&deg;C </template>
+                <template v-if="gpu.temperature_c != null">
+                  {{ gpu.temperature_c }}&deg;C
+                </template>
               </div>
             </div>
           </q-card-section>
           <q-card-section class="q-pt-none">
-            <GpuUtilizationChart :gpu-history="gpuHistory" />
+            <GpuUtilizationChart :gpuHistory="gpuHistory" />
           </q-card-section>
         </q-card>
       </div>
 
       <!-- Row 3: Tasks -->
       <div class="col-12 col-md-5">
-        <PendingTasks v-bind="pendingTasksData" :queue-eta="queueEta" />
+        <PendingTasks v-bind="pendingTasksData" :queueEta="queueEta" />
       </div>
       <div class="col-12 col-md-7">
         <CompletedTasks v-bind="completedTasksData" />
@@ -109,6 +110,7 @@
       <div class="col-12 col-md-6">
         <HealthCheckPanel />
       </div>
+
     </div>
 
     <ReleaseNotesDialog />
@@ -123,19 +125,19 @@ import WorkersPanel from 'components/dashboard/workers/WorkersPanel.vue'
 import LinkedNodesPanel from 'components/dashboard/LinkedNodesPanel.vue'
 import HealthCheckPanel from 'components/dashboard/HealthCheckPanel.vue'
 import PendingTasks from 'components/dashboard/pending/PendingTasksDashboardSection.vue'
-import CompletedTasks from 'components/dashboard/completed/CompletedTasksDashboardSection.vue'
-import dateTools from 'src/js/dateTools'
-import { useQuasar } from 'quasar'
+import CompletedTasks from "components/dashboard/completed/CompletedTasksDashboardSection.vue"
+import dateTools from "src/js/dateTools"
+import { useQuasar } from "quasar"
 import { onMounted, onUnmounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import axios from 'axios'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import ReleaseNotesDialog from 'components/docs/ReleaseNotesDialog.vue'
-import GpuUtilizationChart from 'components/charts/GpuUtilizationChart.vue'
-import { useWorkerGauges } from 'src/composables/useWorkerGauges'
-import { useSystemStatus } from 'src/composables/useSystemStatus'
-import { createLogger } from 'src/composables/useLogger'
+import { useI18n } from "vue-i18n"
+import { CompressoWebsocketHandler } from "src/js/compressoWebsocket"
+import axios from "axios"
+import { getCompressoApiUrl } from "src/js/compressoGlobals"
+import ReleaseNotesDialog from "components/docs/ReleaseNotesDialog.vue"
+import GpuUtilizationChart from "components/charts/GpuUtilizationChart.vue"
+import { useWorkerGauges } from "src/composables/useWorkerGauges"
+import { useSystemStatus } from "src/composables/useSystemStatus"
+import { createLogger } from "src/composables/useLogger"
 
 export default {
   name: 'MainDashboard',
@@ -149,52 +151,44 @@ export default {
     LinkedNodesPanel,
     HealthCheckPanel,
     PendingTasks,
-    GpuUtilizationChart,
+    GpuUtilizationChart
   },
   setup() {
-    const { t: $t } = useI18n()
-    const $q = useQuasar()
-    const log = createLogger('Dashboard')
-    const { generateGroupColour } = useWorkerGauges()
-    const {
-      systemInfo,
-      liveMetrics,
-      gpuHistory,
-      fetchSystemInfo,
-      startLiveMetrics,
-      stopLiveMetrics,
-      updateLiveMetrics,
-    } = useSystemStatus()
-    const lastWorkersUpdate = ref(null)
-    const workersStale = ref(false)
-    const workerProgressList = ref([])
+    const { t: $t } = useI18n();
+    const $q = useQuasar();
+    const log = createLogger('Dashboard');
+    const { generateGroupColour } = useWorkerGauges();
+    const { systemInfo, liveMetrics, gpuHistory, fetchSystemInfo, startLiveMetrics, stopLiveMetrics, updateLiveMetrics } = useSystemStatus();
+    const lastWorkersUpdate = ref(null);
+    const workersStale = ref(false);
+    const workerProgressList = ref([]);
     const pendingTasksData = ref({
-      taskList: [],
-    })
+      taskList: []
+    });
     const completedTasksData = ref({
-      taskList: [],
-    })
+      taskList: []
+    });
     const optimizationData = ref({
       totalFiles: 0,
       processedFiles: 0,
       percent: 0,
-      loading: true,
-    })
-    const queueEta = ref(null)
+      loading: true
+    });
+    const queueEta = ref(null);
 
     function formatDuration(seconds) {
-      if (seconds == null || seconds <= 0) return null
-      if (seconds < 60) return '< 1m'
-      const hours = Math.floor(seconds / 3600)
-      const minutes = Math.floor((seconds % 3600) / 60)
-      if (hours > 0) return hours + 'h ' + minutes + 'm'
-      return minutes + 'm'
+      if (seconds == null || seconds <= 0) return null;
+      if (seconds < 60) return '< 1m';
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours > 0) return hours + 'h ' + minutes + 'm';
+      return minutes + 'm';
     }
 
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
-    let queuedWorkersPayload = null
-    let queuedWorkerUpdate = false
+    let ws = null;
+    let compressoWSHandler = CompressoWebsocketHandler($t);
+    let queuedWorkersPayload = null;
+    let queuedWorkerUpdate = false;
 
     let workerGroupColours = {}
 
@@ -208,11 +202,11 @@ export default {
 
     function buildWorkerProgressEntry(worker) {
       function calculateEtc(percent_completed, time_elapsed) {
-        const percentToGo = 100 - parseInt(percent_completed)
-        return (parseInt(time_elapsed) / parseInt(percent_completed)) * percentToGo
+        const percentToGo = 100 - parseInt(percent_completed);
+        return (parseInt(time_elapsed) / parseInt(percent_completed) * percentToGo);
       }
 
-      const workerGroupColour = getWorkerGroupColour(worker.name)
+      const workerGroupColour = getWorkerGroupColour(worker.name);
       const workerEntry = {
         indeterminate: false,
         id: worker.id,
@@ -237,128 +231,131 @@ export default {
         currentTask: worker.current_task ?? null,
         runnersInfo: worker.runners_info || {},
         subprocess: worker.subprocess || {},
-      }
+      };
 
       if (worker.paused) {
-        workerEntry.color = 'negative'
-        workerEntry.progressText = '...'
-        workerEntry.state = $t('components.workers.state.paused')
+        workerEntry.color = 'negative';
+        workerEntry.progressText = '...';
+        workerEntry.state = $t('components.workers.state.paused');
       }
 
       if (!worker.idle) {
-        workerEntry.label = worker.current_file ? `${worker.name}: ${worker.current_file}` : worker.name
-        workerEntry.color = 'secondary'
-        workerEntry.state = $t('components.workers.state.processing')
+        workerEntry.label = worker.current_file ? `${worker.name}: ${worker.current_file}` : worker.name;
+        workerEntry.color = 'secondary';
+        workerEntry.state = $t('components.workers.state.processing');
 
-        let currentRunner = $t('components.workers.currentRunner.indeterminate')
+        let currentRunner = $t('components.workers.currentRunner.indeterminate');
         if (typeof worker.runners_info === 'object' && worker.runners_info !== null) {
           for (const runnerValue of Object.values(worker.runners_info)) {
             if (runnerValue.status === 'in_progress') {
-              currentRunner = runnerValue.name
+              currentRunner = runnerValue.name;
             }
           }
         }
-        workerEntry.currentRunner = currentRunner
+        workerEntry.currentRunner = currentRunner;
 
-        const processingDuration = worker.start_time ? (new Date() - new Date(worker.start_time * 1000)) / 1000 : 0
-        workerEntry.startTime = worker.start_time ? dateTools.printDateTimeString(worker.start_time) : ''
-        workerEntry.timeSinceStart = processingDuration > 0 ? dateTools.printSecondsAsDuration(processingDuration) : ''
-        workerEntry.currentCommand = worker.current_command || ''
-        workerEntry.workerLog = worker.worker_log_tail || []
+        const processingDuration = worker.start_time
+          ? (new Date() - new Date(worker.start_time * 1000)) / 1000
+          : 0;
+        workerEntry.startTime = worker.start_time ? dateTools.printDateTimeString(worker.start_time) : '';
+        workerEntry.timeSinceStart = processingDuration > 0
+          ? dateTools.printSecondsAsDuration(processingDuration)
+          : '';
+        workerEntry.currentCommand = worker.current_command || '';
+        workerEntry.workerLog = worker.worker_log_tail || [];
 
-        const percentValue = Number(worker.subprocess?.percent)
-        const elapsedValue = Number(worker.subprocess?.elapsed)
-        const hasPercent = Number.isFinite(percentValue) && worker.subprocess?.percent !== ''
-        const hasElapsed = Number.isFinite(elapsedValue) && elapsedValue >= 0
-        const canEstimate = hasPercent && percentValue > 0 && hasElapsed
+        const percentValue = Number(worker.subprocess?.percent);
+        const elapsedValue = Number(worker.subprocess?.elapsed);
+        const hasPercent = Number.isFinite(percentValue) && worker.subprocess?.percent !== '';
+        const hasElapsed = Number.isFinite(elapsedValue) && elapsedValue >= 0;
+        const canEstimate = hasPercent && percentValue > 0 && hasElapsed;
 
         if (hasPercent) {
-          workerEntry.progress = percentValue
-          workerEntry.progressText = `${worker.subprocess.percent}%`
+          workerEntry.progress = percentValue;
+          workerEntry.progressText = `${worker.subprocess.percent}%`;
         } else {
-          workerEntry.indeterminate = true
-          workerEntry.progressText = '...'
+          workerEntry.indeterminate = true;
+          workerEntry.progressText = '...';
         }
 
         if (canEstimate) {
-          workerEntry.elapsed = dateTools.printSecondsAsDuration(elapsedValue)
+          workerEntry.elapsed = dateTools.printSecondsAsDuration(elapsedValue);
           // Prefer backend ETA when available, fall back to frontend calculation
-          const backendEta = Number(worker.subprocess?.eta_seconds)
+          const backendEta = Number(worker.subprocess?.eta_seconds);
           if (Number.isFinite(backendEta) && backendEta > 0) {
-            workerEntry.etc = formatDuration(backendEta)
+            workerEntry.etc = formatDuration(backendEta);
           } else {
-            workerEntry.etc = dateTools.printSecondsAsDuration(calculateEtc(percentValue, elapsedValue))
+            workerEntry.etc = dateTools.printSecondsAsDuration(calculateEtc(percentValue, elapsedValue));
           }
         }
 
         // Encoding FPS and speed from backend
-        const encodingFps = Number(worker.subprocess?.encoding_fps)
-        const encodingSpeed = Number(worker.subprocess?.encoding_speed)
-        workerEntry.encodingFps = Number.isFinite(encodingFps) && encodingFps > 0 ? encodingFps.toFixed(1) : null
-        workerEntry.encodingSpeed =
-          Number.isFinite(encodingSpeed) && encodingSpeed > 0 ? encodingSpeed.toFixed(1) + 'x' : null
+        const encodingFps = Number(worker.subprocess?.encoding_fps);
+        const encodingSpeed = Number(worker.subprocess?.encoding_speed);
+        workerEntry.encodingFps = Number.isFinite(encodingFps) && encodingFps > 0 ? encodingFps.toFixed(1) : null;
+        workerEntry.encodingSpeed = Number.isFinite(encodingSpeed) && encodingSpeed > 0 ? encodingSpeed.toFixed(1) + 'x' : null;
 
         if (worker.paused) {
-          workerEntry.indeterminate = true
-          workerEntry.color = 'negative'
-          workerEntry.state = $t('components.workers.state.paused')
+          workerEntry.indeterminate = true;
+          workerEntry.color = 'negative';
+          workerEntry.state = $t('components.workers.state.paused');
         }
       }
 
-      return workerEntry
+      return workerEntry;
     }
 
     function updateWorkerProgressCharts(data) {
-      const nextWorkerKeys = new Set()
+      const nextWorkerKeys = new Set();
       for (let i = 0; i < data.length; i++) {
-        const worker = data[i]
-        const workerKey = 'worker-' + worker.id
-        nextWorkerKeys.add(workerKey)
+        const worker = data[i];
+        const workerKey = 'worker-' + worker.id;
+        nextWorkerKeys.add(workerKey);
 
-        const nextWorkerState = buildWorkerProgressEntry(worker)
+        const nextWorkerState = buildWorkerProgressEntry(worker);
         if (workerProgressList.value[workerKey]) {
-          Object.assign(workerProgressList.value[workerKey], nextWorkerState)
+          Object.assign(workerProgressList.value[workerKey], nextWorkerState);
         } else {
-          workerProgressList.value[workerKey] = nextWorkerState
+          workerProgressList.value[workerKey] = nextWorkerState;
         }
       }
 
       Object.keys(workerProgressList.value).forEach((workerKey) => {
         if (!nextWorkerKeys.has(workerKey)) {
-          delete workerProgressList.value[workerKey]
+          delete workerProgressList.value[workerKey];
         }
-      })
+      });
     }
 
     function queueWorkerProgressUpdate(data) {
-      queuedWorkersPayload = data
+      queuedWorkersPayload = data;
       if (queuedWorkerUpdate) {
-        return
+        return;
       }
-      queuedWorkerUpdate = true
+      queuedWorkerUpdate = true;
 
       const flushWorkerUpdate = () => {
-        queuedWorkerUpdate = false
+        queuedWorkerUpdate = false;
         if (queuedWorkersPayload !== null) {
-          updateWorkerProgressCharts(queuedWorkersPayload)
-          queuedWorkersPayload = null
-          lastWorkersUpdate.value = Date.now()
-          workersStale.value = false
+          updateWorkerProgressCharts(queuedWorkersPayload);
+          queuedWorkersPayload = null;
+          lastWorkersUpdate.value = Date.now();
+          workersStale.value = false;
         }
-      }
+      };
 
       if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(flushWorkerUpdate)
+        window.requestAnimationFrame(flushWorkerUpdate);
       } else {
-        setTimeout(flushWorkerUpdate, 0)
+        setTimeout(flushWorkerUpdate, 0);
       }
     }
 
     function updatePendingTasksList(data) {
-      let result
-      let results = []
+      let result;
+      let results = [];
       for (let i = 0; i < data.results.length; i++) {
-        result = data.results[i]
+        result = data.results[i];
         results[i] = {
           id: data.results[i].id,
           priority: data.results[i].priority,
@@ -366,23 +363,23 @@ export default {
           status: data.results[i].status,
         }
       }
-      pendingTasksData.value.taskList = results
+      pendingTasksData.value.taskList = results;
       if (data.queue_eta) {
         queueEta.value = {
           formatted: formatDuration(data.queue_eta.eta_seconds),
           seconds: data.queue_eta.eta_seconds,
           confidence: data.queue_eta.confidence || 'low',
-        }
+        };
       } else {
-        queueEta.value = null
+        queueEta.value = null;
       }
     }
 
     function updateCompletedTasksList(data) {
-      let result
-      let results = []
+      let result;
+      let results = [];
       for (let i = 0; i < data.results.length; i++) {
-        result = data.results[i]
+        result = data.results[i];
         results[i] = {
           id: data.results[i].id,
           label: data.results[i].label,
@@ -391,96 +388,96 @@ export default {
           success: data.results[i].success,
         }
       }
-      completedTasksData.value.taskList = results
+      completedTasksData.value.taskList = results;
     }
 
     function initDashboardWebsocket() {
-      ws = compressoWSHandler.init()
-      let activeServerId = null
+      ws = compressoWSHandler.init();
+      let activeServerId = null;
 
       compressoWSHandler.addEventListener('open', 'start_dashboard_messages', function (evt) {
-        const activeSocket = evt?.target || ws
-        activeSocket.send(JSON.stringify({ command: 'start_workers_info', params: {} }))
-        activeSocket.send(JSON.stringify({ command: 'start_pending_tasks_info', params: {} }))
-        activeSocket.send(JSON.stringify({ command: 'start_completed_tasks_info', params: {} }))
-        startLiveMetrics(activeSocket)
-      })
+        const activeSocket = evt?.target || ws;
+        activeSocket.send(JSON.stringify({ command: 'start_workers_info', params: {} }));
+        activeSocket.send(JSON.stringify({ command: 'start_pending_tasks_info', params: {} }));
+        activeSocket.send(JSON.stringify({ command: 'start_completed_tasks_info', params: {} }));
+        startLiveMetrics(activeSocket);
+      });
 
       compressoWSHandler.addEventListener('message', 'handle_dashboard_messages', function (evt) {
         if (typeof evt.data === 'string') {
-          let jsonData = JSON.parse(evt.data)
+          let jsonData = JSON.parse(evt.data);
           if (jsonData.success) {
             if (activeServerId === null) {
-              activeServerId = jsonData.server_id
+              activeServerId = jsonData.server_id;
             } else {
               if (jsonData.server_id !== activeServerId) {
-                log.debug('Compresso server has restarted. Reloading page...')
-                location.reload()
+                log.debug('Compresso server has restarted. Reloading page...');
+                location.reload();
               }
             }
             switch (jsonData.type) {
               case 'workers_info':
-                queueWorkerProgressUpdate(jsonData.data)
-                break
+                queueWorkerProgressUpdate(jsonData.data);
+                break;
               case 'pending_tasks':
-                updatePendingTasksList(jsonData.data)
-                break
+                updatePendingTasksList(jsonData.data);
+                break;
               case 'completed_tasks':
-                updateCompletedTasksList(jsonData.data)
-                break
+                updateCompletedTasksList(jsonData.data);
+                break;
               case 'system_status':
-                updateLiveMetrics(jsonData.data)
-                break
+                updateLiveMetrics(jsonData.data);
+                break;
             }
           } else {
-            log.error('WebSocket Error: Received contained errors - ' + evt.data)
+            log.error('WebSocket Error: Received contained errors - ' + evt.data);
           }
         } else {
-          log.error('WebSocket Error: Received data was not JSON - ' + evt.data)
+          log.error('WebSocket Error: Received data was not JSON - ' + evt.data);
         }
-      })
+      });
     }
 
     function closeDashboardWebsocket() {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ command: 'stop_workers_info', params: {} }))
-        ws.send(JSON.stringify({ command: 'stop_pending_tasks_info', params: {} }))
-        ws.send(JSON.stringify({ command: 'stop_completed_tasks_info', params: {} }))
-        stopLiveMetrics(ws)
+        ws.send(JSON.stringify({ command: 'stop_workers_info', params: {} }));
+        ws.send(JSON.stringify({ command: 'stop_pending_tasks_info', params: {} }));
+        ws.send(JSON.stringify({ command: 'stop_completed_tasks_info', params: {} }));
+        stopLiveMetrics(ws);
       }
-      compressoWSHandler.close()
+      compressoWSHandler.close();
     }
 
     async function fetchOptimizationProgress() {
       try {
-        const response = await axios.get(getCompressoApiUrl('v2', 'compression/optimization-progress'))
+        const response = await axios.get(getCompressoApiUrl('v2', 'compression/optimization-progress'));
         optimizationData.value = {
           totalFiles: response.data.total || 0,
           processedFiles: response.data.processed || 0,
           percent: response.data.percent || 0,
-          loading: false,
-        }
+          loading: false
+        };
       } catch (_e) {
-        optimizationData.value.loading = false
+        optimizationData.value.loading = false;
       }
     }
 
-    let staleCheckInterval = null
+    let staleCheckInterval = null;
 
     onMounted(() => {
-      initDashboardWebsocket()
-      fetchSystemInfo()
-      fetchOptimizationProgress()
+      initDashboardWebsocket();
+      fetchSystemInfo();
+      fetchOptimizationProgress();
       staleCheckInterval = setInterval(() => {
-        if (lastWorkersUpdate.value && Date.now() - lastWorkersUpdate.value > 10000) {
-          workersStale.value = true
+        if (lastWorkersUpdate.value && (Date.now() - lastWorkersUpdate.value) > 10000) {
+          workersStale.value = true;
         }
-      }, 2000)
+      }, 2000);
     })
 
     onUnmounted(() => {
-      closeDashboardWebsocket()
-      if (staleCheckInterval) clearInterval(staleCheckInterval)
+      closeDashboardWebsocket();
+      if (staleCheckInterval) clearInterval(staleCheckInterval);
     })
 
     return {
@@ -500,51 +497,47 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'workers/worker/pause/all'),
-        data: {},
+        data: {}
+      }).then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          message: this.$t('components.workers.workerPaused'),
+          icon: 'check_circle',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('components.workers.workerPausedFailed'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            message: this.$t('components.workers.workerPaused'),
-            icon: 'check_circle',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('components.workers.workerPausedFailed'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     },
     resumeAllWorkers: function () {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'workers/worker/resume/all'),
-        data: {},
+        data: {}
+      }).then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          message: this.$t('components.workers.workerResumed'),
+          icon: 'check_circle',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('components.workers.workerResumedFailed'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            message: this.$t('components.workers.workerResumed'),
-            icon: 'check_circle',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('components.workers.workerResumedFailed'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     },
     terminateWorker: function (workerId) {
       let data = {
@@ -553,46 +546,42 @@ export default {
       axios({
         method: 'delete',
         url: getCompressoApiUrl('v2', 'workers/worker/terminate'),
-        data: data,
+        data: data
+      }).then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          message: this.$t('components.workers.workerTerminated'),
+          icon: 'check_circle',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('components.workers.workerTerminationFailed'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            message: this.$t('components.workers.workerTerminated'),
-            icon: 'check_circle',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('components.workers.workerTerminationFailed'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     },
     terminateAllWorkers: function () {
       for (let key in this.workerProgressList) {
-        let workerData = this.workerProgressList[key]
+        let workerData = this.workerProgressList[key];
         if (workerData.idle) {
-          this.terminateWorker(workerData.id)
+          this.terminateWorker(workerData.id);
         } else {
-          this.$q
-            .dialog({
-              title: this.$t('headers.confirm') + ' - ' + workerData.name,
-              message: this.$t('components.workers.terminateWorkerWarning'),
-              cancel: true,
-              persistent: true,
-            })
-            .onOk(() => {
-              this.terminateWorker(workerData.id)
-            })
+          this.$q.dialog({
+            title: this.$t('headers.confirm') + ' - ' + workerData.name,
+            message: this.$t('components.workers.terminateWorkerWarning'),
+            cancel: true,
+            persistent: true
+          }).onOk(() => {
+            this.terminateWorker(workerData.id);
+          })
         }
       }
-    },
-  },
+    }
+  }
 }
 </script>

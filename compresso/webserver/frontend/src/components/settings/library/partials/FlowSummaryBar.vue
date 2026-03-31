@@ -2,7 +2,15 @@
   <div class="flow-summary-bar q-mb-md">
     <div class="text-subtitle2 q-mb-xs">{{ $t('flow.flowSummary') }}</div>
     <div class="row items-center q-gutter-xs flex-wrap">
-      <q-chip dense color="primary" text-color="white" icon="search" size="sm"> Scan </q-chip>
+      <q-chip
+        dense
+        color="primary"
+        text-color="white"
+        icon="search"
+        size="sm"
+      >
+        Scan
+      </q-chip>
       <q-icon name="arrow_forward" size="16px" color="grey-6" />
 
       <q-chip
@@ -20,10 +28,26 @@
       </q-chip>
       <q-icon name="arrow_forward" size="16px" color="grey-6" />
 
-      <q-chip dense color="primary" text-color="white" icon="extension" size="sm"> Plugins </q-chip>
+      <q-chip
+        dense
+        color="primary"
+        text-color="white"
+        icon="extension"
+        size="sm"
+      >
+        Plugins
+      </q-chip>
       <q-icon name="arrow_forward" size="16px" color="grey-6" />
 
-      <q-chip dense color="primary" text-color="white" icon="engineering" size="sm"> Worker </q-chip>
+      <q-chip
+        dense
+        color="primary"
+        text-color="white"
+        icon="engineering"
+        size="sm"
+      >
+        Worker
+      </q-chip>
       <q-icon name="arrow_forward" size="16px" color="grey-6" />
 
       <q-chip
@@ -34,11 +58,19 @@
         size="sm"
       >
         {{ $t('flow.sizeGuardrails') }}
-        <q-tooltip v-if="sizeGuardrailEnabled"> {{ sizeGuardrailMinPct }}% — {{ sizeGuardrailMaxPct }}% </q-tooltip>
+        <q-tooltip v-if="sizeGuardrailEnabled">
+          {{ sizeGuardrailMinPct }}% — {{ sizeGuardrailMaxPct }}%
+        </q-tooltip>
       </q-chip>
       <q-icon name="arrow_forward" size="16px" color="grey-6" />
 
-      <q-chip dense :color="policyColor" text-color="white" :icon="policyIcon" size="sm">
+      <q-chip
+        dense
+        :color="policyColor"
+        text-color="white"
+        :icon="policyIcon"
+        size="sm"
+      >
         {{ policyLabel }}
       </q-chip>
     </div>
@@ -56,7 +88,7 @@ const props = defineProps({
   sizeGuardrailMinPct: { type: Number, default: 20 },
   sizeGuardrailMaxPct: { type: Number, default: 80 },
   replacementPolicy: { type: String, default: '' },
-  globalApprovalRequired: { type: Boolean, default: false },
+  globalApprovalRequired: { type: Boolean, default: false }
 })
 
 const { t } = useI18n()
@@ -70,27 +102,27 @@ const effectivePolicy = computed(() => {
 
 const policyLabel = computed(() => {
   const map = {
-    replace: t('flow.policyReplace'),
-    approval_required: t('flow.policyApproval'),
-    keep_both: t('flow.policyKeepBoth'),
+    'replace': t('flow.policyReplace'),
+    'approval_required': t('flow.policyApproval'),
+    'keep_both': t('flow.policyKeepBoth'),
   }
   return map[effectivePolicy.value] || t('flow.policyReplace')
 })
 
 const policyColor = computed(() => {
   const map = {
-    replace: 'positive',
-    approval_required: 'info',
-    keep_both: 'accent',
+    'replace': 'positive',
+    'approval_required': 'info',
+    'keep_both': 'accent',
   }
   return map[effectivePolicy.value] || 'positive'
 })
 
 const policyIcon = computed(() => {
   const map = {
-    replace: 'swap_horiz',
-    approval_required: 'gavel',
-    keep_both: 'file_copy',
+    'replace': 'swap_horiz',
+    'approval_required': 'gavel',
+    'keep_both': 'file_copy',
   }
   return map[effectivePolicy.value] || 'swap_horiz'
 })

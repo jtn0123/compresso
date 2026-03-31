@@ -1,6 +1,7 @@
 <template>
   <q-card class="worker-log-card">
     <q-card-section class="bg-card-head q-pa-sm">
+
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-h6 text-grey-8">
@@ -8,12 +9,15 @@
           </div>
         </div>
       </div>
+
     </q-card-section>
 
-    <q-separator />
+    <q-separator/>
 
     <q-card-section class="q-pa-md worker-log-scroll">
-      <div v-for="(logLine, index) in workerLog" :key="index">
+      <div
+        v-for="(logLine, index) in workerLog"
+        v-bind:key="index">
         <p class="q-ma-none q-pa-none">{{ logLine }}</p>
       </div>
     </q-card-section>
@@ -28,9 +32,9 @@ export default {
   },
   props: {
     workerLog: {
-      type: Array,
+      type: Array
     },
-  },
+  }
 }
 </script>
 

@@ -10,7 +10,7 @@
     :auto-close="autoClose"
     content-class="compresso-dropdown-menu"
   >
-    <slot />
+    <slot/>
   </q-btn-dropdown>
 </template>
 
@@ -18,23 +18,23 @@
 defineProps({
   label: {
     type: String,
-    default: '',
+    default: ''
   },
   icon: {
     type: String,
-    default: '',
+    default: ''
   },
   iconRight: {
     type: String,
-    default: '',
+    default: ''
   },
   dense: {
     type: Boolean,
-    default: false,
+    default: false
   },
   autoClose: {
     type: Boolean,
-    default: false,
-  },
+    default: false
+  }
 })
 </script>

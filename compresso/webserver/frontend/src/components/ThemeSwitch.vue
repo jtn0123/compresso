@@ -13,22 +13,22 @@
 
 <script>
 import { LocalStorage, useQuasar } from 'quasar'
-import { ref } from 'vue'
-import { applyTheme } from 'src/js/compressoTheme'
+import { ref } from "vue";
+import { applyTheme } from "src/js/compressoTheme";
 
 export default {
   setup() {
-    const $q = useQuasar()
-    const compressoDarkMode = ref($q.dark.isActive)
+    const $q = useQuasar();
+    const compressoDarkMode = ref($q.dark.isActive);
 
     function toggleMode() {
-      compressoDarkMode.value = !compressoDarkMode.value
-      const themeName = compressoDarkMode.value ? 'dark' : 'light'
-      const palette = LocalStorage.getItem('palette') || 'forest'
-      LocalStorage.set('theme', themeName)
-      LocalStorage.set('theme_explicit', true)
-      $q.dark.set(compressoDarkMode.value)
-      applyTheme(themeName, palette)
+      compressoDarkMode.value = !compressoDarkMode.value;
+      const themeName = compressoDarkMode.value ? 'dark' : 'light';
+      const palette = LocalStorage.getItem('palette') || 'forest';
+      LocalStorage.set('theme', themeName);
+      LocalStorage.set('theme_explicit', true);
+      $q.dark.set(compressoDarkMode.value);
+      applyTheme(themeName, palette);
     }
 
     return {

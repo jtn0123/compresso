@@ -32,7 +32,7 @@ const props = defineProps({
   totalFiles: { type: Number, default: 0 },
   processedFiles: { type: Number, default: 0 },
   percent: { type: Number, default: 0 },
-  loading: { type: Boolean, default: false },
+  loading: { type: Boolean, default: false }
 })
 
 const chartRef = ref(null)
@@ -56,13 +56,11 @@ async function renderChart() {
     type: 'doughnut',
     data: {
       labels: [$t('flow.optimizationProgress'), $t('dashboard.remaining')],
-      datasets: [
-        {
-          data: [processed, remaining],
-          backgroundColor: [getChartColor(1), remainingColor],
-          borderWidth: 0,
-        },
-      ],
+      datasets: [{
+        data: [processed, remaining],
+        backgroundColor: [getChartColor(1), remainingColor],
+        borderWidth: 0
+      }]
     },
     options: {
       responsive: true,
@@ -72,31 +70,24 @@ async function renderChart() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString()}`,
-          },
-        },
-      },
-    },
+            label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString()}`
+          }
+        }
+      }
+    }
   })
 }
 
-watch(
-  () => [props.totalFiles, props.processedFiles, props.loading, $q.dark.isActive],
-  () => {
-    if (!props.loading) renderChart()
-  },
-  { deep: true },
-)
+watch(() => [props.totalFiles, props.processedFiles, props.loading, $q.dark.isActive], () => {
+  if (!props.loading) renderChart()
+}, { deep: true })
 
 onMounted(() => {
   if (!props.loading) renderChart()
 })
 
 onBeforeUnmount(() => {
-  if (chart) {
-    chart.destroy()
-    chart = null
-  }
+  if (chart) { chart.destroy(); chart = null }
 })
 </script>
 

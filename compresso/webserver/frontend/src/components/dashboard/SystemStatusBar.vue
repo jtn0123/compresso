@@ -58,7 +58,11 @@
 
         <!-- GPU(s) -->
         <template v-if="liveGpus.length > 0">
-          <div v-for="(gpu, i) in liveGpus" :key="'gpu-' + i" class="col-6 col-sm-4 col-md gt-xs">
+          <div
+            v-for="(gpu, i) in liveGpus"
+            :key="'gpu-' + i"
+            class="col-6 col-sm-4 col-md gt-xs"
+          >
             <div class="row items-center no-wrap q-gutter-xs">
               <span class="text-caption text-grey-7">GPU{{ liveGpus.length > 1 ? gpu.index : '' }}</span>
               <q-linear-progress
@@ -103,17 +107,15 @@
             <div
               :class="[
                 'connection-dot',
-                connectionState === 'connected'
-                  ? 'connection-dot--connected'
-                  : connectionState === 'connecting'
-                    ? 'connection-dot--connecting'
-                    : 'connection-dot--disconnected',
+                connectionState === 'connected' ? 'connection-dot--connected' :
+                connectionState === 'connecting' ? 'connection-dot--connecting' :
+                'connection-dot--disconnected'
               ]"
             />
             <q-tooltip>
-              {{
-                connectionState === 'connected' ? $t('systemStatus.realtimeActive') : $t('systemStatus.realtimeLost')
-              }}
+              {{ connectionState === 'connected'
+                ? $t('systemStatus.realtimeActive')
+                : $t('systemStatus.realtimeLost') }}
             </q-tooltip>
             <span class="text-caption" :class="connectionTextClass">
               {{ connectionLabel }}
@@ -145,8 +147,8 @@ const props = defineProps({
       disk_percent: 0,
       disk_used_gb: 0,
       gpus: [],
-    }),
-  },
+    })
+  }
 })
 
 const { t } = useI18n()
@@ -174,34 +176,25 @@ function gpuDisplayName(gpu) {
 
 const connectionColor = computed(() => {
   switch (connectionState.value) {
-    case 'connected':
-      return 'positive'
-    case 'connecting':
-      return 'warning'
-    default:
-      return 'negative'
+    case 'connected': return 'positive'
+    case 'connecting': return 'warning'
+    default: return 'negative'
   }
 })
 
 const connectionTextClass = computed(() => {
   switch (connectionState.value) {
-    case 'connected':
-      return 'text-positive'
-    case 'connecting':
-      return 'text-warning'
-    default:
-      return 'text-negative'
+    case 'connected': return 'text-positive'
+    case 'connecting': return 'text-warning'
+    default: return 'text-negative'
   }
 })
 
 const connectionLabel = computed(() => {
   switch (connectionState.value) {
-    case 'connected':
-      return t('systemStatus.connected')
-    case 'connecting':
-      return t('systemStatus.connecting')
-    default:
-      return t('systemStatus.disconnected')
+    case 'connected': return t('systemStatus.connected')
+    case 'connecting': return t('systemStatus.connecting')
+    default: return t('systemStatus.disconnected')
   }
 })
 </script>

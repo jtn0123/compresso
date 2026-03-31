@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios from "axios";
 import { ref, reactive } from 'vue'
 import { Notify, LocalStorage } from 'quasar'
 import { createLogger } from 'src/composables/useLogger'
@@ -21,9 +21,7 @@ function loadToastSettings() {
   try {
     const stored = LocalStorage.getItem(TOAST_SETTINGS_KEY)
     if (stored) return stored
-  } catch {
-    /* ignore parse errors */
-  }
+  } catch { /* ignore parse errors */ }
   return { enabled: true, verbosity: 'all' }
 }
 export const toastSettings = reactive(loadToastSettings())
@@ -34,9 +32,7 @@ export function saveToastSettings() {
       enabled: toastSettings.enabled,
       verbosity: toastSettings.verbosity,
     })
-  } catch {
-    /* ignore storage errors */
-  }
+  } catch { /* ignore storage errors */ }
 }
 
 const TOAST_ICON_MAP = {
@@ -71,30 +67,32 @@ export function showEventToast(type, message, options = {}) {
     message: message,
     position: 'bottom-right',
     timeout: 4000,
-    actions: [{ icon: 'close', color: 'white', round: true, dense: true }],
+    actions: [
+      { icon: 'close', color: 'white', round: true, dense: true }
+    ],
     ...options,
   })
 }
 
-let $compresso = {}
+let $compresso = {};
 
 export const getCompressoServerUrl = function () {
   if (typeof $compresso.serverUrl === 'undefined') {
-    let parser = document.createElement('a')
-    parser.href = window.location.href
+    let parser = document.createElement('a');
+    parser.href = window.location.href;
 
-    $compresso.serverUrl = parser.protocol + '//' + parser.host
+    $compresso.serverUrl = parser.protocol + '//' + parser.host;
   }
-  return $compresso.serverUrl
+  return $compresso.serverUrl;
 }
 
 export const getCompressoApiUrl = function (api_version, api_endpoint) {
   if (typeof $compresso.apiUrl === 'undefined') {
-    let serverUrl = getCompressoServerUrl()
+    let serverUrl = getCompressoServerUrl();
 
-    $compresso.apiUrl = serverUrl + '/compresso/api'
+    $compresso.apiUrl = serverUrl + '/compresso/api';
   }
-  return $compresso.apiUrl + '/' + api_version + '/' + api_endpoint
+  return $compresso.apiUrl + '/' + api_version + '/' + api_endpoint;
 }
 
 export const setTheme = function (mode) {
@@ -109,149 +107,139 @@ export default {
       if (typeof $compresso.version === 'undefined') {
         axios({
           method: 'get',
-          url: getCompressoApiUrl('v2', 'version/read'),
+          url: getCompressoApiUrl('v2', 'version/read')
         }).then((response) => {
-          $compresso.version = response.data.version
+          $compresso.version = response.data.version;
           resolve($compresso.version)
         })
       } else {
-        resolve($compresso.version)
+        resolve($compresso.version);
       }
     })
   },
   getCompressoSession(options = {}) {
     return new Promise((resolve, reject) => {
-      let cacheKey = 'session'
+      let cacheKey = 'session';
       if (options.skipProxy) {
-        cacheKey = 'localSession'
+        cacheKey = 'localSession';
       }
 
       if (typeof $compresso[cacheKey] === 'undefined') {
         axios({
           method: 'get',
           url: getCompressoApiUrl('v2', 'session/state'),
-          ...options,
+          ...options
+        }).then((response) => {
+          $compresso[cacheKey] = {
+            created: response.data.created,
+            email: response.data.email,
+            level: response.data.level,
+            name: response.data.name,
+            picture_uri: response.data.picture_uri,
+            uuid: response.data.uuid,
+          }
+          resolve($compresso[cacheKey])
+        }).catch(() => {
+          reject()
         })
-          .then((response) => {
-            $compresso[cacheKey] = {
-              created: response.data.created,
-              email: response.data.email,
-              level: response.data.level,
-              name: response.data.name,
-              picture_uri: response.data.picture_uri,
-              uuid: response.data.uuid,
-            }
-            resolve($compresso[cacheKey])
-          })
-          .catch(() => {
-            reject()
-          })
       } else {
-        resolve($compresso[cacheKey])
+        resolve($compresso[cacheKey]);
       }
     })
   },
   getCompressoPrivacyPolicy() {
     return new Promise((resolve, reject) => {
-      $compresso.docs = typeof $compresso.docs === 'undefined' ? {} : $compresso.docs
+      $compresso.docs = (typeof $compresso.docs === 'undefined') ? {} : $compresso.docs
       if (typeof $compresso.docs.privacypolicy === 'undefined') {
         axios({
           method: 'get',
-          url: getCompressoApiUrl('v2', 'docs/privacypolicy'),
+          url: getCompressoApiUrl('v2', 'docs/privacypolicy')
+        }).then((response) => {
+          $compresso.docs.privacypolicy = response.data.content.join('')
+          resolve($compresso.docs.privacypolicy)
+        }).catch(() => {
+          reject()
         })
-          .then((response) => {
-            $compresso.docs.privacypolicy = response.data.content.join('')
-            resolve($compresso.docs.privacypolicy)
-          })
-          .catch(() => {
-            reject()
-          })
       } else {
-        resolve($compresso.docs.privacypolicy)
+        resolve($compresso.docs.privacypolicy);
       }
     })
   },
   getCompressoNotifications() {
     if (typeof $compresso.notificationsList === 'undefined') {
-      $compresso.notificationsList = []
+      $compresso.notificationsList = [];
     }
-    return $compresso.notificationsList
+    return $compresso.notificationsList;
   },
   updateCompressoNotifications($t) {
     return new Promise((resolve, reject) => {
-      $compresso.notificationsList =
-        typeof $compresso.notificationsList === 'undefined' ? [] : $compresso.notificationsList
+      $compresso.notificationsList = (typeof $compresso.notificationsList === 'undefined') ? [] : $compresso.notificationsList
       axios({
         method: 'get',
         url: getCompressoApiUrl('v2', 'notifications/read'),
-      })
-        .then((response) => {
-          // Update success
-          let notifications = []
-          for (let i = 0; i < response.data.notifications.length; i++) {
-            let notification = response.data.notifications[i]
-            // Fetch label string from i18n
-            let labelStringId = 'notifications.serverNotificationLabels.' + notification.label
-            let labelString = $t(labelStringId)
-            // If i18n doesn't have this string ID, then revert to just displaying the provided label
-            if (labelString === labelStringId) {
-              labelString = notification.label
-            }
-            // Fetch message string from i18n
-            let messageStringId = 'notifications.serverNotificationLabels.' + notification.message
-            let messageString = $t(messageStringId)
-            // If i18n doesn't have this string ID, then revert to just displaying the provided label
-            if (messageString === messageStringId) {
-              messageString = notification.message
-            }
-            // Set the color of the notification
-            let color = 'info'
-            if (notification.type === 'error') {
-              color = 'negative'
-            } else if (notification.type === 'warning') {
-              color = 'warning'
-            } else if (notification.type === 'success') {
-              color = 'positive'
-            }
-            // Add notification to list
-            notifications[notifications.length] = {
-              uuid: notification.uuid,
-              icon: notification.icon,
-              navigation: notification.navigation,
-              label: labelString,
-              message: messageString,
-              color: color,
-            }
+      }).then((response) => {
+        // Update success
+        let notifications = []
+        for (let i = 0; i < response.data.notifications.length; i++) {
+          let notification = response.data.notifications[i];
+          // Fetch label string from i18n
+          let labelStringId = 'notifications.serverNotificationLabels.' + notification.label
+          let labelString = $t(labelStringId)
+          // If i18n doesn't have this string ID, then revert to just displaying the provided label
+          if (labelString === labelStringId) {
+            labelString = notification.label;
           }
-          $compresso.notificationsList = notifications
-          notificationsCount.value = notifications.length
-          resolve($compresso.notificationsList)
-        })
-        .catch(() => {
-          log.error('Failed to retrieve server notifications')
-          resolve($compresso.notificationsList)
-        })
+          // Fetch message string from i18n
+          let messageStringId = 'notifications.serverNotificationLabels.' + notification.message
+          let messageString = $t(messageStringId)
+          // If i18n doesn't have this string ID, then revert to just displaying the provided label
+          if (messageString === messageStringId) {
+            messageString = notification.message;
+          }
+          // Set the color of the notification
+          let color = 'info';
+          if (notification.type === 'error') {
+            color = 'negative';
+          } else if (notification.type === 'warning') {
+            color = 'warning';
+          } else if (notification.type === 'success') {
+            color = 'positive';
+          }
+          // Add notification to list
+          notifications[notifications.length] = {
+            uuid: notification.uuid,
+            icon: notification.icon,
+            navigation: notification.navigation,
+            label: labelString,
+            message: messageString,
+            color: color,
+          }
+        }
+        $compresso.notificationsList = notifications;
+        notificationsCount.value = notifications.length
+        resolve($compresso.notificationsList)
+      }).catch(() => {
+        log.error("Failed to retrieve server notifications")
+        resolve($compresso.notificationsList)
+      });
     })
   },
   dismissNotifications($t, uuidList) {
     let queryData = {
-      uuid_list: uuidList,
+      uuid_list: uuidList
     }
     return new Promise((resolve, reject) => {
-      $compresso.notificationsList =
-        typeof $compresso.notificationsList === 'undefined' ? [] : $compresso.notificationsList
+      $compresso.notificationsList = (typeof $compresso.notificationsList === 'undefined') ? [] : $compresso.notificationsList
       axios({
         method: 'delete',
         url: getCompressoApiUrl('v2', 'notifications/remove'),
         data: queryData,
-      })
-        .then((response) => {
-          resolve()
-        })
-        .catch(() => {
-          log.error('Failed to dismiss server notifications')
-          resolve()
-        })
+      }).then((response) => {
+        resolve()
+      }).catch(() => {
+        log.error("Failed to dismiss server notifications")
+        resolve()
+      });
     })
   },
 }

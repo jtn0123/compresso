@@ -1,16 +1,16 @@
 <template>
-  <CompressoDialogWindow ref="dialogRef" :title="t('headers.completedTasks')" @hide="onDialogHide">
+  <CompressoDialogWindow
+    ref="dialogRef"
+    :title="t('headers.completedTasks')"
+    @hide="onDialogHide"
+  >
     <div class="completed-tasks-dialog">
       <div class="completed-tasks-table-actions-bar q-pa-sm">
         <div class="row q-col-gutter-sm items-center completed-tasks-toolbar">
           <div v-if="showActionsToggle" class="col-12 row items-center justify-end">
             <CompressoListActionButton
               :icon="actionsExpanded ? 'expand_less' : 'expand_more'"
-              :tooltip="
-                actionsExpanded
-                  ? t('components.completedTasks.hideActions')
-                  : t('components.completedTasks.showActions')
-              "
+              :tooltip="actionsExpanded ? t('components.completedTasks.hideActions') : t('components.completedTasks.showActions')"
               @click="toggleActionsExpanded"
             />
           </div>
@@ -27,8 +27,8 @@
                     v-model="searchValue"
                     :placeholder="t('navigation.search')"
                   >
-                    <template #append>
-                      <q-icon name="search" :color="searchLabelColor" />
+                    <template v-slot:append>
+                      <q-icon name="search" :color="searchLabelColor"/>
                     </template>
                   </q-input>
                 </div>
@@ -66,7 +66,7 @@
                       />
                     </div>
 
-                    <q-space />
+                    <q-space/>
 
                     <div class="col-auto">
                       <CompressoStandardButtonDropdown
@@ -78,18 +78,18 @@
                           <q-item clickable v-close-popup @click="selectLibraryForRecreateTask">
                             <q-item-section>
                               <q-item-label>
-                                <q-icon name="add" />
+                                <q-icon name="add"/>
                                 {{ t('components.completedTasks.addToPendingTasksList') }}
                               </q-item-label>
                             </q-item-section>
                           </q-item>
 
-                          <q-separator />
+                          <q-separator/>
 
                           <q-item clickable v-close-popup @click="deleteSelected">
                             <q-item-section>
                               <q-item-label>
-                                <q-icon name="delete_outline" />
+                                <q-icon name="delete_outline"/>
                                 {{ t('components.completedTasks.removeSelected') }}
                               </q-item-label>
                             </q-item-section>
@@ -103,7 +103,7 @@
                 <div v-if="activeFilterChips.length" class="col-12">
                   <div class="row items-center q-col-gutter-sm completed-tasks-filter-indicator">
                     <div class="col-auto text-secondary completed-tasks-filter-indicator__label">
-                      <q-icon name="filter_list" class="q-mr-xs" />
+                      <q-icon name="filter_list" class="q-mr-xs"/>
                       {{ t('components.completedTasks.filtersActive') }}
                     </div>
                     <div class="col">
@@ -140,7 +140,7 @@
           </q-slide-transition>
         </div>
 
-        <q-separator class="q-mt-sm" />
+        <q-separator class="q-mt-sm"/>
       </div>
 
       <!-- SELECTION BANNER -->
@@ -205,14 +205,14 @@
               :columns="columns"
               class="completed-tasks-table"
             >
-              <template #body="props">
+              <template v-slot:body="props">
                 <q-tr :props="props" class="completed-task-row">
                   <q-td auto-width class="completed-task-select">
                     <div class="completed-task-cell-center">
                       <q-checkbox
                         color="secondary"
                         :model-value="isRowSelected(props.row)"
-                        @update:model-value="(value) => toggleRowSelection(props.row, value)"
+                        @update:model-value="value => toggleRowSelection(props.row, value)"
                       />
                     </div>
                   </q-td>
@@ -222,11 +222,15 @@
                       {{ props.row.name }}
                     </div>
                     <div class="text-caption">
-                      <span class="text-weight-medium"> {{ t('components.completedTasks.columns.completed') }}: </span>
+                      <span class="text-weight-medium">
+                        {{ t('components.completedTasks.columns.completed') }}:
+                      </span>
                       {{ props.row.dateTimeCompleted }}
                     </div>
                     <div class="text-caption">
-                      <span class="text-weight-medium"> {{ t('components.completedTasks.columns.status') }}: </span>
+                      <span class="text-weight-medium">
+                        {{ t('components.completedTasks.columns.status') }}:
+                      </span>
                       <q-badge :color="props.row.status ? 'positive' : 'negative'">
                         {{ props.row.status ? t('status.success') : t('status.failed') }}
                       </q-badge>
@@ -240,7 +244,7 @@
                           v-if="$q.screen.gt.xs"
                           @click="openDetailsDialog(props.row.id)"
                           :label="t('components.completedTasks.details')"
-                          style="min-width: 100px"
+                          style="min-width: 100px;"
                         />
                         <CompressoListActionButton
                           v-else
@@ -253,7 +257,7 @@
                           v-if="$q.screen.gt.xs && props.row.hasMetadata"
                           @click="openMetadataDialog(props.row.id)"
                           :label="t('components.completedTasks.metadata')"
-                          style="min-width: 120px"
+                          style="min-width: 120px;"
                         />
                         <CompressoListActionButton
                           v-else-if="props.row.hasMetadata"
@@ -267,18 +271,18 @@
                 </q-tr>
               </template>
 
-              <template #no-data>
+              <template v-slot:no-data>
                 <div class="full-width row flex-center text-accent q-gutter-sm">
-                  <q-icon size="2em" name="sentiment_dissatisfied" />
+                  <q-icon size="2em" name="sentiment_dissatisfied"/>
                   <q-item-label>{{ t('headers.listEmpty') }}</q-item-label>
-                  <q-icon size="2em" name="priority_high" />
+                  <q-icon size="2em" name="priority_high"/>
                 </div>
               </template>
             </q-table>
 
-            <template #loading>
+            <template v-slot:loading>
               <div class="row flex-center q-my-md">
-                <q-spinner-dots size="32px" color="secondary" />
+                <q-spinner-dots size="32px" color="secondary"/>
               </div>
             </template>
           </q-infinite-scroll>
@@ -292,7 +296,7 @@
           </div>
 
           <q-inner-loading :showing="loading && rows.length === 0">
-            <q-spinner-dots size="42px" color="secondary" />
+            <q-spinner-dots size="42px" color="secondary"/>
           </q-inner-loading>
 
           <div v-show="showScrollTop" class="completed-tasks-scroll-top">
@@ -318,38 +322,48 @@
           </div>
         </q-card-section>
 
-        <q-separator />
+        <q-separator/>
 
         <q-card-section class="completed-tasks-dialog-body scroll q-pa-lg q-gutter-md">
           <div class="text-subtitle2 text-secondary">
             {{ t('components.completedTasks.filterStatusLabel') }}
           </div>
-          <q-btn-toggle v-model="draftStatusFilter" toggle-color="secondary" :options="statusFilterOptions" />
+          <q-btn-toggle
+            v-model="draftStatusFilter"
+            toggle-color="secondary"
+            :options="statusFilterOptions"
+          />
 
           <div class="text-subtitle2 text-secondary">
             {{ t('components.completedTasks.since') }}
           </div>
           <div class="row items-center q-col-gutter-sm">
             <div class="col">
-              <q-input outlined dense debounce="300" color="secondary" v-model="draftSinceDate">
-                <template #prepend>
+              <q-input
+                outlined
+                dense
+                debounce="300"
+                color="secondary"
+                v-model="draftSinceDate"
+              >
+                <template v-slot:prepend>
                   <q-icon name="event" class="cursor-pointer">
                     <q-popup-proxy cover transition-show="scale" transition-hide="scale">
                       <q-date v-model="draftSinceDate" mask="YYYY-MM-DD HH:mm" flat bordered>
                         <div class="row items-center justify-end">
-                          <CompressoStandardButton v-close-popup :label="sincePopupActionLabel" color="secondary" />
+                          <CompressoStandardButton v-close-popup :label="sincePopupActionLabel" color="secondary"/>
                         </div>
                       </q-date>
                     </q-popup-proxy>
                   </q-icon>
                 </template>
 
-                <template #append>
+                <template v-slot:append>
                   <q-icon name="access_time" class="cursor-pointer">
                     <q-popup-proxy cover transition-show="scale" transition-hide="scale">
                       <q-time v-model="draftSinceDate" mask="YYYY-MM-DD HH:mm" format24h flat bordered>
                         <div class="row items-center justify-end">
-                          <CompressoStandardButton v-close-popup :label="sincePopupActionLabel" color="secondary" />
+                          <CompressoStandardButton v-close-popup :label="sincePopupActionLabel" color="secondary"/>
                         </div>
                       </q-time>
                     </q-popup-proxy>
@@ -373,25 +387,31 @@
           </div>
           <div class="row items-center q-col-gutter-sm">
             <div class="col">
-              <q-input outlined dense debounce="300" color="secondary" v-model="draftBeforeDate">
-                <template #prepend>
+              <q-input
+                outlined
+                dense
+                debounce="300"
+                color="secondary"
+                v-model="draftBeforeDate"
+              >
+                <template v-slot:prepend>
                   <q-icon name="event" class="cursor-pointer">
                     <q-popup-proxy cover transition-show="scale" transition-hide="scale">
                       <q-date v-model="draftBeforeDate" mask="YYYY-MM-DD HH:mm" flat bordered>
                         <div class="row items-center justify-end">
-                          <CompressoStandardButton v-close-popup :label="beforePopupActionLabel" color="secondary" />
+                          <CompressoStandardButton v-close-popup :label="beforePopupActionLabel" color="secondary"/>
                         </div>
                       </q-date>
                     </q-popup-proxy>
                   </q-icon>
                 </template>
 
-                <template #append>
+                <template v-slot:append>
                   <q-icon name="access_time" class="cursor-pointer">
                     <q-popup-proxy cover transition-show="scale" transition-hide="scale">
                       <q-time v-model="draftBeforeDate" mask="YYYY-MM-DD HH:mm" format24h flat bordered>
                         <div class="row items-center justify-end">
-                          <CompressoStandardButton v-close-popup :label="beforePopupActionLabel" color="secondary" />
+                          <CompressoStandardButton v-close-popup :label="beforePopupActionLabel" color="secondary"/>
                         </div>
                       </q-time>
                     </q-popup-proxy>
@@ -439,7 +459,7 @@
           </div>
         </q-card-section>
 
-        <q-separator />
+        <q-separator/>
 
         <q-card-section class="completed-tasks-dialog-body scroll q-pa-lg q-gutter-md">
           <q-list bordered separator>
@@ -465,9 +485,7 @@
               <q-item-section>{{ t('components.completedTasks.columns.status') }}</q-item-section>
               <q-item-section side>
                 <q-icon
-                  :name="
-                    draftSortBy === 'task_success' ? (draftDescending ? 'arrow_downward' : 'arrow_upward') : 'sort'
-                  "
+                  :name="draftSortBy === 'task_success' ? (draftDescending ? 'arrow_downward' : 'arrow_upward') : 'sort'"
                   :color="draftSortBy === 'task_success' ? 'secondary' : 'grey-5'"
                 />
               </q-item-section>
@@ -502,7 +520,7 @@
           </div>
         </q-card-section>
 
-        <q-separator />
+        <q-separator/>
 
         <q-card-section class="completed-tasks-dialog-body q-pa-lg q-gutter-md">
           <div>{{ t('components.completedTasks.metadataDeletePrompt') }}</div>
@@ -512,11 +530,7 @@
         </q-card-section>
 
         <q-card-actions align="between">
-          <CompressoStandardButton
-            color="secondary"
-            :label="t('navigation.cancel')"
-            @click="deleteDialogOpen = false"
-          />
+          <CompressoStandardButton color="secondary" :label="t('navigation.cancel')" @click="deleteDialogOpen = false"/>
           <div class="row items-center q-gutter-sm">
             <CompressoStandardButton
               color="secondary"
@@ -554,7 +568,7 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <CompressoStandardButton color="secondary" :label="t('navigation.cancel')" v-close-popup />
+          <CompressoStandardButton color="secondary" :label="t('navigation.cancel')" v-close-popup/>
           <CompressoStandardButton
             @click="addSelectedToPendingTaskList"
             color="secondary"
@@ -566,9 +580,14 @@
     </q-dialog>
   </CompressoDialogWindow>
 
-  <FileMetadataDetailsDialog ref="metadataDialogRef" :completed-task-id="metadataDialogTaskId" />
+  <FileMetadataDetailsDialog
+    ref="metadataDialogRef"
+    :completedTaskId="metadataDialogTaskId"
+  />
 
-  <FileMetadataListDialog ref="metadataBrowserRef" />
+  <FileMetadataListDialog
+    ref="metadataBrowserRef"
+  />
 </template>
 
 <script setup>
@@ -590,8 +609,8 @@ import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStan
 const props = defineProps({
   initStatusFilter: {
     type: String,
-    default: 'all',
-  },
+    default: 'all'
+  }
 })
 
 const emit = defineEmits(['hide'])
@@ -642,7 +661,7 @@ const selectLibrary = ref(false)
 const selectedLibraryId = ref(null)
 const libraryOptions = ref([])
 
-const columns = computed(() => [
+const columns = computed(() => ([
   {
     name: 'select',
     label: '',
@@ -672,23 +691,23 @@ const columns = computed(() => [
     label: '',
     field: 'id',
     sortable: false,
-  },
-])
+  }
+]))
 
-const statusFilterOptions = computed(() => [
+const statusFilterOptions = computed(() => ([
   {
     label: t('status.all'),
-    value: 'all',
+    value: 'all'
   },
   {
     label: t('status.success'),
-    value: 'success',
+    value: 'success'
   },
   {
     label: t('status.failed'),
-    value: 'failed',
-  },
-])
+    value: 'failed'
+  }
+]))
 
 const filterSortButtonSize = computed(() => ($q.screen.width < 450 ? 'sm' : 'md'))
 
@@ -696,39 +715,41 @@ const filterSortActiveColor = 'warning'
 
 const searchLabelColor = computed(() => (searchValue.value.trim().length > 0 ? filterSortActiveColor : 'secondary'))
 
-const showActionsToggle = computed(() => $q.screen.width < 1024 || ($q.screen.width >= 1024 && $q.screen.height < 800))
+const showActionsToggle = computed(() => (
+  $q.screen.width < 1024 ||
+  ($q.screen.width >= 1024 && $q.screen.height < 800)
+))
 
-const sincePopupActionLabel = computed(() =>
-  draftSinceDate.value ? t('components.completedTasks.apply') : t('navigation.close'),
-)
+const sincePopupActionLabel = computed(() => (
+  draftSinceDate.value ? t('components.completedTasks.apply') : t('navigation.close')
+))
 
-const beforePopupActionLabel = computed(() =>
-  draftBeforeDate.value ? t('components.completedTasks.apply') : t('navigation.close'),
-)
+const beforePopupActionLabel = computed(() => (
+  draftBeforeDate.value ? t('components.completedTasks.apply') : t('navigation.close')
+))
 
 const activeFilterChips = computed(() => {
   const chips = []
 
   if (statusFilter.value !== 'all') {
-    const statusLabel =
-      statusFilterOptions.value.find((option) => option.value === statusFilter.value)?.label || statusFilter.value
+    const statusLabel = statusFilterOptions.value.find((option) => option.value === statusFilter.value)?.label || statusFilter.value
     chips.push({
       key: 'status',
-      label: t('components.completedTasks.filterStatus', { status: statusLabel }),
+      label: t('components.completedTasks.filterStatus', { status: statusLabel })
     })
   }
 
   if (sinceDate.value) {
     chips.push({
       key: 'since',
-      label: t('components.completedTasks.filterSince', { date: sinceDate.value }),
+      label: t('components.completedTasks.filterSince', { date: sinceDate.value })
     })
   }
 
   if (beforeDate.value) {
     chips.push({
       key: 'before',
-      label: t('components.completedTasks.filterBefore', { date: beforeDate.value }),
+      label: t('components.completedTasks.filterBefore', { date: beforeDate.value })
     })
   }
 
@@ -736,11 +757,17 @@ const activeFilterChips = computed(() => {
 })
 
 const hasSearch = computed(() => searchValue.value.trim().length > 0)
-const hasFilters = computed(() => statusFilter.value !== 'all' || !!sinceDate.value || !!beforeDate.value)
+const hasFilters = computed(() => (
+  statusFilter.value !== 'all' ||
+  !!sinceDate.value ||
+  !!beforeDate.value
+))
 
 const filterButtonColor = computed(() => (hasFilters.value ? filterSortActiveColor : 'secondary'))
 
-const isDefaultSort = computed(() => sortBy.value === 'finish_time' && descending.value === true)
+const isDefaultSort = computed(() => (
+  sortBy.value === 'finish_time' && descending.value === true
+))
 
 const sortButtonColor = computed(() => (isDefaultSort.value ? 'secondary' : filterSortActiveColor))
 
@@ -754,13 +781,15 @@ const sortFieldLabel = computed(() => {
   return t('components.completedTasks.columns.completed')
 })
 
-const sortDirectionIcon = computed(() => (descending.value ? 'arrow_downward' : 'arrow_upward'))
+const sortDirectionIcon = computed(() => (
+  descending.value ? 'arrow_downward' : 'arrow_upward'
+))
 
-const sortButtonLabel = computed(() =>
+const sortButtonLabel = computed(() => (
   t('components.completedTasks.sortByActive', {
-    field: sortFieldLabel.value,
-  }),
-)
+    field: sortFieldLabel.value
+  })
+))
 
 const selectedCount = computed(() => {
   if (selectAllMatching.value) {
@@ -776,13 +805,13 @@ const allPageSelected = computed(() => {
   return rows.value.every((row) => isRowSelected(row))
 })
 
-const showSelectAllMatchingPrompt = computed(
-  () => !selectAllMatching.value && allPageSelected.value && totalCount.value > rows.value.length,
-)
+const showSelectAllMatchingPrompt = computed(() => (
+  !selectAllMatching.value && allPageSelected.value && totalCount.value > rows.value.length
+))
 
-const selectionBannerPageText = computed(() =>
-  t('components.completedTasks.selectionBanner.pageSelected', { count: rows.value.length }),
-)
+const selectionBannerPageText = computed(() => (
+  t('components.completedTasks.selectionBanner.pageSelected', { count: rows.value.length })
+))
 
 const selectionBannerSelectAllLabel = computed(() => {
   if (hasSearch.value) {
@@ -978,13 +1007,13 @@ const deleteSelected = () => {
       position: 'top',
       message: t('components.completedTasks.nothingSelected'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }],
+      actions: [{ icon: 'close', color: 'white' }]
     })
     return
   }
 
-  const selectionHasMetadata =
-    selectAllMatching.value || rows.value.some((row) => selectedIds.value.includes(row.id) && row.hasMetadata)
+  const selectionHasMetadata = selectAllMatching.value
+    || rows.value.some((row) => selectedIds.value.includes(row.id) && row.hasMetadata)
 
   if (selectionHasMetadata) {
     deleteDialogOpen.value = true
@@ -997,12 +1026,11 @@ const deleteSelected = () => {
 const performDeleteSelected = (deleteMetadata) => {
   const data = getSelectionPayload()
 
-  const deleteTasks = () =>
-    axios({
-      method: 'delete',
-      url: getCompressoApiUrl('v2', 'history/tasks'),
-      data,
-    })
+  const deleteTasks = () => axios({
+    method: 'delete',
+    url: getCompressoApiUrl('v2', 'history/tasks'),
+    data
+  })
 
   const deleteMetadataForSelection = async () => {
     if (selectAllMatching.value) {
@@ -1010,34 +1038,34 @@ const performDeleteSelected = (deleteMetadata) => {
     }
 
     const fingerprints = new Set()
-    const requests = selectedIds.value.map((id) =>
+    const requests = selectedIds.value.map((id) => (
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'metadata/by-task'),
         data: {
           task_id: Number(id),
-        },
-      }),
-    )
+        }
+      })
+    ))
 
     const responses = await Promise.all(requests)
     responses.forEach((response) => {
-      ;(response.data.results || []).forEach((entry) => {
+      (response.data.results || []).forEach((entry) => {
         if (entry.fingerprint) {
           fingerprints.add(entry.fingerprint)
         }
       })
     })
 
-    const deleteRequests = Array.from(fingerprints).map((fingerprint) =>
+    const deleteRequests = Array.from(fingerprints).map((fingerprint) => (
       axios({
         method: 'delete',
         url: getCompressoApiUrl('v2', 'metadata'),
         data: {
           fingerprint,
-        },
-      }),
-    )
+        }
+      })
+    ))
 
     await Promise.all(deleteRequests)
     return true
@@ -1053,25 +1081,23 @@ const performDeleteSelected = (deleteMetadata) => {
           position: 'top',
           message: t('components.completedTasks.metadataErrorDelete'),
           icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }],
+          actions: [{ icon: 'close', color: 'white' }]
         })
       }
     }
 
-    deleteTasks()
-      .then(() => {
-        resetSelection()
-        fetchCompletedTasks({ reset: true })
+    deleteTasks().then(() => {
+      resetSelection()
+      fetchCompletedTasks({ reset: true })
+    }).catch(() => {
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('components.completedTasks.errorDeleteSelected'),
+        icon: 'report_problem',
+        actions: [{ icon: 'close', color: 'white' }]
       })
-      .catch(() => {
-        $q.notify({
-          color: 'negative',
-          position: 'top',
-          message: t('components.completedTasks.errorDeleteSelected'),
-          icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }],
-        })
-      })
+    })
   }
 
   run()
@@ -1085,40 +1111,38 @@ const confirmDeleteSelected = (deleteMetadata) => {
 const selectLibraryForRecreateTask = () => {
   axios({
     method: 'get',
-    url: getCompressoApiUrl('v2', 'settings/libraries'),
-  })
-    .then((response) => {
-      const libraryPathsList = []
-      let defaultSelection
-      for (let i = 0; i < response.data.libraries.length; i++) {
-        const libraryPath = response.data.libraries[i]
-        if (typeof defaultSelection === 'undefined') {
-          defaultSelection = libraryPath.id
-        }
-        libraryPathsList.push({
-          label: libraryPath.name,
-          value: libraryPath.id,
-        })
+    url: getCompressoApiUrl('v2', 'settings/libraries')
+  }).then((response) => {
+    const libraryPathsList = []
+    let defaultSelection
+    for (let i = 0; i < response.data.libraries.length; i++) {
+      const libraryPath = response.data.libraries[i]
+      if (typeof defaultSelection === 'undefined') {
+        defaultSelection = libraryPath.id
       }
-      libraryOptions.value = libraryPathsList
-
-      selectedLibraryId.value = 1
-      if (libraryPathsList.length === 1) {
-        selectedLibraryId.value = defaultSelection
-        addSelectedToPendingTaskList()
-      } else {
-        selectLibrary.value = true
-      }
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('notifications.failedToFetchLibraryList'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
+      libraryPathsList.push({
+        label: libraryPath.name,
+        value: libraryPath.id,
       })
+    }
+    libraryOptions.value = libraryPathsList
+
+    selectedLibraryId.value = 1
+    if (libraryPathsList.length === 1) {
+      selectedLibraryId.value = defaultSelection
+      addSelectedToPendingTaskList()
+    } else {
+      selectLibrary.value = true
+    }
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: t('notifications.failedToFetchLibraryList'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
     })
+  })
 }
 
 const addSelectedToPendingTaskList = () => {
@@ -1128,7 +1152,7 @@ const addSelectedToPendingTaskList = () => {
       position: 'top',
       message: t('components.completedTasks.nothingSelected'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }],
+      actions: [{ icon: 'close', color: 'white' }]
     })
     return
   }
@@ -1141,28 +1165,26 @@ const addSelectedToPendingTaskList = () => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'history/reprocess'),
-    data,
+    data
+  }).then(() => {
+    resetSelection()
+    fetchCompletedTasks({ reset: true })
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: t('components.completedTasks.errorAddSelected'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
   })
-    .then(() => {
-      resetSelection()
-      fetchCompletedTasks({ reset: true })
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('components.completedTasks.errorAddSelected'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
 }
 
 const openDetailsDialog = (id) => {
   $q.dialog({
     component: CompletedTaskLogDialog,
     componentProps: {
-      completedTaskId: id,
+      completedTaskId: id
     },
   })
 }
@@ -1209,58 +1231,55 @@ const fetchCompletedTasks = ({ reset = false, silent = false, refreshTop = false
   return axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'history/tasks'),
-    data,
-  })
-    .then((response) => {
-      totalCount.value = response.data.recordsFiltered
+    data
+  }).then((response) => {
+    totalCount.value = response.data.recordsFiltered
 
-      const returnedData = response.data.results.map((results) => ({
-        id: results.id,
-        name: results.task_label,
-        dateTimeCompleted: dateTools.printDateTimeString(results.finish_time),
-        status: results.task_success,
-        hasMetadata: results.has_metadata,
-      }))
+    const returnedData = response.data.results.map((results) => ({
+      id: results.id,
+      name: results.task_label,
+      dateTimeCompleted: dateTools.printDateTimeString(results.finish_time),
+      status: results.task_success,
+      hasMetadata: results.has_metadata
+    }))
 
-      if (refreshTop) {
-        if (rows.value.length === 0) {
-          rows.value = returnedData
-          offset.value = rows.value.length
-        } else {
-          const updated = [...rows.value]
-          for (let i = 0; i < returnedData.length; i++) {
-            updated[i] = returnedData[i]
-          }
-          rows.value = updated
-        }
-      } else if (reset) {
+    if (refreshTop) {
+      if (rows.value.length === 0) {
         rows.value = returnedData
         offset.value = rows.value.length
       } else {
-        rows.value = [...rows.value, ...returnedData]
-        offset.value = rows.value.length
+        const updated = [...rows.value]
+        for (let i = 0; i < returnedData.length; i++) {
+          updated[i] = returnedData[i]
+        }
+        rows.value = updated
       }
+    } else if (reset) {
+      rows.value = returnedData
+      offset.value = rows.value.length
+    } else {
+      rows.value = [...rows.value, ...returnedData]
+      offset.value = rows.value.length
+    }
 
-      if (totalCount.value > 0 && rows.value.length > totalCount.value) {
-        rows.value = rows.value.slice(0, totalCount.value)
-        offset.value = rows.value.length
-      }
+    if (totalCount.value > 0 && rows.value.length > totalCount.value) {
+      rows.value = rows.value.slice(0, totalCount.value)
+      offset.value = rows.value.length
+    }
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: t('components.completedTasks.errorFetchingList'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
     })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('components.completedTasks.errorFetchingList'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
-    .finally(() => {
-      if (!silent) {
-        loading.value = false
-      }
-      loadingMore.value = false
-    })
+  }).finally(() => {
+    if (!silent) {
+      loading.value = false
+    }
+    loadingMore.value = false
+  })
 }
 
 const loadMore = (index, done) => {
@@ -1331,7 +1350,7 @@ onBeforeUnmount(() => {
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 

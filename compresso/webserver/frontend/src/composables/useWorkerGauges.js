@@ -17,8 +17,12 @@ export function useWorkerGauges() {
   const gradientColor = (percent) => {
     const clamped = clampPercent(percent)
     const isDark = $q.dark.isActive
-    const secondary = isDark ? { r: 64, g: 200, b: 255 } : { r: 0, g: 120, b: 180 }
-    const red = isDark ? { r: 255, g: 90, b: 90 } : { r: 180, g: 20, b: 20 }
+    const secondary = isDark
+      ? { r: 64, g: 200, b: 255 }
+      : { r: 0, g: 120, b: 180 }
+    const red = isDark
+      ? { r: 255, g: 90, b: 90 }
+      : { r: 180, g: 20, b: 20 }
     const ratio = clamped / 100
     const r = Math.round(secondary.r + (red.r - secondary.r) * ratio)
     const g = Math.round(secondary.g + (red.g - secondary.g) * ratio)
@@ -35,7 +39,7 @@ export function useWorkerGauges() {
     }
     let colour = '#'
     for (let i = 0; i < 3; i++) {
-      const value = (hash >> (i * 8)) & 0xff
+      const value = (hash >> (i * 8)) & 0xFF
       colour += ('00' + value.toString(16)).substr(-2)
     }
     return colour
@@ -45,6 +49,6 @@ export function useWorkerGauges() {
     clampPercent,
     formatPercent,
     gradientColor,
-    generateGroupColour,
+    generateGroupColour
   }
 }

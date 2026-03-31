@@ -1,20 +1,23 @@
 <template>
   <div class="lt-md">
-    <p class="text-subtitle2 q-mb-none footer-text">Compresso v{{ compressoVersion }}</p>
+    <p class="text-subtitle2 q-mb-none footer-text">
+      Compresso v{{ compressoVersion }}
+    </p>
   </div>
   <div class="gt-sm">
     <div class="row q-mt-lg items-center">
       <div class="col q-ml-lg">
         <p class="text-subtitle2 footer-text">
-          <a class="footer-link" target="_blank" href="https://github.com/jtn0123/compresso">Compresso</a>
+          <a class="footer-link" target="_blank"
+             href="https://github.com/jtn0123/compresso">Compresso</a>
           &mdash; Media Library Optimizer
         </p>
       </div>
       <div class="col-auto q-mr-lg">
         <p class="text-subtitle2 footer-text">
-          <a class="footer-link" target="_blank" href="https://github.com/jtn0123/compresso/releases"
-            >v{{ compressoVersion }}</a
-          >
+          <a class="footer-link"
+             target="_blank"
+             href="https://github.com/jtn0123/compresso/releases">v{{ compressoVersion }}</a>
         </p>
       </div>
     </div>
@@ -22,8 +25,8 @@
 </template>
 
 <script>
-import compressoGlobals from 'src/js/compressoGlobals'
-import { onMounted, ref } from 'vue'
+import compressoGlobals from "src/js/compressoGlobals";
+import { onMounted, ref } from "vue";
 
 export default {
   setup() {
@@ -31,18 +34,18 @@ export default {
 
     function updateVersion() {
       compressoGlobals.getCompressoVersion().then((version) => {
-        compressoVersion.value = version
+        compressoVersion.value = version;
       })
     }
 
     onMounted(() => {
-      updateVersion()
+      updateVersion();
     })
 
     return {
-      compressoVersion,
+      compressoVersion
     }
-  },
+  }
 }
 </script>
 

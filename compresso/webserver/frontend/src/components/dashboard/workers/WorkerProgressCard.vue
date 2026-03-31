@@ -16,14 +16,21 @@
         </div>
 
         <div class="col-auto">
-          <q-btn @click="openDetails" color="secondary" dense round flat icon="open_in_full">
+          <q-btn
+            @click="openDetails"
+            color="secondary"
+            dense
+            round
+            flat
+            icon="open_in_full"
+          >
             <q-tooltip class="bg-white text-primary">{{ $t('navigation.showMore') }}</q-tooltip>
           </q-btn>
         </div>
       </div>
     </q-card-section>
 
-    <q-separator :style="'border-bottom:solid thin ' + workerGroupColour" />
+    <q-separator :style="'border-bottom:solid thin ' + workerGroupColour"/>
 
     <div class="row">
       <q-card-section class="q-pb-none col q-pb-none justify-center full-height full-width text-center">
@@ -80,29 +87,20 @@
     <div v-if="!idle" class="q-px-md q-pb-sm">
       <div class="row items-center q-gutter-xs">
         <span class="text-caption text-grey">{{ $t('workers.cpuLabel') }}</span>
-        <q-linear-progress
-          :value="cpuValue"
-          size="6px"
-          class="col"
-          color="secondary"
-          :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'"
-        />
-        <span class="text-caption" :style="{ color: cpuColor }">{{ cpuDisplay }}%</span>
+        <q-linear-progress :value="cpuValue" size="6px" class="col" color="secondary" :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'" />
+        <span class="text-caption" :style="{color: cpuColor}">{{ cpuDisplay }}%</span>
       </div>
       <div class="row items-center q-gutter-xs q-mt-xs">
         <span class="text-caption text-grey">{{ $t('workers.memLabel') }}</span>
-        <q-linear-progress
-          :value="memValue"
-          size="6px"
-          class="col"
-          color="secondary"
-          :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'"
-        />
-        <span class="text-caption" :style="{ color: memColor }">{{ memDisplay }}%</span>
+        <q-linear-progress :value="memValue" size="6px" class="col" color="secondary" :track-color="$q.dark.isActive ? 'grey-8' : 'grey-5'" />
+        <span class="text-caption" :style="{color: memColor}">{{ memDisplay }}%</span>
       </div>
     </div>
 
-    <WorkerMoreDetailsDialog ref="workerDetailsDialogRef" v-bind="props" />
+    <WorkerMoreDetailsDialog
+      ref="workerDetailsDialogRef"
+      v-bind="props"
+    />
   </q-card>
 </template>
 
@@ -120,96 +118,96 @@ const { clampPercent, formatPercent, gradientColor } = useWorkerGauges()
 const props = defineProps({
   id: {
     type: String,
-    required: true,
+    required: true
   },
   label: {
     type: String,
-    required: true,
+    required: true
   },
   name: {
     type: String,
-    required: true,
+    required: true
   },
   progress: {
     type: Number,
-    default: 100,
+    default: 100
   },
   progressText: {
     type: String,
-    default: '',
+    default: ''
   },
   elapsed: {
     type: String,
-    default: '',
+    default: ''
   },
   etc: {
     type: String,
-    default: '',
+    default: ''
   },
   color: {
     type: String,
-    default: 'warning',
+    default: 'warning'
   },
   workerGroupColour: {
     type: String,
-    default: 'var(--compresso-grey-4)',
+    default: 'var(--compresso-grey-4)'
   },
   state: {
     type: String,
-    default: 'Waiting for another task...',
+    default: 'Waiting for another task...'
   },
   currentRunner: {
     type: String,
-    default: '',
+    default: ''
   },
   startTime: {
     type: String,
-    default: '',
+    default: ''
   },
   timeSinceStart: {
     type: String,
-    default: '',
+    default: ''
   },
   indeterminate: {
     type: Boolean,
-    default: false,
+    default: false
   },
   currentCommand: {
     type: String,
-    default: '',
+    default: ''
   },
   currentFile: {
     type: String,
-    default: '',
+    default: ''
   },
   currentTask: {
     type: Number,
-    default: null,
+    default: null
   },
   runnersInfo: {
     type: Object,
-    default: () => ({}),
+    default: () => ({})
   },
   subprocess: {
     type: Object,
-    default: () => ({}),
+    default: () => ({})
   },
   workerLog: {
     type: Array,
-    default: () => [],
+    default: () => []
   },
   idle: {
     type: Boolean,
-    default: false,
+    default: false
   },
   paused: {
     type: Boolean,
-    default: false,
+    default: false
   },
   workerType: {
     type: String,
-    default: '',
-  },
+    default: ''
+  }
 })
 
 const workerDetailsDialogRef = ref(null)

@@ -68,33 +68,9 @@ const MOCK_SUMMARY = {
 
 const MOCK_STATUSES = {
   results: [
-    {
-      id: 1,
-      abspath: '/media/video1.mkv',
-      status: 'healthy',
-      check_mode: 'quick',
-      error_detail: null,
-      last_checked: '2025-06-01',
-      error_count: 0,
-    },
-    {
-      id: 2,
-      abspath: '/media/video2.mp4',
-      status: 'warning',
-      check_mode: 'thorough',
-      error_detail: 'Minor issue',
-      last_checked: '2025-06-01',
-      error_count: 1,
-    },
-    {
-      id: 3,
-      abspath: '/media/video3.avi',
-      status: 'corrupted',
-      check_mode: 'quick',
-      error_detail: 'File truncated',
-      last_checked: '2025-06-01',
-      error_count: 3,
-    },
+    { id: 1, abspath: '/media/video1.mkv', status: 'healthy', check_mode: 'quick', error_detail: null, last_checked: '2025-06-01', error_count: 0 },
+    { id: 2, abspath: '/media/video2.mp4', status: 'warning', check_mode: 'thorough', error_detail: 'Minor issue', last_checked: '2025-06-01', error_count: 1 },
+    { id: 3, abspath: '/media/video3.avi', status: 'corrupted', check_mode: 'quick', error_detail: 'File truncated', last_checked: '2025-06-01', error_count: 3 },
   ],
   recordsFiltered: 3,
 }
@@ -214,7 +190,9 @@ describe('HealthCheck.vue', () => {
       await globalThis.__testDialogOnOk()
       await flushPromises()
 
-      const scanCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/scan-library'))
+      const scanCalls = axios.post.mock.calls.filter(
+        ([url]) => url.includes('healthcheck/scan-library'),
+      )
       expect(scanCalls.length).toBe(1)
       expect(scanCalls[0][1]).toEqual({
         library_id: expect.any(Number),
@@ -313,7 +291,9 @@ describe('HealthCheck.vue', () => {
       expect(wrapper.vm.pagination.sortBy).toBe('status')
       expect(wrapper.vm.pagination.descending).toBe(false)
 
-      const statusCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/status'))
+      const statusCalls = axios.post.mock.calls.filter(
+        ([url]) => url.includes('healthcheck/status'),
+      )
       expect(statusCalls.length).toBeGreaterThanOrEqual(1)
     })
   })
@@ -382,7 +362,9 @@ describe('HealthCheck.vue', () => {
       await wrapper.vm.checkSingleFile()
       await flushPromises()
 
-      const scanCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/scan'))
+      const scanCalls = axios.post.mock.calls.filter(
+        ([url]) => url.includes('healthcheck/scan'),
+      )
       expect(scanCalls.length).toBeGreaterThanOrEqual(1)
       expect(wrapper.vm.singleFileResult).toEqual({
         abspath: '/media/test.mkv',
@@ -402,7 +384,9 @@ describe('HealthCheck.vue', () => {
       await wrapper.vm.cancelScan()
       await flushPromises()
 
-      const cancelCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/cancel-scan'))
+      const cancelCalls = axios.post.mock.calls.filter(
+        ([url]) => url.includes('healthcheck/cancel-scan'),
+      )
       expect(cancelCalls.length).toBe(1)
     })
   })
@@ -418,7 +402,9 @@ describe('HealthCheck.vue', () => {
       await wrapper.vm.changeWorkerCount(1)
       await flushPromises()
 
-      const workerCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/workers'))
+      const workerCalls = axios.post.mock.calls.filter(
+        ([url]) => url.includes('healthcheck/workers'),
+      )
       expect(workerCalls.length).toBe(1)
       expect(workerCalls[0][1]).toEqual({ worker_count: 3 })
       expect(wrapper.vm.workerCount).toBe(3)
@@ -432,7 +418,9 @@ describe('HealthCheck.vue', () => {
       await wrapper.vm.changeWorkerCount(-1)
       await flushPromises()
 
-      const workerCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/workers'))
+      const workerCalls = axios.post.mock.calls.filter(
+        ([url]) => url.includes('healthcheck/workers'),
+      )
       expect(workerCalls.length).toBe(0)
     })
 
@@ -444,7 +432,9 @@ describe('HealthCheck.vue', () => {
       await wrapper.vm.changeWorkerCount(1)
       await flushPromises()
 
-      const workerCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/workers'))
+      const workerCalls = axios.post.mock.calls.filter(
+        ([url]) => url.includes('healthcheck/workers'),
+      )
       expect(workerCalls.length).toBe(0)
     })
   })

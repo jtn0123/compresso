@@ -14,7 +14,7 @@
 
 <script>
 import { LocalStorage } from 'quasar'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'vue-i18n';
 
 export default {
   setup() {
@@ -36,14 +36,14 @@ export default {
         { value: 'pt-br', label: 'Portuguese (Brazil)/Português' },
         { value: 'ru', label: 'Russian/русский' },
         { value: 'es', label: 'Spanish/Español' },
-        { value: 'sv', label: 'Swedish/Svenska' },
-      ],
+        { value: 'sv', label: 'Swedish/Svenska' }
+      ]
     }
   },
   watch: {
     locale(lang) {
       LocalStorage.set('locale', lang)
-    },
-  },
+    }
+  }
 }
 </script>

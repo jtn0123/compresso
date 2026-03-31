@@ -1,9 +1,18 @@
 <template>
-  <q-btn flat dense round :size="size" :color="color" :icon="icon" :disable="disable" @click="$emit('click', $event)">
+  <q-btn
+    flat
+    dense
+    round
+    :size="size"
+    :color="color"
+    :icon="icon"
+    :disable="disable"
+    @click="$emit('click', $event)"
+  >
     <q-tooltip v-if="tooltip" class="bg-white text-primary">
       {{ tooltip }}
     </q-tooltip>
-    <slot />
+    <slot/>
   </q-btn>
 </template>
 
@@ -11,24 +20,24 @@
 defineProps({
   icon: {
     type: String,
-    required: true,
+    required: true
   },
   color: {
     type: String,
-    default: 'secondary',
+    default: 'secondary'
   },
   size: {
     type: String,
-    default: '12px',
+    default: '12px'
   },
   tooltip: {
     type: String,
-    default: '',
+    default: ''
   },
   disable: {
     type: Boolean,
-    default: false,
-  },
+    default: false
+  }
 })
 
 defineEmits(['click'])

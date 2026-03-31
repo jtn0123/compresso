@@ -1,4 +1,6 @@
 <template>
+
+
   <q-card flat>
     <q-card-section class="q-pa-none">
       <div class="row q-gutter-xs q-mt-xs justify-between">
@@ -7,18 +9,16 @@
             <CompressoStandardButton
               @click="openPluginInstaller"
               icon-right="add"
-              :label="$t('components.plugins.installPluginFromRepo')"
-            />
+              :label="$t('components.plugins.installPluginFromRepo')"/>
 
             <CompressoStandardButtonDropdown
               :class="$q.platform.is.mobile ? 'q-my-sm' : ''"
-              :label="$t('components.plugins.installPluginFromFile')"
-            >
+              :label="$t('components.plugins.installPluginFromFile')">
               <div>
                 <div class="row no-wrap q-pa-md">
                   <div class="column">
                     <q-uploader
-                      :style="$q.platform.is.mobile ? 'max-width: 210px' : 'max-width: 300px'"
+                      :style="$q.platform.is.mobile ?  'max-width: 210px' : 'max-width: 300px'"
                       :url="getUploadUrl()"
                       label="Upload ZIP file..."
                       color="secondary"
@@ -36,16 +36,14 @@
         </div>
         <div class="col-auto" style="max-width: 200px">
           <q-input
-            outlined
-            dense
+            outlined dense
             color="secondary"
             class="shadow-1"
             debounce="300"
             v-model="filter"
-            :placeholder="$t('navigation.search')"
-          >
-            <template #append>
-              <q-icon name="search" />
+            :placeholder="$t('navigation.search')">
+            <template v-slot:append>
+              <q-icon name="search"/>
             </template>
           </q-input>
         </div>
@@ -54,14 +52,17 @@
 
     <q-card-section class="q-px-none">
       <div class="q-gutter-sm">
-        <q-list bordered separator class="rounded-borders">
+        <q-list
+          bordered
+          separator
+          class="rounded-borders">
+
           <q-item
             v-for="(plugin, index) in listedPlugins"
-            :key="index"
-            :class="plugin.status.update_available ? 'bg-warning' : ''"
-          >
+            v-bind:key="index"
+            :class="plugin.status.update_available ? 'bg-warning' : ''">
             <q-item-section avatar>
-              <q-img :src="plugin.icon" />
+              <q-img :src="plugin.icon"/>
             </q-item-section>
 
             <q-item-section top class="">
@@ -78,9 +79,10 @@
                     <span class="text-weight-medium">Author</span>
                   </div>
                   <div class="col-6 q-px-sm">
-                    <span :class="$q.dark.isActive && !plugin.status.update_available ? 'text-grey-5' : 'text-grey-8'">
-                      {{ plugin.author }}
-                    </span>
+                      <span
+                        :class="$q.dark.isActive && !plugin.status.update_available ? 'text-grey-5' : 'text-grey-8'">
+                        {{ plugin.author }}
+                      </span>
                   </div>
                 </div>
               </q-item-label>
@@ -90,9 +92,10 @@
                     <span class="text-weight-medium">Version</span>
                   </div>
                   <div class="col-6 q-px-sm">
-                    <span :class="$q.dark.isActive && !plugin.status.update_available ? 'text-grey-5' : 'text-grey-8'">
-                      {{ plugin.version }}
-                    </span>
+                      <span
+                        :class="$q.dark.isActive && !plugin.status.update_available ? 'text-grey-5' : 'text-grey-8'">
+                        {{ plugin.version }}
+                      </span>
                   </div>
                 </div>
               </q-item-label>
@@ -116,61 +119,54 @@
                 />
               </div>
               <q-tooltip class="bg-white text-primary">
-                <span v-if="plugin.status.update_available">
+                  <span
+                    v-if="plugin.status.update_available">
                   {{ $t('components.plugins.clickToUpdatePlugin') }}
-                </span>
-                <span v-else>
+                  </span>
+                <span
+                  v-else>
                   {{ $t('components.plugins.pluginUpToDate') }}
-                </span>
+                  </span>
               </q-tooltip>
             </q-item-section>
 
-            <q-separator inset vertical class="q-mx-sm" />
+            <q-separator inset vertical class="q-mx-sm"/>
 
             <q-item-section center side>
               <div class="text-grey-8 q-gutter-xs">
+
                 <q-btn-dropdown
-                  flat
-                  dense
-                  rounded
+                  flat dense rounded
                   class="lt-sm"
                   size="12px"
                   color="secondary"
                   no-icon-animation
-                  dropdown-icon="more_vert"
-                >
+                  dropdown-icon="more_vert">
                   <q-list>
+
                     <q-item clickable v-close-popup @click="openPluginInfo(plugin.id)">
                       <q-item-section avatar>
-                        <q-icon color="info" name="info" />
+                        <q-icon color="info" name="info"/>
                       </q-item-section>
                       <q-item-section>
                         <q-item-label>{{ $t('headers.pluginInfo') }}</q-item-label>
                       </q-item-section>
                     </q-item>
 
-                    <q-item
-                      clickable
-                      v-close-popup
-                      @click="openPluginInfo(plugin.id, 'settings')"
-                      v-if="plugin.has_config"
-                    >
+                    <q-item clickable v-close-popup @click="openPluginInfo(plugin.id, 'settings')"
+                            v-if="plugin.has_config">
                       <q-item-section avatar>
-                        <q-icon color="grey-8" name="tune" />
+                        <q-icon color="grey-8" name="tune"/>
                       </q-item-section>
                       <q-item-section>
                         <q-item-label>{{ $t('components.plugins.globalConfiguration') }}</q-item-label>
                       </q-item-section>
                     </q-item>
 
-                    <q-item
-                      clickable
-                      v-close-popup
-                      @click="updateSinglePlugin(plugin.id)"
-                      v-if="plugin.status.update_available"
-                    >
+                    <q-item clickable v-close-popup @click="updateSinglePlugin(plugin.id)"
+                            v-if="plugin.status.update_available">
                       <q-item-section avatar>
-                        <q-icon color="warning" name="update" />
+                        <q-icon color="warning" name="update"/>
                       </q-item-section>
                       <q-item-section>
                         <q-item-label>{{ $t('components.plugins.updatePlugin') }}</q-item-label>
@@ -179,12 +175,13 @@
 
                     <q-item clickable v-close-popup @click="removeSinglePlugin(plugin.id)">
                       <q-item-section avatar>
-                        <q-icon color="negative" name="delete" />
+                        <q-icon color="negative" name="delete"/>
                       </q-item-section>
                       <q-item-section>
                         <q-item-label>{{ $t('components.plugins.removePlugin') }}</q-item-label>
                       </q-item-section>
                     </q-item>
+
                   </q-list>
                 </q-btn-dropdown>
 
@@ -210,32 +207,43 @@
                   :tooltip="$t('components.plugins.removePlugin')"
                   @click="removeSinglePlugin(plugin.id)"
                 />
+
               </div>
             </q-item-section>
-            <q-tooltip v-if="plugin.status.update_available" class="bg-white text-primary"
-              >{{ $t('components.plugins.updateAvailable') }}
+            <q-tooltip
+              v-if="plugin.status.update_available"
+              class="bg-white text-primary">{{ $t('components.plugins.updateAvailable') }}
             </q-tooltip>
           </q-item>
+
         </q-list>
       </div>
     </q-card-section>
-    <PluginInstallerDialog ref="pluginInstallerDialog" @hide="onPluginInstallerHide" />
-    <PluginInfoDialog ref="pluginInfoDialogRef" :plugin-id="selectedPluginId" :start-tab="pluginInfoTab" />
+    <PluginInstallerDialog
+      ref="pluginInstallerDialog"
+      @hide="onPluginInstallerHide"
+    />
+    <PluginInfoDialog
+      ref="pluginInfoDialogRef"
+      :pluginId="selectedPluginId"
+      :startTab="pluginInfoTab"
+    />
   </q-card>
+
 </template>
 
 <script>
-import { onMounted, watch, ref, nextTick } from 'vue'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import { useQuasar } from 'quasar'
-import axios from 'axios'
-import { bbCodeToHTML } from 'src/js/markupParser'
-import { useI18n } from 'vue-i18n'
-import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog.vue'
-import PluginInstallerDialog from 'components/settings/plugins/PluginInstallerDialog'
-import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
-import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
-import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
+import { onMounted, watch, ref, nextTick } from 'vue';
+import { getCompressoApiUrl } from "src/js/compressoGlobals";
+import { useQuasar } from "quasar";
+import axios from "axios";
+import { bbCodeToHTML } from "src/js/markupParser";
+import { useI18n } from "vue-i18n";
+import PluginInfoDialog from "components/settings/plugins/PluginInfoDialog.vue";
+import PluginInstallerDialog from "components/settings/plugins/PluginInstallerDialog";
+import CompressoListActionButton from "components/ui/buttons/CompressoListActionButton.vue";
+import CompressoStandardButton from "components/ui/buttons/CompressoStandardButton.vue";
+import CompressoStandardButtonDropdown from "components/ui/buttons/CompressoStandardButtonDropdown.vue";
 
 export default {
   components: {
@@ -243,23 +251,23 @@ export default {
     PluginInstallerDialog,
     CompressoListActionButton,
     CompressoStandardButton,
-    CompressoStandardButtonDropdown,
+    CompressoStandardButtonDropdown
   },
   setup() {
-    const $q = useQuasar()
-    const { t: $t } = useI18n()
-    const rows = ref([])
-    const filter = ref('')
-    const loading = ref(false)
+    const $q = useQuasar();
+    const { t: $t } = useI18n();
+    const rows = ref([]);
+    const filter = ref('');
+    const loading = ref(false);
     const pagination = ref({
       sortBy: 'name',
       descending: false,
       page: 1,
       rowsPerPage: 50,
-      rowsNumber: 10,
+      rowsNumber: 10
     })
-    const selected = ref([])
-    const listedPlugins = ref([])
+    const selected = ref([]);
+    const listedPlugins = ref([]);
 
     const itemOffset = ref(0)
     const pluginInstallerDialog = ref(null)
@@ -280,8 +288,8 @@ export default {
         // Fetch the selected row IDs
         let id_list = []
         for (let i = 0; i < selected.value.length; i++) {
-          let row = selected.value[i]
-          id_list[id_list.length] = row.id
+          let row = selected.value[i];
+          id_list[id_list.length] = row.id;
         }
         // Send those to the backend
         let data = {
@@ -290,30 +298,28 @@ export default {
         axios({
           method: 'post',
           url: getCompressoApiUrl('v2', 'plugins/disable'),
-          data: data,
+          data: data
+        }).then((response) => {
+          onRequest({
+            pagination: pagination.value,
+            filter: filter.value
+          })
+        }).catch(() => {
+          $q.notify({
+            color: 'negative',
+            position: 'top',
+            message: 'An error was encountered while requesting the selected plugins be disabled',
+            icon: 'report_problem',
+            actions: [{ icon: 'close', color: 'white' }]
+          })
         })
-          .then((response) => {
-            onRequest({
-              pagination: pagination.value,
-              filter: filter.value,
-            })
-          })
-          .catch(() => {
-            $q.notify({
-              color: 'negative',
-              position: 'top',
-              message: 'An error was encountered while requesting the selected plugins be disabled',
-              icon: 'report_problem',
-              actions: [{ icon: 'close', color: 'white' }],
-            })
-          })
       } else {
         $q.notify({
           color: 'warning',
           position: 'top',
           message: 'Nothing selected',
           icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }],
+          actions: [{ icon: 'close', color: 'white' }]
         })
       }
     }
@@ -325,27 +331,25 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'plugins/update'),
-        data: data,
+        data: data
+      }).then((response) => {
+        onRequest({
+          pagination: pagination.value,
+          filter: filter.value
+        })
+      }).catch(() => {
+        $q.notify({
+          color: 'negative',
+          position: 'top',
+          message: 'An error was encountered while requesting the selected plugins be updated',
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          onRequest({
-            pagination: pagination.value,
-            filter: filter.value,
-          })
-        })
-        .catch(() => {
-          $q.notify({
-            color: 'negative',
-            position: 'top',
-            message: 'An error was encountered while requesting the selected plugins be updated',
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     }
 
     function updateSinglePlugin(tableId) {
-      updatePluginList([tableId])
+      updatePluginList([tableId]);
     }
 
     function removePluginList(id_list) {
@@ -355,27 +359,25 @@ export default {
       axios({
         method: 'delete',
         url: getCompressoApiUrl('v2', 'plugins/remove'),
-        data: data,
+        data: data
+      }).then((response) => {
+        onRequest({
+          pagination: pagination.value,
+          filter: filter.value
+        })
+      }).catch(() => {
+        $q.notify({
+          color: 'negative',
+          position: 'top',
+          message: 'An error was encountered while requesting the selected plugins be removed',
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          onRequest({
-            pagination: pagination.value,
-            filter: filter.value,
-          })
-        })
-        .catch(() => {
-          $q.notify({
-            color: 'negative',
-            position: 'top',
-            message: 'An error was encountered while requesting the selected plugins be removed',
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     }
 
     function removeSinglePlugin(tableId) {
-      removePluginList([tableId])
+      removePluginList([tableId]);
     }
 
     function uninstallSelected() {
@@ -383,18 +385,18 @@ export default {
         // Fetch the selected row IDs
         let id_list = []
         for (let i = 0; i < selected.value.length; i++) {
-          let row = selected.value[i]
-          id_list[id_list.length] = row.id
+          let row = selected.value[i];
+          id_list[id_list.length] = row.id;
         }
         // Send those to the backend
-        removePluginList(id_list)
+        removePluginList(id_list);
       } else {
         $q.notify({
           color: 'warning',
           position: 'top',
           message: 'Nothing selected',
           icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }],
+          actions: [{ icon: 'close', color: 'white' }]
         })
       }
     }
@@ -402,25 +404,25 @@ export default {
     function parseAndLimitDescription(description_text) {
       // Limit description text to 280 characters
       if (description_text.length > 280) {
-        description_text = description_text.substring(0, 277) + '...'
+        description_text = description_text.substring(0, 277) + '...';
       }
       // Only show first line in multi-line description text.
-      description_text = description_text.split('\n')[0]
+      description_text = description_text.split('\n')[0];
       // Parse BBCode
-      return bbCodeToHTML(description_text)
+      return bbCodeToHTML(description_text);
     }
 
     function onRequest(props) {
-      const { page, rowsPerPage, sortBy, descending } = props.pagination
-      const filter = props.filter
+      const { page, rowsPerPage, sortBy, descending } = props.pagination;
+      const filter = props.filter;
 
-      loading.value = true
+      loading.value = true;
 
       // get all rows if "All" (0) is selected
-      const fetchCount = rowsPerPage === 0 ? pagination.value.rowsNumber : rowsPerPage
+      const fetchCount = rowsPerPage === 0 ? pagination.value.rowsNumber : rowsPerPage;
 
       // calculate starting row of data
-      const startRow = (page - 1) * rowsPerPage
+      const startRow = (page - 1) * rowsPerPage;
 
       // Fetch from server
       let data = {
@@ -433,63 +435,61 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'plugins/installed'),
-        data: data,
-      })
-        .then((response) => {
-          // update rowsCount with appropriate value
-          pagination.value.rowsNumber = response.data.recordsFiltered
+        data: data
+      }).then((response) => {
+        // update rowsCount with appropriate value
+        pagination.value.rowsNumber = response.data.recordsFiltered;
 
-          // Set returned data from server results
-          listedPlugins.value = []
-          for (let i = 0; i < response.data.results.length; i++) {
-            let results = response.data.results[i]
-            listedPlugins.value[i] = {
-              id: results.id,
-              plugin_id: results.plugin_id,
-              icon: results.icon,
-              name: results.name,
-              description: parseAndLimitDescription(results.description),
-              tags: results.tags,
-              author: results.author,
-              version: results.version,
-              status: results.status,
-              has_config: results.has_config,
-            }
+        // Set returned data from server results
+        listedPlugins.value = [];
+        for (let i = 0; i < response.data.results.length; i++) {
+          let results = response.data.results[i];
+          listedPlugins.value[i] = {
+            id: results.id,
+            plugin_id: results.plugin_id,
+            icon: results.icon,
+            name: results.name,
+            description: parseAndLimitDescription(results.description),
+            tags: results.tags,
+            author: results.author,
+            version: results.version,
+            status: results.status,
+            has_config: results.has_config,
           }
+        }
 
-          // clear out existing data and add new
-          rows.value.splice(0, rows.value.length, ...listedPlugins.value)
+        // clear out existing data and add new
+        rows.value.splice(0, rows.value.length, ...listedPlugins.value);
 
-          // don't forget to update local pagination object
-          pagination.value.page = page
-          pagination.value.rowsPerPage = rowsPerPage
-          pagination.value.sortBy = sortBy
-          pagination.value.descending = descending
+        // don't forget to update local pagination object
+        pagination.value.page = page;
+        pagination.value.rowsPerPage = rowsPerPage;
+        pagination.value.sortBy = sortBy;
+        pagination.value.descending = descending;
 
-          // ...and turn of loading indicator
-          loading.value = false
+        // ...and turn of loading indicator
+        loading.value = false;
+      }).catch(() => {
+        $q.notify({
+          color: 'negative',
+          position: 'top',
+          message: 'An error was encountered while requesting the installed plugins list',
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
         })
-        .catch(() => {
-          $q.notify({
-            color: 'negative',
-            position: 'top',
-            message: 'An error was encountered while requesting the installed plugins list',
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+      })
     }
 
-    const showPluginInfo = ref('')
-    const showPluginSettings = ref('')
+    const showPluginInfo = ref('');
+    const showPluginSettings = ref('');
 
     function openPluginInfo(tableId, tab) {
       // Fetch the details of the plugin info to be shown
-      let pluginId = ''
+      let pluginId = '';
       for (let i = 0; i < listedPlugins.value.length; i++) {
-        let plugin = listedPlugins.value[i]
+        let plugin = listedPlugins.value[i];
         if (plugin.id === tableId) {
-          pluginId = plugin.plugin_id
+          pluginId = plugin.plugin_id;
         }
       }
       // Ensure we have the info for the plugin to be displayed
@@ -500,13 +500,13 @@ export default {
           position: 'top',
           message: 'An error was encountered while attempting to open plugin info',
           icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }],
+          actions: [{ icon: 'close', color: 'white' }]
         })
         return
       }
 
       selectedPluginId.value = pluginId
-      pluginInfoTab.value = tab === 'settings' ? 'settings' : 'info'
+      pluginInfoTab.value = (tab === 'settings') ? 'settings' : 'info'
       nextTick(() => {
         if (pluginInfoDialogRef.value) {
           pluginInfoDialogRef.value.show()
@@ -515,8 +515,8 @@ export default {
     }
 
     function closePluginInfo() {
-      showPluginInfo.value = ''
-      showPluginSettings.value = ''
+      showPluginInfo.value = '';
+      showPluginSettings.value = '';
     }
 
     function openPluginInstaller() {
@@ -528,7 +528,7 @@ export default {
     function onPluginInstallerHide() {
       onRequest({
         pagination: pagination.value,
-        filter: filter.value,
+        filter: filter.value
       })
     }
 
@@ -542,7 +542,7 @@ export default {
         position: 'top',
         message: $t('components.plugins.invalidZipFile'),
         icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
+        actions: [{ icon: 'close', color: 'white' }]
       })
     }
 
@@ -552,11 +552,11 @@ export default {
         position: 'top',
         message: $t('components.plugins.failedToInstallPluginFromZip'),
         icon: 'check_circle',
-        actions: [{ icon: 'close', color: 'white' }],
+        actions: [{ icon: 'close', color: 'white' }]
       })
       onRequest({
         pagination: pagination.value,
-        filter: undefined,
+        filter: undefined
       })
     }
 
@@ -566,11 +566,11 @@ export default {
         position: 'top',
         message: $t('components.plugins.installedPluginFromZip'),
         icon: 'check_circle',
-        actions: [{ icon: 'close', color: 'white' }],
+        actions: [{ icon: 'close', color: 'white' }]
       })
       onRequest({
         pagination: pagination.value,
-        filter: undefined,
+        filter: undefined
       })
     }
 
@@ -578,16 +578,16 @@ export default {
       // get initial data from server (1st page)
       onRequest({
         pagination: pagination.value,
-        filter: undefined,
+        filter: undefined
       })
     })
 
     watch(filter, (currentValue, oldValue) => {
       onRequest({
         pagination: pagination.value,
-        filter: filter.value,
+        filter: filter.value
       })
-    })
+    });
 
     return {
       selected,
@@ -617,9 +617,9 @@ export default {
       getUploadUrl,
       onRejectedPluginUpload,
       onFailedPluginUploadAndInstall,
-      onSuccessfulPluginUploadAndInstall,
+      onSuccessfulPluginUploadAndInstall
     }
-  },
+  }
 }
 </script>
 <style>

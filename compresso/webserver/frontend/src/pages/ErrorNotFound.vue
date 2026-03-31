@@ -1,11 +1,15 @@
 <template>
   <div class="fullscreen bg-blue text-white text-center q-pa-md flex flex-center">
     <div>
-      <div style="font-size: 30vh">404</div>
+      <div style="font-size: 30vh">
+        404
+      </div>
 
-      <div class="text-h2" style="opacity: 0.4">Oops. Nothing here...</div>
+      <div class="text-h2" style="opacity:.4">
+        Oops. Nothing here...
+      </div>
 
-      <div class="text-subtitle1 q-mt-md" style="opacity: 0.7">
+      <div class="text-subtitle1 q-mt-md" style="opacity:.7">
         {{ $t('pages.errorNotFound.message') }}
       </div>
 
@@ -39,8 +43,8 @@ export default defineComponent({
   methods: {
     showHelp() {
       // Navigate to dashboard where help dialog can be accessed
-      this.$router.push('/ui/dashboard')
-    },
-  },
+      this.$router.push('/ui/dashboard');
+    }
+  }
 })
 </script>

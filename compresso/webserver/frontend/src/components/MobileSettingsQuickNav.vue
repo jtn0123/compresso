@@ -1,7 +1,7 @@
 <template>
   <!--START QUICK NAV-->
   <div v-if="$q.platform.is.mobile" class="mobile-quick-nav">
-    <q-separator />
+    <q-separator/>
     <div class="row q-pa-sm">
       <div class="col-6 q-pr-xs">
         <CompressoStandardButton
@@ -27,34 +27,34 @@
 </template>
 
 <script>
-import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
+import CompressoStandardButton from "components/ui/buttons/CompressoStandardButton.vue";
 
 export default {
   name: 'MobileSettingsQuickNav',
   components: { CompressoStandardButton },
   props: {
     prevEnabled: {
-      type: Boolean,
+      type: Boolean
     },
     prevLabel: {
-      type: String,
+      type: String
     },
     prevPath: {
-      type: String,
+      type: String
     },
     nextEnabled: {
-      type: Boolean,
+      type: Boolean
     },
     nextLabel: {
-      type: String,
+      type: String
     },
     nextPath: {
-      type: String,
-    },
+      type: String
+    }
   },
   setup() {
     return {}
-  },
+  }
 }
 </script>
 

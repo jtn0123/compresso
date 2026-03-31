@@ -1,6 +1,7 @@
 <template>
   <q-card>
     <q-card-section class="bg-card-head q-pa-sm">
+
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-h6 text-grey-8">
@@ -9,46 +10,66 @@
         </div>
 
         <div class="col-auto">
-          <q-btn-dropdown class="q-ml-sm" outline color="secondary" :label="$t('navigation.options')">
+          <q-btn-dropdown
+            class="q-ml-sm"
+            outline
+            color="secondary"
+            :label="$t('navigation.options')"
+          >
             <q-list>
-              <q-item v-if="paused" clickable @click="resumeWorker()" v-close-popup>
+
+              <q-item
+                v-if="paused"
+                clickable
+                @click="resumeWorker()"
+                v-close-popup>
                 <q-item-section>
                   <q-item-label>
-                    <q-icon name="play_arrow" />
+                    <q-icon name="play_arrow"/>
                     {{ $t('components.workers.resumeWorker') }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
-              <q-item v-else clickable @click="pauseWorker()" v-close-popup>
+              <q-item
+                v-else
+                clickable
+                @click="pauseWorker()"
+                v-close-popup>
                 <q-item-section>
                   <q-item-label>
-                    <q-icon name="pause" />
+                    <q-icon name="pause"/>
                     {{ $t('components.workers.pauseWorker') }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
 
-              <q-separator />
+              <q-separator/>
 
-              <q-item clickable @click="terminateWorkerPrompt()" v-close-popup>
+              <q-item
+                clickable
+                @click="terminateWorkerPrompt()"
+                v-close-popup>
                 <q-item-section>
                   <q-item-label>
-                    <q-icon name="fas fa-skull-crossbones" />
+                    <q-icon name="fas fa-skull-crossbones"/>
                     {{ $t('components.workers.terminateWorker') }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
+
             </q-list>
           </q-btn-dropdown>
         </div>
       </div>
+
     </q-card-section>
 
-    <q-separator />
+    <q-separator/>
 
     <div class="column">
       <!-- Two side-by-side lists -->
       <div class="row q-col-gutter-md items-stretch">
+
         <!-- Left list -->
         <div class="col-12 col-sm-6">
           <q-list padding class="fit">
@@ -130,8 +151,8 @@
 </template>
 
 <script>
-import axios from 'axios'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import axios from "axios";
+import { getCompressoApiUrl } from "src/js/compressoGlobals";
 
 export default {
   // name: 'ComponentName',
@@ -140,51 +161,51 @@ export default {
   },
   props: {
     id: {
-      type: String,
+      type: String
     },
 
     state: {
       type: String,
-      default: 'Waiting for another task...',
+      default: 'Waiting for another task...'
     },
 
     currentRunner: {
       type: String,
-      default: '',
+      default: ''
     },
 
     startTime: {
       type: String,
-      default: '',
+      default: ''
     },
 
     timeSinceStart: {
       type: String,
-      default: '',
+      default: ''
     },
 
     elapsed: {
       type: String,
-      default: '',
+      default: ''
     },
 
     etc: {
       type: String,
-      default: '',
+      default: ''
     },
 
     currentCommand: {
       type: String,
-      default: '',
+      default: ''
     },
 
     idle: {
-      type: Boolean,
+      type: Boolean
     },
 
     paused: {
-      type: Boolean,
-    },
+      type: Boolean
+    }
   },
   methods: {
     pauseWorker: function () {
@@ -194,26 +215,24 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'workers/worker/pause'),
-        data: data,
+        data: data
+      }).then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          message: this.$t('components.workers.workerPaused'),
+          icon: 'check_circle',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('components.workers.workerPausedFailed'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            message: this.$t('components.workers.workerPaused'),
-            icon: 'check_circle',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('components.workers.workerPausedFailed'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     },
     resumeWorker: function () {
       let data = {
@@ -222,26 +241,24 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'workers/worker/resume'),
-        data: data,
+        data: data
+      }).then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          message: this.$t('components.workers.workerResumed'),
+          icon: 'check_circle',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('components.workers.workerResumedFailed'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            message: this.$t('components.workers.workerResumed'),
-            icon: 'check_circle',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('components.workers.workerResumedFailed'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     },
     terminateWorker: function () {
       let data = {
@@ -250,52 +267,48 @@ export default {
       axios({
         method: 'delete',
         url: getCompressoApiUrl('v2', 'workers/worker/terminate'),
-        data: data,
+        data: data
+      }).then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          message: this.$t('components.workers.workerTerminated'),
+          icon: 'check_circle',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('components.workers.workerTerminationFailed'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            message: this.$t('components.workers.workerTerminated'),
-            icon: 'check_circle',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('components.workers.workerTerminationFailed'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
     },
     terminateWorkerPrompt: function () {
       if (this.idle) {
         // If the worker is idle, dont prompt, just terminate it.
-        this.terminateWorker()
+        this.terminateWorker();
       } else {
         // If the worker is not idle, prompt to confirm the termination
-        this.$q
-          .dialog({
-            title: this.$t('headers.confirm'),
-            message: this.$t('components.workers.terminateWorkerWarning'),
-            cancel: true,
-            persistent: true,
-          })
-          .onOk(() => {
-            this.terminateWorker()
-          })
+        this.$q.dialog({
+          title: this.$t('headers.confirm'),
+          message: this.$t('components.workers.terminateWorkerWarning'),
+          cancel: true,
+          persistent: true
+        }).onOk(() => {
+          this.terminateWorker();
+        })
       }
     },
-  },
+  }
 }
 </script>
 
 <style lang="css" scoped>
 .monospace {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .wrap-anywhere {

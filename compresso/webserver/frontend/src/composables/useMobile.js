@@ -9,6 +9,6 @@ export function useMobile() {
   })
 
   return {
-    isMobile,
+    isMobile
   }
 }

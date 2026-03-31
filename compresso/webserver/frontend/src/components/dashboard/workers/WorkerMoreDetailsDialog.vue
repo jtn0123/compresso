@@ -1,5 +1,9 @@
 <template>
-  <CompressoDialogWindow ref="dialogRef" :title="label" @hide="onDialogHide">
+  <CompressoDialogWindow
+    ref="dialogRef"
+    :title="label"
+    @hide="onDialogHide"
+  >
     <div
       class="worker-details-body column full-height"
       :class="{ 'scroll-enabled': isMobile || $q.screen.lt.md }"
@@ -26,7 +30,7 @@
               </q-avatar>
             </q-circular-progress>
 
-            <q-separator class="worker-gauges-separator" />
+            <q-separator class="worker-gauges-separator"/>
 
             <div class="worker-gauges">
               <div class="text-caption text-grey-7 q-mt-sm">
@@ -61,12 +65,12 @@
           <WorkerProgressStatusCard
             :id="id"
             :state="state"
-            :current-runner="currentRunner"
-            :start-time="startTime"
-            :time-since-start="timeSinceStart"
+            :currentRunner="currentRunner"
+            :startTime="startTime"
+            :timeSinceStart="timeSinceStart"
             :elapsed="elapsed"
             :etc="etc"
-            :current-command="currentCommand"
+            :currentCommand="currentCommand"
             :paused="paused"
             :idle="idle"
           />
@@ -77,7 +81,7 @@
       <div class="row worker-log-row">
         <!--START WORKER LOG-->
         <q-card-section class="col worker-log-section">
-          <WorkerProgressLogCard :worker-log="workerLog" />
+          <WorkerProgressLogCard :workerLog="workerLog"/>
         </q-card-section>
         <!--END WORKER LOG-->
       </div>
@@ -101,92 +105,92 @@ const { clampPercent, formatPercent, gradientColor } = useWorkerGauges()
 const props = defineProps({
   id: {
     type: String,
-    required: true,
+    required: true
   },
   label: {
     type: String,
-    required: true,
+    required: true
   },
   name: {
     type: String,
-    required: true,
+    required: true
   },
   progress: {
     type: Number,
-    default: 100,
+    default: 100
   },
   progressText: {
     type: String,
-    default: '',
+    default: ''
   },
   elapsed: {
     type: String,
-    default: '',
+    default: ''
   },
   etc: {
     type: String,
-    default: '',
+    default: ''
   },
   color: {
     type: String,
-    default: 'warning',
+    default: 'warning'
   },
   workerGroupColour: {
     type: String,
-    default: 'var(--compresso-grey-4)',
+    default: 'var(--compresso-grey-4)'
   },
   state: {
     type: String,
-    default: 'Waiting for another task...',
+    default: 'Waiting for another task...'
   },
   currentRunner: {
     type: String,
-    default: '',
+    default: ''
   },
   startTime: {
     type: String,
-    default: '',
+    default: ''
   },
   timeSinceStart: {
     type: String,
-    default: '',
+    default: ''
   },
   indeterminate: {
     type: Boolean,
-    default: false,
+    default: false
   },
   currentCommand: {
     type: String,
-    default: '',
+    default: ''
   },
   currentFile: {
     type: String,
-    default: '',
+    default: ''
   },
   currentTask: {
     type: Number,
-    default: null,
+    default: null
   },
   runnersInfo: {
     type: Object,
-    default: () => ({}),
+    default: () => ({})
   },
   subprocess: {
     type: Object,
-    default: () => ({}),
+    default: () => ({})
   },
   workerLog: {
     type: Array,
-    default: () => [],
+    default: () => []
   },
   idle: {
     type: Boolean,
-    default: false,
+    default: false
   },
   paused: {
     type: Boolean,
-    default: false,
-  },
+    default: false
+  }
 })
 
 const emit = defineEmits(['hide'])
@@ -232,7 +236,7 @@ const onDialogHide = () => {
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 

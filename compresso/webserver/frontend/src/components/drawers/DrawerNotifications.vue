@@ -1,23 +1,35 @@
 <template>
+
   <q-list padding>
+
     <q-item>
-      <q-space />
-      <q-item-section class="on-right" style="padding-right: 0" top side>
+      <q-space/>
+      <q-item-section
+        class="on-right"
+        style="padding-right:0;"
+        top
+        side>
         <div class="text-grey-8 q-gutter-xs">
           <q-btn
             dense
             size="sm"
             color="secondary"
             :label="$t('buttons.dismissAll')"
-            @click="dismissAllNotifications()"
-          />
+            @click="dismissAllNotifications()"/>
         </div>
       </q-item-section>
     </q-item>
 
-    <q-item v-for="(notification, index) in notificationsList" :key="index" clickable>
+    <q-item
+      v-for="(notification, index) in notificationsList"
+      v-bind:key="index"
+      clickable
+    >
+
       <q-item-section avatar @click="runNotificationAction(index)">
-        <q-icon :color="notification.color" :name="notification.icon" />
+        <q-icon
+          :color="notification.color"
+          :name="notification.icon"/>
       </q-item-section>
 
       <q-item-section @click="runNotificationAction(index)">
@@ -34,35 +46,44 @@
 
       <q-item-section top side>
         <div class="text-grey-8 q-gutter-xs">
-          <CompressoListActionButton class="gt-xs" icon="close" color="grey-8" @click="dismissNotification(index)" />
+          <CompressoListActionButton
+            class="gt-xs"
+            icon="close"
+            color="grey-8"
+            @click="dismissNotification(index)"
+          />
         </div>
       </q-item-section>
+
     </q-item>
+
   </q-list>
+
 </template>
 
 <script>
-import { ref } from 'vue'
-import compressoGlobals from 'src/js/compressoGlobals'
-import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
-import { createLogger } from 'src/composables/useLogger'
+
+import { ref } from 'vue';
+import compressoGlobals from "src/js/compressoGlobals";
+import CompressoListActionButton from "components/ui/buttons/CompressoListActionButton.vue";
+import { createLogger } from "src/composables/useLogger";
 
 export default {
   name: 'DrawerNotifications',
   components: { CompressoListActionButton },
   created() {
-    this._log = createLogger('Notifications')
+    this._log = createLogger('Notifications');
   },
   methods: {
     runNotificationAction: function (index) {
       if (this.notificationActionsDisabled) {
-        this._log.debug('Notification actions disabled')
-        return
+        this._log.debug('Notification actions disabled');
+        return;
       }
       // Disable any other actions being triggered while this one is being run
-      this.notificationActionsDisabled = true
+      this.notificationActionsDisabled = true;
       // Get notification by index
-      let notification = this.notificationsList[index]
+      let notification = this.notificationsList[index];
       if (
         typeof notification.navigation === 'object' &&
         notification.navigation !== null &&
@@ -70,20 +91,20 @@ export default {
       ) {
         // Handle full url
         if (typeof notification.navigation['url'] !== 'undefined') {
-          window.open(notification.navigation['url'], '_blank')
+          window.open(notification.navigation['url'], '_blank');
         }
         // Handle routing any given 'push' links
         if (typeof notification.navigation['push'] !== 'undefined') {
           this.$router.push(notification.navigation['push'])
         }
         if (typeof notification.navigation['events'] !== 'undefined') {
-          let i = 0
+          let i = 0;
           const loopEventsDelayed = function (emitter) {
             if (i < notification.navigation['events'].length) {
               setTimeout(function () {
                 let triggerEvent = notification.navigation['events'][i]
                 emitter(triggerEvent)
-                i++
+                i++;
                 loopEventsDelayed(emitter)
               }, 200)
             }
@@ -92,49 +113,49 @@ export default {
         }
       }
       // Re-enable notification actions
-      this.notificationActionsDisabled = false
+      this.notificationActionsDisabled = false;
     },
     dismissNotification: function (index) {
       // Get notification by index
-      let notification = this.notificationsList[index]
+      let notification = this.notificationsList[index];
       // Dismiss the matching notification
       compressoGlobals.dismissNotifications(this.$t, [notification.uuid]).then(() => {
-        this.updateNotificationList()
+        this.updateNotificationList();
       })
     },
     dismissAllNotifications: function () {
-      let uuidList = []
+      let uuidList = [];
       for (let i = 0; i < this.notificationsList.length; i++) {
-        let notification = this.notificationsList[i]
-        uuidList[uuidList.length] = notification.uuid
+        let notification = this.notificationsList[i];
+        uuidList[uuidList.length] = notification.uuid;
       }
       // Dismiss the notifications
       compressoGlobals.dismissNotifications(this.$t, uuidList).then(() => {
-        this.updateNotificationList()
+        this.updateNotificationList();
       })
     },
     updateNotificationList: function () {
       compressoGlobals.updateCompressoNotifications(this.$t).then((notificationsList) => {
-        this.notificationsList = notificationsList
+        this.notificationsList = notificationsList;
       })
     },
     startNotificationReload: function () {
       // Run an initial update
-      this.updateNotificationList()
+      this.updateNotificationList();
       // Start an interval to reload it every 15 seconds
       this.reloadInterval = setInterval(() => {
-        this.updateNotificationList()
-      }, 15000)
+        this.updateNotificationList();
+      }, 15000);
     },
     stopNotificationReload: function () {
-      clearInterval(this.reloadInterval)
-    },
+      clearInterval(this.reloadInterval);
+    }
   },
   mounted() {
-    this.startNotificationReload()
+    this.startNotificationReload();
   },
   unmounted() {
-    this.stopNotificationReload()
+    this.stopNotificationReload();
   },
   data: function () {
     return {
@@ -142,6 +163,6 @@ export default {
       notificationsList: ref([]),
       notificationActionsDisabled: ref(false),
     }
-  },
+  }
 }
 </script>

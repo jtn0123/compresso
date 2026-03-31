@@ -1,5 +1,9 @@
 <template>
-  <q-dialog ref="dialogRef" :persistent="persistent" @hide="onDialogHide">
+  <q-dialog
+    ref="dialogRef"
+    :persistent="persistent"
+    @hide="onDialogHide"
+  >
     <q-card class="confirm-dialog-card" flat bordered>
       <q-card-section class="bg-card-head text-primary">
         {{ resolvedTitle }}
@@ -12,8 +16,18 @@
       </q-card-section>
 
       <q-card-actions align="right" class="q-pa-md">
-        <q-btn outline :color="cancelColor" :label="resolvedCancelLabel" @click="onCancel" />
-        <q-btn outline :color="okColor" :label="resolvedOkLabel" @click="onConfirm" />
+        <q-btn
+          outline
+          :color="cancelColor"
+          :label="resolvedCancelLabel"
+          @click="onCancel"
+        />
+        <q-btn
+          outline
+          :color="okColor"
+          :label="resolvedOkLabel"
+          @click="onConfirm"
+        />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -26,32 +40,32 @@ import { useI18n } from 'vue-i18n'
 const props = defineProps({
   title: {
     type: String,
-    default: '',
+    default: ''
   },
   message: {
     type: String,
-    default: '',
+    default: ''
   },
   okLabel: {
     type: String,
-    default: '',
+    default: ''
   },
   cancelLabel: {
     type: String,
-    default: '',
+    default: ''
   },
   okColor: {
     type: String,
-    default: 'secondary',
+    default: 'secondary'
   },
   cancelColor: {
     type: String,
-    default: 'secondary',
+    default: 'secondary'
   },
   persistent: {
     type: Boolean,
-    default: true,
-  },
+    default: true
+  }
 })
 
 const emit = defineEmits(['confirm', 'cancel', 'hide'])
@@ -59,13 +73,21 @@ const emit = defineEmits(['confirm', 'cancel', 'hide'])
 const { t } = useI18n()
 const dialogRef = ref(null)
 
-const resolvedTitle = computed(() => props.title || t('headers.confirm'))
+const resolvedTitle = computed(() => (
+  props.title || t('headers.confirm')
+))
 
-const resolvedMessage = computed(() => props.message || t('components.settings.library.confirmRemove'))
+const resolvedMessage = computed(() => (
+  props.message || t('components.settings.library.confirmRemove')
+))
 
-const resolvedOkLabel = computed(() => props.okLabel || t('navigation.yes'))
+const resolvedOkLabel = computed(() => (
+  props.okLabel || t('navigation.yes')
+))
 
-const resolvedCancelLabel = computed(() => props.cancelLabel || t('navigation.cancel'))
+const resolvedCancelLabel = computed(() => (
+  props.cancelLabel || t('navigation.cancel')
+))
 
 const show = () => {
   if (dialogRef.value) {
@@ -95,7 +117,7 @@ const onDialogHide = () => {
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 

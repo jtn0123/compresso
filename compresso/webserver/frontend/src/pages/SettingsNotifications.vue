@@ -4,6 +4,7 @@
       <div class="row">
         <div class="col-sm-12 col-md-10 col-lg-8">
           <div :class="$q.platform.is.mobile ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
+
             <PageHeader
               :title="$t('pages.settingsNotifications.title')"
               :subtitle="$t('pages.settingsNotifications.subtitle')"
@@ -19,8 +20,8 @@
 
               <!-- Loading state -->
               <q-card-section v-if="loading">
-                <q-skeleton type="QInput" class="q-mb-sm" />
-                <q-skeleton type="QInput" />
+                <q-skeleton type="QInput" class="q-mb-sm"/>
+                <q-skeleton type="QInput"/>
               </q-card-section>
 
               <!-- Empty state when no channels -->
@@ -34,32 +35,19 @@
               <q-list separator v-else>
                 <q-item v-for="channel in channels" :key="channel.id">
                   <q-item-section avatar>
-                    <q-icon :name="channelIcon(channel.type)" :color="channelColor(channel.type)" />
+                    <q-icon :name="channelIcon(channel.type)" :color="channelColor(channel.type)"/>
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ channel.name }}</q-item-label>
                     <q-item-label caption>
-                      <q-badge
-                        :color="channelColor(channel.type)"
-                        :label="channelTypeLabel(channel.type)"
-                        class="q-mr-xs"
-                      />
-                      <span class="text-grey"
-                        >{{ channel.triggers.length }} {{ $t('pages.settingsNotifications.triggerCount') }}</span
-                      >
+                      <q-badge :color="channelColor(channel.type)" :label="channelTypeLabel(channel.type)" class="q-mr-xs"/>
+                      <span class="text-grey">{{ channel.triggers.length }} {{ $t('pages.settingsNotifications.triggerCount') }}</span>
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-toggle v-model="channel.enabled" @update:model-value="saveChannels" dense />
-                      <q-btn
-                        flat
-                        dense
-                        icon="send"
-                        size="sm"
-                        @click="testChannel(channel)"
-                        :loading="testingId === channel.id"
-                      >
+                      <q-toggle v-model="channel.enabled" @update:model-value="saveChannels" dense/>
+                      <q-btn flat dense icon="send" size="sm" @click="testChannel(channel)" :loading="testingId === channel.id">
                         <q-tooltip>{{ $t('pages.settingsNotifications.sendTest') }}</q-tooltip>
                       </q-btn>
                       <q-btn flat dense icon="edit" size="sm" @click="editChannel(channel)">
@@ -74,12 +62,7 @@
               </q-list>
 
               <q-card-actions>
-                <q-btn
-                  color="primary"
-                  icon="add"
-                  :label="$t('pages.settingsNotifications.addChannel')"
-                  @click="openAddDialog"
-                />
+                <q-btn color="primary" icon="add" :label="$t('pages.settingsNotifications.addChannel')" @click="openAddDialog"/>
               </q-card-actions>
             </q-card>
 
@@ -88,11 +71,7 @@
               <q-card style="min-width: 500px">
                 <q-card-section>
                   <div class="text-h6">
-                    {{
-                      editingChannel
-                        ? $t('pages.settingsNotifications.editChannel')
-                        : $t('pages.settingsNotifications.addChannel')
-                    }}
+                    {{ editingChannel ? $t('pages.settingsNotifications.editChannel') : $t('pages.settingsNotifications.addChannel') }}
                   </div>
                 </q-card-section>
                 <q-card-section>
@@ -101,7 +80,7 @@
                       outlined
                       v-model="dialogForm.name"
                       :label="$t('pages.settingsNotifications.channelName')"
-                      :rules="[(v) => !!v || $t('pages.settingsNotifications.fieldRequired')]"
+                      :rules="[v => !!v || $t('pages.settingsNotifications.fieldRequired')]"
                     />
                     <q-select
                       outlined
@@ -110,14 +89,14 @@
                       :label="$t('pages.settingsNotifications.channelType')"
                       emit-value
                       map-options
-                      :rules="[(v) => !!v || $t('pages.settingsNotifications.fieldRequired')]"
+                      :rules="[v => !!v || $t('pages.settingsNotifications.fieldRequired')]"
                     />
                     <q-input
                       outlined
                       v-model="dialogForm.url"
                       :label="$t('pages.settingsNotifications.webhookUrl')"
                       type="url"
-                      :rules="[(v) => !!v || $t('pages.settingsNotifications.fieldRequired')]"
+                      :rules="[v => !!v || $t('pages.settingsNotifications.fieldRequired')]"
                       :hint="urlHint"
                     />
                     <q-input
@@ -145,7 +124,7 @@
                   </q-form>
                 </q-card-section>
                 <q-card-actions align="right">
-                  <q-btn flat :label="$t('navigation.cancel')" v-close-popup />
+                  <q-btn flat :label="$t('navigation.cancel')" v-close-popup/>
                   <q-btn
                     color="primary"
                     :label="editingChannel ? $t('navigation.save') : $t('pages.settingsNotifications.addChannel')"
@@ -154,30 +133,31 @@
                 </q-card-actions>
               </q-card>
             </q-dialog>
+
           </div>
         </div>
       </div>
 
       <MobileSettingsQuickNav
-        :prev-enabled="true"
-        :prev-label="$t('navigation.link')"
-        :prev-path="'/ui/settings-link'"
-        :next-enabled="false"
-        :next-label="'none'"
-        :next-path="'/ui/settings-link'"
+        v-bind:prevEnabled="true"
+        v-bind:prevLabel="$t('navigation.link')"
+        v-bind:prevPath="'/ui/settings-link'"
+        v-bind:nextEnabled="false"
+        v-bind:nextLabel="'none'"
+        v-bind:nextPath="'/ui/settings-link'"
       />
     </div>
   </q-page>
 </template>
 
 <script>
-import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { onMounted, onUnmounted, ref, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import axios from 'axios'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
-import PageHeader from 'components/ui/PageHeader.vue'
+import { CompressoWebsocketHandler } from "src/js/compressoWebsocket";
+import { onMounted, onUnmounted, ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
+import axios from "axios";
+import { getCompressoApiUrl } from "src/js/compressoGlobals";
+import MobileSettingsQuickNav from "components/MobileSettingsQuickNav";
+import PageHeader from "components/ui/PageHeader.vue";
 
 export default {
   name: 'SettingsNotifications',
@@ -186,27 +166,27 @@ export default {
     PageHeader,
   },
   setup() {
-    const { t: $t } = useI18n()
+    const { t: $t } = useI18n();
 
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    let ws = null;
+    let compressoWSHandler = CompressoWebsocketHandler($t);
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      ws = compressoWSHandler.init();
     }
 
     function closeCompressoWebsocket() {
-      compressoWSHandler.close()
+      compressoWSHandler.close();
     }
 
     onMounted(() => {
-      initCompressoWebsocket()
-    })
+      initCompressoWebsocket();
+    });
     onUnmounted(() => {
-      closeCompressoWebsocket()
-    })
+      closeCompressoWebsocket();
+    });
 
-    return {}
+    return {};
   },
   data() {
     return {
@@ -222,7 +202,7 @@ export default {
         headersRaw: '',
         triggers: [],
       }),
-    }
+    };
   },
   computed: {
     typeOptions() {
@@ -230,7 +210,7 @@ export default {
         { label: 'Discord', value: 'discord' },
         { label: 'Slack', value: 'slack' },
         { label: this.$t('pages.settingsNotifications.typeWebhook'), value: 'webhook' },
-      ]
+      ];
     },
     triggerOptions() {
       return [
@@ -239,16 +219,16 @@ export default {
         { label: this.$t('pages.settingsNotifications.triggers.queueEmpty'), value: 'queue_empty' },
         { label: this.$t('pages.settingsNotifications.triggers.approvalNeeded'), value: 'approval_needed' },
         { label: this.$t('pages.settingsNotifications.triggers.healthCheckFailed'), value: 'health_check_failed' },
-      ]
+      ];
     },
     urlHint() {
       if (this.dialogForm.type === 'discord') {
-        return this.$t('pages.settingsNotifications.hintDiscord')
+        return this.$t('pages.settingsNotifications.hintDiscord');
       }
       if (this.dialogForm.type === 'slack') {
-        return this.$t('pages.settingsNotifications.hintSlack')
+        return this.$t('pages.settingsNotifications.hintSlack');
       }
-      return this.$t('pages.settingsNotifications.hintWebhook')
+      return this.$t('pages.settingsNotifications.hintWebhook');
     },
   },
   methods: {
@@ -257,57 +237,57 @@ export default {
         discord: 'fab fa-discord',
         slack: 'fab fa-slack',
         webhook: 'webhook',
-      }
-      return icons[type] || 'webhook'
+      };
+      return icons[type] || 'webhook';
     },
     channelColor(type) {
       const colors = {
         discord: 'indigo',
         slack: 'green',
         webhook: 'grey',
-      }
-      return colors[type] || 'grey'
+      };
+      return colors[type] || 'grey';
     },
     channelTypeLabel(type) {
       const labels = {
         discord: 'Discord',
         slack: 'Slack',
         webhook: this.$t('pages.settingsNotifications.typeWebhook'),
-      }
-      return labels[type] || type
+      };
+      return labels[type] || type;
     },
     generateId() {
       if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID()
+        return crypto.randomUUID();
       }
       // Fallback for older browsers
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = (Math.random() * 16) | 0
-        const v = c === 'x' ? r : (r & 0x3) | 0x8
-        return v.toString(16)
-      })
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
     },
     fetchChannels() {
-      this.loading = true
+      this.loading = true;
       axios({
         method: 'get',
         url: getCompressoApiUrl('v2', 'notifications/channels'),
       })
         .then((response) => {
-          this.channels = response.data.channels || []
-          this.loading = false
+          this.channels = response.data.channels || [];
+          this.loading = false;
         })
         .catch(() => {
-          this.channels = []
-          this.loading = false
+          this.channels = [];
+          this.loading = false;
           this.$q.notify({
             color: 'negative',
             position: 'top',
             message: this.$t('pages.settingsNotifications.fetchError'),
             icon: 'report_problem',
             actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+          });
+        });
     },
     saveChannels() {
       axios({
@@ -322,7 +302,7 @@ export default {
             icon: 'cloud_done',
             message: this.$t('notifications.saved'),
             timeout: 200,
-          })
+          });
         })
         .catch(() => {
           this.$q.notify({
@@ -331,90 +311,90 @@ export default {
             message: this.$t('notifications.failedToSaveSettings'),
             icon: 'report_problem',
             actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+          });
+        });
     },
     testChannel(channel) {
-      this.testingId = channel.id
+      this.testingId = channel.id;
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'notifications/channels/test'),
         data: { channel: channel },
       })
         .then(() => {
-          this.testingId = null
+          this.testingId = null;
           this.$q.notify({
             color: 'positive',
             position: 'top',
             icon: 'check_circle',
             message: this.$t('pages.settingsNotifications.testSuccess'),
             timeout: 3000,
-          })
+          });
         })
         .catch(() => {
-          this.testingId = null
+          this.testingId = null;
           this.$q.notify({
             color: 'negative',
             position: 'top',
             message: this.$t('pages.settingsNotifications.testFailed'),
             icon: 'report_problem',
             actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+          });
+        });
     },
     openAddDialog() {
-      this.editingChannel = null
+      this.editingChannel = null;
       this.dialogForm = {
         name: '',
         type: '',
         url: '',
         headersRaw: '',
         triggers: [],
-      }
-      this.showDialog = true
+      };
+      this.showDialog = true;
     },
     editChannel(channel) {
-      this.editingChannel = channel
+      this.editingChannel = channel;
       this.dialogForm = {
         name: channel.name,
         type: channel.type,
         url: channel.url,
         headersRaw: channel.headers ? JSON.stringify(channel.headers) : '',
         triggers: [...channel.triggers],
-      }
-      this.showDialog = true
+      };
+      this.showDialog = true;
     },
     saveDialog() {
       // Validate required fields
       if (!this.dialogForm.name || !this.dialogForm.type || !this.dialogForm.url) {
-        return
+        return;
       }
 
       // Parse custom headers if provided
-      let headers = null
+      let headers = null;
       if (this.dialogForm.type === 'webhook' && this.dialogForm.headersRaw) {
         try {
-          headers = JSON.parse(this.dialogForm.headersRaw)
+          headers = JSON.parse(this.dialogForm.headersRaw);
         } catch {
           this.$q.notify({
             color: 'negative',
             position: 'top',
             message: this.$t('notifications.invalidJson'),
             icon: 'report_problem',
-          })
-          return
+          });
+          return;
         }
       }
 
       if (this.editingChannel) {
         // Update existing channel
-        const idx = this.channels.findIndex((c) => c.id === this.editingChannel.id)
+        const idx = this.channels.findIndex((c) => c.id === this.editingChannel.id);
         if (idx !== -1) {
-          this.channels[idx].name = this.dialogForm.name
-          this.channels[idx].type = this.dialogForm.type
-          this.channels[idx].url = this.dialogForm.url
-          this.channels[idx].headers = headers
-          this.channels[idx].triggers = [...this.dialogForm.triggers]
+          this.channels[idx].name = this.dialogForm.name;
+          this.channels[idx].type = this.dialogForm.type;
+          this.channels[idx].url = this.dialogForm.url;
+          this.channels[idx].headers = headers;
+          this.channels[idx].triggers = [...this.dialogForm.triggers];
         }
       } else {
         // Add new channel
@@ -426,30 +406,28 @@ export default {
           headers: headers,
           triggers: [...this.dialogForm.triggers],
           enabled: true,
-        })
+        });
       }
 
-      this.showDialog = false
-      this.saveChannels()
+      this.showDialog = false;
+      this.saveChannels();
     },
     confirmDelete(channel) {
-      this.$q
-        .dialog({
-          title: this.$t('headers.confirm'),
-          message: this.$t('pages.settingsNotifications.confirmDelete', { name: channel.name }),
-          cancel: true,
-          persistent: true,
-        })
-        .onOk(() => {
-          this.channels = this.channels.filter((c) => c.id !== channel.id)
-          this.saveChannels()
-        })
+      this.$q.dialog({
+        title: this.$t('headers.confirm'),
+        message: this.$t('pages.settingsNotifications.confirmDelete', { name: channel.name }),
+        cancel: true,
+        persistent: true,
+      }).onOk(() => {
+        this.channels = this.channels.filter((c) => c.id !== channel.id);
+        this.saveChannels();
+      });
     },
   },
   created() {
-    this.fetchChannels()
+    this.fetchChannels();
   },
-}
+};
 </script>
 
 <style>

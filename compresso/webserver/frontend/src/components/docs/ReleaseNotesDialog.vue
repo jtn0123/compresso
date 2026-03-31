@@ -1,5 +1,10 @@
 <template>
-  <CompressoDialogPopup ref="dialogRef" :title="$t('headers.releaseNotes')" width="1000px" @hide="onDialogHide">
+  <CompressoDialogPopup
+    ref="dialogRef"
+    :title="$t('headers.releaseNotes')"
+    width="1000px"
+    @hide="onDialogHide"
+  >
     <div class="q-pa-md release-notes-dialog-content">
       <span v-html="releaseNotes"></span>
     </div>
@@ -36,25 +41,23 @@ const markAsViewed = () => {
   const data = {
     settings: {
       release_notes_viewed: symVer.value,
-    },
+    }
   }
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/write'),
-    data: data,
+    data: data
+  }).then((response) => {
+    // Save success, Don't show feedback, just close
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: t('notifications.failedToSaveSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
   })
-    .then((response) => {
-      // Save success, Don't show feedback, just close
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('notifications.failedToSaveSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
 }
 
 const onDialogHide = () => {
@@ -65,7 +68,7 @@ const displayReleaseNotes = () => {
   // Fetch current settings
   axios({
     method: 'get',
-    url: getCompressoApiUrl('v2', 'settings/read'),
+    url: getCompressoApiUrl('v2', 'settings/read')
   }).then((response) => {
     const releaseNotesViewed = response.data.settings.release_notes_viewed
     compressoGlobals.getCompressoVersion().then((version) => {
@@ -80,79 +83,67 @@ const displayReleaseNotes = () => {
       }
 
       // Fetch release data from GitHub
-      const url = 'https://api.github.com/repos/jtn0123/compresso/releases/tags/' + symVer.value
+      const url = "https://api.github.com/repos/jtn0123/compresso/releases/tags/" + symVer.value
       axios({
         method: 'get',
         url: url,
+      }).then((response) => {
+        const publishDate = response.data.published_at
+        const responseBody = response.data.body
+        // Convert Markdown to HTML
+        let releaseNotesHtml = markdownToHTML(responseBody)
+
+        // Replace list heads with shields
+        const newShield = '<img class="shield" src="https://shields.io/badge/-NEW-green" alt="NEW">'
+        const imprShield = '<img class="shield" src="https://shields.io/badge/-IMPR-blue" alt="IMPR">'
+        const fixShield = '<img class="shield" src="https://shields.io/badge/-FIX%20-grey" alt="FIX">'
+        const noteShield = '<img class="shield" src="https://shields.io/badge/-NOTE-yellow" alt="NOTE">'
+        releaseNotesHtml = releaseNotesHtml.replace(/(<li>)\[NEW\]([\S\s]*?)((<ul>)|(<\/li>))/g, '$1' + newShield + '<p>$2</p>$3')
+        releaseNotesHtml = releaseNotesHtml.replace(/(<li>)\[IMPR\]([\S\s]*?)((<ul>)|(<\/li>))/g, '$1' + imprShield + '<p>$2</p>$3')
+        releaseNotesHtml = releaseNotesHtml.replace(/(<li>)\[FIX\]([\S\s]*?)((<ul>)|(<\/li>))/g, '$1' + fixShield + '<p>$2</p>$3')
+        releaseNotesHtml = releaseNotesHtml.replace(/(<li>)\[NOTE\]([\S\s]*?)((<ul>)|(<\/li>))/g, '$1' + noteShield + '<p>$2</p>$3')
+        // Ensure that even if the above regex failed, we still replace the shield
+        releaseNotesHtml = releaseNotesHtml.replace(/\[NEW\]/g, newShield)
+        releaseNotesHtml = releaseNotesHtml.replace(/\[IMPR\]/g, imprShield)
+        releaseNotesHtml = releaseNotesHtml.replace(/\[FIX\]/g, fixShield)
+        releaseNotesHtml = releaseNotesHtml.replace(/\[NOTE\]/g, noteShield)
+
+        // Generate Template from release notes
+        const template = document.createElement('template')
+        template.innerHTML = releaseNotesHtml
+        // Add horizontal rule
+        const hr = document.createElement('hr')
+        template.content.prepend(hr)
+        // Add header
+        const headerDivContainer = document.createElement('div')
+        headerDivContainer.className = 'row'
+
+        const headerDiv1 = document.createElement('div')
+        headerDiv1.className = 'col'
+        const headerVersion = document.createElement('h1')
+        headerVersion.appendChild(document.createTextNode('v' + symVer.value))
+        headerDiv1.appendChild(headerVersion)
+
+        const headerDiv2 = document.createElement('div')
+        headerDiv2.className = 'col text-right text-primary'
+        const headerDate = document.createElement('h4')
+        const d = new Date(publishDate)
+        headerDate.appendChild(document.createTextNode('Published: ' + d))
+        headerDiv2.appendChild(headerDate)
+
+        headerDivContainer.appendChild(headerDiv1)
+        headerDivContainer.appendChild(headerDiv2)
+
+        template.content.prepend(headerDivContainer)
+
+        // Display release notes
+        releaseNotes.value = sanitizeHtml(template.innerHTML)
+
+        // Display dialog
+        show()
+
+      }).catch((error) => {
       })
-        .then((response) => {
-          const publishDate = response.data.published_at
-          const responseBody = response.data.body
-          // Convert Markdown to HTML
-          let releaseNotesHtml = markdownToHTML(responseBody)
-
-          // Replace list heads with shields
-          const newShield = '<img class="shield" src="https://shields.io/badge/-NEW-green" alt="NEW">'
-          const imprShield = '<img class="shield" src="https://shields.io/badge/-IMPR-blue" alt="IMPR">'
-          const fixShield = '<img class="shield" src="https://shields.io/badge/-FIX%20-grey" alt="FIX">'
-          const noteShield = '<img class="shield" src="https://shields.io/badge/-NOTE-yellow" alt="NOTE">'
-          releaseNotesHtml = releaseNotesHtml.replace(
-            /(<li>)\[NEW\]([\S\s]*?)((<ul>)|(<\/li>))/g,
-            '$1' + newShield + '<p>$2</p>$3',
-          )
-          releaseNotesHtml = releaseNotesHtml.replace(
-            /(<li>)\[IMPR\]([\S\s]*?)((<ul>)|(<\/li>))/g,
-            '$1' + imprShield + '<p>$2</p>$3',
-          )
-          releaseNotesHtml = releaseNotesHtml.replace(
-            /(<li>)\[FIX\]([\S\s]*?)((<ul>)|(<\/li>))/g,
-            '$1' + fixShield + '<p>$2</p>$3',
-          )
-          releaseNotesHtml = releaseNotesHtml.replace(
-            /(<li>)\[NOTE\]([\S\s]*?)((<ul>)|(<\/li>))/g,
-            '$1' + noteShield + '<p>$2</p>$3',
-          )
-          // Ensure that even if the above regex failed, we still replace the shield
-          releaseNotesHtml = releaseNotesHtml.replace(/\[NEW\]/g, newShield)
-          releaseNotesHtml = releaseNotesHtml.replace(/\[IMPR\]/g, imprShield)
-          releaseNotesHtml = releaseNotesHtml.replace(/\[FIX\]/g, fixShield)
-          releaseNotesHtml = releaseNotesHtml.replace(/\[NOTE\]/g, noteShield)
-
-          // Generate Template from release notes
-          const template = document.createElement('template')
-          template.innerHTML = releaseNotesHtml
-          // Add horizontal rule
-          const hr = document.createElement('hr')
-          template.content.prepend(hr)
-          // Add header
-          const headerDivContainer = document.createElement('div')
-          headerDivContainer.className = 'row'
-
-          const headerDiv1 = document.createElement('div')
-          headerDiv1.className = 'col'
-          const headerVersion = document.createElement('h1')
-          headerVersion.appendChild(document.createTextNode('v' + symVer.value))
-          headerDiv1.appendChild(headerVersion)
-
-          const headerDiv2 = document.createElement('div')
-          headerDiv2.className = 'col text-right text-primary'
-          const headerDate = document.createElement('h4')
-          const d = new Date(publishDate)
-          headerDate.appendChild(document.createTextNode('Published: ' + d))
-          headerDiv2.appendChild(headerDate)
-
-          headerDivContainer.appendChild(headerDiv1)
-          headerDivContainer.appendChild(headerDiv2)
-
-          template.content.prepend(headerDivContainer)
-
-          // Display release notes
-          releaseNotes.value = sanitizeHtml(template.innerHTML)
-
-          // Display dialog
-          show()
-        })
-        .catch((error) => {})
     })
   })
 }
@@ -163,7 +154,7 @@ onMounted(() => {
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 
@@ -191,6 +182,7 @@ defineExpose({
 .release-notes-dialog-content span > ul > li > ul {
   padding-left: 63px;
 }
+
 
 .release-notes-dialog-content h1 {
   font-size: 2.125rem;

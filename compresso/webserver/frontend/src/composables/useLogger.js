@@ -1,6 +1,6 @@
-import { showEventToast } from 'src/js/compressoGlobals'
+import { showEventToast } from 'src/js/compressoGlobals';
 
-const isProduction = process.env.NODE_ENV === 'production'
+const isProduction = process.env.NODE_ENV === 'production';
 
 /**
  * Create a logger with a tagged prefix.
@@ -10,32 +10,32 @@ const isProduction = process.env.NODE_ENV === 'production'
  * @returns {{ debug: Function, info: Function, warn: Function, error: Function }}
  */
 export function createLogger(tag) {
-  const prefix = `[${tag}]`
+  const prefix = `[${tag}]`;
 
   return {
     debug(...args) {
       if (!isProduction) {
-        console.debug(prefix, ...args)
+        console.debug(prefix, ...args);
       }
     },
     info(...args) {
       if (!isProduction) {
-        console.info(prefix, ...args)
+        console.info(prefix, ...args);
       }
     },
     warn(message, options = {}) {
-      console.warn(prefix, message)
+      console.warn(prefix, message);
       if (options.toast) {
-        showEventToast('warning', typeof message === 'string' ? message : String(message))
+        showEventToast('warning', typeof message === 'string' ? message : String(message));
       }
     },
     error(message, options = {}) {
-      console.error(prefix, message)
+      console.error(prefix, message);
       if (options.toast) {
-        showEventToast('error', typeof message === 'string' ? message : String(message))
+        showEventToast('error', typeof message === 'string' ? message : String(message));
       }
     },
-  }
+  };
 }
 
 /**
@@ -43,5 +43,5 @@ export function createLogger(tag) {
  * Use in Vue components' setup() function.
  */
 export function useLogger(tag) {
-  return createLogger(tag)
+  return createLogger(tag);
 }

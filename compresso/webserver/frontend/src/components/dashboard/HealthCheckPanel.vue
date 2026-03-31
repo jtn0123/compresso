@@ -13,15 +13,11 @@
           <div class="row items-center q-gutter-sm q-mb-xs">
             <q-badge color="positive" :label="$t('healthCheckPanel.scanning')" />
             <span class="text-caption">
-              {{ scanProgress.checked || 0 }}/{{ scanProgress.total || 0 }} ({{ scanPercent }}%)
+              {{ scanProgress.checked || 0 }}/{{ scanProgress.total || 0 }}
+              ({{ scanPercent }}%)
             </span>
           </div>
-          <q-linear-progress
-            :value="scanPercent / 100"
-            size="8px"
-            color="positive"
-            :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'"
-          />
+          <q-linear-progress :value="scanPercent / 100" size="8px" color="positive" :track-color="$q.dark.isActive ? 'grey-8' : 'grey-4'" />
         </div>
         <div v-else class="q-mb-sm">
           <q-badge color="grey" :label="$t('healthCheckPanel.notScanning')" />
@@ -40,10 +36,7 @@
           <q-icon name="warning" class="q-mr-xs" />
           {{ $t('healthCheckPanel.fetchError') }}
         </div>
-        <div
-          v-else-if="!isScanning && !summary.healthy && !summary.warning && !summary.corrupted"
-          class="text-caption text-grey q-mb-sm"
-        >
+        <div v-else-if="!isScanning && !summary.healthy && !summary.warning && !summary.corrupted" class="text-caption text-grey q-mb-sm">
           {{ $t('healthCheckPanel.noData') }}
         </div>
         <div v-else class="row q-gutter-sm">
@@ -91,13 +84,13 @@ async function fetchData() {
   try {
     const [summaryRes, workersRes] = await Promise.all([
       axios.get(getCompressoApiUrl('v2', 'healthcheck/summary')),
-      axios.get(getCompressoApiUrl('v2', 'healthcheck/workers')),
+      axios.get(getCompressoApiUrl('v2', 'healthcheck/workers'))
     ])
     summary.value = summaryRes.data
     isScanning.value = summaryRes.data.scanning || false
     scanProgress.value = {
       checked: summaryRes.data.scan_progress?.checked || 0,
-      total: summaryRes.data.scan_progress?.total || 0,
+      total: summaryRes.data.scan_progress?.total || 0
     }
     workerCount.value = workersRes.data.worker_count || 0
     fetchError.value = false
@@ -118,7 +111,7 @@ async function changeWorkerCount(delta) {
       position: 'top',
       message: $t('healthCheckPanel.workerCountFailed'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }],
+      actions: [{ icon: 'close', color: 'white' }]
     })
   }
 }

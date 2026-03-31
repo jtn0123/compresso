@@ -16,8 +16,14 @@
         >
           <q-item-section side>
             <div class="row no-wrap q-gutter-xs">
-              <div class="palette-swatch" :style="{ background: getSwatchColor(name, 'primary') }" />
-              <div class="palette-swatch" :style="{ background: getSwatchColor(name, 'secondary') }" />
+              <div
+                class="palette-swatch"
+                :style="{ background: getSwatchColor(name, 'primary') }"
+              />
+              <div
+                class="palette-swatch"
+                :style="{ background: getSwatchColor(name, 'secondary') }"
+              />
             </div>
           </q-item-section>
           <q-item-section>

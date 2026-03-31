@@ -1,7 +1,11 @@
 <template>
   <q-page class="q-pa-md">
+
     <!-- Header -->
-    <PageHeader :title="t('pages.taskHistory.title')" :subtitle="t('pages.taskHistory.subtitle')">
+    <PageHeader
+      :title="t('pages.taskHistory.title')"
+      :subtitle="t('pages.taskHistory.subtitle')"
+    >
       <template #actions>
         <q-btn
           flat
@@ -10,7 +14,11 @@
           :disable="tasks.length === 0"
           @click="exportCsv"
         />
-        <q-btn-dropdown flat icon="view_column" :label="t('pages.taskHistory.columns')">
+        <q-btn-dropdown
+          flat
+          icon="view_column"
+          :label="t('pages.taskHistory.columns')"
+        >
           <q-list>
             <q-item v-for="col in allColumns" :key="col.name" dense>
               <q-item-section>
@@ -51,7 +59,13 @@
     <!-- Filter bar -->
     <div class="row q-col-gutter-sm items-center q-mb-sm">
       <div class="col-auto">
-        <q-btn-toggle v-model="statusFilter" toggle-color="secondary" :options="statusFilterOptions" dense no-caps />
+        <q-btn-toggle
+          v-model="statusFilter"
+          toggle-color="secondary"
+          :options="statusFilterOptions"
+          dense
+          no-caps
+        />
       </div>
       <div class="col-auto">
         <q-input
@@ -233,14 +247,14 @@
 
     <!-- Log dialog -->
     <q-dialog v-model="logDialogOpen" backdrop-filter="blur(2px)">
-      <q-card style="min-width: 60vw; max-width: 92vw">
+      <q-card style="min-width: 60vw; max-width: 92vw;">
         <q-card-section class="bg-card-head row items-center">
           <div class="text-h6 text-primary">{{ t('pages.taskHistory.taskLog') }}</div>
           <q-space />
           <q-btn flat round icon="close" v-close-popup />
         </q-card-section>
         <q-separator />
-        <q-card-section class="scroll" style="max-height: 70vh">
+        <q-card-section class="scroll" style="max-height: 70vh;">
           <q-inner-loading :showing="logLoading">
             <q-spinner-dots size="32px" color="secondary" />
           </q-inner-loading>
@@ -251,7 +265,7 @@
 
     <!-- Library select dialog for reprocess -->
     <q-dialog v-model="selectLibraryOpen" persistent>
-      <q-card flat bordered style="min-width: 340px">
+      <q-card flat bordered style="min-width: 340px;">
         <q-card-section>
           <div class="text-h6 text-primary">{{ t('headers.selectLibrary') }}</div>
         </q-card-section>
@@ -269,7 +283,12 @@
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat :label="t('navigation.cancel')" v-close-popup />
-          <q-btn color="secondary" :label="t('navigation.submit')" @click="confirmReprocess" v-close-popup />
+          <q-btn
+            color="secondary"
+            :label="t('navigation.submit')"
+            @click="confirmReprocess"
+            v-close-popup
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -382,15 +401,15 @@ function loadVisibleColumns() {
   try {
     const stored = localStorage.getItem(COLUMN_STORAGE_KEY)
     if (stored) return JSON.parse(stored)
-  } catch {
-    /* ignore */
-  }
-  return allColumns.value.map((c) => c.name)
+  } catch { /* ignore */ }
+  return allColumns.value.map(c => c.name)
 }
 
 const visibleColumnNames = ref(loadVisibleColumns())
 
-const visibleColumns = computed(() => allColumns.value.filter((c) => visibleColumnNames.value.includes(c.name)))
+const visibleColumns = computed(() =>
+  allColumns.value.filter(c => visibleColumnNames.value.includes(c.name))
+)
 
 function toggleColumn(name) {
   const idx = visibleColumnNames.value.indexOf(name)
@@ -403,9 +422,7 @@ function toggleColumn(name) {
   }
   try {
     localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(visibleColumnNames.value))
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 }
 
 // --- Filter options ---
@@ -424,50 +441,40 @@ const sortOptions = computed(() => [
 const activeFilterChips = computed(() => {
   const chips = []
   if (statusFilter.value !== 'all') {
-    const label = statusFilterOptions.value.find((o) => o.value === statusFilter.value)?.label || statusFilter.value
+    const label = statusFilterOptions.value.find(o => o.value === statusFilter.value)?.label || statusFilter.value
     chips.push({
       key: 'status',
       label: t('components.completedTasks.filterStatus', { status: label }),
-      remove: () => {
-        statusFilter.value = 'all'
-      },
+      remove: () => { statusFilter.value = 'all' },
     })
   }
   if (afterDate.value) {
     chips.push({
       key: 'after',
       label: t('components.completedTasks.filterSince', { date: afterDate.value }),
-      remove: () => {
-        afterDate.value = null
-      },
+      remove: () => { afterDate.value = null },
     })
   }
   if (beforeDate.value) {
     chips.push({
       key: 'before',
       label: t('components.completedTasks.filterBefore', { date: beforeDate.value }),
-      remove: () => {
-        beforeDate.value = null
-      },
+      remove: () => { beforeDate.value = null },
     })
   }
   if (codecFilter.value) {
     chips.push({
       key: 'codec',
       label: t('pages.taskHistory.colCodec') + ': ' + codecFilter.value,
-      remove: () => {
-        codecFilter.value = null
-      },
+      remove: () => { codecFilter.value = null },
     })
   }
   if (libraryFilter.value) {
-    const lib = libraryOptions.value.find((o) => o.value === libraryFilter.value)
+    const lib = libraryOptions.value.find(o => o.value === libraryFilter.value)
     chips.push({
       key: 'library',
       label: t('pages.taskHistory.library') + ': ' + (lib?.label || libraryFilter.value),
-      remove: () => {
-        libraryFilter.value = null
-      },
+      remove: () => { libraryFilter.value = null },
     })
   }
   return chips
@@ -500,7 +507,7 @@ async function fetchTasks({ reset = false } = {}) {
     totalCount.value = response.data.recordsFiltered
     pagination.value.rowsNumber = totalCount.value
 
-    tasks.value = (response.data.results || []).map((r) => ({
+    tasks.value = (response.data.results || []).map(r => ({
       id: r.id,
       task_label: r.task_label,
       task_success: r.task_success,
@@ -538,13 +545,11 @@ function onRequest(props) {
 async function fetchLibraries() {
   try {
     const response = await axios.get(getCompressoApiUrl('v2', 'settings/libraries'))
-    libraryOptions.value = (response.data.libraries || []).map((lib) => ({
+    libraryOptions.value = (response.data.libraries || []).map(lib => ({
       label: lib.name,
       value: lib.id,
     }))
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 }
 
 async function fetchCodecs() {
@@ -559,15 +564,11 @@ async function fetchCodecs() {
       order_direction: 'desc',
     })
     const codecs = new Set()
-    ;(response.data.results || []).forEach((r) => {
+    ;(response.data.results || []).forEach(r => {
       if (r.codec) codecs.add(r.codec)
     })
-    codecOptions.value = Array.from(codecs)
-      .sort()
-      .map((c) => ({ label: c, value: c }))
-  } catch {
-    /* ignore */
-  }
+    codecOptions.value = Array.from(codecs).sort().map(c => ({ label: c, value: c }))
+  } catch { /* ignore */ }
 }
 
 // --- Log viewer ---
@@ -592,14 +593,14 @@ function reprocessSingle(row) {
 }
 
 function selectLibraryForReprocess() {
-  pendingReprocessIds.value = selected.value.map((s) => s.id)
+  pendingReprocessIds.value = selected.value.map(s => s.id)
   openLibrarySelect()
 }
 
 async function openLibrarySelect() {
   try {
     const response = await axios.get(getCompressoApiUrl('v2', 'settings/libraries'))
-    const libs = (response.data.libraries || []).map((lib) => ({
+    const libs = (response.data.libraries || []).map(lib => ({
       label: lib.name,
       value: lib.id,
     }))
@@ -685,7 +686,7 @@ function deleteSelected() {
         url: getCompressoApiUrl('v2', 'history/tasks'),
         data: {
           selection_mode: 'explicit',
-          id_list: selected.value.map((s) => s.id),
+          id_list: selected.value.map(s => s.id),
         },
       })
       selected.value = []
@@ -704,18 +705,16 @@ function deleteSelected() {
 
 // --- CSV export ---
 function exportCsv() {
-  const cols = visibleColumns.value.filter((c) => c.name !== 'actions')
-  const headers = cols.map((c) => c.label).join(',')
-  const rows = tasks.value.map((task) =>
-    cols
-      .map((c) => {
-        let val = task[c.field] ?? ''
-        if (c.name === 'status') {
-          val = task.task_success ? 'Success' : 'Failed'
-        }
-        return `"${String(val).replace(/"/g, '""')}"`
-      })
-      .join(','),
+  const cols = visibleColumns.value.filter(c => c.name !== 'actions')
+  const headers = cols.map(c => c.label).join(',')
+  const rows = tasks.value.map(task =>
+    cols.map(c => {
+      let val = task[c.field] ?? ''
+      if (c.name === 'status') {
+        val = task.task_success ? 'Success' : 'Failed'
+      }
+      return `"${String(val).replace(/"/g, '""')}"`
+    }).join(',')
   )
   const csv = [headers, ...rows].join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })

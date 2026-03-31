@@ -3,25 +3,38 @@
     <!-- content -->
 
     <div class="q-pa-none">
+
       <!--      <h4 class="q-ma-none">{{ $t('headers.librarySettings') }}</h4>-->
 
       <div class="row">
         <div class="col q-ma-sm">
-          <div class="q-pa-md" :style="$q.platform.is.mobile ? '' : 'max-width: 70%'">
-            <q-form @submit="save" class="q-gutter-md">
+
+          <div class="q-pa-md"
+               :style="$q.platform.is.mobile ? '' : 'max-width: 70%'">
+
+            <q-form
+              @submit="save"
+              class="q-gutter-md"
+            >
+
               <!--START WORKER GROUPS-->
               <h5 class="q-mb-none">{{ $t('components.settings.workers.workerGroups') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="workerGroups === null" type="text" />
+                <q-skeleton
+                  v-if="workerGroups === null"
+                  type="text"/>
 
-                <q-list bordered separator class="rounded-borders">
+                <q-list
+                  bordered
+                  separator
+                  class="rounded-borders">
+
                   <q-item
                     v-for="(workerGroup, index) in workerGroups"
-                    :key="index"
-                    active-class="library-path-list-item"
-                  >
+                    v-bind:key="index"
+                    active-class="library-path-list-item">
                     <q-item-section avatar>
-                      <q-avatar text-color="grey-8" icon="workspaces" />
+                      <q-avatar text-color="grey-8" icon="workspaces"/>
                     </q-item-section>
 
                     <q-item-section>
@@ -45,13 +58,13 @@
                       <q-tooltip>
                         <span class="text-weight-bold">{{ $t('components.settings.workers.workerCount') }}:</span>
                         {{ workerGroup.workerCount }}
-                        <br />
+                        <br>
                         <span class="text-weight-bold">{{ $t('components.settings.common.tags') }}:</span>
                         {{ workerGroup.tags.join(', ') || $t('status.none') }}
                       </q-tooltip>
                     </q-item-section>
 
-                    <q-separator inset vertical class="q-mx-sm" />
+                    <q-separator inset vertical class="q-mx-sm"/>
 
                     <q-item-section center side>
                       <div class="text-grey-8 q-gutter-xs">
@@ -62,8 +75,7 @@
                           size="12px"
                           color="grey-8"
                           icon="tune"
-                          @click="configureWorkerGroup(index)"
-                        >
+                          @click="configureWorkerGroup(index)">
                           <q-tooltip class="bg-white text-primary">
                             {{ $t('tooltips.configure') }}
                           </q-tooltip>
@@ -76,28 +88,35 @@
                           :color="workerGroup.locked ? 'grey-6' : 'negative'"
                           icon="delete"
                           :disable="workerGroup.locked"
-                          @click="deleteWorkerGroup(index)"
-                        >
+                          @click="deleteWorkerGroup(index)">
                           <q-tooltip class="bg-white text-primary">
                             {{ $t('tooltips.delete') }}
                           </q-tooltip>
                         </q-btn>
                       </div>
                     </q-item-section>
+
                   </q-item>
+
                 </q-list>
 
                 <q-bar class="bg-transparent">
-                  <q-space />
-                  <CompressoListAddButton :tooltip="$t('tooltips.add')" @click="configureWorkerGroup('new')" />
+                  <q-space/>
+                  <CompressoListAddButton
+                    :tooltip="$t('tooltips.add')"
+                    @click="configureWorkerGroup('new')"
+                  />
                 </q-bar>
+
               </div>
               <!--END WORKER GROUPS-->
 
               <!--START CACHE PATHS-->
               <h5 class="q-mb-none">{{ $t('components.settings.workers.path') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="cachePath === null" type="QInput" />
+                <q-skeleton
+                  v-if="cachePath === null"
+                  type="QInput"/>
                 <q-input
                   v-else
                   readonly
@@ -106,121 +125,117 @@
                   v-model="cachePath"
                   :label="$t('components.settings.workers.path')"
                   :placeholder="cachePath"
-                  @click="updateCacheWithDirectoryBrowser"
-                >
-                  <template #append>
-                    <q-icon @click="updateCacheWithDirectoryBrowser" class="cursor-pointer" name="folder_open" />
+                  @click="updateCacheWithDirectoryBrowser">
+                  <template v-slot:append>
+                    <q-icon
+                      @click="updateCacheWithDirectoryBrowser"
+                      class="cursor-pointer"
+                      name="folder_open"/>
                   </template>
                 </q-input>
               </div>
               <!--END CACHE PATHS-->
 
-              <q-separator class="q-my-lg" />
+              <q-separator class="q-my-lg"/>
 
               <div>
-                <CompressoSettingsSubmitButton />
+                <CompressoSettingsSubmitButton/>
               </div>
             </q-form>
+
           </div>
+
         </div>
       </div>
 
       <MobileSettingsQuickNav
-        :prev-enabled="true"
-        :prev-label="$t('navigation.library')"
-        :prev-path="'/ui/settings-library'"
-        :next-enabled="true"
-        :next-label="$t('navigation.plugins')"
-        :next-path="'/ui/settings-plugins'"
-      />
+        v-bind:prevEnabled="true"
+        v-bind:prevLabel="$t('navigation.library')"
+        v-bind:prevPath="'/ui/settings-library'"
+        v-bind:nextEnabled="true"
+        v-bind:nextLabel="$t('navigation.plugins')"
+        v-bind:nextPath="'/ui/settings-plugins'"/>
 
       <WorkerGroupConfigDialog
         ref="workerGroupDialogRef"
-        :worker-group-id="activeWorkerGroupId"
+        :workerGroupId="activeWorkerGroupId"
         @saved="onWorkerGroupSaved"
         @hide="onWorkerGroupHide"
       />
 
       <SelectDirectoryDialog
         ref="selectDirectoryDialogRef"
-        :initial-path="selectDirectoryInitialPath"
-        :list-type="selectDirectoryListType"
+        :initialPath="selectDirectoryInitialPath"
+        :listType="selectDirectoryListType"
         @selected="onDirectorySelected"
       />
+
     </div>
   </q-page>
 </template>
 
 <script>
-import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { CompressoWebsocketHandler } from "src/js/compressoWebsocket";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useQuasar } from 'quasar'
-import { useI18n } from 'vue-i18n'
-import axios from 'axios'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
-import WorkerGroupConfigDialog from 'components/settings/workers/WorkerGroupConfigDialog.vue'
-import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
-import CompressoSettingsSubmitButton from 'components/ui/buttons/CompressoSettingsSubmitButton.vue'
-import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
+import { useI18n } from "vue-i18n";
+import axios from "axios";
+import { getCompressoApiUrl } from "src/js/compressoGlobals";
+import MobileSettingsQuickNav from "components/MobileSettingsQuickNav";
+import WorkerGroupConfigDialog from "components/settings/workers/WorkerGroupConfigDialog.vue";
+import SelectDirectoryDialog from "components/ui/pickers/SelectDirectoryDialog.vue";
+import CompressoSettingsSubmitButton from "components/ui/buttons/CompressoSettingsSubmitButton.vue";
+import CompressoListAddButton from "components/ui/buttons/CompressoListAddButton.vue";
 
-import { checkUnsavedChanges } from 'src/js/settingsUtils'
+import { checkUnsavedChanges } from "src/js/settingsUtils";
 
 export default {
   name: 'SettingsWorkers',
-  components: {
-    MobileSettingsQuickNav,
-    WorkerGroupConfigDialog,
-    SelectDirectoryDialog,
-    CompressoSettingsSubmitButton,
-    CompressoListAddButton,
-  },
+  components: { MobileSettingsQuickNav, WorkerGroupConfigDialog, SelectDirectoryDialog, CompressoSettingsSubmitButton, CompressoListAddButton },
   setup() {
     const $q = useQuasar()
-    const { t: $t } = useI18n()
+    const { t: $t } = useI18n();
 
     /**
      * Compresso WS handle
      * @type {null}
      */
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    let ws = null;
+    let compressoWSHandler = CompressoWebsocketHandler($t);
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      ws = compressoWSHandler.init();
     }
 
     function closeCompressoWebsocket() {
-      compressoWSHandler.close()
+      compressoWSHandler.close();
     }
 
     // END COMPRESSO WS HANDLE
 
     onMounted(() => {
       // Start the websocket
-      initCompressoWebsocket()
+      initCompressoWebsocket();
     })
     onUnmounted(() => {
       // Close the websocket
-      closeCompressoWebsocket()
+      closeCompressoWebsocket();
     })
+
   },
   beforeRouteLeave(to, from, next) {
     if (this.hasUnsavedChanges) {
-      this.$q
-        .dialog({
-          title: this.$t('headers.confirm'),
-          message: this.$t('components.settings.common.unsavedChanges'),
-          cancel: this.$t('navigation.cancel'),
-          ok: this.$t('navigation.yes'),
-          persistent: true,
-        })
-        .onOk(() => {
-          next()
-        })
-        .onCancel(() => {
-          next(false)
-        })
+      this.$q.dialog({
+        title: this.$t('headers.confirm'),
+        message: this.$t('components.settings.common.unsavedChanges'),
+        cancel: this.$t('navigation.cancel'),
+        ok: this.$t('navigation.yes'),
+        persistent: true
+      }).onOk(() => {
+        next()
+      }).onCancel(() => {
+        next(false)
+      })
     } else {
       next()
     }
@@ -238,7 +253,7 @@ export default {
   computed: {
     hasUnsavedChanges() {
       return checkUnsavedChanges(this.originalCachePath, this.cachePath)
-    },
+    }
   },
   methods: {
     updateCacheWithDirectoryBrowser: function () {
@@ -259,141 +274,131 @@ export default {
       // Fetch current settings
       axios({
         method: 'get',
-        url: getCompressoApiUrl('v2', 'settings/read'),
-      })
-        .then((response) => {
-          // Set the cache path value
-          this.cachePath = response.data.settings.cache_path
-          this.originalCachePath = response.data.settings.cache_path
+        url: getCompressoApiUrl('v2', 'settings/read')
+      }).then((response) => {
+        // Set the cache path value
+        this.cachePath = response.data.settings.cache_path
+        this.originalCachePath = response.data.settings.cache_path
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('notifications.failedToFetchSettings'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
         })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('notifications.failedToFetchSettings'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+      });
     },
     fetchWorkerGroupsList: function () {
       // Fetch current settings
       axios({
         method: 'get',
-        url: getCompressoApiUrl('v2', 'settings/worker_groups'),
-      })
-        .then((response) => {
-          let workerGroupsList = []
-          for (let i = 0; i < response.data.worker_groups.length; i++) {
-            let workerGroup = response.data.worker_groups[i]
-            workerGroupsList[workerGroupsList.length] = {
-              id: workerGroup.id,
-              name: workerGroup.name,
-              workerType: workerGroup.worker_type || 'cpu',
-              workerCount: workerGroup.number_of_workers,
-              tags: workerGroup.tags,
-              locked: workerGroup.locked,
-            }
+        url: getCompressoApiUrl('v2', 'settings/worker_groups')
+      }).then((response) => {
+        let workerGroupsList = []
+        for (let i = 0; i < response.data.worker_groups.length; i++) {
+          let workerGroup = response.data.worker_groups[i];
+          workerGroupsList[workerGroupsList.length] = {
+            id: workerGroup.id,
+            name: workerGroup.name,
+            workerType: workerGroup.worker_type || 'cpu',
+            workerCount: workerGroup.number_of_workers,
+            tags: workerGroup.tags,
+            locked: workerGroup.locked,
           }
-          this.workerGroups = workerGroupsList
+        }
+        this.workerGroups = workerGroupsList
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('notifications.failedToFetchLibraryList'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
         })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('notifications.failedToFetchLibraryList'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+      });
     },
     deleteWorkerGroup: function (index) {
       // Fetch worker group ID
-      let workerGroupId
+      let workerGroupId;
       for (let i = 0; i < this.workerGroups.length; i++) {
         if (i === index) {
-          workerGroupId = this.workerGroups[i].id
-          break
+          workerGroupId = this.workerGroups[i].id;
+          break;
         }
       }
-      this.$q
-        .dialog({
-          title: this.$t('headers.confirm'),
-          message: this.$t('components.settings.workers.confirmRemove'),
-          cancel: this.$t('navigation.cancel'),
-          ok: this.$t('navigation.yes'),
-          persistent: true,
-        })
-        .onOk(() => {
-          // Request a DELETE from server
-          let data = {
-            id: workerGroupId,
-          }
-          axios({
-            method: 'delete',
-            url: getCompressoApiUrl('v2', 'settings/worker_group/remove'),
-            data: data,
+      this.$q.dialog({
+        title: this.$t('headers.confirm'),
+        message: this.$t('components.settings.workers.confirmRemove'),
+        cancel: this.$t('navigation.cancel'),
+        ok: this.$t('navigation.yes'),
+        persistent: true
+      }).onOk(() => {
+        // Request a DELETE from server
+        let data = {
+          id: workerGroupId,
+        }
+        axios({
+          method: 'delete',
+          url: getCompressoApiUrl('v2', 'settings/worker_group/remove'),
+          data: data
+        }).then((response) => {
+          // Save success, show feedback
+          this.$q.notify({
+            color: 'positive',
+            position: 'top',
+            icon: 'cloud_done',
+            message: this.$t('notifications.saved'),
+            timeout: 200
           })
-            .then((response) => {
-              // Save success, show feedback
-              this.$q.notify({
-                color: 'positive',
-                position: 'top',
-                icon: 'cloud_done',
-                message: this.$t('notifications.saved'),
-                timeout: 200,
-              })
-              // Update list
-              this.fetchWorkerGroupsList()
-            })
-            .catch(() => {
-              this.$q.notify({
-                color: 'negative',
-                position: 'top',
-                message: this.$t('notifications.failedToSaveSettings'),
-                icon: 'report_problem',
-                actions: [{ icon: 'close', color: 'white' }],
-              })
-            })
-        })
+          // Update list
+          this.fetchWorkerGroupsList();
+        }).catch(() => {
+          this.$q.notify({
+            color: 'negative',
+            position: 'top',
+            message: this.$t('notifications.failedToSaveSettings'),
+            icon: 'report_problem',
+            actions: [{ icon: 'close', color: 'white' }]
+          })
+        });
+      })
     },
     save: function () {
       // Save settings
       let data = {
         settings: {
           cache_path: this.cachePath,
-        },
+        }
       }
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'settings/write'),
-        data: data,
-      })
-        .then((response) => {
-          // Save success, show feedback
-          this.originalCachePath = this.cachePath
-          this.fetchSettings()
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            icon: 'cloud_done',
-            message: this.$t('notifications.saved'),
-            timeout: 200,
-          })
+        data: data
+      }).then((response) => {
+        // Save success, show feedback
+        this.originalCachePath = this.cachePath
+        this.fetchSettings();
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          icon: 'cloud_done',
+          message: this.$t('notifications.saved'),
+          timeout: 200
         })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('notifications.failedToSaveSettings'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('notifications.failedToSaveSettings'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
         })
+      });
     },
     configureWorkerGroup: function (index) {
       if (index === 'new') {
-        this.activeWorkerGroupId = 0
+        this.activeWorkerGroupId = 0;
       } else {
         this.activeWorkerGroupId = this.workerGroups[index].id
       }
@@ -404,16 +409,16 @@ export default {
       })
     },
     onWorkerGroupSaved: function () {
-      this.fetchSettings()
-      this.fetchWorkerGroupsList()
+      this.fetchSettings();
+      this.fetchWorkerGroupsList();
     },
     onWorkerGroupHide: function () {
       this.activeWorkerGroupId = 0
     },
   },
   created() {
-    this.fetchSettings()
-    this.fetchWorkerGroupsList()
+    this.fetchSettings();
+    this.fetchWorkerGroupsList();
   },
 }
 </script>

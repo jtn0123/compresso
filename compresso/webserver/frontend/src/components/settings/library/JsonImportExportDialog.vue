@@ -9,10 +9,22 @@
     @submit="submit"
   >
     <div class="q-pa-md">
-      <q-card flat bordered class="q-pa-sm" style="width: 100%">
+      <q-card
+        flat
+        bordered
+        class="q-pa-sm"
+        style="width:100%"
+      >
         <q-card-section class="q-pt-none">
-          <pre v-if="mode === 'export'" style="white-space: pre-wrap; word-wrap: break-word">{{ jsonData }}</pre>
-          <q-input v-else v-model="importString" rows="30" type="textarea" filled class="monospace-input" />
+          <pre v-if="mode === 'export'" style="white-space: pre-wrap; word-wrap: break-word;">{{ jsonData }}</pre>
+          <q-input
+            v-else
+            v-model="importString"
+            rows="30"
+            type="textarea"
+            filled
+            class="monospace-input"
+          />
         </q-card-section>
       </q-card>
     </div>
@@ -29,18 +41,18 @@ const props = defineProps({
   dialogHeader: {
     type: String,
     required: true,
-    default: ' --- header --- ',
+    default: ' --- header --- '
   },
   jsonData: {
     type: String,
     required: true,
-    default: ' --- jsonData --- ',
+    default: ' --- jsonData --- '
   },
   mode: {
     type: String,
     required: true,
-    default: 'export',
-  },
+    default: 'export'
+  }
 })
 
 const emit = defineEmits(['ok', 'hide'])
@@ -68,8 +80,8 @@ const dialogActions = computed(() => {
         label: t('navigation.copy'),
         icon: 'content_copy',
         color: 'secondary',
-        emit: 'copy',
-      },
+        emit: 'copy'
+      }
     ]
   } else {
     return [
@@ -81,8 +93,8 @@ const dialogActions = computed(() => {
         disabled: !isDirty.value,
         tooltip: isDirty.value
           ? t('components.settings.library.importLibraryConfig')
-          : t('components.settings.common.noChangesToSave'),
-      },
+          : t('components.settings.common.noChangesToSave')
+      }
     ]
   }
 })
@@ -106,7 +118,7 @@ const copyJson = () => {
         color: 'secondary',
         position: 'top',
         message: t('notifications.copied'),
-        timeout: 200,
+        timeout: 200
       })
     })
     .catch(() => {
@@ -125,14 +137,14 @@ const submit = () => {
       position: 'top',
       message: t('notifications.invalidJson'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }],
+      actions: [{ icon: 'close', color: 'white' }]
     })
   }
 }
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 

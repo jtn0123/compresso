@@ -20,18 +20,17 @@
       <!-- HEADER -->
       <q-card-section class="bg-card-head col-auto dialog-sticky-header q-py-sm">
         <div class="row items-center no-wrap">
+
           <!-- MOBILE HEADER (lt-md OR mobile platform): Left Close Button -->
           <template v-if="isMobile">
             <q-btn
-              outline
-              dense
-              round
+              outline dense round
               icon="arrow_back"
               color="grey-7"
               :class="{ 'dialog-attention': attentionActive }"
               @click="hide"
             >
-              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none">
+              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none;">
                 {{ closeTooltip || $t('tooltips.close') }}
               </q-tooltip>
             </q-btn>
@@ -53,7 +52,7 @@
                   @click="triggerAction(action)"
                 >
                   <q-item-section v-if="action.icon" avatar>
-                    <q-icon :name="action.icon" :color="action.color || 'secondary'" />
+                    <q-icon :name="action.icon" :color="action.color || 'secondary'"/>
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ action.label }}</q-item-label>
@@ -79,13 +78,13 @@
               </q-tooltip>
             </q-btn>
 
-            <q-space />
+            <q-space/>
 
             <div class="text-h6 text-primary q-px-sm ellipsis">
               {{ title }}
             </div>
 
-            <q-space />
+            <q-space/>
           </template>
 
           <!-- DESKTOP HEADER (md+ AND desktop platform): Right Close Button -->
@@ -111,7 +110,7 @@
                   @click="triggerAction(action)"
                 >
                   <q-item-section v-if="action.icon" avatar>
-                    <q-icon :name="action.icon" :color="action.color || 'secondary'" />
+                    <q-icon :name="action.icon" :color="action.color || 'secondary'"/>
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ action.label }}</q-item-label>
@@ -133,7 +132,7 @@
               :class="[
                 { 'dialog-attention': attentionActive },
                 index === 0 ? 'q-mr-sm' : 'q-ml-xs',
-                index === actions.length - 1 ? 'q-mr-sm' : '',
+                index === actions.length - 1 ? 'q-mr-sm' : ''
               ]"
               @click="triggerAction(action)"
             >
@@ -143,19 +142,18 @@
             </q-btn>
 
             <q-btn
-              outline
-              dense
-              round
+              outline dense round
               icon="arrow_forward"
               color="grey-7"
               :class="{ 'dialog-attention': attentionActive }"
               @click="hide"
             >
-              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none">
+              <q-tooltip class="bg-white text-primary no-wrap" style="max-width: none;">
                 {{ closeTooltip || $t('tooltips.close') }}
               </q-tooltip>
             </q-btn>
           </template>
+
         </div>
       </q-card-section>
 
@@ -176,24 +174,24 @@ import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStan
 const props = defineProps({
   title: {
     type: String,
-    default: '',
+    default: ''
   },
   width: {
     type: String,
-    default: '95vw',
+    default: '95vw'
   },
   closeTooltip: {
     type: String,
-    default: '',
+    default: ''
   },
   persistent: {
     type: Boolean,
-    default: false,
+    default: false
   },
   actions: {
     type: Array,
-    default: () => [],
-  },
+    default: () => []
+  }
 })
 
 const emit = defineEmits(['ok', 'hide', 'action', 'save', 'reset'])
@@ -250,7 +248,7 @@ const reversedActions = computed(() => [...props.actions].reverse())
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 

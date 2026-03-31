@@ -1,8 +1,12 @@
 <template>
-  <CompressoDialogWindow ref="dialogRef" :title="$t('headers.privacyPolicy')" @hide="onDialogHide">
+  <CompressoDialogWindow
+    ref="dialogRef"
+    :title="$t('headers.privacyPolicy')"
+    @hide="onDialogHide"
+  >
     <div class="privacy-dialog-content">
       <q-inner-loading :showing="isLoading">
-        <q-spinner color="secondary" size="32px" />
+        <q-spinner color="secondary" size="32px"/>
       </q-inner-loading>
       <div class="q-pa-md markdown-dialog-content privacy-dialog-body" v-html="privacyPolicyHtml"></div>
     </div>
@@ -28,8 +32,7 @@ const show = () => {
   isLoading.value = true
   privacyPolicyHtml.value = ''
   dialogRef.value.show()
-  compressoGlobals
-    .getCompressoPrivacyPolicy()
+  compressoGlobals.getCompressoPrivacyPolicy()
     .then((privacyPolicy) => {
       privacyPolicyHtml.value = markdownToHTML(privacyPolicy)
     })
@@ -50,7 +53,7 @@ const onDialogHide = () => {
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 

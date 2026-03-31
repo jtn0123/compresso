@@ -1,13 +1,17 @@
 <template>
   <div class="column fit">
-    <div :class="{ 'q-mt-xl': !$q.screen.gt.sm }"></div>
+    <div :class="{'q-mt-xl' : !$q.screen.gt.sm}"></div>
     <q-scroll-area class="col">
       <q-list padding>
+
         <q-item-label header>{{ $t('navigation.settings') }}:</q-item-label>
         <!--START LIBRARY SELECT-->
-        <q-item clickable to="/ui/settings-library" v-ripple>
+        <q-item
+          clickable
+          to="/ui/settings-library"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="account_tree" />
+            <q-icon name="account_tree"/>
           </q-item-section>
           <q-item-section>
             {{ $t('navigation.library') }}
@@ -16,9 +20,12 @@
         <!--END LIBRARY SELECT-->
 
         <!--START WORKERS SELECT-->
-        <q-item clickable to="/ui/settings-workers" v-ripple>
+        <q-item
+          clickable
+          to="/ui/settings-workers"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="engineering" />
+            <q-icon name="engineering"/>
           </q-item-section>
           <q-item-section>
             {{ $t('navigation.workers') }}
@@ -27,9 +34,12 @@
         <!--END WORKERS SELECT-->
 
         <!--START PLUGINS SELECT-->
-        <q-item clickable to="/ui/settings-plugins" v-ripple>
+        <q-item
+          clickable
+          to="/ui/settings-plugins"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="extension" />
+            <q-icon name="extension"/>
           </q-item-section>
           <q-item-section>
             {{ $t('navigation.plugins') }}
@@ -38,9 +48,12 @@
         <!--END PLUGINS SELECT-->
 
         <!--START LINK SELECT-->
-        <q-item clickable to="/ui/settings-link" v-ripple>
+        <q-item
+          clickable
+          to="/ui/settings-link"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="link" />
+            <q-icon name="link"/>
           </q-item-section>
           <q-item-section>
             {{ $t('navigation.link') }}
@@ -49,9 +62,12 @@
         <!--END LINK SELECT-->
 
         <!--START NOTIFICATIONS SELECT-->
-        <q-item clickable to="/ui/settings-notifications" v-ripple>
+        <q-item
+          clickable
+          to="/ui/settings-notifications"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="notifications_active" />
+            <q-icon name="notifications_active"/>
           </q-item-section>
           <q-item-section>
             {{ $t('navigation.notifications') }}
@@ -59,13 +75,16 @@
         </q-item>
         <!--END NOTIFICATIONS SELECT-->
 
-        <q-separator spaced />
+        <q-separator spaced/>
 
         <q-item-label header>{{ $t('navigation.documentation') }}:</q-item-label>
         <!--START SUPPORT SELECT-->
-        <q-item clickable @click="showHelpSupportDialog" v-ripple>
+        <q-item
+          clickable
+          @click="showHelpSupportDialog"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="fa-regular fa-life-ring" />
+            <q-icon name="fa-regular fa-life-ring"/>
           </q-item-section>
           <q-item-section>
             {{ $t('navigation.helpAndSupport') }}
@@ -74,9 +93,12 @@
         <!--END SUPPORT SELECT-->
 
         <!--START APPLICATION LOGS-->
-        <q-item clickable @click="showApplicationLogsDialog" v-ripple>
+        <q-item
+          clickable
+          @click="showApplicationLogsDialog"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="article" />
+            <q-icon name="article"/>
           </q-item-section>
           <q-item-section>
             {{ $t('navigation.applicationLogs') }}
@@ -85,45 +107,51 @@
         <!--END APPLICATION LOGS-->
 
         <!--START PRIVACY POLICY-->
-        <q-item clickable @click="showPrivacyPolicyDialog" v-ripple>
+        <q-item
+          clickable
+          @click="showPrivacyPolicyDialog"
+          v-ripple>
           <q-item-section avatar>
-            <q-icon name="o_shield" />
+            <q-icon name="o_shield"/>
           </q-item-section>
           <q-item-section>
             {{ $t('headers.privacyPolicy') }}
           </q-item-section>
         </q-item>
         <!--END PRIVACY POLICY-->
+
+
       </q-list>
     </q-scroll-area>
 
-    <HelpSupportDialog ref="helpSupportDialogRef" />
-    <ApplicationLogsDialog ref="applicationLogsDialogRef" />
-    <PrivacyPolicyDialog ref="privacyPolicyDialogRef" />
+    <HelpSupportDialog ref="helpSupportDialogRef"/>
+    <ApplicationLogsDialog ref="applicationLogsDialogRef"/>
+    <PrivacyPolicyDialog ref="privacyPolicyDialogRef"/>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue'
-import compressoGlobals from 'src/js/compressoGlobals'
-import PrivacyPolicyDialog from 'components/docs/PrivacyPolicyDialog.vue'
-import HelpSupportDialog from 'components/docs/HelpSupportDialog.vue'
-import ApplicationLogsDialog from 'components/docs/ApplicationLogsDialog.vue'
+
+import { ref } from "vue";
+import compressoGlobals from "src/js/compressoGlobals";
+import PrivacyPolicyDialog from "components/docs/PrivacyPolicyDialog.vue";
+import HelpSupportDialog from "components/docs/HelpSupportDialog.vue";
+import ApplicationLogsDialog from "components/docs/ApplicationLogsDialog.vue";
 
 export default {
   name: 'DrawerSettingsNav',
   components: { PrivacyPolicyDialog, HelpSupportDialog, ApplicationLogsDialog },
   setup() {
-    const compressoSession = ref(null)
+    const compressoSession = ref(null);
     const formAction = ref(null)
     const uuid = ref(null)
     const currentUri = ref(null)
-    const privacyPolicyDialogRef = ref(null)
-    const helpSupportDialogRef = ref(null)
-    const applicationLogsDialogRef = ref(null)
+    const privacyPolicyDialogRef = ref(null);
+    const helpSupportDialogRef = ref(null);
+    const applicationLogsDialogRef = ref(null);
 
     compressoGlobals.getCompressoSession().then((session) => {
-      compressoSession.value = session
+      compressoSession.value = session;
     })
 
     function showPrivacyPolicyDialog() {
@@ -156,6 +184,6 @@ export default {
       helpSupportDialogRef,
       applicationLogsDialogRef,
     }
-  },
+  }
 }
 </script>

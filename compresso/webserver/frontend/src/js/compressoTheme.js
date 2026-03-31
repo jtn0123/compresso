@@ -22,16 +22,8 @@ const PALETTES = {
       headerBg: '#13291f',
       headerGradientEnd: '#1a3d2d',
       chart: [
-        '#1a6b4a',
-        '#d49a1e',
-        '#7c5cbf',
-        '#d43545',
-        '#2e9e5a',
-        '#3a8fd4',
-        '#e67e22',
-        '#1abc9c',
-        '#34495e',
-        '#95a5a6',
+        '#1a6b4a', '#d49a1e', '#7c5cbf', '#d43545', '#2e9e5a',
+        '#3a8fd4', '#e67e22', '#1abc9c', '#34495e', '#95a5a6',
       ],
     },
     dark: {
@@ -48,16 +40,8 @@ const PALETTES = {
       headerBg: '#0f1f18',
       headerGradientEnd: '#152e22',
       chart: [
-        '#2da87a',
-        '#e8a525',
-        '#9a80d4',
-        '#e06060',
-        '#3ebe70',
-        '#5aafee',
-        '#f0a050',
-        '#40d8b0',
-        '#8898a8',
-        '#b0b8c0',
+        '#2da87a', '#e8a525', '#9a80d4', '#e06060', '#3ebe70',
+        '#5aafee', '#f0a050', '#40d8b0', '#8898a8', '#b0b8c0',
       ],
     },
   },
@@ -76,16 +60,8 @@ const PALETTES = {
       headerBg: '#2c2017',
       headerGradientEnd: '#3d2e22',
       chart: [
-        '#c05621',
-        '#4a6670',
-        '#8b6f47',
-        '#d43545',
-        '#2e9e5a',
-        '#3a8fd4',
-        '#b8512e',
-        '#1abc9c',
-        '#5d4e37',
-        '#95a5a6',
+        '#c05621', '#4a6670', '#8b6f47', '#d43545', '#2e9e5a',
+        '#3a8fd4', '#b8512e', '#1abc9c', '#5d4e37', '#95a5a6',
       ],
     },
     dark: {
@@ -102,16 +78,8 @@ const PALETTES = {
       headerBg: '#1a150f',
       headerGradientEnd: '#2a2018',
       chart: [
-        '#e07030',
-        '#7a9aa8',
-        '#b8965e',
-        '#e06060',
-        '#3ebe70',
-        '#5aafee',
-        '#f0a050',
-        '#40d8b0',
-        '#8898a8',
-        '#b0b8c0',
+        '#e07030', '#7a9aa8', '#b8965e', '#e06060', '#3ebe70',
+        '#5aafee', '#f0a050', '#40d8b0', '#8898a8', '#b0b8c0',
       ],
     },
   },
@@ -162,7 +130,9 @@ export function applyTheme(mode, palette) {
  */
 export function getChartColors() {
   const style = getComputedStyle(document.body)
-  return Array.from({ length: 10 }, (_, i) => style.getPropertyValue(`--compresso-chart-${i + 1}`).trim() || '#808080')
+  return Array.from({ length: 10 }, (_, i) =>
+    style.getPropertyValue(`--compresso-chart-${i + 1}`).trim() || '#808080'
+  )
 }
 
 /**
@@ -171,7 +141,9 @@ export function getChartColors() {
  * @returns {string} Hex color string
  */
 export function getChartColor(index) {
-  return getComputedStyle(document.body).getPropertyValue(`--compresso-chart-${index}`).trim() || '#808080'
+  return getComputedStyle(document.body)
+    .getPropertyValue(`--compresso-chart-${index}`)
+    .trim() || '#808080'
 }
 
 /**

@@ -15,18 +15,18 @@
         <!-- Local Option -->
         <q-item clickable v-close-popup @click="setTarget('local')">
           <q-item-section avatar>
-            <q-icon name="computer" />
+            <q-icon name="computer"/>
           </q-item-section>
           <q-item-section>
             <q-item-label>{{ localLabel }}</q-item-label>
             <q-item-label caption>{{ $t('components.sharedLinkDropdown.thisInstallation') }}</q-item-label>
           </q-item-section>
           <q-item-section side v-if="!isRemote">
-            <q-icon name="check" color="primary" />
+            <q-icon name="check" color="primary"/>
           </q-item-section>
         </q-item>
 
-        <q-separator />
+        <q-separator/>
 
         <!-- Remote Options -->
         <q-item
@@ -38,14 +38,14 @@
           @click="setTarget(link.uuid)"
         >
           <q-item-section avatar>
-            <q-icon name="cloud" :color="link.available ? 'primary' : 'grey'" />
+            <q-icon name="cloud" :color="link.available ? 'primary' : 'grey'"/>
           </q-item-section>
           <q-item-section>
             <q-item-label :class="!link.available ? 'text-grey' : ''">{{ link.name }}</q-item-label>
             <q-item-label caption v-if="link.address">{{ link.address }}</q-item-label>
           </q-item-section>
           <q-item-section side v-if="currentTarget === link.uuid">
-            <q-icon name="check" color="primary" />
+            <q-icon name="check" color="primary"/>
           </q-item-section>
         </q-item>
       </q-list>
@@ -78,7 +78,7 @@ const localLabel = computed(() => {
 
 const currentLabel = computed(() => {
   if (!isRemote.value) return localLabel.value
-  const link = availableLinks.value.find((l) => l.uuid === currentTarget.value)
+  const link = availableLinks.value.find(l => l.uuid === currentTarget.value)
   return link ? link.name : t('components.sharedLinkDropdown.unknownRemote')
 })
 

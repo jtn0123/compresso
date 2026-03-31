@@ -56,7 +56,10 @@
 
       <div v-for="group in workerGroups" :key="group.name" class="q-mb-md">
         <!-- Group Header -->
-        <div class="row items-center no-wrap q-pa-xs q-mb-xs" :style="{ borderLeft: '3px solid ' + group.color }">
+        <div
+          class="row items-center no-wrap q-pa-xs q-mb-xs"
+          :style="{ borderLeft: '3px solid ' + group.color }"
+        >
           <q-badge
             :color="group.workerType === 'gpu' ? 'green' : 'blue'"
             :label="group.workerType === 'gpu' ? $t('workers.gpuLabel') : $t('workers.cpuLabel')"
@@ -64,33 +67,19 @@
           />
           <span class="text-subtitle2 text-weight-medium q-mr-sm">{{ group.name }}</span>
           <span class="text-caption text-grey q-mr-xs">
-            <span v-if="group.active > 0" class="text-positive"
-              >{{ group.active }} {{ $t('workers.activeCount', { count: group.active }) }}</span
-            >
-            <span v-if="group.idle > 0" class="q-ml-xs text-grey">{{
-              $t('workers.idleCount', { count: group.idle })
-            }}</span>
-            <span v-if="group.paused > 0" class="q-ml-xs text-negative">{{
-              $t('workers.pausedCount', { count: group.paused })
-            }}</span>
+            <span v-if="group.active > 0" class="text-positive">{{ group.active }} {{ $t('workers.activeCount', { count: group.active }) }}</span>
+            <span v-if="group.idle > 0" class="q-ml-xs text-grey">{{ $t('workers.idleCount', { count: group.idle }) }}</span>
+            <span v-if="group.paused > 0" class="q-ml-xs text-negative">{{ $t('workers.pausedCount', { count: group.paused }) }}</span>
           </span>
           <q-space />
           <q-btn
-            dense
-            flat
-            round
-            size="xs"
-            icon="remove"
+            dense flat round size="xs" icon="remove"
             :disable="(group.workerCount || 0) <= 0 || group.saving"
             @click.stop="changeGroupWorkerCount(group, -1)"
           />
           <span class="text-caption text-weight-medium q-mx-xs">{{ group.workerCount ?? '?' }}</span>
           <q-btn
-            dense
-            flat
-            round
-            size="xs"
-            icon="add"
+            dense flat round size="xs" icon="add"
             :disable="group.saving"
             @click.stop="changeGroupWorkerCount(group, 1)"
           />
@@ -120,7 +109,7 @@
                 track-color="transparent"
               >
                 <div class="absolute-full flex flex-center">
-                  <span class="text-caption text-white" style="text-shadow: 0 0 3px rgba(0, 0, 0, 0.5)">
+                  <span class="text-caption text-white" style="text-shadow: 0 0 3px rgba(0,0,0,0.5)">
                     {{ truncateFile(worker.currentFile) }}
                     <template v-if="!worker.indeterminate">{{ worker.progressText }}</template>
                   </span>
@@ -136,24 +125,23 @@
           </div>
 
           <!-- Encoding stats -->
-          <div
-            v-if="!worker.idle && !worker.paused && (worker.encodingFps != null || worker.encodingSpeed)"
-            class="col-auto text-caption q-px-xs worker-encoding-stats"
-          >
-            <span v-if="worker.encodingFps != null" class="worker-fps"
-              >{{ worker.encodingFps }} {{ $t('workerStats.fps') }}</span
-            >
+          <div v-if="!worker.idle && !worker.paused && (worker.encodingFps != null || worker.encodingSpeed)" class="col-auto text-caption q-px-xs worker-encoding-stats">
+            <span v-if="worker.encodingFps != null" class="worker-fps">{{ worker.encodingFps }} {{ $t('workerStats.fps') }}</span>
             <span v-if="worker.encodingSpeed" class="worker-speed q-ml-xs">{{ worker.encodingSpeed }}</span>
           </div>
 
           <!-- ETC -->
           <div class="col-auto text-caption text-grey q-px-xs" style="min-width: 55px; text-align: right">
-            {{ !worker.idle && !worker.paused ? worker.etc : '' }}
+            {{ (!worker.idle && !worker.paused) ? worker.etc : '' }}
           </div>
 
           <!-- Expand -->
           <div class="col-auto">
-            <q-btn dense round flat size="xs" icon="open_in_full" color="secondary" @click="openWorkerDetails(worker)">
+            <q-btn
+              dense round flat size="xs" icon="open_in_full"
+              color="secondary"
+              @click="openWorkerDetails(worker)"
+            >
               <q-tooltip>{{ $t('navigation.showMore') }}</q-tooltip>
             </q-btn>
           </div>
@@ -161,7 +149,10 @@
       </div>
     </q-card-section>
 
-    <WorkerMoreDetailsDialog ref="workerDetailsDialogRef" v-bind="selectedWorkerProps" />
+    <WorkerMoreDetailsDialog
+      ref="workerDetailsDialogRef"
+      v-bind="selectedWorkerProps"
+    />
   </q-card>
 </template>
 
@@ -181,8 +172,8 @@ const { generateGroupColour } = useWorkerGauges()
 const props = defineProps({
   workerProgressList: {
     type: Object,
-    default: () => ({}),
-  },
+    default: () => ({})
+  }
 })
 
 defineEmits(['pause-all', 'resume-all', 'terminate-all'])
@@ -212,7 +203,7 @@ const selectedWorkerProps = ref({
   subprocess: {},
   workerLog: [],
   idle: false,
-  paused: false,
+  paused: false
 })
 
 const hasWorkers = computed(() => Object.keys(props.workerProgressList).length > 0)
@@ -236,7 +227,7 @@ const workerGroups = computed(() => {
         workerCount: config.number_of_workers ?? null,
         groupId: config.id ?? null,
         saving: savingGroups.value[groupName] || false,
-        workers: [],
+        workers: []
       }
     }
 
@@ -289,7 +280,7 @@ function openWorkerDetails(worker) {
     subprocess: worker.subprocess || {},
     workerLog: worker.workerLog || [],
     idle: worker.idle || false,
-    paused: worker.paused || false,
+    paused: worker.paused || false
   }
   workerDetailsDialogRef.value.show()
 }
@@ -302,7 +293,7 @@ async function fetchWorkerGroupConfigs() {
       configs[group.name] = {
         id: group.id,
         worker_type: group.worker_type || 'cpu',
-        number_of_workers: group.number_of_workers || 0,
+        number_of_workers: group.number_of_workers || 0
       }
     }
     workerGroupConfigs.value = configs
@@ -318,7 +309,7 @@ async function changeGroupWorkerCount(group, delta) {
   try {
     await axios.post(getCompressoApiUrl('v2', 'settings/worker_group/write'), {
       id: group.groupId,
-      number_of_workers: newCount,
+      number_of_workers: newCount
     })
     if (workerGroupConfigs.value[group.name]) {
       workerGroupConfigs.value[group.name].number_of_workers = newCount
@@ -328,7 +319,7 @@ async function changeGroupWorkerCount(group, delta) {
       position: 'top',
       message: $t('workers.workerCountUpdated'),
       icon: 'check_circle',
-      actions: [{ icon: 'close', color: 'white' }],
+      actions: [{ icon: 'close', color: 'white' }]
     })
   } catch (_e) {
     $q.notify({
@@ -336,7 +327,7 @@ async function changeGroupWorkerCount(group, delta) {
       position: 'top',
       message: $t('workers.workerCountFailed'),
       icon: 'report_problem',
-      actions: [{ icon: 'close', color: 'white' }],
+      actions: [{ icon: 'close', color: 'white' }]
     })
   } finally {
     savingGroups.value[group.name] = false

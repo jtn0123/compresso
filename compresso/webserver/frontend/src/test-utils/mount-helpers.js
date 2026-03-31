@@ -1,5 +1,5 @@
-import { mount, shallowMount } from '@vue/test-utils'
-import { createI18n } from 'vue-i18n'
+import { mount, shallowMount } from '@vue/test-utils';
+import { createI18n } from 'vue-i18n';
 
 // Minimal i18n for tests - returns the key as the translation
 const i18n = createI18n({
@@ -8,7 +8,7 @@ const i18n = createI18n({
   fallbackLocale: 'en',
   messages: { en: {} },
   missing: (_locale, key) => key,
-})
+});
 
 // Minimal $q mock to satisfy components that call useQuasar()
 const quasarMock = {
@@ -18,17 +18,13 @@ const quasarMock = {
   screen: {
     gt: { xs: true, sm: true, md: true, lg: true },
     lt: { sm: false, md: false, lg: false, xl: false },
-    xs: false,
-    sm: false,
-    md: true,
-    lg: false,
-    xl: false,
+    xs: false, sm: false, md: true, lg: false, xl: false,
     width: 1024,
     height: 768,
   },
   platform: { is: { desktop: true, mobile: false } },
   localStorage: { getItem: () => null, setItem: () => {}, has: () => false },
-}
+};
 
 /**
  * Mount a component with i18n and a lightweight Quasar-like $q mock.
@@ -36,7 +32,7 @@ const quasarMock = {
  * does not work in the happy-dom test environment.
  */
 export function mountWithQuasar(component, options = {}) {
-  const globalOpts = options.global || {}
+  const globalOpts = options.global || {};
   return mount(component, {
     ...options,
     global: {
@@ -52,15 +48,8 @@ export function mountWithQuasar(component, options = {}) {
         'q-card': { template: '<div class="q-card"><slot /></div>' },
         'q-card-section': { template: '<div class="q-card-section"><slot /></div>' },
         'q-card-actions': { template: '<div class="q-card-actions"><slot /></div>' },
-        'q-btn': {
-          template: '<button class="q-btn"><slot /></button>',
-          props: ['disable', 'loading', 'color', 'icon', 'label', 'flat', 'dense', 'to'],
-        },
-        'q-table': {
-          template:
-            '<div class="q-table"><slot /><slot name="loading" /><slot name="body" /><slot name="no-data" /></div>',
-          props: ['rows', 'columns', 'loading', 'pagination', 'visibleColumns'],
-        },
+        'q-btn': { template: '<button class="q-btn"><slot /></button>', props: ['disable', 'loading', 'color', 'icon', 'label', 'flat', 'dense', 'to'] },
+        'q-table': { template: '<div class="q-table"><slot /><slot name="loading" /><slot name="body" /><slot name="no-data" /></div>', props: ['rows', 'columns', 'loading', 'pagination', 'visibleColumns'] },
         'q-input': { template: '<input class="q-input" />', props: ['modelValue'] },
         'q-icon': { template: '<span class="q-icon" />' },
         'q-skeleton': { template: '<span class="q-skeleton" />' },
@@ -89,11 +78,11 @@ export function mountWithQuasar(component, options = {}) {
       },
       ...globalOpts,
     },
-  })
+  });
 }
 
 export function shallowMountWithQuasar(component, options = {}) {
-  const globalOpts = options.global || {}
+  const globalOpts = options.global || {};
   return shallowMount(component, {
     ...options,
     global: {
@@ -109,5 +98,5 @@ export function shallowMountWithQuasar(component, options = {}) {
       },
       ...globalOpts,
     },
-  })
+  });
 }

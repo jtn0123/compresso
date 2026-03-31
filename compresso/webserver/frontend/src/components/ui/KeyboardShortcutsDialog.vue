@@ -3,8 +3,8 @@
     <q-card style="min-width: 420px; max-width: 520px">
       <q-card-section class="row items-center q-pb-none bg-card-head">
         <div class="text-h6 text-primary">{{ t('keyboardShortcuts.title') }}</div>
-        <q-space />
-        <q-btn icon="close" outline dense round color="grey-7" v-close-popup />
+        <q-space/>
+        <q-btn icon="close" outline dense round color="grey-7" v-close-popup/>
       </q-card-section>
 
       <q-card-section>
@@ -16,9 +16,7 @@
               <td style="width: 120px">
                 <span v-for="(key, idx) in shortcut.keys.split(' ')" :key="idx">
                   <kbd class="shortcut-key">{{ key }}</kbd>
-                  <span v-if="idx < shortcut.keys.split(' ').length - 1" class="text-grey-6 q-mx-xs">{{
-                    t('keyboardShortcuts.then')
-                  }}</span>
+                  <span v-if="idx < shortcut.keys.split(' ').length - 1" class="text-grey-6 q-mx-xs">{{ t('keyboardShortcuts.then') }}</span>
                 </span>
               </td>
               <td class="text-secondary">{{ shortcut.label }}</td>
@@ -62,8 +60,8 @@ import { useI18n } from 'vue-i18n'
 const props = defineProps({
   modelValue: {
     type: Boolean,
-    default: false,
-  },
+    default: false
+  }
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -71,12 +69,9 @@ const emit = defineEmits(['update:modelValue'])
 const { t } = useI18n()
 const dialogVisible = ref(props.modelValue)
 
-watch(
-  () => props.modelValue,
-  (val) => {
-    dialogVisible.value = val
-  },
-)
+watch(() => props.modelValue, (val) => {
+  dialogVisible.value = val
+})
 
 watch(dialogVisible, (val) => {
   if (!val) {
@@ -94,7 +89,9 @@ const navigationShortcuts = computed(() => [
   { keys: 'g w', label: t('keyboardShortcuts.goToSettingsWorkers') },
 ])
 
-const actionShortcuts = computed(() => [{ keys: '?', label: t('keyboardShortcuts.showHelp') }])
+const actionShortcuts = computed(() => [
+  { keys: '?', label: t('keyboardShortcuts.showHelp') },
+])
 </script>
 
 <style scoped>

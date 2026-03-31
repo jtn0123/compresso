@@ -13,9 +13,9 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { useQuasar } from 'quasar'
-import { useChartTheme } from 'src/composables/useChartTheme'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { useQuasar } from 'quasar';
+import { useChartTheme } from 'src/composables/useChartTheme';
 
 export default {
   name: 'ResolutionDistributionChart',
@@ -24,35 +24,33 @@ export default {
     loading: { type: Boolean, default: false },
   },
   setup(props) {
-    const $q = useQuasar()
-    const { getChartColor } = useChartTheme()
-    const chartRef = ref(null)
-    let chart = null
+    const $q = useQuasar();
+    const { getChartColor } = useChartTheme();
+    const chartRef = ref(null);
+    let chart = null;
 
     async function renderChart() {
-      const { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } = await import('chart.js')
-      Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
+      const { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } = await import('chart.js');
+      Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-      await nextTick()
+      await nextTick();
 
-      if (chart) chart.destroy()
+      if (chart) chart.destroy();
 
       if (chartRef.value && props.resolutions.length > 0) {
-        const isDark = $q.dark.isActive
-        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
-        const labelColor = isDark ? '#ccc' : '#666'
+        const isDark = $q.dark.isActive;
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const labelColor = isDark ? '#ccc' : '#666';
 
         chart = new Chart(chartRef.value, {
           type: 'bar',
           data: {
-            labels: props.resolutions.map((r) => r.resolution),
-            datasets: [
-              {
-                label: 'Files',
-                data: props.resolutions.map((r) => r.count),
-                backgroundColor: getChartColor(2),
-              },
-            ],
+            labels: props.resolutions.map(r => r.resolution),
+            datasets: [{
+              label: 'Files',
+              data: props.resolutions.map(r => r.count),
+              backgroundColor: getChartColor(2),
+            }],
           },
           options: {
             responsive: true,
@@ -72,31 +70,24 @@ export default {
               },
             },
           },
-        })
+        });
       }
     }
 
-    watch(
-      () => props.resolutions,
-      () => {
-        if (!props.loading) renderChart()
-      },
-      { deep: true },
-    )
-    watch(() => $q.dark.isActive, renderChart)
+    watch(() => props.resolutions, () => {
+      if (!props.loading) renderChart();
+    }, { deep: true });
+    watch(() => $q.dark.isActive, renderChart);
 
     onMounted(() => {
-      if (!props.loading) renderChart()
-    })
+      if (!props.loading) renderChart();
+    });
 
     onBeforeUnmount(() => {
-      if (chart) {
-        chart.destroy()
-        chart = null
-      }
-    })
+      if (chart) { chart.destroy(); chart = null; }
+    });
 
-    return { chartRef }
+    return { chartRef };
   },
-}
+};
 </script>

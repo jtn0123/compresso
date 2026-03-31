@@ -3,45 +3,56 @@
     <!-- content -->
 
     <div class="q-pa-none">
+
       <!--      <h4 class="q-ma-none">{{ $t('headers.librarySettings') }}</h4>-->
 
       <div class="row">
         <div class="col-12 col-sm-12 col-md-10 col-lg-8">
           <div :class="$q.platform.is.mobile ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
-            <q-form @submit="save" class="q-gutter-md">
+
+            <q-form
+              @submit="save"
+              class="q-gutter-md"
+            >
               <!--START LIBRARY PATHS-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.pathConfiguration') }}</h5>
               <div class="q-gutter-sm">
+
                 <!-- LIBRARY SEARCH BAR -->
                 <q-input
-                  filled
-                  dense
+                  filled dense
                   class="shadow-1 library-list"
                   debounce="300"
                   color="primary"
                   v-model="filter"
-                  :placeholder="$t('navigation.search')"
-                >
-                  <template #append>
-                    <q-icon name="search" />
+                  :placeholder="$t('navigation.search')">
+                  <template v-slot:append>
+                    <q-icon name="search"/>
                   </template>
                 </q-input>
 
-                <q-skeleton v-if="libraryPaths === null" type="text" />
+                <q-skeleton
+                  v-if="libraryPaths === null"
+                  type="text"/>
 
-                <q-list bordered separator class="rounded-borders library-list">
+                <q-list
+                  bordered
+                  separator
+                  class="rounded-borders library-list">
+
                   <q-item
                     v-for="(path, index) in filteredLibraryPaths"
-                    :key="index"
-                    active-class="library-path-list-item"
-                  >
+                    v-bind:key="index"
+                    active-class="library-path-list-item">
                     <q-item-section avatar class="avatar-size">
-                      <q-avatar text-color="grey-8" icon="source" />
+                      <q-avatar text-color="grey-8" icon="source"/>
                       <q-tooltip>
                         <!--Indicate the default library-->
-                        <span v-if="index === 0" class="text-weight-bold">
+                        <span
+                          v-if="index === 0"
+                          class="text-weight-bold">
                           ({{ $t('components.settings.library.defaultLibrary') }})
-                          <br />
+                        <br>
                         </span>
                         <!--Indicate library path-->
                         <span class="text-weight-bold">{{ $t('components.settings.library.path') }}:</span>
@@ -51,7 +62,7 @@
                         <span v-else>
                           {{ path.path }}
                         </span>
-                        <br />
+                        <br>
                         <!--Indicate library tags-->
                         <span class="text-weight-bold">{{ $t('components.settings.common.tags') }}:</span>
                         {{ path.tags.join(', ') || $t('status.none') }}
@@ -72,7 +83,10 @@
 
                       <!--Library Path-->
                       <q-item-label caption lines="1">
-                        <span class="text-weight-bold"> {{ $t('components.settings.library.path') }}: </span>
+                        <span
+                          class="text-weight-bold">
+                          {{ $t('components.settings.library.path') }}:
+                        </span>
                         <span v-if="path.enableRemoteOnly">
                           ({{ $t('components.settings.library.libraryRemoteOnlyStatus') }})
                         </span>
@@ -83,9 +97,11 @@
 
                       <!--Library Tags-->
                       <q-item-label caption lines="1" class="tags-container">
-                        <q-chip v-for="(tag, index) in path.tags" :key="index" dense class="chip">
+                        <q-chip v-for="(tag, index) in path.tags"
+                                :key="index" dense class="chip">
                           {{ tag }}
                         </q-chip>
+
                       </q-item-label>
                     </q-item-section>
 
@@ -94,10 +110,9 @@
                         <div class="row">
                           <div class="col-6 text-left">
                             <span
-                              :class="path.enableScanner && !path.enableRemoteOnly ? 'text-primary' : 'text-grey-8'"
-                            >
-                              <q-icon v-if="path.enableScanner && !path.enableRemoteOnly" color="check" name="check" />
-                              <q-icon v-else color="close" name="close" />
+                              :class="path.enableScanner && !path.enableRemoteOnly ? 'text-primary' : 'text-grey-8'">
+                              <q-icon v-if="path.enableScanner && !path.enableRemoteOnly" color="check" name="check"/>
+                              <q-icon v-else color="close" name="close"/>
                               |
                               {{ $t('components.settings.library.libraryScannerStatusLabel') }}
                             </span>
@@ -108,10 +123,9 @@
                         <div class="row">
                           <div class="col-6 text-left">
                             <span
-                              :class="path.enableInotify && !path.enableRemoteOnly ? 'text-primary' : 'text-grey-8'"
-                            >
-                              <q-icon v-if="path.enableInotify && !path.enableRemoteOnly" color="check" name="check" />
-                              <q-icon v-else color="close" name="close" />
+                              :class="path.enableInotify && !path.enableRemoteOnly ? 'text-primary' : 'text-grey-8'">
+                              <q-icon v-if="path.enableInotify && !path.enableRemoteOnly" color="check" name="check"/>
+                              <q-icon v-else color="close" name="close"/>
                               |
                               {{ $t('components.settings.library.libraryFileMonitorStatusLabel') }}
                             </span>
@@ -120,7 +134,7 @@
                       </q-item-label>
                     </q-item-section>
 
-                    <q-separator inset vertical class="q-mx-sm" />
+                    <q-separator inset vertical class="q-mx-sm"/>
 
                     <q-item-section center side>
                       <div class="text-grey-8 q-gutter-xs">
@@ -139,30 +153,42 @@
                         />
                       </div>
                     </q-item-section>
+
                   </q-item>
+
                 </q-list>
 
                 <q-bar class="bg-transparent">
-                  <q-space />
-                  <CompressoListAddButton :tooltip="$t('tooltips.add')" @click="addNewLibraryWithDirectoryBrowser" />
+                  <q-space/>
+                  <CompressoListAddButton
+                    :tooltip="$t('tooltips.add')"
+                    @click="addNewLibraryWithDirectoryBrowser"
+                  />
                 </q-bar>
+
               </div>
               <!--END LIBRARY PATHS-->
 
-              <q-separator class="q-my-lg" />
+              <q-separator class="q-my-lg"/>
 
               <!--START LIBRARY SCANNER-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.libraryScanner') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="enableLibraryScanner === null" type="QToggle" />
+                <q-skeleton
+                  v-if="enableLibraryScanner === null"
+                  type="QToggle"/>
                 <q-toggle
                   v-else
                   v-model="enableLibraryScanner"
                   :label="$t('components.settings.library.enableLibraryScanner')"
                 />
-                <div v-if="enableLibraryScanner" class="sub-setting">
+                <div
+                  v-if="enableLibraryScanner"
+                  class="sub-setting">
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="libraryScanSchedule === null" type="QInput" />
+                    <q-skeleton
+                      v-if="libraryScanSchedule === null"
+                      type="QInput"/>
                     <q-input
                       v-if="enableLibraryScanner && libraryScanSchedule !== null"
                       outlined
@@ -171,17 +197,17 @@
                       :label="$t('components.settings.library.libraryScannerSchedule')"
                       lazy-rules
                       :rules="[
-                        (val) =>
-                          (val !== null && val !== '') ||
-                          $t('components.settings.library.libraryScannerScheduleNotValid'),
-                        (val) => val > 0 || $t('components.settings.pleaseEnterAValidNumber'),
-                      ]"
+                  val => val !== null && val !== '' || $t('components.settings.library.libraryScannerScheduleNotValid'),
+                  val => val > 0 || $t('components.settings.pleaseEnterAValidNumber')
+                ]"
                     />
                   </div>
                 </div>
               </div>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="runLibraryScanOnStart === null" type="QToggle" />
+                <q-skeleton
+                  v-if="runLibraryScanOnStart === null"
+                  type="QToggle"/>
                 <q-toggle
                   v-if="runLibraryScanOnStart !== null"
                   v-model="runLibraryScanOnStart"
@@ -189,7 +215,9 @@
                 />
               </div>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="libraryScanFollowSymlinks === null" type="QToggle" />
+                <q-skeleton
+                  v-if="libraryScanFollowSymlinks === null"
+                  type="QToggle"/>
                 <q-toggle
                   v-if="libraryScanFollowSymlinks !== null"
                   v-model="libraryScanFollowSymlinks"
@@ -198,12 +226,14 @@
               </div>
               <!--END LIBRARY SCANNER-->
 
-              <q-separator class="q-my-lg" />
+              <q-separator class="q-my-lg"/>
 
               <!--START FILE TESTING-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.fileTesting') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="concurrentFileTesters === null" type="QInput" />
+                <q-skeleton
+                  v-if="concurrentFileTesters === null"
+                  type="QInput"/>
                 <q-input
                   v-if="concurrentFileTesters !== null"
                   readonly
@@ -211,10 +241,11 @@
                   color="primary"
                   v-model="concurrentFileTesters"
                   :label="$t('components.settings.library.concurrentFileTesters')"
-                  :placeholder="concurrentFileTesters"
-                >
+                  :placeholder="concurrentFileTesters">
                 </q-input>
-                <q-skeleton v-if="concurrentFileTesters === null" type="QSlider" />
+                <q-skeleton
+                  v-if="concurrentFileTesters === null"
+                  type="QSlider"/>
                 <q-slider
                   v-if="concurrentFileTesters !== null"
                   v-model="concurrentFileTesters"
@@ -226,12 +257,14 @@
               </div>
               <!--END FILE TESTING-->
 
-              <q-separator class="q-my-lg" />
+              <q-separator class="q-my-lg"/>
 
               <!--START PENDING TASKS CONFIG-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.pendingTasks') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="clearPendingTasksOnStart === null" type="QToggle" />
+                <q-skeleton
+                  v-if="clearPendingTasksOnStart === null"
+                  type="QToggle"/>
                 <q-toggle
                   v-else
                   v-model="clearPendingTasksOnStart"
@@ -240,20 +273,26 @@
               </div>
               <!--END PENDING TASKS CONFIG-->
 
-              <q-separator class="q-my-lg" />
+              <q-separator class="q-my-lg"/>
 
               <!--START COMPLETED TASKS CONFIG-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.completedTasks') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="autoManageCompletedTasks === null" type="QToggle" />
+                <q-skeleton
+                  v-if="autoManageCompletedTasks === null"
+                  type="QToggle"/>
                 <q-toggle
                   v-else
                   v-model="autoManageCompletedTasks"
                   :label="$t('components.settings.library.autoManageCompletedTasks')"
                 />
-                <div v-if="autoManageCompletedTasks" class="sub-setting q-gutter-sm">
+                <div
+                  v-if="autoManageCompletedTasks"
+                  class="sub-setting q-gutter-sm">
                   <div class="q-gutter-sm q-mb-lg">
-                    <q-skeleton v-if="compressCompletedTasksLogs === null" type="QInput" />
+                    <q-skeleton
+                      v-if="compressCompletedTasksLogs === null"
+                      type="QInput"/>
                     <q-toggle
                       v-else
                       v-model="compressCompletedTasksLogs"
@@ -261,54 +300,60 @@
                     />
                   </div>
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="maxAgeOfCompletedTasks === null" type="QInput" />
+                    <q-skeleton
+                      v-if="maxAgeOfCompletedTasks === null"
+                      type="QInput"/>
                     <q-input
                       v-if="autoManageCompletedTasks && maxAgeOfCompletedTasks !== null"
                       outlined
                       type="number"
                       v-model="maxAgeOfCompletedTasks"
-                      :label="
-                        compressCompletedTasksLogs
-                          ? $t('components.settings.library.maxAgeOfCompletedTasksCompress')
-                          : $t('components.settings.library.maxAgeOfCompletedTasks')
-                      "
+                      :label="compressCompletedTasksLogs ? $t('components.settings.library.maxAgeOfCompletedTasksCompress') : $t('components.settings.library.maxAgeOfCompletedTasks')"
                       lazy-rules
                       :rules="[
-                        (val) => (val !== null && val !== '') || $t('components.settings.pleaseEnterAValidNumber'),
-                        (val) => val > 0 || $t('components.settings.pleaseEnterAValidNumber'),
-                      ]"
+                  val => val !== null && val !== '' || $t('components.settings.pleaseEnterAValidNumber'),
+                  val => val > 0 || $t('components.settings.pleaseEnterAValidNumber')
+                ]"
                     />
                   </div>
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="alwaysKeepFailedTasks === null" type="QInput" />
+                    <q-skeleton
+                      v-if="alwaysKeepFailedTasks === null"
+                      type="QInput"/>
                     <q-toggle
                       v-else
                       v-model="alwaysKeepFailedTasks"
-                      :label="
-                        compressCompletedTasksLogs
-                          ? $t('components.settings.library.dontCompressFailedTasks')
-                          : $t('components.settings.library.alwaysKeepFailedTasks')
-                      "
+                      :label="compressCompletedTasksLogs ? $t('components.settings.library.dontCompressFailedTasks') : $t('components.settings.library.alwaysKeepFailedTasks')"
                     />
                   </div>
                 </div>
               </div>
               <!--END COMPLETED TASKS CONFIG-->
 
-              <q-separator class="q-my-lg" />
+              <q-separator class="q-my-lg"/>
 
               <!--START APPROVAL WORKFLOW-->
               <h5 class="q-mb-none">Approval Workflow</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="approvalRequired === null" type="QToggle" />
-                <q-toggle v-else v-model="approvalRequired" label="Require approval before replacing originals" />
+                <q-skeleton
+                  v-if="approvalRequired === null"
+                  type="QToggle"/>
+                <q-toggle
+                  v-else
+                  v-model="approvalRequired"
+                  label="Require approval before replacing originals"
+                />
                 <div class="text-caption text-grey q-ml-md">
                   When turned on, transcoded files wait for your review instead of immediately replacing originals.
                   Check the Approval Queue to approve or reject each one.
                 </div>
-                <div v-if="approvalRequired" class="sub-setting">
+                <div
+                  v-if="approvalRequired"
+                  class="sub-setting">
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="stagingPath === null" type="QInput" />
+                    <q-skeleton
+                      v-if="stagingPath === null"
+                      type="QInput"/>
                     <q-input
                       v-else
                       outlined
@@ -321,36 +366,37 @@
               </div>
               <!--END APPROVAL WORKFLOW-->
 
-              <q-separator class="q-my-lg" />
+              <q-separator class="q-my-lg"/>
 
               <div>
-                <CompressoSettingsSubmitButton />
+                <CompressoSettingsSubmitButton/>
               </div>
             </q-form>
+
           </div>
+
         </div>
       </div>
 
       <MobileSettingsQuickNav
-        :prev-enabled="false"
-        :prev-label="'none'"
-        :prev-path="'/ui/settings-plugins'"
-        :next-enabled="true"
-        :next-label="$t('navigation.workers')"
-        :next-path="'/ui/settings-workers'"
-      />
+        v-bind:prevEnabled="false"
+        v-bind:prevLabel="'none'"
+        v-bind:prevPath="'/ui/settings-plugins'"
+        v-bind:nextEnabled="true"
+        v-bind:nextLabel="$t('navigation.workers')"
+        v-bind:nextPath="'/ui/settings-workers'"/>
 
       <LibraryConfigDialog
         ref="libraryConfigDialog"
-        :library-id="libraryConfigLibraryId"
+        :libraryId="libraryConfigLibraryId"
         @saved="onLibraryConfigSaved"
         @hide="onLibraryConfigDialogHide"
       />
 
       <SelectDirectoryDialog
         ref="selectDirectoryDialogRef"
-        :initial-path="selectDirectoryInitialPath"
-        :list-type="selectDirectoryListType"
+        :initialPath="selectDirectoryInitialPath"
+        :listType="selectDirectoryListType"
         @selected="onDirectorySelected"
       />
     </div>
@@ -358,79 +404,71 @@
 </template>
 
 <script>
-import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { onMounted, onUnmounted, ref, computed, getCurrentInstance } from 'vue'
+import { CompressoWebsocketHandler } from "src/js/compressoWebsocket";
+import { onMounted, onUnmounted, ref, computed, getCurrentInstance } from "vue";
 import { useQuasar } from 'quasar'
-import { useI18n } from 'vue-i18n'
-import axios from 'axios'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
-import LibraryConfigDialog from 'components/settings/library/LibraryConfigDialog.vue'
-import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
-import CompressoSettingsSubmitButton from 'components/ui/buttons/CompressoSettingsSubmitButton.vue'
-import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
-import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
+import { useI18n } from "vue-i18n";
+import axios from "axios";
+import { getCompressoApiUrl } from "src/js/compressoGlobals";
+import MobileSettingsQuickNav from "components/MobileSettingsQuickNav";
+import LibraryConfigDialog from "components/settings/library/LibraryConfigDialog.vue";
+import SelectDirectoryDialog from "components/ui/pickers/SelectDirectoryDialog.vue";
+import CompressoSettingsSubmitButton from "components/ui/buttons/CompressoSettingsSubmitButton.vue";
+import CompressoListActionButton from "components/ui/buttons/CompressoListActionButton.vue";
+import CompressoListAddButton from "components/ui/buttons/CompressoListAddButton.vue";
 
 export default {
   name: 'SettingsLibrary',
-  components: {
-    MobileSettingsQuickNav,
-    LibraryConfigDialog,
-    SelectDirectoryDialog,
-    CompressoSettingsSubmitButton,
-    CompressoListActionButton,
-    CompressoListAddButton,
-  },
+  components: { MobileSettingsQuickNav, LibraryConfigDialog, SelectDirectoryDialog, CompressoSettingsSubmitButton, CompressoListActionButton, CompressoListAddButton },
   setup() {
     const $q = useQuasar()
-    const { t: $t } = useI18n()
+    const { t: $t } = useI18n();
 
-    const { proxy } = getCurrentInstance() // To get access to libraryPaths from data
-    const filter = ref('')
+    const { proxy } = getCurrentInstance(); // To get access to libraryPaths from data
+    const filter = ref("");
 
     const filteredLibraryPaths = computed(() => {
-      if (!filter.value) return proxy.libraryPaths // Don't filter when search is empty
+      if (!filter.value) return proxy.libraryPaths; // Don't filter when search is empty
 
-      const search = filter.value.toLowerCase()
+      const search = filter.value.toLowerCase();
       // Return filtered library paths
-      return proxy.libraryPaths?.filter(
-        (path) =>
-          path.name.toLowerCase().includes(search) ||
-          path.path.toLowerCase().includes(search) ||
-          path.tags.join(',').toLowerCase().includes(search),
-      )
-    })
+      return proxy.libraryPaths?.filter(path => (
+        path.name.toLowerCase().includes(search) ||
+        path.path.toLowerCase().includes(search) ||
+        path.tags.join(",").toLowerCase().includes(search)
+      ));
+    });
+
 
     /**
      * Compresso WS handle
      * @type {null}
      */
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    let ws = null;
+    let compressoWSHandler = CompressoWebsocketHandler($t);
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      ws = compressoWSHandler.init();
     }
 
     function closeCompressoWebsocket() {
-      compressoWSHandler.close()
+      compressoWSHandler.close();
     }
 
     // END COMPRESSO WS HANDLE
 
     onMounted(() => {
       // Start the websocket
-      initCompressoWebsocket()
+      initCompressoWebsocket();
     })
     onUnmounted(() => {
       // Close the websocket
-      closeCompressoWebsocket()
+      closeCompressoWebsocket();
     })
 
     return {
-      filter,
-      filteredLibraryPaths,
-    }
+      filter, filteredLibraryPaths
+    };
   },
   data() {
     return {
@@ -473,58 +511,49 @@ export default {
       }
       if (this.selectDirectoryMode === 'newLibrary') {
         // Name the library as a clone
-        let randomString = (Math.random() + 1).toString(36).substring(7)
-        let newName =
-          '| ' +
-          (this.libraryPaths.length + 1) +
-          ' | ' +
-          this.$t('components.settings.library.newLibrary') +
-          ' (' +
-          randomString +
-          ')'
+        let randomString = (Math.random() + 1).toString(36).substring(7);
+        let newName = '| ' + (this.libraryPaths.length + 1) + ' | ' + this.$t('components.settings.library.newLibrary') + ' (' + randomString + ')';
         // Save this data
         let data = {
           library_config: {
             name: newName,
             path: payload.selectedPath,
-          },
+          }
         }
         axios({
           method: 'post',
           url: getCompressoApiUrl('v2', 'settings/library/write'),
-          data: data,
-        })
-          .then((response) => {
-            // Save success, show feedback
-            this.$q.notify({
-              color: 'positive',
-              position: 'top',
-              icon: 'cloud_done',
-              message: this.$t('notifications.saved'),
-              timeout: 200,
-            })
-            // Update list
-            this.fetchLibraryList()
+          data: data
+        }).then((response) => {
+          // Save success, show feedback
+          this.$q.notify({
+            color: 'positive',
+            position: 'top',
+            icon: 'cloud_done',
+            message: this.$t('notifications.saved'),
+            timeout: 200
           })
-          .catch(() => {
-            this.$q.notify({
-              color: 'negative',
-              position: 'top',
-              message: this.$t('notifications.failedToSaveSettings'),
-              icon: 'report_problem',
-              actions: [{ icon: 'close', color: 'white' }],
-            })
+          // Update list
+          this.fetchLibraryList();
+        }).catch(() => {
+          this.$q.notify({
+            color: 'negative',
+            position: 'top',
+            message: this.$t('notifications.failedToSaveSettings'),
+            icon: 'report_problem',
+            actions: [{ icon: 'close', color: 'white' }]
           })
+        });
       }
       this.selectDirectoryMode = ''
     },
     deleteLibrary: function (index) {
       // Fetch library ID
-      let libraryId
+      let libraryId;
       for (let i = 0; i < this.libraryPaths.length; i++) {
         if (i === index) {
-          libraryId = this.libraryPaths[i].id
-          break
+          libraryId = this.libraryPaths[i].id;
+          break;
         }
       }
       // Ensure we do not allow removing the default path
@@ -535,83 +564,76 @@ export default {
           position: 'top',
           message: this.$t('notifications.cannotRemoveDefaultLibrary'),
           icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }],
+          actions: [{ icon: 'close', color: 'white' }]
         })
-        return
+        return;
       }
-      this.$q
-        .dialog({
-          title: this.$t('headers.confirm'),
-          message: this.$t('components.settings.library.confirmRemove'),
-          cancel: this.$t('navigation.cancel'),
-          ok: this.$t('navigation.yes'),
-          persistent: true,
-        })
-        .onOk(() => {
-          // Request a DELETE from server
-          let data = {
-            id: libraryId,
-          }
-          axios({
-            method: 'delete',
-            url: getCompressoApiUrl('v2', 'settings/library/remove'),
-            data: data,
+      this.$q.dialog({
+        title: this.$t('headers.confirm'),
+        message: this.$t('components.settings.library.confirmRemove'),
+        cancel: this.$t('navigation.cancel'),
+        ok: this.$t('navigation.yes'),
+        persistent: true
+      }).onOk(() => {
+        // Request a DELETE from server
+        let data = {
+          id: libraryId,
+        }
+        axios({
+          method: 'delete',
+          url: getCompressoApiUrl('v2', 'settings/library/remove'),
+          data: data
+        }).then((response) => {
+          // Save success, show feedback
+          this.$q.notify({
+            color: 'positive',
+            position: 'top',
+            icon: 'cloud_done',
+            message: this.$t('notifications.saved'),
+            timeout: 200
           })
-            .then((response) => {
-              // Save success, show feedback
-              this.$q.notify({
-                color: 'positive',
-                position: 'top',
-                icon: 'cloud_done',
-                message: this.$t('notifications.saved'),
-                timeout: 200,
-              })
-              // Update list
-              this.fetchLibraryList()
-            })
-            .catch(() => {
-              this.$q.notify({
-                color: 'negative',
-                position: 'top',
-                message: this.$t('notifications.failedToSaveSettings'),
-                icon: 'report_problem',
-                actions: [{ icon: 'close', color: 'white' }],
-              })
-            })
-        })
+          // Update list
+          this.fetchLibraryList();
+        }).catch(() => {
+          this.$q.notify({
+            color: 'negative',
+            position: 'top',
+            message: this.$t('notifications.failedToSaveSettings'),
+            icon: 'report_problem',
+            actions: [{ icon: 'close', color: 'white' }]
+          })
+        });
+      })
     },
     fetchSettings: function () {
       // Fetch current settings
       axios({
         method: 'get',
-        url: getCompressoApiUrl('v2', 'settings/read'),
-      })
-        .then((response) => {
-          this.libraryPath = response.data.settings.library_path
-          this.enableLibraryScanner = response.data.settings.enable_library_scanner
-          this.libraryScanSchedule = response.data.settings.schedule_full_scan_minutes
-          this.libraryScanFollowSymlinks = response.data.settings.follow_symlinks
-          this.concurrentFileTesters = response.data.settings.concurrent_file_testers
-          this.runLibraryScanOnStart = response.data.settings.run_full_scan_on_start
-          this.enableLibraryFileMonitor = response.data.settings.enable_inotify
-          this.clearPendingTasksOnStart = response.data.settings.clear_pending_tasks_on_restart
-          this.autoManageCompletedTasks = response.data.settings.auto_manage_completed_tasks
-          this.compressCompletedTasksLogs = response.data.settings.compress_completed_tasks_logs
-          this.maxAgeOfCompletedTasks = response.data.settings.max_age_of_completed_tasks
-          this.alwaysKeepFailedTasks = response.data.settings.always_keep_failed_tasks
-          this.approvalRequired =
-            response.data.settings.approval_required === true || response.data.settings.approval_required === 'true'
-          this.stagingPath = response.data.settings.staging_path != null ? response.data.settings.staging_path : ''
+        url: getCompressoApiUrl('v2', 'settings/read')
+      }).then((response) => {
+        this.libraryPath = response.data.settings.library_path
+        this.enableLibraryScanner = response.data.settings.enable_library_scanner
+        this.libraryScanSchedule = response.data.settings.schedule_full_scan_minutes
+        this.libraryScanFollowSymlinks = response.data.settings.follow_symlinks
+        this.concurrentFileTesters = response.data.settings.concurrent_file_testers
+        this.runLibraryScanOnStart = response.data.settings.run_full_scan_on_start
+        this.enableLibraryFileMonitor = response.data.settings.enable_inotify
+        this.clearPendingTasksOnStart = response.data.settings.clear_pending_tasks_on_restart
+        this.autoManageCompletedTasks = response.data.settings.auto_manage_completed_tasks
+        this.compressCompletedTasksLogs = response.data.settings.compress_completed_tasks_logs
+        this.maxAgeOfCompletedTasks = response.data.settings.max_age_of_completed_tasks
+        this.alwaysKeepFailedTasks = response.data.settings.always_keep_failed_tasks
+        this.approvalRequired = response.data.settings.approval_required === true || response.data.settings.approval_required === 'true'
+        this.stagingPath = response.data.settings.staging_path != null ? response.data.settings.staging_path : ''
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('notifications.failedToFetchSettings'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
         })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('notifications.failedToFetchSettings'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+      });
     },
     save: function () {
       // Save settings
@@ -631,67 +653,63 @@ export default {
           always_keep_failed_tasks: this.alwaysKeepFailedTasks,
           approval_required: this.approvalRequired,
           staging_path: this.stagingPath,
-        },
+        }
       }
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'settings/write'),
-        data: data,
-      })
-        .then((response) => {
-          // Save success, show feedback
-          this.fetchSettings()
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            icon: 'cloud_done',
-            message: this.$t('notifications.saved'),
-            timeout: 200,
-          })
+        data: data
+      }).then((response) => {
+        // Save success, show feedback
+        this.fetchSettings();
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          icon: 'cloud_done',
+          message: this.$t('notifications.saved'),
+          timeout: 200
         })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('notifications.failedToSaveSettings'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('notifications.failedToSaveSettings'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
         })
+      });
     },
     fetchLibraryList: function () {
       // Fetch current settings
       axios({
         method: 'get',
-        url: getCompressoApiUrl('v2', 'settings/libraries'),
-      })
-        .then((response) => {
-          let libraryPathsList = []
-          // TODO: Rename from library path
-          for (let i = 0; i < response.data.libraries.length; i++) {
-            let libraryPath = response.data.libraries[i]
-            libraryPathsList[libraryPathsList.length] = {
-              id: libraryPath.id,
-              name: libraryPath.name,
-              path: libraryPath.path,
-              enableRemoteOnly: libraryPath.enable_remote_only,
-              enableScanner: libraryPath.enable_scanner,
-              enableInotify: libraryPath.enable_inotify,
-              tags: libraryPath.tags,
-              locked: libraryPath.locked,
-            }
+        url: getCompressoApiUrl('v2', 'settings/libraries')
+      }).then((response) => {
+        let libraryPathsList = []
+        // TODO: Rename from library path
+        for (let i = 0; i < response.data.libraries.length; i++) {
+          let libraryPath = response.data.libraries[i];
+          libraryPathsList[libraryPathsList.length] = {
+            id: libraryPath.id,
+            name: libraryPath.name,
+            path: libraryPath.path,
+            enableRemoteOnly: libraryPath.enable_remote_only,
+            enableScanner: libraryPath.enable_scanner,
+            enableInotify: libraryPath.enable_inotify,
+            tags: libraryPath.tags,
+            locked: libraryPath.locked,
           }
-          this.libraryPaths = libraryPathsList
+        }
+        this.libraryPaths = libraryPathsList
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('notifications.failedToFetchLibraryList'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
         })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('notifications.failedToFetchLibraryList'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
+      });
     },
     configureLibraryPath: function (index) {
       let library = this.libraryPaths[index]
@@ -704,17 +722,17 @@ export default {
       })
     },
     onLibraryConfigSaved: function () {
-      this.fetchSettings()
-      this.fetchLibraryList()
+      this.fetchSettings();
+      this.fetchLibraryList();
     },
     onLibraryConfigDialogHide: function () {
       this.libraryConfigLibraryId = 0
     },
   },
   created() {
-    this.fetchSettings()
-    this.fetchLibraryList()
-  },
+    this.fetchSettings();
+    this.fetchLibraryList();
+  }
 }
 </script>
 

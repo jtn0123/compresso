@@ -1,5 +1,11 @@
 <template>
-  <CompressoDialogPopup ref="dialogRef" :title="$t('headers.login')" width="720px" :mini="true" @hide="onDialogHide">
+  <CompressoDialogPopup
+    ref="dialogRef"
+    :title="$t('headers.login')"
+    width="720px"
+    :mini="true"
+    @hide="onDialogHide"
+  >
     <div class="q-pa-md">
       <p>
         {{ $t('components.loginDialog.intro') }}
@@ -25,8 +31,12 @@
         {{ $t('components.loginDialog.codePrompt') }}
       </p>
       <div class="row justify-center">
-        <q-spinner v-if="!userCode" class="text-h3 q-mt-md q-mb-md" />
-        <span v-else class="text-h3 q-mt-md q-mb-md login-code-text" @click="copyUserCode">
+        <q-spinner v-if="!userCode" class="text-h3 q-mt-md q-mb-md"/>
+        <span
+          v-else
+          class="text-h3 q-mt-md q-mb-md login-code-text"
+          @click="copyUserCode"
+        >
           {{ userCode }}
           <q-tooltip class="bg-white text-primary no-wrap">
             {{ $t('navigation.copy') }}
@@ -43,17 +53,17 @@
         @click="loginRemotely"
       />
       <div class="q-mt-md">
-        <q-linear-progress :value="timerProgress" color="primary" size="10px" :class="userCode ? '' : 'disabled'" />
-        <div class="text-center q-mt-sm" :class="userCode ? '' : 'invisible'">
+        <q-linear-progress :value="timerProgress" color="primary" size="10px" :class="userCode ? '' : 'disabled' "/>
+        <div class="text-center q-mt-sm" :class="userCode ? '' : 'invisible' ">
           {{ $t('components.loginDialog.timeRemaining', { time: formattedTime }) }}
         </div>
       </div>
       <p class="q-pt-lg text-caption">
         <strong>{{ $t('components.loginDialog.noteTitle') }}</strong>
         {{ $t('components.loginDialog.noteLineOne') }}
-        <br />
+        <br>
         {{ $t('components.loginDialog.noteLineTwo') }}
-        <br />
+        <br>
         {{ $t('components.loginDialog.noteLineThree') }}
       </p>
     </div>
@@ -64,7 +74,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import axios from 'axios'
+import axios from "axios"
 import { copyToClipboard, useQuasar } from 'quasar'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
 import { createLogger } from 'src/composables/useLogger'
@@ -85,7 +95,9 @@ const totalTime = ref(1)
 let timerInterval = null
 
 // Computed properties for progress bar and timer text
-const timerProgress = computed(() => (totalTime.value > 0 ? remainingTime.value / totalTime.value : 0))
+const timerProgress = computed(() =>
+  totalTime.value > 0 ? remainingTime.value / totalTime.value : 0
+)
 const formattedTime = computed(() => {
   const minutes = Math.floor(remainingTime.value / 60)
   const seconds = remainingTime.value % 60
@@ -125,20 +137,18 @@ function startCountdown(expiresIn) {
       if (remainingTime.value % 5 === 0) {
         axios({
           method: 'get',
-          url: getCompressoApiUrl('v2', 'session/state'),
-        })
-          .then((response) => {
-            if (response.data && response.data.level && response.data.level > 0) {
-              if (response.data.level !== 9) {
-                location.reload()
-              } else {
-                log.debug(t('components.loginDialog.trialSessionIgnored'))
-              }
+          url: getCompressoApiUrl('v2', 'session/state')
+        }).then((response) => {
+          if (response.data && response.data.level && response.data.level > 0) {
+            if (response.data.level !== 9) {
+              location.reload();
+            } else {
+              log.debug(t('components.loginDialog.trialSessionIgnored'))
             }
-          })
-          .catch(() => {
-            log.error(t('components.loginDialog.sessionStateFailed'))
-          })
+          }
+        }).catch(() => {
+          log.error(t('components.loginDialog.sessionStateFailed'))
+        })
       }
     } else {
       clearInterval(timerInterval)
@@ -173,7 +183,7 @@ function copyUserCode() {
         color: 'secondary',
         position: 'top',
         message: t('notifications.copied'),
-        timeout: 200,
+        timeout: 200
       })
     })
     .catch(() => {
@@ -183,6 +193,6 @@ function copyUserCode() {
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>

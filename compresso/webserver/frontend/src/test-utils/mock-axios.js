@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi } from 'vitest';
 
 export function createMockAxios() {
   const mock = {
@@ -11,6 +11,6 @@ export function createMockAxios() {
       request: { use: vi.fn(), eject: vi.fn() },
       response: { use: vi.fn(), eject: vi.fn() },
     },
-  }
-  return mock
+  };
+  return mock;
 }

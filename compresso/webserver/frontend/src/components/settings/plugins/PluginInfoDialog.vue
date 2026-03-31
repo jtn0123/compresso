@@ -9,26 +9,41 @@
   >
     <div class="plugin-info-dialog">
       <div class="plugin-info-tabs bg-card-head q-px-md">
-        <q-tabs v-if="showSettingsTab" v-model="tab" align="left" class="text-primary">
-          <q-tab :label="t('navigation.info')" name="info" />
-          <q-tab :label="t('navigation.settings')" name="settings" />
+        <q-tabs
+          v-if="showSettingsTab"
+          v-model="tab"
+          align="left"
+          class="text-primary"
+        >
+          <q-tab :label="t('navigation.info')" name="info"/>
+          <q-tab :label="t('navigation.settings')" name="settings"/>
         </q-tabs>
-        <q-separator v-if="showSettingsTab" />
+        <q-separator v-if="showSettingsTab"/>
       </div>
 
       <q-tab-panels v-model="tab" animated class="plugin-info-panels">
         <q-tab-panel name="info">
           <div class="row">
             <div v-if="!isMobile" class="col col-md-auto col-12 q-pa-xs">
-              <q-skeleton v-if="!icon" width="350px" height="350px" class="shadow-1" />
-              <q-avatar v-else rounded size="350px" font-size="82px" text-color="white" class="shadow-1">
-                <q-img :src="icon" style="max-width: 300px" />
+              <q-skeleton v-if="!icon" width="350px" height="350px" class="shadow-1"/>
+              <q-avatar
+                v-else
+                rounded
+                size="350px"
+                font-size="82px"
+                text-color="white"
+                class="shadow-1"
+              >
+                <q-img :src="icon" style="max-width: 300px;"/>
               </q-avatar>
             </div>
             <div class="col col-md-grow col-12 q-pa-xs">
-              <q-skeleton v-if="!name" width="100%" max-height="350px" class="shadow-1" />
-              <q-card v-else :style="isMobile && changelog.length === 0 ? 'height: 128px;' : ''">
-                <q-card-section style="max-height: 128px">
+              <q-skeleton v-if="!name" width="100%" max-height="350px" class="shadow-1"/>
+              <q-card
+                v-else
+                :style="(isMobile && changelog.length === 0) ? 'height: 128px;' : ''"
+              >
+                <q-card-section style="max-height: 128px;">
                   <q-list>
                     <q-item dense>
                       <q-item-section>
@@ -59,9 +74,12 @@
                   </q-list>
                 </q-card-section>
 
-                <q-separator />
+                <q-separator/>
 
-                <q-card-section v-if="(isMobile && changelog.length > 0) || !isMobile" style="max-height: 222px">
+                <q-card-section
+                  v-if="(isMobile && changelog.length > 0) || (!isMobile)"
+                  style="max-height: 222px;"
+                >
                   <q-list>
                     <q-item>
                       <q-item-section>
@@ -69,7 +87,7 @@
                       </q-item-section>
                     </q-item>
                   </q-list>
-                  <q-scroll-area style="height: 150px; max-width: 100%">
+                  <q-scroll-area style="height: 150px; max-width: 100%;">
                     <span class="plugin-changelog" v-html="changelog"></span>
                   </q-scroll-area>
                 </q-card-section>
@@ -80,8 +98,8 @@
           <div class="row">
             <div class="col col-12 q-pa-xs">
               <div class="plugin-info-description">
-                <q-card style="width: 100%">
-                  <q-skeleton v-if="!description" width="100%" height="550px" class="shadow-1" />
+                <q-card style="width:100%">
+                  <q-skeleton v-if="!description" width="100%" height="550px" class="shadow-1"/>
                   <q-card-section v-else class="q-pa-md">
                     <div class="row q-mt-md">
                       <span class="plugin-description" v-html="description"></span>
@@ -97,7 +115,12 @@
           <div class="row">
             <div class="col col-12 q-pa-xs">
               <div>
-                <q-card flat bordered class="q-pa-sm" style="width: 100%">
+                <q-card
+                  flat
+                  bordered
+                  class="q-pa-sm"
+                  style="width:100%"
+                >
                   <q-card-section class="q-pt-none">
                     <q-list v-if="settings.length > 0">
                       <q-item
@@ -117,7 +140,7 @@
                             :label="item.label"
                             :placeholder="item.label"
                           >
-                            <template #hint v-if="item.description.length > 0">
+                            <template v-slot:hint v-if="item.description.length > 0">
                               {{ item.description }}
                             </template>
                           </q-input>
@@ -136,7 +159,7 @@
                             :disable="item.display === 'disabled'"
                             :label="item.label"
                           >
-                            <template #hint v-if="item.description.length > 0">
+                            <template v-slot:hint v-if="item.description.length > 0">
                               {{ item.description }}
                             </template>
                           </q-input>
@@ -148,9 +171,7 @@
                         <q-item-section v-if="item.input_type === 'checkbox'">
                           <div
                             @click="item.value = !item.value"
-                            :style="
-                              $q.dark.isActive ? 'background:rgba(255,255,255,.07)' : 'background:rgba(0, 0, 0, 0.05);'
-                            "
+                            :style="$q.dark.isActive ? 'background:rgba(255,255,255,.07)' : 'background:rgba(0, 0, 0, 0.05);'"
                             class="q-pa-sm rounded-borders"
                           >
                             <q-checkbox
@@ -175,12 +196,12 @@
                             map-options
                             :bottom-slots="item.description.length > 0"
                             :options="item.select_options"
-                            :option-value="(opt) => (Object(opt) === opt && 'value' in opt ? opt.value : null)"
-                            :option-label="(opt) => (Object(opt) === opt && 'label' in opt ? opt.label : '- Null -')"
+                            :option-value="opt => Object(opt) === opt && 'value' in opt ? opt.value : null"
+                            :option-label="opt => Object(opt) === opt && 'label' in opt ? opt.label : '- Null -'"
                             :disable="item.display === 'disabled'"
                             :label="item.label"
                           >
-                            <template #hint v-if="item.description.length > 0">
+                            <template v-slot:hint v-if="item.description.length > 0">
                               {{ item.description }}
                             </template>
                           </q-select>
@@ -192,7 +213,7 @@
                         <q-item-section v-if="item.input_type === 'slider'">
                           <q-item class="q-pa-none q-ma-none">
                             <q-item-section :class="item.display" avatar>
-                              <q-icon color="primary" name="chevron_right" />
+                              <q-icon color="primary" name="chevron_right"/>
                             </q-item-section>
                             <q-item-section class="q-pt-lg q-pb-none" :class="item.display">
                               <q-slider
@@ -209,7 +230,7 @@
                               />
                             </q-item-section>
                             <q-item-section :class="item.display" avatar>
-                              <q-icon color="primary" name="chevron_left" />
+                              <q-icon color="primary" name="chevron_left"/>
                             </q-item-section>
                           </q-item>
                           <div v-if="item.description.length > 0" class="checkbox-hint">
@@ -229,7 +250,7 @@
                             :hint="item.description"
                             @click="updateWithDirectoryBrowser(item)"
                           >
-                            <template #append>
+                            <template v-slot:append>
                               <q-icon
                                 @click="updateWithDirectoryBrowser(item)"
                                 class="cursor-pointer"
@@ -280,8 +301,8 @@
 
   <SelectDirectoryDialog
     ref="selectDirectoryDialogRef"
-    :initial-path="selectDirectoryInitialPath"
-    :list-type="selectDirectoryListType"
+    :initialPath="selectDirectoryInitialPath"
+    :listType="selectDirectoryListType"
     @selected="onDirectorySelected"
   />
 </template>
@@ -301,11 +322,11 @@ import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 const props = defineProps({
   pluginId: {
     type: String,
-    default: '',
+    default: ''
   },
   startTab: {
     type: String,
-    default: 'info',
+    default: 'info'
   },
   viewingRemoteInfo: {
     type: Boolean,
@@ -314,7 +335,7 @@ const props = defineProps({
   libraryId: {
     type: Number,
     required: false,
-  },
+  }
 })
 
 const emit = defineEmits(['hide'])
@@ -378,7 +399,7 @@ const resetAction = computed(() => ({
   icon: 'restart_alt',
   color: 'secondary',
   tooltip: t('components.plugins.resetConfiguration'),
-  emit: 'reset',
+  emit: 'reset'
 }))
 
 const headerActions = computed(() => {
@@ -399,7 +420,7 @@ const fetchPluginData = () => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'plugins/info'),
-    data: postData,
+    data: postData
   }).then((response) => {
     id.value = response.data.id
     icon.value = response.data.icon
@@ -435,34 +456,32 @@ const resetPluginLibraryConfig = () => {
   }
   const data = {
     plugin_id: props.pluginId,
-    library_id: props.libraryId,
+    library_id: props.libraryId
   }
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'plugins/settings/reset'),
-    data: data,
+    data: data
+  }).then(() => {
+    fetchPluginData()
+    $q.notify({
+      color: 'positive',
+      position: 'top',
+      message: t('notifications.SavedPluginSettings'),
+      icon: 'check_circle',
+      timeout: 200,
+      actions: [{ icon: 'close', color: 'white' }]
+    })
+    hide()
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: t('notifications.failedToSavePluginSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
   })
-    .then(() => {
-      fetchPluginData()
-      $q.notify({
-        color: 'positive',
-        position: 'top',
-        message: t('notifications.SavedPluginSettings'),
-        icon: 'check_circle',
-        timeout: 200,
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-      hide()
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('notifications.failedToSavePluginSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
 }
 
 const savePluginSettings = () => {
@@ -475,7 +494,7 @@ const savePluginSettings = () => {
   isSavingSettings.value = true
   const data = {
     plugin_id: props.pluginId,
-    settings: settings.value,
+    settings: settings.value
   }
   if (props.libraryId) {
     data.library_id = props.libraryId
@@ -483,24 +502,21 @@ const savePluginSettings = () => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'plugins/settings/update'),
-    data: data,
+    data: data
+  }).then(() => {
+    originalSettings.value = JSON.parse(JSON.stringify(settings.value))
+    fetchPluginData()
+  }).catch(() => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: t('notifications.failedToSavePluginSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }]
+    })
+  }).finally(() => {
+    isSavingSettings.value = false
   })
-    .then(() => {
-      originalSettings.value = JSON.parse(JSON.stringify(settings.value))
-      fetchPluginData()
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('notifications.failedToSavePluginSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
-    .finally(() => {
-      isSavingSettings.value = false
-    })
 }
 
 const updateWithDirectoryBrowser = (input) => {
@@ -539,45 +555,35 @@ const onDialogHide = () => {
   emit('hide')
 }
 
-watch(
-  () => props.pluginId,
-  (value) => {
-    if (!value || !isOpen.value) {
-      return
-    }
-    fetchPluginData()
-  },
-)
+watch(() => props.pluginId, (value) => {
+  if (!value || !isOpen.value) {
+    return
+  }
+  fetchPluginData()
+})
 
-watch(
-  () => props.startTab,
-  (value) => {
-    if (!value || !isOpen.value) {
-      return
-    }
-    tab.value = value
-  },
-)
+watch(() => props.startTab, (value) => {
+  if (!value || !isOpen.value) {
+    return
+  }
+  tab.value = value
+})
 
-watch(
-  settings,
-  () => {
-    if (isHydratingSettings.value || isSavingSettings.value) {
-      return
-    }
-    if (!settingsHaveBeenModified()) {
-      return
-    }
-    savePluginSettings()
-  },
-  { deep: true },
-)
+watch(settings, () => {
+  if (isHydratingSettings.value || isSavingSettings.value) {
+    return
+  }
+  if (!settingsHaveBeenModified()) {
+    return
+  }
+  savePluginSettings()
+}, { deep: true })
 
 const selectDirectoryDialogRef = ref(null)
 
 defineExpose({
   show,
-  hide,
+  hide
 })
 </script>
 
@@ -668,7 +674,7 @@ defineExpose({
 }
 
 :deep(.body--light span.plugin-description pre) {
-  background: #eee;
+  background: #EEE;
 }
 
 :deep(.body--dark span.plugin-description pre) {

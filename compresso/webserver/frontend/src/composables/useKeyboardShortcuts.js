@@ -26,9 +26,7 @@ export function useKeyboardShortcuts() {
     'g+s': () => router.push('/ui/settings-library'),
     'g+w': () => router.push('/ui/settings-workers'),
     // Actions
-    '?': () => {
-      showHelp.value = !showHelp.value
-    },
+    '?': () => { showHelp.value = !showHelp.value },
   }
 
   function handleKeydown(e) {
@@ -62,9 +60,7 @@ export function useKeyboardShortcuts() {
 
     if (key === 'g') {
       pendingPrefix = 'g'
-      prefixTimer = setTimeout(() => {
-        pendingPrefix = null
-      }, 800)
+      prefixTimer = setTimeout(() => { pendingPrefix = null }, 800)
       return
     }
 

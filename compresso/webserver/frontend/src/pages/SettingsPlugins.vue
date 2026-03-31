@@ -3,65 +3,67 @@
     <!-- content -->
 
     <div class="q-pa-none">
+
       <div class="col-12 col-sm-12 col-md-10 col-lg-8">
         <div :class="$q.platform.is.mobile ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
+
           <q-form class="q-gutter-md">
             <h5 class="q-mb-none">{{ $t('components.plugins.pathConfiguration') }}</h5>
-            <PluginsInstalledTable />
+            <PluginsInstalledTable/>
           </q-form>
         </div>
       </div>
 
       <MobileSettingsQuickNav
-        :prev-enabled="true"
-        :prev-label="$t('navigation.workers')"
-        :prev-path="'/ui/settings-workers'"
-        :next-enabled="true"
-        :next-label="$t('navigation.link')"
-        :next-path="'/ui/settings-link'"
-      />
+        v-bind:prevEnabled="true"
+        v-bind:prevLabel="$t('navigation.workers')"
+        v-bind:prevPath="'/ui/settings-workers'"
+        v-bind:nextEnabled="true"
+        v-bind:nextLabel="$t('navigation.link')"
+        v-bind:nextPath="'/ui/settings-link'"/>
+
     </div>
   </q-page>
 </template>
 
 <script>
-import PluginsInstalledTable from 'components/settings/plugins/partials/PluginsInstalledTable'
-import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
+import PluginsInstalledTable from "components/settings/plugins/partials/PluginsInstalledTable";
+import { CompressoWebsocketHandler } from "src/js/compressoWebsocket";
+import { onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
+import MobileSettingsQuickNav from "components/MobileSettingsQuickNav";
 
 export default {
   components: { MobileSettingsQuickNav, PluginsInstalledTable },
   setup() {
-    const { t: $t } = useI18n()
+    const { t: $t } = useI18n();
 
     /**
      * Compresso WS handle
      * @type {null}
      */
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    let ws = null;
+    let compressoWSHandler = CompressoWebsocketHandler($t);
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      ws = compressoWSHandler.init();
     }
 
     function closeCompressoWebsocket() {
-      compressoWSHandler.close()
+      compressoWSHandler.close();
     }
 
     // END COMPRESSO WS HANDLE
 
     onMounted(() => {
       // Start the websocket
-      initCompressoWebsocket()
+      initCompressoWebsocket();
     })
     onUnmounted(() => {
       // Close the websocket
-      closeCompressoWebsocket()
+      closeCompressoWebsocket();
     })
-  },
+  }
 }
 </script>
 

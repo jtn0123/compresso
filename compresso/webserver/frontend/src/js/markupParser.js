@@ -1,15 +1,16 @@
 //import bbCodeToMD from 'bbcode-to-markdown';
-import XBBCODE from 'xbbcode-parser'
+import XBBCODE from 'xbbcode-parser';
 
-import { Remarkable } from 'remarkable'
-import admonitions from 'remarkable-admonitions'
+
+import { Remarkable } from "remarkable";
+import admonitions from 'remarkable-admonitions';
 
 export const bbCodeToHTML = function (strings) {
   return XBBCODE.process({
     text: strings,
     removeMisalignedTags: false,
-    addInLineBreaks: true,
-  }).html
+    addInLineBreaks: true
+  }).html;
 }
 
 export const markdownToHTML = function (strings) {
@@ -30,14 +31,14 @@ export const markdownToHTML = function (strings) {
     // Highlighter function. Should return escaped HTML,
     // or '' if the source string is not changed
     highlight: function (/*str, lang*/) {
-      return ''
-    },
-  })
-  md.use(admonitions({ icon: 'svg-inline' }))
-  return md.render(strings)
+      return '';
+    }
+  });
+  md.use(admonitions({ icon: 'svg-inline' }));
+  return md.render(strings);
 }
 
 export default {
   bbCodeToHTML,
-  markdownToHTML,
+  markdownToHTML
 }

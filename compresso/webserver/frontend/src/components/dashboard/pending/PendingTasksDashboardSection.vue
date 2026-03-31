@@ -1,10 +1,11 @@
 <template>
   <q-card flat bordered>
     <q-card-section class="bg-card-head pending-tasks-card-head">
+
       <div class="row items-center no-wrap pending-tasks-header">
         <div class="col">
           <div class="text-h6 text-primary">
-            <q-icon name="fas fa-list-ul" />
+            <q-icon name="fas fa-list-ul"/>
             {{ $t('headers.pendingTasks') }}
           </div>
           <div v-if="queueEta && queueEta.formatted" class="text-caption text-grey q-mt-xs">
@@ -12,9 +13,7 @@
             <q-icon
               name="circle"
               size="8px"
-              :color="
-                queueEta.confidence === 'high' ? 'positive' : queueEta.confidence === 'medium' ? 'warning' : 'negative'
-              "
+              :color="queueEta.confidence === 'high' ? 'positive' : queueEta.confidence === 'medium' ? 'warning' : 'negative'"
               class="q-ml-xs"
             />
             <q-tooltip>{{ $t('queueEta.confidence') }}: {{ queueEta.confidence }}</q-tooltip>
@@ -22,17 +21,25 @@
         </div>
 
         <div class="col-auto">
-          <q-btn @click="openDetails" color="secondary" dense round flat icon="open_in_full">
+          <q-btn
+            @click="openDetails"
+            color="secondary"
+            dense
+            round
+            flat
+            icon="open_in_full">
             <q-tooltip class="bg-white text-primary">{{ $t('navigation.showMore') }}</q-tooltip>
           </q-btn>
         </div>
       </div>
+
     </q-card-section>
 
     <!--MINIMAL SCREEN-->
     <q-card-section class="q-pb-none pending-tasks-card-body">
       <div class="pending-tasks-list-wrap">
         <q-list separator>
+
           <q-item v-if="!taskList || !taskList.length">
             <q-item-section>
               <div class="empty-state">
@@ -41,21 +48,27 @@
               </div>
             </q-item-section>
           </q-item>
-          <q-item v-else v-for="task in taskList" :key="task.id" v-bind="task">
+          <q-item
+            v-else
+            v-for="task in taskList"
+            :key="task.id"
+            v-bind="task">
             <q-item-section avatar>
-              <q-icon name="pending" class="text-amber-10" style="opacity: 0.8" />
+              <q-icon name="pending" class="text-amber-10" style="opacity: 0.8;"/>
             </q-item-section>
             <q-item-section>
               <q-item-label>{{ task.label }}</q-item-label>
             </q-item-section>
           </q-item>
+
         </q-list>
+
       </div>
     </q-card-section>
 
     <q-card-section class="q-pt-none">
       <div class="row items-center pending-tasks-footer">
-        <div class="col" />
+        <div class="col"/>
         <div class="col-auto">
           <q-btn
             :label="$t('components.pendingTasks.rescanLibrary')"
@@ -65,70 +78,68 @@
           />
         </div>
       </div>
-      <q-space />
+      <q-space/>
     </q-card-section>
 
     <!--FULL SCREEN-->
-    <PendingTasksListDialog ref="pendingTasksDetailsDialogRef" />
+    <PendingTasksListDialog ref="pendingTasksDetailsDialogRef"/>
   </q-card>
 </template>
 
 <script>
-import { defineComponent, ref } from 'vue'
-import PendingTasksListDialog from 'components/dashboard/pending/PendingTasksListDialog.vue'
-import axios from 'axios'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { defineComponent, ref } from "vue";
+import PendingTasksListDialog from "components/dashboard/pending/PendingTasksListDialog.vue";
+import axios from "axios";
+import { getCompressoApiUrl } from "src/js/compressoGlobals";
 
 export default defineComponent({
   name: 'PendingTasks',
   components: { PendingTasksListDialog },
   setup() {
-    const pendingTasksDetailsDialogRef = ref(null)
+    const pendingTasksDetailsDialogRef = ref(null);
 
     return {
-      pendingTasksDetailsDialogRef,
+      pendingTasksDetailsDialogRef
     }
   },
   props: {
     taskList: {
       type: Array,
-      required: true,
+      required: true
     },
     queueEta: {
       type: Object,
-      default: null,
-    },
+      default: null
+    }
   },
   methods: {
     openDetails() {
-      this.pendingTasksDetailsDialogRef.show()
+      this.pendingTasksDetailsDialogRef.show();
     },
     rescanLibrary: function () {
       axios({
         method: 'post',
-        url: getCompressoApiUrl('v2', 'pending/rescan'),
+        url: getCompressoApiUrl('v2', 'pending/rescan')
+      }).then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          position: 'top',
+          message: this.$t('notifications.rescanLibraryScheduled'),
+          icon: 'check_circle',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
+      }).catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: this.$t('notifications.rescanLibraryError'),
+          icon: 'report_problem',
+          actions: [{ icon: 'close', color: 'white' }]
+        })
       })
-        .then((response) => {
-          this.$q.notify({
-            color: 'positive',
-            position: 'top',
-            message: this.$t('notifications.rescanLibraryScheduled'),
-            icon: 'check_circle',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-        .catch(() => {
-          this.$q.notify({
-            color: 'negative',
-            position: 'top',
-            message: this.$t('notifications.rescanLibraryError'),
-            icon: 'report_problem',
-            actions: [{ icon: 'close', color: 'white' }],
-          })
-        })
-    },
-  },
-})
+    }
+  }
+});
 </script>
 
 <style scoped>

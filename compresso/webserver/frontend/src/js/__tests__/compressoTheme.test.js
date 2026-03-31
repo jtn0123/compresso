@@ -18,18 +18,10 @@ import {
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
 const REQUIRED_VARIANT_KEYS = [
-  'primary',
-  'secondary',
-  'accent',
-  'warning',
-  'primarySoft',
-  'primaryBorder',
-  'surface0',
-  'surface1',
-  'surface2',
-  'surfaceRaised',
-  'headerBg',
-  'headerGradientEnd',
+  'primary', 'secondary', 'accent', 'warning',
+  'primarySoft', 'primaryBorder',
+  'surface0', 'surface1', 'surface2', 'surfaceRaised',
+  'headerBg', 'headerGradientEnd',
   'chart',
 ]
 
@@ -62,16 +54,7 @@ describe('PALETTES', () => {
   it.each(['forest', 'ember'])('%s color values are valid hex strings', (palette) => {
     for (const mode of ['light', 'dark']) {
       const v = PALETTES[palette][mode]
-      for (const key of [
-        'primary',
-        'secondary',
-        'accent',
-        'warning',
-        'primarySoft',
-        'primaryBorder',
-        'headerBg',
-        'headerGradientEnd',
-      ]) {
+      for (const key of ['primary', 'secondary', 'accent', 'warning', 'primarySoft', 'primaryBorder', 'headerBg', 'headerGradientEnd']) {
         expect(v[key], `${palette}.${mode}.${key}`).toMatch(HEX_RE)
       }
       for (const color of v.chart) {
@@ -93,7 +76,7 @@ describe('applyTheme', () => {
 
   it('calls setCssVar for primary, secondary, accent, warning', () => {
     applyTheme('light', 'forest')
-    const calls = mockSetCssVar.mock.calls.map((c) => c[0])
+    const calls = mockSetCssVar.mock.calls.map(c => c[0])
     expect(calls).toContain('primary')
     expect(calls).toContain('secondary')
     expect(calls).toContain('accent')
@@ -112,7 +95,7 @@ describe('applyTheme', () => {
 
   it('sets extended CSS vars on document.body.style', () => {
     applyTheme('light', 'forest')
-    const propNames = setPropertySpy.mock.calls.map((c) => c[0])
+    const propNames = setPropertySpy.mock.calls.map(c => c[0])
     expect(propNames).toContain('--compresso-primary-soft')
     expect(propNames).toContain('--compresso-primary-border')
     expect(propNames).toContain('--compresso-header-bg')
@@ -121,7 +104,7 @@ describe('applyTheme', () => {
 
   it('sets surface hierarchy vars', () => {
     applyTheme('dark', 'forest')
-    const propNames = setPropertySpy.mock.calls.map((c) => c[0])
+    const propNames = setPropertySpy.mock.calls.map(c => c[0])
     expect(propNames).toContain('--surface-0')
     expect(propNames).toContain('--surface-1')
     expect(propNames).toContain('--surface-2')
@@ -130,8 +113,8 @@ describe('applyTheme', () => {
   it('sets 10 chart color CSS vars', () => {
     applyTheme('light', 'ember')
     const chartProps = setPropertySpy.mock.calls
-      .map((c) => c[0])
-      .filter((name) => name.startsWith('--compresso-chart-'))
+      .map(c => c[0])
+      .filter(name => name.startsWith('--compresso-chart-'))
     expect(chartProps).toHaveLength(10)
   })
 
@@ -142,7 +125,7 @@ describe('applyTheme', () => {
 
   it('sets --q-card-head for backward compat', () => {
     applyTheme('light', 'forest')
-    const cardHeadCall = setPropertySpy.mock.calls.find((c) => c[0] === '--q-card-head')
+    const cardHeadCall = setPropertySpy.mock.calls.find(c => c[0] === '--q-card-head')
     expect(cardHeadCall).toBeTruthy()
     expect(cardHeadCall[1]).toBe(PALETTES.forest.light.surfaceRaised)
   })
@@ -164,7 +147,7 @@ describe('getChartColors', () => {
     applyTheme('light', 'forest')
     const colors = getChartColors()
     expect(colors).toHaveLength(10)
-    colors.forEach((c) => expect(typeof c).toBe('string'))
+    colors.forEach(c => expect(typeof c).toBe('string'))
   })
 })
 
