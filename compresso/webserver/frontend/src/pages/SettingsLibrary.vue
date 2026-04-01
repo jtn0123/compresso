@@ -83,7 +83,7 @@
 
                       <!--Library Tags-->
                       <q-item-label caption lines="1" class="tags-container">
-                        <q-chip v-for="(tag, index) in path.tags" :key="index" dense class="chip">
+                        <q-chip v-for="(tag, tagIndex) in path.tags" :key="tagIndex" dense class="chip">
                           {{ tag }}
                         </q-chip>
                       </q-item-label>

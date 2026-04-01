@@ -38,18 +38,22 @@ export default {
     },
     prevLabel: {
       type: String,
+      default: '',
     },
     prevPath: {
       type: String,
+      default: '',
     },
     nextEnabled: {
       type: Boolean,
     },
     nextLabel: {
       type: String,
+      default: '',
     },
     nextPath: {
       type: String,
+      default: '',
     },
   },
   setup() {

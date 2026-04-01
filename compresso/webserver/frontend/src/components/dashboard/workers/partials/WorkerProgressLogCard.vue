@@ -29,6 +29,7 @@ export default {
   props: {
     workerLog: {
       type: Array,
+      default: () => [],
     },
   },
 }

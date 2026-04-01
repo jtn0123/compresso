@@ -315,6 +315,7 @@ const props = defineProps({
   libraryId: {
     type: Number,
     required: false,
+    default: null,
   },
 })
 

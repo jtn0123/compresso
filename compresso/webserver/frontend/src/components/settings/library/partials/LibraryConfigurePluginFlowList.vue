@@ -102,6 +102,7 @@ export default {
     libraryId: {
       type: Number,
       required: false,
+      default: null,
     },
   },
   created() {
