@@ -177,7 +177,8 @@
       {{ $t('pages.approvalQueue.selectAllMatching', { count: pagination.rowsNumber }) }} selected.
       <template #action>
         <!-- prettier-ignore -->
-        <q-btn flat color="primary" label="Clear"
+        <q-btn
+          flat color="primary" label="Clear"
           @click="selectAllMode = false; selected = []" />
       </template>
     </q-banner>

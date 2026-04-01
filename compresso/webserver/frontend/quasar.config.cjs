@@ -110,7 +110,14 @@ module.exports = configure(function (ctx) {
           }
         ]
       })(),
-      open: false // opens browser window automatically
+      open: false, // opens browser window automatically
+      client: {
+        overlay: {
+          errors: true,
+          runtimeErrors: false,
+          warnings: false,
+        },
+      },
     },
 
     // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-framework

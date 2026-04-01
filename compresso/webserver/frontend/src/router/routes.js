@@ -8,27 +8,24 @@ const routes = [
     },
   },
   {
-    name: 'trigger',
     path: '/ui/trigger',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/ActionTrigger.vue') }],
+    children: [{ name: 'trigger', path: '', component: () => import('pages/ActionTrigger.vue') }],
   },
   {
-    name: 'dashboard',
     path: '/ui/dashboard',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/MainDashboard.vue') }],
+    children: [{ name: 'dashboard', path: '', component: () => import('pages/MainDashboard.vue') }],
     meta: {
       showHome: false,
       showMainNavDrawer: true,
     },
   },
   {
-    name: 'data-panels',
     path: '/ui/data-panels',
     props: true,
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/DataPanels.vue') }],
+    children: [{ name: 'data-panels', path: '', component: () => import('pages/DataPanels.vue') }],
     meta: {
       showHome: true,
       showMainNavDrawer: true,
@@ -80,50 +77,45 @@ const routes = [
     },
   },
   {
-    name: 'compression',
     path: '/ui/compression',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/CompressionDashboard.vue') }],
+    children: [{ name: 'compression', path: '', component: () => import('pages/CompressionDashboard.vue') }],
     meta: {
       showHome: true,
       showMainNavDrawer: true,
     },
   },
   {
-    name: 'health',
     path: '/ui/health',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/HealthCheck.vue') }],
+    children: [{ name: 'health', path: '', component: () => import('pages/HealthCheck.vue') }],
     meta: {
       showHome: true,
       showMainNavDrawer: true,
     },
   },
   {
-    name: 'history',
     path: '/ui/history',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/TaskHistory.vue') }],
+    children: [{ name: 'history', path: '', component: () => import('pages/TaskHistory.vue') }],
     meta: {
       showHome: true,
       showMainNavDrawer: true,
     },
   },
   {
-    name: 'approval',
     path: '/ui/approval',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/ApprovalQueue.vue') }],
+    children: [{ name: 'approval', path: '', component: () => import('pages/ApprovalQueue.vue') }],
     meta: {
       showHome: true,
       showMainNavDrawer: true,
     },
   },
   {
-    name: 'preview',
     path: '/ui/preview',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/PreviewCompare.vue') }],
+    children: [{ name: 'preview', path: '', component: () => import('pages/PreviewCompare.vue') }],
     meta: {
       showHome: true,
       showMainNavDrawer: true,

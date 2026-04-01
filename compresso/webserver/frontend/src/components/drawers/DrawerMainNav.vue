@@ -237,7 +237,18 @@
 
       <!-- Version -->
       <div class="text-center q-py-xs">
-        <span class="text-caption" style="opacity: 0.4; font-size: 0.6rem">v{{ compressoVersion }}</span>
+        <span
+          class="text-caption"
+          style="
+            opacity: 0.4;
+            font-size: 0.6rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+          "
+          >v{{ compressoVersion }}</span
+        >
       </div>
     </div>
 

@@ -205,30 +205,30 @@
               :columns="columns"
               class="completed-tasks-table"
             >
-              <template #body="props">
-                <q-tr :props="props" class="completed-task-row">
+              <template #body="slotProps">
+                <q-tr :props="slotProps" class="completed-task-row">
                   <q-td auto-width class="completed-task-select">
                     <div class="completed-task-cell-center">
                       <q-checkbox
                         color="secondary"
-                        :model-value="isRowSelected(props.row)"
-                        @update:model-value="(value) => toggleRowSelection(props.row, value)"
+                        :model-value="isRowSelected(slotProps.row)"
+                        @update:model-value="(value) => toggleRowSelection(slotProps.row, value)"
                       />
                     </div>
                   </q-td>
 
                   <q-td>
                     <div class="completed-task-name">
-                      {{ props.row.name }}
+                      {{ slotProps.row.name }}
                     </div>
                     <div class="text-caption">
                       <span class="text-weight-medium"> {{ t('components.completedTasks.columns.completed') }}: </span>
-                      {{ props.row.dateTimeCompleted }}
+                      {{ slotProps.row.dateTimeCompleted }}
                     </div>
                     <div class="text-caption">
                       <span class="text-weight-medium"> {{ t('components.completedTasks.columns.status') }}: </span>
-                      <q-badge :color="props.row.status ? 'positive' : 'negative'">
-                        {{ props.row.status ? t('status.success') : t('status.failed') }}
+                      <q-badge :color="slotProps.row.status ? 'positive' : 'negative'">
+                        {{ slotProps.row.status ? t('status.success') : t('status.failed') }}
                       </q-badge>
                     </div>
                   </q-td>
@@ -238,26 +238,26 @@
                       <div class="completed-task-action-group">
                         <CompressoStandardButton
                           v-if="$q.screen.gt.xs"
-                          @click="openDetailsDialog(props.row.id)"
+                          @click="openDetailsDialog(slotProps.row.id)"
                           :label="t('components.completedTasks.details')"
                           style="min-width: 100px"
                         />
                         <CompressoListActionButton
                           v-else
-                          @click="openDetailsDialog(props.row.id)"
+                          @click="openDetailsDialog(slotProps.row.id)"
                           icon="info"
                           :tooltip="t('components.completedTasks.details')"
                         />
 
                         <CompressoStandardButton
-                          v-if="$q.screen.gt.xs && props.row.hasMetadata"
-                          @click="openMetadataDialog(props.row.id)"
+                          v-if="$q.screen.gt.xs && slotProps.row.hasMetadata"
+                          @click="openMetadataDialog(slotProps.row.id)"
                           :label="t('components.completedTasks.metadata')"
                           style="min-width: 120px"
                         />
                         <CompressoListActionButton
-                          v-else-if="props.row.hasMetadata"
-                          @click="openMetadataDialog(props.row.id)"
+                          v-else-if="slotProps.row.hasMetadata"
+                          @click="openMetadataDialog(slotProps.row.id)"
                           icon="data_object"
                           :tooltip="t('components.completedTasks.metadata')"
                         />

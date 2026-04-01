@@ -6,18 +6,14 @@
       </iframe>
 
       <div v-else>
-        <div class="full-width row flex-center text-negative q-gutter-sm">
-          <q-icon size="2em" name="sentiment_dissatisfied" />
-          <q-item-label>{{ $t('components.dataPanels.noDataPanelsEnabled') }}</q-item-label>
-          <q-icon size="2em" name="priority_high" />
-        </div>
-
-        <div class="text-caption text-grey q-mt-md" style="max-width: 400px; margin: 0 auto">
-          {{ $t('pages.dataPanels.bannerText') }}
-        </div>
-
-        <div class="full-width row flex-center text-negative absolute-center">
-          <q-icon size="512px" name="warning_amber" />
+        <div class="full-width column flex-center q-mt-xl q-pt-xl">
+          <q-icon size="64px" name="extension" color="grey-6" />
+          <q-item-label class="text-subtitle1 text-grey-6 q-mt-md">
+            {{ $t('components.dataPanels.noDataPanelsEnabled') }}
+          </q-item-label>
+          <div class="text-caption text-grey q-mt-sm" style="max-width: 400px; text-align: center">
+            {{ $t('pages.dataPanels.bannerText') }}
+          </div>
         </div>
       </div>
     </div>
