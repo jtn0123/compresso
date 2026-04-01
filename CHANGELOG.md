@@ -1,3 +1,11 @@
+## [1.10.7](https://github.com/jtn0123/compresso/compare/v1.10.6...v1.10.7) (2026-04-01)
+
+
+### Bug Fixes
+
+* address CodeRabbit review comments ([3c2eb7c](https://github.com/jtn0123/compresso/commit/3c2eb7c4c372ef0c8d14ec3c7a7069a680727c53))
+* resolve i18n translation keys, Vue Router warnings, and UI polish ([68fe6cf](https://github.com/jtn0123/compresso/commit/68fe6cf7c8721e9bbb390dec44b83bf160c902bd))
+
 ## [1.10.6](https://github.com/jtn0123/compresso/compare/v1.10.5...v1.10.6) (2026-03-31)
 
 
