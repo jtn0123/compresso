@@ -237,18 +237,7 @@
 
       <!-- Version -->
       <div class="text-center q-py-xs">
-        <span
-          class="text-caption"
-          style="
-            opacity: 0.4;
-            font-size: 0.6rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: block;
-          "
-          >v{{ compressoVersion }}</span
-        >
+        <span class="text-caption nav-version">v{{ compressoVersion }}</span>
       </div>
     </div>
 
@@ -368,5 +357,14 @@ export default {
 
 .q-item .q-icon {
   color: var(--compresso-grey-6);
+}
+
+.nav-version {
+  opacity: 0.4;
+  font-size: 0.6rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 </style>

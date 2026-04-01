@@ -956,7 +956,9 @@
       "selectAllMatching": "Select all {count} matching items",
       "searchPlaceholder": "Search files...",
       "codecFilter": "Codec",
-      "qualityThreshold": "Quality (VMAF min)"
+      "qualityThreshold": "Quality (VMAF min)",
+      "allMatchingSelected": "All {count} matching items selected.",
+      "clearSelection": "Clear"
     },
     "compressionDashboard": {
       "title": "Compression Dashboard",

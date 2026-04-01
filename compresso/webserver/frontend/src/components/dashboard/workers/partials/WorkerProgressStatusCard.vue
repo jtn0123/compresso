@@ -189,6 +189,7 @@ export default {
   },
   methods: {
     pauseWorker: function () {
+      if (!this.id) return
       let data = {
         worker_id: this.id,
       }
@@ -217,6 +218,7 @@ export default {
         })
     },
     resumeWorker: function () {
+      if (!this.id) return
       let data = {
         worker_id: this.id,
       }
@@ -245,6 +247,7 @@ export default {
         })
     },
     terminateWorker: function () {
+      if (!this.id) return
       let data = {
         worker_id: this.id,
       }

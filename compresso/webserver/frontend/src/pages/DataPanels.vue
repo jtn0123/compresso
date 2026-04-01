@@ -7,11 +7,11 @@
 
       <div v-else>
         <div class="full-width column flex-center q-mt-xl q-pt-xl">
-          <q-icon size="64px" name="extension" color="grey-6" />
-          <q-item-label class="text-subtitle1 text-grey-6 q-mt-md">
+          <q-icon size="64px" name="extension" class="text-secondary" />
+          <q-item-label class="text-subtitle1 text-secondary q-mt-md">
             {{ $t('components.dataPanels.noDataPanelsEnabled') }}
           </q-item-label>
-          <div class="text-caption text-grey q-mt-sm" style="max-width: 400px; text-align: center">
+          <div class="text-caption text-secondary q-mt-sm data-panels-empty-caption">
             {{ $t('pages.dataPanels.bannerText') }}
           </div>
         </div>
@@ -83,7 +83,12 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
+.data-panels-empty-caption {
+  max-width: 400px;
+  text-align: center;
+}
+
 .iframe-container {
   position: absolute;
   top: 0;

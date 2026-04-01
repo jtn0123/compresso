@@ -174,11 +174,11 @@
       dense
       rounded
     >
-      {{ $t('pages.approvalQueue.selectAllMatching', { count: pagination.rowsNumber }) }} selected.
+      {{ $t('pages.approvalQueue.allMatchingSelected', { count: pagination.rowsNumber }) }}
       <template #action>
         <!-- prettier-ignore -->
         <q-btn
-          flat color="primary" label="Clear"
+          flat color="primary" :label="$t('pages.approvalQueue.clearSelection')"
           @click="selectAllMode = false; selected = []" />
       </template>
     </q-banner>
