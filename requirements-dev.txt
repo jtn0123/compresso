@@ -10,7 +10,7 @@ wheel==0.46.3
 setuptools==82.0.1
 build==1.4.0
 yappi==1.7.6            # Thread-aware profiler for dev profiling
-mypy==1.19.1            # Gradual type checking
+mypy==1.20.0            # Gradual type checking
 
 # API schema exporting
 apispec==6.10.0
