@@ -1,3 +1,10 @@
+## [1.10.8](https://github.com/jtn0123/compresso/compare/v1.10.7...v1.10.8) (2026-04-08)
+
+
+### Bug Fixes
+
+* bump SonarSource/sonarqube-scan-action v5 → v7 (CVE fix) ([f21f462](https://github.com/jtn0123/compresso/commit/f21f462c8ef07c71b5b6d31d012c36039ad8fc9c))
+
 ## [1.10.7](https://github.com/jtn0123/compresso/compare/v1.10.6...v1.10.7) (2026-04-01)
 
 
