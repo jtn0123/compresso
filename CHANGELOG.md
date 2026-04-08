@@ -1,3 +1,10 @@
+## [1.10.9](https://github.com/jtn0123/compresso/compare/v1.10.8...v1.10.9) (2026-04-08)
+
+
+### Bug Fixes
+
+* npm audit fix — resolve vite and lodash vulnerabilities ([f77856d](https://github.com/jtn0123/compresso/commit/f77856d9b9695ddc2b87754ccd3e364bf65e3f69))
+
 ## [1.10.8](https://github.com/jtn0123/compresso/compare/v1.10.7...v1.10.8) (2026-04-08)
 
 
