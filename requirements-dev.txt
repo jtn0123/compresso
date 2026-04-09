@@ -1,6 +1,6 @@
 -r requirements.txt
 
-ruff==0.15.7
+ruff==0.15.10
 pytest==9.0.2
 pytest-cov==7.0.0
 pytest-benchmark==5.2.3
