@@ -393,7 +393,7 @@ jobs:
           grep -q STARTUP_SUMMARY "${tmp_root}/config/.compresso/logs/compresso.log"
 
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: compresso-smoke:ci
           format: table
