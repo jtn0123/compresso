@@ -1,6 +1,6 @@
 <template>
-  <q-page padding>
-    <!-- content -->
+  <q-page class="flex flex-center">
+    <q-spinner color="primary" size="3em" />
   </q-page>
 </template>
 
@@ -26,19 +26,23 @@ export default {
         method: 'post',
         url: getCompressoApiUrl('v2', 'session/reload'),
       })
-        .then((response) => {
-          navigateToDashboard()
-        })
         .catch(() => {
           log.error('Failed to reload session.')
+        })
+        .finally(() => {
+          // Always leave this action-only route; never strand the user
+          // on a blank page, whether the reload succeeded or failed.
+          navigateToDashboard()
         })
     }
 
     onMounted(() => {
-      if (typeof route.query !== 'undefined') {
-        if (route.query.session === 'reload') {
-          reloadSession()
-        }
+      if (route.query?.session === 'reload') {
+        reloadSession()
+      } else {
+        // No recognized action — this route renders no content of its
+        // own, so redirect instead of showing a blank page.
+        navigateToDashboard()
       }
     })
 

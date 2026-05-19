@@ -25,11 +25,11 @@ class TestRateLimiter:
         limiter = self._make_limiter()
         allowed, remaining, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         assert allowed is True
-        assert remaining == 59
+        assert remaining == RateLimiter.DEFAULT_LIMIT - 1
 
     def test_over_limit_returns_false(self):
         limiter = self._make_limiter()
-        for _ in range(60):
+        for _ in range(RateLimiter.DEFAULT_LIMIT):
             limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         allowed, remaining, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         assert allowed is False
@@ -37,7 +37,7 @@ class TestRateLimiter:
 
     def test_different_ips_independent(self):
         limiter = self._make_limiter()
-        for _ in range(60):
+        for _ in range(RateLimiter.DEFAULT_LIMIT):
             limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         # Different IP should still be allowed
         allowed, _, _ = limiter.check_rate_limit("5.6.7.8", "/healthcheck/summary")
@@ -71,7 +71,7 @@ class TestRateLimiter:
         limiter = self._make_limiter()
         # First request at t=0
         mock_time.return_value = 1000.0
-        for _ in range(60):
+        for _ in range(RateLimiter.DEFAULT_LIMIT):
             limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         # Over limit
         allowed, _, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
@@ -103,15 +103,15 @@ class TestRateLimiter:
 
     def test_exactly_at_limit_last_request_allowed(self):
         limiter = self._make_limiter()
-        # Make 59 requests (0-58)
-        for _ in range(59):
+        # Make DEFAULT_LIMIT - 1 requests
+        for _ in range(RateLimiter.DEFAULT_LIMIT - 1):
             allowed, _, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
             assert allowed is True
-        # 60th request should still be allowed (count was 59 before this)
+        # The request at the exact limit should still be allowed
         allowed, remaining, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         assert allowed is True
         assert remaining == 0
-        # 61st should be rejected
+        # The next request should be rejected
         allowed, _, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         assert allowed is False
 
@@ -134,7 +134,7 @@ class TestRateLimiter:
         for i in range(5):
             allowed, remaining, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
             assert allowed is True
-            assert remaining == 59 - i
+            assert remaining == RateLimiter.DEFAULT_LIMIT - 1 - i
 
     def test_expensive_and_normal_counts_are_separate(self):
         limiter = self._make_limiter()
@@ -146,8 +146,8 @@ class TestRateLimiter:
         # Normal endpoint should still have capacity (but counts all 5 expensive requests too)
         allowed, remaining, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         assert allowed is True
-        # 60 limit - 5 expensive requests already counted - 1 for this request = 54
-        assert remaining == 54
+        # DEFAULT_LIMIT - 5 expensive requests already counted - 1 for this request
+        assert remaining == RateLimiter.DEFAULT_LIMIT - 5 - 1
 
     def test_get_rate_limiter_singleton_returns_same_instance(self):
         import compresso.webserver.api_v2.rate_limiter as rl_module
