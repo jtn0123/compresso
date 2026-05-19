@@ -146,8 +146,8 @@ class TestRateLimiter:
         # Normal endpoint should still have capacity (but counts all 5 expensive requests too)
         allowed, remaining, _ = limiter.check_rate_limit("1.2.3.4", "/healthcheck/summary")
         assert allowed is True
-        # DEFAULT_LIMIT - 5 expensive requests already counted - 1 for this request
-        assert remaining == RateLimiter.DEFAULT_LIMIT - 5 - 1
+        # DEFAULT_LIMIT - STRICT_LIMIT expensive requests already counted - 1 for this request
+        assert remaining == RateLimiter.DEFAULT_LIMIT - RateLimiter.STRICT_LIMIT - 1
 
     def test_get_rate_limiter_singleton_returns_same_instance(self):
         import compresso.webserver.api_v2.rate_limiter as rl_module
