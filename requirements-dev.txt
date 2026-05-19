@@ -1,7 +1,7 @@
 -r requirements.txt
 
-ruff==0.15.7
-pytest==9.0.2
+ruff==0.15.13
+pytest==9.0.3
 pytest-cov==7.0.0
 pytest-benchmark==5.2.3
 pytest-asyncio==1.3.0
@@ -10,7 +10,7 @@ wheel==0.46.3
 setuptools==82.0.1
 build==1.4.0
 yappi==1.7.6            # Thread-aware profiler for dev profiling
-mypy==1.19.1            # Gradual type checking
+mypy==2.1.0             # Gradual type checking
 
 # API schema exporting
 apispec==6.10.0

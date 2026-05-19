@@ -44,7 +44,7 @@ logger = CompressoLogging.get_logger(__name__)
 # Configure a global shared manager
 _shared_manager = None
 
-_active_plugin_pids = set()
+_active_plugin_pids: set[int] = set()
 _active_lock = threading.Lock()
 
 
