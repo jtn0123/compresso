@@ -163,19 +163,23 @@ def validate_startup_environment(settings):
 
 
 def _sum_worker_groups_count():
-    """Sum number_of_workers across all configured worker groups.
+    """Sum ``number_of_workers`` across all configured worker groups.
 
     Imported lazily so this module stays import-free of peewee for
-    callers that only need the readiness helpers above.
+    callers that only need the readiness helpers above. The body is
+    wrapped in a broad try so the startup summary still renders if
+    the worker-group DB isn't queryable yet (e.g. mid-migration or
+    transient lock).
     """
     try:
         from compresso.libs.worker_group import WorkerGroup
+
+        total = 0
+        for wg in WorkerGroup.get_all_worker_groups():
+            total += int(wg.get("number_of_workers", 0) or 0)
+        return total
     except Exception:
         return 0
-    total = 0
-    for wg in WorkerGroup.get_all_worker_groups():
-        total += int(wg.get("number_of_workers", 0) or 0)
-    return total
 
 
 def build_startup_summary(settings, event_monitor_module):
