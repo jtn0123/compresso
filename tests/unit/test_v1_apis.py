@@ -183,7 +183,10 @@ class TestHistoryHandler:
         handler.set_status.assert_called_once_with(501)
         written = json.loads(handler.write.call_args[0][0])
         assert written["success"] is False
+        # Body must say "not implemented" AND keep pointing callers at v2 —
+        # a future change that drops the v2 migration hint should fail here.
         assert "not implemented" in written["error"].lower()
+        assert "v2" in written["error"].lower()
 
 
 @pytest.mark.unittest
@@ -218,7 +221,10 @@ class TestPendingHandler:
         handler.set_status.assert_called_once_with(501)
         written = json.loads(handler.write.call_args[0][0])
         assert written["success"] is False
+        # Body must say "not implemented" AND point to the v2 endpoint —
+        # regressions that drop the migration path will fail here.
         assert "not implemented" in written["error"].lower()
+        assert "/compresso/api/v2/pending/add" in written["error"]
 
 
 @pytest.mark.unittest
