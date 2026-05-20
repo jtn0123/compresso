@@ -45,6 +45,19 @@ class TestApiRouter(ApiRouterTestBase):
         data = self.parse_response(response)
         assert "version" in data
 
+    @patch("compresso.libs.session.Session")
+    def test_version_route_body_shape(self, _mock_session):
+        """The /version/read endpoint must return a JSON body with a non-empty
+        string `version` field (callers depend on this shape for the UI banner)."""
+        response = self.fetch("/compresso/api/v2/version/read", method="GET")
+        assert response.code == 200
+        data = self.parse_response(response)
+        # Body must be a dict with a string `version` field
+        assert isinstance(data, dict)
+        assert "version" in data
+        assert isinstance(data["version"], str)
+        assert data["version"]  # non-empty
+
     @patch("compresso.webserver.helpers.healthcheck.get_startup_readiness")
     def test_readiness_route_resolves_through_router(self, mock_readiness):
         mock_readiness.return_value = {

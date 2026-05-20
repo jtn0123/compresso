@@ -93,6 +93,30 @@ class TestMaskUrl:
         # Should show exactly 12 chars + '***'
         assert rest_shown == "discord.com/***"
 
+    def test_handles_url_with_control_chars(self):
+        """Adversarial input: control characters and HTML/JSON-significant bytes
+        in the URL must not crash the function and must JSON-serialize cleanly.
+
+        We engineer the input so the dangerous bytes live past byte 12 of the
+        post-scheme portion -- the truncating mask should drop them, leaving a
+        result string that contains none of those bytes verbatim.
+        """
+        from compresso.webserver.api_v2.notifications_api import ApiNotificationsHandler
+
+        # "discord.com/" is exactly 12 chars; everything after gets truncated.
+        adversarial_tail = "\n\t<>\"'"
+        url = "https://discord.com/" + adversarial_tail + "abcdef"
+        result = ApiNotificationsHandler._mask_url(url)
+
+        # Result is a string and is non-empty
+        assert isinstance(result, str)
+        assert result  # truthy
+        # The dangerous bytes were truncated away -- none of them must appear.
+        for bad in ("\n", "\t", "<", ">", '"', "'"):
+            assert bad not in result, f"control/HTML byte {bad!r} leaked through mask"
+        # And the result must JSON-serialize without raising.
+        json.dumps({"u": result})
+
 
 # ------------------------------------------------------------------
 # TestGetNotificationChannels

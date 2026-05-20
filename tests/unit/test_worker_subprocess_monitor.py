@@ -164,10 +164,13 @@ class TestSetProc:
             # Should not raise
             monitor.set_proc(9999)
 
-        # State should not have been updated with new pid after the exception path
-        # (the pid assignment happens before Process(), so it will be set)
-        # But most importantly: no exception propagated
-        assert True
+        # The implementation assigns `subprocess_pid` *before* calling
+        # `psutil.Process(...)`, so the pid is observably set even though the
+        # Process construction failed. The `subprocess` attribute must NOT have
+        # been replaced (it stays at the pre-call value of None) -- this is the
+        # behavior the try/except in set_proc is meant to guarantee.
+        assert monitor.subprocess_pid == 9999
+        assert monitor.subprocess is None
 
 
 # ---------------------------------------------------------------------------
@@ -822,8 +825,15 @@ class TestRunLoop:
         with patch(MODULE + ".psutil.cpu_count", return_value=4):
             m.run()
 
-        # If we get here the loop exited cleanly
-        assert True
+        # The run loop must observe the stop event and exit. After the loop
+        # returns, the stop event must still be set (the loop must not silently
+        # clear it), and no subprocess polling state should have been populated
+        # (we never set a subprocess, so the per-iteration polling fields stay
+        # at their initial zero values).
+        assert m._stop_event.is_set()
+        assert m.subprocess is None
+        assert m.subprocess_cpu_percent == 0
+        assert m.subprocess_rss_bytes == 0
 
     def test_redundant_flag_calls_terminate_proc(self):
         m = self._make_run_monitor()

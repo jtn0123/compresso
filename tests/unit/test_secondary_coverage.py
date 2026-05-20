@@ -1280,6 +1280,56 @@ class TestGetCommunityReposWithCache(ApiTestBase):
 
     @patch(PLUGIN_REPOS_MIXIN + ".os.path.exists", return_value=True)
     @patch(PLUGIN_REPOS_MIXIN + ".compresso_config")
+    def test_get_community_repos_malformed_cache_falls_through_to_api(self, mock_cfg, mock_exists):
+        """Malformed cache entries (missing repo_id schema) are discarded and the
+        endpoint falls through to the live API call (lines 240-243)."""
+        import time as _time
+
+        mock_cfg.Config.return_value.get_plugins_path.return_value = "/tmp/plugins-test"
+
+        # Schema-invalid: repos list contains entries without the expected `repo_id`
+        # key. The cache validator at line 241 must treat this as stale.
+        malformed_cached = {
+            "cached_at": _time.time(),  # fresh-by-time, but bad schema
+            "response": {"repos": [{"wrong_key": "no_repo_id_here"}]},
+        }
+        live_response = {
+            "repos": [
+                {
+                    "repo_id": "live-repo",
+                    "name": "Live",
+                    "icon": "",
+                    "path": "https://example.com/live.json",
+                }
+            ]
+        }
+
+        live_api_called = []
+
+        def _init(handler_self, **kwargs):
+            _plugins_mock_initialize(handler_self, **kwargs)
+            handler_self.session.get_installation_uuid.return_value = "uuid-test"
+            handler_self.session.get_supporter_level.return_value = "free"
+
+            def _api_get(*args, **kwargs):
+                live_api_called.append((args, kwargs))
+                return (live_response, 200)
+
+            handler_self.session.api_get.side_effect = _api_get
+
+        with (
+            patch.object(ApiPluginsHandler, "initialize", _init),
+            patch.object(ApiPluginsHandler, "_read_json_file", return_value=malformed_cached),
+            patch.object(ApiPluginsHandler, "_write_json_file"),
+        ):
+            resp = self.get_json("/plugins/repos/community")
+        assert resp.code == 200
+        # The key assertion: the malformed cache MUST have been discarded and the
+        # live API path MUST have been hit (i.e. the live api_get was called).
+        assert live_api_called, "malformed cache was served instead of being discarded"
+
+    @patch(PLUGIN_REPOS_MIXIN + ".os.path.exists", return_value=True)
+    @patch(PLUGIN_REPOS_MIXIN + ".compresso_config")
     def test_get_community_repos_stale_cache_falls_through_to_api(self, mock_cfg, mock_exists):
         """Stale cache falls through to the live API call (lines 243, 249-265)."""
         mock_cfg.Config.return_value.get_plugins_path.return_value = "/tmp/plugins-test"
