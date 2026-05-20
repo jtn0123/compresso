@@ -1,3 +1,10 @@
+## [1.10.11](https://github.com/jtn0123/compresso/compare/v1.10.10...v1.10.11) (2026-05-20)
+
+
+### Bug Fixes
+
+* ten code-quality and small-bug fixes across frontend and backend ([#115](https://github.com/jtn0123/compresso/issues/115)) ([e943d79](https://github.com/jtn0123/compresso/commit/e943d79ec83c602d4db17f90cb05a3294f83c17f)), closes [#1](https://github.com/jtn0123/compresso/issues/1)
+
 ## [1.10.10](https://github.com/jtn0123/compresso/compare/v1.10.9...v1.10.10) (2026-05-20)
 
 
