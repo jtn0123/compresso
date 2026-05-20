@@ -131,8 +131,9 @@ class TestGenerateSwaggerFile:
         errors = generate_swagger_file()
         assert isinstance(errors, list)
         assert len(errors) == 0
-        # Should write both JSON and YAML files
-        assert mock_open.call_count == 2
+        # Only the JSON spec is written now — the unused .yaml sidecar
+        # was removed in v2.0-prep.
+        assert mock_open.call_count == 1
 
 
 @pytest.mark.unittest
@@ -145,6 +146,11 @@ class TestSwaggerConstants:
 
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_security_spec_contains_basic_auth(self):
+        # OPENAPI_SPEC_SECURITY is a Python dict now (was a YAML string
+        # parsed at import time). Walk into the structure rather than
+        # relying on string containment.
         from compresso.webserver.api_v2.schema.swagger import OPENAPI_SPEC_SECURITY
 
-        assert "BasicAuth" in OPENAPI_SPEC_SECURITY
+        assert "BasicAuth" in OPENAPI_SPEC_SECURITY["components"]["securitySchemes"]
+        assert OPENAPI_SPEC_SECURITY["components"]["securitySchemes"]["BasicAuth"]["scheme"] == "basic"
+        assert {"BasicAuth": []} in OPENAPI_SPEC_SECURITY["security"]

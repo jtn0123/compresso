@@ -31,7 +31,6 @@ Copyright:
 
 import random
 
-from compresso import config
 from compresso.libs.unmodels import Tags
 from compresso.libs.unmodels.workergroups import WorkerGroups
 from compresso.libs.unmodels.workerschedules import WorkerSchedules
@@ -185,6 +184,10 @@ class WorkerGroup:
         configured_worker_groups = WorkerGroups.select()
 
         if not configured_worker_groups:
+            # v2.0: no legacy top-level number_of_workers / worker_event_schedules
+            # to migrate from. New installs start with a single default
+            # worker group; the user configures workers through worker
+            # groups directly.
             default_worker_group = {
                 "id": 1,
                 "locked": False,
@@ -194,20 +197,8 @@ class WorkerGroup:
                 "tags": [],
                 "worker_event_schedules": [],
             }
-
-            # Migrate default worker data from
-            settings = config.Config()
-            if settings.number_of_workers is not None:
-                default_worker_group["number_of_workers"] = settings.number_of_workers
-                if settings.worker_event_schedules is not None:
-                    default_worker_group["worker_event_schedules"] = settings.worker_event_schedules
-
-                # Disable the legacy settings
-                settings.set_config_item("number_of_workers", None, save_settings=True)
-                settings.set_config_item("worker_event_schedules", None, save_settings=True)
-
-                WorkerGroup.create(default_worker_group)
-                return [default_worker_group]
+            WorkerGroup.create(default_worker_group)
+            return [default_worker_group]
 
         # Loop over results
         worker_groups = []

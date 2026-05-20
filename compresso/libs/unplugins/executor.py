@@ -307,37 +307,18 @@ class PluginExecutor:
                     return True
                 return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
-            def has_required_positional_after_data():
-                positional = []
-                for param in params.values():
-                    if param.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
-                        positional.append(param)
-                # First positional is expected to be `data`
-                remaining = positional[1:]
-                return any(param.default is inspect._empty for param in remaining)
-
+            # v2.0: kwargs-only plugin runner contract. Plugins must accept
+            # `task_data_store` and/or `file_metadata` as keyword arguments
+            # (or **kwargs). The legacy positional-args fallback was
+            # removed; any plugin still using positional helpers will now
+            # raise TypeError, which surfaces as a clean run failure via
+            # the broad except below.
             kwargs = {}
             if supports_kwarg("task_data_store"):
                 kwargs["task_data_store"] = TaskDataStore
             if supports_kwarg("file_metadata"):
                 kwargs["file_metadata"] = CompressoFileMetadata
-
-            if kwargs and not has_required_positional_after_data():
-                runner(data, **kwargs)
-            else:
-                # TODO(v2.0): Remove backward compatibility for legacy positional helper args
-                self.logger.warning(
-                    "Plugin '%s' runner '%s' is using legacy positional helper args. "
-                    "Please update to keyword args (task_data_store, file_metadata).",
-                    plugin_id,
-                    plugin_runner,
-                )
-                if len(params) >= 3:
-                    runner(data, TaskDataStore, CompressoFileMetadata)
-                elif len(params) >= 2:
-                    runner(data, TaskDataStore)
-                else:
-                    runner(data)
+            runner(data, **kwargs)
 
             run_successfully = True
         except Exception:

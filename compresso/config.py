@@ -111,11 +111,6 @@ class Config(metaclass=SingletonType):
         self.remote_installations = []
         self.distributed_worker_count_target = 0
 
-        # Legacy config
-        # TODO(v2.0): Remove legacy number_of_workers and worker_event_schedules fields
-        self.number_of_workers = None
-        self.worker_event_schedules = None
-
         # Approval workflow settings
         self.approval_required = False
         self.staging_path = os.path.join(home_directory, _APP_DIR_NAME, "staging")
@@ -176,8 +171,6 @@ class Config(metaclass=SingletonType):
         self.enable_library_scanner = False if self.enable_library_scanner is None else self.enable_library_scanner
         self.run_full_scan_on_start = False if self.run_full_scan_on_start is None else self.run_full_scan_on_start
         self.concurrent_file_testers = int(self.concurrent_file_testers or 2)
-        if self.number_of_workers is None:
-            self.number_of_workers = self.get_default_worker_cap()
 
     def get_config_as_dict(self):
         """
@@ -517,22 +510,6 @@ class Config(metaclass=SingletonType):
         :return:
         """
         return self.log_path
-
-    def get_number_of_workers(self):
-        """
-        Get setting - number_of_workers
-
-        :return:
-        """
-        return self.number_of_workers
-
-    def get_worker_event_schedules(self):
-        """
-        Get setting - worker_event_schedules
-
-        :return:
-        """
-        return self.worker_event_schedules
 
     def get_enable_library_scanner(self):
         """

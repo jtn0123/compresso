@@ -23,9 +23,10 @@ def test_safe_defaults_enabled_by_default():
 
     settings = config.Config(config_path=config_path)
 
+    # v2.0: number_of_workers is no longer a top-level setting; the only
+    # top-level worker-related default that remains is default_worker_cap.
     assert settings.get_large_library_safe_defaults() is True
     assert settings.get_default_worker_cap() == 2
-    assert settings.get_number_of_workers() == 2
 
 
 @pytest.mark.unittest
@@ -36,7 +37,6 @@ def test_safe_defaults_can_be_disabled_from_config_file():
         json.dump(
             {
                 "large_library_safe_defaults": False,
-                "number_of_workers": None,
             },
             infile,
         )
@@ -44,7 +44,6 @@ def test_safe_defaults_can_be_disabled_from_config_file():
     settings = config.Config(config_path=config_path)
 
     assert settings.get_large_library_safe_defaults() is False
-    assert settings.get_number_of_workers() is None
 
 
 @pytest.mark.unittest
@@ -70,12 +69,13 @@ def test_settings_file_overrides_environment_but_constructor_args_override_both(
 
 @pytest.mark.unittest
 def test_safe_defaults_only_fill_unset_values():
+    """Verify that values explicitly set in settings.json are not
+    overwritten by `__apply_large_library_safe_defaults`."""
     reset_singletons()
     config_path = tempfile.mkdtemp(prefix="compresso_tests_config_")
     with open(os.path.join(config_path, "settings.json"), "w") as infile:
         json.dump(
             {
-                "number_of_workers": 6,
                 "concurrent_file_testers": 4,
             },
             infile,
@@ -83,7 +83,6 @@ def test_safe_defaults_only_fill_unset_values():
 
     settings = config.Config(config_path=config_path)
 
-    assert settings.get_number_of_workers() == 6
     assert settings.get_concurrent_file_testers() == 4
 
 

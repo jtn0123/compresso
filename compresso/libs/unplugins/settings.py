@@ -77,20 +77,11 @@ class PluginSettings:
                 raise Exception(f"Library ID needs to be an integer. You have provided '{self.library_id}'") from None
 
     def __get_plugin_settings_file(self, force_library_settings=False):
-        plugin_directory = self.get_plugin_directory()
         profile_directory = self.get_profile_directory()
-        # Legacy migration: move settings.json from plugin dir to profile dir
-        # TODO(v2.0): Remove this migration shim
-        if not os.path.exists(os.path.join(profile_directory, _SETTINGS_FILENAME)) and os.path.exists(
-            os.path.join(plugin_directory, _SETTINGS_FILENAME)
-        ):  # noqa: E501 — long path condition; splitting reduces readability
-            import shutil
-
-            shutil.move(
-                os.path.join(plugin_directory, _SETTINGS_FILENAME),
-                os.path.join(profile_directory, _SETTINGS_FILENAME),
-            )
-        # If provided with a library ID, then the settings file will be different
+        # The legacy migration that moved settings.json from the plugin
+        # directory to the profile directory has been removed in
+        # v2.0-prep. Anyone still running a pre-migration build needs to
+        # move plugin settings.json manually before upgrading.
         plugin_settings_file = os.path.join(profile_directory, _SETTINGS_FILENAME)
         if self.library_id:
             plugin_settings_file = os.path.join(profile_directory, f"settings.{self.library_id}.json")
