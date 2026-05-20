@@ -11,7 +11,6 @@ Unit tests for compresso.libs.file_operation_tracker.FileOperationTracker:
 """
 
 import logging
-import os
 from unittest.mock import MagicMock
 
 import pytest
