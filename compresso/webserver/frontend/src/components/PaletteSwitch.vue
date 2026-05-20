@@ -1,9 +1,11 @@
 <template>
-  <q-btn flat round dense icon="palette" color="grey-5">
-    <q-tooltip>Color palette</q-tooltip>
+  <q-btn flat round dense icon="palette" color="grey-5" aria-label="Color palette">
+    <q-tooltip>{{ $t('components.paletteSwitch.tooltip') }}</q-tooltip>
     <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
       <q-list dense style="min-width: 140px">
-        <q-item-label header class="text-caption text-weight-medium q-pb-xs">Palette</q-item-label>
+        <q-item-label header class="text-caption text-weight-medium q-pb-xs">
+          {{ $t('components.paletteSwitch.header') }}
+        </q-item-label>
         <q-item
           v-for="name in paletteNames"
           :key="name"

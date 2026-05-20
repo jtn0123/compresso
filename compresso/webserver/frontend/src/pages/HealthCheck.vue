@@ -132,7 +132,16 @@
               <span class="text-h6">{{ workerCount }}</span>
             </div>
             <div class="col-auto">
-              <q-btn flat round dense icon="add" size="sm" :disable="workerCount >= 16" @click="changeWorkerCount(1)" />
+              <q-btn
+                flat
+                round
+                dense
+                icon="add"
+                size="sm"
+                aria-label="Add library"
+                :disable="workerCount >= 16"
+                @click="changeWorkerCount(1)"
+              />
             </div>
           </div>
 
@@ -288,7 +297,15 @@
                     @click="recheckFile(props.row)"
                     :loading="props.row._checking"
                   />
-                  <q-btn flat round dense icon="info" size="sm" @click="showFileInfo(props.row.abspath)" />
+                  <q-btn
+                    flat
+                    round
+                    dense
+                    icon="info"
+                    size="sm"
+                    aria-label="Library details"
+                    @click="showFileInfo(props.row.abspath)"
+                  />
                 </q-td>
               </template>
             </q-table>

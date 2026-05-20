@@ -301,13 +301,37 @@
           <!-- Actions -->
           <q-td key="actions" :props="props" class="text-center">
             <template v-if="$q.screen.gt.xs">
-              <q-btn flat dense color="positive" icon="check" size="sm" @click.stop="approveSingle(props.row.id)">
+              <q-btn
+                flat
+                dense
+                color="positive"
+                icon="check"
+                size="sm"
+                aria-label="Approve"
+                @click.stop="approveSingle(props.row.id)"
+              >
                 <q-tooltip>{{ $t('pages.approvalQueue.tooltipApprove') }}</q-tooltip>
               </q-btn>
-              <q-btn flat dense color="negative" icon="close" size="sm" @click.stop="rejectSingle(props.row.id)">
+              <q-btn
+                flat
+                dense
+                color="negative"
+                icon="close"
+                size="sm"
+                aria-label="Reject"
+                @click.stop="rejectSingle(props.row.id)"
+              >
                 <q-tooltip>{{ $t('pages.approvalQueue.tooltipReject') }}</q-tooltip>
               </q-btn>
-              <q-btn flat dense color="info" icon="info" size="sm" @click.stop="showDetail(props.row.id)">
+              <q-btn
+                flat
+                dense
+                color="info"
+                icon="info"
+                size="sm"
+                aria-label="Details"
+                @click.stop="showDetail(props.row.id)"
+              >
                 <q-tooltip>{{ $t('pages.approvalQueue.tooltipDetails') }}</q-tooltip>
               </q-btn>
             </template>

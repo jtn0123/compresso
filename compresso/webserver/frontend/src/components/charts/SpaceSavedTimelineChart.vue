@@ -2,7 +2,7 @@
   <q-card>
     <q-card-section>
       <div class="row items-center">
-        <div class="text-h6 col">Space Saved Over Time</div>
+        <div class="text-h6 col">{{ $t('charts.spaceSavedTimeline.title') }}</div>
         <q-btn-toggle
           v-model="interval"
           toggle-color="primary"

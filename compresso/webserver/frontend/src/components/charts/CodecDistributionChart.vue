@@ -1,7 +1,7 @@
 <template>
   <q-card>
     <q-card-section>
-      <div class="text-h6">Codec Distribution</div>
+      <div class="text-h6">{{ $t('charts.codecDistribution.title') }}</div>
     </q-card-section>
     <q-card-section v-if="loading" class="text-center">
       <q-spinner-dots size="40px" color="primary" />
@@ -9,11 +9,11 @@
     <q-card-section v-else>
       <div class="row q-col-gutter-md">
         <div class="col-12 col-md-6">
-          <div class="text-subtitle2 text-center q-mb-sm">Source Codecs</div>
+          <div class="text-subtitle2 text-center q-mb-sm">{{ $t('charts.codecDistribution.sourceCodecs') }}</div>
           <canvas ref="sourceChartRef" aria-label="Source codec distribution chart"></canvas>
         </div>
         <div class="col-12 col-md-6">
-          <div class="text-subtitle2 text-center q-mb-sm">Destination Codecs</div>
+          <div class="text-subtitle2 text-center q-mb-sm">{{ $t('charts.codecDistribution.destinationCodecs') }}</div>
           <canvas ref="destChartRef" aria-label="Destination codec distribution chart"></canvas>
         </div>
       </div>

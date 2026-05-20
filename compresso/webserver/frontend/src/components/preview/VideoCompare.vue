@@ -228,13 +228,13 @@
           />
           <!-- Snapshot Button -->
           <q-btn flat round icon="photo_camera" :disable="playing" @click="takeSnapshot">
-            <q-tooltip>Take snapshot (paused only)</q-tooltip>
+            <q-tooltip>{{ $t('components.videoCompare.snapshotTooltip') }}</q-tooltip>
           </q-btn>
           <!-- Keyboard Shortcuts Button -->
           <q-btn flat round icon="keyboard">
             <q-menu>
               <q-list dense style="min-width: 220px">
-                <q-item-label header>Keyboard Shortcuts</q-item-label>
+                <q-item-label header>{{ $t('components.videoCompare.keyboardShortcutsHeader') }}</q-item-label>
                 <q-item v-for="sc in shortcutList" :key="sc.key">
                   <q-item-section side>
                     <q-badge color="grey-8" text-color="white">{{ sc.key }}</q-badge>

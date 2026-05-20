@@ -30,9 +30,26 @@
         <!-- Worker count control -->
         <div class="row items-center q-gutter-sm q-mb-sm">
           <span class="text-caption text-grey">{{ $t('healthCheckPanel.workers') }}:</span>
-          <q-btn dense flat round size="sm" icon="remove" @click="changeWorkerCount(-1)" :disable="workerCount <= 0" />
+          <q-btn
+            dense
+            flat
+            round
+            size="sm"
+            icon="remove"
+            aria-label="Decrease worker count"
+            @click="changeWorkerCount(-1)"
+            :disable="workerCount <= 0"
+          />
           <span class="text-weight-medium">{{ workerCount }}</span>
-          <q-btn dense flat round size="sm" icon="add" @click="changeWorkerCount(1)" />
+          <q-btn
+            dense
+            flat
+            round
+            size="sm"
+            icon="add"
+            aria-label="Increase worker count"
+            @click="changeWorkerCount(1)"
+          />
         </div>
 
         <!-- Health summary -->
@@ -47,9 +64,18 @@
           {{ $t('healthCheckPanel.noData') }}
         </div>
         <div v-else class="row q-gutter-sm">
-          <q-badge color="positive" :label="(summary.healthy || 0) + ' healthy'" />
-          <q-badge v-if="summary.warning > 0" color="warning" text-color="dark" :label="summary.warning + ' warning'" />
-          <q-badge v-if="summary.corrupted > 0" color="negative" :label="summary.corrupted + ' corrupted'" />
+          <q-badge color="positive" :label="$t('healthCheckPanel.healthyCount', { count: summary.healthy || 0 })" />
+          <q-badge
+            v-if="summary.warning > 0"
+            color="warning"
+            text-color="dark"
+            :label="$t('healthCheckPanel.warningCount', { count: summary.warning })"
+          />
+          <q-badge
+            v-if="summary.corrupted > 0"
+            color="negative"
+            :label="$t('healthCheckPanel.corruptedCount', { count: summary.corrupted })"
+          />
         </div>
 
         <div class="q-mt-sm">
