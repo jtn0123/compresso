@@ -1,4 +1,20 @@
 {
+  "a11y": {
+    "logoAlt": "Compresso",
+    "repoIconAlt": "{name} icon",
+    "colorPalette": "Color palette",
+    "notifications": "Notifications",
+    "close": "Close",
+    "approve": "Approve",
+    "reject": "Reject",
+    "details": "Details",
+    "decreaseWorkerCount": "Decrease worker count",
+    "increaseWorkerCount": "Increase worker count",
+    "editChannel": "Edit channel",
+    "deleteChannel": "Delete channel",
+    "addLibrary": "Add library",
+    "libraryDetails": "Library details"
+  },
   "systemStatus": {
     "title": "System",
     "cpu": "CPU",

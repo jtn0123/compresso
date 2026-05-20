@@ -4,7 +4,7 @@
       <q-bar class="bg-primary text-white">
         <div class="text-subtitle1">{{ $t('components.fileInfo.title') }}</div>
         <q-space />
-        <q-btn dense flat icon="close" aria-label="Close" @click="hide" />
+        <q-btn dense flat icon="close" :aria-label="$t('a11y.close')" @click="hide" />
       </q-bar>
 
       <q-card-section v-if="loading" class="text-center q-pa-xl">

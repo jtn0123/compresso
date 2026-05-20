@@ -1,5 +1,5 @@
 <template>
-  <q-btn flat round dense icon="palette" color="grey-5" aria-label="Color palette">
+  <q-btn flat round dense icon="palette" color="grey-5" :aria-label="$t('a11y.colorPalette')">
     <q-tooltip>{{ $t('components.paletteSwitch.tooltip') }}</q-tooltip>
     <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
       <q-list dense style="min-width: 140px">

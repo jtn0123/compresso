@@ -36,7 +36,7 @@
             round
             size="sm"
             icon="remove"
-            aria-label="Decrease worker count"
+            :aria-label="$t('a11y.decreaseWorkerCount')"
             @click="changeWorkerCount(-1)"
             :disable="workerCount <= 0"
           />
@@ -47,7 +47,7 @@
             round
             size="sm"
             icon="add"
-            aria-label="Increase worker count"
+            :aria-label="$t('a11y.increaseWorkerCount')"
             @click="changeWorkerCount(1)"
           />
         </div>

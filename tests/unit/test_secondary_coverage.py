@@ -1324,6 +1324,8 @@ class TestGetCommunityReposWithCache(ApiTestBase):
         ):
             resp = self.get_json("/plugins/repos/community")
         assert resp.code == 200
+        data = self.parse_response(resp)
+        assert data["repos"][0]["repo_id"] == "live-repo"
         # The key assertion: the malformed cache MUST have been discarded and the
         # live API path MUST have been hit (i.e. the live api_get was called).
         assert live_api_called, "malformed cache was served instead of being discarded"

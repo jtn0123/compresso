@@ -138,7 +138,7 @@
                 dense
                 icon="add"
                 size="sm"
-                aria-label="Add library"
+                :aria-label="$t('a11y.addLibrary')"
                 :disable="workerCount >= 16"
                 @click="changeWorkerCount(1)"
               />
@@ -303,7 +303,7 @@
                     dense
                     icon="info"
                     size="sm"
-                    aria-label="Library details"
+                    :aria-label="$t('a11y.libraryDetails')"
                     @click="showFileInfo(props.row.abspath)"
                   />
                 </q-td>

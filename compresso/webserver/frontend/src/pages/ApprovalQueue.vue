@@ -307,7 +307,7 @@
                 color="positive"
                 icon="check"
                 size="sm"
-                aria-label="Approve"
+                :aria-label="$t('a11y.approve')"
                 @click.stop="approveSingle(props.row.id)"
               >
                 <q-tooltip>{{ $t('pages.approvalQueue.tooltipApprove') }}</q-tooltip>
@@ -318,7 +318,7 @@
                 color="negative"
                 icon="close"
                 size="sm"
-                aria-label="Reject"
+                :aria-label="$t('a11y.reject')"
                 @click.stop="rejectSingle(props.row.id)"
               >
                 <q-tooltip>{{ $t('pages.approvalQueue.tooltipReject') }}</q-tooltip>
@@ -329,7 +329,7 @@
                 color="info"
                 icon="info"
                 size="sm"
-                aria-label="Details"
+                :aria-label="$t('a11y.details')"
                 @click.stop="showDetail(props.row.id)"
               >
                 <q-tooltip>{{ $t('pages.approvalQueue.tooltipDetails') }}</q-tooltip>

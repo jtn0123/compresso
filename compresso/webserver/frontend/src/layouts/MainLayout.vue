@@ -16,7 +16,7 @@
         <!-- Logo (always visible, clickable to dashboard) -->
         <q-btn flat round dense size="sm" @click="$router.push('/ui/dashboard')" class="q-mr-xs">
           <q-avatar rounded size="22px">
-            <img src="~assets/compresso-logo-white.png" alt="Compresso" />
+            <img src="~assets/compresso-logo-white.png" :alt="$t('a11y.logoAlt')" />
           </q-avatar>
         </q-btn>
 
@@ -36,7 +36,7 @@
             round
             icon="notifications"
             size="sm"
-            aria-label="Notifications"
+            :aria-label="$t('a11y.notifications')"
             @click="toggleNotificationsDrawer"
           >
             <q-badge
