@@ -7,6 +7,10 @@ peewee_migrate==1.15.0
 psutil==7.2.2
 requests==2.34.2
 requests_toolbelt==1.0.0
+# Pinned to address CVE-2026-44431 / CVE-2026-44432 (fixed in 2.7.0).
+# requests only constrains urllib3<3,>=1.26, so the resolver was free to
+# install the older 2.6.3, which Trivy flags during the Docker image scan.
+urllib3==2.7.0
 py-cpuinfo==9.0.0
 JSON-log-formatter==1.1.1
 xxhash==3.6.0
