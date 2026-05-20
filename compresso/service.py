@@ -210,7 +210,7 @@ class RootService:
                         vms_bytes=vms_bytes,
                     )
                 except Exception as e:
-                    self.logger.warning(f"Resource logging failed: {e}")
+                    self.logger.warning("Resource logging failed: %s", e)
                     time.sleep(5)
                     continue
 
@@ -325,10 +325,10 @@ class RootService:
         self.logger.info("Stopping all threads")
         self.event.set()
         for thread in self.threads:
-            self.logger.info(f"Sending thread {thread['name']} abort signal")
+            self.logger.info("Sending thread %s abort signal", thread["name"])
             thread["thread"].stop()
         for thread in self.threads:
-            self.logger.info(f"Waiting for thread {thread['name']} to stop")
+            self.logger.info("Waiting for thread %s to stop", thread["name"])
             thread["thread"].join(10)
             if thread["thread"].is_alive():
                 self.logger.error("WORKER_THREAD_STOP_TIMEOUT name=%s", thread["name"])
@@ -344,7 +344,7 @@ class RootService:
             pass
 
     def sig_handle(self, signum, frame):
-        self.logger.info(f"Received {signum}")
+        self.logger.info("Received %s", signum)
         self.stop()
 
     def stop(self):
