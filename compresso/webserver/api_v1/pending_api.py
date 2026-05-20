@@ -30,7 +30,6 @@ Copyright:
 """
 
 import json
-import os
 
 import tornado.escape
 
@@ -162,56 +161,18 @@ class ApiPendingHandler(BaseApiHandler):
 
         return task_handler.reorder_tasks(pending_task_ids, direction)
 
-    def add_tasks_to_pending_tasks_list(self, *args, **kwargs):
-        """
-        TODO: Add the given list of tasks to the pending task list
-
-        :param args:
-        :param kwargs:
-        :return:
-        """
-
     def create_task_from_path(self, *args, **kwargs):
         """
-        Generate a Task object from a pathname
-
-        :param pathname:
-        :return:
+        v1 endpoint kept for route-compatibility only. The implementation
+        was never completed and the rewrite landed on the v2 API. Returns
+        501 Not Implemented and points callers at the v2 equivalent.
         """
-        try:
-            request_dict = json.loads(self.request.body)
-        except (json.JSONDecodeError, ValueError):
-            self.write(json.dumps({"success": False}))
-            return
-
-        # Validate and resolve path to prevent path traversal
-        raw_path = request_dict.get("path", "")
-        if not raw_path or "\x00" in str(raw_path):
-            self.write(json.dumps({"success": False}))
-            return
-        abspath = os.path.realpath(raw_path)
-        # Ensure the resolved path is under a valid filesystem root
-        drive, _ = os.path.splitdrive(abspath)
-        fs_root = drive + os.sep if drive else os.sep
-        if not abspath.startswith(fs_root):
-            self.write(json.dumps({"success": False}))
-            return
-
-        # Ensure path exists
-        if not os.path.exists(abspath):
-            self.write(json.dumps({"success": False}))
-            return
-
-        self.write(json.dumps({"success": False}))
-        return
-        # TODO: Clean up FFmpeg code. Add this feature to v2 API without it
-        # # Create a new task
-        # new_task = task.Task()
-        # # Run a probe on the file for current data
-        # source_data = common.fetch_file_data_by_path(abspath)
-        # if not new_task.create_task_by_absolute_path(abspath, self.config, source_data):
-        #     # If file exists in task queue already this will return false.
-        #     # Do not carry on.
-        #     self.write(json.dumps({"success": False}))
-        #     return
-        # self.write(json.dumps({"success": True}))
+        self.set_status(501)
+        self.write(
+            json.dumps(
+                {
+                    "success": False,
+                    "error": "v1 /api/v1/pending/add/ is not implemented; use POST /compresso/api/v2/pending/add",
+                }
+            )
+        )

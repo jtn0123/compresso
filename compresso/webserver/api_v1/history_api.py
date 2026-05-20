@@ -70,8 +70,19 @@ class ApiHistoryHandler(BaseApiHandler):
         self.action_route()
 
     def fetch_by_id(self, *args, **kwargs):
-        # TODO: add ability to fetch by id
-        pass
+        """
+        v1 endpoint kept for route-compatibility only. Fetch-by-id was
+        never implemented and the supported surface is v2 going forward.
+        """
+        self.set_status(501)
+        self.write(
+            json.dumps(
+                {
+                    "success": False,
+                    "error": "v1 /api/v1/history/id/<id> is not implemented; use the v2 history API",
+                }
+            )
+        )
 
     def manage_historic_tasks_list(self, *args, **kwargs):
         request_dict = json.loads(self.request.body)

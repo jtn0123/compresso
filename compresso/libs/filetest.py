@@ -154,7 +154,8 @@ class FileTest:
         except Exception as e:
             self.logger.debug("Codec pre-filter unexpected error for '%s': %s", path, str(e))
 
-        # TODO: Remove this
+        # Per-directory .compressoignore lockfile — users can opt files out
+        # of processing without modifying server config.
         if self.file_in_compresso_ignore_lockfile(path):
             file_issues.append(
                 {

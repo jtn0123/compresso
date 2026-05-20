@@ -31,6 +31,7 @@ Copyright:
 
 from . import audio_codecs, subtitle_codecs, video_codecs
 from .lib import cli
+from .probe import Probe
 
 
 class Info:
@@ -54,13 +55,13 @@ class Info:
 
     def file_probe(self, vid_file_path):
         """
-        Probe media file and return result dictionary
+        Probe a media file and return the result dictionary.
 
-        :param vid_file_path:
-        :return:
+        Thin compatibility wrapper around :class:`Probe`. New code
+        should call ``Probe.file(path)`` directly; this stays on
+        ``Info`` so existing callers keep working.
         """
-        # TODO: Move this to a new "Probe" class
-        return cli.ffprobe_file(vid_file_path)
+        return Probe.file(vid_file_path)
 
     def get_available_ffmpeg_encoders(self):
         """
