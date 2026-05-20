@@ -1,3 +1,10 @@
+## [1.10.12](https://github.com/jtn0123/compresso/compare/v1.10.11...v1.10.12) (2026-05-20)
+
+
+### Bug Fixes
+
+* a11y + i18n sweep, lazy logging, and ~36 new tests (closes 30-item audit) ([#116](https://github.com/jtn0123/compresso/issues/116)) ([5862fe7](https://github.com/jtn0123/compresso/commit/5862fe7399fa6f3f4e652fcdae1984b7a186e322))
+
 ## [1.10.11](https://github.com/jtn0123/compresso/compare/v1.10.10...v1.10.11) (2026-05-20)
 
 
