@@ -145,6 +145,7 @@
     "saved": "Saved.",
     "installed": "Installed.",
     "copied": "Copied",
+    "failedToCopy": "Failed to copy to clipboard.",
     "backendConnectionWarning": "Unable to connect to Compresso backend. Please check that it is running.",
     "failedToFetchLoginUrl": "Failed to get login URL.",
     "failedToFetchLogoutUrl": "Failed to get logout URL.",

@@ -326,7 +326,15 @@ class PluginsHandler(metaclass=SingletonType):
         return return_list
 
     def read_remote_changelog_file(self, changelog_url):
-        r = requests.get(changelog_url, timeout=1)
+        # A 1s timeout is aggressive enough that transient network blips
+        # would otherwise crash the caller (changelog fetches are
+        # best-effort UI metadata). Treat any RequestException the same
+        # as a non-200 response.
+        try:
+            r = requests.get(changelog_url, timeout=1)
+        except requests.exceptions.RequestException as e:
+            self.logger.debug("Failed to fetch remote changelog from %s: %s", changelog_url, e)
+            return ""
         if r.status_code == 200:
             return r.text
         return ""

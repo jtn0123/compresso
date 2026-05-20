@@ -110,7 +110,15 @@ const copyJson = () => {
       })
     })
     .catch(() => {
-      // fail
+      // copyToClipboard rejects when the browser blocks the Clipboard
+      // API (insecure context, denied permission, etc). Surface that
+      // instead of leaving the user wondering why nothing happened.
+      $q.notify({
+        color: 'negative',
+        position: 'top',
+        message: t('notifications.failedToCopy'),
+        timeout: 1500,
+      })
     })
 }
 

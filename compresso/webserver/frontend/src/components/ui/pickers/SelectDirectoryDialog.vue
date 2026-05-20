@@ -15,8 +15,8 @@
         <q-card-section class="q-pa-none">
           <q-list bordered padding>
             <q-item
-              v-for="(directory, index) in directories"
-              :key="index"
+              v-for="directory in directories"
+              :key="directory.full_path"
               clickable
               v-ripple
               @click="fetchDirectoryListing(directory.full_path)"

@@ -89,6 +89,32 @@ describe('updateCompressoNotifications', () => {
   })
 })
 
+describe('getCompressoVersion', () => {
+  beforeEach(() => {
+    compressoGlobals.$compresso.version = undefined
+    vi.clearAllMocks()
+  })
+
+  it('resolves with the version from the API on success', async () => {
+    axios.mockResolvedValueOnce({ data: { version: '9.9.9-test' } })
+    await expect(compressoGlobals.getCompressoVersion()).resolves.toBe('9.9.9-test')
+    expect(compressoGlobals.$compresso.version).toBe('9.9.9-test')
+  })
+
+  it('returns the cached version on subsequent calls without hitting the API', async () => {
+    compressoGlobals.$compresso.version = '1.2.3-cached'
+    await expect(compressoGlobals.getCompressoVersion()).resolves.toBe('1.2.3-cached')
+    expect(axios).not.toHaveBeenCalled()
+  })
+
+  it('rejects when the API call fails (does not hang)', async () => {
+    // Regression test: previously the missing .catch let the promise
+    // hang forever on network errors, leaving callers stuck.
+    axios.mockRejectedValueOnce(new Error('Network error'))
+    await expect(compressoGlobals.getCompressoVersion()).rejects.toThrow('Network error')
+  })
+})
+
 // ------------------------------------------------------------------
 // Toast notifications
 // ------------------------------------------------------------------
