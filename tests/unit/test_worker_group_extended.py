@@ -9,7 +9,6 @@ Covers error paths, edge cases, schedule management, setters/getters.
 
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -286,17 +285,17 @@ class TestWorkerGroupExtended:
         assert len(name) > 0
 
     @pytest.mark.unittest
-    def test_get_all_worker_groups_empty_with_legacy_settings(self):
-        """When no groups exist and legacy settings are present, creates default."""
+    def test_get_all_worker_groups_empty_creates_default(self):
+        """When no groups exist, get_all_worker_groups seeds a single
+        default group with 0 workers. The legacy migration that copied
+        top-level number_of_workers/worker_event_schedules from Config
+        was removed in v2.0-prep, so no settings mock is needed."""
         from compresso.libs.worker_group import WorkerGroup
 
-        mock_settings = MagicMock()
-        mock_settings.number_of_workers = 4
-        mock_settings.worker_event_schedules = []
-        with patch("compresso.libs.worker_group.config.Config", return_value=mock_settings):
-            result = WorkerGroup.get_all_worker_groups()
+        result = WorkerGroup.get_all_worker_groups()
         assert len(result) == 1
-        assert result[0]["number_of_workers"] == 4
+        assert result[0]["number_of_workers"] == 0
+        assert result[0]["worker_event_schedules"] == []
 
     @pytest.mark.unittest
     def test_create_schedules_static(self):

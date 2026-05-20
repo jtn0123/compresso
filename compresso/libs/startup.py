@@ -162,6 +162,26 @@ def validate_startup_environment(settings):
     _ensure_writable_dir(cache_path, "cache path", create=True)
 
 
+def _sum_worker_groups_count():
+    """Sum ``number_of_workers`` across all configured worker groups.
+
+    Imported lazily so this module stays import-free of peewee for
+    callers that only need the readiness helpers above. The body is
+    wrapped in a broad try so the startup summary still renders if
+    the worker-group DB isn't queryable yet (e.g. mid-migration or
+    transient lock).
+    """
+    try:
+        from compresso.libs.worker_group import WorkerGroup
+
+        total = 0
+        for wg in WorkerGroup.get_all_worker_groups():
+            total += int(wg.get("number_of_workers", 0) or 0)
+        return total
+    except Exception:
+        return 0
+
+
 def build_startup_summary(settings, event_monitor_module):
     ffmpeg_info = _validate_ffmpeg()
     return {
@@ -171,7 +191,9 @@ def build_startup_summary(settings, event_monitor_module):
         "enable_library_scanner": settings.get_enable_library_scanner(),
         "run_full_scan_on_start": settings.get_run_full_scan_on_start(),
         "concurrent_file_testers": settings.get_concurrent_file_testers(),
-        "worker_count": settings.get_number_of_workers(),
+        # v2.0: workers are per-group, not a top-level setting. Sum across
+        # configured worker groups for the startup-summary metric.
+        "worker_count": _sum_worker_groups_count(),
         "event_monitor_active": bool(event_monitor_module),
         "safe_defaults": settings.get_large_library_safe_defaults(),
         "ffmpeg_version": ffmpeg_info.get("version"),

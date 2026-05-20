@@ -33,7 +33,6 @@ import importlib
 import json
 import os
 
-import yaml
 from apispec import APISpec
 from apispec.exceptions import APISpecError
 from apispec.ext.marshmallow import MarshmallowPlugin
@@ -42,15 +41,23 @@ from compresso.webserver.api_v2 import list_all_handlers
 from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
 
 API_VERSION = "2"
-OPENAPI_SPEC_SECURITY = """
-components:
-  securitySchemes:
-    BasicAuth:
-      type: http
-      scheme: basic
-security:
-  - BasicAuth: []
-"""
+
+# Equivalent of the previous YAML-string-then-yaml.safe_load() approach.
+# Keeping this as a Python dict drops the yaml parse from this hot path
+# and removes the only runtime YAML dependency in this module.
+OPENAPI_SPEC_SECURITY = {
+    "components": {
+        "securitySchemes": {
+            "BasicAuth": {
+                "type": "http",
+                "scheme": "basic",
+            },
+        },
+    },
+    "security": [
+        {"BasicAuth": []},
+    ],
+}
 
 
 def find_all_handlers():
@@ -78,7 +85,6 @@ def generate_swagger_file():
 
     # Starting to generate Swagger spec file. All the relevant
     # information can be found from here https://apispec.readthedocs.io/
-    security_settings = yaml.safe_load(OPENAPI_SPEC_SECURITY)
     spec = APISpec(
         title="Compresso API",
         version=str(API_VERSION),
@@ -91,7 +97,7 @@ def generate_swagger_file():
                 "description": "Current environment",
             },
         ],
-        **security_settings,
+        **OPENAPI_SPEC_SECURITY,
     )
     # Looping through all the handlers and trying to register them.
     # Handlers without docstring will raise errors. That's why we
@@ -103,11 +109,10 @@ def generate_swagger_file():
         except APISpecError as e:
             errors.append(f"API Docs - Failed to append spec path - {str(e)}")
 
-    # Write the Swagger file into specified location.
+    # Write the Swagger file into specified location. JSON is the only
+    # consumed format — tornado_api_doc reads `.json`, so the previous
+    # `.yaml` sidecar was unused and has been removed.
     with open(f"{file_location}.json", "w", encoding="utf-8") as file:
         json.dump(spec.to_dict(), file, ensure_ascii=False, indent=4)
-    # TODO: Remove YAML. It sucks!
-    with open(f"{file_location}.yaml", "w", encoding="utf-8") as file:
-        file.write(spec.to_yaml())
 
     return errors

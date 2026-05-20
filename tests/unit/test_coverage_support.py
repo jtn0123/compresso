@@ -301,6 +301,8 @@ def test_swagger_helpers_find_handlers_and_generate_files(fake_apispec, tmp_path
 
     assert len(errors) == 1
     assert "Failed to append spec path" in errors[0]
+    # The .yaml sidecar was removed in v2.0-prep; only the consumed .json
+    # spec is generated now.
     output_base = tmp_path / "docs" / "api_schema_v2"
     assert (output_base.with_suffix(".json")).exists()
-    assert (output_base.with_suffix(".yaml")).exists()
+    assert not (output_base.with_suffix(".yaml")).exists()

@@ -101,11 +101,12 @@ class UIServer(threading.Thread):
         self.developer = developer
         self.data_queues = compresso_data_queues
         self.inotifytasks = compresso_data_queues["inotifytasks"]
-        # TODO: Move all logic out of template calling to foreman.
-        #  Create methods here to handle the calls and rename to foreman
-        self.foreman = foreman
         self.set_logging()
-        # Add a singleton for handling the data queues for sending data to compresso's other processes
+        # Add a singleton for handling the data queues for sending data to compresso's other processes.
+        # All consumers (websocket, workers_api, helpers.workers) read
+        # foreman from CompressoRunningThreads — UIServer doesn't need a
+        # local reference. The TODO that asked to "move all logic out of
+        # template calling to foreman" was resolved by this indirection.
         udq = CompressoDataQueues()
         udq.set_compresso_data_queues(compresso_data_queues)
         urt = CompressoRunningThreads()

@@ -229,28 +229,15 @@ class PluginType:
                     return True
                 return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
+            # v2.0: kwargs-only plugin runner contract (matches executor.py).
+            # Legacy positional fallback removed; non-conforming plugins
+            # will raise TypeError, surfaced as a clean test-data error.
             kwargs = {}
             if supports_kwarg("task_data_store"):
                 kwargs["task_data_store"] = TaskDataStore
             if supports_kwarg("file_metadata"):
                 kwargs["file_metadata"] = CompressoFileMetadata
-
-            if kwargs:
-                plugin_runner_function(test_data_copy, **kwargs)
-            else:
-                # TODO(v2.0): Remove backward compatibility for legacy positional helper args
-                self.logger.warning(
-                    "Plugin '%s' runner '%s' is using legacy positional helper args. "
-                    "Please update to keyword args (task_data_store, file_metadata).",
-                    plugin_id,
-                    plugin_runner,
-                )
-                if len(params) >= 3:
-                    plugin_runner_function(test_data_copy, TaskDataStore, CompressoFileMetadata)
-                elif len(params) >= 2:
-                    plugin_runner_function(test_data_copy, TaskDataStore)
-                else:
-                    plugin_runner_function(test_data_copy)
+            plugin_runner_function(test_data_copy, **kwargs)
             # break loop if the plugin did not request to be run again
             if not test_data_copy.get("repeat", False):
                 break
