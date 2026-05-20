@@ -1,3 +1,10 @@
+## [1.10.10](https://github.com/jtn0123/compresso/compare/v1.10.9...v1.10.10) (2026-05-20)
+
+
+### Bug Fixes
+
+* security vulns, dep bumps (ESLint 9 + mypy 2), and dogfood bug fixes ([#114](https://github.com/jtn0123/compresso/issues/114)) ([5911948](https://github.com/jtn0123/compresso/commit/59119480933595a71151562a5b23f856c8a043cf))
+
 ## [1.10.9](https://github.com/jtn0123/compresso/compare/v1.10.8...v1.10.9) (2026-04-08)
 
 
