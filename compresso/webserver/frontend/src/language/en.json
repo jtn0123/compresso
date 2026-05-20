@@ -1,4 +1,20 @@
 {
+  "a11y": {
+    "logoAlt": "Compresso",
+    "repoIconAlt": "{name} icon",
+    "colorPalette": "Color palette",
+    "notifications": "Notifications",
+    "close": "Close",
+    "approve": "Approve",
+    "reject": "Reject",
+    "details": "Details",
+    "decreaseWorkerCount": "Decrease worker count",
+    "increaseWorkerCount": "Increase worker count",
+    "editChannel": "Edit channel",
+    "deleteChannel": "Delete channel",
+    "addLibrary": "Add library",
+    "libraryDetails": "Library details"
+  },
   "systemStatus": {
     "title": "System",
     "cpu": "CPU",
@@ -28,6 +44,19 @@
     "notAvailable": "N/A",
     "utilizationDatasetLabel": "{name} Utilization",
     "temperatureDatasetLabel": "{name} Temp"
+  },
+  "charts": {
+    "resolutionDistribution": {
+      "title": "Resolution Distribution"
+    },
+    "codecDistribution": {
+      "title": "Codec Distribution",
+      "sourceCodecs": "Source Codecs",
+      "destinationCodecs": "Destination Codecs"
+    },
+    "spaceSavedTimeline": {
+      "title": "Space Saved Over Time"
+    }
   },
   "queueEta": {
     "estCompletion": "Est. completion",
@@ -87,7 +116,10 @@
     "viewDetails": "View Health Check",
     "fetchError": "Failed to load health check status",
     "workerCountFailed": "Failed to update worker count",
-    "noData": "No health data"
+    "noData": "No health data",
+    "healthyCount": "{count} healthy",
+    "warningCount": "{count} warning",
+    "corruptedCount": "{count} corrupted"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -278,6 +310,24 @@
       "thisInstallation": "This installation",
       "centralLink": "Compresso Central",
       "initError": "Error initializing SharedLinkDropdown"
+    },
+    "paletteSwitch": {
+      "tooltip": "Color palette",
+      "header": "Palette"
+    },
+    "themeSwitch": {
+      "lightMode": "Light mode",
+      "darkMode": "Dark mode"
+    },
+    "fileInfo": {
+      "title": "File Info",
+      "probing": "Probing file...",
+      "formatLabel": "Format",
+      "formatCaption": "Container and general file info"
+    },
+    "videoCompare": {
+      "snapshotTooltip": "Take snapshot (paused only)",
+      "keyboardShortcutsHeader": "Keyboard Shortcuts"
     },
     "settings": {
       "pleaseEnterAValidNumber": "Please enter a valid number",
@@ -635,6 +685,7 @@
       "removePlugin": "Remove Plugin",
       "installPluginFromRepo": "Install Plugin From Repo",
       "installPluginFromFile": "Install Plugin From File",
+      "uploadZipLabel": "Upload ZIP file...",
       "categoryFilter": "Category Filter",
       "author": "Author",
       "version": "Version",

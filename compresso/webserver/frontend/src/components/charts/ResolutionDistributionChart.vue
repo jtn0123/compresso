@@ -1,7 +1,7 @@
 <template>
   <q-card>
     <q-card-section>
-      <div class="text-h6">Resolution Distribution</div>
+      <div class="text-h6">{{ $t('charts.resolutionDistribution.title') }}</div>
     </q-card-section>
     <q-card-section v-if="loading" class="text-center">
       <q-spinner-dots size="40px" color="primary" />

@@ -2,14 +2,14 @@
   <q-dialog v-model="dialogVisible" persistent maximized transition-show="slide-up" transition-hide="slide-down">
     <q-card>
       <q-bar class="bg-primary text-white">
-        <div class="text-subtitle1">File Info</div>
+        <div class="text-subtitle1">{{ $t('components.fileInfo.title') }}</div>
         <q-space />
-        <q-btn dense flat icon="close" @click="hide" />
+        <q-btn dense flat icon="close" :aria-label="$t('a11y.close')" @click="hide" />
       </q-bar>
 
       <q-card-section v-if="loading" class="text-center q-pa-xl">
         <q-spinner-gears size="50px" color="primary" />
-        <div class="q-mt-md text-caption">Probing file...</div>
+        <div class="q-mt-md text-caption">{{ $t('components.fileInfo.probing') }}</div>
       </q-card-section>
 
       <q-card-section v-if="error" class="text-center q-pa-xl">
@@ -19,7 +19,12 @@
 
       <q-card-section v-if="!loading && !error && fileInfo" class="q-pa-md">
         <!-- Format Info -->
-        <q-expansion-item default-opened icon="info" label="Format" caption="Container and general file info">
+        <q-expansion-item
+          default-opened
+          icon="info"
+          :label="$t('components.fileInfo.formatLabel')"
+          :caption="$t('components.fileInfo.formatCaption')"
+        >
           <q-card>
             <q-card-section>
               <div class="row q-col-gutter-sm">

@@ -16,7 +16,7 @@
         <!-- Logo (always visible, clickable to dashboard) -->
         <q-btn flat round dense size="sm" @click="$router.push('/ui/dashboard')" class="q-mr-xs">
           <q-avatar rounded size="22px">
-            <img src="~assets/compresso-logo-white.png" />
+            <img src="~assets/compresso-logo-white.png" :alt="$t('a11y.logoAlt')" />
           </q-avatar>
         </q-btn>
 
@@ -30,7 +30,15 @@
         <div class="row items-center no-wrap q-gutter-xs">
           <PaletteSwitch class="gt-xs" />
           <ThemeSwitch class="gt-xs" />
-          <q-btn dense flat round icon="notifications" size="sm" @click="toggleNotificationsDrawer">
+          <q-btn
+            dense
+            flat
+            round
+            icon="notifications"
+            size="sm"
+            :aria-label="$t('a11y.notifications')"
+            @click="toggleNotificationsDrawer"
+          >
             <q-badge
               v-if="notificationsCount > 0"
               color="red"

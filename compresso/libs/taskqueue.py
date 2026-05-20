@@ -49,7 +49,7 @@ def build_tasks_count_query(status):
     Return a 0 if no tasks exist for the given status.
     Return a count >= 1 if any tasks exist for the given status.
 
-    # TODO: look into peewee dynamic query building (surly this exists)
+    # TODO: look into peewee dynamic query building (surely this exists)
 
     :param status:
     :return:

@@ -7,7 +7,9 @@
     :color="compressoDarkMode ? 'amber-4' : 'grey-7'"
     @click="toggleMode"
   >
-    <q-tooltip>{{ compressoDarkMode ? 'Light mode' : 'Dark mode' }}</q-tooltip>
+    <q-tooltip>{{
+      compressoDarkMode ? $t('components.themeSwitch.lightMode') : $t('components.themeSwitch.darkMode')
+    }}</q-tooltip>
   </q-btn>
 </template>
 

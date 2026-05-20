@@ -36,7 +36,7 @@
           <!-- ICON -->
           <q-item-section avatar top class="q-mt-sm">
             <q-avatar rounded size="50px">
-              <img :src="repo.icon || repo.owner_avatar" />
+              <img :src="repo.icon || repo.owner_avatar" :alt="$t('a11y.repoIconAlt', { name: repo.name })" />
             </q-avatar>
           </q-item-section>
 

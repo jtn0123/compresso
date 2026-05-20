@@ -62,10 +62,25 @@
                       >
                         <q-tooltip>{{ $t('pages.settingsNotifications.sendTest') }}</q-tooltip>
                       </q-btn>
-                      <q-btn flat dense icon="edit" size="sm" @click="editChannel(channel)">
+                      <q-btn
+                        flat
+                        dense
+                        icon="edit"
+                        size="sm"
+                        :aria-label="$t('a11y.editChannel')"
+                        @click="editChannel(channel)"
+                      >
                         <q-tooltip>{{ $t('tooltips.configure') }}</q-tooltip>
                       </q-btn>
-                      <q-btn flat dense icon="delete" color="negative" size="sm" @click="confirmDelete(channel)">
+                      <q-btn
+                        flat
+                        dense
+                        icon="delete"
+                        color="negative"
+                        size="sm"
+                        :aria-label="$t('a11y.deleteChannel')"
+                        @click="confirmDelete(channel)"
+                      >
                         <q-tooltip>{{ $t('tooltips.delete') }}</q-tooltip>
                       </q-btn>
                     </div>

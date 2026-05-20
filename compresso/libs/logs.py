@@ -931,7 +931,7 @@ class CompressoLogging:
         # Adjust stream handler level
         if instance.stream_handler:
             instance.stream_handler.setLevel(logging.DEBUG if debugging else logging.INFO)
-            instance._logger.info(f"Stream logging set to {'DEBUG' if debugging else 'INFO'}")
+            instance._logger.info("Stream logging set to %s", "DEBUG" if debugging else "INFO")
 
     @staticmethod
     def update_stream_formatter(formatter):

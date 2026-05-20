@@ -20,7 +20,7 @@
                     <q-uploader
                       :style="$q.platform.is.mobile ? 'max-width: 210px' : 'max-width: 300px'"
                       :url="getUploadUrl()"
-                      label="Upload ZIP file..."
+                      :label="$t('components.plugins.uploadZipLabel')"
                       color="secondary"
                       accept=".zip, application/zip"
                       auto-upload
@@ -75,7 +75,7 @@
               <q-item-label lines="1">
                 <div class="row">
                   <div class="col-6 text-right">
-                    <span class="text-weight-medium">Author</span>
+                    <span class="text-weight-medium">{{ $t('components.plugins.author') }}</span>
                   </div>
                   <div class="col-6 q-px-sm">
                     <span :class="$q.dark.isActive && !plugin.status.update_available ? 'text-grey-5' : 'text-grey-8'">
@@ -87,7 +87,7 @@
               <q-item-label lines="1">
                 <div class="row">
                   <div class="col-6 text-right">
-                    <span class="text-weight-medium">Version</span>
+                    <span class="text-weight-medium">{{ $t('components.plugins.version') }}</span>
                   </div>
                   <div class="col-6 q-px-sm">
                     <span :class="$q.dark.isActive && !plugin.status.update_available ? 'text-grey-5' : 'text-grey-8'">

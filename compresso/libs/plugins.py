@@ -150,7 +150,7 @@ class PluginsHandler(metaclass=SingletonType):
         )
         if status_code == 401:
             # Something is wrong with registration. Let's resend it and try again.
-            self.logger.debug(f"Plugin repo returned a request to register. Code:{status_code}")
+            self.logger.debug("Plugin repo returned a request to register. Code:%s", status_code)
             session.register_compresso()
             data, status_code = session.api_get(
                 "compresso-api",
@@ -158,7 +158,7 @@ class PluginsHandler(metaclass=SingletonType):
                 api_path,
             )
         if status_code >= 500:
-            self.logger.debug(f"Failed to fetch plugin repo from '{api_path}'. Code:{status_code}")
+            self.logger.debug("Failed to fetch plugin repo from '%s'. Code:%s", api_path, status_code)
         return data
 
     def update_plugin_repos(self):
@@ -503,7 +503,7 @@ class PluginsHandler(metaclass=SingletonType):
         if os.path.exists(os.path.join(str(plugin_directory), ".git")):
             raise Exception("Plugin directory contains a git repository. Uninstall this source version before installing.")
         # Extract zip file contents
-        self.logger.debug(f"Extracting plugin to '{plugin_directory}'")
+        self.logger.debug("Extracting plugin to '%s'", plugin_directory)
         with zipfile.ZipFile(zip_file, "r") as zip_ref:
             zip_ref.extractall(str(plugin_directory))
         # Read plugin info

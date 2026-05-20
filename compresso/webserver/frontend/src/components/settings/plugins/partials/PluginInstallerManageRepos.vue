@@ -55,7 +55,7 @@
             <q-item-section avatar>
               <q-skeleton v-if="!repo.icon" type="QAvatar" />
               <q-avatar v-else rounded>
-                <img :src="repo.icon" />
+                <img :src="repo.icon" :alt="$t('a11y.repoIconAlt', { name: repo.name })" />
               </q-avatar>
             </q-item-section>
 
@@ -107,7 +107,7 @@
           <div class="column items-center">
             <q-skeleton v-if="!repo.icon" width="72px" height="72px" />
             <q-avatar v-else rounded size="72px">
-              <img :src="repo.icon" />
+              <img :src="repo.icon" :alt="$t('a11y.repoIconAlt', { name: repo.name })" />
             </q-avatar>
 
             <q-btn
