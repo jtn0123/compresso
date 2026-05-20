@@ -35,6 +35,7 @@ from . import audio_codecs, containers, exceptions, subtitle_codecs, video_codec
 from .audio_codec_handle import AudioCodecHandle
 from .hardware_acceleration_handle import HardwareAccelerationHandle
 from .info import Info
+from .probe import Probe
 from .subtitle_handle import SubtitleHandle
 from .video_codec_handle import VideoCodecHandle
 
@@ -47,6 +48,7 @@ __all__ = (
     "subtitle_codecs",
     "video_codecs",
     "Info",
+    "Probe",
     "AudioCodecHandle",
     "HardwareAccelerationHandle",
     "SubtitleHandle",

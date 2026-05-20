@@ -173,12 +173,20 @@ class TestHistoryHandler:
             result = handler.delete_historic_tasks([1, 2])
         assert result is True
 
-    def test_fetch_by_id_is_noop(self):
+    def test_fetch_by_id_returns_501(self):
         from compresso.webserver.api_v1.history_api import ApiHistoryHandler
 
         handler = ApiHistoryHandler.__new__(ApiHistoryHandler)
-        # fetch_by_id is a pass/TODO - should not raise
+        handler.set_status = MagicMock()
+        handler.write = MagicMock()
         handler.fetch_by_id()
+        handler.set_status.assert_called_once_with(501)
+        written = json.loads(handler.write.call_args[0][0])
+        assert written["success"] is False
+        # Body must say "not implemented" AND keep pointing callers at v2 —
+        # a future change that drops the v2 migration hint should fail here.
+        assert "not implemented" in written["error"].lower()
+        assert "v2" in written["error"].lower()
 
 
 @pytest.mark.unittest
@@ -203,11 +211,20 @@ class TestPendingHandler:
             result = handler.reorder_pending_tasks([1], "top")
         assert result == 1
 
-    def test_add_tasks_is_noop(self):
+    def test_create_task_from_path_returns_501(self):
         from compresso.webserver.api_v1.pending_api import ApiPendingHandler
 
         handler = ApiPendingHandler.__new__(ApiPendingHandler)
-        handler.add_tasks_to_pending_tasks_list()
+        handler.set_status = MagicMock()
+        handler.write = MagicMock()
+        handler.create_task_from_path()
+        handler.set_status.assert_called_once_with(501)
+        written = json.loads(handler.write.call_args[0][0])
+        assert written["success"] is False
+        # Body must say "not implemented" AND point to the v2 endpoint —
+        # regressions that drop the migration path will fail here.
+        assert "not implemented" in written["error"].lower()
+        assert "/compresso/api/v2/pending/add" in written["error"]
 
 
 @pytest.mark.unittest
