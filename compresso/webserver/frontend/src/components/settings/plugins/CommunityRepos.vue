@@ -64,7 +64,17 @@
             <q-btn round flat dense color="secondary" icon="add_circle" @click="addRepo(repo)">
               <q-tooltip>{{ $t('tooltips.addRepository') }}</q-tooltip>
             </q-btn>
-            <q-btn round flat dense color="grey" icon="open_in_new" type="a" :href="repo.html_url" target="_blank">
+            <q-btn
+              round
+              flat
+              dense
+              color="grey"
+              icon="open_in_new"
+              type="a"
+              :href="repo.html_url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <q-tooltip>{{ $t('tooltips.viewOnGithub') }}</q-tooltip>
             </q-btn>
           </q-item-section>

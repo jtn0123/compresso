@@ -110,10 +110,16 @@ export default {
         axios({
           method: 'get',
           url: getCompressoApiUrl('v2', 'version/read'),
-        }).then((response) => {
-          $compresso.version = response.data.version
-          resolve($compresso.version)
         })
+          .then((response) => {
+            $compresso.version = response.data.version
+            resolve($compresso.version)
+          })
+          .catch((err) => {
+            // Without this catch the promise would hang forever on
+            // network errors; mirrors how the sibling getters reject.
+            reject(err)
+          })
       } else {
         resolve($compresso.version)
       }

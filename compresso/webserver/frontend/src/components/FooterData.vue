@@ -6,13 +6,19 @@
     <div class="row q-mt-lg items-center">
       <div class="col q-ml-lg">
         <p class="text-subtitle2 footer-text">
-          <a class="footer-link" target="_blank" href="https://github.com/jtn0123/compresso">Compresso</a>
+          <a class="footer-link" target="_blank" rel="noopener noreferrer" href="https://github.com/jtn0123/compresso"
+            >Compresso</a
+          >
           &mdash; Media Library Optimizer
         </p>
       </div>
       <div class="col-auto q-mr-lg">
         <p class="text-subtitle2 footer-text">
-          <a class="footer-link" target="_blank" href="https://github.com/jtn0123/compresso/releases"
+          <a
+            class="footer-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://github.com/jtn0123/compresso/releases"
             >v{{ compressoVersion }}</a
           >
         </p>
@@ -23,16 +29,26 @@
 
 <script>
 import compressoGlobals from 'src/js/compressoGlobals'
+import { createLogger } from 'src/composables/useLogger'
 import { onMounted, ref } from 'vue'
+
+const log = createLogger('FooterData')
 
 export default {
   setup() {
     const compressoVersion = ref('UNSET')
 
     function updateVersion() {
-      compressoGlobals.getCompressoVersion().then((version) => {
-        compressoVersion.value = version
-      })
+      compressoGlobals
+        .getCompressoVersion()
+        .then((version) => {
+          compressoVersion.value = version
+        })
+        .catch((err) => {
+          // Leave the placeholder ('UNSET') visible but at least
+          // surface the failure to the console.
+          log.error('Failed to fetch version', err)
+        })
     }
 
     onMounted(() => {

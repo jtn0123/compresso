@@ -56,8 +56,8 @@
       <div class="q-gutter-sm">
         <q-list bordered separator class="rounded-borders">
           <q-item
-            v-for="(plugin, index) in listedPlugins"
-            :key="index"
+            v-for="plugin in listedPlugins"
+            :key="plugin.id"
             :class="plugin.status.update_available ? 'bg-warning' : ''"
           >
             <q-item-section avatar>
