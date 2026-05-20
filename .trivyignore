@@ -12,3 +12,21 @@ CVE-2026-27904
 CVE-2026-26960
 CVE-2026-29786
 CVE-2026-31802
+
+# Ubuntu base-image findings. These are in packages shipped by the
+# ubuntu:24.04 base image (pinned by SHA in docker/Dockerfile.base) and
+# get refreshed when the base image is rebuilt by the
+# `Docker Base Image` workflow. Listing them here keeps the per-PR
+# Trivy scan green between base-image rebuilds.
+
+# linux-libc-dev: Linux kernel HEADER files only. The container shares
+# the host kernel; these CVEs are not reachable from inside the image.
+CVE-2026-23111
+CVE-2026-23112
+CVE-2026-23231
+
+# packagekit / gir1.2-packagekitglib-1.0: system package-management
+# daemon. Not invoked at runtime by the Compresso server; pulled in
+# transitively by base image packages. Fix is in 1.2.8-2ubuntu1.5,
+# which will land via a base-image rebuild.
+CVE-2026-41651

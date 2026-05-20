@@ -15,8 +15,13 @@ class RateLimiter:
     """
     Sliding window rate limiter keyed by IP address.
 
-    Default: 60 requests/minute for normal endpoints.
-    Strict: 5 requests/minute for expensive endpoints.
+    Default: 300 requests/minute for normal endpoints. The default bucket is
+    shared across every non-expensive endpoint for a given IP, so it must be
+    high enough for a single dashboard page load (which legitimately fires
+    dozens of API calls) plus normal navigation. A lower limit caused
+    spurious 429s on startup.
+    Strict: 5 requests/minute for expensive endpoints (scan/preview), which
+    is what actually guards against abuse.
 
     SECURITY NOTE: Rate limiting is keyed by request.remote_ip. If Tornado's
     xheaders option is ever enabled (e.g. behind a reverse proxy), clients can
@@ -25,7 +30,7 @@ class RateLimiter:
     configuring trusted proxy validation.
     """
 
-    DEFAULT_LIMIT = 60
+    DEFAULT_LIMIT = 300
     DEFAULT_WINDOW = 60  # seconds
     STRICT_LIMIT = 5
     STRICT_WINDOW = 60
