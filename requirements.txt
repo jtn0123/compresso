@@ -12,7 +12,7 @@ requests_toolbelt==1.0.0
 # install the older 2.6.3, which Trivy flags during the Docker image scan.
 urllib3==2.7.0
 py-cpuinfo==9.0.0
-JSON-log-formatter==1.1.1
+JSON-log-formatter==1.2.1
 xxhash==3.6.0
 
 # Optional requirements
