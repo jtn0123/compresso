@@ -25,7 +25,7 @@ jobs:
 
     steps:
       # Fetch shallow git repository
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Restore test video's cache
       - name: Restore test videos cache
@@ -112,7 +112,7 @@ jobs:
         working-directory: compresso/webserver/frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -139,7 +139,7 @@ jobs:
     steps:
       # Fetch full git repository
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Checkout tags
       - name: Fetch tags
@@ -242,7 +242,7 @@ jobs:
       build_arm64: ${{ steps.prepare.outputs.build_arm64 }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -321,7 +321,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -412,7 +412,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -504,7 +504,7 @@ jobs:
     steps:
       # Fetch shallow git repository
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Fetch all artifacts
       - name: Download Artifact
