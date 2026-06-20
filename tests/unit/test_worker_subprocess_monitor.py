@@ -502,9 +502,11 @@ class TestGetSubprocessElapsed:
     def test_exception_returns_cached(self, monitor):
         monitor.subprocess_elapsed = 77
         monitor.subprocess = MagicMock()
-        # Force an exception by making time.time raise
-        with patch(MODULE + ".time.time", side_effect=RuntimeError("boom")):
-            result = monitor.get_subprocess_elapsed()
+        # Force an exception inside the try block via non-numeric arithmetic.
+        # (Patching time.time would also break logging.LogRecord on Python <3.13,
+        # masking the cached-value path we actually want to exercise.)
+        monitor.subprocess_start_time = "not-a-number"
+        result = monitor.get_subprocess_elapsed()
 
         assert result == 77
 

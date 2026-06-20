@@ -126,7 +126,7 @@ SQLite can report "database is locked" under heavy concurrent access. Compresso 
 
 ## License and Contribution
 
-This projected is licensed under the GPL version 3.
+This project is licensed under the GPL version 3.
 
 Copyright (C) Josh Sunnex - All Rights Reserved
 
