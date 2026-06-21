@@ -17,10 +17,10 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.18.0",
-    "axios": "^1.16.1",
+    "axios": "^1.18.0",
     "chart.js": "^4.5.1",
     "core-js": "^3.49.0",
-    "dompurify": "^3.4.5",
+    "dompurify": "^3.4.11",
     "js-bbcode-parser": "^3.0.5",
     "quasar": "^2.19.3",
     "remarkable": "^2.0.1",
