@@ -1,3 +1,11 @@
+// @vitest-environment jsdom
+//
+// DOMPurify's tag/namespace stripping is exercised here against a
+// spec-compliant DOM. happy-dom (the default test environment) has a
+// parsing quirk that leaves disallowed elements like <iframe>, SVG <use>,
+// and <foreignObject> in place under DOMPurify >= 3.4.11, even though real
+// browsers (and jsdom) strip them. Pin this file to jsdom so the assertions
+// reflect production behavior.
 import { describe, it, expect } from 'vitest'
 import { sanitizeHtml } from '../sanitize'
 
