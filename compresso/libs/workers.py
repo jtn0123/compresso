@@ -598,7 +598,7 @@ class Worker(threading.Thread):
             return
         os.remove(file_in_abs)
 
-    def __move_final_output_to_cache(self, current_file_out, cache_directory, original_abspath, task_cache_path):
+    def __move_final_output_to_cache(self, current_file_out, cache_directory, original_abspath, fallback_cache_path):
         """
         Move the final worker output to the task cache path for the postprocessor.
 
@@ -606,9 +606,13 @@ class Worker(threading.Thread):
         the output to preserve the source) a copy is made instead of a move, so the
         original is never relocated out from under the library.
 
-        :return: tuple of (success: bool, task_cache_path: str). On failure the
-                 incoming ``task_cache_path`` is returned unchanged.
+        :param fallback_cache_path: Cache path to return unchanged if the move fails
+                                    before a fresh cache path can be resolved.
+        :return: tuple of (success: bool, task_cache_path: str).
         """
+        # Start from the caller's cache path; resolve a fresh one once the final
+        # extension is known. Kept as a local so the parameter is never reassigned.
+        task_cache_path = fallback_cache_path
         try:
             # Set the new file out as the extension may have changed
             split_file_name = os.path.splitext(current_file_out)
