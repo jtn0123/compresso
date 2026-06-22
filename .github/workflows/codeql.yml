@@ -1,0 +1,63 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    # Weekly on Saturday at 04:00 UTC (after the other weekly CI schedules)
+    - cron: "0 4 * * 6"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload results to the GitHub code scanning dashboard.
+      security-events: write
+      # Required to read the repository contents during checkout/analysis.
+      contents: read
+      # Required by the CodeQL action to read the Actions metadata.
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Initialize the CodeQL tools for scanning.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          languages: ${{ matrix.language }}
+          # Interpreted languages need no compilation; skip autobuild entirely.
+          build-mode: ${{ matrix.build-mode }}
+          # Exclude vendored / generated frontend build output and test fixtures
+          # so analysis focuses on first-party source.
+          config: |
+            paths-ignore:
+              - compresso/webserver/public
+              - compresso/webserver/frontend/dist
+              - compresso/webserver/frontend/node_modules
+              - tests/support_
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          category: "/language:${{ matrix.language }}"
