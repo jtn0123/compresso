@@ -36,7 +36,7 @@ import tornado.log
 from compresso.libs import session
 from compresso.libs.library import Library
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.pending_schemas import (
     PendingTasksSchema,
     PendingTasksTableResultsSchema,
@@ -199,9 +199,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def delete_pending_tasks(self):
         """
@@ -278,9 +276,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def trigger_library_rescan(self):
         """
@@ -338,9 +334,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def reorder_pending_tasks(self):
         """
@@ -417,9 +411,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def create_task_from_path(self):
         """
@@ -506,9 +498,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def test_task_from_path(self):
         """
@@ -614,9 +604,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_pending_status_of_tasks(self):
         """
@@ -685,9 +673,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def set_pending_status_as_ready(self):
         """
@@ -749,9 +735,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def set_pending_library_by_name(self):
         """
@@ -816,9 +800,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def gen_download_link_pending_task_file(self, task_id=None):
         """
@@ -890,9 +872,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def gen_download_link_pending_task_data(self, task_id=None):
         """
@@ -970,6 +950,4 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

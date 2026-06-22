@@ -37,7 +37,7 @@ from tornado.ioloop import IOLoop
 
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.docs_schemas import DocumentContentSuccessSchema
 from compresso.webserver.helpers import documents
 
@@ -241,9 +241,7 @@ class ApiDocsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_logs_as_zip(self):
         """
@@ -306,6 +304,4 @@ class ApiDocsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

@@ -36,7 +36,7 @@ from peewee import fn
 
 from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.unmodels import CompletedTasks, FileMetadata, FileMetadataPaths
-from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.history_schemas import (
     MetadataSearchResultsSchema,
     RequestMetadataByFingerprintSchema,
@@ -168,9 +168,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_metadata_by_task(self):
         try:
@@ -183,9 +181,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_metadata_by_task_id(self, task_id):
         try:
@@ -196,9 +192,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def _get_metadata_by_task_id(self, task_id):
         try:
@@ -287,9 +281,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def delete_metadata(self):
         try:
@@ -311,9 +303,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_metadata_by_fingerprint(self):
         try:
@@ -360,6 +350,4 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

@@ -34,7 +34,7 @@ import tornado.log
 from compresso import config
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.history_schemas import (
     CompletedTasksLogRequestSchema,
     CompletedTasksLogSchema,
@@ -161,9 +161,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def delete_completed_tasks(self):
         """
@@ -242,9 +240,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def add_completed_tasks_to_pending_list(self):
         """
@@ -332,9 +328,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_completed_task_log(self):
         """
@@ -400,6 +394,4 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
