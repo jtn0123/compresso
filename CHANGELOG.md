@@ -1,3 +1,10 @@
+## [1.10.14](https://github.com/jtn0123/compresso/compare/v1.10.13...v1.10.14) (2026-06-22)
+
+
+### Bug Fixes
+
+* app-wide grade & polish — backend bug fixes, CI coverage gate, a11y/i18n ([#153](https://github.com/jtn0123/compresso/issues/153)) ([126b6c0](https://github.com/jtn0123/compresso/commit/126b6c0e10ff546ab8bbd47c2aae6e4c3773e8b8)), closes [pypa/#action-pypi-publish](https://github.com/jtn0123/compresso/issues/action-pypi-publish)
+
 ## [1.10.13](https://github.com/jtn0123/compresso/compare/v1.10.12...v1.10.13) (2026-06-22)
 
 
