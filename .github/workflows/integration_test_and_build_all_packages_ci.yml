@@ -319,6 +319,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Required for cosign keyless signing via the Sigstore OIDC flow.
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -346,6 +348,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push amd64
+        id: build
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
         with:
           context: .
@@ -355,6 +358,42 @@ jobs:
           tags: ${{ needs.docker_prepare.outputs.ghcr_image }}:build-amd64-${{ github.sha }}
           cache-from: type=gha,scope=docker-amd64
           cache-to: type=gha,scope=docker-amd64,mode=max
+
+      # ---------------------------------------------------------------------
+      # Supply-chain hardening (publish path only).
+      # PR builds push to GHCR with a throwaway build tag but must NOT sign /
+      # attest: forks/PRs have no Sigstore OIDC token, so guard on a real
+      # branch/tag ref (same condition the Docker Hub publish login uses).
+      # ---------------------------------------------------------------------
+      - name: Install cosign
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign amd64 image by digest (keyless)
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        env:
+          IMAGE: ${{ needs.docker_prepare.outputs.ghcr_image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Generate SBOM (SPDX JSON) for amd64 image
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ needs.docker_prepare.outputs.ghcr_image }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-amd64.spdx.json
+          # The action also auto-uploads as an artifact; we upload explicitly
+          # below to control the artifact name and retention.
+          upload-artifact: false
+
+      - name: Upload amd64 SBOM artifact
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-amd64-${{ github.sha }}
+          path: sbom-amd64.spdx.json
+          retention-days: 30
 
       # Smoke test on the amd64 image
       - name: Build local smoke-test image
@@ -410,6 +449,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Required for cosign keyless signing via the Sigstore OIDC flow.
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -437,6 +478,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push arm64
+        id: build
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
         with:
           context: .
@@ -446,6 +488,39 @@ jobs:
           tags: ${{ needs.docker_prepare.outputs.ghcr_image }}:build-arm64-${{ github.sha }}
           cache-from: type=gha,scope=docker-arm64
           cache-to: type=gha,scope=docker-arm64,mode=max
+
+      # ---------------------------------------------------------------------
+      # Supply-chain hardening (publish path only). This job only runs on the
+      # publish path (build_arm64 == 'true' => master/staging/tags), but guard
+      # explicitly to match the amd64 job and stay safe on forks.
+      # ---------------------------------------------------------------------
+      - name: Install cosign
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign arm64 image by digest (keyless)
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        env:
+          IMAGE: ${{ needs.docker_prepare.outputs.ghcr_image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Generate SBOM (SPDX JSON) for arm64 image
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ needs.docker_prepare.outputs.ghcr_image }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-arm64.spdx.json
+          upload-artifact: false
+
+      - name: Upload arm64 SBOM artifact
+        if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-arm64-${{ github.sha }}
+          path: sbom-arm64.spdx.json
+          retention-days: 30
 
   docker_manifest:
     name: Create Docker manifest
