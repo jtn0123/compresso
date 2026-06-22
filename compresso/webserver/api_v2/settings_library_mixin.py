@@ -9,7 +9,7 @@ Mixin providing library configuration endpoints for ApiSettingsHandler.
 import tornado.log
 
 from compresso.libs.library import Library
-from compresso.webserver.api_v2.base_api_handler import BaseApiError
+from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError
 from compresso.webserver.api_v2.schema.settings_schemas import (
     RequestLibraryByIdSchema,
     SettingsLibrariesListSchema,
@@ -75,6 +75,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -175,6 +176,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -244,6 +246,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -311,6 +314,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -374,6 +378,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -443,5 +448,6 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

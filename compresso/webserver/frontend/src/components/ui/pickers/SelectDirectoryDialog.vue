@@ -38,6 +38,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
+import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
@@ -59,6 +60,7 @@ const props = defineProps({
 
 const emit = defineEmits(['hide', 'selected'])
 
+const $q = useQuasar()
 const { t } = useI18n()
 
 const dialogRef = ref(null)
@@ -79,10 +81,14 @@ const fetchDirectoryListing = (path) => {
     method: 'post',
     url: getCompressoApiUrl('v2', 'filebrowser/list'),
     data: data,
-  }).then((response) => {
-    directories.value = response.data.directories
-    files.value = response.data.files
   })
+    .then((response) => {
+      directories.value = response.data.directories
+      files.value = response.data.files
+    })
+    .catch(() => {
+      $q.notify({ type: 'negative', message: t('notifications.failedToListDirectory') })
+    })
 }
 
 const show = () => {

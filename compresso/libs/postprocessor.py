@@ -380,15 +380,26 @@ class PostProcessor(threading.Thread):
 
             dispatcher = ExternalNotificationDispatcher()
             source_data = self.current_task.get_source_data()
-            dest_data = self.current_task.get_destination_data()
+            cache_path = self.current_task.get_cache_path()
+
+            # Source size comes from the task record (the source_data/dest_data dicts
+            # only carry abspath/basename, never a "size" key).
+            source_size = self.current_task.task.source_size or 0
+            # Destination size is the size of the encoded output in the cache path.
+            destination_size = None
+            try:
+                if cache_path and os.path.exists(cache_path):
+                    destination_size = os.path.getsize(cache_path)
+            except OSError:
+                destination_size = None
+
             context = {
                 "file_name": os.path.basename(source_data.get("abspath", "")),
-                "source_size": source_data.get("size"),
-                "destination_size": dest_data.get("size") if dest_data else None,
+                "source_size": source_size or None,
+                "destination_size": destination_size,
             }
             # Include codec from destination metadata if available
             try:
-                cache_path = self.current_task.get_cache_path()
                 if cache_path and os.path.exists(cache_path):
                     meta = extract_media_metadata(cache_path)
                     context["codec"] = meta.get("codec", "")
@@ -396,10 +407,9 @@ class PostProcessor(threading.Thread):
                 pass
             # Include size savings
             try:
-                src_size = self.current_task.task.source_size or 0
-                if src_size > 0 and dest_data and dest_data.get("size"):
-                    saved = src_size - dest_data["size"]
-                    pct = (saved / src_size) * 100
+                if source_size > 0 and destination_size:
+                    saved = source_size - destination_size
+                    pct = (saved / source_size) * 100
                     context["size_saved"] = f"{saved / (1024 * 1024):.1f} MB ({pct:.0f}%)"
             except (AttributeError, TypeError, ZeroDivisionError):
                 pass

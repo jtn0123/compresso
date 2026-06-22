@@ -16,28 +16,38 @@
 import { LocalStorage } from 'quasar'
 import { useI18n } from 'vue-i18n'
 
+// Human-readable labels for known locales.
+// Use ISO codes from table: https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
+const LOCALE_LABELS = {
+  en: 'English',
+  mi: 'Maori/te reo Māori',
+  zh: 'Chinese/中文',
+  nl: 'Dutch/Nederlands',
+  fr: 'French/français',
+  de: 'German/Deutsch',
+  it: 'Italian/Italiano',
+  ja: 'Japanese/日本語',
+  pl: 'Polish/Polskie',
+  'pt-br': 'Portuguese (Brazil)/Português',
+  ru: 'Russian/русский',
+  es: 'Spanish/Español',
+  sv: 'Swedish/Svenska',
+}
+
 export default {
   setup() {
-    const { locale } = useI18n({ useScope: 'global' })
+    const { locale, availableLocales } = useI18n({ useScope: 'global' })
 
-    // Use ISO codes from table: https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
+    // Only offer locales that actually have loaded messages so users can't
+    // pick a language that silently falls back to English.
+    const localeOptions = availableLocales.map((value) => ({
+      value,
+      label: LOCALE_LABELS[value] || value,
+    }))
+
     return {
       locale,
-      localeOptions: [
-        { value: 'en', label: 'English' },
-        { value: 'mi', label: 'Maori/te reo Māori' },
-        { value: 'zh', label: 'Chinese/中文' },
-        { value: 'nl', label: 'Dutch/Nederlands' },
-        { value: 'fr', label: 'French/français' },
-        { value: 'de', label: 'German/Deutsch' },
-        { value: 'it', label: 'Italian/Italiano' },
-        { value: 'ja', label: 'Japanese/日本語' },
-        { value: 'pl', label: 'Polish/Polskie' },
-        { value: 'pt-br', label: 'Portuguese (Brazil)/Português' },
-        { value: 'ru', label: 'Russian/русский' },
-        { value: 'es', label: 'Spanish/Español' },
-        { value: 'sv', label: 'Swedish/Svenska' },
-      ],
+      localeOptions,
     }
   },
   watch: {

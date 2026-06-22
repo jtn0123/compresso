@@ -298,7 +298,7 @@
               <q-skeleton v-if="enabledPlugins === null" type="text" />
 
               <q-list bordered separator class="rounded-borders">
-                <div v-for="(plugin, index) in enabledPlugins" :key="index">
+                <div v-for="(plugin, index) in enabledPlugins" :key="plugin.plugin_id">
                   <q-item>
                     <q-item-section avatar>
                       <q-img :src="plugin.icon" />

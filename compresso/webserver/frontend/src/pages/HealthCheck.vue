@@ -294,6 +294,7 @@
                     dense
                     icon="refresh"
                     size="sm"
+                    :aria-label="$t('a11y.refresh')"
                     @click="recheckFile(props.row)"
                     :loading="props.row._checking"
                   />

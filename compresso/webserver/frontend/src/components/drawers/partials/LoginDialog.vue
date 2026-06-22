@@ -26,7 +26,15 @@
       </p>
       <div class="row justify-center">
         <q-spinner v-if="!userCode" class="text-h3 q-mt-md q-mb-md" />
-        <span v-else class="text-h3 q-mt-md q-mb-md login-code-text" @click="copyUserCode">
+        <span
+          v-else
+          class="text-h3 q-mt-md q-mb-md login-code-text"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('a11y.copyCode')"
+          @click="copyUserCode"
+          @keyup.enter="copyUserCode"
+        >
           {{ userCode }}
           <q-tooltip class="bg-white text-primary no-wrap">
             {{ $t('navigation.copy') }}

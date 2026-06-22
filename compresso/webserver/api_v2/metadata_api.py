@@ -36,7 +36,7 @@ from peewee import fn
 
 from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.unmodels import CompletedTasks, FileMetadata, FileMetadataPaths
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.history_schemas import (
     MetadataSearchResultsSchema,
     RequestMetadataByFingerprintSchema,
@@ -109,6 +109,9 @@ class ApiMetadataHandler(BaseApiHandler):
 
             if limit < 1:
                 limit = 1
+            # Cap the page size so a single request cannot trigger an unbounded query.
+            if limit > 500:
+                limit = 500
             if offset < 0:
                 offset = 0
 
@@ -165,6 +168,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -179,6 +183,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -191,6 +196,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -281,6 +287,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -304,6 +311,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()
 
@@ -352,5 +360,6 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
             self.write_error()

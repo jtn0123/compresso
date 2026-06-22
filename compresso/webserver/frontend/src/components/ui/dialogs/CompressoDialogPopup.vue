@@ -146,6 +146,7 @@
               round
               icon="close"
               color="grey-7"
+              :aria-label="closeTooltip || $t('tooltips.close')"
               :class="{ 'dialog-attention': attentionActive }"
               @click="hide"
             >

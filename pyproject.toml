@@ -3,6 +3,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Require async tests to be explicitly marked so an unmarked `async def test_*`
+# fails loudly rather than being silently skipped.
+asyncio_mode = "strict"
 markers = [
     "unittest: Unit tests.",
     "integrationtest: Integration tests.",

@@ -30,7 +30,7 @@ if (configuredLocale === null) {
 export default boot(({ app }) => {
   const i18n = createI18n({
     legacy: false,
-    locale: 'en',
+    locale: configuredLocale,
     fallbackLocale: 'en',
     silentTranslationWarn: true,
     messages,

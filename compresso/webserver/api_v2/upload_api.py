@@ -220,10 +220,14 @@ class ApiUploadHandler(BaseApiHandler):
             pathname = os.path.join(self.cache_directory, self.meta["filename"])
             task_info = pending_tasks.add_remote_tasks(pathname)
             if not task_info:
+                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to create task for uploaded file")
                 self.write_error()
+                return
 
-            # TODO: Make this optional
-            checksum = common.get_file_checksum(task_info.get("abspath"))
+            # Checksumming reads the whole file, which is expensive for large uploads.
+            # Allow callers to opt out via ?include_checksum=false (defaults to enabled).
+            include_checksum = self.get_query_argument("include_checksum", "true").lower() != "false"
+            checksum = common.get_file_checksum(task_info.get("abspath")) if include_checksum else None
 
             # Return the details of the generated task
             response = self.build_response(

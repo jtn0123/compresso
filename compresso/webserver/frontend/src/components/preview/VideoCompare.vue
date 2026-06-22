@@ -6,8 +6,8 @@
         v-model="viewMode"
         toggle-color="primary"
         :options="[
-          { label: 'Side by Side', value: 'side-by-side' },
-          { label: 'Slider', value: 'slider' },
+          { label: $t('components.videoCompare.sideBySide'), value: 'side-by-side' },
+          { label: $t('components.videoCompare.slider'), value: 'slider' },
         ]"
         dense
         flat
@@ -33,7 +33,7 @@
         <q-card>
           <q-card-section class="q-pb-none">
             <div class="text-subtitle1">
-              Original
+              {{ $t('components.videoCompare.original') }}
               <q-badge class="q-ml-sm">{{ formatBytes(sourceSize) }}</q-badge>
               <q-badge class="q-ml-sm" color="grey">{{ sourceCodec }}</q-badge>
               <q-badge v-if="sourceResolution" class="q-ml-sm" color="grey-7">{{ sourceResolution }}</q-badge>
@@ -72,7 +72,7 @@
         <q-card>
           <q-card-section class="q-pb-none">
             <div class="text-subtitle1">
-              Encoded
+              {{ $t('components.videoCompare.encoded') }}
               <q-badge class="q-ml-sm" color="positive">{{ formatBytes(encodedSize) }}</q-badge>
               <q-badge class="q-ml-sm" color="grey">{{ encodedCodec }}</q-badge>
               <q-badge v-if="encodedResolution" class="q-ml-sm" color="grey-7">{{ encodedResolution }}</q-badge>
@@ -112,12 +112,12 @@
         <q-card-section class="q-pb-none">
           <div class="row">
             <div class="col text-subtitle1">
-              Original
+              {{ $t('components.videoCompare.original') }}
               <q-badge class="q-ml-sm">{{ formatBytes(sourceSize) }}</q-badge>
               <q-badge v-if="sourceResolution" class="q-ml-sm" color="grey-7">{{ sourceResolution }}</q-badge>
             </div>
             <div class="col text-right text-subtitle1">
-              Encoded
+              {{ $t('components.videoCompare.encoded') }}
               <q-badge class="q-ml-sm" color="positive">{{ formatBytes(encodedSize) }}</q-badge>
               <q-badge v-if="encodedResolution" class="q-ml-sm" color="grey-7">{{ encodedResolution }}</q-badge>
             </div>
@@ -243,7 +243,7 @@
                 </q-item>
               </q-list>
             </q-menu>
-            <q-tooltip>Keyboard shortcuts</q-tooltip>
+            <q-tooltip>{{ $t('components.videoCompare.keyboardShortcutsTooltip') }}</q-tooltip>
           </q-btn>
           <q-slider
             v-model="currentTime"
@@ -260,7 +260,7 @@
         </div>
         <div class="row items-center q-mt-xs q-gutter-sm" v-if="scale > 1">
           <q-badge color="info">Zoom: {{ scale.toFixed(1) }}x</q-badge>
-          <q-btn flat dense size="sm" label="Reset Zoom" @click="resetZoom" />
+          <q-btn flat dense size="sm" :label="$t('components.videoCompare.resetZoom')" @click="resetZoom" />
         </div>
       </q-card-section>
     </q-card>
@@ -270,6 +270,7 @@
 <script>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
+import { useI18n } from 'vue-i18n'
 import { formatBytes, formatTime } from 'src/js/formatUtils'
 
 export default {
@@ -288,6 +289,7 @@ export default {
   },
   setup(props) {
     const $q = useQuasar()
+    const { t: $t } = useI18n()
     const rootRef = ref(null)
     const videoError = ref('')
     const sourceVideoRef = ref(null)
@@ -384,7 +386,7 @@ export default {
       const video = event.target
       const src = video ? video.src : 'unknown'
       videoError.value = 'Failed to load video: ' + src
-      $q.notify({ type: 'negative', message: 'Video failed to load. The preview file may have been cleaned up.' })
+      $q.notify({ type: 'negative', message: $t('components.videoCompare.videoLoadFailed') })
     }
 
     function onSourceTimeUpdate() {
@@ -773,7 +775,7 @@ export default {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
-        $q.notify({ type: 'positive', message: 'Snapshot saved' })
+        $q.notify({ type: 'positive', message: $t('components.videoCompare.snapshotSaved') })
       }, 'image/png')
     }
 

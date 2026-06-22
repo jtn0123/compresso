@@ -47,15 +47,14 @@ from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
 
 
 class Worker(threading.Thread):
-    idle = True
-    paused = False
-
-    current_task = None
-    worker_log = None
-    start_time = None
-    finish_time = None
-
-    worker_runners_info: dict = {}
+    # Instance state is initialised in __init__; annotations here avoid the
+    # shared-mutable-default footgun of class-level `{}` / mutable attributes.
+    idle: bool
+    paused: bool
+    worker_log: "deque | None"
+    start_time: "float | None"
+    finish_time: "float | None"
+    worker_runners_info: dict
 
     def __init__(self, thread_id, name, worker_group_id, pending_queue, complete_queue, event):
         super().__init__(name=name)
@@ -63,6 +62,13 @@ class Worker(threading.Thread):
         self.name = name
         self.worker_group_id = worker_group_id
         self.event = event
+
+        self.idle = True
+        self.paused = False
+        self.worker_log = None
+        self.start_time = None
+        self.finish_time = None
+        self.worker_runners_info = {}
 
         self.current_task = None
         self.current_command_ref = None
@@ -403,6 +409,12 @@ class Worker(threading.Thread):
 
                 # if we were told to shut down, mark failure and exit loop
                 if self.redundant_flag.is_set():
+                    # Give the orphaned runner thread a chance to unwind (the subprocess
+                    # monitor terminates any running command) before we abandon it, so it
+                    # cannot keep mutating shared `data`/`worker_log` after we move on.
+                    runner_thread.join(timeout=10)
+                    if runner_thread.is_alive():
+                        self.logger.warning("Plugin runner '%s' did not stop within timeout after worker shutdown", runner_id)
                     self.worker_runners_info[runner_id]["status"] = "complete"
                     self.worker_runners_info[runner_id]["success"] = False
                     overall_success = False

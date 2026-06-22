@@ -2,7 +2,13 @@
   <div>
     <div class="row q-col-gutter-xs">
       <div class="col-6" v-for="stat in mainStats" :key="stat.key">
-        <div class="stat-cell cursor-pointer q-pa-sm text-center" @click="navigateTo(stat.link)">
+        <div
+          class="stat-cell cursor-pointer q-pa-sm text-center"
+          role="button"
+          tabindex="0"
+          @click="navigateTo(stat.link)"
+          @keyup.enter="navigateTo(stat.link)"
+        >
           <q-skeleton v-if="stat.loading" type="text" width="60%" class="q-mx-auto" />
           <div v-else class="text-h6 text-weight-bold">
             {{ stat.value }}
@@ -17,7 +23,10 @@
     <div
       v-if="healthStat"
       class="stat-cell cursor-pointer q-pa-xs q-mt-xs text-center"
+      role="button"
+      tabindex="0"
       @click="navigateTo('/ui/health')"
+      @keyup.enter="navigateTo('/ui/health')"
     >
       <q-skeleton v-if="healthStat.loading" type="text" width="60%" class="q-mx-auto" />
       <div v-else class="row justify-center q-gutter-xs">
@@ -37,7 +46,10 @@
     <div
       v-if="approvalStat && approvalStat.value !== '0'"
       class="stat-cell cursor-pointer q-pa-xs q-mt-xs text-center"
+      role="button"
+      tabindex="0"
       @click="navigateTo('/ui/approval')"
+      @keyup.enter="navigateTo('/ui/approval')"
     >
       <div class="text-subtitle1 text-weight-medium text-warning">{{ approvalStat.value }}</div>
       <div class="text-caption text-grey">{{ approvalStat.label }}</div>

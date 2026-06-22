@@ -78,10 +78,17 @@ export default defineComponent({
   },
   mounted() {
     // Add listeners
-    this.$global.$on('completedTasksShowFailed', () => {
+    this.showFailedHandler = () => {
       this.completedTasksPopupInitStatusFilter = 'failed'
       this.openDetails()
-    })
+    }
+    this.$global.$on('completedTasksShowFailed', this.showFailedHandler)
+  },
+  beforeUnmount() {
+    // Remove listeners to avoid leaking handlers on the global event bus
+    if (this.showFailedHandler) {
+      this.$global.$off('completedTasksShowFailed', this.showFailedHandler)
+    }
   },
   data() {
     return {

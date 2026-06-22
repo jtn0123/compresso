@@ -303,7 +303,7 @@ export default {
             $q.notify({
               color: 'negative',
               position: 'top',
-              message: 'An error was encountered while requesting the selected plugins be disabled',
+              message: $t('components.plugins.failedToDisablePlugins'),
               icon: 'report_problem',
               actions: [{ icon: 'close', color: 'white' }],
             })
@@ -312,7 +312,7 @@ export default {
         $q.notify({
           color: 'warning',
           position: 'top',
-          message: 'Nothing selected',
+          message: $t('components.plugins.nothingSelected'),
           icon: 'report_problem',
           actions: [{ icon: 'close', color: 'white' }],
         })
@@ -338,7 +338,7 @@ export default {
           $q.notify({
             color: 'negative',
             position: 'top',
-            message: 'An error was encountered while requesting the selected plugins be updated',
+            message: $t('components.plugins.failedToUpdatePlugins'),
             icon: 'report_problem',
             actions: [{ icon: 'close', color: 'white' }],
           })
@@ -368,7 +368,7 @@ export default {
           $q.notify({
             color: 'negative',
             position: 'top',
-            message: 'An error was encountered while requesting the selected plugins be removed',
+            message: $t('components.plugins.failedToRemovePlugins'),
             icon: 'report_problem',
             actions: [{ icon: 'close', color: 'white' }],
           })
@@ -393,7 +393,7 @@ export default {
         $q.notify({
           color: 'warning',
           position: 'top',
-          message: 'Nothing selected',
+          message: $t('components.plugins.nothingSelected'),
           icon: 'report_problem',
           actions: [{ icon: 'close', color: 'white' }],
         })
@@ -474,7 +474,7 @@ export default {
           $q.notify({
             color: 'negative',
             position: 'top',
-            message: 'An error was encountered while requesting the installed plugins list',
+            message: $t('components.plugins.failedToFetchInstalledPlugins'),
             icon: 'report_problem',
             actions: [{ icon: 'close', color: 'white' }],
           })
@@ -499,7 +499,7 @@ export default {
         $q.notify({
           color: 'negative',
           position: 'top',
-          message: 'An error was encountered while attempting to open plugin info',
+          message: $t('components.plugins.failedToOpenPluginInfo'),
           icon: 'report_problem',
           actions: [{ icon: 'close', color: 'white' }],
         })

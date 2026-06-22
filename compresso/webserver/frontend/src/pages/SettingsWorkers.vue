@@ -17,7 +17,7 @@
                 <q-list bordered separator class="rounded-borders">
                   <q-item
                     v-for="(workerGroup, index) in workerGroups"
-                    :key="index"
+                    :key="workerGroup.id"
                     active-class="library-path-list-item"
                   >
                     <q-item-section avatar>
