@@ -41,11 +41,10 @@ jobs:
     - name: Audit dependencies for known vulnerabilities
       run: |
         pip install pip-audit
-        # Audit the pinned dependency set that is actually installed.
-        # NOTE: requirements.lock is currently stale relative to requirements.txt
-        # (the latter carries the CVE-fixed pins), so auditing the lock would flag
-        # versions that are never installed. Re-point at the lock once it is regenerated.
-        pip-audit -r requirements.txt
+        # Audit the fully-resolved lockfiles so transitive dependencies are
+        # covered, not just the direct deps in the *.txt files.
+        pip-audit -r requirements.lock
+        pip-audit -r requirements-dev.lock
 
     - name: Clean local build artifacts
       run: |
