@@ -496,6 +496,16 @@ class TestGetWorkerStatus:
         result = foreman.get_worker_status(0)
         assert result["name"] == "W-1"
 
+    def test_get_worker_status_by_string_thread_id(self):
+        # Real worker threads are keyed by string thread_id (e.g. "GroupName-0"),
+        # which previously raised ValueError under int() coercion.
+        foreman = _make_foreman()
+        t1 = MagicMock()
+        t1.get_status.return_value = {"id": "GroupName-0", "name": "W-1"}
+        foreman.worker_threads = {"GroupName-0": t1}
+        result = foreman.get_worker_status("GroupName-0")
+        assert result["name"] == "W-1"
+
     def test_get_worker_status_not_found(self):
         foreman = _make_foreman()
         foreman.worker_threads = {}

@@ -121,8 +121,7 @@ class ApiPreviewHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_preview_status(self):
         """
@@ -179,8 +178,7 @@ class ApiPreviewHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def cleanup_preview(self):
         """
@@ -216,5 +214,4 @@ class ApiPreviewHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

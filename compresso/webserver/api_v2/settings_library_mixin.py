@@ -75,8 +75,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def read_library_config(self):
         """
@@ -175,8 +174,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def write_library_config(self):
         """
@@ -244,8 +242,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def remove_library(self):
         """
@@ -311,8 +308,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def export_library_plugin_config(self):
         """
@@ -374,8 +370,7 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def import_library_plugin_config(self):
         """
@@ -443,5 +438,4 @@ class LibrarySettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

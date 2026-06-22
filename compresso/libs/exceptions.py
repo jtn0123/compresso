@@ -35,3 +35,11 @@ class QualityMetricsError(PostProcessingError):
 
 class TaskMetadataError(PostProcessingError):
     """Failed to write/commit task metadata or history log."""
+
+
+class TaskError(RuntimeError):
+    """Raised when a Task operation is attempted before the task is set/valid.
+
+    Subclasses ``RuntimeError`` so callers can catch it precisely instead of a
+    bare ``Exception``.
+    """

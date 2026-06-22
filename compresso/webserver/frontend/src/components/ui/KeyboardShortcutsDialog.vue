@@ -4,7 +4,7 @@
       <q-card-section class="row items-center q-pb-none bg-card-head">
         <div class="text-h6 text-primary">{{ t('keyboardShortcuts.title') }}</div>
         <q-space />
-        <q-btn icon="close" outline dense round color="grey-7" v-close-popup />
+        <q-btn icon="close" outline dense round color="grey-7" :aria-label="$t('a11y.close')" v-close-popup />
       </q-card-section>
 
       <q-card-section>

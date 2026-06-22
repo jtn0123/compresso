@@ -41,6 +41,10 @@ jobs:
     - name: Audit dependencies for known vulnerabilities
       run: |
         pip install pip-audit
+        # Audit the pinned dependency set that is actually installed.
+        # NOTE: requirements.lock is currently stale relative to requirements.txt
+        # (the latter carries the CVE-fixed pins), so auditing the lock would flag
+        # versions that are never installed. Re-point at the lock once it is regenerated.
         pip-audit -r requirements.txt
 
     - name: Clean local build artifacts
@@ -96,6 +100,10 @@ jobs:
 
     - name: Test with pytest
       shell: bash
+      env:
+        # Write a per-shard coverage data file so the summary job can combine
+        # them into a single coverage figure (XML reports cannot be combined).
+        COVERAGE_FILE: .coverage.${{ matrix.os }}.${{ matrix.shard }}
       run: |
         pytest tests/unit -q --splits 3 --group ${{ matrix.shard }} \
           --cov=compresso --cov-report=xml:coverage-shard-${{ matrix.shard }}.xml \
@@ -106,7 +114,11 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: coverage-${{ matrix.os }}-shard-${{ matrix.shard }}
-        path: coverage-shard-${{ matrix.shard }}.xml
+        path: |
+          coverage-shard-${{ matrix.shard }}.xml
+          .coverage.${{ matrix.os }}.${{ matrix.shard }}
+        # .coverage.* are hidden files, which upload-artifact excludes by default.
+        include-hidden-files: true
         retention-days: 30
 
   coverage_report:
@@ -134,14 +146,20 @@ jobs:
 
     - name: Combine and report coverage
       run: |
-        coverage combine --data-file=.coverage coverage-shard-*.xml 2>/dev/null || true
-        coverage report --format=total 2>/dev/null || echo "Coverage combine not supported with XML; see individual shard reports."
+        # Combine the per-shard .coverage data files into one dataset.
+        coverage combine
+        coverage xml -o coverage.xml
+        # Print the report and enforce the project coverage gate (fail_under=75).
+        coverage report --show-missing --fail-under=75
 
     - name: Upload combined coverage
+      if: always()
       uses: actions/upload-artifact@v7
       with:
         name: coverage-report
-        path: coverage-shard-*.xml
+        path: |
+          coverage.xml
+          coverage-shard-*.xml
         retention-days: 30
 
   sonarcloud:

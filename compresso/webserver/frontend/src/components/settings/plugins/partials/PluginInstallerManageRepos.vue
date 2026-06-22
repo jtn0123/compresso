@@ -176,7 +176,7 @@ export default {
           this.$q.notify({
             color: 'negative',
             position: 'top',
-            message: 'Failed to fetch the list of plugin repos.',
+            message: this.$t('components.plugins.failedToFetchRepos'),
             icon: 'report_problem',
             actions: [{ icon: 'close', color: 'white' }],
           })

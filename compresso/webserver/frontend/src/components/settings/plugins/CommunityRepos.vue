@@ -61,7 +61,15 @@
 
           <!-- ACTIONS -->
           <q-item-section side top class="q-mt-sm">
-            <q-btn round flat dense color="secondary" icon="add_circle" @click="addRepo(repo)">
+            <q-btn
+              round
+              flat
+              dense
+              color="secondary"
+              icon="add_circle"
+              :aria-label="$t('a11y.addRepository')"
+              @click="addRepo(repo)"
+            >
               <q-tooltip>{{ $t('tooltips.addRepository') }}</q-tooltip>
             </q-btn>
             <q-btn

@@ -349,7 +349,9 @@ class TestGetStatusRunnersInfoException:
         def _raise_attr(self):
             raise AttributeError("no attr")
 
-        with patch.object(type(worker), "worker_runners_info", new_callable=lambda: property(_raise_attr)):
+        # worker_runners_info is an instance attribute; create=True lets us shadow it
+        # with a raising property on the class for this test.
+        with patch.object(type(worker), "worker_runners_info", new_callable=lambda: property(_raise_attr), create=True):
             status = worker.get_status()
         assert status["runners_info"] == {}
 

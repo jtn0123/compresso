@@ -776,14 +776,40 @@ class PluginsHandler(metaclass=SingletonType):
     @staticmethod
     def set_plugin_flow_position_for_single_plugin(plugin_info: Plugins, plugin_type: str, library_id: int, priority: int):
         """
-        Update the plugin flow for a single plugin and type with the provided priority.
+        Persist the flow position for a single plugin and type with the provided priority.
 
-        :param plugin_info:
-        :param plugin_type:
-        :param library_id:
-        :param priority:
-        :return:
+        Writes (or replaces) the matching ``LibraryPluginFlow`` row so the plugin's
+        configured order of execution is honoured for the given library.
+
+        :param plugin_info: The ``Plugins`` model instance for this plugin.
+        :param plugin_type: The plugin runner type this position applies to.
+        :param library_id: The library this flow position belongs to.
+        :param priority: The 1-based position within the flow.
+        :return: The created ``LibraryPluginFlow`` row on success, otherwise ``None``.
         """
+        try:
+            # Remove any existing position for this exact plugin/type/library tuple so
+            # repeated saves do not accumulate duplicate flow rows.
+            LibraryPluginFlow.delete().where(
+                (LibraryPluginFlow.plugin_id == plugin_info.id)
+                & (LibraryPluginFlow.plugin_type == plugin_type)
+                & (LibraryPluginFlow.library_id == library_id)
+            ).execute()
+            return LibraryPluginFlow.create(
+                plugin_id=plugin_info,
+                library_id=library_id,
+                plugin_name=plugin_info.name,
+                plugin_type=plugin_type,
+                position=priority,
+            )
+        except Exception:
+            logging.getLogger(_LOGGER_NAME).exception(
+                "Failed to persist plugin flow position for plugin '%s' (type=%s, library=%s)",
+                getattr(plugin_info, "plugin_id", plugin_info),
+                plugin_type,
+                library_id,
+            )
+            return None
 
     def get_enabled_plugin_modules_by_type(self, plugin_type, library_id=None):
         """

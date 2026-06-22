@@ -168,6 +168,23 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         self.set_status(self.STATUS_SUCCESS)
         self.finish(response)
 
+    def handle_unhandled_error(self, exc: Exception) -> None:
+        """
+        Standard handling for an unexpected exception raised inside a handler:
+        log it against the current route, set a 500 status with the exception
+        text, and write the error response.
+
+        Centralising this keeps the per-handler ``except Exception`` arms to a
+        single call rather than repeating the log/set_status/write_error trio.
+
+        :param exc: The caught exception.
+        :return:
+        """
+        call_method = self.route.get("call_method") if getattr(self, "route", None) else None
+        tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, call_method)
+        self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(exc))
+        self.write_error()
+
     def write_error(self, status_code=None, **kwargs: Any) -> None:
         """
         Set the default error message.

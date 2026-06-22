@@ -75,7 +75,11 @@
                 <q-icon
                   :name="showPassword ? 'visibility_off' : 'visibility'"
                   class="cursor-pointer"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="$t('a11y.togglePasswordVisibility')"
                   @click="showPassword = !showPassword"
+                  @keyup.enter="showPassword = !showPassword"
                 />
               </template>
             </q-input>

@@ -18,7 +18,7 @@
           :disable="selectedIds.length === 0"
           @click="showRejectDialog = true"
         />
-        <q-btn flat icon="refresh" @click="fetchTasks" />
+        <q-btn flat icon="refresh" :aria-label="$t('a11y.refresh')" @click="fetchTasks" />
       </template>
     </PageHeader>
 

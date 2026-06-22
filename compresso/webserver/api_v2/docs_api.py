@@ -241,8 +241,7 @@ class ApiDocsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_logs_as_zip(self):
         """
@@ -305,5 +304,4 @@ class ApiDocsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

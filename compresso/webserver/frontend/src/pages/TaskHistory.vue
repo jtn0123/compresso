@@ -25,7 +25,7 @@
             </q-item>
           </q-list>
         </q-btn-dropdown>
-        <q-btn flat icon="refresh" @click="fetchTasks({ reset: true })" />
+        <q-btn flat icon="refresh" :aria-label="$t('a11y.refresh')" @click="fetchTasks({ reset: true })" />
       </template>
     </PageHeader>
 
@@ -237,7 +237,7 @@
         <q-card-section class="bg-card-head row items-center">
           <div class="text-h6 text-primary">{{ t('pages.taskHistory.taskLog') }}</div>
           <q-space />
-          <q-btn flat round icon="close" v-close-popup />
+          <q-btn flat round icon="close" :aria-label="$t('a11y.close')" v-close-popup />
         </q-card-section>
         <q-separator />
         <q-card-section class="scroll" style="max-height: 70vh">

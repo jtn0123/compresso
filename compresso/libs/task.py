@@ -41,6 +41,7 @@ from playhouse.shortcuts import model_to_dict
 
 from compresso import config
 from compresso.libs import common
+from compresso.libs.exceptions import TaskError
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.tasks import IntegrityError, Tasks  # type: ignore[attr-defined]
@@ -83,7 +84,7 @@ class Task:
 
     def set_cache_path(self, cache_directory=None, file_extension=None):
         if not self.task:
-            raise Exception("Unable to set cache path. Task has not been set!")
+            raise TaskError("Unable to set cache path. Task has not been set!")
         # Fetch the file's name without the file extension (this is going to be reset)
         split_file_name = os.path.splitext(self.get_source_basename())
         file_name_without_extension = split_file_name[0]
@@ -104,47 +105,47 @@ class Task:
 
     def get_cache_path(self):
         if not self.task:
-            raise Exception("Unable to fetch cache path. Task has not been set!")
+            raise TaskError("Unable to fetch cache path. Task has not been set!")
         if not self.task.cache_path:
-            raise Exception("Unable to fetch cache path. Task cache path has not been set!")
+            raise TaskError("Unable to fetch cache path. Task cache path has not been set!")
         return self.task.cache_path
 
     def get_task_data(self):
         if not self.task:
-            raise Exception("Unable to fetch task dictionary. Task has not been set!")
+            raise TaskError("Unable to fetch task dictionary. Task has not been set!")
         self.task_dict = model_to_dict(self.task, backrefs=True)
         return self.task_dict
 
     def get_task_id(self):
         if not self.task:
-            raise Exception("Unable to fetch task ID. Task has not been set!")
+            raise TaskError("Unable to fetch task ID. Task has not been set!")
         return self.task.id
 
     def get_task_type(self):
         if not self.task:
-            raise Exception("Unable to fetch task type. Task has not been set!")
+            raise TaskError("Unable to fetch task type. Task has not been set!")
         return self.task.type
 
     def get_task_library_id(self):
         if not self.task:
-            raise Exception(_ERR_NO_TASK_LIBRARY)
+            raise TaskError(_ERR_NO_TASK_LIBRARY)
         return self.task.library_id
 
     def get_task_library_name(self):
         if not self.task:
-            raise Exception(_ERR_NO_TASK_LIBRARY)
+            raise TaskError(_ERR_NO_TASK_LIBRARY)
         library = Library(self.task.library_id)
         return library.get_name()
 
     def get_task_library_priority_score(self):
         if not self.task:
-            raise Exception(_ERR_NO_TASK_LIBRARY)
+            raise TaskError(_ERR_NO_TASK_LIBRARY)
         library = Library(self.task.library_id)
         return library.get_priority_score()
 
     def get_destination_data(self):
         if not self.task:
-            raise Exception("Unable to fetch destination data. Task has not been set!")
+            raise TaskError("Unable to fetch destination data. Task has not been set!")
 
         cache_path = self.get_cache_path()
 
@@ -156,9 +157,9 @@ class Task:
 
     def get_source_data(self):
         if not self.task:
-            raise Exception("Unable to fetch source absolute path. Task has not been set!")
+            raise TaskError("Unable to fetch source absolute path. Task has not been set!")
         if not self.task.abspath:
-            raise Exception("Unable to fetch source absolute path. Task absolute path has not been set!")
+            raise TaskError("Unable to fetch source absolute path. Task absolute path has not been set!")
         return {
             "abspath": self.task.abspath,
             "basename": os.path.basename(self.task.abspath),
@@ -172,17 +173,17 @@ class Task:
 
     def get_task_success(self):
         if not self.task:
-            raise Exception("Unable to fetch task success. Task has not been set!")
+            raise TaskError("Unable to fetch task success. Task has not been set!")
         return self.task.success
 
     def get_start_time(self):
         if not self.task:
-            raise Exception("Unable to fetch task start time. Task has not been set!")
+            raise TaskError("Unable to fetch task start time. Task has not been set!")
         return self.task.start_time
 
     def get_finish_time(self):
         if not self.task:
-            raise Exception("Unable to fetch task finish time. Task has not been set!")
+            raise TaskError("Unable to fetch task finish time. Task has not been set!")
         return self.task.finish_time
 
     def task_dump(self):
@@ -278,9 +279,9 @@ class Task:
         """
         allowed = ["pending", "in_progress", "processed", "awaiting_approval", "approved", "complete"]
         if status not in allowed:
-            raise Exception(f'Unable to set status to "{status}". Status must be one of [{", ".join(allowed)}].')
+            raise TaskError(f'Unable to set status to "{status}". Status must be one of [{", ".join(allowed)}].')
         if not self.task:
-            raise Exception(_ERR_NO_TASK_STATUS)
+            raise TaskError(_ERR_NO_TASK_STATUS)
         self.task.status = status
         self.save()
         if status == "complete":
@@ -294,7 +295,7 @@ class Task:
         :return:
         """
         if not self.task:
-            raise Exception(_ERR_NO_TASK_STATUS)
+            raise TaskError(_ERR_NO_TASK_STATUS)
         if success:
             self.task.success = True
         else:
@@ -309,7 +310,7 @@ class Task:
         :return:
         """
         if not self.task:
-            raise Exception("Unable to update abspath. Task has not been set!")
+            raise TaskError("Unable to update abspath. Task has not been set!")
         self.task.abspath = new_path
         self.save()
 
@@ -321,7 +322,7 @@ class Task:
         :return:
         """
         if not self.task:
-            raise Exception(_ERR_NO_TASK_STATUS)
+            raise TaskError(_ERR_NO_TASK_STATUS)
         self.task.log += "".join(log)
         self.save()
 
@@ -332,7 +333,7 @@ class Task:
         :return:
         """
         if not self.task:
-            raise Exception("Unable to save Task. Task has not been set!")
+            raise TaskError("Unable to save Task. Task has not been set!")
         self.task.save()
 
     def delete(self):
@@ -342,7 +343,7 @@ class Task:
         :return:
         """
         if not self.task:
-            raise Exception("Unable to save Task. Task has not been set!")
+            raise TaskError("Unable to save Task. Task has not been set!")
         TaskDataStore.clear_task(self.task.id)
         self.task.delete_instance()
 

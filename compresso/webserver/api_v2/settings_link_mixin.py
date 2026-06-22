@@ -92,8 +92,7 @@ class LinkSettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def read_link_config(self):
         """
@@ -178,8 +177,7 @@ class LinkSettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def write_link_config(self):
         """
@@ -242,8 +240,7 @@ class LinkSettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def remove_link_config(self):
         """
@@ -307,5 +304,4 @@ class LinkSettingsMixin:
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

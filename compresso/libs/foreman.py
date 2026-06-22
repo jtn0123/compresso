@@ -109,10 +109,8 @@ class Foreman(threading.Thread):
         for library in Library.get_all_libraries():
             try:
                 library_config = Library(library.get("id"))
-            except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-                self.logger.exception("Unable to fetch library config for ID %s: %s", library.get("id"), e)
-                continue
             except Exception as e:
+                # Skip libraries whose config cannot be loaded rather than aborting the sweep.
                 self.logger.exception("Unable to fetch library config for ID %s: %s", library.get("id"), e)
                 continue
             # Get list of enabled plugins with their settings
@@ -828,15 +826,17 @@ class Foreman(threading.Thread):
 
         self.logger.info("Leaving Foreman Monitor loop...")
 
-    def get_all_worker_status(self):
+    def get_all_worker_status(self) -> list:
         all_status = []
         for thread in self.worker_threads:
             all_status.append(self.worker_threads[thread].get_status())
         return all_status
 
-    def get_worker_status(self, worker_id):
-        result = {}
+    def get_worker_status(self, worker_id) -> dict:
+        result: dict = {}
         for thread in self.worker_threads:
-            if int(worker_id) == int(thread):
+            # Worker threads are keyed by their string thread_id (e.g. "GroupName-0"),
+            # so compare as strings rather than coercing to int.
+            if str(worker_id) == str(thread):
                 result = self.worker_threads[thread].get_status()
         return result

@@ -141,8 +141,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def remove_notifications(self):
         """
@@ -208,8 +207,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     @staticmethod
     def _mask_url(url):
@@ -253,8 +251,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.write_success({"channels": masked})
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def save_notification_channels(self):
         """
@@ -293,8 +290,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def test_notification_channel(self):
         """
@@ -334,5 +330,4 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

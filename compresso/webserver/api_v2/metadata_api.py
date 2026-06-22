@@ -109,6 +109,9 @@ class ApiMetadataHandler(BaseApiHandler):
 
             if limit < 1:
                 limit = 1
+            # Cap the page size so a single request cannot trigger an unbounded query.
+            if limit > 500:
+                limit = 500
             if offset < 0:
                 offset = 0
 
@@ -165,8 +168,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_metadata_by_task(self):
         try:
@@ -179,8 +181,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_metadata_by_task_id(self, task_id):
         try:
@@ -191,8 +192,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def _get_metadata_by_task_id(self, task_id):
         try:
@@ -281,8 +281,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def delete_metadata(self):
         try:
@@ -304,8 +303,7 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_metadata_by_fingerprint(self):
         try:
@@ -352,5 +350,4 @@ class ApiMetadataHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

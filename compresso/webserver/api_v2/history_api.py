@@ -161,8 +161,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def delete_completed_tasks(self):
         """
@@ -241,8 +240,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def add_completed_tasks_to_pending_list(self):
         """
@@ -330,8 +328,7 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_completed_task_log(self):
         """
@@ -397,5 +394,4 @@ class ApiHistoryHandler(BaseApiHandler):
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

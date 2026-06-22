@@ -37,7 +37,7 @@
             <q-card-section class="q-pa-none">
               <q-list bordered padding>
                 <q-separator spaced inset />
-                <div v-for="(plugin, index) in plugins" :key="index">
+                <div v-for="plugin in plugins" :key="plugin.plugin_id">
                   <q-item clickable v-ripple @click="selectPlugin(plugin)">
                     <q-item-section avatar>
                       <q-img :src="plugin.icon" />

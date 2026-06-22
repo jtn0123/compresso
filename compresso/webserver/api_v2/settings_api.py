@@ -195,8 +195,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def write_settings(self):
         """
@@ -266,8 +265,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_system_configuration(self):
         """
@@ -325,5 +323,4 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             self.write_error()
             return
         except Exception as e:
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

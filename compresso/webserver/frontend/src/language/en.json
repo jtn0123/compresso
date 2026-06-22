@@ -13,7 +13,12 @@
     "editChannel": "Edit channel",
     "deleteChannel": "Delete channel",
     "addLibrary": "Add library",
-    "libraryDetails": "Library details"
+    "libraryDetails": "Library details",
+    "refresh": "Refresh",
+    "showMore": "Show more",
+    "addRepository": "Add repository",
+    "togglePasswordVisibility": "Toggle password visibility",
+    "copyCode": "Copy code"
   },
   "systemStatus": {
     "title": "System",
@@ -184,6 +189,7 @@
     "failedToLogout": "Failed to log current user out of installation.",
     "failedToSaveSettings": "Failed to save settings.",
     "failedToFetchSettings": "Failed to fetch Compresso's current settings.",
+    "failedToListDirectory": "Failed to list directory contents.",
     "failedToFetchSystemConfig": "Failed to fetch Compresso's system configuration.",
     "failedToFetchLibraryList": "Failed to fetch Compresso's library list.",
     "SavedPluginSettings": "Plugin settings saved.",
@@ -353,7 +359,15 @@
     },
     "videoCompare": {
       "snapshotTooltip": "Take snapshot (paused only)",
-      "keyboardShortcutsHeader": "Keyboard Shortcuts"
+      "keyboardShortcutsHeader": "Keyboard Shortcuts",
+      "sideBySide": "Side by Side",
+      "slider": "Slider",
+      "original": "Original",
+      "encoded": "Encoded",
+      "resetZoom": "Reset Zoom",
+      "keyboardShortcutsTooltip": "Keyboard shortcuts",
+      "snapshotSaved": "Snapshot saved",
+      "videoLoadFailed": "Video failed to load. The preview file may have been cleaned up."
     },
     "settings": {
       "pleaseEnterAValidNumber": "Please enter a valid number",
@@ -406,7 +420,12 @@
         "maxAgeOfCompletedTasksCompress": "Maximum number of days before completed tasks are compressed",
         "maxAgeOfCompletedTasks": "Maximum number of days before completed task cleanup",
         "alwaysKeepFailedTasks": "Always keep failed tasks",
-        "dontCompressFailedTasks": "Don't compress failed tasks"
+        "dontCompressFailedTasks": "Don't compress failed tasks",
+        "approvalWorkflow": "Approval Workflow",
+        "requireApproval": "Require approval before replacing originals",
+        "approvalWorkflowHelp": "When turned on, transcoded files wait for your review instead of immediately replacing originals. Check the Approval Queue to approve or reject each one.",
+        "stagingDirectory": "Staging directory",
+        "stagingDirectoryHint": "Where transcoded files wait for review. Leave blank for the default location."
       },
       "workers": {
         "workerGroups": "Worker groups",
@@ -733,6 +752,12 @@
       "invalidZipFile": "File is not a valid ZIP file",
       "failedToInstallPluginFromZip": "Failed to install plugin from the uploaded ZIP file",
       "installedPluginFromZip": "Plugin installed",
+      "failedToDisablePlugins": "An error was encountered while requesting the selected plugins be disabled",
+      "failedToUpdatePlugins": "An error was encountered while requesting the selected plugins be updated",
+      "failedToRemovePlugins": "An error was encountered while requesting the selected plugins be removed",
+      "failedToFetchInstalledPlugins": "An error was encountered while requesting the installed plugins list",
+      "nothingSelected": "Nothing selected",
+      "failedToFetchRepos": "Failed to fetch the list of plugin repos.",
       "types": {
         "libraryManagement": {
           "fileTest": "Library Management - File test",

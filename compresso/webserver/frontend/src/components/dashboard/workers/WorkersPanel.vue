@@ -153,7 +153,16 @@
 
           <!-- Expand -->
           <div class="col-auto">
-            <q-btn dense round flat size="xs" icon="open_in_full" color="secondary" @click="openWorkerDetails(worker)">
+            <q-btn
+              dense
+              round
+              flat
+              size="xs"
+              icon="open_in_full"
+              color="secondary"
+              :aria-label="$t('a11y.showMore')"
+              @click="openWorkerDetails(worker)"
+            >
               <q-tooltip>{{ $t('navigation.showMore') }}</q-tooltip>
             </q-btn>
           </div>

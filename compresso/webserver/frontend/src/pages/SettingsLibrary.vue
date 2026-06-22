@@ -32,7 +32,7 @@
                 <q-list bordered separator class="rounded-borders library-list">
                   <q-item
                     v-for="(path, index) in filteredLibraryPaths"
-                    :key="index"
+                    :key="path.id"
                     active-class="library-path-list-item"
                   >
                     <q-item-section avatar class="avatar-size">
@@ -298,13 +298,16 @@
               <q-separator class="q-my-lg" />
 
               <!--START APPROVAL WORKFLOW-->
-              <h5 class="q-mb-none">Approval Workflow</h5>
+              <h5 class="q-mb-none">{{ $t('components.settings.library.approvalWorkflow') }}</h5>
               <div class="q-gutter-sm">
                 <q-skeleton v-if="approvalRequired === null" type="QToggle" />
-                <q-toggle v-else v-model="approvalRequired" label="Require approval before replacing originals" />
+                <q-toggle
+                  v-else
+                  v-model="approvalRequired"
+                  :label="$t('components.settings.library.requireApproval')"
+                />
                 <div class="text-caption text-grey q-ml-md">
-                  When turned on, transcoded files wait for your review instead of immediately replacing originals.
-                  Check the Approval Queue to approve or reject each one.
+                  {{ $t('components.settings.library.approvalWorkflowHelp') }}
                 </div>
                 <div v-if="approvalRequired" class="sub-setting">
                   <div class="q-gutter-sm">
@@ -313,8 +316,8 @@
                       v-else
                       outlined
                       v-model="stagingPath"
-                      label="Staging directory"
-                      hint="Where transcoded files wait for review. Leave blank for the default location."
+                      :label="$t('components.settings.library.stagingDirectory')"
+                      :hint="$t('components.settings.library.stagingDirectoryHint')"
                     />
                   </div>
                 </div>
