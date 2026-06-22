@@ -289,17 +289,7 @@ class Worker(threading.Thread):
         plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type("worker.process", library_id=library_id)
 
         # Create dictionary of runners info for the frontend
-        self.worker_runners_info = {}
-        for plugin_module in plugin_modules:
-            self.worker_runners_info[plugin_module.get("plugin_id")] = {
-                "plugin_id": plugin_module.get("plugin_id"),
-                "status": "pending",
-                "name": plugin_module.get("name"),
-                "author": plugin_module.get("author"),
-                "version": plugin_module.get("version"),
-                "icon": plugin_module.get("icon"),
-                "description": plugin_module.get("description"),
-            }
+        self.worker_runners_info = self.__build_worker_runners_info(plugin_modules)
 
         # Set the absolute path to the original file
         original_abspath = self.current_task.get_source_abspath()
@@ -475,21 +465,10 @@ class Worker(threading.Thread):
                             file_in = data.get("file_in")
                         # Ensure the 'file_out' that was specified by the plugin to be created was actually created.
                         elif os.path.exists(data.get("file_out")):
-                            # The outfile exists...
-                            # In order to clean up as we go and avoid unnecessary RAM/disk use in the cache directory,
-                            #   we want to remove the 'file_in' file.
-                            # We want to ensure that we do not accidentally remove any original files here.
-                            # We also want to ensure that the 'file_out' is not removed if
-                            # the plugin set it to the same path as the 'file_in'.
-                            # To avoid this, run x3 tests.
-                            # First, check current 'file_in' is not the original file.
-                            if (  # noqa: SIM102 — nested ifs are clearer here for safety-critical file deletion
-                                os.path.abspath(data.get("file_in")) != os.path.abspath(original_abspath)
-                                and "compresso_file_conversion" in os.path.abspath(data.get("file_in"))
-                            ):
-                                # Ensure file_out is not the same file as file_in before removing old file_in
-                                if os.path.abspath(data.get("file_out")) != os.path.abspath(data.get("file_in")):
-                                    os.remove(os.path.abspath(data.get("file_in")))
+                            # The outfile exists. Clean up the intermediate input file as we go to
+                            # avoid unnecessary disk use in the cache directory. The guard logic that
+                            # prevents deleting the original (or the new output) lives in the helper.
+                            self.__remove_intermediate_input_file(data.get("file_in"), data.get("file_out"), original_abspath)
 
                             # Set the new 'file_in' as the previous runner's 'file_out' for the next loop
                             file_in = data.get("file_out")
@@ -543,47 +522,10 @@ class Worker(threading.Thread):
             self.logger.info("Successfully completed Worker processing on file '%s'", original_abspath)
 
             # Attempt to move the final output file to the final cache file path for the postprocessor
-            try:
-                # Set the new file out as the extension may have changed
-                split_file_name = os.path.splitext(current_file_out)
-                file_extension = split_file_name[1].lstrip(".")
-                self.current_task.set_cache_path(cache_directory, file_extension)
-                # Read the updated cache path
-                task_cache_path = self.current_task.get_cache_path()
-
-                # Move file to original cache path
-                self.logger.info("Moving final cache file from '%s' to '%s'", current_file_out, task_cache_path)
-                current_file_out = os.path.abspath(current_file_out)
-
-                # There is a really odd intermittent bug with the shutil module that is causing it to
-                #   sometimes report that the file does not exist.
-                # This section adds a small pause and logs the error if that is the case.
-                # I have not yet figured out a solution as this is difficult to reproduce.
-                if not os.path.exists(current_file_out):
-                    self.logger.error("WORKER_FINAL_OUTPUT_MISSING file=%s", file_in)
-                    self.logger.error("Error - current_file_out path does not exist! '%s'", file_in)
-                    self.event.wait(1)
-
-                # Ensure the cache directory exists
-                if not os.path.exists(cache_directory):
-                    os.makedirs(cache_directory)
-
-                # Check that the current file out is not the original source file
-                if os.path.abspath(current_file_out) == os.path.abspath(original_abspath):
-                    # The current file out is not a cache file, the file must have never been modified.
-                    # This can happen if all Plugins failed to run, or a Plugin specifically reset the out
-                    #   file to the original source in order to preserve it.
-                    # In this circumstance, we want to create a cache copy and let the process continue.
-                    self.logger.debug("Final cache file is the same path as the original source. Creating cache copy.")
-                    shutil.copyfile(current_file_out, task_cache_path)
-                else:
-                    # Use shutil module to move the file to the final task cache location
-                    shutil.move(current_file_out, task_cache_path)
-            except (OSError, PermissionError, shutil.Error) as e:
-                self.logger.error("WORKER_FINAL_MOVE_FAILED source=%s dest=%s", current_file_out, task_cache_path)
-                self.logger.exception(
-                    "Exception in final move operation of file %s to %s: %s", current_file_out, task_cache_path, e
-                )
+            move_ok, task_cache_path = self.__move_final_output_to_cache(
+                current_file_out, cache_directory, original_abspath, task_cache_path
+            )
+            if not move_ok:
                 overall_success = False
 
         # Execute event plugin runners (only when added to queue)
@@ -606,6 +548,114 @@ class Worker(threading.Thread):
             self.logger.warning("WORKER_TASK_FAILED file=%s", original_abspath)
             self.logger.warning("Failed to process task for file '%s'", original_abspath)
         return overall_success
+
+    @staticmethod
+    def __build_worker_runners_info(plugin_modules):
+        """
+        Build the initial per-runner status map that is surfaced to the frontend.
+
+        :param plugin_modules: Enabled ``worker.process`` plugin module dicts.
+        :return: dict keyed by plugin_id with pending status entries.
+        """
+        runners_info = {}
+        for plugin_module in plugin_modules:
+            runners_info[plugin_module.get("plugin_id")] = {
+                "plugin_id": plugin_module.get("plugin_id"),
+                "status": "pending",
+                "name": plugin_module.get("name"),
+                "author": plugin_module.get("author"),
+                "version": plugin_module.get("version"),
+                "icon": plugin_module.get("icon"),
+                "description": plugin_module.get("description"),
+            }
+        return runners_info
+
+    @staticmethod
+    def __remove_intermediate_input_file(file_in, file_out, original_abspath):
+        """
+        Remove an intermediate worker input file once a runner has produced a new
+        output, freeing cache space between passes.
+
+        Three guards protect against ever deleting a file we must keep:
+          1. never delete the original source file;
+          2. only delete files that live inside a 'compresso_file_conversion' cache
+             directory (never an arbitrary path);
+          3. never delete file_in when the plugin set file_out to the same path.
+
+        :param file_in: The intermediate input file that may be removed.
+        :param file_out: The output file the runner produced.
+        :param original_abspath: Absolute path of the original source file.
+        """
+        file_in_abs = os.path.abspath(file_in)
+        # Guard 1: never touch the original source file.
+        if file_in_abs == os.path.abspath(original_abspath):
+            return
+        # Guard 2: only ever delete from within a Compresso conversion cache directory.
+        if "compresso_file_conversion" not in file_in_abs:
+            return
+        # Guard 3: never delete file_in if it is also the produced file_out.
+        if os.path.abspath(file_out) == file_in_abs:
+            return
+        os.remove(file_in_abs)
+
+    def __move_final_output_to_cache(self, current_file_out, cache_directory, original_abspath, fallback_cache_path):
+        """
+        Move the final worker output to the task cache path for the postprocessor.
+
+        When the final output is still the original source (e.g. all plugins reset
+        the output to preserve the source) a copy is made instead of a move, so the
+        original is never relocated out from under the library.
+
+        :param fallback_cache_path: Cache path to return unchanged if the move fails
+                                    before a fresh cache path can be resolved.
+        :return: tuple of (success: bool, task_cache_path: str).
+        """
+        # Start from the caller's cache path; resolve a fresh one once the final
+        # extension is known. Kept as a local so the parameter is never reassigned.
+        task_cache_path = fallback_cache_path
+        try:
+            # Set the new file out as the extension may have changed
+            split_file_name = os.path.splitext(current_file_out)
+            file_extension = split_file_name[1].lstrip(".")
+            self.current_task.set_cache_path(cache_directory, file_extension)
+            # Read the updated cache path
+            task_cache_path = self.current_task.get_cache_path()
+
+            # Move file to original cache path
+            self.logger.info("Moving final cache file from '%s' to '%s'", current_file_out, task_cache_path)
+            current_file_out = os.path.abspath(current_file_out)
+
+            # There is a really odd intermittent bug with the shutil module that is causing it to
+            #   sometimes report that the file does not exist.
+            # This section adds a small pause and logs the error if that is the case.
+            # I have not yet figured out a solution as this is difficult to reproduce.
+            if not os.path.exists(current_file_out):
+                self.logger.error("WORKER_FINAL_OUTPUT_MISSING file=%s", current_file_out)
+                self.logger.error("Error - current_file_out path does not exist! '%s'", current_file_out)
+                self.event.wait(1)
+
+            # Ensure the cache directory exists
+            if not os.path.exists(cache_directory):
+                os.makedirs(cache_directory)
+
+            # Check that the current file out is not the original source file
+            if os.path.abspath(current_file_out) == os.path.abspath(original_abspath):
+                # The current file out is not a cache file, the file must have never been modified.
+                # This can happen if all Plugins failed to run, or a Plugin specifically reset the out
+                #   file to the original source in order to preserve it.
+                # In this circumstance, we want to create a cache copy and let the process continue.
+                self.logger.debug("Final cache file is the same path as the original source. Creating cache copy.")
+                shutil.copyfile(current_file_out, task_cache_path)
+            else:
+                # Use shutil module to move the file to the final task cache location
+                shutil.move(current_file_out, task_cache_path)
+            return True, task_cache_path
+        except (OSError, PermissionError, shutil.Error) as e:
+            self.logger.error("WORKER_FINAL_MOVE_FAILED source=%s dest=%s", current_file_out, task_cache_path)
+            self.logger.exception(
+                "Exception in final move operation of file %s to %s: %s", current_file_out, task_cache_path, e
+            )
+            return False, task_cache_path
 
     def __exec_command_subprocess(self, data):
         """

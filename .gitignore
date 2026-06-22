@@ -34,3 +34,4 @@ dist/**
 
 # Scratch / temp directories
 .codex_tmp/
+.claude/
