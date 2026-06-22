@@ -1,3 +1,10 @@
+## [1.10.13](https://github.com/jtn0123/compresso/compare/v1.10.12...v1.10.13) (2026-06-22)
+
+
+### Bug Fixes
+
+* FileInfoDialog i18n, Node 24 pin, and CVE-gate fixes ([#152](https://github.com/jtn0123/compresso/issues/152)) ([b08b4f0](https://github.com/jtn0123/compresso/commit/b08b4f0f83641f7c908c9e3cc285cf88ab9bd362))
+
 ## [1.10.12](https://github.com/jtn0123/compresso/compare/v1.10.11...v1.10.12) (2026-05-20)
 
 
