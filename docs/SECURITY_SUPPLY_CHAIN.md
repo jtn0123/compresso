@@ -7,11 +7,10 @@ the published images.
 
 ## Static analysis (CodeQL)
 
-`.github/workflows/codeql.yml` runs GitHub CodeQL over the `python` and
-`javascript-typescript` sources on every push and pull request to `master`, and
-on a weekly schedule. Results appear in the repository's **Security > Code
-scanning** dashboard. Vendored/generated frontend output and test fixtures are
-excluded from analysis.
+CodeQL static analysis is enabled for this repository through GitHub's **default
+setup** (configured under **Security > Code scanning**), which scans the
+`python` and `javascript-typescript` sources automatically. Results appear in
+the repository's **Security > Code scanning** dashboard.
 
 ## Signed container images (cosign, keyless)
 
