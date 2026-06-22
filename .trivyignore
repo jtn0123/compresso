@@ -24,6 +24,23 @@ CVE-2026-31802
 CVE-2026-23111
 CVE-2026-23112
 CVE-2026-23231
+CVE-2025-68263
+CVE-2026-22984
+CVE-2026-23172
+CVE-2026-31431
+CVE-2026-43284
+CVE-2026-43500
+CVE-2026-46300
+CVE-2026-46323
+CVE-2026-46333
+CVE-2026-47331
+CVE-2026-47333
+
+# openssl / libssl3t64: Heap use-after-free in PKCS7_verify(). Shipped
+# by the ubuntu:24.04 base image; fix is in 3.0.13-0ubuntu3.11, which
+# lands via a base-image rebuild. Compresso does not invoke PKCS7
+# verification at runtime.
+CVE-2026-45447
 
 # packagekit / gir1.2-packagekitglib-1.0: system package-management
 # daemon. Not invoked at runtime by the Compresso server; pulled in

@@ -1,3 +1,8 @@
+// @vitest-environment jsdom
+// DOMPurify 3.4.11+ hardened its cross-realm/instanceof checks, which the
+// happy-dom DOM does not satisfy (it strips all markup). jsdom is DOMPurify's
+// officially supported environment, so this suite overrides the default
+// happy-dom environment to exercise real sanitization behaviour.
 import { describe, it, expect } from 'vitest'
 import { sanitizeHtml } from '../sanitize'
 
