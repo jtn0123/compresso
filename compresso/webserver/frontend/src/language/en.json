@@ -345,6 +345,8 @@
         "colorTransfer": "Color Transfer",
         "channels": "Channels",
         "sampleRate": "Sample Rate",
+        "sampleRateValue": "{value} Hz",
+        "notAvailable": "N/A",
         "title": "Title",
         "health": "Health"
       }

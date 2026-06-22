@@ -77,7 +77,8 @@
                   <strong>{{ $t('components.fileInfo.fields.codec') }}:</strong> {{ stream.codec_long_name }}
                 </div>
                 <div class="col-6 col-sm-3">
-                  <strong>{{ $t('components.fileInfo.fields.profile') }}:</strong> {{ stream.profile || 'N/A' }}
+                  <strong>{{ $t('components.fileInfo.fields.profile') }}:</strong>
+                  {{ stream.profile || $t('components.fileInfo.fields.notAvailable') }}
                 </div>
                 <div class="col-6 col-sm-3">
                   <strong>{{ $t('components.fileInfo.fields.bitrate') }}:</strong> {{ formatBitrate(stream.bit_rate) }}
@@ -119,12 +120,16 @@
                 </div>
                 <div class="col-6 col-sm-3">
                   <strong>{{ $t('components.fileInfo.fields.channels') }}:</strong> {{ stream.channels }} ({{
-                    stream.channel_layout || 'N/A'
+                    stream.channel_layout || $t('components.fileInfo.fields.notAvailable')
                   }})
                 </div>
                 <div class="col-6 col-sm-3">
                   <strong>{{ $t('components.fileInfo.fields.sampleRate') }}:</strong>
-                  {{ stream.sample_rate ? stream.sample_rate + ' Hz' : 'N/A' }}
+                  {{
+                    stream.sample_rate
+                      ? $t('components.fileInfo.fields.sampleRateValue', { value: stream.sample_rate })
+                      : $t('components.fileInfo.fields.notAvailable')
+                  }}
                 </div>
                 <div class="col-6 col-sm-3">
                   <strong>{{ $t('components.fileInfo.fields.bitrate') }}:</strong> {{ formatBitrate(stream.bit_rate) }}
@@ -249,17 +254,17 @@ export default {
     }
 
     function formatBytes(bytes) {
-      if (!bytes || bytes === 0) return 'N/A'
+      if (!bytes || bytes === 0) return t('components.fileInfo.fields.notAvailable')
       return sharedFormatBytes(bytes)
     }
 
     function formatBitrate(bps) {
-      if (!bps || bps === 0) return 'N/A'
+      if (!bps || bps === 0) return t('components.fileInfo.fields.notAvailable')
       return sharedFormatBitrate(bps)
     }
 
     function formatDuration(seconds) {
-      if (!seconds || seconds === 0) return 'N/A'
+      if (!seconds || seconds === 0) return t('components.fileInfo.fields.notAvailable')
       return sharedFormatDuration(seconds)
     }
 
