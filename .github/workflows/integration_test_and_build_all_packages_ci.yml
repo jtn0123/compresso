@@ -29,7 +29,7 @@ jobs:
 
       # Restore test video's cache
       - name: Restore test videos cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: test_videos_cache
         with:
           path: tests/support_/videos
@@ -51,7 +51,7 @@ jobs:
 
       # Restore the python cache if it exists
       - name: Restore python cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
@@ -61,7 +61,7 @@ jobs:
       # Restore the apt cache if it exists
       - name: Restore apt cache
         id: apt-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-cache-ffmpeg
@@ -156,7 +156,7 @@ jobs:
 
       # Restore the python cache if it exists
       - name: Restore python cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
