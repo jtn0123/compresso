@@ -13,7 +13,7 @@ requests_toolbelt==1.0.0
 urllib3==2.7.0
 py-cpuinfo==9.0.0
 JSON-log-formatter==1.1.1
-xxhash==3.6.0
+xxhash==3.7.1
 
 # Optional requirements
 watchdog==6.0.0
