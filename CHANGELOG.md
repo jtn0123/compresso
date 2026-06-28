@@ -1,3 +1,10 @@
+## [1.10.15](https://github.com/jtn0123/compresso/compare/v1.10.14...v1.10.15) (2026-06-28)
+
+
+### Bug Fixes
+
+* **postprocessor:** clean up orphaned staging file on failed move + add file-pipeline integration tests ([#161](https://github.com/jtn0123/compresso/issues/161)) ([fe50293](https://github.com/jtn0123/compresso/commit/fe502935559a0955c0346e581c4c502b01db3570))
+
 ## [1.10.14](https://github.com/jtn0123/compresso/compare/v1.10.13...v1.10.14) (2026-06-22)
 
 
