@@ -62,6 +62,7 @@ def _task(cache_path, source_abspath, dest_abspath, task_id=1):
 @pytest.mark.integrationtest
 class TestFileMovePipeline:
     def setup_method(self):
+        """Create an isolated temp library + conversion-cache dir for each test."""
         self.tmp = tempfile.mkdtemp(prefix="compresso_integ_pipeline_")
         self.library = os.path.join(self.tmp, "library")
         # The cache dir name MUST contain 'compresso_file_conversion' or the
@@ -71,15 +72,18 @@ class TestFileMovePipeline:
         os.makedirs(self.cache)
 
     def teardown_method(self):
+        """Remove the temp tree created for the test."""
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     @staticmethod
     def _write(path, content):
+        """Write ``content`` bytes to ``path`` and return the path."""
         with open(path, "wb") as fh:
             fh.write(content)
         return path
 
     def _run(self, pp):
+        """Run post_process_file() with no enabled plugins (default file movement)."""
         with patch(f"{PP}.PluginsHandler") as MockPH:
             MockPH.return_value.get_enabled_plugin_modules_by_type.return_value = []
             pp.post_process_file()
@@ -140,6 +144,10 @@ class TestFileMovePipeline:
         with open(source, "rb") as fh:
             assert fh.read() == b"PRECIOUS-ORIGINAL", "source content must be untouched"
         assert not os.path.exists(dest), "no destination should be created on failure"
+        # The failure path must not leave staging/backup artifacts and must clean the cache.
+        assert not os.path.exists(dest + ".compresso.part")
+        assert not os.path.exists(source + ".compresso.bak")
+        assert not os.path.exists(self.cache)
 
     def test_preexisting_destination_restored_when_final_move_fails(self):
         """Overwrite scenario: if the final move fails after the existing dest was
@@ -172,3 +180,6 @@ class TestFileMovePipeline:
         # The source must not have been removed (movement was not successful).
         assert os.path.exists(source), "source must be preserved when the move fails"
         assert not os.path.exists(dest + ".compresso.bak"), "rollback should consume the backup"
+        # The failed move must not orphan its staging file, and the cache is cleaned.
+        assert not os.path.exists(dest + ".compresso.part"), "the staging part file must be cleaned up after a failed move"
+        assert not os.path.exists(self.cache), "cache directory should still be cleaned after rollback"

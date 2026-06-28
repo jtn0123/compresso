@@ -766,6 +766,10 @@ class PostProcessor(threading.Thread):
             self._log(f"Copy file triggered by ({plugin_id}) {file_in} --> {file_out}")
 
         file_move_processes_success = True
+        # Use a '.part' suffix for the file movement, then rename it after. Defined
+        # up-front so a partial failure can clean it up rather than orphaning it next
+        # to the destination file.
+        part_file_out = os.path.join(f"{file_out}.compresso.part")
         try:
             # Ensure the src and dst are not the same file
             if os.path.exists(file_out) and os.path.samefile(file_in, file_out):
@@ -779,9 +783,6 @@ class PostProcessor(threading.Thread):
                 self._log(f"The file_in path does not exist! '{file_in}'", level="warning")
                 self.event.wait(1)
             self._log(f"Fetching checksum of source file '{file_in}'.", level="debug")
-
-            # Use a '.part' suffix for the file movement, then rename it after
-            part_file_out = os.path.join(f"{file_out}.compresso.part")
 
             # Carry out the file movement
             if move:
@@ -814,6 +815,13 @@ class PostProcessor(threading.Thread):
             if tracker:
                 self._log("Rolling back file operations due to copy failure", level="warning")
                 tracker.rollback()
+            # Remove the staging '.part' file if it was left behind by a failed
+            # move/rename so it is not orphaned next to the destination file.
+            if os.path.exists(part_file_out):
+                try:
+                    os.remove(part_file_out)
+                except OSError as cleanup_error:
+                    self._log(f"Failed to remove staging file '{part_file_out}'", message2=str(cleanup_error), level="warning")
             file_move_processes_success = False
 
         return file_move_processes_success
