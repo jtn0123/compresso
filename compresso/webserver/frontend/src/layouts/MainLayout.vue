@@ -14,15 +14,7 @@
         />
 
         <!-- Logo (mobile only — desktop shows it in the sidebar) -->
-        <q-btn
-          v-if="$q.screen.lt.md"
-          flat
-          round
-          dense
-          size="sm"
-          @click="$router.push('/ui/dashboard')"
-          class="q-mr-xs"
-        >
+        <q-btn v-if="$q.screen.lt.md" flat round dense size="sm" @click="$router.push('/ui/dashboard')" class="q-mr-xs">
           <q-avatar rounded size="22px">
             <img src="~assets/compresso-logo-white.png" :alt="$t('a11y.logoAlt')" />
           </q-avatar>
