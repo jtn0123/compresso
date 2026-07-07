@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/jtn0123/compresso/compare/v1.10.15...v1.11.0) (2026-07-07)
+
+
+### Features
+
+* **ui:** implement polished design system, app shell and theme tokens ([#168](https://github.com/jtn0123/compresso/issues/168)) ([2485b9b](https://github.com/jtn0123/compresso/commit/2485b9b0d8e69f54b4596e67cc33e6f62cfe7a95))
+
 ## [1.10.15](https://github.com/jtn0123/compresso/compare/v1.10.14...v1.10.15) (2026-06-28)
 
 
