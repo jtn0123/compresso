@@ -13,12 +13,16 @@ const PALETTES = {
       secondary: '#d49a1e',
       accent: '#7c5cbf',
       warning: '#d49a1e',
+      positive: '#2e9e5a',
+      negative: '#d43545',
+      info: '#3a8fd4',
       primarySoft: '#e6f2ec',
       primaryBorder: '#b3d4c4',
       surface0: '#f5f6f7',
       surface1: '#ffffff',
       surface2: '#f8f9fa',
       surfaceRaised: '#f0f3f1',
+      sidebarBg: '#fbfcfc',
       headerBg: '#13291f',
       headerGradientEnd: '#1a3d2d',
       chart: [
@@ -35,25 +39,29 @@ const PALETTES = {
       ],
     },
     dark: {
-      primary: '#2da87a',
+      primary: '#2fb27f',
       secondary: '#e8a525',
-      accent: '#9a80d4',
+      accent: '#a08ad8',
       warning: '#e8a525',
-      primarySoft: '#1a2e26',
-      primaryBorder: '#264a3a',
-      surface0: '#111114',
-      surface1: '#1a1a1e',
-      surface2: '#222226',
-      surfaceRaised: '#252528',
-      headerBg: '#0f1f18',
-      headerGradientEnd: '#152e22',
+      positive: '#34b46f',
+      negative: '#e05563',
+      info: '#58a6e8',
+      primarySoft: '#1a2a28',
+      primaryBorder: '#215644',
+      surface0: '#0e0f11',
+      surface1: '#17181c',
+      surface2: '#1d1f24',
+      surfaceRaised: '#1d1f24',
+      sidebarBg: '#141519',
+      headerBg: '#0e0f11',
+      headerGradientEnd: '#0e0f11',
       chart: [
-        '#2da87a',
+        '#2fb27f',
         '#e8a525',
-        '#9a80d4',
-        '#e06060',
-        '#3ebe70',
-        '#5aafee',
+        '#a08ad8',
+        '#e05563',
+        '#34b46f',
+        '#58a6e8',
         '#f0a050',
         '#40d8b0',
         '#8898a8',
@@ -67,12 +75,16 @@ const PALETTES = {
       secondary: '#4a6670',
       accent: '#8b6f47',
       warning: '#c05621',
+      positive: '#2e9e5a',
+      negative: '#d43545',
+      info: '#3a8fd4',
       primarySoft: '#fdf0e8',
       primaryBorder: '#f0c9a8',
       surface0: '#f6f5f4',
       surface1: '#ffffff',
       surface2: '#faf8f7',
       surfaceRaised: '#f3f1ef',
+      sidebarBg: '#fcfbfa',
       headerBg: '#2c2017',
       headerGradientEnd: '#3d2e22',
       chart: [
@@ -93,21 +105,25 @@ const PALETTES = {
       secondary: '#7a9aa8',
       accent: '#b8965e',
       warning: '#e07030',
-      primarySoft: '#2c2018',
-      primaryBorder: '#4a3425',
-      surface0: '#131210',
-      surface1: '#1c1a18',
-      surface2: '#262320',
-      surfaceRaised: '#2a2720',
-      headerBg: '#1a150f',
-      headerGradientEnd: '#2a2018',
+      positive: '#34b46f',
+      negative: '#e05563',
+      info: '#58a6e8',
+      primarySoft: '#2f231e',
+      primaryBorder: '#673b24',
+      surface0: '#0e0f11',
+      surface1: '#17181c',
+      surface2: '#1d1f24',
+      surfaceRaised: '#1d1f24',
+      sidebarBg: '#141519',
+      headerBg: '#0e0f11',
+      headerGradientEnd: '#0e0f11',
       chart: [
         '#e07030',
         '#7a9aa8',
         '#b8965e',
-        '#e06060',
-        '#3ebe70',
-        '#5aafee',
+        '#e05563',
+        '#34b46f',
+        '#58a6e8',
         '#f0a050',
         '#40d8b0',
         '#8898a8',
@@ -132,6 +148,9 @@ export function applyTheme(mode, palette) {
   setCssVar('secondary', p.secondary)
   setCssVar('accent', p.accent)
   setCssVar('warning', p.warning)
+  if (p.positive) setCssVar('positive', p.positive)
+  if (p.negative) setCssVar('negative', p.negative)
+  if (p.info) setCssVar('info', p.info)
 
   // Extended Compresso CSS vars
   const body = document.body.style
@@ -141,6 +160,7 @@ export function applyTheme(mode, palette) {
   body.setProperty('--surface-1', p.surface1)
   body.setProperty('--surface-2', p.surface2)
   body.setProperty('--compresso-surface-raised', p.surfaceRaised)
+  body.setProperty('--compresso-sidebar-bg', p.sidebarBg || p.surface1)
   body.setProperty('--compresso-header-bg', p.headerBg)
   body.setProperty('--compresso-header-gradient-end', p.headerGradientEnd)
 

@@ -8,6 +8,7 @@
 // Grey Scale (neutral — works with all palettes)
 // ============================================================
 :root {
+  --border-subtle: rgba(0, 0, 0, 0.08);
   --compresso-grey-1: #f8f9fa;
   --compresso-grey-2: #f0f1f3;
   --compresso-grey-3: #e4e5e8;
@@ -21,6 +22,7 @@
 }
 
 .body--dark {
+  --border-subtle: rgba(255, 255, 255, 0.07);
   --compresso-grey-1: #1c1d1e;
   --compresso-grey-2: #2a2b2d;
   --compresso-grey-3: #3a3b3e;
@@ -89,7 +91,11 @@ body {
 // ============================================================
 .q-card {
   background: var(--surface-1);
-  border-radius: 6px;
+  border-radius: 10px;
+}
+
+.q-card--bordered {
+  border-color: var(--border-subtle);
 }
 
 .body--dark .q-card {
@@ -98,8 +104,8 @@ body {
 
 .nested-card {
   background: var(--surface-2);
-  border: 1px solid color-mix(in srgb, var(--compresso-grey-3), transparent 40%);
-  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
@@ -111,7 +117,7 @@ body {
 // Border Hover Effect
 // ============================================================
 .border-hover {
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid transparent;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
@@ -126,6 +132,87 @@ body {
 // ============================================================
 .header-background {
   background: var(--compresso-header-bg) !important;
+}
+
+// Polished app shell — top bar sits on the page background with a hairline border
+.app-topbar {
+  background: var(--surface-0) !important;
+  border-bottom: 1px solid var(--border-subtle);
+  color: inherit !important;
+  box-shadow: none !important;
+}
+
+.app-topbar .topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.app-topbar .topbar-subtitle {
+  font-size: 11px;
+  color: var(--compresso-grey-6);
+  line-height: 1.3;
+}
+
+.topbar-meter-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--compresso-grey-6);
+  letter-spacing: 0.06em;
+}
+
+.topbar-meter-track {
+  width: 52px;
+  height: 4px;
+  background: color-mix(in srgb, var(--compresso-grey-6), transparent 80%);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.topbar-meter-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background-color 0.3s ease;
+}
+
+.topbar-meter-value {
+  font-size: 11px;
+  color: var(--compresso-grey-7);
+  min-width: 28px;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-subtle);
+}
+
+// Polished sidebar
+.q-drawer.app-sidebar {
+  background: var(--compresso-sidebar-bg) !important;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.app-sidebar .sidebar-brand-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.app-sidebar .sidebar-brand-sub {
+  font-size: 10px;
+  color: var(--compresso-grey-5);
+  line-height: 1.3;
+}
+
+.nav-count-badge {
+  background: color-mix(in srgb, var(--q-warning), transparent 84%);
+  color: var(--q-warning);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 99px;
 }
 
 .footer-background {
@@ -151,55 +238,41 @@ body {
 }
 
 // ============================================================
-// Stat Cards v2 — Top-line accent with tinted background
+// Stat Cards v3 — Polished flat surface with subtle border
 // ============================================================
 .stat-card {
   position: relative;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 85%);
-  background: color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 96%);
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
   transition: border-color 0.2s ease;
 }
 
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--stat-card-accent, var(--q-primary));
-  border-radius: 6px 6px 0 0;
-}
-
 .stat-card:hover {
-  border-color: color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 70%);
-}
-
-.body--dark .stat-card {
-  background: color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 93%);
+  border-color: color-mix(in srgb, var(--stat-card-accent, var(--q-primary)), transparent 60%);
 }
 
 .stat-card .stat-value {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.375rem;
+  font-weight: 700;
   line-height: 1.15;
+  margin-top: 4px;
 }
 
 .stat-card .stat-label {
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--compresso-grey-6);
   margin-bottom: 2px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .stat-card .stat-sublabel {
   font-size: 0.7rem;
   color: var(--compresso-grey-5);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .stat-card--primary { --stat-card-accent: var(--q-primary); }
@@ -305,20 +378,20 @@ body {
 // Table Overrides
 // ============================================================
 .q-table thead th {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.656rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--compresso-grey-6);
-  border-bottom: 2px solid var(--compresso-grey-3);
-  padding: 6px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle), var(--compresso-grey-6) 12%);
+  padding: 8px 12px;
   white-space: nowrap;
 }
 
 .q-table tbody td {
   font-size: 0.8rem;
-  padding: 5px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--compresso-grey-3), transparent 50%);
+  padding: 6px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle), transparent 30%);
 }
 
 .q-table tbody tr:hover td {
@@ -429,15 +502,15 @@ body {
 // ============================================================
 .nav-section-label {
   font-size: 0.625rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--compresso-grey-5);
-  padding: 12px 16px 4px;
+  padding: 16px 20px 4px;
 }
 
 .nav-active {
-  background: color-mix(in srgb, var(--q-primary), transparent 88%) !important;
+  background: color-mix(in srgb, var(--q-primary), transparent 86%) !important;
   border-radius: 8px;
   margin: 1px 8px;
 }
@@ -452,8 +525,8 @@ body {
 // Custom Scrollbar
 // ============================================================
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -462,7 +535,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--compresso-grey-4);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {

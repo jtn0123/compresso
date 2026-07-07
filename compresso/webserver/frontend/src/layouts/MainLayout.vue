@@ -1,7 +1,7 @@
 <template>
   <q-layout view="hHh lpR fff">
-    <q-header class="header-background text-white">
-      <q-toolbar style="min-height: 38px; height: 38px">
+    <q-header class="app-topbar">
+      <q-toolbar style="min-height: 52px; height: 52px; padding: 0 16px 0 8px">
         <!-- Mobile menu toggle -->
         <q-btn
           v-if="$q.screen.lt.md"
@@ -13,43 +13,82 @@
           @click="toggleDrawer"
         />
 
-        <!-- Logo (always visible, clickable to dashboard) -->
-        <q-btn flat round dense size="sm" @click="$router.push('/ui/dashboard')" class="q-mr-xs">
+        <!-- Logo (mobile only — desktop shows it in the sidebar) -->
+        <q-btn v-if="$q.screen.lt.md" flat round dense size="sm" @click="$router.push('/ui/dashboard')" class="q-mr-xs">
           <q-avatar rounded size="22px">
             <img src="~assets/compresso-logo-white.png" :alt="$t('a11y.logoAlt')" />
           </q-avatar>
         </q-btn>
 
-        <div class="gt-xs">
-          <SharedLinkDropdown />
+        <!-- Page title + subtitle -->
+        <div class="col q-pl-sm" style="min-width: 0">
+          <div class="topbar-title ellipsis">{{ pageTitle }}</div>
+          <div class="topbar-subtitle ellipsis gt-xs">{{ pageSubtitle }}</div>
         </div>
 
-        <q-space />
-
         <!-- Right-side controls -->
-        <div class="row items-center no-wrap q-gutter-xs">
-          <PaletteSwitch class="gt-xs" />
-          <ThemeSwitch class="gt-xs" />
-          <q-btn
-            dense
-            flat
-            round
-            icon="notifications"
-            size="sm"
-            :aria-label="$t('a11y.notifications')"
-            @click="toggleNotificationsDrawer"
-          >
-            <q-badge
-              v-if="notificationsCount > 0"
-              color="red"
-              text-color="white"
-              floating
-              style="font-size: 0.6rem; padding: 2px 4px"
+        <div class="row items-center no-wrap" style="gap: 14px">
+          <!-- System meters -->
+          <div v-if="$q.screen.gt.sm" class="row items-center no-wrap" style="gap: 14px">
+            <div v-for="meter in meters" :key="meter.label" class="row items-center no-wrap" style="gap: 6px">
+              <span class="topbar-meter-label">{{ meter.label }}</span>
+              <div class="topbar-meter-track">
+                <div class="topbar-meter-fill" :style="{ width: meter.percent + '%', background: meter.color }"></div>
+              </div>
+              <span class="topbar-meter-value">{{ meter.percent }}%</span>
+            </div>
+            <div class="topbar-divider"></div>
+          </div>
+
+          <!-- Live connection indicator -->
+          <div class="row items-center no-wrap" style="gap: 6px">
+            <div
+              :class="[
+                'connection-dot',
+                connectionState === 'connected'
+                  ? 'connection-dot--connected'
+                  : connectionState === 'connecting'
+                    ? 'connection-dot--connecting'
+                    : 'connection-dot--disconnected',
+              ]"
+            />
+            <span class="text-caption text-weight-medium" :class="connectionTextClass" style="font-size: 11px">
+              {{ connectionLabel }}
+            </span>
+            <q-tooltip>
+              {{
+                connectionState === 'connected' ? $t('systemStatus.realtimeActive') : $t('systemStatus.realtimeLost')
+              }}
+            </q-tooltip>
+          </div>
+
+          <div class="gt-xs">
+            <SharedLinkDropdown />
+          </div>
+          <div class="row items-center no-wrap q-gutter-xs">
+            <PaletteSwitch class="gt-xs" />
+            <ThemeSwitch class="gt-xs" />
+            <q-btn
+              dense
+              flat
+              round
+              icon="notifications"
+              size="sm"
+              :aria-label="$t('a11y.notifications')"
+              @click="toggleNotificationsDrawer"
             >
-              {{ notificationsCount }}
-            </q-badge>
-            <q-tooltip>Notifications</q-tooltip>
-          </q-btn>
+              <q-badge
+                v-if="notificationsCount > 0"
+                color="red"
+                text-color="white"
+                floating
+                style="font-size: 0.6rem; padding: 2px 4px"
+              >
+                {{ notificationsCount }}
+              </q-badge>
+              <q-tooltip>Notifications</q-tooltip>
+            </q-btn>
+          </div>
         </div>
       </q-toolbar>
     </q-header>
@@ -60,12 +99,11 @@
       side="left"
       :mini="!sidebarPinned && !sidebarHovered && !isMobile"
       :mini-width="56"
-      :width="240"
+      :width="232"
       :behavior="isMobile ? 'mobile' : 'desktop'"
-      bordered
+      class="app-sidebar"
       @mouseover="onDrawerMouseOver"
       @mouseout="onDrawerMouseOut"
-      class="bg-surface-1"
     >
       <DrawerMainNav :mini="isDrawerMini" :pinned="sidebarPinned" @update:pinned="onPinToggle" />
     </q-drawer>
@@ -99,9 +137,11 @@
 </template>
 
 <script>
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { LocalStorage, useQuasar } from 'quasar'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import DrawerMainNav from 'components/drawers/DrawerMainNav'
 import ThemeSwitch from 'components/ThemeSwitch'
 import PaletteSwitch from 'components/PaletteSwitch'
@@ -110,8 +150,24 @@ import SharedLinkDropdown from 'components/SharedLinkDropdown'
 import KeyboardShortcutsDialog from 'components/ui/KeyboardShortcutsDialog'
 import FirstRunWizard from 'components/ui/FirstRunWizard'
 import compressoGlobals, { getCompressoApiUrl, notificationsCount } from 'src/js/compressoGlobals'
+import { wsConnectionState } from 'src/js/compressoWebsocket'
 import { useKeyboardShortcuts } from 'src/composables/useKeyboardShortcuts'
 import { createLogger } from 'src/composables/useLogger'
+
+const PAGE_HEADER_KEYS = {
+  '/ui/dashboard': 'dashboard',
+  '/ui/compression': 'compression',
+  '/ui/approval': 'approval',
+  '/ui/preview': 'preview',
+  '/ui/health': 'health',
+  '/ui/history': 'history',
+  '/ui/data-panels': 'dataPanels',
+  '/ui/settings-library': 'settings',
+  '/ui/settings-workers': 'settings',
+  '/ui/settings-plugins': 'settings',
+  '/ui/settings-link': 'settings',
+  '/ui/settings-notifications': 'settings',
+}
 
 export default {
   components: {
@@ -125,11 +181,14 @@ export default {
   },
   setup() {
     const $q = useQuasar()
+    const route = useRoute()
+    const { t } = useI18n()
     const log = createLogger('MainLayout')
 
     // Sidebar state
     const leftDrawerOpen = ref(!$q.screen.lt.md)
-    const sidebarPinned = ref(LocalStorage.getItem('sidebar_pinned') === true)
+    // Expanded (pinned) by default — matches the polished fixed-sidebar design
+    const sidebarPinned = ref(LocalStorage.getItem('sidebar_pinned') !== false)
     const sidebarHovered = ref(false)
     const rightNotificationsDrawerOpen = ref(false)
 
@@ -157,6 +216,74 @@ export default {
       LocalStorage.set('sidebar_pinned', val)
     }
 
+    // Page header (title + subtitle) derived from route
+    const pageTitle = computed(() => {
+      const key = PAGE_HEADER_KEYS[route.path]
+      return key ? t(`pageHeaders.${key}.title`) : 'Compresso'
+    })
+    const pageSubtitle = computed(() => {
+      const key = PAGE_HEADER_KEYS[route.path]
+      return key ? t(`pageHeaders.${key}.subtitle`) : ''
+    })
+
+    // Top bar system meters (polled — independent of page websockets)
+    const systemMetrics = ref({ cpu: 0, mem: 0, gpu: null })
+    let metricsInterval = null
+
+    function meterColor(percent) {
+      if (percent >= 85) return 'var(--q-negative)'
+      if (percent >= 50) return 'var(--q-warning)'
+      return 'var(--q-positive)'
+    }
+
+    const meters = computed(() => {
+      const list = [
+        { label: 'CPU', percent: Math.round(systemMetrics.value.cpu) },
+        { label: 'MEM', percent: Math.round(systemMetrics.value.mem) },
+      ]
+      if (systemMetrics.value.gpu != null) {
+        list.push({ label: 'GPU', percent: Math.round(systemMetrics.value.gpu) })
+      }
+      return list.map((m) => ({ ...m, color: meterColor(m.percent) }))
+    })
+
+    async function fetchSystemMetrics() {
+      try {
+        const response = await axios.get(getCompressoApiUrl('v2', 'system/status'))
+        const gpus = response.data.gpus || []
+        systemMetrics.value = {
+          cpu: response.data.cpu?.percent || 0,
+          mem: response.data.memory?.percent || 0,
+          gpu: gpus.length > 0 && gpus[0].utilization_percent != null ? gpus[0].utilization_percent : null,
+        }
+      } catch (err) {
+        log.debug('Failed to fetch system metrics for top bar: ' + err)
+      }
+    }
+
+    // Connection indicator
+    const connectionState = computed(() => wsConnectionState.value)
+    const connectionTextClass = computed(() => {
+      switch (connectionState.value) {
+        case 'connected':
+          return 'text-positive'
+        case 'connecting':
+          return 'text-warning'
+        default:
+          return 'text-negative'
+      }
+    })
+    const connectionLabel = computed(() => {
+      switch (connectionState.value) {
+        case 'connected':
+          return t('systemStatus.live')
+        case 'connecting':
+          return t('systemStatus.connecting')
+        default:
+          return t('systemStatus.offline')
+      }
+    })
+
     // Keyboard shortcuts
     const { showHelp } = useKeyboardShortcuts()
     const showShortcutsHelp = ref(false)
@@ -174,6 +301,10 @@ export default {
       // Fetch version (used by sidebar)
       compressoGlobals.getCompressoVersion()
 
+      // Top bar meters
+      fetchSystemMetrics()
+      metricsInterval = setInterval(fetchSystemMetrics, 5000)
+
       // Check onboarding status
       axios
         .get(getCompressoApiUrl('v2', 'settings/read'))
@@ -185,6 +316,10 @@ export default {
         .catch((err) => {
           log.warn('Failed to fetch settings for onboarding check: ' + err)
         })
+    })
+
+    onUnmounted(() => {
+      if (metricsInterval) clearInterval(metricsInterval)
     })
 
     return {
@@ -200,6 +335,12 @@ export default {
       onDrawerMouseOut,
       onPinToggle,
       notificationsCount,
+      pageTitle,
+      pageSubtitle,
+      meters,
+      connectionState,
+      connectionTextClass,
+      connectionLabel,
       showShortcutsHelp,
       showOnboarding,
     }

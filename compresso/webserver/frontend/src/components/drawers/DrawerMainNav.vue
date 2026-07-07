@@ -1,13 +1,23 @@
 <template>
   <div class="column fit">
-    <!-- Pin toggle (only visible when expanded) -->
-    <div v-if="!mini" class="row items-center justify-end q-px-sm q-pt-sm" style="min-height: 32px">
+    <!-- Brand header -->
+    <div class="row items-center no-wrap q-px-md q-pt-md q-pb-sm" style="gap: 10px; min-height: 54px">
+      <q-avatar rounded size="26px" style="cursor: pointer" @click="$router.push('/ui/dashboard')">
+        <img src="~assets/compresso-logo-white.png" :alt="$t('a11y.logoAlt')" />
+      </q-avatar>
+      <div v-if="!mini" class="col" style="min-width: 0">
+        <div class="sidebar-brand-name">Compresso</div>
+        <div class="sidebar-brand-sub ellipsis">
+          <template v-if="compressoVersion">v{{ compressoVersion }} · </template>media optimizer
+        </div>
+      </div>
       <q-btn
+        v-if="!mini"
         dense
         flat
         round
         size="xs"
-        :icon="pinned ? 'push_pin' : 'push_pin'"
+        icon="push_pin"
         :color="pinned ? 'primary' : 'grey-6'"
         :style="{ transform: pinned ? 'none' : 'rotate(45deg)' }"
         @click="$emit('update:pinned', !pinned)"
@@ -15,7 +25,6 @@
         <q-tooltip>{{ pinned ? 'Unpin sidebar' : 'Pin sidebar' }}</q-tooltip>
       </q-btn>
     </div>
-    <div v-else style="height: 8px" />
 
     <!-- Scrollable Navigation -->
     <q-scroll-area class="col">
@@ -31,10 +40,9 @@
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.dashboard') }}</q-tooltip>
         </q-item>
 
-        <q-separator class="q-my-xs q-mx-sm" />
-
         <!-- CORE TOOLS -->
         <q-item-label v-if="!mini" class="nav-section-label">{{ $t('navigation.tools') }}</q-item-label>
+        <q-separator v-else class="q-my-xs q-mx-sm" />
 
         <q-item clickable to="/ui/compression" v-ripple :class="{ 'nav-active': $route.path === '/ui/compression' }">
           <q-item-section avatar><q-icon name="compress" size="20px" /></q-item-section>
@@ -47,7 +55,10 @@
           <q-item-section v-if="!mini">
             {{ $t('navigation.approvalQueue') }}
           </q-item-section>
-          <q-badge v-if="approvalCount > 0" color="orange" floating :label="approvalCount" />
+          <q-item-section v-if="!mini && approvalCount > 0" side>
+            <span class="nav-count-badge">{{ approvalCount }}</span>
+          </q-item-section>
+          <q-badge v-if="mini && approvalCount > 0" color="orange" floating :label="approvalCount" />
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{
             $t('navigation.approvalQueue')
           }}</q-tooltip>
@@ -59,12 +70,11 @@
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.abPreview') }}</q-tooltip>
         </q-item>
 
-        <q-separator class="q-my-xs q-mx-sm" />
-
         <!-- MONITORING -->
         <q-item-label v-if="!mini" class="nav-section-label">{{
           $t('navigation.monitoring') || 'Monitoring'
         }}</q-item-label>
+        <q-separator v-else class="q-my-xs q-mx-sm" />
 
         <q-item clickable to="/ui/health" v-ripple :class="{ 'nav-active': $route.path === '/ui/health' }">
           <q-item-section avatar><q-icon name="health_and_safety" size="20px" /></q-item-section>
@@ -135,10 +145,9 @@
           </q-item>
         </q-expansion-item>
 
-        <q-separator class="q-my-xs q-mx-sm" />
-
         <!-- SETTINGS (flat list) -->
         <q-item-label v-if="!mini" class="nav-section-label">{{ $t('navigation.settings') }}</q-item-label>
+        <q-separator v-else class="q-my-xs q-mx-sm" />
 
         <q-item
           clickable
@@ -234,11 +243,6 @@
           </q-item>
         </template>
       </q-list>
-
-      <!-- Version -->
-      <div class="text-center q-py-xs">
-        <span class="text-caption nav-version">v{{ compressoVersion }}</span>
-      </div>
     </div>
 
     <!-- Dialogs -->
@@ -357,14 +361,5 @@ export default {
 
 .q-item .q-icon {
   color: var(--compresso-grey-6);
-}
-
-.nav-version {
-  opacity: 0.4;
-  font-size: 0.6rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
 }
 </style>
