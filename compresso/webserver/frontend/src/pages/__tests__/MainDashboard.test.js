@@ -116,22 +116,13 @@ describe('MainDashboard.vue', () => {
     expect(wrapper.exists()).toBe(true)
   })
 
-  // 2. Shows system status bar
-  it('renders the SystemStatusBar component', async () => {
+  // 2. System meters moved to the app top bar (MainLayout) — the dashboard no longer renders SystemStatusBar
+  it('does not render the SystemStatusBar component', async () => {
     const wrapper = shallowMountWithQuasar(MainDashboard)
     await flushPromises()
 
     const statusBar = wrapper.findComponent({ name: 'SystemStatusBar' })
-    expect(statusBar.exists()).toBe(true)
-  })
-
-  it('passes systemInfo and liveMetrics props to SystemStatusBar', async () => {
-    const wrapper = shallowMountWithQuasar(MainDashboard)
-    await flushPromises()
-
-    const statusBar = wrapper.findComponent({ name: 'SystemStatusBar' })
-    expect(statusBar.props('systemInfo')).toBeDefined()
-    expect(statusBar.props('liveMetrics')).toBeDefined()
+    expect(statusBar.exists()).toBe(false)
   })
 
   // 3. Worker cards render with data

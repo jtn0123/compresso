@@ -6,7 +6,8 @@ $primary   : #1a6b4a;
 $secondary : #d49a1e;
 $accent    : #7c5cbf;
 
-$dark      : #141418;
+$dark      : #17181c;
+$dark-page : #0e0f11;
 
 $positive  : #2e9e5a;
 $negative  : #d43545;
@@ -16,6 +17,10 @@ $warning   : #d49a1e;
 // Custom colours
 $header: #13291f;
 $card-head: #f4f6f5;
+
+// Rounded corners (polished shell: 8px controls, 10px cards)
+$generic-border-radius: 8px;
+$button-border-radius: 8px;
 
 // Typography
 $typography-font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;

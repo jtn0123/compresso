@@ -30,6 +30,8 @@
     "connected": "Connected",
     "disconnected": "Disconnected",
     "connecting": "Connecting...",
+    "live": "Live",
+    "offline": "Offline",
     "realtimeActive": "Real-time updates active",
     "realtimeLost": "Real-time updates lost — data may be stale",
     "uptime": "Uptime"
@@ -1196,6 +1198,40 @@
         "approvalNeeded": "Approval needed",
         "healthCheckFailed": "Health check failed"
       }
+    }
+  },
+  "pageHeaders": {
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "Overview of workers, queue and library health"
+    },
+    "compression": {
+      "title": "Compression",
+      "subtitle": "Ratios, savings and per-library stats"
+    },
+    "approval": {
+      "title": "Approval Queue",
+      "subtitle": "Review transcodes before they replace originals"
+    },
+    "preview": {
+      "title": "A/B Preview",
+      "subtitle": "Compare source vs. encoded quality"
+    },
+    "health": {
+      "title": "Health Check",
+      "subtitle": "Scan your library for integrity issues"
+    },
+    "history": {
+      "title": "Task History",
+      "subtitle": "Everything Compresso has processed"
+    },
+    "dataPanels": {
+      "title": "Data Panels",
+      "subtitle": "Plugin-provided data views"
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "Libraries, workers, plugins, links and notifications"
     }
   }
 }

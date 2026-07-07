@@ -1,12 +1,7 @@
 <template>
   <q-page padding class="q-pa-sm">
     <div class="row q-col-gutter-md">
-      <!-- Row 1: System Status Bar -->
-      <div class="col-12">
-        <SystemStatusBar :system-info="systemInfo" :live-metrics="liveMetrics" />
-      </div>
-
-      <!-- Row 2: Hero section -->
+      <!-- Row 1: Hero section -->
       <!-- Left: Donut + Stats -->
       <div class="col-12 col-md-4 col-lg-3">
         <q-card flat bordered class="full-height">
@@ -116,7 +111,6 @@
 </template>
 
 <script>
-import SystemStatusBar from 'components/dashboard/SystemStatusBar.vue'
 import LibraryDonutChart from 'components/charts/LibraryDonutChart.vue'
 import CompactStatsGrid from 'components/dashboard/CompactStatsGrid.vue'
 import WorkersPanel from 'components/dashboard/workers/WorkersPanel.vue'
@@ -142,7 +136,6 @@ export default {
   components: {
     ReleaseNotesDialog,
     CompletedTasks,
-    SystemStatusBar,
     LibraryDonutChart,
     CompactStatsGrid,
     WorkersPanel,

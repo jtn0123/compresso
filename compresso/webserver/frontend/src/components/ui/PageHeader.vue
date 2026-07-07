@@ -1,12 +1,7 @@
 <template>
-  <div class="row items-center q-mb-md page-header">
-    <div class="col">
-      <div class="page-header-title">{{ title }}</div>
-      <div v-if="subtitle" class="page-header-subtitle">{{ subtitle }}</div>
-    </div>
-    <div v-if="$slots.actions" class="col-auto q-gutter-sm">
-      <slot name="actions" />
-    </div>
+  <!-- Page title + subtitle now live in the app top bar; this renders page-level actions only -->
+  <div v-if="$slots.actions" class="row items-center justify-end q-gutter-sm q-mb-md page-header">
+    <slot name="actions" />
   </div>
 </template>
 
@@ -22,22 +17,3 @@ defineProps({
   },
 })
 </script>
-
-<style scoped>
-.page-header {
-  border-bottom: 1px solid color-mix(in srgb, var(--q-primary), transparent 70%);
-  padding-bottom: 10px;
-}
-
-.page-header-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.page-header-subtitle {
-  font-size: 0.78rem;
-  color: var(--compresso-grey-6);
-  margin-top: 2px;
-}
-</style>
