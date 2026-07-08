@@ -27,13 +27,15 @@ export default [
   {
     ignores: [
       'dist/**',
+      'coverage/**',
+      'playwright-report/**',
       'src-bex/www/**',
       'src-capacitor/**',
       'src-cordova/**',
       '.quasar/**',
       'node_modules/**',
+      'test-results/**',
       '**/*.cjs',
-      'babel.config.js',
       'quasar.config.*.temporary.compiled*',
       'eslint.config.mjs',
     ],
@@ -64,7 +66,13 @@ export default [
     files: ['**/*.js'],
     languageOptions: {
       parser: babelParser,
-      parserOptions: { requireConfigFile: false },
+      parserOptions: {
+        requireConfigFile: false,
+        babelOptions: {
+          babelrc: false,
+          configFile: false,
+        },
+      },
     },
   },
 
@@ -73,7 +81,14 @@ export default [
   {
     files: ['**/*.vue'],
     languageOptions: {
-      parserOptions: { parser: babelParser, requireConfigFile: false },
+      parserOptions: {
+        parser: babelParser,
+        requireConfigFile: false,
+        babelOptions: {
+          babelrc: false,
+          configFile: false,
+        },
+      },
     },
   },
 ]

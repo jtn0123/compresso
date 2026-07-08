@@ -79,7 +79,9 @@ python3.13 -m pip install -r requirements.txt -r requirements-dev.txt
 ```bash
 cd compresso/webserver/frontend
 npm ci
+npm run test -- --run
 npm run lint
+npm run test:e2e
 npm run build:publish
 cd ../../..
 ```
@@ -108,6 +110,13 @@ To mirror the main local validation gates from a prepared checkout, run:
 
 ```bash
 bash scripts/verify-local.sh
+```
+
+For Docker-focused changes, run the local container preflight when Docker is available:
+
+```bash
+bash scripts/docker-preflight.sh
+bash scripts/trivy-group-report.sh compresso:local-preflight
 ```
 
 For a production-focused source or Docker workflow, including a deployment checklist for large libraries, see [docs/FORK_DEPLOYMENT.md](./docs/FORK_DEPLOYMENT.md).

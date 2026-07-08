@@ -59,4 +59,21 @@ npm run lint
 echo "==> Running frontend coverage gate"
 npx vitest run --coverage
 
+echo "==> Building frontend package assets"
+npm run build:publish
+
+if [[ "${SKIP_E2E:-0}" != "1" ]]; then
+  echo "==> Installing Playwright Chromium"
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    npx playwright install --with-deps chromium
+  else
+    npx playwright install chromium
+  fi
+
+  echo "==> Running frontend Playwright smoke tests"
+  npm run test:e2e
+else
+  echo "==> Skipping frontend Playwright smoke tests because SKIP_E2E=1"
+fi
+
 echo "==> Local verification complete"

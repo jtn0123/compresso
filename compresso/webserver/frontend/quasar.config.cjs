@@ -6,10 +6,7 @@
  */
 
 // Configuration for your app
-// https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js
-
-
-const ESLintPlugin = require('eslint-webpack-plugin')
+// https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
 // Load .env variables for devserver proxy configuration
 require('dotenv').config()
@@ -18,22 +15,22 @@ const { configure } = require('quasar/wrappers');
 
 module.exports = configure(function (ctx) {
   return {
-    // https://v2.quasar.dev/quasar-cli-webpack/supporting-ts
+    // https://v2.quasar.dev/quasar-cli-vite/supporting-ts
     supportTS: false,
 
-    // https://v2.quasar.dev/quasar-cli-webpack/prefetch-feature
+    // https://v2.quasar.dev/quasar-cli-vite/prefetch-feature
     // preFetch: true,
 
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
-    // https://v2.quasar.dev/quasar-cli-webpack/boot-files
+    // https://v2.quasar.dev/quasar-cli-vite/boot-files
     boot: [
       'axios',
       'i18n',
       'global-event-bus',
     ],
 
-    // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-css
+    // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
     css: [
       'app.scss',
       'admonitions.css'
@@ -54,7 +51,7 @@ module.exports = configure(function (ctx) {
       'material-icons-outlined', // optional, you are not bound to it
     ],
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-build
+    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#build
     build: {
       vueRouterMode: 'history', // available values: 'hash', 'history'
 
@@ -77,50 +74,34 @@ module.exports = configure(function (ctx) {
       // Options below are automatically set depending on the env, set them if you want to override
       // extractCSS: false,
 
-      // https://v2.quasar.dev/quasar-cli-webpack/handling-webpack
-      // "chain" is a webpack-chain object https://github.com/neutrinojs/webpack-chain
-
-      chainWebpack (chain) {
-        chain.plugin('eslint-webpack-plugin')
-          .use(ESLintPlugin, [{ extensions: [ 'js', 'vue' ] }])
-      }
-
+      vueOptionsAPI: true,
+      extendViteConf(viteConf) {
+        viteConf.resolve = viteConf.resolve || {}
+        viteConf.resolve.extensions = ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.vue']
+        viteConf.resolve.dedupe = ['vue', 'vue-router', 'quasar']
+      },
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-devServer
+    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#devserver
     devServer: {
-      server: {
-        type: 'http'
-      },
+      https: false,
       port: 8889,
       proxy: (() => {
         // Allow configuring the backend target via .env
         // Example: COMPRESSO_BACKEND_URL=http://localhost:8888
         const httpTarget = process.env.COMPRESSO_BACKEND_URL || 'http://localhost:8888'
 
-        return [
-          {
-            context: ['/compresso/api', '/compresso/panel', '/compresso/swagger'],
-            target: httpTarget
-          },
-          {
-            context: ['/compresso/websocket'],
-            target: httpTarget,
-            ws: true
-          }
-        ]
+        return {
+          '/compresso/api': { target: httpTarget },
+          '/compresso/panel': { target: httpTarget },
+          '/compresso/swagger': { target: httpTarget },
+          '/compresso/websocket': { target: httpTarget, ws: true },
+        }
       })(),
       open: false, // opens browser window automatically
-      client: {
-        overlay: {
-          errors: true,
-          runtimeErrors: false,
-          warnings: false,
-        },
-      },
     },
 
-    // https://v2.quasar.dev/quasar-cli-webpack/quasar-config-js#Property%3A-framework
+    // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
     framework: {
       config: {},
 
@@ -147,7 +128,7 @@ module.exports = configure(function (ctx) {
     // https://quasar.dev/options/animations
     animations: [],
 
-    // https://v2.quasar.dev/quasar-cli-webpack/developing-ssr/configuring-ssr
+    // https://v2.quasar.dev/quasar-cli-vite/developing-ssr/configuring-ssr
     ssr: {
       pwa: false,
 
@@ -160,32 +141,16 @@ module.exports = configure(function (ctx) {
       maxAge: 1000 * 60 * 60 * 24 * 30,
         // Tell browser when a file from the server should expire from cache (in ms)
 
-
-      chainWebpackWebserver (chain) {
-        chain.plugin('eslint-webpack-plugin')
-          .use(ESLintPlugin, [{ extensions: [ 'js' ] }])
-      },
-
-
       middlewares: [
         ctx.prod ? 'compression' : '',
         'render' // keep this as last one
       ]
     },
 
-    // https://v2.quasar.dev/quasar-cli-webpack/developing-pwa/configuring-pwa
+    // https://v2.quasar.dev/quasar-cli-vite/developing-pwa/configuring-pwa
     pwa: {
       workboxPluginMode: 'GenerateSW', // 'GenerateSW' or 'InjectManifest'
       workboxOptions: {}, // only for GenerateSW
-
-      // for the custom service worker ONLY (/src-pwa/custom-service-worker.[js|ts])
-      // if using workbox in InjectManifest mode
-
-      chainWebpackCustomSW (chain) {
-        chain.plugin('eslint-webpack-plugin')
-          .use(ESLintPlugin, [{ extensions: [ 'js' ] }])
-      },
-
 
       manifest: {
         name: `Compresso`,
@@ -225,17 +190,17 @@ module.exports = configure(function (ctx) {
       }
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/developing-cordova-apps/configuring-cordova
+    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-cordova-apps/configuring-cordova
     cordova: {
       // noIosLegacyBuildFlag: true, // uncomment only if you know what you are doing
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/developing-capacitor-apps/configuring-capacitor
+    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-capacitor-apps/configuring-capacitor
     capacitor: {
       hideSplashscreen: true
     },
 
-    // Full list of options: https://v2.quasar.dev/quasar-cli-webpack/developing-electron-apps/configuring-electron
+    // Full list of options: https://v2.quasar.dev/quasar-cli-vite/developing-electron-apps/configuring-electron
     electron: {
       bundler: 'packager', // 'packager' or 'builder'
 
@@ -257,21 +222,6 @@ module.exports = configure(function (ctx) {
 
         appId: 'compresso-frontend'
       },
-
-      // "chain" is a webpack-chain object https://github.com/neutrinojs/webpack-chain
-
-      chainWebpackMain (chain) {
-        chain.plugin('eslint-webpack-plugin')
-          .use(ESLintPlugin, [{ extensions: [ 'js' ] }])
-      },
-
-
-
-      chainWebpackPreload (chain) {
-        chain.plugin('eslint-webpack-plugin')
-          .use(ESLintPlugin, [{ extensions: [ 'js' ] }])
-      },
-
     }
   }
 });

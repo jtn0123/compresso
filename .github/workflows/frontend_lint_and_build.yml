@@ -58,6 +58,12 @@ jobs:
       run: |
         test -f dist/spa/index.html
 
+    - name: Install Playwright browser
+      run: npx playwright install --with-deps chromium
+
+    - name: Run Playwright smoke tests
+      run: npm run test:e2e
+
     - name: Audit direct production dependencies
       run: |
         npm audit --omit=dev

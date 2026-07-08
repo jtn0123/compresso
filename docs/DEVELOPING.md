@@ -86,11 +86,16 @@ compresso --version
 ## Building the Frontend
 
 The Compresso frontend lives in `compresso/webserver/frontend/` (vendored, no submodules).
+It uses Quasar CLI with Vite, Vue 3, Vue Router 4, and vue-i18n 11. Node.js 24 is the CI baseline; Node.js 22 is accepted for local development.
 
 ```bash
 cd compresso/webserver/frontend
 npm ci
+npm run test -- --run
+npm run lint
+npx vitest run --coverage
 npm run build:publish
+npm run test:e2e
 ```
 
 The built assets are output to `compresso/webserver/public/`.
@@ -145,6 +150,23 @@ To run the main local verification gates used for day-to-day changes:
 ```bash
 bash scripts/verify-local.sh
 ```
+
+Set `SKIP_E2E=1` only when you intentionally want to skip local Playwright browser setup. CI still runs the smoke tests.
+
+### Frontend coverage ratchet
+
+Vitest coverage thresholds start conservatively so the current suite passes. Raise the thresholds only when new tests make the higher number stable, and never lower them without documenting the reason in the PR.
+
+### Docker preflight and scan grouping
+
+For Docker-facing changes:
+
+```bash
+bash scripts/docker-preflight.sh
+bash scripts/trivy-group-report.sh compresso:local-preflight
+```
+
+The Docker preflight rebuilds a fresh wheel before the image build. If Docker or Trivy is not installed locally, the scripts explain what was skipped.
 
 
 

@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md">
+  <q-page class="q-pa-md" data-testid="approval-queue-page">
     <!-- Header -->
     <PageHeader :title="$t('pages.approvalQueue.title')" :subtitle="$t('pages.approvalQueue.caption')">
       <template #actions>
@@ -530,6 +530,7 @@
           <div class="q-mb-md">
             <q-btn
               v-if="!previewActive && !previewLoading"
+              data-testid="approval-compare-quality"
               color="info"
               icon="compare"
               :label="$t('pages.approvalQueue.compareQuality')"

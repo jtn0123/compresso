@@ -121,9 +121,10 @@ A progressive trust-building sequence for new plugin configurations:
 ## Production Checklist
 
 - The repo builds cleanly from a fresh checkout.
-- `npm ci`, `npm run lint`, and `npm run build:publish` succeed in `compresso/webserver/frontend`.
+- `npm ci`, `npm run test -- --run`, `npm run lint`, `npx vitest run --coverage`, `npm run build:publish`, and `npm run test:e2e` succeed in `compresso/webserver/frontend`.
 - `python3.13 -m build --no-isolation --skip-dependency-check --wheel` succeeds.
-- The Docker image builds successfully if you are deploying with Docker.
+- `bash scripts/docker-preflight.sh` succeeds if you are deploying with Docker.
+- `bash scripts/trivy-group-report.sh compresso:local-preflight` has been reviewed when Trivy is available.
 - `/config`, `/library`, and `/tmp/compresso` are mounted to the intended persistent locations.
 - `GET /compresso/api/v2/healthcheck/readiness` returns `200`.
 - "First 30 Minutes After Boot" checklist completed successfully.
