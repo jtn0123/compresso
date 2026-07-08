@@ -1,3 +1,17 @@
+# [1.12.0](https://github.com/jtn0123/compresso/compare/v1.11.0...v1.12.0) (2026-07-08)
+
+
+### Bug Fixes
+
+* address approval queue review feedback ([d8c6a9a](https://github.com/jtn0123/compresso/commit/d8c6a9ae1c99d6c5bc499cf5ebfcc370082bbb9d))
+
+
+### Features
+
+* harden backend approval and analysis paths ([442ffad](https://github.com/jtn0123/compresso/commit/442ffad0ee8bfc4be5f4d375b4cb0e43046bf558))
+* migrate frontend tooling to vite ([9ffcf9c](https://github.com/jtn0123/compresso/commit/9ffcf9c1a4093ff6bf71cfd766398a70c3770931))
+* tighten approval queue filters and validation ([e9bec5a](https://github.com/jtn0123/compresso/commit/e9bec5af1c92a898ed0636c20bde69386d3cd972))
+
 # [1.11.0](https://github.com/jtn0123/compresso/compare/v1.10.15...v1.11.0) (2026-07-07)
 
 
