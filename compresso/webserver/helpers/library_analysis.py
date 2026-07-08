@@ -15,16 +15,35 @@ import threading
 import time
 from datetime import datetime
 
+from compresso.libs import common
 from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.unmodels import CompressionStats, LibraryAnalysisCache
+from compresso.libs.unmodels import CompressionStats, FileMetadata, FileMetadataPaths, LibraryAnalysisCache
 
 logger = CompressoLogging.get_logger("library_analysis")
+ANALYSIS_METADATA_KEY = "_compresso_library_analysis"
 
 # In-progress analyses keyed by library_id
 _active_analyses: dict = {}
 _analyses_lock = threading.Lock()
+_MEDIA_EXTENSIONS = {
+    ".mp4",
+    ".mkv",
+    ".avi",
+    ".mov",
+    ".wmv",
+    ".flv",
+    ".webm",
+    ".m4v",
+    ".ts",
+    ".mpg",
+    ".mpeg",
+    ".m2ts",
+    ".vob",
+    ".ogv",
+    ".3gp",
+}
 
 
 def start_analysis(library_id):
@@ -98,35 +117,135 @@ def get_analysis_status(library_id):
     }
 
 
+def _normalise_codec(codec):
+    codec = (codec or "unknown").lower()
+    if " (estimated)" in codec:
+        codec = codec.replace(" (estimated)", "")
+    return codec
+
+
+def _load_json_dict(value):
+    try:
+        data = json.loads(value or "{}")
+        return data if isinstance(data, dict) else {}
+    except (TypeError, json.JSONDecodeError):
+        return {}
+
+
+def _probe_analysis_file(filepath):
+    meta = extract_media_metadata(filepath)
+    file_size = os.path.getsize(filepath)
+    bitrate_mbps = 0
+    try:
+        from compresso.libs.ffprobe_utils import probe_file
+
+        probe_data = probe_file(filepath, timeout=10)
+        if probe_data and probe_data.get("format"):
+            duration = float(probe_data["format"].get("duration", 0))
+            if duration > 0:
+                bit_rate = probe_data["format"].get("bit_rate")
+                bitrate_mbps = float(bit_rate) / 1000000 if bit_rate else file_size * 8 / duration / 1000000
+    except Exception as e:
+        logger.debug("Failed to probe bitrate for %s: %s", filepath, e)
+
+    return {
+        "codec": _normalise_codec(meta.get("codec")),
+        "resolution": meta.get("resolution", "unknown"),
+        "file_size": file_size,
+        "bitrate_mbps": bitrate_mbps,
+        "updated_at": datetime.now().isoformat(),
+    }
+
+
+def _cached_analysis_file(filepath):
+    try:
+        fingerprint, algo = common.get_file_fingerprint(filepath)
+        path_row = FileMetadataPaths.get_or_none(FileMetadataPaths.path == filepath)
+        if not path_row or path_row.file_metadata.fingerprint != fingerprint:
+            return None, (fingerprint, algo)
+
+        metadata = _load_json_dict(path_row.file_metadata.metadata_json)
+        cached = metadata.get(ANALYSIS_METADATA_KEY)
+        if not isinstance(cached, dict):
+            return None, (fingerprint, algo)
+        required = {"codec", "resolution", "file_size", "bitrate_mbps"}
+        if not required.issubset(cached):
+            return None, (fingerprint, algo)
+        return cached, (fingerprint, algo)
+    except Exception as e:
+        logger.debug("Unable to read library analysis metadata cache for %s: %s", filepath, e)
+        return None, None
+
+
+def _persist_analysis_file(filepath, fingerprint_info, entry):
+    if not fingerprint_info:
+        return
+    try:
+        fingerprint, algo = fingerprint_info
+        row, _created = FileMetadata.get_or_create(
+            fingerprint=fingerprint,
+            defaults={
+                "fingerprint_algo": algo,
+                "metadata_json": "{}",
+                "updated_at": datetime.now(),
+            },
+        )
+        row.fingerprint_algo = algo
+        metadata = _load_json_dict(row.metadata_json)
+        metadata[ANALYSIS_METADATA_KEY] = entry
+        row.metadata_json = json.dumps(metadata, sort_keys=True)
+        row.updated_at = datetime.now()
+        row.save()
+
+        FileMetadataPaths.delete().where(
+            (FileMetadataPaths.path == filepath) & (FileMetadataPaths.file_metadata != row.id)
+        ).execute()
+        path_row = FileMetadataPaths.get_or_none(
+            (FileMetadataPaths.file_metadata == row.id) & (FileMetadataPaths.path == filepath)
+        )
+        if path_row:
+            path_row.updated_at = datetime.now()
+            path_row.path_type = "library_analysis"
+            path_row.save()
+        else:
+            FileMetadataPaths.create(file_metadata=row.id, path=filepath, path_type="library_analysis")
+    except Exception as e:
+        logger.debug("Unable to persist library analysis metadata cache for %s: %s", filepath, e)
+
+
+def _analyse_file_incremental(filepath):
+    cached, fingerprint = _cached_analysis_file(filepath)
+    if cached:
+        return cached
+
+    entry = _probe_analysis_file(filepath)
+    _persist_analysis_file(filepath, fingerprint, entry)
+    return entry
+
+
+def _cleanup_missing_analysis_paths(current_paths):
+    try:
+        current_paths = set(current_paths)
+        for path_row in FileMetadataPaths.select().where(FileMetadataPaths.path_type == "library_analysis"):
+            if path_row.path not in current_paths and not os.path.exists(path_row.path):
+                path_row.delete_instance()
+    except Exception as e:
+        logger.debug("Unable to clean stale library analysis metadata paths: %s", e)
+
+
 def _run_analysis(library_id, library_path, info):
     """
     Background thread: walk library, probe each media file, aggregate results.
     """
     try:
         # Collect all files
-        media_extensions = {
-            ".mp4",
-            ".mkv",
-            ".avi",
-            ".mov",
-            ".wmv",
-            ".flv",
-            ".webm",
-            ".m4v",
-            ".ts",
-            ".mpg",
-            ".mpeg",
-            ".m2ts",
-            ".vob",
-            ".ogv",
-            ".3gp",
-        }
         all_files = []
         for root, _dirs, files in os.walk(library_path):
             for fname in files:
                 ext = os.path.splitext(fname)[1].lower()
-                if ext in media_extensions:
+                if ext in _MEDIA_EXTENSIONS:
                     all_files.append(os.path.join(root, fname))
+        _cleanup_missing_analysis_paths(all_files)
 
         info["progress"]["total"] = len(all_files)
         info["progress"]["checked"] = 0
@@ -135,27 +254,11 @@ def _run_analysis(library_id, library_path, info):
         groups = {}
         for filepath in all_files:
             try:
-                meta = extract_media_metadata(filepath)
-                codec = meta.get("codec", "unknown").lower()
-                # Strip "(estimated)" suffix
-                if " (estimated)" in codec:
-                    codec = codec.replace(" (estimated)", "")
-                resolution = meta.get("resolution", "unknown")
-                file_size = os.path.getsize(filepath)
-
-                # Calculate bitrate from file size and duration
-                bitrate_mbps = 0
-                try:
-                    from compresso.libs.ffprobe_utils import probe_file
-
-                    probe_data = probe_file(filepath, timeout=10)
-                    if probe_data and probe_data.get("format"):
-                        duration = float(probe_data["format"].get("duration", 0))
-                        if duration > 0:
-                            bit_rate = probe_data["format"].get("bit_rate")
-                            bitrate_mbps = float(bit_rate) / 1000000 if bit_rate else file_size * 8 / duration / 1000000
-                except Exception as e:
-                    logger.debug("Failed to probe bitrate for %s: %s", filepath, e)
+                analysis_entry = _analyse_file_incremental(filepath)
+                codec = analysis_entry.get("codec", "unknown")
+                resolution = analysis_entry.get("resolution", "unknown")
+                file_size = analysis_entry.get("file_size", 0)
+                bitrate_mbps = analysis_entry.get("bitrate_mbps", 0)
 
                 key = (codec, resolution)
                 if key not in groups:

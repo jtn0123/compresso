@@ -234,32 +234,29 @@ class TestApprovalListingOrderAndSearch:
 
         mock_task_handler = MagicMock()
         mock_task_handler.get_total_task_list_count.return_value = 2
-        mock_task_handler.get_task_list_filtered_and_sorted.side_effect = [
-            MagicMock(),
-            [
-                {
-                    "id": 1,
-                    "abspath": "/media/hevc.mkv",
-                    "priority": 100,
-                    "type": "local",
-                    "status": "awaiting_approval",
-                    "source_size": 1000,
-                    "finish_time": "2024-06-01",
-                    "library_id": 1,
-                    "vmaf_score": 95,
-                },
-                {
-                    "id": 2,
-                    "abspath": "/media/h264.mkv",
-                    "priority": 100,
-                    "type": "local",
-                    "status": "awaiting_approval",
-                    "source_size": 2000,
-                    "finish_time": "2024-06-02",
-                    "library_id": 1,
-                    "vmaf_score": 85,
-                },
-            ],
+        mock_task_handler.get_task_list_filtered_and_sorted.return_value = [
+            {
+                "id": 1,
+                "abspath": "/media/hevc.mkv",
+                "priority": 100,
+                "type": "local",
+                "status": "awaiting_approval",
+                "source_size": 1000,
+                "finish_time": "2024-06-01",
+                "library_id": 1,
+                "vmaf_score": 95,
+            },
+            {
+                "id": 2,
+                "abspath": "/media/h264.mkv",
+                "priority": 100,
+                "type": "local",
+                "status": "awaiting_approval",
+                "source_size": 2000,
+                "finish_time": "2024-06-02",
+                "library_id": 1,
+                "vmaf_score": 85,
+            },
         ]
         mock_task_module.Task.return_value = mock_task_handler
         mock_staged_info.side_effect = [
@@ -300,21 +297,18 @@ class TestApprovalListingOrderAndSearch:
 
         mock_task_handler = MagicMock()
         mock_task_handler.get_total_task_list_count.return_value = 1
-        mock_task_handler.get_task_list_filtered_and_sorted.side_effect = [
-            MagicMock(),
-            [
-                {
-                    "id": 1,
-                    "abspath": "/media/missing-staged.mkv",
-                    "priority": 100,
-                    "type": "local",
-                    "status": "awaiting_approval",
-                    "source_size": 1000,
-                    "finish_time": "2024-06-01",
-                    "library_id": 1,
-                    "vmaf_score": 95,
-                },
-            ],
+        mock_task_handler.get_task_list_filtered_and_sorted.return_value = [
+            {
+                "id": 1,
+                "abspath": "/media/missing-staged.mkv",
+                "priority": 100,
+                "type": "local",
+                "status": "awaiting_approval",
+                "source_size": 1000,
+                "finish_time": "2024-06-01",
+                "library_id": 1,
+                "vmaf_score": 95,
+            },
         ]
         mock_task_module.Task.return_value = mock_task_handler
 
@@ -323,6 +317,84 @@ class TestApprovalListingOrderAndSearch:
         assert result["average_savings_percent"] == 0
         assert result["largest_savings_file"] == ""
         assert result["largest_savings_bytes"] == 0
+
+    @patch("compresso.webserver.helpers.approval.extract_media_metadata")
+    @patch("compresso.webserver.helpers.approval._get_staged_file_info")
+    @patch("compresso.webserver.helpers.approval.config.Config")
+    @patch("compresso.webserver.helpers.approval.task")
+    def test_summary_uses_persisted_approval_metadata_without_probing(
+        self, mock_task_module, mock_config_class, mock_staged_info, mock_extract
+    ):
+        from compresso.webserver.helpers.approval import prepare_approval_summary
+
+        mock_config = MagicMock()
+        mock_config.get_staging_path.return_value = "/tmp/staging"
+        mock_config_class.return_value = mock_config
+
+        mock_task_handler = MagicMock()
+        mock_task_handler.get_task_list_filtered_and_sorted.return_value = [
+            {
+                "id": 1,
+                "abspath": "/media/persisted.mkv",
+                "source_size": 1000,
+                "staged_size": 600,
+                "source_codec": "h264",
+                "staged_codec": "hevc",
+                "vmaf_score": 95,
+            }
+        ]
+        mock_task_module.Task.return_value = mock_task_handler
+
+        result = prepare_approval_summary({})
+
+        assert result["total_count"] == 1
+        assert result["total_staged_size"] == 600
+        assert result["codec_options"] == ["h264", "hevc"]
+        assert result["largest_savings_bytes"] == 400
+        mock_extract.assert_not_called()
+        mock_staged_info.assert_not_called()
+
+    @patch("compresso.webserver.helpers.approval.Tasks")
+    @patch("compresso.webserver.helpers.approval.extract_media_metadata")
+    @patch("compresso.webserver.helpers.approval._get_staged_file_info")
+    @patch("compresso.webserver.helpers.approval.config.Config")
+    @patch("compresso.webserver.helpers.approval.task")
+    def test_summary_backfills_legacy_approval_metadata(
+        self, mock_task_module, mock_config_class, mock_staged_info, mock_extract, mock_tasks_model
+    ):
+        from compresso.webserver.helpers.approval import prepare_approval_summary
+
+        mock_config = MagicMock()
+        mock_config.get_staging_path.return_value = "/tmp/staging"
+        mock_config_class.return_value = mock_config
+
+        mock_task_handler = MagicMock()
+        mock_task_handler.get_task_list_filtered_and_sorted.return_value = [
+            {
+                "id": 2,
+                "abspath": "/media/legacy.mkv",
+                "source_size": 1000,
+                "staged_size": 0,
+                "source_codec": "",
+                "staged_codec": "",
+                "vmaf_score": 90,
+            }
+        ]
+        mock_task_module.Task.return_value = mock_task_handler
+        mock_staged_info.return_value = {"size": 700, "path": "/tmp/staging/task_2/video.mkv"}
+        mock_extract.side_effect = [
+            {"codec": "h264", "resolution": "1080p"},
+            {"codec": "hevc", "resolution": "1080p"},
+        ]
+
+        result = prepare_approval_summary({})
+
+        assert result["total_staged_size"] == 700
+        assert result["codec_options"] == ["h264", "hevc"]
+        update_kwargs = mock_tasks_model.update.call_args.kwargs
+        assert update_kwargs["source_codec"] == "h264"
+        assert update_kwargs["staged_codec"] == "hevc"
+        assert update_kwargs["staged_size"] == 700
 
 
 # ------------------------------------------------------------------

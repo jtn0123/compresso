@@ -107,10 +107,11 @@ class TestPostProcessError:
 class TestStageForApproval:
     """Tests for PostProcessor._stage_for_approval()."""
 
+    @patch(f"{PP_MOD}.PostProcessor._record_approval_metadata")
     @patch("compresso.libs.ffprobe_utils.compute_quality_scores", return_value={"vmaf_score": None, "ssim_score": None})
     @patch(f"{PP_MOD}.shutil.copy2")
     @patch(f"{PP_MOD}.os.makedirs")
-    def test_stages_file_successfully(self, mock_makedirs, mock_copy2, mock_quality):
+    def test_stages_file_successfully(self, mock_makedirs, mock_copy2, mock_quality, mock_record_metadata):
         pp = _make_postprocessor()
         pp.settings = MagicMock()
         pp.settings.get_staging_path.return_value = "/staging"
@@ -120,12 +121,14 @@ class TestStageForApproval:
 
         mock_makedirs.assert_called_once_with(os.path.join("/staging", "task_42"), exist_ok=True)
         mock_copy2.assert_called_once()
+        mock_record_metadata.assert_called_once_with(os.path.join("/staging", "task_42", "output.mkv"))
         pp.current_task.set_status.assert_called_once_with("awaiting_approval")
 
+    @patch(f"{PP_MOD}.PostProcessor._record_approval_metadata")
     @patch("compresso.libs.ffprobe_utils.compute_quality_scores", return_value={"vmaf_score": None, "ssim_score": None})
     @patch(f"{PP_MOD}.shutil.copy2", side_effect=OSError("disk full"))
     @patch(f"{PP_MOD}.os.makedirs")
-    def test_falls_back_on_staging_failure(self, mock_makedirs, mock_copy2, mock_quality):
+    def test_falls_back_on_staging_failure(self, mock_makedirs, mock_copy2, mock_quality, mock_record_metadata):
         pp = _make_postprocessor()
         pp.settings = MagicMock()
         pp.settings.get_staging_path.return_value = "/staging"
@@ -135,6 +138,26 @@ class TestStageForApproval:
         pp._stage_for_approval()
 
         pp._finalize_local_task.assert_called_once()
+        mock_record_metadata.assert_not_called()
+
+    @patch(f"{PP_MOD}.os.path.exists", return_value=True)
+    @patch(f"{PP_MOD}.os.path.getsize", return_value=600)
+    @patch(f"{PP_MOD}.extract_media_metadata")
+    def test_record_approval_metadata_persists_codecs_and_size(self, mock_extract, _mock_getsize, _mock_exists):
+        pp = _make_postprocessor()
+        pp.current_task = _make_current_task(source_abspath="/src/source.mkv")
+        mock_extract.side_effect = [
+            {"codec": "h264"},
+            {"codec": "hevc"},
+        ]
+
+        pp._record_approval_metadata("/staging/task_42/output.mkv")
+
+        assert pp.current_task.task.source_codec == "h264"
+        assert pp.current_task.task.staged_codec == "hevc"
+        assert pp.current_task.task.staged_size == 600
+        assert pp.current_task.task.metadata_updated_at is not None
+        pp.current_task.task.save.assert_called_once()
 
 
 # ------------------------------------------------------------------

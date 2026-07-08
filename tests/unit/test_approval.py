@@ -105,7 +105,8 @@ class TestPostprocessorStaging:
             f.write(content)
         return path
 
-    def test_stage_for_approval_copies_to_staging(self):
+    @patch("compresso.libs.postprocessor.PostProcessor._record_approval_metadata")
+    def test_stage_for_approval_copies_to_staging(self, _mock_metadata):
         """When approval_required is True, file should be copied to staging dir."""
         pp = _make_postprocessor()
         pp.settings.get_staging_path.return_value = self.staging_dir
@@ -131,7 +132,8 @@ class TestPostprocessorStaging:
         # Verify status was set
         mock_task.set_status.assert_called_once_with("awaiting_approval")
 
-    def test_stage_for_approval_preserves_cache(self):
+    @patch("compresso.libs.postprocessor.PostProcessor._record_approval_metadata")
+    def test_stage_for_approval_preserves_cache(self, _mock_metadata):
         """Staging should copy, not move — cache file should still exist."""
         pp = _make_postprocessor()
         pp.settings.get_staging_path.return_value = self.staging_dir

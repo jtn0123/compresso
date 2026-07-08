@@ -29,7 +29,9 @@ Copyright:
 
 """
 
+import hmac
 import json
+import secrets
 import sys
 import traceback
 from json import JSONDecodeError
@@ -45,6 +47,30 @@ from compresso.webserver.security_headers import SecurityHeadersMixin
 
 LOG_UNHANDLED_ERROR = "Unhandled error in %s.%s"
 LOG_BASE_API_ERROR = "BaseApiError.%s: %s"
+CSRF_COOKIE_NAME = "compresso_csrf_token"
+CSRF_HEADER_NAME = "X-Compresso-CSRF-Token"
+API_TOKEN_HEADER_NAME = "X-Compresso-Api-Token"  # noqa: S105 - header name, not a token value
+READ_ONLY_POST_PATHS = (
+    "/approval/tasks",
+    "/approval/summary",
+    "/approval/detail",
+    "/compression/stats",
+    "/compression/library-analysis/status",
+    "/filebrowser/list",
+    "/fileinfo/probe",
+    "/fileinfo/task",
+    "/healthcheck/status",
+    "/metadata/search",
+    "/metadata/by-task",
+    "/metadata/by-fingerprint",
+    "/plugins/installed",
+    "/plugins/info",
+    "/plugins/flow",
+    "/settings/worker_group/read",
+    "/settings/link/read",
+    "/settings/library/read",
+    "/preview/status",
+)
 
 
 class BaseApiError(Exception):
@@ -66,6 +92,8 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
     Valid API return status codes:
     """
     STATUS_SUCCESS = 200
+    STATUS_ERROR_UNAUTHORIZED = 401
+    STATUS_ERROR_FORBIDDEN = 403
     STATUS_ERROR_EXTERNAL = 400
     STATUS_ERROR_ENDPOINT_NOT_FOUND = 404
     STATUS_ERROR_METHOD_NOT_ALLOWED = 405
@@ -76,8 +104,11 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         self.params = kwargs.get("params", [])
 
     def prepare(self):
-        """Check rate limits before routing to handler methods."""
+        """Check cross-cutting API guards before routing to handler methods."""
         from compresso.webserver.api_v2.rate_limiter import get_rate_limiter
+
+        if not self._authorize_request():
+            return
 
         limiter = get_rate_limiter()
         ip = self.request.remote_ip
@@ -95,6 +126,76 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
                     "messages": {"rate_limit": f"Rate limit exceeded. Try again in {reset_time} seconds."},
                 }
             )
+
+    def _request_api_path(self):
+        path = self.request.path
+        marker = "/api/v2"
+        if marker in path:
+            return path.split(marker, 1)[1] or "/"
+        return path
+
+    def _is_read_only_post_path(self):
+        api_path = self._request_api_path()
+        return any(api_path == path or api_path.startswith(path + "/") for path in READ_ONLY_POST_PATHS)
+
+    def _requires_mutation_protection(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return False
+        return not (self.request.method == "POST" and self._is_read_only_post_path())
+
+    def _finish_auth_error(self, status, reason):
+        self.set_status(status, reason=reason)
+        self.write_error()
+        return False
+
+    def _request_has_valid_api_token(self, expected_token):
+        if not expected_token:
+            return False
+
+        bearer_prefix = "Bearer "
+        auth_header = self.request.headers.get("Authorization", "")
+        if auth_header.startswith(bearer_prefix) and hmac.compare_digest(auth_header[len(bearer_prefix) :], expected_token):
+            return True
+
+        token_header = self.request.headers.get(API_TOKEN_HEADER_NAME, "")
+        return bool(token_header and hmac.compare_digest(token_header, expected_token))
+
+    def _ensure_csrf_cookie(self):
+        csrf_token = self.get_cookie(CSRF_COOKIE_NAME)
+        if not csrf_token:
+            csrf_token = secrets.token_urlsafe(32)
+            self.set_cookie(CSRF_COOKIE_NAME, csrf_token, httponly=False, samesite="Strict")
+        return csrf_token
+
+    @staticmethod
+    def _explicit_bool(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("true", "1", "yes", "on")
+        if isinstance(value, int):
+            return bool(value)
+        return False
+
+    def _authorize_request(self):
+        from compresso import config
+
+        settings = config.Config()
+        csrf_enabled = self._explicit_bool(settings.get_csrf_protection_enabled())
+        csrf_cookie = self._ensure_csrf_cookie() if csrf_enabled else ""
+
+        if not self._requires_mutation_protection():
+            return True
+
+        if self._explicit_bool(settings.get_api_auth_enabled()) and not self._request_has_valid_api_token(
+            settings.get_api_auth_token()
+        ):
+            return self._finish_auth_error(self.STATUS_ERROR_UNAUTHORIZED, "Unauthorized")
+
+        if csrf_enabled and self.request.headers.get(CSRF_HEADER_NAME, "") != csrf_cookie:
+            return self._finish_auth_error(self.STATUS_ERROR_FORBIDDEN, "Invalid CSRF token")
+
+        return True
 
     def set_default_headers(self):
         """
@@ -133,6 +234,10 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
         return schema.dump(schema.load(json_data))
 
+    def load_request(self, schema: Schema):
+        """Load and validate a JSON request body."""
+        return self.read_json_request(schema)
+
     def build_response(self, schema: Schema, response):
         """
         Validate the given response against a given Schema.
@@ -154,6 +259,16 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         # Build schema object from response
         data = schema.dump(response)
         return data
+
+    def respond_with_schema(self, schema: Schema, response):
+        """Validate, serialize, and send a successful schema response."""
+        self.write_success(self.build_response(schema, response))
+
+    def handle_base_api_error(self, exc: BaseApiError) -> None:
+        """Standard handler for expected API errors."""
+        tornado.log.app_log.error(LOG_BASE_API_ERROR, self.route.get("call_method"), exc)
+        self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(exc))
+        self.write_error()
 
     def write_success(self, response=None):
         """

@@ -67,6 +67,14 @@ class TestIsBlockedAddress:
             with patch("compresso.webserver.proxy.socket.getaddrinfo", return_value=_addrinfo(ip)):
                 assert _is_blocked_address("lan.example") is False, f"Expected {ip} to be allowed (LAN)"
 
+    def test_rfc1918_lan_addresses_can_be_disabled_by_config(self):
+        settings = type("Settings", (), {"get_allow_lan_proxy_targets": lambda self: False})()
+        with (
+            patch("compresso.webserver.proxy.config.Config", return_value=settings),
+            patch("compresso.webserver.proxy.socket.getaddrinfo", return_value=_addrinfo("192.168.1.1")),
+        ):
+            assert _is_blocked_address("lan.example") is True
+
     def test_hostname_resolving_to_loopback_is_blocked(self):
         # Even a benign-looking hostname is blocked if DNS points it at a loopback IP
         # (this is the classic DNS rebinding scenario).

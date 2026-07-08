@@ -8,6 +8,7 @@ Manages tasks in 'awaiting_approval' status — listing, approving, rejecting,
 and fetching detail/comparison data.
 """
 
+import datetime
 import os
 import shutil
 
@@ -58,31 +59,104 @@ def _build_approval_item(approval_task, staging_path, include_library=False):
     }
 
     staged_info = _get_staged_file_info(task_id, staging_path)
-    item["staged_size"] = staged_info.get("size", 0)
+    stored_staged_size = approval_task.get("staged_size") or 0
+    item["staged_size"] = staged_info.get("size") or stored_staged_size
     item["staged_path"] = staged_info.get("path", "")
     item["size_delta"] = item["staged_size"] - item["source_size"] if item["staged_size"] else 0
 
+    metadata_updates = {}
+    stored_source_codec = approval_task.get("source_codec") or ""
     source_meta = extract_media_metadata(approval_task["abspath"]) if approval_task.get("abspath") else {}
+    if stored_source_codec:
+        source_meta["codec"] = stored_source_codec
+    else:
+        if source_meta.get("codec"):
+            metadata_updates["source_codec"] = source_meta.get("codec", "")
     item["source_codec"] = source_meta.get("codec", "")
     item["source_resolution"] = source_meta.get("resolution", "")
 
     staged_path = staged_info.get("path", "")
+    stored_staged_codec = approval_task.get("staged_codec") or ""
     if staged_path:
         staged_meta = extract_media_metadata(staged_path)
-        item["staged_codec"] = staged_meta.get("codec", "")
+        item["staged_codec"] = stored_staged_codec or staged_meta.get("codec", "")
         item["staged_resolution"] = staged_meta.get("resolution", "")
+        if item["staged_codec"] and not stored_staged_codec:
+            metadata_updates["staged_codec"] = item["staged_codec"]
+    elif stored_staged_codec:
+        item["staged_codec"] = stored_staged_codec
+        item["staged_resolution"] = ""
     else:
         item["staged_codec"] = ""
         item["staged_resolution"] = ""
+    if staged_path and staged_info.get("size"):
+        metadata_updates["staged_size"] = staged_info.get("size", 0)
 
     item["vmaf_score"] = approval_task.get("vmaf_score")
     item["ssim_score"] = approval_task.get("ssim_score")
+
+    _backfill_approval_metadata(task_id, approval_task, metadata_updates)
 
     if include_library:
         library = Library(approval_task["library_id"])
         item["library_id"] = library.get_id()
         item["library_name"] = library.get_name()
 
+    return item
+
+
+def _backfill_approval_metadata(task_id, approval_task, metadata_updates):
+    if not metadata_updates:
+        return
+
+    changed = {
+        key: value
+        for key, value in metadata_updates.items()
+        if value not in ("", None) and approval_task.get(key) in ("", None, 0)
+    }
+    if not changed:
+        return
+
+    try:
+        changed["metadata_updated_at"] = datetime.datetime.now()
+        Tasks.update(**changed).where(Tasks.id == task_id).execute()
+    except Exception as e:
+        logger.debug("Failed to backfill approval metadata for task %s: %s", task_id, e)
+
+
+def _approval_summary_item_from_task(approval_task, staging_path):
+    task_id = approval_task["id"]
+    item = {
+        "id": task_id,
+        "abspath": approval_task.get("abspath", ""),
+        "source_size": approval_task.get("source_size") or 0,
+        "vmaf_score": approval_task.get("vmaf_score"),
+        "source_codec": approval_task.get("source_codec") or "",
+        "staged_codec": approval_task.get("staged_codec") or "",
+        "staged_size": approval_task.get("staged_size") or 0,
+    }
+
+    metadata_updates = {}
+    if not item["source_codec"] and item["abspath"]:
+        source_meta = extract_media_metadata(item["abspath"])
+        item["source_codec"] = source_meta.get("codec", "")
+        if item["source_codec"]:
+            metadata_updates["source_codec"] = item["source_codec"]
+
+    if not item["staged_codec"] or not item["staged_size"]:
+        staged_info = _get_staged_file_info(task_id, staging_path)
+        staged_path = staged_info.get("path", "")
+        if staged_info.get("size"):
+            item["staged_size"] = staged_info.get("size", 0)
+            metadata_updates["staged_size"] = item["staged_size"]
+        if staged_path and not item["staged_codec"]:
+            staged_meta = extract_media_metadata(staged_path)
+            item["staged_codec"] = staged_meta.get("codec", "")
+            if item["staged_codec"]:
+                metadata_updates["staged_codec"] = item["staged_codec"]
+
+    item["size_delta"] = item["staged_size"] - item["source_size"] if item["staged_size"] else 0
+    _backfill_approval_metadata(task_id, approval_task, metadata_updates)
     return item
 
 
@@ -190,11 +264,26 @@ def prepare_approval_summary(params):
     :param params: dict with search/filter parameters
     :return: dict with counts, aggregate sizes, VMAF average, and codec options
     """
-    _records_total, _records_filtered, items = _get_approval_items(
-        params=params,
-        include_library=False,
-        force_all=True,
+    search_value = params.get("search_value", "")
+    library_ids = params.get("library_ids") or []
+    codec_filter = params.get("codec") or ""
+    quality_min = _normalise_quality_min(params.get("quality_min", 0))
+    order = _build_order(params)
+
+    task_handler = task.Task()
+    approval_task_results = task_handler.get_task_list_filtered_and_sorted(
+        order=order,
+        start=0,
+        length=0,
+        search_value=search_value,
+        status="awaiting_approval",
+        library_ids=library_ids,
     )
+
+    settings = config.Config()
+    staging_path = settings.get_staging_path()
+    items = [_approval_summary_item_from_task(approval_task, staging_path) for approval_task in approval_task_results]
+    items = [item for item in items if _matches_approval_filters(item, codec_filter=codec_filter, quality_min=quality_min)]
 
     codec_options = sorted(
         {codec for item in items for codec in (item.get("source_codec"), item.get("staged_codec")) if codec}
