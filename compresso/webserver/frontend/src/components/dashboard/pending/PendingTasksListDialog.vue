@@ -335,6 +335,7 @@ import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useMobile } from 'src/composables/useMobile'
+import { useTaskDialogScroll } from 'src/composables/useTaskDialogScroll'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
@@ -397,6 +398,13 @@ const showActionsToggle = computed(() => {
   const isNarrow = $q.screen.lt.md
   const isShortWide = !$q.screen.lt.md && $q.screen.height < 800
   return isNarrow || isShortWide
+})
+
+const { handleTableScroll, scrollToTop } = useTaskDialogScroll({
+  tableWrapperRef,
+  showScrollTop,
+  actionsExpanded,
+  showActionsToggle,
 })
 
 const filterSortActiveColor = 'warning'
@@ -532,26 +540,6 @@ const clearFilterDrafts = () => {
 
 const applyFilterDrafts = () => {
   libraryFilters.value = [...draftLibraryFilters.value]
-}
-
-const handleTableScroll = (event) => {
-  const wrapper = event?.target || tableWrapperRef.value
-  if (!wrapper) {
-    return
-  }
-  showScrollTop.value = wrapper.scrollTop > 120
-  if (showActionsToggle.value && actionsExpanded.value && wrapper.scrollTop > 4) {
-    actionsExpanded.value = false
-  }
-}
-
-const scrollToTop = () => {
-  const wrapper = tableWrapperRef.value
-  if (!wrapper) {
-    return
-  }
-  wrapper.scrollTo({ top: 0, behavior: 'smooth' })
-  showScrollTop.value = false
 }
 
 const resetSelection = () => {

@@ -1,5 +1,5 @@
 <template>
-  <q-page padding class="q-pa-sm">
+  <q-page padding class="q-pa-sm" data-testid="dashboard-page">
     <div class="row q-col-gutter-md">
       <!-- Row 1: Hero section -->
       <!-- Left: Donut + Stats -->

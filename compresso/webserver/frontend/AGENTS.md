@@ -10,11 +10,11 @@ This document is designed to help AI agents understand the structure, technology
 
 - **Framework**: [Vue.js 3](https://v3.vuejs.org/)
 - **UI Component Library**: [Quasar Framework v2](https://quasar.dev/)
-- **Build System**: Quasar CLI (Webpack)
+- **Build System**: Quasar CLI (Vite)
 - **State Management**: [Vuex](https://vuex.vuejs.org/)
 - **Routing**: [Vue Router](https://router.vuejs.org/)
 - **HTTP Client**: [Axios](https://axios-http.com/)
-- **Internationalization**: [Vue-i18n](https://kazupon.github.io/vue-i18n/)
+- **Internationalization**: [Vue-i18n](https://vue-i18n.intlify.dev/)
 - **Event Bus**: `tiny-emitter`
 
 ## Directory Structure
@@ -55,8 +55,21 @@ The project follows the standard Quasar directory structure:
 
 - **`src/js/compressoGlobals.js`**: Contains the `$compresso` global object. This is the primary interface for communicating with the backend API. It handles URL resolution, authentication state, and theme management.
 - **`src/boot/global-event-bus.js`**: Initializes the global event bus available as `$global`. This is used for decoupled communication between components (e.g., triggering a refresh).
-- **`quasar.conf.js`**: The main configuration file for the Quasar framework. It defines boot files, plugins, build settings, and the development server proxy.
+- **`quasar.config.cjs`**: The main configuration file for the Quasar framework. It defines boot files, plugins, build settings, and the Vite development server proxy.
 - **`package.json`**: Dependency definitions and script commands.
+
+## Validation Commands
+
+```bash
+npm ci
+npm run test -- --run
+npm run lint
+npx vitest run --coverage
+npm run build:publish
+npm run test:e2e
+```
+
+The Playwright smoke tests mock backend API responses and do not require a running Compresso backend.
 
 ## Component Standards
 

@@ -22,6 +22,16 @@ RUN \
             && rm -f picomatch-*.tgz \
             && cd /; \
         fi \
+    && \
+    echo "**** Patch sigstore CVE-2026-48815 in bundled npm ****" \
+        && SIGSTORE_DIR="/usr/lib/node_modules/npm/node_modules/sigstore" \
+        && if [ -d "$SIGSTORE_DIR" ]; then \
+            cd "$SIGSTORE_DIR" \
+            && npm pack sigstore@4.1.1 2>/dev/null \
+            && tar -xzf sigstore-*.tgz --strip-components=1 \
+            && rm -f sigstore-*.tgz \
+            && cd /; \
+        fi \
         && \
         echo "**** Make default paths for compresso library ****" \
             && mkdir -p /library

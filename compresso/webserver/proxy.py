@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import tornado.httpclient
 import tornado.web
 
+from compresso import config
 from compresso.libs.installation_link import Links
 
 _HTTP_SCHEME = "http://"
@@ -37,6 +38,8 @@ def _is_blocked_address(hostname):
         except ValueError:
             continue
         if addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return True
+        if addr.is_private and not config.Config().get_allow_lan_proxy_targets():
             return True
         for net in _BLOCKED_NETWORKS:
             if addr in net:

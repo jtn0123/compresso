@@ -712,6 +712,75 @@ class TestRunAnalysisCachePersistence:
 
 
 # ---------------------------------------------------------------------------
+# Incremental per-file analysis metadata cache
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unittest
+class TestIncrementalAnalysisMetadata:
+    """Tests for per-file metadata caching used by library analysis."""
+
+    @patch(ANALYSIS_MODULE + "._probe_analysis_file")
+    @patch(ANALYSIS_MODULE + "._persist_analysis_file")
+    @patch(
+        ANALYSIS_MODULE + "._cached_analysis_file",
+        return_value=({"codec": "h264", "resolution": "1080p", "file_size": 100, "bitrate_mbps": 1.5}, ("fp", "algo")),
+    )
+    def test_unchanged_file_uses_cached_metadata(self, _mock_cached, mock_persist, mock_probe):
+        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+
+        result = _analyse_file_incremental("/media/unchanged.mkv")
+
+        assert result["codec"] == "h264"
+        mock_probe.assert_not_called()
+        mock_persist.assert_not_called()
+
+    @patch(ANALYSIS_MODULE + "._probe_analysis_file")
+    @patch(ANALYSIS_MODULE + "._persist_analysis_file")
+    @patch(ANALYSIS_MODULE + "._cached_analysis_file", return_value=(None, ("fp-new", "algo")))
+    def test_changed_file_probes_and_persists_metadata(self, _mock_cached, mock_persist, mock_probe):
+        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+
+        entry = {"codec": "hevc", "resolution": "4k", "file_size": 200, "bitrate_mbps": 2.5}
+        mock_probe.return_value = entry
+
+        result = _analyse_file_incremental("/media/changed.mkv")
+
+        assert result == entry
+        mock_probe.assert_called_once_with("/media/changed.mkv")
+        mock_persist.assert_called_once_with("/media/changed.mkv", ("fp-new", "algo"), entry)
+
+    @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_corrupt_metadata_json_falls_back_to_reprobe(self, mock_paths, _mock_fingerprint):
+        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+
+        row = MagicMock()
+        row.file_metadata.fingerprint = "fp"
+        row.file_metadata.metadata_json = "not-json"
+        mock_paths.get_or_none.return_value = row
+
+        cached, fingerprint_info = _cached_analysis_file("/media/corrupt.mkv")
+
+        assert cached is None
+        assert fingerprint_info == ("fp", "algo")
+
+    @patch(ANALYSIS_MODULE + ".os.path.exists", return_value=False)
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_missing_file_paths_are_removed_from_analysis_metadata(self, mock_paths, _mock_exists):
+        from compresso.webserver.helpers.library_analysis import _cleanup_missing_analysis_paths
+
+        stale = MagicMock(path="/media/missing.mkv")
+        current = MagicMock(path="/media/current.mkv")
+        mock_paths.select.return_value.where.return_value = [stale, current]
+
+        _cleanup_missing_analysis_paths({"/media/current.mkv"})
+
+        stale.delete_instance.assert_called_once()
+        current.delete_instance.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # _run_analysis — error handling and cleanup (lines 274-286)
 # ---------------------------------------------------------------------------
 

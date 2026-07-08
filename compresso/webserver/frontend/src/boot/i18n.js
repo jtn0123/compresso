@@ -6,19 +6,19 @@ import { LocalStorage } from 'quasar'
 //import messages from 'src/i18n'
 
 function loadLocaleInfo() {
-  const locales = require.context('src/language', true, /(^|\/)[A-Za-z0-9_,\s-]+\.json$/i)
+  const locales = import.meta.glob('../language/*.json', { eager: true })
   const messages = {}
-  locales.keys().forEach((key) => {
+  Object.entries(locales).forEach(([key, module]) => {
     const matched = key.match(/([A-Za-z0-9_-]+)\./i)
     if (matched && matched.length > 1) {
       const locale = matched[1]
-      messages[locale] = locales(key)
+      messages[locale] = module.default || module
     }
   })
-  return { id: locales.id, messages }
+  return { messages }
 }
 
-const { id, messages } = loadLocaleInfo()
+const { messages } = loadLocaleInfo()
 
 // Read configured local from localStorage
 let configuredLocale = LocalStorage.getItem('locale')
@@ -32,7 +32,8 @@ export default boot(({ app }) => {
     legacy: false,
     locale: configuredLocale,
     fallbackLocale: 'en',
-    silentTranslationWarn: true,
+    missingWarn: false,
+    fallbackWarn: false,
     messages,
   })
   // Set i18n instance on app

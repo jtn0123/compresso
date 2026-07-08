@@ -105,7 +105,8 @@ class TestPostprocessorStaging:
             f.write(content)
         return path
 
-    def test_stage_for_approval_copies_to_staging(self):
+    @patch("compresso.libs.postprocessor.PostProcessor._record_approval_metadata")
+    def test_stage_for_approval_copies_to_staging(self, _mock_metadata):
         """When approval_required is True, file should be copied to staging dir."""
         pp = _make_postprocessor()
         pp.settings.get_staging_path.return_value = self.staging_dir
@@ -131,7 +132,8 @@ class TestPostprocessorStaging:
         # Verify status was set
         mock_task.set_status.assert_called_once_with("awaiting_approval")
 
-    def test_stage_for_approval_preserves_cache(self):
+    @patch("compresso.libs.postprocessor.PostProcessor._record_approval_metadata")
+    def test_stage_for_approval_preserves_cache(self, _mock_metadata):
         """Staging should copy, not move — cache file should still exist."""
         pp = _make_postprocessor()
         pp.settings.get_staging_path.return_value = self.staging_dir
@@ -555,6 +557,8 @@ class TestApprovalQualityScores:
             "source_size": 5000,
             "finish_time": "2024-06-01",
             "library_id": 1,
+            "vmaf_score": 85.0,
+            "ssim_score": 0.940,
         }
         # First call returns count query, second returns data query
         mock_task_handler.get_task_list_filtered_and_sorted.side_effect = [
@@ -563,16 +567,12 @@ class TestApprovalQualityScores:
         ]
         mock_task_module.Task.return_value = mock_task_handler
 
-        mock_record = MagicMock()
-        mock_record.vmaf_score = 85.0
-        mock_record.ssim_score = 0.940
-        mock_tasks_model.get_by_id.return_value = mock_record
-
         result = prepare_filtered_approval_tasks({"start": 0, "length": 10})
         assert len(result["results"]) == 1
         item = result["results"][0]
         assert item["vmaf_score"] == 85.0
         assert item["ssim_score"] == 0.940
+        mock_tasks_model.get_by_id.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -13,7 +13,8 @@
     "serve": "quasar dev --debug",
     "dev": "quasar dev",
     "build": "quasar build",
-    "build:publish": "quasar build --publish"
+    "build:publish": "quasar build --publish",
+    "test:e2e": "npm run build:publish && playwright test"
   },
   "dependencies": {
     "@quasar/extras": "^1.18.0",
@@ -27,7 +28,7 @@
     "remarkable-admonitions": "^0.2.2",
     "tiny-emitter": "^2.1.0",
     "vue": "^3.2.29",
-    "vue-i18n": "^9.14.5",
+    "vue-i18n": "^11.4.6",
     "vue-router": "^4.6.4",
     "vuedraggable": "^4.1.0",
     "vuex": "^4.1.0",
@@ -35,7 +36,8 @@
   },
   "devDependencies": {
     "@babel/eslint-parser": "^7.28.6",
-    "@quasar/app-webpack": "^4.4.5",
+    "@playwright/test": "^1.61.1",
+    "@quasar/app-vite": "2.4.1",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vitest/coverage-v8": "^4.1.0",
     "@vue/test-utils": "^2.4.10",
@@ -44,7 +46,6 @@
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.9.1",
-    "eslint-webpack-plugin": "^6.0.0",
     "globals": "^17.6.0",
     "happy-dom": "^20.9.0",
     "jsdom": "^29.1.1",
@@ -67,5 +68,10 @@
     "node": "^24 || ^22",
     "npm": ">= 6.13.4",
     "yarn": ">= 1.21.1"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1",
+    "serialize-javascript": "^7.0.7",
+    "vite": "7.3.6"
   }
 }

@@ -10,9 +10,9 @@ The vendored frontend is a build input, not a distributed runtime payload. Relea
 
 ```bash
 rm -rf build dist
-python3 -m pip install -r requirements.txt -r requirements-dev.txt
-python3 -m build --no-isolation --skip-dependency-check --wheel
-python3 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
+python3.13 -m pip install -r requirements.txt -r requirements-dev.txt
+python3.13 -m build --no-isolation --skip-dependency-check --wheel
+python3.13 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
 compresso
 ```
 
@@ -30,9 +30,9 @@ cd ../../..
 
 ```bash
 rm -rf build dist
-python3 -m pip install -r requirements.txt -r requirements-dev.txt
-python3 -m build --no-isolation --skip-dependency-check --wheel
-python3 -m build --no-isolation --skip-dependency-check --sdist
+python3.13 -m pip install -r requirements.txt -r requirements-dev.txt
+python3.13 -m build --no-isolation --skip-dependency-check --wheel
+python3.13 -m build --no-isolation --skip-dependency-check --sdist
 docker build -f ./docker/Dockerfile -t josh5/compresso:staging .
 ```
 
@@ -41,6 +41,12 @@ Mount these paths for production:
 - `/config` for persistent application state and database files
 - `/library` for the media library
 - `/tmp/compresso` for the transcode and processing cache
+
+## Network Exposure Model
+
+Compresso is designed for trusted localhost, trusted LAN, or VPN access. The built-in web UI and API do not provide a full multi-user authentication boundary, and mutating endpoints can change queue, settings, and media replacement state.
+
+Do not expose Compresso directly to the public internet. If remote access is required, put it behind a reverse proxy that provides TLS, authentication, and network allowlisting. Keep replacement-style workflows disabled until proxy access, mounts, backups, and plugin behavior have been validated.
 
 ## Verify Readiness
 
@@ -115,9 +121,10 @@ A progressive trust-building sequence for new plugin configurations:
 ## Production Checklist
 
 - The repo builds cleanly from a fresh checkout.
-- `npm ci`, `npm run lint`, and `npm run build:publish` succeed in `compresso/webserver/frontend`.
-- `python3 -m build --no-isolation --skip-dependency-check --wheel` succeeds.
-- The Docker image builds successfully if you are deploying with Docker.
+- `npm ci`, `npm run test -- --run`, `npm run lint`, `npx vitest run --coverage`, `npm run build:publish`, and `npm run test:e2e` succeed in `compresso/webserver/frontend`.
+- `python3.13 -m build --no-isolation --skip-dependency-check --wheel` succeeds.
+- `bash scripts/docker-preflight.sh` succeeds if you are deploying with Docker.
+- `bash scripts/trivy-group-report.sh compresso:local-preflight` has been reviewed when Trivy is available.
 - `/config`, `/library`, and `/tmp/compresso` are mounted to the intended persistent locations.
 - `GET /compresso/api/v2/healthcheck/readiness` returns `200`.
 - "First 30 Minutes After Boot" checklist completed successfully.

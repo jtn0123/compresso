@@ -22,7 +22,15 @@
         </div>
 
         <div class="col-auto">
-          <q-btn @click="openDetails" color="secondary" dense round flat icon="open_in_full">
+          <q-btn
+            data-testid="pending-tasks-open"
+            @click="openDetails"
+            color="secondary"
+            dense
+            round
+            flat
+            icon="open_in_full"
+          >
             <q-tooltip class="bg-white text-primary">{{ $t('navigation.showMore') }}</q-tooltip>
           </q-btn>
         </div>

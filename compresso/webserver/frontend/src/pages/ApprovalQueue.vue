@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md">
+  <q-page class="q-pa-md" data-testid="approval-queue-page">
     <!-- Header -->
     <PageHeader :title="$t('pages.approvalQueue.title')" :subtitle="$t('pages.approvalQueue.caption')">
       <template #actions>
@@ -95,6 +95,10 @@
         </q-card>
       </div>
     </div>
+
+    <q-banner v-if="summaryIsPartial" class="q-mb-md" rounded dense>
+      {{ summaryError }}
+    </q-banner>
 
     <!-- Search & Filters -->
     <div class="row q-col-gutter-sm q-mb-md items-center">
@@ -526,6 +530,7 @@
           <div class="q-mb-md">
             <q-btn
               v-if="!previewActive && !previewLoading"
+              data-testid="approval-compare-quality"
               color="info"
               icon="compare"
               :label="$t('pages.approvalQueue.compareQuality')"
@@ -616,6 +621,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { useApprovalQueueData } from 'src/composables/useApprovalQueueData'
 import VideoCompare from 'components/preview/VideoCompare.vue'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
@@ -626,9 +632,7 @@ export default {
   setup() {
     const $q = useQuasar()
     const { t: $t } = useI18n()
-    const tasks = ref([])
     const selected = ref([])
-    const loading = ref(false)
     const approving = ref(false)
     const rejecting = ref(false)
     const showDetailDialog = ref(false)
@@ -637,14 +641,31 @@ export default {
     const rejectAction = ref('discard')
     const rejectTargetIds = ref([])
     const approvalEnabled = ref(null)
-    const newItemCount = ref(0)
-    const allTasks = ref([]) // All tasks for summary cards (not just current page)
-    const searchValue = ref('')
-    const filterCodec = ref(null)
-    const filterQualityMin = ref(0)
     const selectAllMode = ref(false)
-    let lastKnownIds = new Set()
     let refreshInterval = null
+    const {
+      tasks,
+      loading,
+      pagination,
+      newItemCount,
+      searchValue,
+      filterCodec,
+      filterQualityMin,
+      totalSpaceSaved,
+      avgSavingsPercent,
+      largestFileName,
+      largestFileSavings,
+      avgVmafScore,
+      codecOptions,
+      hasActiveFilters,
+      summaryError,
+      summaryIsPartial,
+      fileName,
+      formatSize,
+      buildBulkFilterPayload,
+      fetchSummary,
+      fetchTasks: fetchApprovalTasks,
+    } = useApprovalQueueData({ notify: $q.notify, t: $t })
 
     // Preview state
     const previewActive = ref(false)
@@ -653,14 +674,6 @@ export default {
     const previewData = ref(null)
     let previewJobId = null
     let previewPollInterval = null
-
-    const pagination = ref({
-      page: 1,
-      rowsPerPage: 25,
-      rowsNumber: 0,
-      sortBy: 'finish_time',
-      descending: true,
-    })
 
     const columns = computed(() => [
       {
@@ -757,88 +770,22 @@ export default {
       { label: $t('pages.approvalQueue.requeueOption'), value: 'requeue' },
     ])
 
-    const codecOptions = computed(() => {
-      const codecs = new Set()
-      allTasks.value.forEach((t) => {
-        if (t.source_codec) codecs.add(t.source_codec)
-        if (t.staged_codec) codecs.add(t.staged_codec)
-      })
-      return Array.from(codecs)
-        .sort()
-        .map((c) => ({ label: c, value: c }))
-    })
-
-    const hasActiveFilters = computed(() => {
-      return filterCodec.value !== null || filterQualityMin.value > 0
-    })
-
     function onSearchChange() {
       pagination.value.page = 1
       selectAllMode.value = false
-      fetchTasks()
+      refreshApprovalData()
     }
 
+    let filterRefreshTimer = null
     watch([filterCodec, filterQualityMin], () => {
       pagination.value.page = 1
       selectAllMode.value = false
-      fetchTasks()
+      if (filterRefreshTimer) clearTimeout(filterRefreshTimer)
+      filterRefreshTimer = setTimeout(() => {
+        filterRefreshTimer = null
+        refreshApprovalData()
+      }, 250)
     })
-
-    // Summary card computations (use allTasks so they reflect the full queue, not just current page)
-    const totalSpaceSaved = computed(() => {
-      return allTasks.value.reduce((sum, t) => {
-        const delta = t.size_delta || 0
-        return delta < 0 ? sum + Math.abs(delta) : sum
-      }, 0)
-    })
-
-    const avgSavingsPercent = computed(() => {
-      const valid = allTasks.value.filter((t) => t.source_size > 0)
-      if (valid.length === 0) return '0.0'
-      const totalPct = valid.reduce((sum, t) => {
-        return sum + ((t.source_size - t.staged_size) / t.source_size) * 100
-      }, 0)
-      return (totalPct / valid.length).toFixed(1)
-    })
-
-    const largestFileName = computed(() => {
-      if (allTasks.value.length === 0) return '—'
-      let largest = allTasks.value[0]
-      for (const t of allTasks.value) {
-        if (Math.abs(t.size_delta || 0) > Math.abs(largest.size_delta || 0)) {
-          largest = t
-        }
-      }
-      return fileName(largest.abspath)
-    })
-
-    const largestFileSavings = computed(() => {
-      if (allTasks.value.length === 0) return ''
-      let largest = allTasks.value[0]
-      for (const t of allTasks.value) {
-        if (Math.abs(t.size_delta || 0) > Math.abs(largest.size_delta || 0)) {
-          largest = t
-        }
-      }
-      return formatSize(Math.abs(largest.size_delta || 0)) + ' ' + $t('pages.approvalQueue.saved')
-    })
-
-    function fileName(abspath) {
-      if (!abspath) return ''
-      return abspath.split('/').pop()
-    }
-
-    function formatSize(bytes) {
-      if (!bytes || bytes === 0) return '0 B'
-      const units = ['B', 'KB', 'MB', 'GB', 'TB']
-      let i = 0
-      let size = Math.abs(bytes)
-      while (size >= 1024 && i < units.length - 1) {
-        size /= 1024
-        i++
-      }
-      return size.toFixed(1) + ' ' + units[i]
-    }
 
     function formatSizeDelta(delta) {
       if (delta === 0) return '0 B'
@@ -876,13 +823,6 @@ export default {
       return $t('pages.approvalQueue.qualityPoor')
     }
 
-    const avgVmafScore = computed(() => {
-      const withVmaf = allTasks.value.filter((t) => t.vmaf_score != null)
-      if (withVmaf.length === 0) return null
-      const sum = withVmaf.reduce((acc, t) => acc + t.vmaf_score, 0)
-      return sum / withVmaf.length
-    })
-
     async function fetchApprovalSetting() {
       try {
         const res = await axios.get(getCompressoApiUrl('v2', 'settings/read'))
@@ -893,81 +833,23 @@ export default {
       }
     }
 
-    async function fetchAllTasksForSummary() {
-      try {
-        const res = await axios.post(getCompressoApiUrl('v2', 'approval/tasks'), {
-          start: 0,
-          length: 1000,
-          search_value: '',
-          include_library: false,
-        })
-        allTasks.value = res.data.results || []
-      } catch {
-        // Summary cards will just show current page data as fallback
-      }
+    async function fetchTasks(props) {
+      const restoredSelection = await fetchApprovalTasks(props, selectedIds.value)
+      if (restoredSelection) selected.value = restoredSelection
     }
 
-    async function fetchTasks(props) {
-      loading.value = true
-      const pg = props ? props.pagination : pagination.value
-      const start = (pg.page - 1) * pg.rowsPerPage
-
-      try {
-        const res = await axios.post(getCompressoApiUrl('v2', 'approval/tasks'), {
-          start: start,
-          length: pg.rowsPerPage,
-          search_value: searchValue.value || '',
-          order_by: pg.sortBy || 'finish_time',
-          order_direction: pg.descending ? 'desc' : 'asc',
-          include_library: false,
-        })
-        const data = res.data
-        const newTasks = data.results || []
-        const newCount = data.recordsFiltered || 0
-
-        // Smart refresh: detect new items
-        const newIds = new Set(newTasks.map((t) => t.id))
-        if (lastKnownIds.size > 0) {
-          let addedCount = 0
-          for (const id of newIds) {
-            if (!lastKnownIds.has(id)) addedCount++
-          }
-          if (addedCount > 0 && tasks.value.length > 0) {
-            newItemCount.value += addedCount
-          }
-        }
-
-        // Preserve selection across refresh
-        const selectedIdSet = new Set(selectedIds.value)
-        tasks.value = newTasks
-        lastKnownIds = newIds
-        pagination.value.rowsNumber = newCount
-        pagination.value.page = pg.page
-        pagination.value.rowsPerPage = pg.rowsPerPage
-        pagination.value.sortBy = pg.sortBy
-        pagination.value.descending = pg.descending
-
-        // Restore selection
-        selected.value = newTasks.filter((t) => selectedIdSet.has(t.id))
-      } catch (e) {
-        $q.notify({
-          type: 'negative',
-          message: $t('pages.approvalQueue.failedToFetchTasks'),
-          timeout: 3000,
-          position: 'top',
-        })
-      } finally {
-        loading.value = false
-      }
+    async function refreshApprovalData(props) {
+      await fetchTasks(props)
+      await fetchSummary()
     }
 
     function acknowledgeNewItems() {
       newItemCount.value = 0
-      fetchTasks()
+      refreshApprovalData()
     }
 
     function onRequest(props) {
-      fetchTasks(props)
+      refreshApprovalData(props)
     }
 
     async function approveSelected() {
@@ -981,9 +863,7 @@ export default {
     async function doApprove(ids) {
       approving.value = true
       try {
-        const payload = selectAllMode.value
-          ? { all_matching: true, search_value: searchValue.value || '' }
-          : { id_list: ids }
+        const payload = selectAllMode.value ? { all_matching: true, ...buildBulkFilterPayload() } : { id_list: ids }
         await axios.post(getCompressoApiUrl('v2', 'approval/approve'), payload)
         const count = selectAllMode.value ? pagination.value.rowsNumber : ids.length
         $q.notify({
@@ -994,7 +874,7 @@ export default {
         })
         selected.value = []
         selectAllMode.value = false
-        await fetchTasks()
+        await refreshApprovalData()
       } catch (e) {
         $q.notify({
           type: 'negative',
@@ -1019,7 +899,7 @@ export default {
       try {
         const payload =
           selectAllMode.value && rejectTargetIds.value.length === 0
-            ? { all_matching: true, search_value: searchValue.value || '', requeue: rejectAction.value === 'requeue' }
+            ? { all_matching: true, ...buildBulkFilterPayload(), requeue: rejectAction.value === 'requeue' }
             : { id_list: ids, requeue: rejectAction.value === 'requeue' }
         await axios.post(getCompressoApiUrl('v2', 'approval/reject'), payload)
         const count =
@@ -1034,7 +914,7 @@ export default {
         selectAllMode.value = false
         rejectTargetIds.value = []
         showRejectDialog.value = false
-        await fetchTasks()
+        await refreshApprovalData()
       } catch (e) {
         $q.notify({
           type: 'negative',
@@ -1093,7 +973,7 @@ export default {
     async function startPreview() {
       if (!detailData.value) return
       previewLoading.value = true
-      previewStatus.value = 'Starting...'
+      previewStatus.value = $t('pages.approvalQueue.previewStarting')
       try {
         const res = await axios.post(getCompressoApiUrl('v2', 'preview/create'), {
           source_path: detailData.value.abspath,
@@ -1102,7 +982,7 @@ export default {
           library_id: detailData.value.library_id || 1,
         })
         previewJobId = res.data.job_id
-        previewStatus.value = 'Processing...'
+        previewStatus.value = $t('pages.approvalQueue.previewProcessing')
         pollPreviewStatus()
       } catch (e) {
         previewLoading.value = false
@@ -1178,11 +1058,9 @@ export default {
 
     onMounted(() => {
       fetchApprovalSetting()
-      fetchTasks()
-      fetchAllTasksForSummary()
+      refreshApprovalData()
       refreshInterval = setInterval(() => {
-        fetchTasks()
-        fetchAllTasksForSummary()
+        refreshApprovalData()
       }, 10000)
       window.addEventListener('keydown', handleKeydown)
     })
@@ -1190,6 +1068,9 @@ export default {
     onUnmounted(() => {
       if (refreshInterval) {
         clearInterval(refreshInterval)
+      }
+      if (filterRefreshTimer) {
+        clearTimeout(filterRefreshTimer)
       }
       cleanupPreview()
       window.removeEventListener('keydown', handleKeydown)
@@ -1220,6 +1101,8 @@ export default {
       largestFileName,
       largestFileSavings,
       avgVmafScore,
+      summaryError,
+      summaryIsPartial,
       vmafColor,
       vmafLabel,
       previewActive,

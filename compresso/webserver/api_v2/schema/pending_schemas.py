@@ -16,6 +16,20 @@ from compresso.webserver.api_v2.schema.schemas import (
 )
 
 _EXAMPLE_FILE_PATH = "/library/TEST_FILE.mkv"
+PENDING_TASK_ORDER_COLUMNS = (
+    "id",
+    "abspath",
+    "priority",
+    "type",
+    "status",
+    "library_id",
+    "start_time",
+    "finish_time",
+    "source_size",
+    "retry_count",
+    "max_retries",
+    "deferred_until",
+)
 
 
 class RequestPendingTableDataSchema(RequestTableDataSchema):
@@ -24,6 +38,7 @@ class RequestPendingTableDataSchema(RequestTableDataSchema):
     order_by = fields.Str(
         metadata={"example": "priority"},
         load_default="priority",
+        validate=validate.OneOf(PENDING_TASK_ORDER_COLUMNS),
     )
     library_ids = fields.List(
         cls_or_instance=fields.Int,

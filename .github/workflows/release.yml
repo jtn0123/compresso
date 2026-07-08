@@ -16,7 +16,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Install semantic-release plugins
         run: npm install --no-save @semantic-release/changelog @semantic-release/git @semantic-release/exec semantic-release
       - name: Release

@@ -10,7 +10,7 @@ This extends upon paragraph 11 of the Terms & Conditions stipulated in the GPL v
 
 ## Checklist 
 
-- [ ] I have ensured that my pull request is being opened to merge into the staging branch.
+- [ ] I have ensured that my pull request targets `master` or `staging`, as appropriate for the change.
 
 - [ ] I have ensured that all new python file contributions contain the correct header as 
 stipulated in the [Contributing Docs](CONTRIBUTING.md).

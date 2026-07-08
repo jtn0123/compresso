@@ -292,6 +292,7 @@ class PostProcessor(threading.Thread):
             shutil.copy2(cache_path, staged_path)
 
             self._log(f"Staged transcoded file for approval: {cache_path} -> {staged_path}")
+            self._record_approval_metadata(staged_path)
 
             # Compute quality metrics (non-blocking, best-effort)
             try:
@@ -345,6 +346,28 @@ class PostProcessor(threading.Thread):
             self._log("Exception in staging file for approval", message2=str(e), level="exception")
             # Fall back to normal processing on staging failure
             self._finalize_local_task()
+
+    def _record_approval_metadata(self, staged_path):
+        """Persist approval queue metadata while the staged file is fresh."""
+        try:
+            source_meta = extract_media_metadata(self.current_task.get_source_abspath())
+        except (subprocess.SubprocessError, OSError, ValueError) as e:
+            self._log("Failed to extract source approval metadata", message2=str(e), level="debug")
+            source_meta = {}
+        try:
+            staged_meta = extract_media_metadata(staged_path)
+        except (subprocess.SubprocessError, OSError, ValueError) as e:
+            self._log("Failed to extract staged approval metadata", message2=str(e), level="debug")
+            staged_meta = {}
+
+        try:
+            self.current_task.task.source_codec = source_meta.get("codec", "")
+            self.current_task.task.staged_codec = staged_meta.get("codec", "")
+            self.current_task.task.staged_size = os.path.getsize(staged_path) if os.path.exists(staged_path) else 0
+            self.current_task.task.metadata_updated_at = datetime.datetime.now()
+            self.current_task.task.save()
+        except (OSError, AttributeError, TypeError) as e:
+            self._log("Failed to persist approval metadata", message2=str(e), level="debug")
 
     def _finalize_local_task(self):
         """Run the standard local task postprocessing: file move, history, metadata, cleanup."""

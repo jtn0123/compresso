@@ -56,6 +56,12 @@ DEFAULT_READINESS_TIMEOUT_SECONDS = 30
 DEFAULT_WORKER_CAP = 2
 
 
+def _as_bool(value):
+    if isinstance(value, str):
+        return value.lower() in ("true", "1", "yes", "on")
+    return bool(value)
+
+
 class Config(metaclass=SingletonType):
     app_version = ""
 
@@ -131,6 +137,10 @@ class Config(metaclass=SingletonType):
         self.large_library_safe_defaults = True
         self.startup_readiness_timeout_seconds = DEFAULT_READINESS_TIMEOUT_SECONDS
         self.default_worker_cap = DEFAULT_WORKER_CAP
+        self.api_auth_enabled = False
+        self.api_auth_token = ""
+        self.csrf_protection_enabled = False
+        self.allow_lan_proxy_targets = True
 
         # Import env variables and override all previous settings.
         self.__import_settings_from_env()
@@ -218,7 +228,7 @@ class Config(metaclass=SingletonType):
             config_path = self.get_config_path()
         # Ensure the config path exists
         if not os.path.exists(config_path):
-            os.makedirs(config_path)
+            os.makedirs(config_path, exist_ok=True)
         settings_file = os.path.join(config_path, "settings.json")
         if os.path.exists(settings_file):
             data = {}
@@ -244,7 +254,7 @@ class Config(metaclass=SingletonType):
         :return:
         """
         if not os.path.exists(self.get_config_path()):
-            os.makedirs(self.get_config_path())
+            os.makedirs(self.get_config_path(), exist_ok=True)
         settings_file = os.path.join(self.get_config_path(), "settings.json")
         data = self.get_config_as_dict()
         result = common.json_dump_to_file(data, settings_file)
@@ -589,9 +599,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        if isinstance(self.large_library_safe_defaults, str):
-            return self.large_library_safe_defaults.lower() in ("true", "1", "yes", "on")
-        return bool(self.large_library_safe_defaults)
+        return _as_bool(self.large_library_safe_defaults)
 
     def get_startup_readiness_timeout_seconds(self):
         """
@@ -610,9 +618,19 @@ class Config(metaclass=SingletonType):
         return max(1, int(self.default_worker_cap))
 
     def get_approval_required(self):
-        if isinstance(self.approval_required, str):
-            return self.approval_required.lower() in ("true", "1", "yes", "on")
-        return bool(self.approval_required)
+        return _as_bool(self.approval_required)
+
+    def get_api_auth_enabled(self):
+        return _as_bool(self.api_auth_enabled)
+
+    def get_api_auth_token(self):
+        return str(self.api_auth_token or "")
+
+    def get_csrf_protection_enabled(self):
+        return _as_bool(self.csrf_protection_enabled)
+
+    def get_allow_lan_proxy_targets(self):
+        return _as_bool(self.allow_lan_proxy_targets)
 
     def get_staging_path(self):
         return self.staging_path

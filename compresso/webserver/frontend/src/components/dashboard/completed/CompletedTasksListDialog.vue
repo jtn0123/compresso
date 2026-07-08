@@ -579,6 +579,7 @@ import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import dateTools from 'src/js/dateTools'
 import { useMobile } from 'src/composables/useMobile'
+import { useTaskDialogScroll } from 'src/composables/useTaskDialogScroll'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import CompletedTaskLogDialog from 'components/dashboard/completed/CompletedTaskLogDialog.vue'
 import FileMetadataDetailsDialog from 'components/dashboard/completed/FileMetadataDetailsDialog.vue'
@@ -697,6 +698,13 @@ const filterSortActiveColor = 'warning'
 const searchLabelColor = computed(() => (searchValue.value.trim().length > 0 ? filterSortActiveColor : 'secondary'))
 
 const showActionsToggle = computed(() => $q.screen.width < 1024 || ($q.screen.width >= 1024 && $q.screen.height < 800))
+
+const { handleTableScroll, scrollToTop } = useTaskDialogScroll({
+  tableWrapperRef,
+  showScrollTop,
+  actionsExpanded,
+  showActionsToggle,
+})
 
 const sincePopupActionLabel = computed(() =>
   draftSinceDate.value ? t('components.completedTasks.apply') : t('navigation.close'),
@@ -829,26 +837,6 @@ const onDialogHide = () => {
 
 const toggleActionsExpanded = () => {
   actionsExpanded.value = !actionsExpanded.value
-}
-
-const handleTableScroll = (event) => {
-  const wrapper = event?.target || tableWrapperRef.value
-  if (!wrapper) {
-    return
-  }
-  showScrollTop.value = wrapper.scrollTop > 120
-  if (showActionsToggle.value && actionsExpanded.value && wrapper.scrollTop > 4) {
-    actionsExpanded.value = false
-  }
-}
-
-const scrollToTop = () => {
-  const wrapper = tableWrapperRef.value
-  if (!wrapper) {
-    return
-  }
-  wrapper.scrollTo({ top: 0, behavior: 'smooth' })
-  showScrollTop.value = false
 }
 
 const resetSelection = () => {

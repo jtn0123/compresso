@@ -50,7 +50,7 @@ Then open http://localhost:8888 in your browser.
 ## Dependencies
 
  - Python 3.x ([Install](https://www.python.org/downloads/))
- - To install requirements run 'python3 -m pip install -r requirements.txt' from the project root
+ - To install requirements run 'python3.13 -m pip install -r requirements.txt' from the project root
 
 Since Compresso can be used for running any commands, you will need to ensure that the required dependencies for those commands are also installed on your system.
 
@@ -67,34 +67,57 @@ Since Compresso can be used for running any commands, you will need to ensure th
 
 To run from source:
 
-1) Install Python 3 and Node.js 24.x.
-2) Install Python build dependencies:
-    ```
-    python3 -m pip install -r requirements.txt -r requirements-dev.txt
-    ```
-3) Optionally run the frontend validation steps used in CI:
-    ```bash
-    cd compresso/webserver/frontend
-    npm ci
-    npm run lint
-    npm run build:publish
-    cd ../../..
-    ```
-4) Build and install the package:
-    ```bash
-    rm -rf build dist
-    python3 -m build --no-isolation --skip-dependency-check --wheel
-    python3 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
-    ```
-5) Run Compresso:
-    ```bash
-    compresso
-    ```
-6) Open your web browser and navigate to http://localhost:8888/
+1. Install Python 3.13 and Node.js 24.x. Node.js 22.x is accepted for local development, but Node.js 24 is the frontend CI baseline.
+2. Install Python build dependencies:
 
-Node.js 24 is the supported frontend build baseline. Node 22 may still work, but CI and release validation now use Node 24.
+```bash
+python3.13 -m pip install -r requirements.txt -r requirements-dev.txt
+```
+
+3. Optionally run the frontend validation steps used in CI:
+
+```bash
+cd compresso/webserver/frontend
+npm ci
+npm run test -- --run
+npm run lint
+npm run test:e2e
+npm run build:publish
+cd ../../..
+```
+
+4. Build and install the package:
+
+```bash
+rm -rf build dist
+python3.13 -m build --no-isolation --skip-dependency-check --wheel
+python3.13 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
+```
+
+5. Run Compresso:
+
+```bash
+compresso
+```
+
+6. Open your web browser and navigate to http://localhost:8888/
+
+Node.js 24 is the supported frontend build baseline. Node 22 may still work locally, but frontend CI validates Node 24.
 
 The Python package build performs its own clean frontend install from the committed lockfile, so a pre-existing `node_modules` directory is not required.
+
+To mirror the main local validation gates from a prepared checkout, run:
+
+```bash
+bash scripts/verify-local.sh
+```
+
+For Docker-focused changes, run the local container preflight when Docker is available:
+
+```bash
+bash scripts/docker-preflight.sh
+bash scripts/trivy-group-report.sh compresso:local-preflight
+```
 
 For a production-focused source or Docker workflow, including a deployment checklist for large libraries, see [docs/FORK_DEPLOYMENT.md](./docs/FORK_DEPLOYMENT.md).
 

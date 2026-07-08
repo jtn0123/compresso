@@ -169,9 +169,10 @@ class TestStageForApprovalNotifications:
             f.write(content)
         return path
 
+    @patch("compresso.libs.postprocessor.PostProcessor._record_approval_metadata")
     @patch("compresso.libs.external_notifications.ExternalNotificationDispatcher")
     @patch("compresso.libs.ffprobe_utils.compute_quality_scores", return_value=None)
-    def test_dispatches_approval_needed_notification(self, mock_quality_scores, mock_dispatcher_cls):
+    def test_dispatches_approval_needed_notification(self, mock_quality_scores, mock_dispatcher_cls, _mock_metadata):
         pp = _make_postprocessor()
         pp.settings.get_staging_path.return_value = self.staging_dir
 
@@ -200,9 +201,10 @@ class TestStageForApprovalNotifications:
         assert context["task_id"] == 42
         assert "staged_path" in context
 
+    @patch("compresso.libs.postprocessor.PostProcessor._record_approval_metadata")
     @patch("compresso.libs.external_notifications.ExternalNotificationDispatcher")
     @patch("compresso.libs.ffprobe_utils.compute_quality_scores", return_value=None)
-    def test_approval_notification_failure_does_not_crash(self, mock_quality_scores, mock_dispatcher_cls):
+    def test_approval_notification_failure_does_not_crash(self, mock_quality_scores, mock_dispatcher_cls, _mock_metadata):
         """Notification failure during staging should not prevent staging completion."""
         pp = _make_postprocessor()
         pp.settings.get_staging_path.return_value = self.staging_dir
