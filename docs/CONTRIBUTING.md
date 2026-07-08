@@ -43,8 +43,7 @@ Your contribution becomes licensed under the same license as the project and own
 is handed over to the project owner. 
 This extends upon paragraph 11 of the Terms & Conditions stipulated in the GPL v3.0
 
-All pull requests must be opened to merge into the staging branch. No pull requests 
-will be merged into the master branch.
+Open pull requests against `master` for release-bound work or `staging` for pre-release validation work. If you are unsure, use `master` unless a maintainer asks for `staging`.
 
 All new python file contributions must contain the following header:
 
@@ -88,4 +87,3 @@ and its owner.
 Only submissions that conform to this will be merged into the mainline project. This ensures
 that Compresso as a project is free to grow following any path that opens up at the discretion
 of the project's owner.
-

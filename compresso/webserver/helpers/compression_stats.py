@@ -7,6 +7,8 @@ Helper functions for compression statistics API endpoints.
 
 """
 
+from peewee import fn
+
 from compresso.libs import history
 from compresso.libs.logs import CompressoLogging
 
@@ -127,11 +129,17 @@ def get_pending_estimate():
 
     # Get pending tasks and sum their source sizes
     try:
-        pending_query = Tasks.select().where(Tasks.status.in_(["pending", "creating"]))
-        pending_count = pending_query.count()
-        total_pending_size = 0
-        for t in pending_query:
-            total_pending_size += t.source_size or 0
+        aggregate = (
+            Tasks.select(
+                fn.COUNT(Tasks.id).alias("pending_count"),
+                fn.COALESCE(fn.SUM(Tasks.source_size), 0).alias("total_pending_size"),
+            )
+            .where(Tasks.status.in_(["pending", "creating"]))
+            .dicts()
+            .get()
+        )
+        pending_count = int(aggregate.get("pending_count") or 0)
+        total_pending_size = int(aggregate.get("total_pending_size") or 0)
     except Exception as e:
         logger.warning("Failed to query pending tasks: %s", str(e))
         pending_count = 0

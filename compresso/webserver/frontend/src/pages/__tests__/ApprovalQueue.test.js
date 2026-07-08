@@ -86,8 +86,41 @@ const MOCK_TASKS = [
   },
 ]
 
+function mockSummary(tasks = MOCK_TASKS) {
+  const withVmaf = tasks.filter((t) => t.vmaf_score != null)
+  const validSavings = tasks.filter((t) => t.source_size > 0)
+  let largest = tasks[0] || null
+  for (const task of tasks) {
+    if (Math.abs(task.size_delta || 0) > Math.abs(largest?.size_delta || 0)) largest = task
+  }
+  return {
+    total_count: tasks.length,
+    total_source_size: tasks.reduce((sum, task) => sum + (task.source_size || 0), 0),
+    total_staged_size: tasks.reduce((sum, task) => sum + (task.staged_size || 0), 0),
+    total_space_saved: tasks.reduce((sum, task) => {
+      const delta = task.size_delta || 0
+      return delta < 0 ? sum + Math.abs(delta) : sum
+    }, 0),
+    average_savings_percent:
+      validSavings.length === 0
+        ? 0
+        : validSavings.reduce(
+            (sum, task) => sum + ((task.source_size - task.staged_size) / task.source_size) * 100,
+            0,
+          ) / validSavings.length,
+    largest_savings_file: largest?.abspath || '',
+    largest_savings_bytes: Math.abs(largest?.size_delta || 0),
+    average_vmaf:
+      withVmaf.length === 0 ? null : withVmaf.reduce((sum, task) => sum + task.vmaf_score, 0) / withVmaf.length,
+    codec_options: ['h264', 'hevc'],
+  }
+}
+
 function mockFetchSuccess(tasks = MOCK_TASKS) {
   axios.post.mockImplementation((url) => {
+    if (url.includes('approval/summary')) {
+      return Promise.resolve({ data: mockSummary(tasks) })
+    }
     if (url.includes('approval/tasks')) {
       return Promise.resolve({
         data: {
@@ -119,6 +152,9 @@ function mockFetchSuccess(tasks = MOCK_TASKS) {
 
 function mockFetchEmpty() {
   axios.post.mockImplementation((url) => {
+    if (url.includes('approval/summary')) {
+      return Promise.resolve({ data: mockSummary([]) })
+    }
     if (url.includes('approval/tasks')) {
       return Promise.resolve({
         data: { results: [], recordsFiltered: 0 },
@@ -331,6 +367,22 @@ describe('ApprovalQueue.vue', () => {
       expect(taskCalls.length).toBeGreaterThanOrEqual(1)
       expect(taskCalls[0][1].search_value).toBe('movie')
     })
+
+    it('sends active codec and quality filters to tasks and summary endpoints', async () => {
+      const wrapper = await mountApprovalQueue()
+      vi.clearAllMocks()
+      mockFetchSuccess()
+
+      wrapper.vm.filterCodec = 'hevc'
+      wrapper.vm.filterQualityMin = 90
+      await wrapper.vm.$nextTick()
+      await flushPromises()
+
+      const taskCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/tasks'))
+      const summaryCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/summary'))
+      expect(taskCalls.at(-1)[1]).toMatchObject({ codec: 'hevc', quality_min: 90 })
+      expect(summaryCalls.at(-1)[1]).toMatchObject({ codec: 'hevc', quality_min: 90 })
+    })
   })
 
   // 9. Empty state shows appropriate message when no tasks
@@ -412,10 +464,8 @@ describe('ApprovalQueue.vue', () => {
       expect(wrapper.vm.vmafColor(null)).toBe('grey')
     })
 
-    it('totalSpaceSaved sums only negative deltas from allTasks', async () => {
+    it('totalSpaceSaved uses the approval summary aggregate', async () => {
       const wrapper = await mountApprovalQueue()
-      wrapper.vm.allTasks = MOCK_TASKS
-      await wrapper.vm.$nextTick()
       // MOCK_TASKS: |-400000| + |-500000| = 900000 (task 3 has positive delta, excluded)
       expect(wrapper.vm.totalSpaceSaved).toBe(900000)
     })

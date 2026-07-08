@@ -23,7 +23,9 @@
       </q-badge>
       <q-badge v-else class="q-pa-sm text-body2" color="grey">SSIM: N/A</q-badge>
       <q-badge class="q-pa-sm text-body2" :color="encodedByPipeline ? 'positive' : 'grey'">
-        {{ encodedByPipeline ? 'Plugin Pipeline' : 'Default Encode' }}
+        {{
+          encodedByPipeline ? $t('components.videoCompare.pluginPipeline') : $t('components.videoCompare.defaultEncode')
+        }}
       </q-badge>
     </div>
 
@@ -50,7 +52,7 @@
               @touchend="onTouchEnd"
             >
               <!-- A/B Label Overlay -->
-              <div class="ab-label ab-label-source">A &mdash; Original</div>
+              <div class="ab-label ab-label-source">{{ $t('components.videoCompare.sourceOverlay') }}</div>
               <!-- Video Error Overlay -->
               <div v-if="videoError" class="video-error-overlay">{{ videoError }}</div>
               <video
@@ -89,7 +91,7 @@
               @touchend="onTouchEnd"
             >
               <!-- A/B Label Overlay -->
-              <div class="ab-label ab-label-encoded">B &mdash; Encoded</div>
+              <div class="ab-label ab-label-encoded">{{ $t('components.videoCompare.encodedOverlay') }}</div>
               <video
                 ref="encodedVideoRef"
                 :src="encodedUrl"
@@ -164,7 +166,7 @@
               :aria-valuenow="Math.round(sliderPos)"
               aria-valuemin="0"
               aria-valuemax="100"
-              aria-label="Comparison slider"
+              :aria-label="$t('components.videoCompare.comparisonSlider')"
             >
               <!-- Slider A/B labels -->
               <div class="slider-ab-label slider-ab-label-a">A</div>
@@ -185,7 +187,8 @@
             {{ savings > 0 ? '-' : '+' }}{{ Math.abs(savingsPercent).toFixed(1) }}%
           </q-badge>
           <div class="text-caption q-mt-xs">
-            {{ savings > 0 ? 'Saved' : 'Increased by' }} {{ formatBytes(Math.abs(savings)) }}
+            {{ savings > 0 ? $t('components.videoCompare.saved') : $t('components.videoCompare.increasedBy') }}
+            {{ formatBytes(Math.abs(savings)) }}
           </div>
         </div>
       </q-card-section>
@@ -195,22 +198,40 @@
     <q-card class="q-mt-md">
       <q-card-section>
         <div class="row items-center q-gutter-sm">
-          <q-btn flat round icon="skip_previous" @click="seekToStart" aria-label="Skip to start" />
-          <q-btn flat round icon="fast_rewind" @click="framePrev" aria-label="Previous frame" />
+          <q-btn
+            flat
+            round
+            icon="skip_previous"
+            @click="seekToStart"
+            :aria-label="$t('components.videoCompare.skipToStart')"
+          />
+          <q-btn
+            flat
+            round
+            icon="fast_rewind"
+            @click="framePrev"
+            :aria-label="$t('components.videoCompare.previousFrame')"
+          />
           <q-btn
             flat
             round
             :icon="playing ? 'pause' : 'play_arrow'"
             @click="togglePlay"
-            :aria-label="playing ? 'Pause' : 'Play'"
+            :aria-label="playing ? $t('components.videoCompare.pause') : $t('components.videoCompare.play')"
           />
-          <q-btn flat round icon="fast_forward" @click="frameNext" aria-label="Next frame" />
-          <q-btn flat round icon="skip_next" @click="seekToEnd" aria-label="Skip to end" />
+          <q-btn
+            flat
+            round
+            icon="fast_forward"
+            @click="frameNext"
+            :aria-label="$t('components.videoCompare.nextFrame')"
+          />
+          <q-btn flat round icon="skip_next" @click="seekToEnd" :aria-label="$t('components.videoCompare.skipToEnd')" />
           <q-separator vertical class="q-mx-xs" />
           <q-select
             v-model="playbackSpeed"
             :options="speedOptions"
-            label="Speed"
+            :label="$t('components.videoCompare.speed')"
             dense
             outlined
             emit-value
@@ -224,7 +245,7 @@
             :icon="looping ? 'repeat_one' : 'repeat'"
             :color="looping ? 'primary' : ''"
             @click="looping = !looping"
-            :aria-label="looping ? 'Disable loop' : 'Enable loop'"
+            :aria-label="looping ? $t('components.videoCompare.disableLoop') : $t('components.videoCompare.enableLoop')"
           />
           <!-- Snapshot Button -->
           <q-btn flat round icon="photo_camera" :disable="playing" @click="takeSnapshot">
@@ -326,16 +347,16 @@ export default {
       { label: '2x', value: 2 },
     ]
 
-    const shortcutList = [
-      { key: 'Space', desc: 'Play / Pause' },
-      { key: '\u2190', desc: 'Frame step backward' },
-      { key: '\u2192', desc: 'Frame step forward' },
-      { key: '+ / =', desc: 'Zoom in 0.5x' },
-      { key: '-', desc: 'Zoom out 0.5x' },
-      { key: '0', desc: 'Reset zoom' },
-      { key: 'Home', desc: 'Seek to start' },
-      { key: 'End', desc: 'Seek to end' },
-    ]
+    const shortcutList = computed(() => [
+      { key: 'Space', desc: $t('components.videoCompare.shortcutPlayPause') },
+      { key: '\u2190', desc: $t('components.videoCompare.shortcutFrameBackward') },
+      { key: '\u2192', desc: $t('components.videoCompare.shortcutFrameForward') },
+      { key: '+ / =', desc: $t('components.videoCompare.shortcutZoomIn') },
+      { key: '-', desc: $t('components.videoCompare.shortcutZoomOut') },
+      { key: '0', desc: $t('components.videoCompare.shortcutResetZoom') },
+      { key: 'Home', desc: $t('components.videoCompare.shortcutSeekStart') },
+      { key: 'End', desc: $t('components.videoCompare.shortcutSeekEnd') },
+    ])
 
     const savings = computed(() => props.sourceSize - props.encodedSize)
     const savingsPercent = computed(() => {
@@ -757,12 +778,12 @@ export default {
       ctx.fillStyle = 'rgba(0, 0, 128, 0.8)'
       ctx.fillRect(4, 4, 100, 24)
       ctx.fillStyle = '#fff'
-      ctx.fillText('A - Original', 8, 22)
+      ctx.fillText($t('components.videoCompare.sourceOverlay'), 8, 22)
 
       ctx.fillStyle = 'rgba(0, 128, 0, 0.8)'
       ctx.fillRect(srcW + 4, 4, 100, 24)
       ctx.fillStyle = '#fff'
-      ctx.fillText('B - Encoded', srcW + 8, 22)
+      ctx.fillText($t('components.videoCompare.encodedOverlay'), srcW + 8, 22)
 
       canvas.toBlob((blob) => {
         if (!blob) return

@@ -14,6 +14,7 @@ from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHan
 from compresso.webserver.api_v2.schema.approval_schemas import (
     ApprovalCountResponseSchema,
     ApprovalDetailResponseSchema,
+    ApprovalSummaryResponseSchema,
     ApprovalTasksResponseSchema,
     RequestApprovalActionSchema,
     RequestApprovalDetailSchema,
@@ -28,6 +29,11 @@ class ApiApprovalHandler(BaseApiHandler):
             "path_pattern": r"/approval/tasks",
             "supported_methods": ["POST"],
             "call_method": "get_approval_tasks",
+        },
+        {
+            "path_pattern": r"/approval/summary",
+            "supported_methods": ["POST"],
+            "call_method": "get_approval_summary",
         },
         {
             "path_pattern": r"/approval/approve",
@@ -84,12 +90,62 @@ class ApiApprovalHandler(BaseApiHandler):
                     "library_ids": json_request.get("library_ids", []),
                     "order_by": json_request.get("order_by", "finish_time"),
                     "order_direction": json_request.get("order_direction", "desc"),
+                    "codec": json_request.get("codec", ""),
+                    "quality_min": json_request.get("quality_min", 0),
                 },
                 include_library=json_request.get("include_library", False),
             )
 
             result["success"] = True
             response = self.build_response(ApprovalTasksResponseSchema(), result)
+            self.write_success(response)
+            return
+        except BaseApiError as bae:
+            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
+            self.write_error()
+            return
+        except Exception as e:
+            self.handle_unhandled_error(e)
+
+    async def get_approval_summary(self):
+        """
+        Approval - summary
+        ---
+        description: Aggregate tasks awaiting approval with optional filters.
+        requestBody:
+            description: Filter parameters.
+            required: True
+            content:
+                application/json:
+                    schema:
+                        RequestApprovalTasksSchema
+        responses:
+            200:
+                description: 'Aggregate summary for tasks awaiting approval.'
+                content:
+                    application/json:
+                        schema:
+                            ApprovalSummaryResponseSchema
+        """
+        try:
+            json_request = self.read_json_request(RequestApprovalTasksSchema())
+
+            from compresso.webserver.helpers import approval
+
+            result = approval.prepare_approval_summary(
+                params={
+                    "search_value": json_request.get("search_value", ""),
+                    "library_ids": json_request.get("library_ids", []),
+                    "order_by": json_request.get("order_by", "finish_time"),
+                    "order_direction": json_request.get("order_direction", "desc"),
+                    "codec": json_request.get("codec", ""),
+                    "quality_min": json_request.get("quality_min", 0),
+                }
+            )
+
+            result["success"] = True
+            response = self.build_response(ApprovalSummaryResponseSchema(), result)
             self.write_success(response)
             return
         except BaseApiError as bae:
@@ -130,6 +186,8 @@ class ApiApprovalHandler(BaseApiHandler):
                 ids = approval.get_all_matching_task_ids(
                     search_value=json_request.get("search_value", ""),
                     library_ids=json_request.get("library_ids", []),
+                    codec=json_request.get("codec", ""),
+                    quality_min=json_request.get("quality_min", 0),
                 )
             else:
                 ids = json_request.get("id_list", [])
@@ -175,6 +233,8 @@ class ApiApprovalHandler(BaseApiHandler):
                 ids = approval.get_all_matching_task_ids(
                     search_value=json_request.get("search_value", ""),
                     library_ids=json_request.get("library_ids", []),
+                    codec=json_request.get("codec", ""),
+                    quality_min=json_request.get("quality_min", 0),
                 )
             else:
                 ids = json_request.get("id_list", [])

@@ -380,8 +380,11 @@ class Task:
                 else:
                     order_by = attrgetter(order.get("column"))(Tasks).desc()
 
-            if order_by and length:
-                query = query.order_by(order_by).limit(length).offset(start)
+            if order_by:
+                query = query.order_by(order_by)
+
+            if length:
+                query = query.limit(length).offset(start)
 
         except Tasks.DoesNotExist:
             # No task entries exist yet

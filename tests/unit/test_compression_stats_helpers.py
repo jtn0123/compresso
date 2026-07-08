@@ -122,18 +122,11 @@ class TestGetPendingEstimate:
         mock_instance.get_library_compression_summary.return_value = {"avg_ratio": 0.5}
 
         MockTasks = MagicMock()
-        mock_query = MagicMock()
-        MockTasks.select.return_value.where.return_value = mock_query
-        mock_query.count.return_value = 3
-        mock_query.__iter__ = MagicMock(
-            return_value=iter(
-                [
-                    MagicMock(source_size=1000),
-                    MagicMock(source_size=2000),
-                    MagicMock(source_size=3000),
-                ]
-            )
-        )
+        mock_query = MockTasks.select.return_value.where.return_value
+        mock_query.dicts.return_value.get.return_value = {
+            "pending_count": 3,
+            "total_pending_size": 6000,
+        }
 
         with patch("compresso.libs.unmodels.Tasks", MockTasks):
             result = get_pending_estimate()
@@ -152,10 +145,11 @@ class TestGetPendingEstimate:
         mock_instance.get_library_compression_summary.return_value = {"avg_ratio": 0.5}
 
         MockTasks = MagicMock()
-        mock_query = MagicMock()
-        MockTasks.select.return_value.where.return_value = mock_query
-        mock_query.count.return_value = 0
-        mock_query.__iter__ = MagicMock(return_value=iter([]))
+        mock_query = MockTasks.select.return_value.where.return_value
+        mock_query.dicts.return_value.get.return_value = {
+            "pending_count": 0,
+            "total_pending_size": 0,
+        }
 
         with patch("compresso.libs.unmodels.Tasks", MockTasks):
             result = get_pending_estimate()
@@ -172,10 +166,11 @@ class TestGetPendingEstimate:
         mock_instance.get_library_compression_summary.return_value = {"avg_ratio": 0}
 
         MockTasks = MagicMock()
-        mock_query = MagicMock()
-        MockTasks.select.return_value.where.return_value = mock_query
-        mock_query.count.return_value = 1
-        mock_query.__iter__ = MagicMock(return_value=iter([MagicMock(source_size=1000)]))
+        mock_query = MockTasks.select.return_value.where.return_value
+        mock_query.dicts.return_value.get.return_value = {
+            "pending_count": 1,
+            "total_pending_size": 1000,
+        }
 
         with patch("compresso.libs.unmodels.Tasks", MockTasks):
             result = get_pending_estimate()
@@ -191,10 +186,11 @@ class TestGetPendingEstimate:
         mock_instance.get_library_compression_summary.return_value = {"avg_ratio": -0.5}
 
         MockTasks = MagicMock()
-        mock_query = MagicMock()
-        MockTasks.select.return_value.where.return_value = mock_query
-        mock_query.count.return_value = 1
-        mock_query.__iter__ = MagicMock(return_value=iter([MagicMock(source_size=1000)]))
+        mock_query = MockTasks.select.return_value.where.return_value
+        mock_query.dicts.return_value.get.return_value = {
+            "pending_count": 1,
+            "total_pending_size": 1000,
+        }
 
         with patch("compresso.libs.unmodels.Tasks", MockTasks):
             result = get_pending_estimate()
@@ -209,7 +205,7 @@ class TestGetPendingEstimate:
         mock_instance.get_library_compression_summary.return_value = {"avg_ratio": 0.5}
 
         MockTasks = MagicMock()
-        MockTasks.select.return_value.where.return_value.count.side_effect = Exception("DB error")
+        MockTasks.select.return_value.where.return_value.dicts.return_value.get.side_effect = Exception("DB error")
 
         with patch("compresso.libs.unmodels.Tasks", MockTasks):
             result = get_pending_estimate()

@@ -46,21 +46,21 @@ You can also just install the module natively in your home directory in "develop
 
 Start by creating a venv.
 ```
-python3 -m venv venv
+python3.13 -m venv venv
 echo 'export HOME_DIR=$(readlink -e ${VIRTUAL_ENV}/../)/dev_environment/config-venv' >> ./venv/bin/activate
 source ./venv/bin/activate
 ```
 
 Then install the dependencies into that venv
 ```
-python3 -m pip install --upgrade pip
-python3 -m pip install --upgrade -r ./requirements.txt -r ./requirements-dev.txt
+python3.13 -m pip install --upgrade pip
+python3.13 -m pip install --upgrade -r ./requirements.txt -r ./requirements-dev.txt
 ```
 
 Then install the module:
 
 ```
-python3 -m pip install --editable .
+python3.13 -m pip install --editable .
 ```
 
 This creates an egg symlink to the project directory for development.
@@ -68,7 +68,7 @@ This creates an egg symlink to the project directory for development.
 To later uninstall the development symlink:
 
 ```
-python3 -m pip uninstall compresso
+python3.13 -m pip uninstall compresso
 ```
 
 You should now be able to run compresso from the commandline:
@@ -133,7 +133,13 @@ Open Compresso in Chrome at `http://localhost:8888`, then open DevTools:
 Run the Python test suite from a host venv:
 
 ```
-python3 -m pytest
+python3.13 -m pytest
+```
+
+To run the main local verification gates used for day-to-day changes:
+
+```
+bash scripts/verify-local.sh
 ```
 
 

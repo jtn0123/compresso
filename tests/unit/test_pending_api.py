@@ -57,6 +57,10 @@ class TestPendingApiGetTasks(ApiTestBase):
         )
         assert resp.code == 400
 
+    def test_get_pending_tasks_invalid_order_by(self):
+        resp = self.post_json("/pending/tasks", {"start": 0, "length": 10, "order_by": "not_a_column"})
+        assert resp.code == 400
+
     @patch(PENDING_HELPERS + ".prepare_filtered_pending_tasks")
     def test_get_pending_tasks_internal_error(self, mock_tasks):
         mock_tasks.side_effect = Exception("DB error")

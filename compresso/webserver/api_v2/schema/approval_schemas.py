@@ -10,6 +10,20 @@ from marshmallow import fields, validate
 
 from compresso.webserver.api_v2.schema.schemas import BaseSchema, BaseSuccessSchema
 
+APPROVAL_TASK_ORDER_COLUMNS = (
+    "id",
+    "abspath",
+    "priority",
+    "type",
+    "status",
+    "library_id",
+    "start_time",
+    "finish_time",
+    "source_size",
+    "vmaf_score",
+    "ssim_score",
+)
+
 
 class RequestApprovalTasksSchema(BaseSchema):
     """Schema for listing tasks awaiting approval"""
@@ -38,11 +52,22 @@ class RequestApprovalTasksSchema(BaseSchema):
     order_by = fields.Str(
         load_default="finish_time",
         metadata={"description": "Column to order results by", "example": "finish_time"},
+        validate=validate.OneOf(APPROVAL_TASK_ORDER_COLUMNS),
     )
     order_direction = fields.Str(
         load_default="desc",
         metadata={"description": "Order direction ('asc' or 'desc')", "example": "desc"},
         validate=validate.OneOf(["asc", "desc"]),
+    )
+    codec = fields.Str(
+        load_default="",
+        allow_none=True,
+        metadata={"description": "Filter by source or staged codec", "example": "hevc"},
+    )
+    quality_min = fields.Float(
+        load_default=0,
+        metadata={"description": "Minimum VMAF score to include", "example": 85},
+        validate=validate.Range(min=0, max=100),
     )
 
 
@@ -93,6 +118,21 @@ class RequestApprovalActionSchema(BaseSchema):
         load_default="",
         metadata={"description": "Search filter when all_matching is true"},
     )
+    library_ids = fields.List(
+        fields.Int(),
+        load_default=[],
+        metadata={"description": "Library filter when all_matching is true"},
+    )
+    codec = fields.Str(
+        load_default="",
+        allow_none=True,
+        metadata={"description": "Codec filter when all_matching is true"},
+    )
+    quality_min = fields.Float(
+        load_default=0,
+        metadata={"description": "Minimum VMAF filter when all_matching is true"},
+        validate=validate.Range(min=0, max=100),
+    )
 
 
 class RequestRejectActionSchema(BaseSchema):
@@ -114,6 +154,21 @@ class RequestRejectActionSchema(BaseSchema):
     search_value = fields.Str(
         load_default="",
         metadata={"description": "Search filter when all_matching is true"},
+    )
+    library_ids = fields.List(
+        fields.Int(),
+        load_default=[],
+        metadata={"description": "Library filter when all_matching is true"},
+    )
+    codec = fields.Str(
+        load_default="",
+        allow_none=True,
+        metadata={"description": "Codec filter when all_matching is true"},
+    )
+    quality_min = fields.Float(
+        load_default=0,
+        metadata={"description": "Minimum VMAF filter when all_matching is true"},
+        validate=validate.Range(min=0, max=100),
     )
 
 
@@ -156,3 +211,17 @@ class ApprovalCountResponseSchema(BaseSuccessSchema):
     """Schema for the approval count response"""
 
     count = fields.Int()
+
+
+class ApprovalSummaryResponseSchema(BaseSuccessSchema):
+    """Schema for aggregate approval queue summary data"""
+
+    total_count = fields.Int()
+    total_source_size = fields.Int()
+    total_staged_size = fields.Int()
+    total_space_saved = fields.Int()
+    average_savings_percent = fields.Float()
+    largest_savings_file = fields.Str()
+    largest_savings_bytes = fields.Int()
+    average_vmaf = fields.Float(allow_none=True)
+    codec_options = fields.List(fields.Str())

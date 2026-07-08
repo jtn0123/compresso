@@ -62,6 +62,10 @@ class TestApprovalApiGetTasks(ApiTestBase):
         assert resp.code == 200
         data = self.parse_response(resp)
         assert data["recordsTotal"] == 2
+        mock_tasks.assert_called_once()
+        params = mock_tasks.call_args.kwargs["params"]
+        assert params["codec"] == ""
+        assert params["quality_min"] == 0
 
     @patch(APPROVAL_HELPERS + ".prepare_filtered_approval_tasks")
     def test_get_approval_tasks_error(self, mock_tasks):
@@ -76,6 +80,71 @@ class TestApprovalApiGetTasks(ApiTestBase):
             body="not json",
             headers={"Content-Type": "application/json"},
         )
+        assert resp.code == 400
+
+    def test_get_approval_tasks_invalid_order_by(self):
+        resp = self.post_json("/approval/tasks", {"start": 0, "length": 10, "order_by": "not_a_column"})
+        assert resp.code == 400
+
+    @patch(APPROVAL_HELPERS + ".prepare_filtered_approval_tasks")
+    def test_get_approval_tasks_passes_filters(self, mock_tasks):
+        mock_tasks.return_value = {"recordsTotal": 2, "recordsFiltered": 1, "results": []}
+        resp = self.post_json(
+            "/approval/tasks",
+            {
+                "start": 0,
+                "length": 10,
+                "codec": "hevc",
+                "quality_min": 90,
+            },
+        )
+        assert resp.code == 200
+        params = mock_tasks.call_args.kwargs["params"]
+        assert params["codec"] == "hevc"
+        assert params["quality_min"] == 90
+
+
+# ------------------------------------------------------------------
+# Get approval summary
+# ------------------------------------------------------------------
+
+
+@pytest.mark.unittest
+@patch.object(ApiApprovalHandler, "initialize", _mock_initialize)
+class TestApprovalApiSummary(ApiTestBase):
+    __test__ = True
+    handler_class = ApiApprovalHandler
+
+    @patch(APPROVAL_HELPERS + ".prepare_approval_summary")
+    def test_get_summary_success(self, mock_summary):
+        mock_summary.return_value = {
+            "total_count": 2,
+            "total_source_size": 3000,
+            "total_staged_size": 1800,
+            "total_space_saved": 1200,
+            "average_savings_percent": 40,
+            "largest_savings_file": "/media/v.mp4",
+            "largest_savings_bytes": 1200,
+            "average_vmaf": 92.5,
+            "codec_options": ["h264", "hevc"],
+        }
+        resp = self.post_json("/approval/summary", {"codec": "hevc", "quality_min": 80})
+        assert resp.code == 200
+        data = self.parse_response(resp)
+        assert data["total_count"] == 2
+        assert data["codec_options"] == ["h264", "hevc"]
+        params = mock_summary.call_args.kwargs["params"]
+        assert params["codec"] == "hevc"
+        assert params["quality_min"] == 80
+
+    @patch(APPROVAL_HELPERS + ".prepare_approval_summary")
+    def test_get_summary_error(self, mock_summary):
+        mock_summary.side_effect = Exception("DB error")
+        resp = self.post_json("/approval/summary", {})
+        assert resp.code == 500
+
+    def test_get_summary_invalid_quality_min(self):
+        resp = self.post_json("/approval/summary", {"quality_min": 101})
         assert resp.code == 400
 
 
@@ -101,6 +170,27 @@ class TestApprovalApiApprove(ApiTestBase):
         mock_approve.side_effect = Exception("error")
         resp = self.post_json("/approval/approve", {"id_list": [1]})
         assert resp.code == 500
+
+    @patch(APPROVAL_HELPERS + ".approve_tasks")
+    @patch(APPROVAL_HELPERS + ".get_all_matching_task_ids", return_value=[1, 3])
+    def test_approve_all_matching_passes_filters(self, mock_matching, _mock_approve):
+        resp = self.post_json(
+            "/approval/approve",
+            {
+                "all_matching": True,
+                "search_value": "movie",
+                "library_ids": [2],
+                "codec": "hevc",
+                "quality_min": 90,
+            },
+        )
+        assert resp.code == 200
+        mock_matching.assert_called_once_with(
+            search_value="movie",
+            library_ids=[2],
+            codec="hevc",
+            quality_min=90,
+        )
 
 
 # ------------------------------------------------------------------
@@ -131,6 +221,27 @@ class TestApprovalApiReject(ApiTestBase):
         mock_reject.side_effect = Exception("error")
         resp = self.post_json("/approval/reject", {"id_list": [1]})
         assert resp.code == 500
+
+    @patch(APPROVAL_HELPERS + ".reject_tasks")
+    @patch(APPROVAL_HELPERS + ".get_all_matching_task_ids", return_value=[2])
+    def test_reject_all_matching_passes_filters(self, mock_matching, _mock_reject):
+        resp = self.post_json(
+            "/approval/reject",
+            {
+                "all_matching": True,
+                "search_value": "movie",
+                "library_ids": [2],
+                "codec": "h264",
+                "quality_min": 75,
+            },
+        )
+        assert resp.code == 200
+        mock_matching.assert_called_once_with(
+            search_value="movie",
+            library_ids=[2],
+            codec="h264",
+            quality_min=75,
+        )
 
 
 # ------------------------------------------------------------------
