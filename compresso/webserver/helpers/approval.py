@@ -171,11 +171,7 @@ def _get_approval_items(params, include_library=False, force_all=False):
     ]
 
     if has_derived_filters:
-        items = [
-            item
-            for item in items
-            if _matches_approval_filters(item, codec_filter=codec_filter, quality_min=quality_min)
-        ]
+        items = [item for item in items if _matches_approval_filters(item, codec_filter=codec_filter, quality_min=quality_min)]
 
     records_filtered_count = len(items) if has_derived_filters or force_all else count_query.count()
     if (has_derived_filters or force_all) and length:
@@ -220,12 +216,7 @@ def prepare_approval_summary(params):
     )
 
     codec_options = sorted(
-        {
-            codec
-            for item in items
-            for codec in (item.get("source_codec"), item.get("staged_codec"))
-            if codec
-        }
+        {codec for item in items for codec in (item.get("source_codec"), item.get("staged_codec")) if codec}
     )
     with_vmaf = [float(item["vmaf_score"]) for item in items if item.get("vmaf_score") is not None]
     total_source_size = sum(item.get("source_size") or 0 for item in items)

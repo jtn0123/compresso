@@ -169,9 +169,7 @@ class TestApprovalListingOrderAndSearch:
     @patch("compresso.webserver.helpers.approval.extract_media_metadata")
     @patch("compresso.webserver.helpers.approval.config.Config")
     @patch("compresso.webserver.helpers.approval.task")
-    def test_filters_by_codec_and_quality_min(
-        self, mock_task_module, mock_config_class, mock_extract, mock_tasks_model
-    ):
+    def test_filters_by_codec_and_quality_min(self, mock_task_module, mock_config_class, mock_extract, mock_tasks_model):
         from compresso.webserver.helpers.approval import prepare_filtered_approval_tasks
 
         mock_config = MagicMock()
