@@ -1070,6 +1070,7 @@
       "rejectedCount": "Rejected {count} file(s)",
       "failedToReject": "Failed to reject — please try again",
       "failedToFetchTasks": "Failed to fetch approval tasks",
+      "summaryPartial": "Summary temporarily unavailable; showing this page only.",
       "failedToFetchDetail": "Failed to fetch task detail",
       "failedToCreatePreview": "Failed to create preview",
       "previewFailed": "Preview generation failed: {error}",

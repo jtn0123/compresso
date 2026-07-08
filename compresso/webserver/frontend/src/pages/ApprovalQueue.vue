@@ -96,6 +96,10 @@
       </div>
     </div>
 
+    <q-banner v-if="summaryIsPartial" class="q-mb-md" rounded dense>
+      {{ summaryError }}
+    </q-banner>
+
     <!-- Search & Filters -->
     <div class="row q-col-gutter-sm q-mb-md items-center">
       <div class="col-12 col-sm-6 col-md-4">
@@ -653,6 +657,10 @@ export default {
       avgVmafScore,
       codecOptions,
       hasActiveFilters,
+      summaryError,
+      summaryIsPartial,
+      fileName,
+      formatSize,
       buildBulkFilterPayload,
       fetchSummary,
       fetchTasks: fetchApprovalTasks,
@@ -767,28 +775,16 @@ export default {
       refreshApprovalData()
     }
 
+    let filterRefreshTimer = null
     watch([filterCodec, filterQualityMin], () => {
       pagination.value.page = 1
       selectAllMode.value = false
-      refreshApprovalData()
+      if (filterRefreshTimer) clearTimeout(filterRefreshTimer)
+      filterRefreshTimer = setTimeout(() => {
+        filterRefreshTimer = null
+        refreshApprovalData()
+      }, 250)
     })
-
-    function fileName(abspath) {
-      if (!abspath) return ''
-      return abspath.split('/').pop()
-    }
-
-    function formatSize(bytes) {
-      if (!bytes || bytes === 0) return '0 B'
-      const units = ['B', 'KB', 'MB', 'GB', 'TB']
-      let i = 0
-      let size = Math.abs(bytes)
-      while (size >= 1024 && i < units.length - 1) {
-        size /= 1024
-        i++
-      }
-      return size.toFixed(1) + ' ' + units[i]
-    }
 
     function formatSizeDelta(delta) {
       if (delta === 0) return '0 B'
@@ -1072,6 +1068,9 @@ export default {
       if (refreshInterval) {
         clearInterval(refreshInterval)
       }
+      if (filterRefreshTimer) {
+        clearTimeout(filterRefreshTimer)
+      }
       cleanupPreview()
       window.removeEventListener('keydown', handleKeydown)
     })
@@ -1101,6 +1100,8 @@ export default {
       largestFileName,
       largestFileSavings,
       avgVmafScore,
+      summaryError,
+      summaryIsPartial,
       vmafColor,
       vmafLabel,
       previewActive,

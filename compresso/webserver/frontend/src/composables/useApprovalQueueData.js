@@ -14,12 +14,12 @@ const EMPTY_SUMMARY = {
   codec_options: [],
 }
 
-function fileName(abspath) {
+export function fileName(abspath) {
   if (!abspath) return ''
   return abspath.split('/').pop()
 }
 
-function formatSize(bytes) {
+export function formatSize(bytes) {
   if (!bytes || bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let i = 0
@@ -33,10 +33,12 @@ function formatSize(bytes) {
 
 function summaryFromTasks(rows) {
   const withVmaf = rows.filter((t) => t.vmaf_score != null)
-  const validSavings = rows.filter((t) => t.source_size > 0)
-  let largest = rows[0] || null
+  const validSavings = rows.filter((t) => t.source_size > 0 && t.staged_size > 0)
+  let largest = null
   for (const row of rows) {
-    if (Math.abs(row.size_delta || 0) > Math.abs(largest?.size_delta || 0)) {
+    const delta = row.size_delta || 0
+    if (delta >= 0) continue
+    if (Math.abs(delta) > Math.abs(largest?.size_delta || 0)) {
       largest = row
     }
   }
@@ -80,6 +82,10 @@ export function useApprovalQueueData({ notify, t } = {}) {
   const filterCodec = ref(null)
   const filterQualityMin = ref(0)
   const summary = ref({ ...EMPTY_SUMMARY })
+  const summaryError = ref('')
+  const summaryIsPartial = ref(false)
+  let fetchSequence = 0
+  let lastTaskPayloadKey = ''
   let lastKnownIds = new Set()
 
   const pagination = ref({
@@ -118,23 +124,35 @@ export function useApprovalQueueData({ notify, t } = {}) {
     try {
       const res = await axios.post(getCompressoApiUrl('v2', 'approval/summary'), buildFilterPayload())
       summary.value = normalizeSummary(res.data)
+      summaryError.value = ''
+      summaryIsPartial.value = false
     } catch {
       summary.value = summaryFromTasks(tasks.value)
+      summaryError.value = t
+        ? t('pages.approvalQueue.summaryPartial')
+        : 'Summary temporarily unavailable; showing this page only.'
+      summaryIsPartial.value = true
     }
   }
 
   async function fetchTasks(props, selectedIds = []) {
+    const sequence = ++fetchSequence
     loading.value = true
     const pg = props && props.pagination ? props.pagination : pagination.value
+    const payload = buildTaskPayload(pg)
+    const payloadKey = JSON.stringify(payload)
+    const isSameViewRefresh = payloadKey === lastTaskPayloadKey
 
     try {
-      const res = await axios.post(getCompressoApiUrl('v2', 'approval/tasks'), buildTaskPayload(pg))
+      const res = await axios.post(getCompressoApiUrl('v2', 'approval/tasks'), payload)
+      if (sequence !== fetchSequence) return null
+
       const data = res.data
       const newTasks = data.results || []
       const newCount = data.recordsFiltered || 0
 
       const newIds = new Set(newTasks.map((task) => task.id))
-      if (lastKnownIds.size > 0) {
+      if (isSameViewRefresh && lastKnownIds.size > 0) {
         let addedCount = 0
         for (const id of newIds) {
           if (!lastKnownIds.has(id)) addedCount++
@@ -146,6 +164,7 @@ export function useApprovalQueueData({ notify, t } = {}) {
 
       tasks.value = newTasks
       lastKnownIds = newIds
+      lastTaskPayloadKey = payloadKey
       pagination.value.rowsNumber = newCount
       pagination.value.page = pg.page
       pagination.value.rowsPerPage = pg.rowsPerPage
@@ -165,7 +184,7 @@ export function useApprovalQueueData({ notify, t } = {}) {
       }
       return null
     } finally {
-      loading.value = false
+      if (sequence === fetchSequence) loading.value = false
     }
   }
 
@@ -194,6 +213,8 @@ export function useApprovalQueueData({ notify, t } = {}) {
     filterCodec,
     filterQualityMin,
     summary,
+    summaryError,
+    summaryIsPartial,
     totalSpaceSaved,
     avgSavingsPercent,
     largestFileName,
@@ -201,6 +222,8 @@ export function useApprovalQueueData({ notify, t } = {}) {
     avgVmafScore,
     codecOptions,
     hasActiveFilters,
+    fileName,
+    formatSize,
     buildBulkFilterPayload,
     fetchSummary,
     fetchTasks,

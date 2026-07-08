@@ -23,7 +23,8 @@ the docker image by following the [Docker documentation](../docker/README.md)
 Once you have a Docker image, you can run it using the scripts in the `../devops/` directory.
 
 Examples:
-```
+
+```bash
 # Enable VAAPI
 devops/run_docker.sh --debug --hw=vaapi --cpus=1
 
@@ -45,21 +46,23 @@ The following folders are generated in the Docker environment:
 You can also just install the module natively in your home directory in "develop" mode.
 
 Start by creating a venv.
-```
+
+```bash
 python3.13 -m venv venv
 echo 'export HOME_DIR=$(readlink -e ${VIRTUAL_ENV}/../)/dev_environment/config-venv' >> ./venv/bin/activate
 source ./venv/bin/activate
 ```
 
 Then install the dependencies into that venv
-```
+
+```bash
 python3.13 -m pip install --upgrade pip
 python3.13 -m pip install --upgrade -r ./requirements.txt -r ./requirements-dev.txt
 ```
 
 Then install the module:
 
-```
+```bash
 python3.13 -m pip install --editable .
 ```
 
@@ -67,12 +70,13 @@ This creates an egg symlink to the project directory for development.
 
 To later uninstall the development symlink:
 
-```
+```bash
 python3.13 -m pip uninstall compresso
 ```
 
 You should now be able to run compresso from the commandline:
-```
+
+```bash
 # In develop mode this should return "UNKNOWN"
 compresso --version
 ```
@@ -83,7 +87,7 @@ compresso --version
 
 The Compresso frontend lives in `compresso/webserver/frontend/` (vendored, no submodules).
 
-```
+```bash
 cd compresso/webserver/frontend
 npm ci
 npm run build:publish
@@ -97,13 +101,13 @@ The built assets are output to `compresso/webserver/public/`.
 
 Use a clean profile config prefix and enable profiling with `--profiling`.
 
-```
+```bash
 ./devops/run_docker.sh --force-recreate --config-prefix=profiling --profiling
 ```
 
 Wait for the container logs to show Compresso is running before opening the UI:
 
-```
+```bash
 ./devops/run_docker.sh logs --tail 200
 ```
 
@@ -112,7 +116,7 @@ The profile output is written to the host path:
 
 To summarize the results:
 
-```
+```bash
 python - <<'PY'
 import pstats
 p = pstats.Stats('dev_environment/config-profiling/compresso-yappi.pstat')
@@ -132,13 +136,13 @@ Open Compresso in Chrome at `http://localhost:8888`, then open DevTools:
 
 Run the Python test suite from a host venv:
 
-```
+```bash
 python3.13 -m pytest
 ```
 
 To run the main local verification gates used for day-to-day changes:
 
-```
+```bash
 bash scripts/verify-local.sh
 ```
 
@@ -148,6 +152,7 @@ bash scripts/verify-local.sh
 
 This project uses Peewee migrations for managing the sqlite database.
 `devops/migrations.sh` provides a small wrapper for the cli tool. To get started, run:
-```
+
+```bash
 devops/migrations.sh --help
 ```

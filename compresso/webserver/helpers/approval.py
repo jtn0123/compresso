@@ -17,22 +17,9 @@ from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.tasks import Tasks
+from compresso.webserver.api_v2.schema.approval_schemas import APPROVAL_TASK_ORDER_COLUMNS
 
 logger = CompressoLogging.get_logger(name=__name__)
-
-_APPROVAL_ORDER_COLUMNS = {
-    "id",
-    "abspath",
-    "priority",
-    "type",
-    "status",
-    "library_id",
-    "start_time",
-    "finish_time",
-    "source_size",
-    "vmaf_score",
-    "ssim_score",
-}
 
 
 def _normalise_codec_filter(codec):
@@ -48,7 +35,7 @@ def _normalise_quality_min(value):
 
 def _build_order(params):
     order_by = params.get("order_by", "finish_time")
-    if order_by not in _APPROVAL_ORDER_COLUMNS:
+    if order_by not in APPROVAL_TASK_ORDER_COLUMNS:
         order_by = "finish_time"
 
     order_direction = params.get("order_direction", "desc")
@@ -90,12 +77,6 @@ def _build_approval_item(approval_task, staging_path, include_library=False):
 
     item["vmaf_score"] = approval_task.get("vmaf_score")
     item["ssim_score"] = approval_task.get("ssim_score")
-    try:
-        task_record = Tasks.get_by_id(task_id)
-        item["vmaf_score"] = task_record.vmaf_score
-        item["ssim_score"] = task_record.ssim_score
-    except Exception:  # noqa: S110 — scores are optional; task record may not exist yet
-        pass
 
     if include_library:
         library = Library(approval_task["library_id"])
@@ -219,17 +200,21 @@ def prepare_approval_summary(params):
         {codec for item in items for codec in (item.get("source_codec"), item.get("staged_codec")) if codec}
     )
     with_vmaf = [float(item["vmaf_score"]) for item in items if item.get("vmaf_score") is not None]
+    items_with_staged_files = [item for item in items if item.get("staged_size", 0) > 0]
     total_source_size = sum(item.get("source_size") or 0 for item in items)
     total_staged_size = sum(item.get("staged_size") or 0 for item in items)
     total_space_saved = sum(abs(item.get("size_delta") or 0) for item in items if (item.get("size_delta") or 0) < 0)
     savings_percentages = [
         ((item.get("source_size", 0) - item.get("staged_size", 0)) / item.get("source_size", 0)) * 100
-        for item in items
+        for item in items_with_staged_files
         if item.get("source_size", 0) > 0
     ]
     largest = None
-    for item in items:
-        if largest is None or abs(item.get("size_delta") or 0) > abs(largest.get("size_delta") or 0):
+    for item in items_with_staged_files:
+        size_delta = item.get("size_delta") or 0
+        if size_delta >= 0:
+            continue
+        if largest is None or abs(size_delta) > abs(largest.get("size_delta") or 0):
             largest = item
 
     return {

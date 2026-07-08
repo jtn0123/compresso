@@ -208,10 +208,6 @@ class TestApprovalListingOrderAndSearch:
             ],
         ]
         mock_task_module.Task.return_value = mock_task_handler
-        mock_tasks_model.get_by_id.side_effect = [
-            MagicMock(vmaf_score=95, ssim_score=0.98),
-            MagicMock(vmaf_score=80, ssim_score=0.95),
-        ]
         mock_extract.side_effect = [
             {"codec": "hevc", "resolution": "1080p"},
             {"codec": "h264", "resolution": "1080p"},
@@ -224,10 +220,11 @@ class TestApprovalListingOrderAndSearch:
 
     @patch("compresso.webserver.helpers.approval.Tasks")
     @patch("compresso.webserver.helpers.approval.extract_media_metadata")
+    @patch("compresso.webserver.helpers.approval._get_staged_file_info")
     @patch("compresso.webserver.helpers.approval.config.Config")
     @patch("compresso.webserver.helpers.approval.task")
     def test_summary_returns_aggregates_and_codec_options(
-        self, mock_task_module, mock_config_class, mock_extract, mock_tasks_model
+        self, mock_task_module, mock_config_class, mock_staged_info, mock_extract, mock_tasks_model
     ):
         from compresso.webserver.helpers.approval import prepare_approval_summary
 
@@ -265,12 +262,14 @@ class TestApprovalListingOrderAndSearch:
             ],
         ]
         mock_task_module.Task.return_value = mock_task_handler
-        mock_tasks_model.get_by_id.side_effect = [
-            MagicMock(vmaf_score=95, ssim_score=0.98),
-            MagicMock(vmaf_score=85, ssim_score=0.95),
+        mock_staged_info.side_effect = [
+            {"size": 100, "path": "/tmp/staging/task_1/video.mkv"},
+            {"size": 1500, "path": "/tmp/staging/task_2/video.mkv"},
         ]
         mock_extract.side_effect = [
             {"codec": "hevc", "resolution": "1080p"},
+            {"codec": "hevc", "resolution": "1080p"},
+            {"codec": "h264", "resolution": "1080p"},
             {"codec": "h264", "resolution": "1080p"},
         ]
 
@@ -278,10 +277,52 @@ class TestApprovalListingOrderAndSearch:
 
         assert result["total_count"] == 2
         assert result["total_source_size"] == 3000
-        assert result["average_savings_percent"] == 100
+        assert result["total_staged_size"] == 1600
+        assert result["average_savings_percent"] == 57.5
         assert result["largest_savings_file"] == "/media/hevc.mkv"
+        assert result["largest_savings_bytes"] == 900
         assert result["average_vmaf"] == 90
         assert result["codec_options"] == ["h264", "hevc"]
+        mock_tasks_model.get_by_id.assert_not_called()
+
+    @patch("compresso.webserver.helpers.approval.extract_media_metadata", return_value={})
+    @patch("compresso.webserver.helpers.approval._get_staged_file_info", return_value={"size": 0, "path": ""})
+    @patch("compresso.webserver.helpers.approval.config.Config")
+    @patch("compresso.webserver.helpers.approval.task")
+    def test_summary_ignores_missing_staged_files_for_savings(
+        self, mock_task_module, mock_config_class, _mock_staged_info, _mock_extract
+    ):
+        from compresso.webserver.helpers.approval import prepare_approval_summary
+
+        mock_config = MagicMock()
+        mock_config.get_staging_path.return_value = "/tmp/staging"
+        mock_config_class.return_value = mock_config
+
+        mock_task_handler = MagicMock()
+        mock_task_handler.get_total_task_list_count.return_value = 1
+        mock_task_handler.get_task_list_filtered_and_sorted.side_effect = [
+            MagicMock(),
+            [
+                {
+                    "id": 1,
+                    "abspath": "/media/missing-staged.mkv",
+                    "priority": 100,
+                    "type": "local",
+                    "status": "awaiting_approval",
+                    "source_size": 1000,
+                    "finish_time": "2024-06-01",
+                    "library_id": 1,
+                    "vmaf_score": 95,
+                },
+            ],
+        ]
+        mock_task_module.Task.return_value = mock_task_handler
+
+        result = prepare_approval_summary({})
+
+        assert result["average_savings_percent"] == 0
+        assert result["largest_savings_file"] == ""
+        assert result["largest_savings_bytes"] == 0
 
 
 # ------------------------------------------------------------------

@@ -102,18 +102,9 @@ class ApprovalTasksResponseSchema(BaseSuccessSchema):
     results = fields.List(fields.Nested(ApprovalTaskItemSchema))
 
 
-class RequestApprovalActionSchema(BaseSchema):
-    """Schema for approve/reject actions"""
+class ApprovalBulkFilterMixin:
+    """Shared filters for approval bulk actions."""
 
-    id_list = fields.List(
-        fields.Int(),
-        load_default=[],
-        metadata={"description": "List of task IDs to approve or reject"},
-    )
-    all_matching = fields.Boolean(
-        load_default=False,
-        metadata={"description": "If true, approve all tasks matching the current filter instead of explicit IDs"},
-    )
     search_value = fields.Str(
         load_default="",
         metadata={"description": "Search filter when all_matching is true"},
@@ -135,7 +126,21 @@ class RequestApprovalActionSchema(BaseSchema):
     )
 
 
-class RequestRejectActionSchema(BaseSchema):
+class RequestApprovalActionSchema(ApprovalBulkFilterMixin, BaseSchema):
+    """Schema for approve/reject actions"""
+
+    id_list = fields.List(
+        fields.Int(),
+        load_default=[],
+        metadata={"description": "List of task IDs to approve or reject"},
+    )
+    all_matching = fields.Boolean(
+        load_default=False,
+        metadata={"description": "If true, approve all tasks matching the current filter instead of explicit IDs"},
+    )
+
+
+class RequestRejectActionSchema(ApprovalBulkFilterMixin, BaseSchema):
     """Schema for reject action with optional requeue"""
 
     id_list = fields.List(
@@ -150,25 +155,6 @@ class RequestRejectActionSchema(BaseSchema):
     all_matching = fields.Boolean(
         load_default=False,
         metadata={"description": "If true, reject all tasks matching the current filter instead of explicit IDs"},
-    )
-    search_value = fields.Str(
-        load_default="",
-        metadata={"description": "Search filter when all_matching is true"},
-    )
-    library_ids = fields.List(
-        fields.Int(),
-        load_default=[],
-        metadata={"description": "Library filter when all_matching is true"},
-    )
-    codec = fields.Str(
-        load_default="",
-        allow_none=True,
-        metadata={"description": "Codec filter when all_matching is true"},
-    )
-    quality_min = fields.Float(
-        load_default=0,
-        metadata={"description": "Minimum VMAF filter when all_matching is true"},
-        validate=validate.Range(min=0, max=100),
     )
 
 

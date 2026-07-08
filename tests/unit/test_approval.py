@@ -555,6 +555,8 @@ class TestApprovalQualityScores:
             "source_size": 5000,
             "finish_time": "2024-06-01",
             "library_id": 1,
+            "vmaf_score": 85.0,
+            "ssim_score": 0.940,
         }
         # First call returns count query, second returns data query
         mock_task_handler.get_task_list_filtered_and_sorted.side_effect = [
@@ -563,16 +565,12 @@ class TestApprovalQualityScores:
         ]
         mock_task_module.Task.return_value = mock_task_handler
 
-        mock_record = MagicMock()
-        mock_record.vmaf_score = 85.0
-        mock_record.ssim_score = 0.940
-        mock_tasks_model.get_by_id.return_value = mock_record
-
         result = prepare_filtered_approval_tasks({"start": 0, "length": 10})
         assert len(result["results"]) == 1
         item = result["results"][0]
         assert item["vmaf_score"] == 85.0
         assert item["ssim_score"] == 0.940
+        mock_tasks_model.get_by_id.assert_not_called()
 
 
 if __name__ == "__main__":

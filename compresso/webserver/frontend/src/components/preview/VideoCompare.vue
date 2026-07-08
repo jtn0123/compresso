@@ -232,6 +232,7 @@
             v-model="playbackSpeed"
             :options="speedOptions"
             :label="$t('components.videoCompare.speed')"
+            color="primary"
             dense
             outlined
             emit-value

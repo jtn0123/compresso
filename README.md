@@ -67,30 +67,38 @@ Since Compresso can be used for running any commands, you will need to ensure th
 
 To run from source:
 
-1) Install Python 3.13 and Node.js 24.x. Node.js 22.x is accepted for local development, but Node.js 24 is the frontend CI baseline.
-2) Install Python build dependencies:
-    ```
-    python3.13 -m pip install -r requirements.txt -r requirements-dev.txt
-    ```
-3) Optionally run the frontend validation steps used in CI:
-    ```bash
-    cd compresso/webserver/frontend
-    npm ci
-    npm run lint
-    npm run build:publish
-    cd ../../..
-    ```
-4) Build and install the package:
-    ```bash
-    rm -rf build dist
-    python3.13 -m build --no-isolation --skip-dependency-check --wheel
-    python3.13 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
-    ```
-5) Run Compresso:
-    ```bash
-    compresso
-    ```
-6) Open your web browser and navigate to http://localhost:8888/
+1. Install Python 3.13 and Node.js 24.x. Node.js 22.x is accepted for local development, but Node.js 24 is the frontend CI baseline.
+2. Install Python build dependencies:
+
+```bash
+python3.13 -m pip install -r requirements.txt -r requirements-dev.txt
+```
+
+3. Optionally run the frontend validation steps used in CI:
+
+```bash
+cd compresso/webserver/frontend
+npm ci
+npm run lint
+npm run build:publish
+cd ../../..
+```
+
+4. Build and install the package:
+
+```bash
+rm -rf build dist
+python3.13 -m build --no-isolation --skip-dependency-check --wheel
+python3.13 -m pip install --user "$(find dist -maxdepth 1 -type f -name '*.whl' | sort | tail -n 1)"
+```
+
+5. Run Compresso:
+
+```bash
+compresso
+```
+
+6. Open your web browser and navigate to http://localhost:8888/
 
 Node.js 24 is the supported frontend build baseline. Node 22 may still work locally, but frontend CI validates Node 24.
 

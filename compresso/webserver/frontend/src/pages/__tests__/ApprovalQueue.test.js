@@ -376,12 +376,38 @@ describe('ApprovalQueue.vue', () => {
       wrapper.vm.filterCodec = 'hevc'
       wrapper.vm.filterQualityMin = 90
       await wrapper.vm.$nextTick()
+      vi.advanceTimersByTime(250)
       await flushPromises()
 
       const taskCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/tasks'))
       const summaryCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/summary'))
       expect(taskCalls.at(-1)[1]).toMatchObject({ codec: 'hevc', quality_min: 90 })
       expect(summaryCalls.at(-1)[1]).toMatchObject({ codec: 'hevc', quality_min: 90 })
+    })
+
+    it('marks summary data partial when the summary endpoint fails', async () => {
+      axios.post.mockImplementation((url) => {
+        if (url.includes('approval/summary')) {
+          return Promise.reject(new Error('summary unavailable'))
+        }
+        if (url.includes('approval/tasks')) {
+          return Promise.resolve({
+            data: {
+              results: MOCK_TASKS,
+              recordsFiltered: MOCK_TASKS.length,
+            },
+          })
+        }
+        return Promise.resolve({ data: {} })
+      })
+      axios.get.mockImplementation(() => Promise.resolve({ data: { settings: { approval_required: true } } }))
+
+      const wrapper = shallowMountWithQuasar(ApprovalQueue)
+      await flushPromises()
+
+      expect(wrapper.vm.summaryIsPartial).toBe(true)
+      expect(wrapper.vm.summaryError).toBe('pages.approvalQueue.summaryPartial')
+      expect(wrapper.vm.totalSpaceSaved).toBe(900000)
     })
   })
 
