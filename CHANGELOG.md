@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/jtn0123/compresso/compare/v1.12.0...v1.12.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* **deps:** update locks and restore Peewee typing ([83a4ad4](https://github.com/jtn0123/compresso/commit/83a4ad43a6d390a58350bc91fc8bc09e281f37ee))
+
 # [1.12.0](https://github.com/jtn0123/compresso/compare/v1.11.0...v1.12.0) (2026-07-08)
 
 
