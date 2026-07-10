@@ -165,7 +165,8 @@ jobs:
     name: SonarCloud Scan
     needs: [py_unit_test]
     runs-on: ubuntu-latest
-    if: always()
+    # Dependabot PRs cannot access repository secrets such as SONAR_TOKEN.
+    if: always() && github.actor != 'dependabot[bot]'
 
     steps:
     - uses: actions/checkout@v4

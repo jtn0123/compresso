@@ -10,7 +10,7 @@ on:
       - "scripts/verify-local.sh"
       - ".github/workflows/verify-local.yml"
       - "requirements*.txt"
-      - "requirements.lock"
+      - "requirements*.lock"
       - "pyproject.toml"
       - "compresso/webserver/frontend/**"
 
