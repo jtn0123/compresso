@@ -33,7 +33,7 @@
 import io
 import os
 import subprocess
-import sys
+from email.parser import Parser
 
 import compresso.metadata as version_info
 
@@ -49,12 +49,7 @@ def version():
         git_version_info = get_git_version_info()
         return git_version_info['short']
     else:
-        # Try VERSION file first, fall back to metadata
-        version_file = os.path.join(get_base_dir(), "VERSION")
-        if os.path.isfile(version_file):
-            with open(version_file, 'r') as f:
-                return f.read().strip()
-        return str(version_info.__version__)
+        return source_version()
 
 
 def full_version():
@@ -62,11 +57,25 @@ def full_version():
         git_version_info = get_git_version_info()
         return git_version_info['long']
     else:
-        version_file = os.path.join(get_base_dir(), "VERSION")
-        if os.path.isfile(version_file):
-            with open(version_file, 'r') as f:
-                return f.read().strip()
-        return str(version_info.__version__)
+        return source_version()
+
+
+def source_version():
+    """Read version metadata when the source tree has no Git history."""
+    base_dir = get_base_dir()
+    version_file = os.path.join(base_dir, "VERSION")
+    if os.path.isfile(version_file):
+        with open(version_file) as f:
+            return f.read().strip()
+
+    package_info_file = os.path.join(base_dir, "PKG-INFO")
+    if os.path.isfile(package_info_file):
+        with open(package_info_file, encoding='utf8') as f:
+            package_version = Parser().parse(f).get('Version')
+        if package_version:
+            return package_version
+
+    return str(version_info.__version__)
 
 
 def description():
@@ -143,7 +152,7 @@ def changes():
 
 
 def get_base_dir():
-    return os.path.abspath(os.path.dirname(sys.argv[0]))
+    return os.path.abspath(os.path.dirname(__file__))
 
 
 def is_git_vcs():

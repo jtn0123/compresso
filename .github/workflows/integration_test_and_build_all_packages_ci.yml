@@ -189,9 +189,8 @@ jobs:
           python ./setup.py  --quiet fullversion
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}/raw/${GITHUB_REF#refs/heads}/"
           sed -i "s|(./docs/|(${REPO_URL:?}/docs/|g" README.md
-          python -m build --no-isolation --skip-dependency-check --wheel 2>&1 | tee /tmp/build-wheel.log
-          ! grep -q "absent from the \`packages\` configuration" /tmp/build-wheel.log
-          python -m build --no-isolation --skip-dependency-check --sdist
+          python -m build --no-isolation --skip-dependency-check 2>&1 | tee /tmp/build.log
+          ! grep -q "absent from the \`packages\` configuration" /tmp/build.log
 
       - name: Verify single wheel output
         run: |

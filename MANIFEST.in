@@ -17,21 +17,22 @@ recursive-include compresso/webserver/templates *.html
 
 # Include vendored frontend source as build input for source distributions
 graft compresso/webserver/frontend/src
-graft compresso/webserver/frontend/public
 graft compresso/webserver/frontend/scripts
 include compresso/webserver/frontend/.editorconfig
 include compresso/webserver/frontend/.env.example
-include compresso/webserver/frontend/.eslintignore
-include compresso/webserver/frontend/.eslintrc.js
+include compresso/webserver/frontend/.prettierrc.json
 include compresso/webserver/frontend/LICENSE
 include compresso/webserver/frontend/README.md
 include compresso/webserver/frontend/AGENTS.md
-include compresso/webserver/frontend/babel.config.js
+include compresso/webserver/frontend/eslint.config.mjs
+include compresso/webserver/frontend/index.html
 include compresso/webserver/frontend/jsconfig.json
 include compresso/webserver/frontend/package-lock.json
 include compresso/webserver/frontend/package.json
+include compresso/webserver/frontend/playwright.config.js
 include compresso/webserver/frontend/postcss.config.cjs
-include compresso/webserver/frontend/quasar.conf.js
+include compresso/webserver/frontend/quasar.config.cjs
+include compresso/webserver/frontend/vitest.config.js
 
 # Prune local-only frontend install artifacts from source distributions
 prune compresso/webserver/frontend/node_modules
