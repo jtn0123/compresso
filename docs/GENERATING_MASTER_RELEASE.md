@@ -14,8 +14,18 @@ based on [Conventional Commits](https://www.conventionalcommits.org/) prefixes.
 3. If a release is warranted:
    - `CHANGELOG.md` and `VERSION` are updated and committed.
    - A git tag and GitHub Release are created.
-4. The new tag triggers the existing **Build All Packages CI** workflow, which handles
-   PyPI and Docker publishing.
+4. The package workflow publishes to GHCR and, when repository credentials are configured,
+   also publishes to PyPI and Docker Hub.
+
+## Optional Publishing Credentials
+
+External publishing uses these repository secrets:
+
+- `PYPI_TOKEN` for PyPI packages
+- `DOCKER_USERNAME` and `DOCKER_PASSWORD` for Docker Hub images
+
+When those secrets are absent, their corresponding publish steps are skipped. GitHub Releases,
+GHCR images, package builds, tests, and security checks continue normally.
 
 ## Commit message format
 
