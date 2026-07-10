@@ -163,8 +163,9 @@ jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
     # via swagger-ui-py
-json-log-formatter==1.1.1 \
-    --hash=sha256:0815e3b4469e5c79cf3f6dc8a0613ba6601f4a7464f85ba03655cfa6e3e17d10
+json-log-formatter==1.2.1 \
+    --hash=sha256:1d4fd14495ad7e694aa576259ba81acaa69e6945d9d780f32ed25373d7d5ae93 \
+    --hash=sha256:1e40432466c911ba2d106a302314b1c3b0019de44c762bef94e8f23138a415a7
     # via -r requirements.txt
 markupsafe==3.0.3 \
     --hash=sha256:0303439a41979d9e74d18ff5e2dd8c43ed6c6001fd40e5bf2e43f7bd9bbc523f \
@@ -265,9 +266,9 @@ packaging==26.0 \
     --hash=sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4 \
     --hash=sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529
     # via swagger-ui-py
-peewee==4.0.5 \
-    --hash=sha256:05bf687660f04f925bcb7d744e5af826ca526322f2fad894bfa4f1d0f3bcaf50 \
-    --hash=sha256:b43a21493f19f205a016cb4a9e29c7eca3500576d29447a89732022d193450ba
+peewee==4.1.2 \
+    --hash=sha256:484abd54316c58e5fcdc83bcab638db906f22bfdf44a33e01acd487938011c79 \
+    --hash=sha256:eee0fe2fbaa49b36d758c2baeeafd9fd586171ed1256ec91c804f7c1b846af4f
     # via
     #   -r requirements.txt
     #   peewee-migrate

@@ -34,6 +34,7 @@ from base64 import b64decode
 from datetime import datetime
 
 from peewee import (
+    AutoField,
     BlobField,
     BooleanField,
     DatabaseProxy,
@@ -159,6 +160,8 @@ class BaseModel(Model):
 
     Generic configuration and methods used across all Model classes
     """
+
+    id = AutoField()
 
     class Meta:
         database = db

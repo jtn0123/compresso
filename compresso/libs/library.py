@@ -270,9 +270,10 @@ class Library:
         # Ensure library ID is not 0
         if library_id < 1:
             raise Exception("Library ID cannot be less than 1")
-        self.model = Libraries.get_or_none(id=library_id)
-        if not self.model:
+        model = Libraries.get_or_none(id=library_id)
+        if model is None:
             raise Exception(f"Unable to fetch library with ID {library_id}")
+        self.model = model
 
     @staticmethod
     def get_all_libraries():
