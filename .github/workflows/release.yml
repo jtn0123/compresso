@@ -1,25 +1,256 @@
 name: Release
+
 on:
   push:
     branches: [master]
+
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
+  packages: write
+  id-token: write
+
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
 jobs:
-  release:
+  prepare_candidate:
+    name: Prepare immutable release candidate
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.candidate.outputs.release_created }}
+      release_version: ${{ steps.candidate.outputs.release_version }}
+      release_tag: ${{ steps.candidate.outputs.release_tag }}
+      release_sha: ${{ steps.commit.outputs.release_sha }}
+      base_sha: ${{ steps.commit.outputs.base_sha }}
+
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: master
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-      - name: Install semantic-release plugins
-        run: npm install --no-save @semantic-release/changelog @semantic-release/git @semantic-release/exec semantic-release
-      - name: Release
+          node-version: 24.10.0
+          cache: npm
+          cache-dependency-path: .github/release/package-lock.json
+
+      - name: Install locked release tooling
+        working-directory: .github/release
+        run: npm ci
+
+      - name: Test release candidate tooling
+        working-directory: .github/release
+        run: npm test
+
+      - name: Determine and prepare the next release
+        run: |
+          node .github/release/prepare-candidate.mjs \
+            --repo-root . \
+            --output "${RUNNER_TEMP}/release-candidate/candidate.json"
+
+      - name: Read candidate metadata
+        id: candidate
+        run: |
+          metadata="${RUNNER_TEMP}/release-candidate/candidate.json"
+          release_created=$(jq -r '.release_created' "${metadata}")
+          echo "release_created=${release_created}" >> "${GITHUB_OUTPUT}"
+          if [[ "${release_created}" == "true" ]]; then
+            release_version=$(jq -r '.version' "${metadata}")
+            release_tag=$(jq -r '.tag' "${metadata}")
+            echo "release_version=${release_version}" >> "${GITHUB_OUTPUT}"
+            echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Commit candidate on an isolated branch
+        id: commit
+        if: steps.candidate.outputs.release_created == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.candidate.outputs.release_version }}
+          RELEASE_TAG: ${{ steps.candidate.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release tag already exists: ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+          base_sha=$(git rev-parse HEAD)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "semantic-release requested ${RELEASE_VERSION}, but candidate files did not change" >&2
+            exit 1
+          fi
+          git commit -m "chore(release): ${RELEASE_VERSION} [skip ci]"
+          release_sha=$(git rev-parse HEAD)
+          git push origin "HEAD:refs/heads/release-candidate/${GITHUB_RUN_ID}"
+          echo "base_sha=${base_sha}" >> "${GITHUB_OUTPUT}"
+          echo "release_sha=${release_sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload release metadata
+        if: steps.candidate.outputs.release_created == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-candidate/
+          retention-days: 14
+
+  python_gate:
+    name: Validate candidate Python
+    needs: prepare_candidate
+    if: needs.prepare_candidate.outputs.release_created == 'true'
+    uses: ./.github/workflows/python_lint_and_run_unit_tests.yml
+    with:
+      checkout_ref: ${{ needs.prepare_candidate.outputs.release_sha }}
+    secrets: inherit
+
+  frontend_gate:
+    name: Validate candidate frontend
+    needs: prepare_candidate
+    if: needs.prepare_candidate.outputs.release_created == 'true'
+    uses: ./.github/workflows/frontend_lint_and_build.yml
+    with:
+      checkout_ref: ${{ needs.prepare_candidate.outputs.release_sha }}
+
+  package_gate:
+    name: Build and validate candidate packages
+    needs: [prepare_candidate, python_gate, frontend_gate]
+    if: needs.prepare_candidate.outputs.release_created == 'true'
+    uses: ./.github/workflows/integration_test_and_build_all_packages_ci.yml
+    with:
+      checkout_ref: ${{ needs.prepare_candidate.outputs.release_sha }}
+      release_version: ${{ needs.prepare_candidate.outputs.release_version }}
+      publish_release: false
+    secrets: inherit
+
+  publish_release:
+    name: Publish validated release
+    needs: [prepare_candidate, package_gate]
+    if: needs.prepare_candidate.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.prepare_candidate.outputs.release_version }}
+      RELEASE_TAG: ${{ needs.prepare_candidate.outputs.release_tag }}
+      RELEASE_SHA: ${{ needs.prepare_candidate.outputs.release_sha }}
+      BASE_SHA: ${{ needs.prepare_candidate.outputs.base_sha }}
+      DOCKER_HUB_PUBLISH_ENABLED: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
+      PYPI_PUBLISH_ENABLED: ${{ secrets.PYPI_TOKEN != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare_candidate.outputs.release_sha }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download release metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: release-candidate-${{ github.run_id }}
+          path: release-candidate
+
+      - name: Download Python distribution
+        uses: actions/download-artifact@v8
+        with:
+          name: compresso-py-dist-data-${{ needs.prepare_candidate.outputs.release_version }}
+          path: release-dist
+
+      - name: Download SBOMs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: sbom-*-${{ needs.prepare_candidate.outputs.release_sha }}
+          path: release-sboms
+          merge-multiple: true
+
+      - name: Verify exact source and artifact identity
+        run: |
+          python scripts/verify-release-integrity.py \
+            --expected-version "${RELEASE_VERSION}" \
+            --expected-sha "${RELEASE_SHA}" \
+            --actual-sha "$(git rev-parse HEAD)" \
+            --dist-dir release-dist \
+            --notes-file release-candidate/release-notes.md
+
+      - name: Prepare PyPI-only distribution directory
+        run: |
+          mkdir -p pypi-dist
+          find release-dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -exec cp {} pypi-dist/ \;
+
+      - name: Confirm master has not moved during validation
+        run: |
+          git fetch origin master
+          current_master=$(git rev-parse origin/master)
+          if [[ "${current_master}" != "${BASE_SHA}" ]]; then
+            echo "master moved during release validation: expected ${BASE_SHA}, got ${current_master}" >&2
+            exit 1
+          fi
+
+      - name: Promote candidate commit and create draft release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: |
+          set -euo pipefail
+          git push origin "${RELEASE_SHA}:refs/heads/master"
+          git tag -a "${RELEASE_TAG}" "${RELEASE_SHA}" -m "${RELEASE_TAG}"
+          git push origin "refs/tags/${RELEASE_TAG}"
+
+          find release-dist release-sboms -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          mapfile -t assets < <(find release-dist release-sboms -type f | sort)
+          assets+=(SHA256SUMS)
+          gh release create "${RELEASE_TAG}" "${assets[@]}" \
+            --verify-tag \
+            --draft \
+            --title "${RELEASE_TAG}" \
+            --notes-file release-candidate/release-notes.md
+
+      - name: Publish distribution package to PyPI
+        if: env.PYPI_PUBLISH_ENABLED == 'true'
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+          packages-dir: pypi-dist/
+
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+      - name: Log into GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log into Docker Hub
+        if: env.DOCKER_HUB_PUBLISH_ENABLED == 'true'
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Publish validated multi-architecture image
+        run: |
+          set -euo pipefail
+          org=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          ghcr_image="ghcr.io/${org}/compresso"
+          images=(
+            "${ghcr_image}:build-amd64-${RELEASE_SHA}"
+            "${ghcr_image}:build-arm64-${RELEASE_SHA}"
+          )
+          docker buildx imagetools inspect "${ghcr_image}:build-amd64-${RELEASE_SHA}"
+          docker buildx imagetools inspect "${ghcr_image}:build-arm64-${RELEASE_SHA}"
+          docker buildx imagetools create -t "${ghcr_image}:${RELEASE_VERSION}" "${images[@]}"
+          docker buildx imagetools create -t "${ghcr_image}:latest" "${images[@]}"
+          if [[ "${DOCKER_HUB_PUBLISH_ENABLED}" == "true" ]]; then
+            docker buildx imagetools create -t "docker.io/jtn0123/compresso:${RELEASE_VERSION}" "${images[@]}"
+            docker buildx imagetools create -t "docker.io/jtn0123/compresso:latest" "${images[@]}"
+          fi
+
+      - name: Publish GitHub Release and remove candidate branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${RELEASE_TAG}" --draft=false
+          git push origin --delete "release-candidate/${GITHUB_RUN_ID}" || \
+            echo "::warning::Validated release published, but the candidate branch could not be removed"
