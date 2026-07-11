@@ -120,6 +120,10 @@ class PendingTasksTableResultsSchema(BaseSchema):
         required=False,
         metadata={"description": "The name of the library for which this task was created", "example": "Default"},
     )
+    job_id = fields.Str(
+        required=False,
+        metadata={"description": "Stable cross-installation job identifier"},
+    )
 
 
 class PendingTasksSchema(TableRecordsSuccessSchema):
@@ -170,6 +174,12 @@ class RequestPendingTaskCreateSchema(BaseSchema):
             " increase or decrease its position in the queue",
             "example": 1000,
         },
+    )
+    job_id = fields.Str(required=False, metadata={"description": "Stable job identifier supplied by the master"})
+    lease_token = fields.Str(required=False, metadata={"description": "Current master lease token"})
+    origin_installation_uuid = fields.Str(
+        required=False,
+        metadata={"description": "Installation UUID that owns the job"},
     )
 
 

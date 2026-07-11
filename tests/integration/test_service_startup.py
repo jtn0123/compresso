@@ -43,7 +43,7 @@ def append_dummy_thread(service, name):
 
 
 @pytest.mark.integrationtest
-def test_root_service_can_start_and_stop_twice_with_temp_paths(monkeypatch):
+def test_root_service_can_start_and_stop_twice_with_temp_paths(monkeypatch, in_memory_db):
     base_dir = tempfile.mkdtemp(prefix="compresso_tests_service_")
     config_dir = os.path.join(base_dir, "config")
     cache_dir = os.path.join(base_dir, "cache")
@@ -130,7 +130,7 @@ def test_root_service_can_start_and_stop_twice_with_temp_paths(monkeypatch):
 
 
 @pytest.mark.integrationtest
-def test_root_service_readiness_fails_when_ui_server_never_becomes_ready(monkeypatch):
+def test_root_service_readiness_fails_when_ui_server_never_becomes_ready(monkeypatch, in_memory_db):
     base_dir = tempfile.mkdtemp(prefix="compresso_tests_service_")
     config_dir = os.path.join(base_dir, "config")
     cache_dir = os.path.join(base_dir, "cache")

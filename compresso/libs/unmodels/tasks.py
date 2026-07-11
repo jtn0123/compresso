@@ -70,3 +70,14 @@ class Tasks(BaseModel):
     retry_count = IntegerField(null=True, default=0)
     max_retries = IntegerField(null=True, default=3)
     deferred_until = DateTimeField(null=True, default=None)
+    job_id = TextField(null=True, unique=True)
+    remote_task_id = IntegerField(null=True, default=None)
+    remote_installation_uuid = TextField(null=True, default=None, index=True)
+    lease_token = TextField(null=True, default=None)
+    lease_expires_at = DateTimeField(null=True, default=None, index=True)
+    heartbeat_at = DateTimeField(null=True, default=None)
+    remote_result_checksum = TextField(null=True, default=None)
+    remote_completed_at = DateTimeField(null=True, default=None)
+
+    class Meta:
+        indexes = ((("status", "priority"), False),)

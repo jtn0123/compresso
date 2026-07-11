@@ -17,8 +17,10 @@ import tornado.log
 from compresso import config
 from compresso.libs import session
 from compresso.libs.gpu_monitor import GpuMonitor
+from compresso.libs.operations_status import OperationsStatus
 from compresso.libs.system import System
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
+from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.system_schemas import SystemStatusSuccessSchema
 
@@ -40,6 +42,16 @@ class ApiSystemHandler(BaseApiHandler):
             "supported_methods": ["GET"],
             "call_method": "get_gpu_metrics",
         },
+        {
+            "path_pattern": r"/system/capabilities",
+            "supported_methods": ["GET"],
+            "call_method": "get_worker_capabilities",
+        },
+        {
+            "path_pattern": r"/system/operations",
+            "supported_methods": ["GET"],
+            "call_method": "get_operations_status",
+        },
     ]
 
     def initialize(self, **kwargs):
@@ -47,6 +59,7 @@ class ApiSystemHandler(BaseApiHandler):
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
+        self.foreman = CompressoRunningThreads().get_compresso_running_thread("foreman")
         self.config = config.Config()
 
     async def get_system_status(self):
@@ -192,6 +205,30 @@ class ApiSystemHandler(BaseApiHandler):
             }
             self.write_success(data)
             return
+        except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_worker_capabilities(self):
+        """Return hardware, encoder, and current-capacity data for scheduling."""
+        try:
+            self.write_success(WorkerCapabilities().snapshot(self.config))
+        except Exception as e:
+            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
+            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
+            self.write_error()
+
+    async def get_operations_status(self):
+        """Return queue, worker, transfer, checkpoint, and disk-pressure counters."""
+        try:
+            self.write_success(
+                OperationsStatus().snapshot(
+                    self.config,
+                    foreman=self.foreman,
+                    data_queues=self.compresso_data_queues,
+                )
+            )
         except Exception as e:
             tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))

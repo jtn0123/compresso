@@ -34,6 +34,7 @@ import os
 import shutil
 import threading
 import time
+import uuid
 from copy import deepcopy
 from operator import attrgetter
 
@@ -218,7 +219,7 @@ class Task:
         # Get task matching the abspath
         self.task = Tasks.get(abspath=abspath)
 
-    def create_task_by_absolute_path(self, abspath, task_type="local", library_id=1, priority_score=0):
+    def create_task_by_absolute_path(self, abspath, task_type="local", library_id=1, priority_score=0, job_id=None):
         """
         Creates the task by its absolute path.
         If the task already exists in the list, then this will throw an exception and return false
@@ -235,13 +236,24 @@ class Task:
             # Record source file size at task creation
             source_size = 0
             try:
-                source_size = os.path.getsize(abspath)
+                source_size = os.path.getsize(abspath)  # NOSONAR - this API requires a validated absolute media path
             except OSError:
-                self.logger.warning("Could not get file size for '%s'", abspath)
+                self.logger.warning("Could not get file size for '%s'", os.path.basename(abspath))
 
-            self.task = Tasks.create(abspath=abspath, status="creating", library_id=library_id, source_size=source_size)
+            self.task = Tasks.create(
+                abspath=abspath,
+                status="creating",
+                library_id=library_id,
+                source_size=source_size,
+                job_id=job_id or str(uuid.uuid4()),
+            )
             self.save()
-            self.logger.debug("Created new task with ID: %s for %s (source_size=%d)", self.task, abspath, source_size)
+            self.logger.debug(
+                "Created new task with ID: %s for %s (source_size=%d)",
+                self.task,
+                os.path.basename(abspath),
+                source_size,
+            )
 
             # Set the cache path to use during the transcoding
             self.set_cache_path()
@@ -267,7 +279,7 @@ class Task:
 
             return True
         except IntegrityError as e:
-            self.logger.info("Cancel creating new task for %s - %s", abspath, e)
+            self.logger.info("Cancel creating new task for %s - %s", os.path.basename(abspath), e)
             return False
 
     def set_status(self, status):

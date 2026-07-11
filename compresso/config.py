@@ -54,6 +54,12 @@ DEFAULT_CONCURRENT_FILE_TESTERS = 2
 DEFAULT_MAX_TASK_AGE_DAYS = 91  # ~3 months
 DEFAULT_READINESS_TIMEOUT_SECONDS = 30
 DEFAULT_WORKER_CAP = 2
+DEFAULT_MINIMUM_FREE_SPACE_GB = 5.0
+DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER = 1.25
+DEFAULT_DISK_SPACE_RETRY_SECONDS = 60
+DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS = 48
+DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS = 168
+DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT = 500
 
 
 def _as_bool(value):
@@ -101,6 +107,7 @@ class Config(metaclass=SingletonType):
         self.schedule_full_scan_minutes = DEFAULT_SCAN_INTERVAL_MINUTES
         self.follow_symlinks = True
         self.concurrent_file_testers = DEFAULT_CONCURRENT_FILE_TESTERS
+        self.library_scan_queue_limit = DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT
         self.run_full_scan_on_start = False
         self.clear_pending_tasks_on_restart = False
         self.auto_manage_completed_tasks = False
@@ -110,6 +117,12 @@ class Config(metaclass=SingletonType):
 
         # Worker settings
         self.cache_path = common.get_default_cache_path()
+        self.disk_space_guard_enabled = True
+        self.minimum_free_space_gb = DEFAULT_MINIMUM_FREE_SPACE_GB
+        self.disk_space_output_multiplier = DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER
+        self.disk_space_retry_seconds = DEFAULT_DISK_SPACE_RETRY_SECONDS
+        self.transfer_partial_retention_hours = DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS
+        self.remote_artifact_retention_hours = DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS
 
         # Link settings
         self.installation_name = ""
@@ -553,6 +566,13 @@ class Config(metaclass=SingletonType):
         """
         return self.follow_symlinks
 
+    def get_library_scan_queue_limit(self):
+        """Maximum number of discovered files awaiting scan tests."""
+        try:
+            return max(1, int(self.library_scan_queue_limit))
+        except (TypeError, ValueError):
+            return DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT
+
     def get_concurrent_file_testers(self):
         """
         Get setting - concurrent_file_testers
@@ -616,6 +636,39 @@ class Config(metaclass=SingletonType):
         :return:
         """
         return max(1, int(self.default_worker_cap))
+
+    def get_disk_space_guard_enabled(self):
+        return _as_bool(self.disk_space_guard_enabled)
+
+    def get_minimum_free_space_gb(self):
+        try:
+            return max(0.0, float(self.minimum_free_space_gb))
+        except (TypeError, ValueError):
+            return DEFAULT_MINIMUM_FREE_SPACE_GB
+
+    def get_disk_space_output_multiplier(self):
+        try:
+            return max(1.0, float(self.disk_space_output_multiplier))
+        except (TypeError, ValueError):
+            return DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER
+
+    def get_disk_space_retry_seconds(self):
+        try:
+            return max(5, int(self.disk_space_retry_seconds))
+        except (TypeError, ValueError):
+            return DEFAULT_DISK_SPACE_RETRY_SECONDS
+
+    def get_transfer_partial_retention_hours(self):
+        try:
+            return max(1, int(self.transfer_partial_retention_hours))
+        except (TypeError, ValueError):
+            return DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS
+
+    def get_remote_artifact_retention_hours(self):
+        try:
+            return max(1, int(self.remote_artifact_retention_hours))
+        except (TypeError, ValueError):
+            return DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS
 
     def get_approval_required(self):
         return _as_bool(self.approval_required)

@@ -47,3 +47,6 @@ class CompletedTasks(BaseModel):
     start_time = DateTimeField(null=False, default=datetime.datetime.now)
     finish_time = DateTimeField(null=False, default=datetime.datetime.now, index=True)
     processed_by_worker = TextField(null=False)
+
+    class Meta:
+        indexes = ((("abspath", "task_success"), False),)

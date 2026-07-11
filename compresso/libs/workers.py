@@ -40,7 +40,9 @@ from collections import deque
 
 import psutil
 
+from compresso import config
 from compresso.libs import common
+from compresso.libs.disk_space_guard import DiskSpaceGuard
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
@@ -75,6 +77,9 @@ class Worker(threading.Thread):
         self.pending_queue = pending_queue
         self.complete_queue = complete_queue
         self.worker_subprocess_monitor = None
+        self._disk_space_guard = None
+        self.disk_pressure_paused = False
+        self.disk_pressure = None
 
         # Create 'redundancy' flag. When this is set, the worker should die
         self.redundant_flag = threading.Event()
@@ -157,7 +162,9 @@ class Worker(threading.Thread):
             "id": str(self.thread_id),
             "name": self.name,
             "idle": self.idle,
-            "paused": self.paused_flag.is_set(),
+            "paused": self.paused_flag.is_set() or self.disk_pressure_paused,
+            "pause_reason": "disk_pressure" if self.disk_pressure_paused else None,
+            "disk_pressure": self.disk_pressure,
             "start_time": None if not self.start_time else str(self.start_time),
             "current_task": None,
             "current_file": "",
@@ -216,6 +223,24 @@ class Worker(threading.Thread):
         # Log the start of the job
         self.logger.info("Picked up job - %s", self.current_task.get_source_abspath())
 
+        disk_check = self._check_task_disk_space()
+        if not disk_check.ok:
+            if not self.disk_pressure_paused:
+                self.logger.warning(
+                    "WORKER_DISK_PRESSURE_PAUSED worker=%s path=%s free_bytes=%s required_bytes=%s",
+                    self.name,
+                    disk_check.path,
+                    disk_check.free_bytes,
+                    disk_check.required_bytes,
+                )
+            self.disk_pressure_paused = True
+            self.disk_pressure = disk_check.to_dict() if hasattr(disk_check, "to_dict") else vars(disk_check)
+            return
+        if self.disk_pressure_paused:
+            self.logger.info("WORKER_DISK_PRESSURE_RECOVERED worker=%s path=%s", self.name, disk_check.path)
+        self.disk_pressure_paused = False
+        self.disk_pressure = None
+
         # Start current task stats
         self.__set_start_task_stats()
 
@@ -255,6 +280,14 @@ class Worker(threading.Thread):
 
         # Reset the current file info for the next task
         self.__unset_current_task()
+
+    def _check_task_disk_space(self):
+        if self._disk_space_guard is None:
+            self._disk_space_guard = DiskSpaceGuard(config.Config())
+        return self._disk_space_guard.check_cache_capacity(
+            self.current_task.get_source_abspath(),
+            self.current_task.get_cache_path(),
+        )
 
     def __set_start_task_stats(self):
         """Sets the initial stats for the start of a task"""

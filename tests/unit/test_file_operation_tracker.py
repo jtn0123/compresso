@@ -178,10 +178,11 @@ class TestRollback:
         # Alpha (the second-attempted entry) must have been restored successfully.
         assert f1.exists()
         assert f1.read_text() == "alpha-original"
-        # Beta was sabotaged so it cannot be restored, but rollback should have
-        # tolerated that and continued -- and it must have cleared state.
+        # Beta was sabotaged so it cannot be restored. Its recovery entry must
+        # remain visible instead of being silently forgotten.
         assert not f2.exists()
-        assert tracker._backups == []
+        assert tracker._backups == [(str(backup_beta), str(f2))]
+        assert tracker._state == "rollback_failed"
 
     def test_rollback_partial_failure_on_move_error(self, tmp_path):
         """If shutil.move raises mid-rollback, the OTHER entry must still restore.
@@ -223,8 +224,9 @@ class TestRollback:
         assert not f2.exists()
         # And the error path must have logged.
         log.error.assert_called()
-        # State cleared regardless of partial failure.
-        assert tracker._backups == []
+        # Failed recovery state remains available for a later retry.
+        assert tracker._backups == [(str(tmp_path / "second.txt.compresso.bak"), str(f2))]
+        assert tracker._state == "rollback_failed"
 
 
 if __name__ == "__main__":

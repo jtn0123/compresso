@@ -465,6 +465,26 @@ class ApiPendingHandler(BaseApiHandler):
             library_name = json_request.get("library_name")
             task_type = json_request.get("type", "local")
             priority_score = json_request.get("priority_score", 0)
+            job_id = json_request.get("job_id")
+            lease_token = json_request.get("lease_token")
+            origin_installation_uuid = json_request.get("origin_installation_uuid")
+
+            existing_task = pending_tasks.get_task_by_job_id(job_id)
+            if existing_task:
+                if not pending_tasks.bind_remote_task_identity(
+                    existing_task.get("id"),
+                    lease_token=lease_token,
+                    origin_installation_uuid=origin_installation_uuid,
+                ):
+                    self.set_status(
+                        self.STATUS_ERROR_EXTERNAL,
+                        reason="Remote task identity conflicts with the existing job",
+                    )
+                    self.write_error()
+                    return
+                response = self.build_response(PendingTasksTableResultsSchema(), existing_task)
+                self.write_success(response)
+                return
 
             # Ensure path exists
             if not os.path.exists(abspath):
@@ -481,10 +501,24 @@ class ApiPendingHandler(BaseApiHandler):
                 return False
 
             task_info = pending_tasks.create_task(
-                abspath, library_id=library_id, library_name=library_name, task_type=task_type, priority_score=priority_score
+                abspath,
+                library_id=library_id,
+                library_name=library_name,
+                task_type=task_type,
+                priority_score=priority_score,
+                job_id=job_id,
             )
             if not task_info:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Failed to save new pending task for the provided path")
+                self.write_error()
+                return
+
+            if not pending_tasks.bind_remote_task_identity(
+                task_info.get("id"),
+                lease_token=lease_token,
+                origin_installation_uuid=origin_installation_uuid,
+            ):
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Remote task identity could not be persisted")
                 self.write_error()
                 return
 

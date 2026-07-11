@@ -536,9 +536,10 @@ class TestLogCompletedTaskData:
 class TestDumpHistoryLog:
     """Tests for PostProcessor.dump_history_log()."""
 
+    @patch("compresso.libs.postprocessor.file_sha256", return_value="verified-checksum")
     @patch("compresso.libs.postprocessor.common.json_dump_to_file")
     @patch("compresso.libs.postprocessor.TaskDataStore.export_task_state", return_value={})
-    def test_dumps_to_file(self, mock_export, mock_json_dump):
+    def test_dumps_to_file(self, mock_export, mock_json_dump, mock_checksum):
         pp = _make_postprocessor()
 
         mock_task = MagicMock()
@@ -562,6 +563,7 @@ class TestDumpHistoryLog:
         mock_json_dump.assert_called_once()
         call_args = mock_json_dump.call_args[0]
         assert call_args[0]["task_label"] == "remote.mkv"
+        assert call_args[0]["checksum"] == "verified-checksum"
         assert "data.json" in call_args[1]
 
     @patch("compresso.libs.postprocessor.common.json_dump_to_file")

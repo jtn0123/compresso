@@ -88,7 +88,7 @@ class TestFileTestWorkflow:
         ft = FileTest(library_id=1)
 
         # No failed history
-        mock_history.return_value.get_historic_tasks_list_with_source_probe.return_value = []
+        mock_history.return_value.failed_path_exists.return_value = False
 
         # No ignore file (path doesn't exist)
         result, issues, score, plugin = ft.should_file_be_added_to_task_list("/nonexistent/path/video.mp4")
@@ -103,9 +103,7 @@ class TestFileTestWorkflow:
     def test_file_rejected_by_history(self, mock_history, mock_ph, mock_logging, mock_config):
         """File that previously failed should be rejected."""
         mock_ph.return_value.get_enabled_plugin_modules_by_type.return_value = []
-        mock_history.return_value.get_historic_tasks_list_with_source_probe.return_value = [
-            {"abspath": "/media/failed_video.mp4"}
-        ]
+        mock_history.return_value.failed_path_exists.return_value = True
 
         from compresso.libs.filetest import FileTest
 

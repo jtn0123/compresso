@@ -6,6 +6,7 @@ tests.unit.test_pending_tasks.py
 Unit tests for compresso.webserver.helpers.pending_tasks.
 """
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -198,6 +199,49 @@ class TestAddRemoteTasks:
 
         result = add_remote_tasks("/upload/bad.mkv")
         assert result is False
+
+    @patch("compresso.webserver.helpers.pending_tasks.Tasks")
+    @patch("compresso.webserver.helpers.pending_tasks.task")
+    def test_repeated_job_id_returns_existing_task_without_creating_duplicate(self, mock_task_module, mock_tasks):
+        existing = MagicMock()
+        existing.id = 9
+        existing.abspath = "/upload/original.mkv"
+        existing.job_id = "stable-job"
+        mock_tasks.get_or_none.return_value = existing
+        mock_task_instance = MagicMock()
+        mock_task_module.Task.return_value = mock_task_instance
+        mock_task_instance.get_task_data.return_value = {
+            "id": 9,
+            "abspath": "/upload/original.mkv",
+            "job_id": "stable-job",
+        }
+
+        from compresso.webserver.helpers.pending_tasks import add_remote_tasks
+
+        result = add_remote_tasks("/upload/retry.mkv", job_id="stable-job")
+
+        assert result["id"] == 9
+        mock_task_instance.create_task_by_absolute_path.assert_not_called()
+
+    @patch("compresso.webserver.helpers.pending_tasks.Tasks")
+    @patch("compresso.webserver.helpers.pending_tasks.task")
+    def test_new_remote_job_passes_identity_to_task_creation(self, mock_task_module, mock_tasks):
+        mock_tasks.get_or_none.return_value = None
+        mock_task_instance = MagicMock()
+        mock_task_module.Task.return_value = mock_task_instance
+        mock_task_instance.create_task_by_absolute_path.return_value = True
+        mock_task_instance.get_task_data.return_value = {"id": 2, "job_id": "stable-job"}
+
+        from compresso.webserver.helpers.pending_tasks import add_remote_tasks
+
+        result = add_remote_tasks("/upload/file.mkv", job_id="stable-job")
+
+        assert result["job_id"] == "stable-job"
+        mock_task_instance.create_task_by_absolute_path.assert_called_once_with(
+            os.path.abspath("/upload/file.mkv"),
+            task_type="remote",
+            job_id="stable-job",
+        )
 
 
 @pytest.mark.unittest

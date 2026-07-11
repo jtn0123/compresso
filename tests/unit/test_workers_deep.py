@@ -11,6 +11,7 @@ status reporting, and WorkerSubprocessMonitor run loop.
 import queue
 import threading
 import time
+from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -419,6 +420,29 @@ class TestWorkerGetStatusEdge:
 
 @pytest.mark.unittest
 class TestWorkerProcessTaskQueueItem:
+    def test_low_cache_space_pauses_task_without_starting_or_failing_it(self):
+        worker = _make_worker()
+        mock_task = MagicMock()
+        mock_task.get_source_abspath.return_value = "/path/to/file.mp4"
+        worker.current_task = mock_task
+        worker.worker_log = []
+        check = SimpleNamespace(
+            ok=False,
+            phase="encode_cache",
+            path="/tmp/cache",
+            free_bytes=100,
+            required_bytes=200,
+        )
+
+        with patch.object(worker, "_check_task_disk_space", return_value=check):
+            worker._Worker__process_task_queue_item()
+
+        mock_task.set_status.assert_not_called()
+        mock_task.set_success.assert_not_called()
+        assert worker.complete_queue.empty()
+        assert worker.disk_pressure_paused is True
+        assert worker.get_status()["pause_reason"] == "disk_pressure"
+
     def test_process_task_sets_status_and_completes(self):
         worker = _make_worker()
         mock_task = MagicMock()

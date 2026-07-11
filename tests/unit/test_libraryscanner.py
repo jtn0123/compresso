@@ -256,6 +256,26 @@ class TestScheduledJob:
 
 @pytest.mark.unittest
 class TestScanLibraryPath:
+    def test_completed_scan_root_comparison_is_restart_safe(self):
+        mgr = _make_scanner()
+
+        assert mgr.root_was_completed("/media/lib/A", "/media/lib", "A") is True
+        assert mgr.root_was_completed("/media/lib/A/child", "/media/lib", "A") is False
+        assert mgr.root_was_completed("/media/lib/B", "/media/lib", "A") is False
+
+    def test_queue_limit_has_safe_floor(self):
+        mgr = _make_scanner()
+        mgr.settings.get_library_scan_queue_limit.return_value = 0
+
+        assert mgr.get_scan_queue_limit() == 1
+
+    def test_dequeued_but_unfinished_file_blocks_checkpoint(self):
+        mgr = _make_scanner()
+        mgr.files_to_test.put("/media/lib/movie.mkv")
+        mgr.files_to_test.get_nowait()
+
+        assert mgr.scan_work_is_pending() is True
+
     @patch("compresso.libs.libraryscanner.os.path.exists", return_value=False)
     def test_path_not_exists(self, mock_exists):
         mgr = _make_scanner()

@@ -31,6 +31,7 @@ Copyright:
 
 import os
 import queue
+import shutil
 import threading
 
 from peewee import OperationalError
@@ -60,8 +61,6 @@ class TaskHandler(threading.Thread):
         self.scheduledtasks = data_queues["scheduledtasks"]
         self.abort_flag = threading.Event()
         self.abort_flag.clear()
-        # Remove all items from the task list to start with
-        self.clear_tasks_on_startup()
 
     def _log(self, message, message2="", level="info"):
         message = common.format_message(message, message2)
@@ -113,27 +112,123 @@ class TaskHandler(threading.Thread):
             except Exception as e:
                 self._log("Exception in processing inotifytasks", str(e), level="exception")
 
-    def clear_tasks_on_startup(self):
-        where_clause = None
-        if not self.settings.get_clear_pending_tasks_on_restart():
-            # Exclude all pending tasks except for those that are remote tasks... They need to be removed
-            where_clause = (Tasks.status != "pending") | (Tasks.type == "remote")
+    @staticmethod
+    def _file_is_usable(path):
         try:
-            # Get all task IDs to be deleted
-            select_query = Tasks.select(Tasks.id)
-            if where_clause is not None:
-                select_query = select_query.where(where_clause)
-            # Remove any task data associated with the tasks
-            for (task_id,) in select_query.tuples():
-                task.TaskDataStore.clear_task(task_id)
-            # Delete the tasks
-            delete_query = Tasks.delete()
-            if where_clause is not None:
-                delete_query = delete_query.where(where_clause)
-            rows_deleted_count = delete_query.execute()
-            self._log(f"Deleted {rows_deleted_count} items from tasks list", level="debug")
+            return bool(path) and os.path.isfile(path) and os.path.getsize(path) > 0
+        except OSError:
+            return False
+
+    @classmethod
+    def _find_staged_output(cls, staging_path, task_id):
+        task_staging_dir = os.path.join(staging_path, f"task_{task_id}")
+        if not os.path.isdir(task_staging_dir):
+            return None
+        try:
+            for entry in os.scandir(task_staging_dir):
+                if entry.is_file() and cls._file_is_usable(entry.path):
+                    return entry.path
+        except OSError:
+            return None
+        return None
+
+    @staticmethod
+    def _reset_interrupted_task(task_obj):
+        task_obj.status = "pending"
+        task_obj.success = None
+        task_obj.processed_by_worker = None
+        task_obj.start_time = None
+        task_obj.finish_time = None
+        task_obj.deferred_until = None
+        task_obj.save()
+
+    @classmethod
+    def recover_tasks_on_startup(cls, settings, committed_task_ids=None):
+        """Reconcile persisted tasks before worker and postprocessor startup.
+
+        Returns file paths that startup cache cleanup must preserve. Interrupted
+        work is requeued without consuming a normal retry. Completed outputs and
+        approval artifacts are retained when they are still usable.
+        """
+        logger = CompressoLogging.get_logger(name=cls.__name__)
+        protected_paths = set()
+        staging_path = settings.get_staging_path()
+        clear_pending = settings.get_clear_pending_tasks_on_restart()
+        committed_task_ids = set(committed_task_ids or [])
+
+        try:
+            last_task_id = 0
+            while True:
+                task_batch = list(Tasks.select().where(Tasks.id > last_task_id).order_by(Tasks.id).limit(500))
+                if not task_batch:
+                    break
+
+                for task_obj in task_batch:
+                    last_task_id = task_obj.id
+                    if task_obj.id in committed_task_ids:
+                        logger.warning("STARTUP_COMMITTED_TASK_FINALIZED id=%s", task_obj.id)
+                        task.TaskDataStore.clear_task(task_obj.id)
+                        Tasks.delete().where(Tasks.id == task_obj.id).execute()
+                        continue
+                    status = task_obj.status
+                    source_path = task_obj.abspath
+                    cache_path = task_obj.cache_path
+                    staged_path = cls._find_staged_output(staging_path, task_obj.id)
+
+                    if clear_pending and status == "pending":
+                        task.TaskDataStore.clear_task(task_obj.id)
+                        Tasks.delete().where(Tasks.id == task_obj.id).execute()
+                        continue
+
+                    if status == "in_progress":
+                        cls._reset_interrupted_task(task_obj)
+                        logger.warning("STARTUP_TASK_REQUEUED id=%s previous_status=in_progress", task_obj.id)
+                    elif status == "processed":
+                        if task_obj.success is not False and not cls._file_is_usable(cache_path):
+                            cls._reset_interrupted_task(task_obj)
+                            logger.warning("STARTUP_TASK_REQUEUED id=%s reason=missing_processed_cache", task_obj.id)
+                        elif cls._file_is_usable(cache_path):
+                            protected_paths.add(os.path.realpath(cache_path))
+                    elif status == "awaiting_approval":
+                        if staged_path:
+                            protected_paths.add(os.path.realpath(staged_path))
+                            if cls._file_is_usable(cache_path):
+                                protected_paths.add(os.path.realpath(cache_path))
+                        elif cls._file_is_usable(cache_path):
+                            task_obj.status = "processed"
+                            task_obj.save()
+                            protected_paths.add(os.path.realpath(cache_path))
+                            logger.warning("STARTUP_APPROVAL_RESTAGE id=%s", task_obj.id)
+                        else:
+                            cls._reset_interrupted_task(task_obj)
+                            logger.warning("STARTUP_TASK_REQUEUED id=%s reason=missing_approval_output", task_obj.id)
+                    elif status == "approved":
+                        if cls._file_is_usable(cache_path):
+                            protected_paths.add(os.path.realpath(cache_path))
+                        elif staged_path and cache_path:
+                            os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
+                            shutil.copy2(staged_path, cache_path)
+                            protected_paths.add(os.path.realpath(cache_path))
+                            protected_paths.add(os.path.realpath(staged_path))
+                            logger.warning("STARTUP_APPROVED_CACHE_RESTORED id=%s", task_obj.id)
+                        else:
+                            cls._reset_interrupted_task(task_obj)
+                            logger.warning("STARTUP_TASK_REQUEUED id=%s reason=missing_approved_output", task_obj.id)
+                    elif status == "complete" and cls._file_is_usable(cache_path):
+                        protected_paths.add(os.path.realpath(cache_path))
+
+                    # Uploaded remote sources live under the cache root and must
+                    # remain available while the originating installation recovers.
+                    if task_obj.type == "remote" and cls._file_is_usable(source_path):
+                        protected_paths.add(os.path.realpath(source_path))
         except OperationalError as error:
-            self._log("Skipping task cleanup at startup; tasks table missing", str(error), level="debug")
+            logger.debug("Skipping task recovery at startup; tasks table missing - %s", error)
+
+        return sorted(protected_paths)
+
+    def clear_tasks_on_startup(self):
+        """Compatibility wrapper for callers that still invoke the old hook."""
+        return self.recover_tasks_on_startup(self.settings)
 
     @staticmethod
     def check_if_task_exists_matching_path(abspath):

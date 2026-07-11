@@ -9,6 +9,7 @@ Covers: codec pre-filter logic, FileTesterThread lifecycle.
 
 import queue
 import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -254,3 +255,26 @@ class TestFileTesterThread:
         assert not files_to_process.empty()
         item = files_to_process.get_nowait()
         assert item["path"] == "/test.mp4"
+
+    @patch("compresso.libs.filetest.FileTest")
+    @patch("compresso.libs.filetest.PluginsHandler")
+    @patch("compresso.libs.filetest.config.Config")
+    @patch("compresso.libs.filetest.CompressoLogging")
+    def test_thread_acknowledges_dequeued_file_only_after_test_finishes(self, _log, _cfg, _plugins, file_test_cls):
+        from compresso.libs.filetest import FileTesterThread
+
+        file_test_cls.return_value.should_file_be_added_to_task_list.return_value = (False, [], 0, None)
+        files_to_test = queue.Queue()
+        files_to_test.put("/media/movie.mkv")
+        event = threading.Event()
+        thread = FileTesterThread("tester", files_to_test, queue.Queue(), queue.Queue(), 1, event)
+        thread.start()
+        deadline = time.monotonic() + 2
+        while files_to_test.unfinished_tasks and time.monotonic() < deadline:
+            time.sleep(0.01)
+        thread.stop()
+        event.set()
+        thread.join(2)
+
+        assert files_to_test.unfinished_tasks == 0
+        assert not thread.is_alive()

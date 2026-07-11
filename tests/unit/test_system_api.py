@@ -22,6 +22,7 @@ def _mock_initialize(self, **kwargs):
     self.params = kwargs.get("params")
     self.compresso_data_queues = {}
     self.config = MagicMock()
+    self.foreman = MagicMock()
 
 
 SYSTEM_API = "compresso.webserver.api_v2.system_api"
@@ -130,3 +131,33 @@ class TestSystemApiStatus(ApiTestBase):
         mock_system_cls.side_effect = Exception("System info unavailable")
         resp = self.get_json("/system/status")
         assert resp.code == 500
+
+    @patch(SYSTEM_API + ".WorkerCapabilities")
+    def test_get_worker_capabilities(self, mock_capabilities_cls):
+        mock_capabilities_cls.return_value.snapshot.return_value = {
+            "platform": {"system": "Darwin", "machine": "arm64"},
+            "video_encoders": ["hevc_videotoolbox"],
+            "hardware_accelerators": ["videotoolbox"],
+            "cpu": {"count": 10, "percent": 15.0},
+            "memory": {"total_bytes": 16, "available_bytes": 8, "percent": 50.0},
+            "cache_disk": {"path": "/cache", "total_bytes": 100, "free_bytes": 80},
+        }
+
+        resp = self.get_json("/system/capabilities")
+
+        assert resp.code == 200
+        data = self.parse_response(resp)
+        assert data["video_encoders"] == ["hevc_videotoolbox"]
+        assert data["platform"]["machine"] == "arm64"
+
+    @patch(SYSTEM_API + ".OperationsStatus")
+    def test_get_operations_status(self, mock_status_cls):
+        mock_status_cls.return_value.snapshot.return_value = {
+            "tasks": {"pending": 2, "total": 2},
+            "transfers": {"active": 1},
+        }
+
+        resp = self.get_json("/system/operations")
+
+        assert resp.code == 200
+        assert self.parse_response(resp)["tasks"]["pending"] == 2

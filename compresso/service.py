@@ -41,6 +41,7 @@ import psutil
 from compresso import config, metadata
 from compresso.libs import common, eventmonitor, libraryscanner, startup
 from compresso.libs.db_migrate import Migrations
+from compresso.libs.file_operation_tracker import FileOperationTracker
 from compresso.libs.foreman import Foreman
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.postprocessor import PostProcessor
@@ -237,10 +238,19 @@ class RootService:
             "progress_reports": queue.Queue(),
         }
 
-        # Clear cache directory
-        self.logger.info("Clearing previous cache")
+        # Reconcile persisted task state before any worker or postprocessor can
+        # claim work, then remove only cache directories that are not referenced
+        # by recoverable tasks.
+        self.logger.info("Recovering persisted tasks and clearing abandoned cache")
         try:
-            common.clean_files_in_cache_dir(settings.get_cache_path())
+            journal_dir = os.path.join(settings.get_config_path(), "recovery", "file_operations")
+            operation_recovery = FileOperationTracker.recover_all(journal_dir, self.logger)
+            protected_paths = TaskHandler.recover_tasks_on_startup(
+                settings,
+                committed_task_ids=operation_recovery["committed_task_ids"],
+            )
+            FileOperationTracker.finalize_committed(journal_dir)
+            common.clean_files_in_cache_dir(settings.get_cache_path(), protected_paths=protected_paths)
         except Exception as e:
             message = f"STARTUP_CACHE_CLEANUP_FAILED cache_path={settings.get_cache_path()} error={str(e)}"
             self.logger.error(message)

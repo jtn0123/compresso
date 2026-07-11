@@ -41,6 +41,7 @@ import peewee
 
 from compresso import config
 from compresso.libs import common, history
+from compresso.libs.disk_space_guard import DiskSpaceGuard
 from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.file_operation_tracker import FileOperationTracker, PostProcessError
 from compresso.libs.frontend_push_messages import FrontendPushMessages
@@ -49,6 +50,7 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.notifications import Notifications
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.resumable_transfer import file_sha256
 from compresso.libs.task import TaskDataStore
 
 """
@@ -78,6 +80,8 @@ class PostProcessor(threading.Thread):
         self.abort_flag = threading.Event()
         self.current_task = None
         self._last_destination_files = []
+        self._file_operation_tracker = None
+        self._disk_space_guard = None
         self.ffmpeg = None
         self.abort_flag.clear()
 
@@ -284,11 +288,15 @@ class PostProcessor(threading.Thread):
 
             # Create a per-task staging subdirectory
             task_staging_dir = os.path.join(staging_dir, f"task_{task_id}")
-            os.makedirs(task_staging_dir, exist_ok=True)
 
             # Copy cache file to staging
             staged_filename = os.path.basename(cache_path)
             staged_path = os.path.join(task_staging_dir, staged_filename)
+            disk_check = self._get_disk_space_guard().check_staging_capacity(cache_path, staged_path)
+            if not disk_check.ok:
+                self._defer_for_disk_pressure(disk_check, "processed")
+                return
+            os.makedirs(task_staging_dir, exist_ok=True)
             shutil.copy2(cache_path, staged_path)
 
             self._log(f"Staged transcoded file for approval: {cache_path} -> {staged_path}")
@@ -371,12 +379,14 @@ class PostProcessor(threading.Thread):
 
     def _finalize_local_task(self):
         """Run the standard local task postprocessing: file move, history, metadata, cleanup."""
-        try:
-            self.post_process_file()
-        except (OSError, PermissionError, shutil.Error) as e:
-            self._log("Exception in post-processing local task file", message2=str(e), level="exception")
-        except Exception as e:
-            self._log(f"FileOperationError: {e}", level="exception")
+        if not self._has_finalization_capacity():
+            return
+        self._finalize_local_task_with_capacity()
+
+    def _finalize_local_task_with_capacity(self):
+        """Finalize a local task after disk-capacity preflight succeeds."""
+        if not self._postprocess_local_file_safely():
+            return
         try:
             self.write_history_log()
         except (OSError, AttributeError, TypeError) as e:
@@ -389,13 +399,17 @@ class PostProcessor(threading.Thread):
             self._log("Exception in committing task metadata", message2=str(e), level="exception")
         except Exception as e:
             self._log(f"TaskMetadataError in commit: {e}", level="exception")
+        task_deleted = False
         try:
             # Clean up the staging directory for this task if it exists
             self._cleanup_staging_files()
             # Remove file from task queue
             self.current_task.delete()
+            task_deleted = True
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in removing task from task list", message2=str(e), level="exception")
+
+        self._finalize_file_operation_journal(task_deleted)
 
         # Dispatch external notification for task completion or failure
         try:
@@ -453,6 +467,87 @@ class PostProcessor(threading.Thread):
                 dispatcher.dispatch("task_failed", context)
         except (ImportError, AttributeError, TypeError):
             pass  # notification failure is non-fatal
+
+    def _postprocess_local_file_safely(self):
+        """Run the destructive file phase and defer all later finalization on failure."""
+        try:
+            if self.post_process_file() is False:
+                self._defer_postprocess_failure("file movement did not complete")
+                return False
+        except (OSError, PermissionError, shutil.Error) as e:
+            self._log("Exception in post-processing local task file", message2=str(e), level="exception")
+            self._defer_postprocess_failure(str(e))
+            return False
+        except Exception as e:
+            self._log(f"FileOperationError: {e}", level="exception")
+            self._defer_postprocess_failure(str(e))
+            return False
+        return True
+
+    def _defer_postprocess_failure(self, reason):
+        """Keep the task and encoded cache available for a safe later retry."""
+        try:
+            retry_seconds = max(1, int(self.settings.get_disk_space_retry_seconds()))
+        except (AttributeError, TypeError, ValueError):
+            retry_seconds = 60
+        self.current_task.task.deferred_until = datetime.datetime.now() + datetime.timedelta(seconds=retry_seconds)
+        self.current_task.task.save()
+        self._log(
+            f"POSTPROCESS_DEFERRED task_id={self.current_task.get_task_id()} retry_seconds={retry_seconds} reason={reason}",
+            level="error",
+        )
+
+    def _get_disk_space_guard(self):
+        if self._disk_space_guard is None:
+            self._disk_space_guard = DiskSpaceGuard(self.settings)
+        return self._disk_space_guard
+
+    def _has_finalization_capacity(self):
+        if not self.current_task.task.success:
+            return True
+        source_path = self.current_task.get_source_abspath()
+        cache_path = self.current_task.get_cache_path()
+        destination_path = self.current_task.get_destination_data()["abspath"]
+        disk_check = self._get_disk_space_guard().check_finalization_capacity(
+            source_path,
+            cache_path,
+            destination_path,
+        )
+        if not disk_check.ok:
+            self._defer_for_disk_pressure(disk_check, self.current_task.task.status)
+            return False
+        if self.current_task.task.deferred_until is not None:
+            self.current_task.task.deferred_until = None
+            self.current_task.task.save()
+        return True
+
+    def _defer_for_disk_pressure(self, disk_check, retry_status):
+        retry_seconds = self.settings.get_disk_space_retry_seconds()
+        self.current_task.task.status = retry_status
+        self.current_task.task.deferred_until = datetime.datetime.now() + datetime.timedelta(seconds=retry_seconds)
+        self.current_task.task.save()
+        self._log(
+            f"DISK_PRESSURE_DEFERRED phase={disk_check.phase} path={disk_check.path} "
+            f"free_bytes={disk_check.free_bytes} required_bytes={disk_check.required_bytes} "
+            f"retry_seconds={retry_seconds}",
+            level="warning",
+        )
+
+    def _finalize_file_operation_journal(self, task_deleted):
+        if task_deleted and self._file_operation_tracker is not None:
+            if self._file_operation_tracker._state != "committed":
+                self._log(
+                    f"Retaining file-operation journal in state {self._file_operation_tracker._state}",
+                    level="warning",
+                )
+                self._file_operation_tracker = None
+                return
+            try:
+                self._file_operation_tracker.finalize()
+            except OSError as e:
+                self._log("Failed to finalize file-operation recovery journal", message2=str(e), level="warning")
+            finally:
+                self._file_operation_tracker = None
 
     def _finalize_local_task_keep_both(self):
         """Finalize task but keep original — save output alongside with codec suffix."""
@@ -538,7 +633,20 @@ class PostProcessor(threading.Thread):
         # Create a list for filling with destination paths
         destination_files = []
         # Create a tracker for safe file operations with rollback support
-        tracker = FileOperationTracker(self.logger)
+        config_path = self.settings.get_config_path()
+        journal_dir = None
+        # Config.get_config_path() is a string API. Restrict this deliberately:
+        # generic PathLike objects such as test doubles can stringify into an
+        # unintended relative directory and leave recovery files in the CWD.
+        if isinstance(config_path, str):
+            journal_dir = os.path.join(config_path, "recovery", "file_operations")
+        tracker = FileOperationTracker(
+            self.logger,
+            journal_dir=journal_dir,
+            operation_id=f"task-{self.current_task.get_task_id()}",
+            task_id=self.current_task.get_task_id(),
+        )
+        self._file_operation_tracker = tracker
         if self.current_task.task.success:
             # Run a postprocess file movement on the cache file for each plugin that configures it
 
@@ -683,9 +791,12 @@ class PostProcessor(threading.Thread):
                 # Do not continue with this plugin module's loop
                 continue
 
-        # Cleanup cache files
-        self.__cleanup_cache_files(cache_path)
+        # Retain a valid encode when movement failed so the postprocessor can
+        # retry without destroying the only completed output.
+        if file_move_processes_success or not self.current_task.task.success:
+            self.__cleanup_cache_files(cache_path)
         self._last_destination_files = destination_files
+        return file_move_processes_success
 
     def post_process_remote_file(self):
         """
@@ -827,6 +938,8 @@ class PostProcessor(threading.Thread):
 
             # Move file from part to final destination
             self._log(f"Renaming file '{part_file_out}' --> '{file_out}'.", level="debug")
+            if tracker:
+                tracker.record_created(file_out)
             shutil.move(part_file_out, file_out, copy_function=shutil.copyfile)
             # Write final path to destination_files list
             destination_files.append(file_out)
@@ -842,6 +955,8 @@ class PostProcessor(threading.Thread):
             # move/rename so it is not orphaned next to the destination file.
             if os.path.exists(part_file_out):
                 try:
+                    if move and not os.path.exists(file_in):
+                        shutil.copyfile(part_file_out, file_in)
                     os.remove(part_file_out)
                 except OSError as cleanup_error:
                     self._log(f"Failed to remove staging file '{part_file_out}'", message2=str(cleanup_error), level="warning")
@@ -999,6 +1114,9 @@ class PostProcessor(threading.Thread):
         # Dump history log & task state as metadata in the file's path
         tasks_data_file = os.path.join(os.path.dirname(destination_data.get("abspath")), "data.json")
         task_state = TaskDataStore.export_task_state(self.current_task.get_task_id())
+        checksum = None
+        if task_dump.get("task_success", False):
+            checksum = file_sha256(destination_data.get("abspath"))
         result = common.json_dump_to_file(
             {
                 "task_label": task_dump.get("task_label", ""),
@@ -1008,7 +1126,7 @@ class PostProcessor(threading.Thread):
                 "finish_time": task_dump.get("finish_time", ""),
                 "processed_by_worker": task_dump.get("processed_by_worker", ""),
                 "log": task_dump.get("log", ""),
-                "checksum": "UNKNOWN",
+                "checksum": checksum,
                 "task_state": task_state,
             },
             tasks_data_file,

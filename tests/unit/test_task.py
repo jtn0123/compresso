@@ -214,6 +214,23 @@ class TestTaskDatabaseOps:
             assert result is True
             assert t.task is not None
             assert t.task.abspath == "/media/newfile.mkv"
+            assert t.task.job_id
+
+    def test_create_task_preserves_supplied_stable_job_id(self, in_memory_db):
+        from compresso.libs.task import Task
+
+        self._create_library()
+        with patch("compresso.libs.task.os.path.getsize", return_value=1000):
+            task = Task()
+            result = task.create_task_by_absolute_path(
+                "/media/remote-file.mkv",
+                library_id=1,
+                task_type="remote",
+                job_id="job-from-master",
+            )
+
+        assert result is True
+        assert task.task.job_id == "job-from-master"
 
     def test_create_task_duplicate_returns_false(self, in_memory_db):
         from compresso.libs.task import Task

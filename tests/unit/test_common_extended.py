@@ -162,6 +162,23 @@ class TestCleanFilesInCacheDir:
         assert not dir2.exists()
         assert not dir3.exists()
 
+    def test_preserves_directory_containing_protected_task_file(self, tmp_path):
+        protected_dir = tmp_path / "compresso_file_conversion-active"
+        protected_dir.mkdir()
+        protected_file = protected_dir / "encoded.mkv"
+        protected_file.write_bytes(b"encoded")
+
+        orphan_dir = tmp_path / "compresso_file_conversion-orphan"
+        orphan_dir.mkdir()
+        (orphan_dir / "partial.mkv").write_bytes(b"partial")
+
+        with patch("compresso.libs.common.logger"):
+            common.clean_files_in_cache_dir(str(tmp_path), protected_paths=[str(protected_file)])
+
+        assert protected_dir.exists()
+        assert protected_file.exists()
+        assert not orphan_dir.exists()
+
 
 # ------------------------------------------------------------------
 # tail

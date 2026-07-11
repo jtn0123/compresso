@@ -7,6 +7,7 @@ Unit tests for compresso/libs/scheduler.ScheduledTasksManager.
 Tests each scheduled method, schedule configuration, and the run loop.
 """
 
+import os
 import threading
 from unittest.mock import MagicMock, patch
 
@@ -83,9 +84,10 @@ class TestUpdateRemoteInstallationLinks:
 
 @pytest.mark.unittest
 class TestSetWorkerCountBasedOnRemoteLinks:
+    @patch("compresso.libs.scheduler.WorkerGroup")
     @patch("compresso.libs.scheduler.config.Config")
     @patch("compresso.libs.scheduler.task.Task")
-    def test_no_linked_configs_returns_early(self, mock_task_cls, mock_config_cls):
+    def test_no_linked_configs_returns_early(self, mock_task_cls, mock_config_cls, mock_worker_group_cls):
         mgr = _make_scheduler_manager()
         mock_settings = MagicMock()
         mock_config_cls.return_value = mock_settings
@@ -95,10 +97,12 @@ class TestSetWorkerCountBasedOnRemoteLinks:
         mock_task_cls.return_value = mock_task
         mgr.set_worker_count_based_on_remote_installation_links()
         mock_settings.set_config_item.assert_not_called()
+        mock_worker_group_cls.get_all_worker_groups.assert_not_called()
 
+    @patch("compresso.libs.scheduler.WorkerGroup")
     @patch("compresso.libs.scheduler.config.Config")
     @patch("compresso.libs.scheduler.task.Task")
-    def test_with_linked_configs_sets_worker_count(self, mock_task_cls, mock_config_cls):
+    def test_with_linked_configs_sets_worker_group_count(self, mock_task_cls, mock_config_cls, mock_worker_group_cls):
         mgr = _make_scheduler_manager()
         mock_settings = MagicMock()
         mock_config_cls.return_value = mock_settings
@@ -109,15 +113,22 @@ class TestSetWorkerCountBasedOnRemoteLinks:
         mock_task = MagicMock()
         mock_task.get_total_task_list_count.return_value = 10
         mock_task_cls.return_value = mock_task
+        mock_worker_group_cls.get_all_worker_groups.return_value = [
+            {"id": 7, "number_of_workers": 1},
+        ]
+        mock_group = MagicMock()
+        mock_worker_group_cls.return_value = mock_group
         mgr.set_worker_count_based_on_remote_installation_links()
-        mock_settings.set_config_item.assert_called_once()
-        args = mock_settings.set_config_item.call_args
-        assert args[0][0] == "number_of_workers"
+        mock_worker_group_cls.assert_called_once_with(7)
+        mock_group.set_number_of_workers.assert_called_once_with(2)
+        mock_group.save.assert_called_once_with()
+        mock_settings.set_config_item.assert_not_called()
 
     @patch("compresso.libs.scheduler.time.time", return_value=99999)
+    @patch("compresso.libs.scheduler.WorkerGroup")
     @patch("compresso.libs.scheduler.config.Config")
     @patch("compresso.libs.scheduler.task.Task")
-    def test_force_local_worker_timer(self, mock_task_cls, mock_config_cls, mock_time):
+    def test_force_local_worker_timer(self, mock_task_cls, mock_config_cls, mock_worker_group_cls, mock_time):
         mgr = _make_scheduler_manager()
         mgr.force_local_worker_timer = 0  # timer expired
         mock_settings = MagicMock()
@@ -129,13 +140,18 @@ class TestSetWorkerCountBasedOnRemoteLinks:
         mock_task = MagicMock()
         mock_task.get_total_task_list_count.return_value = 5
         mock_task_cls.return_value = mock_task
+        mock_worker_group_cls.get_all_worker_groups.return_value = [
+            {"id": 3, "number_of_workers": 0},
+        ]
+        mock_group = MagicMock()
+        mock_worker_group_cls.return_value = mock_group
         mgr.set_worker_count_based_on_remote_installation_links()
-        # Worker count should be set
-        mock_settings.set_config_item.assert_called_once()
+        mock_group.set_number_of_workers.assert_called_once_with(1)
 
+    @patch("compresso.libs.scheduler.WorkerGroup")
     @patch("compresso.libs.scheduler.config.Config")
     @patch("compresso.libs.scheduler.task.Task")
-    def test_allocated_exceeds_target(self, mock_task_cls, mock_config_cls):
+    def test_allocated_exceeds_target(self, mock_task_cls, mock_config_cls, mock_worker_group_cls):
         mgr = _make_scheduler_manager()
         mock_settings = MagicMock()
         mock_config_cls.return_value = mock_settings
@@ -146,10 +162,46 @@ class TestSetWorkerCountBasedOnRemoteLinks:
         mock_task = MagicMock()
         mock_task.get_total_task_list_count.return_value = 1
         mock_task_cls.return_value = mock_task
+        mock_worker_group_cls.get_all_worker_groups.return_value = [
+            {"id": 5, "number_of_workers": 2},
+        ]
+        mock_group = MagicMock()
+        mock_worker_group_cls.return_value = mock_group
         mgr.set_worker_count_based_on_remote_installation_links()
-        args = mock_settings.set_config_item.call_args
         # Target workers for local should be 0 since allocated > target
-        assert args[0][1] == 0
+        mock_group.set_number_of_workers.assert_called_once_with(0)
+
+    @patch("compresso.libs.scheduler.WorkerGroup")
+    def test_worker_total_preserves_existing_group_proportions(self, mock_worker_group_cls):
+        mgr = _make_scheduler_manager()
+        mock_worker_group_cls.get_all_worker_groups.return_value = [
+            {"id": 11, "number_of_workers": 3},
+            {"id": 12, "number_of_workers": 1},
+        ]
+        groups = {11: MagicMock(), 12: MagicMock()}
+        mock_worker_group_cls.side_effect = groups.__getitem__
+
+        mgr._set_local_worker_group_total(3)
+
+        groups[11].set_number_of_workers.assert_called_once_with(2)
+        groups[12].set_number_of_workers.assert_called_once_with(1)
+        groups[11].save.assert_called_once_with()
+        groups[12].save.assert_called_once_with()
+
+    @patch("compresso.libs.scheduler.WorkerGroup")
+    def test_worker_total_uses_first_group_when_all_groups_are_disabled(self, mock_worker_group_cls):
+        mgr = _make_scheduler_manager()
+        mock_worker_group_cls.get_all_worker_groups.return_value = [
+            {"id": 21, "number_of_workers": 0},
+            {"id": 22, "number_of_workers": 0},
+        ]
+        groups = {21: MagicMock(), 22: MagicMock()}
+        mock_worker_group_cls.side_effect = groups.__getitem__
+
+        mgr._set_local_worker_group_total(2)
+
+        groups[21].set_number_of_workers.assert_called_once_with(2)
+        groups[22].set_number_of_workers.assert_called_once_with(0)
 
 
 @pytest.mark.unittest
@@ -261,6 +313,48 @@ class TestManageCompletedTasks:
         mock_history.delete_historic_task_command_logs.return_value = False
         mgr.manage_completed_tasks()
         mock_history.delete_historic_task_command_logs.assert_called_once()
+
+
+@pytest.mark.unittest
+class TestTransferCleanup:
+    @patch("compresso.libs.scheduler.ResumableTransferStore")
+    @patch("compresso.libs.scheduler.config.Config")
+    def test_removes_stale_partial_transfers(self, mock_config_cls, store_class):
+        mgr = _make_scheduler_manager()
+        settings = MagicMock()
+        settings.get_cache_path.return_value = "/cache"
+        settings.get_transfer_partial_retention_hours.return_value = 48
+        mock_config_cls.return_value = settings
+
+        mgr.cleanup_stale_transfers()
+
+        store_class.assert_called_once_with(os.path.join("/cache", "remote_transfers"))
+        store_class.return_value.cleanup_stale.assert_called_once_with(max_age_seconds=48 * 60 * 60)
+
+    @patch("compresso.libs.scheduler.task.Task")
+    @patch("compresso.libs.scheduler.Tasks")
+    @patch("compresso.libs.scheduler.config.Config")
+    def test_removes_expired_completed_remote_task_artifacts(self, mock_config_cls, tasks_model, task_class, tmp_path):
+        mgr = _make_scheduler_manager()
+        cache_path = tmp_path / "cache"
+        artifact = cache_path / "remote_transfers" / "completed" / "transfer-1" / "movie.mkv"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_bytes(b"encoded")
+        settings = MagicMock()
+        settings.get_cache_path.return_value = str(cache_path)
+        settings.get_remote_artifact_retention_hours.return_value = 1
+        mock_config_cls.return_value = settings
+        remote_task = MagicMock(id=7, abspath=str(artifact), finish_time=0)
+        tasks_model.select.return_value.where.return_value = [remote_task]
+
+        with (
+            patch("compresso.libs.scheduler.time.time", return_value=10_000),
+            patch("compresso.libs.scheduler.os.path.getmtime", return_value=0),
+        ):
+            mgr.cleanup_orphaned_remote_tasks()
+
+        task_class.return_value.delete_tasks_recursively.assert_called_once_with([7])
+        assert not artifact.parent.exists()
 
 
 @pytest.mark.unittest

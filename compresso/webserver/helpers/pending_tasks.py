@@ -34,6 +34,7 @@ import os
 from compresso.libs import filetest, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.unmodels.tasks import Tasks
 
 logger = CompressoLogging.get_logger(name=__name__)
 
@@ -220,7 +221,7 @@ def reorder_pending_tasks(pending_task_ids, direction="top"):
     return task_handler.reorder_tasks(pending_task_ids, direction)
 
 
-def add_remote_tasks(pathname):
+def add_remote_tasks(pathname, job_id=None):
     """
     Adds an upload file path to the pending task list as a 'remote' task
     Returns the task ID
@@ -233,7 +234,16 @@ def add_remote_tasks(pathname):
     # Create a new task
     new_task = task.Task()
 
-    if not new_task.create_task_by_absolute_path(abspath, task_type="remote"):
+    if job_id:
+        existing_task = Tasks.get_or_none(Tasks.job_id == job_id)
+        if existing_task is not None:
+            new_task.task = existing_task
+            return new_task.get_task_data()
+
+    create_kwargs = {"task_type": "remote"}
+    if job_id:
+        create_kwargs["job_id"] = job_id
+    if not new_task.create_task_by_absolute_path(abspath, **create_kwargs):
         # File was not created.
         # Do not carry on.
         return False
@@ -306,7 +316,7 @@ def check_if_task_exists_matching_path(abspath):
     return bool(TaskHandler.check_if_task_exists_matching_path(abspath))
 
 
-def create_task(abspath, library_id=1, library_name=None, task_type="local", priority_score=0):
+def create_task(abspath, library_id=1, library_name=None, task_type="local", priority_score=0, job_id=None):
     """
     Create a pending task given the path to a file and a library ID or name
 
@@ -329,9 +339,14 @@ def create_task(abspath, library_id=1, library_name=None, task_type="local", pri
     new_task = task.Task()
 
     # Create the task as a local task as the path provided is local
-    if not new_task.create_task_by_absolute_path(
-        abspath, task_type=task_type, library_id=library.get_id(), priority_score=priority_score
-    ):
+    create_kwargs = {
+        "task_type": task_type,
+        "library_id": library.get_id(),
+        "priority_score": priority_score,
+    }
+    if job_id:
+        create_kwargs["job_id"] = job_id
+    if not new_task.create_task_by_absolute_path(abspath, **create_kwargs):
         # File was not created.
         # Do not carry on.
         return False
@@ -345,7 +360,35 @@ def create_task(abspath, library_id=1, library_name=None, task_type="local", pri
         "type": task_info.get("type"),
         "status": task_info.get("status"),
         "library_id": task_info.get("library_id"),
+        "job_id": task_info.get("job_id"),
     }
+
+
+def get_task_by_job_id(job_id):
+    if not job_id:
+        return None
+    task_model = Tasks.get_or_none(Tasks.job_id == job_id)
+    if task_model is None:
+        return None
+    task_object = task.Task()
+    task_object.task = task_model
+    return task_object.get_task_data()
+
+
+def bind_remote_task_identity(task_id, lease_token=None, origin_installation_uuid=None):
+    values = {}
+    if lease_token:
+        values["lease_token"] = lease_token
+    if origin_installation_uuid:
+        values["remote_installation_uuid"] = origin_installation_uuid
+    if not values:
+        return True
+    condition = Tasks.id == task_id
+    if lease_token:
+        condition &= Tasks.lease_token.is_null() | (Tasks.lease_token == lease_token)
+    if origin_installation_uuid:
+        condition &= Tasks.remote_installation_uuid.is_null() | (Tasks.remote_installation_uuid == origin_installation_uuid)
+    return bool(Tasks.update(**values).where(condition).execute())
 
 
 def test_path_for_pending_task(abspath, library_id):

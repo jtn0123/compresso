@@ -367,7 +367,14 @@ class TestStartThreadsOrchestration:
         service = self._make_service()
         mock_settings = MagicMock()
         mock_settings.get_cache_path.return_value = "/tmp/cache"
+        mock_settings.get_config_path.return_value = "/tmp/config"
         with (
+            patch(
+                "compresso.service.FileOperationTracker.recover_all",
+                return_value={"rolled_back_task_ids": [], "committed_task_ids": []},
+            ),
+            patch("compresso.service.FileOperationTracker.finalize_committed"),
+            patch("compresso.service.TaskHandler.recover_tasks_on_startup", return_value=[]),
             patch.object(service, "initial_register_compresso"),
             patch.object(service, "start_post_processor", return_value=MagicMock()),
             patch.object(service, "start_foreman", return_value=MagicMock()),
@@ -387,7 +394,16 @@ class TestStartThreadsOrchestration:
         service = self._make_service()
         mock_settings = MagicMock()
         mock_settings.get_cache_path.return_value = "/tmp/cache"
-        with pytest.raises(Exception, match="fail"):
+        mock_settings.get_config_path.return_value = "/tmp/config"
+        with (
+            patch(
+                "compresso.service.FileOperationTracker.recover_all",
+                return_value={"rolled_back_task_ids": [], "committed_task_ids": []},
+            ),
+            patch("compresso.service.FileOperationTracker.finalize_committed"),
+            patch("compresso.service.TaskHandler.recover_tasks_on_startup", return_value=[]),
+            pytest.raises(Exception, match="fail"),
+        ):
             service.start_threads(mock_settings)
 
 

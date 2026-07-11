@@ -36,12 +36,15 @@ import re
 import shutil
 import threading
 import time
+from datetime import datetime, timedelta
 
 from compresso.libs import common
 from compresso.libs.installation_link import Links
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.remote_task_lease import RemoteTaskLease
+from compresso.libs.resumable_transfer import file_sha256
 from compresso.libs.task import TaskDataStore
 
 
@@ -68,6 +71,8 @@ class RemoteTaskManager(threading.Thread):
         self.complete_queue = complete_queue
 
         self.links = Links()
+        self.lease_token = None
+        self.origin_installation_uuid = None
 
         # Create 'redundancy' flag. When this is set, the worker should die
         self.redundant_flag = threading.Event()
@@ -160,6 +165,13 @@ class RemoteTaskManager(threading.Thread):
         self.worker_subprocess_percent = "0"
         self.worker_subprocess_elapsed = "0"
 
+        if not self._acquire_remote_lease():
+            self.current_task.task.deferred_until = datetime.now() + timedelta(seconds=10)
+            self.current_task.task.save()
+            self.current_task.set_status("pending")
+            self.__unset_current_task()
+            return
+
         # Log the start of the job
         self._log(f"Picked up job - {self.current_task.get_source_abspath()}")
 
@@ -185,6 +197,32 @@ class RemoteTaskManager(threading.Thread):
 
         # Reset the current file info for the next task
         self.__unset_current_task()
+
+    def _acquire_remote_lease(self):
+        installation_uuid = self.installation_info.get("installation_uuid") or self.installation_info.get("uuid")
+        self.lease_token = RemoteTaskLease.acquire(self.current_task.task, installation_uuid)
+        if not self.lease_token:
+            self._log(
+                f"Unable to acquire remote task lease for installation '{installation_uuid}'",
+                level="warning",
+            )
+            return False
+        self.origin_installation_uuid = self.links.session.get_installation_uuid()
+        return True
+
+    def _remote_identity(self):
+        if not self.lease_token:
+            return {}
+        return {
+            "job_id": self.current_task.task.job_id,
+            "lease_token": self.lease_token,
+            "origin_installation_uuid": self.origin_installation_uuid,
+        }
+
+    def _heartbeat_remote_lease(self):
+        if not self.lease_token:
+            return False
+        return RemoteTaskLease.heartbeat(self.current_task.task, self.lease_token)
 
     def __set_start_task_stats(self):
         """Sets the initial stats for the start of a task"""
@@ -266,6 +304,7 @@ class RemoteTaskManager(threading.Thread):
 
         # First attempt to create a task with an abspath on the remote installation
         remote_task_id = None
+        remote_task_status = None
         if not send_file:
             remote_library_id = library_config.get("id")
 
@@ -275,7 +314,10 @@ class RemoteTaskManager(threading.Thread):
             remote_original_abspath = os.path.join(library_config.get("path"), original_relpath)
             # Post the task creation. This will error if the file does not exist
             info = self.links.new_pending_task_create_on_remote_installation(
-                self.installation_info, remote_original_abspath, remote_library_id
+                self.installation_info,
+                remote_original_abspath,
+                remote_library_id,
+                **self._remote_identity(),
             )
             if not info:
                 self._log(
@@ -300,12 +342,12 @@ class RemoteTaskManager(threading.Thread):
             # Set the remote task ID (only when info is valid, i.e. we did not fall back to send_file)
             if not send_file:
                 remote_task_id = info.get("id")
+                remote_task_status = info.get("status")
 
         if send_file:
-            initial_checksum = None
-            if self.installation_info.get("enable_checksum_validation", False):
-                # Get source file checksum
-                initial_checksum = common.get_file_checksum(original_abspath)
+            # Every network transfer is integrity checked. This is deliberately
+            # not optional for remote jobs handling production media.
+            initial_checksum = file_sha256(original_abspath)
             initial_file_size = os.path.getsize(original_abspath)
 
             # Loop until we are able to upload the file to the remote installation
@@ -328,19 +370,30 @@ class RemoteTaskManager(threading.Thread):
 
                 # Send a file to a remote installation.
                 self._log(f"Uploading file to remote installation '{original_abspath}'", level="debug")
-                info = self.links.send_file_to_remote_installation(self.installation_info, original_abspath)
+                upload_identity = self._remote_identity()
+                if self.lease_token:
+                    upload_identity["progress_callback"] = self._heartbeat_remote_lease
+                info = self.links.send_file_to_remote_installation(
+                    self.installation_info,
+                    original_abspath,
+                    **upload_identity,
+                )
                 self.links.release_network_transfer_lock(lock_key)
                 if not info:
-                    self._log(f"Failed to upload the file '{original_abspath}'", level="error")
+                    self._log(f"Upload interrupted; retaining resume state for '{original_abspath}'", level="warning")
+                    if self.lease_token:
+                        self.event.wait(2)
+                        continue
                     self.__write_failure_to_worker_log()
                     return False
                 break
 
             # Set the remote task ID
             remote_task_id = info.get("id")
+            remote_task_status = info.get("status")
 
             # Compare uploaded file md5checksum
-            if initial_checksum and info.get("checksum") != initial_checksum:
+            if info.get("checksum") != initial_checksum:
                 self._log(f"The uploaded file did not return a correct checksum '{original_abspath}'", level="error")
                 # Send request to terminate the remote worker then return
                 self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
@@ -352,10 +405,14 @@ class RemoteTaskManager(threading.Thread):
             self._log("Failed to create remote task. Var remote_task_id is still None", level="error")
             self.__write_failure_to_worker_log()
             return False
+        self.current_task.task.remote_task_id = int(remote_task_id)
+        self.current_task.task.save()
 
         # Set the library of the remote task using the library's name
         set_lib_deadline = time.monotonic() + 1800  # 30 min max
         while not self.redundant_flag.is_set():
+            if remote_task_status in {"in_progress", "processed", "complete"}:
+                break
             if time.monotonic() > set_lib_deadline:
                 self._log(f"Set-remote-library retry deadline exceeded for '{original_abspath}'", level="error")
                 self.__write_failure_to_worker_log()
@@ -379,6 +436,8 @@ class RemoteTaskManager(threading.Thread):
         # Start the remote task
         start_task_deadline = time.monotonic() + 1800  # 30 min max
         while not self.redundant_flag.is_set():
+            if remote_task_status in {"in_progress", "processed", "complete"}:
+                break
             if time.monotonic() > start_task_deadline:
                 self._log(f"Start-task retry deadline exceeded for '{original_abspath}'", level="error")
                 self.__write_failure_to_worker_log()
@@ -433,6 +492,7 @@ class RemoteTaskManager(threading.Thread):
             polling_delay = 5
             if all_task_states:
                 # Successful contact -- reset backoff state
+                self._heartbeat_remote_lease()
                 consecutive_poll_failures = 0
                 first_failure_time = None
                 for ts in all_task_states.get("results", []):
@@ -631,15 +691,27 @@ class RemoteTaskManager(threading.Thread):
                         continue
                     # Download the file
                     self._log(f"Downloading file from remote installation '{task_label}'", level="debug")
-                    success = self.links.fetch_remote_task_completed_file(
-                        self.installation_info,
-                        remote_task_id,
-                        task_cache_path,
-                    )
+                    if self.lease_token:
+                        success = self.links.fetch_remote_task_completed_file_resumable(
+                            self.installation_info,
+                            remote_task_id,
+                            task_cache_path,
+                        )
+                    else:
+                        success = self.links.fetch_remote_task_completed_file(
+                            self.installation_info,
+                            remote_task_id,
+                            task_cache_path,
+                        )
                     self.links.release_network_transfer_lock(lock_key)
                     if not success:
-                        self._log(f"Failed to download file '{os.path.basename(data.get('abspath'))}'", level="error")
-                        # Send request to terminate the remote worker then return
+                        self._log(
+                            f"Download interrupted; retaining resume state for '{os.path.basename(data.get('abspath'))}'",
+                            level="warning",
+                        )
+                        if self.lease_token:
+                            self.event.wait(2)
+                            continue
                         self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                         self.__write_failure_to_worker_log()
                         return False
@@ -651,15 +723,25 @@ class RemoteTaskManager(threading.Thread):
                 self.current_task.save_command_log(self.worker_log)
                 return False
 
-            # Match checksum from task result data with downloaded file
-            if self.installation_info.get("enable_checksum_validation", False):
-                downloaded_checksum = common.get_file_checksum(task_cache_path)
-                if downloaded_checksum != data.get("checksum"):
-                    self._log(f"The downloaded file did not produce a correct checksum '{task_cache_path}'", level="error")
-                    # Send request to terminate the remote worker then return
-                    self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
-                    self.__write_failure_to_worker_log()
-                    return False
+            # Match the remote manifest checksum with the received file. Missing
+            # checksums are rejected so old/partial workers cannot silently bypass
+            # integrity validation.
+            expected_checksum = data.get("checksum")
+            downloaded_checksum = file_sha256(task_cache_path)
+            if not expected_checksum or expected_checksum == "UNKNOWN" or downloaded_checksum != expected_checksum:
+                self._log(f"The downloaded file did not produce a correct checksum '{task_cache_path}'", level="error")
+                self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
+                self.__write_failure_to_worker_log()
+                return False
+
+            if self.lease_token and not RemoteTaskLease.complete(
+                self.current_task.task,
+                self.lease_token,
+                downloaded_checksum,
+            ):
+                self._log(f"Conflicting remote completion received for '{original_abspath}'", level="error")
+                self.__write_failure_to_worker_log()
+                return False
 
             # Send request to terminate the remote worker then return
             self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)

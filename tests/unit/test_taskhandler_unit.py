@@ -103,43 +103,27 @@ def test_process_inotifytasks_queue_logs_exception(task_handler):
 
 
 @pytest.mark.unittest
-def test_clear_tasks_on_startup_clears_matching_tasks(task_handler):
-    select_query = MagicMock()
-    select_query.where.return_value = select_query
-    select_query.tuples.return_value = [(1,), (2,)]
+def test_clear_tasks_on_startup_delegates_to_recovery(task_handler):
+    with patch.object(type(task_handler), "recover_tasks_on_startup", return_value=["/cache/output.mkv"]) as recover:
+        result = task_handler.clear_tasks_on_startup()
 
-    delete_query = MagicMock()
-    delete_query.where.return_value = delete_query
-    delete_query.execute.return_value = 2
-
-    task_handler.settings.get_clear_pending_tasks_on_restart.return_value = False
-    task_handler._log = MagicMock()
-
-    with (
-        patch("compresso.libs.taskhandler.Tasks.select", return_value=select_query),
-        patch("compresso.libs.taskhandler.Tasks.delete", return_value=delete_query),
-        patch("compresso.libs.taskhandler.task.TaskDataStore.clear_task") as mock_clear,
-    ):
-        task_handler.clear_tasks_on_startup()
-
-    assert mock_clear.call_count == 2
-    select_query.where.assert_called_once()
-    delete_query.where.assert_called_once()
-    delete_query.execute.assert_called_once_with()
+    assert result == ["/cache/output.mkv"]
+    recover.assert_called_once_with(task_handler.settings)
 
 
 @pytest.mark.unittest
 def test_clear_tasks_on_startup_handles_missing_table(task_handler):
-    task_handler._log = MagicMock()
+    logger = MagicMock()
 
-    with patch("compresso.libs.taskhandler.Tasks.select", side_effect=OperationalError("missing")):
-        task_handler.clear_tasks_on_startup()
+    with (
+        patch("compresso.libs.taskhandler.Tasks.select", side_effect=OperationalError("missing")),
+        patch("compresso.libs.taskhandler.CompressoLogging.get_logger", return_value=logger),
+    ):
+        type(task_handler).recover_tasks_on_startup(task_handler.settings)
 
-    task_handler._log.assert_called_with(
-        "Skipping task cleanup at startup; tasks table missing",
-        "missing",
-        level="debug",
-    )
+    logger.debug.assert_called_once()
+    assert logger.debug.call_args.args[0] == "Skipping task recovery at startup; tasks table missing - %s"
+    assert str(logger.debug.call_args.args[1]) == "missing"
 
 
 @pytest.mark.unittest

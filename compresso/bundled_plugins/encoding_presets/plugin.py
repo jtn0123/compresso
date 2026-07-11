@@ -180,6 +180,8 @@ CPU_USED_PRESET_MAP = {
     "veryslow": "0",
 }
 
+VIDEOTOOLBOX_ENCODERS = {"h264_videotoolbox", "hevc_videotoolbox"}
+
 # CRF parameter name varies by encoder
 CRF_PARAM_MAP = {
     "libx264": "-crf",
@@ -188,6 +190,12 @@ CRF_PARAM_MAP = {
     "libaom-av1": "-crf",
     "libvpx-vp9": "-crf",
 }
+
+
+def _videotoolbox_quality_from_crf(crf):
+    """Map the UI's lower-is-better CRF scale to VideoToolbox 1-100 quality."""
+    bounded_crf = max(0, min(63, int(crf)))
+    return round(100 - (bounded_crf / 63) * 99)
 
 
 def _get_source_extension(file_path):
@@ -268,7 +276,18 @@ def on_worker_process(data, **kwargs):
     data["file_out"] = file_out
 
     # --- Build FFmpeg command ---
-    cmd = ["ffmpeg", "-y", "-i", file_in]
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        file_in,
+        "-map",
+        "0",
+        "-map_metadata",
+        "0",
+        "-map_chapters",
+        "0",
+    ]
 
     # Video settings
     video_codec = s.get("video_codec", "").strip()
@@ -282,12 +301,15 @@ def on_worker_process(data, **kwargs):
 
         # CRF / quality
         crf = s.get("crf", 23)
-        crf_param = CRF_PARAM_MAP.get(video_encoder, "-crf")
-        cmd.extend([crf_param, str(int(crf))])
+        if video_encoder in VIDEOTOOLBOX_ENCODERS:
+            cmd.extend(["-q:v", str(_videotoolbox_quality_from_crf(crf))])
+        else:
+            crf_param = CRF_PARAM_MAP.get(video_encoder, "-crf")
+            cmd.extend([crf_param, str(int(crf))])
 
         # Encoder preset
         preset = s.get("encoder_preset", "medium").strip()
-        if preset:
+        if preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
             preset_param = PRESET_PARAM_MAP.get(video_encoder, "-preset")
             # Map named presets to numbers for SVT-AV1 and VP9/libaom
             if video_encoder == "libsvtav1":
@@ -301,6 +323,8 @@ def on_worker_process(data, **kwargs):
         # Max bitrate
         max_bitrate = s.get("max_bitrate", "").strip()
         if max_bitrate:
+            if video_encoder in VIDEOTOOLBOX_ENCODERS:
+                cmd.extend(["-b:v", max_bitrate])
             cmd.extend(["-maxrate", max_bitrate, "-bufsize", max_bitrate])
     else:
         # No video codec specified — copy video
@@ -321,6 +345,11 @@ def on_worker_process(data, **kwargs):
             cmd.extend(["-b:a", audio_bitrate])
     else:
         cmd.extend(["-c:a", "copy"])
+
+    # Keep every subtitle, data, and attachment stream. If the selected output
+    # container cannot represent one of them, FFmpeg fails visibly instead of
+    # silently producing an incomplete replacement.
+    cmd.extend(["-c:s", "copy", "-c:d", "copy", "-c:t", "copy"])
 
     # Extra flags
     extra_flags = s.get("extra_flags", "").strip()
