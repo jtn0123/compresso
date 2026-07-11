@@ -5,6 +5,7 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -15,7 +16,7 @@ from typing import Any
 
 def file_sha256(path):
     digest = hashlib.sha256()
-    with open(path, "rb") as source:
+    with open(path, "rb") as source:  # NOSONAR - callers supply validated task or transfer-store paths
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"
@@ -50,10 +51,28 @@ class ResumableTransferStore:
         return hashlib.sha256(identity).hexdigest()[:32]
 
     def _manifest_path(self, transfer_id):
+        self._validate_transfer_id(transfer_id)
         return self.manifest_dir / f"{transfer_id}.json"
 
     def _partial_path(self, transfer_id):
+        self._validate_transfer_id(transfer_id)
         return self.partial_dir / f"{transfer_id}.part"
+
+    @staticmethod
+    def _validate_transfer_id(transfer_id):
+        if not isinstance(transfer_id, str) or re.fullmatch(r"[a-f0-9]{32}", transfer_id) is None:
+            raise ValueError("Invalid transfer ID")
+
+    def _final_path(self, manifest):
+        transfer_id = manifest.get("transfer_id")
+        self._validate_transfer_id(transfer_id)
+        filename = manifest.get("filename")
+        if not isinstance(filename, str) or filename != os.path.basename(filename) or filename in {"", ".", ".."}:
+            raise ValueError("Invalid transfer filename")
+        final_path = (self.completed_dir / transfer_id / filename).resolve()  # NOSONAR - validated immediately below
+        if not final_path.is_relative_to(self.completed_dir):
+            raise ValueError("Transfer path escapes completed directory")
+        return final_path
 
     def _write_manifest(self, manifest):
         fd, temporary_path = tempfile.mkstemp(prefix=".transfer-", suffix=".tmp", dir=self.manifest_dir)
@@ -83,7 +102,10 @@ class ResumableTransferStore:
             raise KeyError(f"Unknown transfer ID: {transfer_id}")
         with open(manifest_path) as source:
             manifest = json.load(source)
-        final_path = Path(manifest["final_path"])
+        if manifest.get("transfer_id") != transfer_id:
+            raise ValueError("Transfer manifest identity mismatch")
+        final_path = self._final_path(manifest)
+        manifest["final_path"] = str(final_path)
         if manifest.get("state") == "finalizing" and final_path.is_file():
             manifest["state"] = "complete"
             manifest["offset"] = manifest["total_size"]
@@ -193,12 +215,12 @@ class ResumableTransferStore:
                 self._reset_partial(manifest)
                 raise ValueError("Transfer checksum mismatch")
 
-            final_path = Path(manifest["final_path"])
+            final_path = self._final_path(manifest)
             final_path.parent.mkdir(parents=True, exist_ok=True)
             manifest["state"] = "finalizing"
             manifest["updated_at"] = self._now()
             self._write_manifest(manifest)
-            os.replace(partial_path, final_path)
+            os.replace(partial_path, final_path)  # NOSONAR - both paths are derived within the transfer root
             manifest["state"] = "complete"
             manifest["offset"] = manifest["total_size"]
             manifest["updated_at"] = self._now()

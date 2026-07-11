@@ -1,10 +1,24 @@
 #!/usr/bin/env python3
 
 import json
+from unittest.mock import patch
 
 import pytest
 
 from compresso.libs.media_manifest import compare_media_summaries, create_manifest, verify_manifest
+
+
+@pytest.mark.unittest
+def test_probe_passes_media_path_as_explicit_input_operand():
+    with patch("compresso.libs.media_manifest.subprocess.run") as run:
+        run.return_value.stdout = json.dumps({"streams": [], "chapters": [], "format": {}})
+
+        from compresso.libs.media_manifest import probe_media
+
+        probe_media("-untrusted-name.mkv")
+
+    command = run.call_args.args[0]
+    assert command[-2:] == ["-i", "-untrusted-name.mkv"]
 
 
 @pytest.mark.unittest

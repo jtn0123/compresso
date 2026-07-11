@@ -2,6 +2,7 @@
 
 """Resumable, checksummed remote-media transfer endpoints."""
 
+import asyncio
 import hashlib
 import os
 
@@ -13,6 +14,12 @@ from compresso.webserver.api_v2.schema.transfer_schemas import RequestTransferSe
 from compresso.webserver.helpers import pending_tasks
 
 MAX_CHUNK_SIZE = 8 * 1024 * 1024
+
+
+def _read_file_chunk(path, offset, limit):
+    with open(path, "rb") as source:
+        source.seek(offset)
+        return source.read(limit)
 
 
 class ApiTransferHandler(BaseApiHandler):
@@ -141,9 +148,7 @@ class ApiTransferHandler(BaseApiHandler):
             task = self._completed_source(task_id)
             offset = max(0, int(self.get_query_argument("offset", "0")))
             limit = min(MAX_CHUNK_SIZE, max(1, int(self.get_query_argument("limit", str(MAX_CHUNK_SIZE)))))
-            with open(task.abspath, "rb") as source:
-                source.seek(offset)
-                chunk = source.read(limit)
+            chunk = await asyncio.to_thread(_read_file_chunk, task.abspath, offset, limit)
             self.set_header("Content-Type", "application/octet-stream")
             self.set_header("X-Transfer-Offset", str(offset))
             self.set_header("X-Chunk-Checksum", f"sha256:{hashlib.sha256(chunk).hexdigest()}")

@@ -1166,11 +1166,15 @@ class Links(metaclass=SingletonType):
         )
         if not manifest:
             return False
+        safe_path = os.path.realpath(path)
+        cache_root = os.path.realpath(self.settings.get_cache_path())
+        if os.path.commonpath((cache_root, safe_path)) != cache_root:
+            raise ValueError("Remote transfer destination must be inside the Compresso cache")
         total_size = int(manifest["total_size"])
-        partial_path = f"{path}.part"
+        partial_path = f"{safe_path}.part"
         offset = os.path.getsize(partial_path) if os.path.exists(partial_path) else 0
         if offset > total_size:
-            os.remove(partial_path)
+            os.remove(partial_path)  # NOSONAR - partial_path is constrained to cache_root above
             offset = 0
 
         request_handler = RequestHandler(
@@ -1179,7 +1183,7 @@ class Links(metaclass=SingletonType):
             password=remote_config.get("password"),
         )
         address = self.__format_address(remote_config.get("address"))
-        with open(partial_path, "ab") as output:
+        with open(partial_path, "ab") as output:  # NOSONAR - partial_path is constrained to cache_root above
             while offset < total_size:
                 response = request_handler.get(
                     f"{address}/compresso/api/v2/transfer/source/{remote_task_id}/chunk",
@@ -1198,9 +1202,9 @@ class Links(metaclass=SingletonType):
                 offset += len(response.content)
 
         if file_sha256(partial_path) != manifest.get("checksum"):
-            os.remove(partial_path)
+            os.remove(partial_path)  # NOSONAR - partial_path is constrained to cache_root above
             return False
-        os.replace(partial_path, path)
+        os.replace(partial_path, safe_path)  # NOSONAR - both paths are constrained to cache_root above
         return True
 
     def remove_task_from_remote_installation(self, remote_config: dict, remote_task_id: int):

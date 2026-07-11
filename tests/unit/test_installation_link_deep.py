@@ -402,6 +402,7 @@ class TestSendFileToRemoteInstallation:
         destination = tmp_path / "movie.mkv"
         (tmp_path / "movie.mkv.part").write_bytes(payload[:4])
         links = _create_links()
+        links.settings.get_cache_path.return_value = str(tmp_path)
         links.remote_api_get = MagicMock(
             return_value={
                 "total_size": len(payload),
@@ -429,6 +430,7 @@ class TestSendFileToRemoteInstallation:
         partial = tmp_path / "movie.mkv.part"
         partial.write_bytes(b"bad!")
         links = _create_links()
+        links.settings.get_cache_path.return_value = str(tmp_path)
         links.remote_api_get = MagicMock(
             return_value={
                 "total_size": len(payload),
@@ -438,6 +440,14 @@ class TestSendFileToRemoteInstallation:
 
         assert links.fetch_remote_task_completed_file_resumable({}, 7, str(destination)) is False
         assert not partial.exists()
+
+    def test_resumable_download_rejects_destination_outside_cache(self, tmp_path):
+        links = _create_links()
+        links.settings.get_cache_path.return_value = str(tmp_path / "cache")
+        links.remote_api_get = MagicMock(return_value={"total_size": 0, "checksum": "sha256:empty"})
+
+        with pytest.raises(ValueError, match="inside the Compresso cache"):
+            links.fetch_remote_task_completed_file_resumable({}, 7, str(tmp_path / "outside.mkv"))
 
     def test_uses_resumable_protocol_for_stable_remote_job(self):
         links = _create_links()

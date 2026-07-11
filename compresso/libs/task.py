@@ -236,9 +236,9 @@ class Task:
             # Record source file size at task creation
             source_size = 0
             try:
-                source_size = os.path.getsize(abspath)
+                source_size = os.path.getsize(abspath)  # NOSONAR - this API requires a validated absolute media path
             except OSError:
-                self.logger.warning("Could not get file size for '%s'", abspath)
+                self.logger.warning("Could not get file size for '%s'", os.path.basename(abspath))
 
             self.task = Tasks.create(
                 abspath=abspath,
@@ -248,7 +248,12 @@ class Task:
                 job_id=job_id or str(uuid.uuid4()),
             )
             self.save()
-            self.logger.debug("Created new task with ID: %s for %s (source_size=%d)", self.task, abspath, source_size)
+            self.logger.debug(
+                "Created new task with ID: %s for %s (source_size=%d)",
+                self.task,
+                os.path.basename(abspath),
+                source_size,
+            )
 
             # Set the cache path to use during the transcoding
             self.set_cache_path()
@@ -274,7 +279,7 @@ class Task:
 
             return True
         except IntegrityError as e:
-            self.logger.info("Cancel creating new task for %s - %s", abspath, e)
+            self.logger.info("Cancel creating new task for %s - %s", os.path.basename(abspath), e)
             return False
 
     def set_status(self, status):

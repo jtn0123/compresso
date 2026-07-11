@@ -204,3 +204,30 @@ def test_summary_uses_actual_partial_size_after_interrupted_manifest_update(tmp_
     summary = store.summary()
 
     assert summary["bytes_received"] == 5
+
+
+@pytest.mark.unittest
+def test_tampered_manifest_cannot_redirect_completed_file(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    payload = b"safe"
+    status = store.begin("job-1", "movie.mkv", len(payload), _sha256(payload))
+    store.append(status["transfer_id"], 0, payload, _sha256(payload))
+    manifest_path = store._manifest_path(status["transfer_id"])
+    manifest = json.loads(manifest_path.read_text())
+    outside = tmp_path / "outside.mkv"
+    manifest["final_path"] = str(outside)
+    manifest_path.write_text(json.dumps(manifest))
+
+    completed = store.finalize(status["transfer_id"])
+
+    assert completed.is_relative_to(tmp_path / "completed")
+    assert completed.read_bytes() == payload
+    assert not outside.exists()
+
+
+@pytest.mark.unittest
+def test_transfer_store_rejects_untrusted_transfer_id():
+    store = ResumableTransferStore.__new__(ResumableTransferStore)
+
+    with pytest.raises(ValueError, match="transfer ID"):
+        store._validate_transfer_id("../escape")

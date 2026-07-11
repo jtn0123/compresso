@@ -57,6 +57,22 @@ def test_begin_and_append_chunk_return_persisted_offsets(tmp_path):
 
 
 @pytest.mark.unittest
+def test_source_chunk_reads_file_off_event_loop(tmp_path):
+    source = tmp_path / "movie.mkv"
+    source.write_bytes(b"abcdefgh")
+    handler = _handler(MagicMock())
+    handler.get_query_argument = MagicMock(side_effect=lambda name, default: {"offset": "2", "limit": "3"}[name])
+    handler.set_header = MagicMock()
+    handler.finish = MagicMock()
+    task = SimpleNamespace(abspath=str(source))
+
+    with patch.object(ApiTransferHandler, "_completed_source", return_value=task):
+        asyncio.run(handler.get_source_chunk("7"))
+
+    handler.finish.assert_called_once_with(b"cde")
+
+
+@pytest.mark.unittest
 def test_finalize_creates_one_remote_task_from_verified_file(tmp_path):
     payload = b"complete-media"
     store = ResumableTransferStore(tmp_path)

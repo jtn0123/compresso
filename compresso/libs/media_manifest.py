@@ -41,7 +41,7 @@ def _is_absolute_manifest_path(path):
 
 def _sha256(path):
     digest = hashlib.sha256()
-    with open(path, "rb") as source:
+    with open(path, "rb") as source:  # NOSONAR - caller constrains paths to the selected media root
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"
@@ -73,9 +73,12 @@ def probe_media(path):
         "-show_format",
         "-of",
         "json",
+        "-i",
         path,
     ]
-    result = subprocess.run(command, capture_output=True, text=True, check=True, timeout=120)  # noqa: S603
+    result = subprocess.run(  # noqa: S603  # NOSONAR - fixed executable, argv list, and explicit input operand
+        command, capture_output=True, text=True, check=True, timeout=120
+    )
     probe = json.loads(result.stdout)
     streams = probe.get("streams", [])
     counts = Counter(stream.get("codec_type") for stream in streams)
@@ -135,7 +138,9 @@ def create_manifest(root, output_path, sample_size=None, seed=20):
         raise ValueError("sample size must be greater than zero")
     paths = _media_files(root)
     if sample_size is not None and int(sample_size) < len(paths):
-        paths = sorted(random.Random(seed).sample(paths, max(0, int(sample_size))))  # noqa: S311 - deterministic sampling
+        paths = sorted(
+            random.Random(seed).sample(paths, max(0, int(sample_size)))  # noqa: S311  # NOSONAR
+        )  # deterministic sampling, not a security decision
     files = []
     for path in paths:
         files.append(
