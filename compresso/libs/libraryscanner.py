@@ -44,6 +44,7 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.scan_checkpoint import ScanCheckpointStore
 
 
 class LibraryScannerManager(threading.Thread):
@@ -215,6 +216,48 @@ class LibraryScannerManager(threading.Thread):
                 return True
         return False
 
+    def scan_work_is_pending(self):
+        """Include dequeued work that a tester has not acknowledged yet."""
+        return bool(self.files_to_test.unfinished_tasks) or self.file_tests_in_progress()
+
+    def get_scan_queue_limit(self):
+        try:
+            return max(1, int(self.settings.get_library_scan_queue_limit()))
+        except (AttributeError, TypeError, ValueError):
+            return 500
+
+    def get_scan_checkpoint_store(self):
+        try:
+            userdata_path = self.settings.get_userdata_path()
+        except (AttributeError, TypeError):
+            return None
+        if not isinstance(userdata_path, str) or not userdata_path:
+            return None
+        return ScanCheckpointStore(userdata_path)
+
+    @staticmethod
+    def root_was_completed(root, library_path, completed_root):
+        if not completed_root:
+            return False
+        relative_root = os.path.relpath(root, library_path)
+        return relative_root == completed_root
+
+    def drain_scan_outputs(self, status_updates, frontend_messages, current_file, library_id):
+        while True:
+            try:
+                current_file = status_updates.get_nowait()
+            except queue.Empty:
+                break
+        while True:
+            try:
+                item = self.files_to_process.get_nowait()
+            except queue.Empty:
+                break
+            self.add_path_to_queue(item.get("path"), library_id, item.get("priority_score"))
+        if current_file:
+            self.update_scan_progress(frontend_messages, f"Testing: {current_file}")
+        return current_file
+
     def scan_library_path(self, library_name, library_path, library_id):  # noqa: C901 — recursive scan with multiple filter stages
         """
         Run a scan of the given library path
@@ -253,16 +296,34 @@ class LibraryScannerManager(threading.Thread):
         )
 
         follow_symlinks = self.settings.get_follow_symlinks()
+        queue_limit = self.get_scan_queue_limit()
+        checkpoint_store = self.get_scan_checkpoint_store()
+        completed_root = checkpoint_store.load(library_id, library_path) if checkpoint_store else None
+        if completed_root and not os.path.isdir(os.path.join(library_path, completed_root)):
+            checkpoint_store.clear(library_id)
+            completed_root = None
+        resume_checkpoint_reached = completed_root is None
         total_file_count = 0
         current_file = ""
         percent_completed_string = ""
-        for root, _subFolders, files in os.walk(library_path, followlinks=follow_symlinks):
+        for root, subfolders, files in os.walk(library_path, followlinks=follow_symlinks):
             if self.abort_flag.is_set():
                 break
+            subfolders.sort()
+            files.sort()
+            if not resume_checkpoint_reached:
+                resume_checkpoint_reached = self.root_was_completed(root, library_path, completed_root)
+                continue
             if self.settings.get_debugging():
                 self.logger.debug(json.dumps(files, indent=2))
             # Add all files in this path that match our container filter
             for file_path in files:
+                if self.abort_flag.is_set():
+                    break
+
+                while self.files_to_test.qsize() >= queue_limit and not self.abort_flag.is_set():
+                    current_file = self.drain_scan_outputs(status_updates, frontend_messages, current_file, library_id)
+                    self.event.wait(0.1)
                 if self.abort_flag.is_set():
                     break
 
@@ -275,6 +336,16 @@ class LibraryScannerManager(threading.Thread):
                     current_file = status_updates.get()
                     percent_completed_string = f"Testing: {current_file}"
                     self.update_scan_progress(frontend_messages, percent_completed_string)
+
+            # A checkpoint is committed only after this directory's files are fully tested.
+            if self.file_test_managers and not self.abort_flag.is_set():
+                while not self.abort_flag.is_set() and self.scan_work_is_pending():
+                    current_file = self.drain_scan_outputs(status_updates, frontend_messages, current_file, library_id)
+                    self.event.wait(0.1)
+                current_file = self.drain_scan_outputs(status_updates, frontend_messages, current_file, library_id)
+                if checkpoint_store and not self.abort_flag.is_set():
+                    completed_root = os.path.relpath(root, library_path)
+                    checkpoint_store.save(library_id, library_path, completed_root)
 
         # Loop while waiting for all threads to finish
         double_check = 0
@@ -368,6 +439,9 @@ class LibraryScannerManager(threading.Thread):
         }
         plugin_handler = PluginsHandler()
         plugin_handler.run_event_plugins_for_plugin_type("events.scan_complete", data)
+
+        if checkpoint_store and not self.abort_flag.is_set():
+            checkpoint_store.clear(library_id)
 
         # Run a manual garbage collection
         gc.collect()

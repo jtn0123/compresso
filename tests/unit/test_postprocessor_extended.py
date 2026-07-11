@@ -189,15 +189,30 @@ class TestFinalizeLocalTask:
     @patch(f"{PP_MOD}.PostProcessor.commit_task_metadata")
     @patch(f"{PP_MOD}.PostProcessor.write_history_log")
     @patch(f"{PP_MOD}.PostProcessor.post_process_file", side_effect=Exception("boom"))
-    def test_continues_on_post_process_error(self, mock_ppf, mock_whl, mock_ctm, mock_csf):
+    def test_stops_finalization_on_post_process_error(self, mock_ppf, mock_whl, mock_ctm, mock_csf):
         pp = _make_postprocessor()
         pp.current_task = _make_current_task()
 
         pp._finalize_local_task()
 
-        # Should still attempt subsequent steps
-        mock_whl.assert_called_once()
-        mock_ctm.assert_called_once()
+        mock_whl.assert_not_called()
+        mock_ctm.assert_not_called()
+        pp.current_task.delete.assert_not_called()
+        pp.current_task.task.save.assert_called()
+
+    @patch(f"{PP_MOD}.PostProcessor._cleanup_staging_files")
+    @patch(f"{PP_MOD}.PostProcessor.commit_task_metadata")
+    @patch(f"{PP_MOD}.PostProcessor.write_history_log")
+    @patch(f"{PP_MOD}.PostProcessor.post_process_file", return_value=False)
+    def test_stops_finalization_when_file_movement_reports_failure(self, mock_ppf, mock_whl, mock_ctm, mock_csf):
+        pp = _make_postprocessor()
+        pp.current_task = _make_current_task()
+
+        pp._finalize_local_task()
+
+        mock_whl.assert_not_called()
+        mock_ctm.assert_not_called()
+        pp.current_task.delete.assert_not_called()
 
     @patch(f"{PP_MOD}.PostProcessor._cleanup_staging_files")
     @patch(f"{PP_MOD}.PostProcessor.commit_task_metadata", side_effect=Exception("meta error"))

@@ -366,8 +366,14 @@ class TestHandTaskToWorkersRemote:
         foreman.remote_task_manager_threads = {}
 
         mock_item = MagicMock()
+        mock_item.task.remote_installation_uuid = "worker-a"
+        foreman.init_remote_task_manager_thread = MagicMock(return_value=True)
         result = foreman.hand_task_to_workers(mock_item, local=False, library_name="Movies")
         assert result is True
+        foreman.init_remote_task_manager_thread.assert_called_once_with(
+            library_name="Movies",
+            preferred_installation_uuid="worker-a",
+        )
 
     def test_remote_failure_when_no_manager(self):
         foreman = _make_foreman()

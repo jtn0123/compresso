@@ -179,18 +179,36 @@ def touch(fname, mode=0o666, dir_fd=None, **kwargs):
         os.utime(f.fileno() if os.utime in os.supports_fd else fname, dir_fd=None if os.supports_fd else dir_fd, **kwargs)
 
 
-def clean_files_in_cache_dir(cache_directory):
-    """This will completely wipe all contents from a directory"""
+def clean_files_in_cache_dir(cache_directory, protected_paths=None):
+    """Remove abandoned task cache directories while retaining active files."""
+    protected_paths = [os.path.realpath(path) for path in (protected_paths or []) if path]
+
+    def contains_protected_path(directory):
+        directory = os.path.realpath(directory)
+        for path in protected_paths:
+            try:
+                if os.path.commonpath([directory, path]) == directory:
+                    return True
+            except ValueError:
+                continue
+        return False
+
     if os.path.exists(cache_directory):
         for root, _subFolders, _files in os.walk(cache_directory):
             root_bn = os.path.basename(root)
             if root_bn.startswith("compresso_file_conversion-"):
+                if contains_protected_path(root):
+                    logger.info("Preserving active cache path - %s", root)
+                    continue
                 try:
                     logger.info("Clearing cache path - %s", root)
                     shutil.rmtree(root)
                 except Exception as e:
                     logger.error("Exception while clearing cache path - %s", str(e))
             elif root_bn.startswith("compresso_remote_pending_library-"):
+                if contains_protected_path(root):
+                    logger.info("Preserving active remote cache path - %s", root)
+                    continue
                 try:
                     logger.info("Clearing remote library cache path - %s", root)
                     shutil.rmtree(root)

@@ -64,22 +64,13 @@ class FileTest:
             "library_management.file_test", library_id=library_id
         )
 
-        # List of filed tasks
-        self.failed_paths: list = []
-
     def file_failed_in_history(self, path):
         """
         Check if file has already failed in history
 
         :return:
         """
-        # Fetch historical tasks
-        history_logging = history.History()
-        if not self.failed_paths:
-            failed_tasks = history_logging.get_historic_tasks_list_with_source_probe(task_success=False)
-            for task in failed_tasks:
-                self.failed_paths.append(task.get("abspath"))
-        return path in self.failed_paths
+        return history.History().failed_path_exists(path)
 
     def file_in_compresso_ignore_lockfile(self, path):
         """
@@ -296,6 +287,7 @@ class FileTesterThread(threading.Thread):
                 self.logger.exception("Exception testing file path in %s. Ignoring.", self.name)
             finally:
                 self._set_testing_state(False)
+                self.files_to_test.task_done()
 
         self.logger.info("Exiting %s", self.name)
 

@@ -43,7 +43,10 @@ from compresso.libs import task
 from compresso.libs.installation_link import Links
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.resumable_transfer import ResumableTransferStore
 from compresso.libs.session import Session
+from compresso.libs.unmodels.tasks import Tasks
+from compresso.libs.worker_group import WorkerGroup
 
 
 class ScheduledTasksManager(threading.Thread):
@@ -80,6 +83,8 @@ class ScheduledTasksManager(threading.Thread):
         self.manage_completed_tasks()
         # Run preview cleanup every hour
         self.scheduler.every(1).hours.do(self.cleanup_old_previews)
+        self.scheduler.every(1).hours.do(self.cleanup_stale_transfers)
+        self.scheduler.every(6).hours.do(self.cleanup_orphaned_remote_tasks)
         # Run staging directory cleanup every 6 hours
         self.scheduler.every(6).hours.do(self.cleanup_expired_staging)
 
@@ -107,6 +112,39 @@ class ScheduledTasksManager(threading.Thread):
         # Don't log this as it will happen often
         links = Links()
         links.update_all_remote_installation_links()
+
+    @staticmethod
+    def _worker_group_allocations(worker_groups, target_total):
+        """Allocate an installation-level target across its worker groups."""
+        if not worker_groups:
+            return []
+
+        target_total = max(0, int(target_total))
+        current_counts = [max(0, int(group.get("number_of_workers", 0))) for group in worker_groups]
+        current_total = sum(current_counts)
+        if current_total == 0:
+            return [target_total, *([0] * (len(worker_groups) - 1))]
+
+        quotas = [(count / current_total) * target_total for count in current_counts]
+        allocations = [int(quota) for quota in quotas]
+        remaining = target_total - sum(allocations)
+        largest_remainders = sorted(
+            range(len(worker_groups)),
+            key=lambda index: quotas[index] - allocations[index],
+            reverse=True,
+        )
+        for index in largest_remainders[:remaining]:
+            allocations[index] += 1
+        return allocations
+
+    def _set_local_worker_group_total(self, target_total):
+        """Persist a distributed worker target to the worker-group model used by Foreman."""
+        worker_groups = WorkerGroup.get_all_worker_groups()
+        allocations = self._worker_group_allocations(worker_groups, target_total)
+        for group_config, worker_count in zip(worker_groups, allocations, strict=True):
+            worker_group = WorkerGroup(group_config["id"])
+            worker_group.set_number_of_workers(worker_count)
+            worker_group.save()
 
     def set_worker_count_based_on_remote_installation_links(self):
         settings = config.Config()
@@ -169,7 +207,7 @@ class ScheduledTasksManager(threading.Thread):
             self.force_local_worker_timer = time_now
 
         self.logger.info("Configuring worker count as %s for this installation", target_workers_for_this_installation)
-        settings.set_config_item("number_of_workers", target_workers_for_this_installation, save_settings=True)
+        self._set_local_worker_group_total(target_workers_for_this_installation)
 
     def manage_completed_tasks(self):
         settings = config.Config()
@@ -233,6 +271,52 @@ class ScheduledTasksManager(threading.Thread):
             preview_manager.cleanup_old_previews()
         except Exception as e:
             self.logger.error("Failed to cleanup old previews: %s", e)
+
+    def cleanup_stale_transfers(self):
+        """Remove abandoned partial chunks after the configured resume window."""
+        settings = config.Config()
+        transfer_root = os.path.join(settings.get_cache_path(), "remote_transfers")
+        max_age_seconds = settings.get_transfer_partial_retention_hours() * 60 * 60
+        removed = ResumableTransferStore(transfer_root).cleanup_stale(max_age_seconds=max_age_seconds)
+        if removed:
+            self.logger.info("Removed %s stale resumable transfer(s)", len(removed))
+
+    @staticmethod
+    def _task_artifact_timestamp(task_model):
+        try:
+            if task_model.abspath and os.path.exists(task_model.abspath):
+                return os.path.getmtime(task_model.abspath)
+        except OSError:
+            pass
+        finish_time = task_model.finish_time
+        if isinstance(finish_time, datetime):
+            return finish_time.timestamp()
+        try:
+            return float(finish_time)
+        except (TypeError, ValueError):
+            return None
+
+    def cleanup_orphaned_remote_tasks(self):
+        """Expire remote results that were never acknowledged by their master."""
+        settings = config.Config()
+        cutoff = time.time() - (settings.get_remote_artifact_retention_hours() * 60 * 60)
+        expired_ids = []
+        transfer_completed_root = os.path.realpath(os.path.join(settings.get_cache_path(), "remote_transfers", "completed"))
+        remote_tasks = Tasks.select().where((Tasks.type == "remote") & (Tasks.status == "complete"))
+        for remote_task in remote_tasks:
+            artifact_timestamp = self._task_artifact_timestamp(remote_task)
+            if artifact_timestamp is None or artifact_timestamp >= cutoff:
+                continue
+            expired_ids.append(remote_task.id)
+            artifact_path = os.path.realpath(remote_task.abspath)
+            try:
+                if os.path.commonpath([transfer_completed_root, artifact_path]) == transfer_completed_root:
+                    shutil.rmtree(os.path.dirname(artifact_path), ignore_errors=True)
+            except ValueError:
+                continue
+        if expired_ids:
+            task.Task().delete_tasks_recursively(expired_ids)
+            self.logger.info("Removed %s expired remote task artifact(s)", len(expired_ids))
 
     def cleanup_expired_staging(self):
         """Remove staging directories for tasks that have expired or no longer exist."""

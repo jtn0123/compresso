@@ -8,6 +8,7 @@ covering RemoteTaskManager, Links config management,
 transfer methods, and remote worker management.
 """
 
+import hashlib
 import json
 import queue
 from unittest.mock import MagicMock, mock_open, patch
@@ -300,6 +301,25 @@ class TestPushRemoteInstallationLinkConfig:
 
 @pytest.mark.unittest
 class TestNewPendingTaskCreate:
+    def test_includes_stable_job_and_lease_identity(self):
+        links = _create_links()
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {"id": 42}
+        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp) as post:
+            config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
+            links.new_pending_task_create_on_remote_installation(
+                config,
+                "/path/to/file",
+                1,
+                job_id="job-1",
+                lease_token="lease-1",  # noqa: S106 - synthetic lease fixture
+                origin_installation_uuid="master-1",
+            )
+
+        assert post.call_args.kwargs["json"]["job_id"] == "job-1"
+        assert post.call_args.kwargs["json"]["lease_token"] == "lease-1"  # noqa: S105 - synthetic fixture
+        assert post.call_args.kwargs["json"]["origin_installation_uuid"] == "master-1"
+
     def test_returns_json_on_success(self):
         links = _create_links()
         mock_resp = MagicMock()
@@ -352,6 +372,94 @@ class TestNewPendingTaskCreate:
 
 @pytest.mark.unittest
 class TestSendFileToRemoteInstallation:
+    def test_resumable_upload_continues_from_remote_offset(self, tmp_path):
+        payload = b"abcdefghij"
+        source = tmp_path / "movie.mkv"
+        source.write_bytes(payload)
+        links = _create_links()
+        transfer_id = "a" * 32
+        links.remote_api_post = MagicMock(
+            side_effect=[
+                {"transfer_id": transfer_id, "offset": 4, "complete": False},
+                {"id": 7, "status": "creating", "checksum": "verified"},
+            ]
+        )
+        offsets = []
+
+        def append_chunk(_config, _endpoint, data, headers):
+            offsets.append((int(headers["X-Transfer-Offset"]), data))
+            return {"offset": int(headers["X-Transfer-Offset"]) + len(data)}
+
+        links.remote_api_post_bytes = MagicMock(side_effect=append_chunk)
+
+        result = links._send_file_resumable({}, str(source), "job-1", chunk_size=3)
+
+        assert result["id"] == 7
+        assert offsets == [(4, b"efg"), (7, b"hij")]
+
+    def test_resumable_download_continues_existing_partial_file(self, tmp_path):
+        payload = b"abcdefghij"
+        destination = tmp_path / "movie.mkv"
+        (tmp_path / "movie.mkv.part").write_bytes(payload[:4])
+        links = _create_links()
+        links.remote_api_get = MagicMock(
+            return_value={
+                "total_size": len(payload),
+                "checksum": f"sha256:{hashlib.sha256(payload).hexdigest()}",
+            }
+        )
+        responses = []
+        for chunk in (payload[4:7], payload[7:]):
+            response = MagicMock(status_code=200, content=chunk)
+            response.headers = {"X-Chunk-Checksum": f"sha256:{hashlib.sha256(chunk).hexdigest()}"}
+            responses.append(response)
+        request_handler = MagicMock()
+        request_handler.get.side_effect = responses
+
+        with patch("compresso.libs.installation_link.RequestHandler", return_value=request_handler):
+            success = links.fetch_remote_task_completed_file_resumable({}, 7, str(destination), chunk_size=3)
+
+        assert success is True
+        assert destination.read_bytes() == payload
+        assert not (tmp_path / "movie.mkv.part").exists()
+
+    def test_resumable_download_discards_full_corrupt_partial_for_next_retry(self, tmp_path):
+        payload = b"good"
+        destination = tmp_path / "movie.mkv"
+        partial = tmp_path / "movie.mkv.part"
+        partial.write_bytes(b"bad!")
+        links = _create_links()
+        links.remote_api_get = MagicMock(
+            return_value={
+                "total_size": len(payload),
+                "checksum": f"sha256:{hashlib.sha256(payload).hexdigest()}",
+            }
+        )
+
+        assert links.fetch_remote_task_completed_file_resumable({}, 7, str(destination)) is False
+        assert not partial.exists()
+
+    def test_uses_resumable_protocol_for_stable_remote_job(self):
+        links = _create_links()
+        links._send_file_resumable = MagicMock(return_value={"id": 5, "checksum": "abc"})
+        config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
+
+        links.send_file_to_remote_installation(
+            config,
+            "/path/to/file",
+            job_id="job-1",
+            lease_token="lease-1",  # noqa: S106 - synthetic lease fixture
+            origin_installation_uuid="master-1",
+        )
+
+        links._send_file_resumable.assert_called_once_with(
+            config,
+            "/path/to/file",
+            "job-1",
+            lease_token="lease-1",  # noqa: S106 - synthetic lease fixture
+            origin_installation_uuid="master-1",
+        )
+
     def test_returns_results_on_success(self):
         links = _create_links()
         links.remote_api_post_file = MagicMock(return_value={"id": 5, "checksum": "abc"})
@@ -711,6 +819,37 @@ class TestCheckRemoteInstallationForAvailableWorkers:
         ]
         result = links.check_remote_installation_for_available_workers()
         assert result == {}
+
+    def test_includes_remote_capabilities_and_scheduling_score(self):
+        links = _create_links()
+        links.settings = MagicMock()
+        remote_uuid = "a" * 21
+        links.settings.get_remote_installations.return_value = [
+            {
+                "available": True,
+                "enable_sending_tasks": True,
+                "uuid": remote_uuid,
+                "address": "10.0.0.1",
+            }
+        ]
+        links.remote_api_get = MagicMock(
+            side_effect=[
+                {"workers_status": [{"idle": True, "paused": False}]},
+                {"libraries": [{"name": "Movies"}]},
+                {
+                    "video_encoders": ["hevc_videotoolbox"],
+                    "cpu": {"percent": 10},
+                    "memory": {"percent": 20},
+                    "cache_disk": {"free_bytes": 100 * 1024**3},
+                },
+            ]
+        )
+        links.remote_api_post = MagicMock(return_value={"recordsFiltered": 0})
+
+        result = links.check_remote_installation_for_available_workers()
+
+        assert result[remote_uuid]["capabilities"]["video_encoders"] == ["hevc_videotoolbox"]
+        assert result[remote_uuid]["scheduling_score"] > 0
 
 
 # ==================================================================

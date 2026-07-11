@@ -34,6 +34,7 @@ import os
 import shutil
 import threading
 import time
+import uuid
 from copy import deepcopy
 from operator import attrgetter
 
@@ -218,7 +219,7 @@ class Task:
         # Get task matching the abspath
         self.task = Tasks.get(abspath=abspath)
 
-    def create_task_by_absolute_path(self, abspath, task_type="local", library_id=1, priority_score=0):
+    def create_task_by_absolute_path(self, abspath, task_type="local", library_id=1, priority_score=0, job_id=None):
         """
         Creates the task by its absolute path.
         If the task already exists in the list, then this will throw an exception and return false
@@ -239,7 +240,13 @@ class Task:
             except OSError:
                 self.logger.warning("Could not get file size for '%s'", abspath)
 
-            self.task = Tasks.create(abspath=abspath, status="creating", library_id=library_id, source_size=source_size)
+            self.task = Tasks.create(
+                abspath=abspath,
+                status="creating",
+                library_id=library_id,
+                source_size=source_size,
+                job_id=job_id or str(uuid.uuid4()),
+            )
             self.save()
             self.logger.debug("Created new task with ID: %s for %s (source_size=%d)", self.task, abspath, source_size)
 

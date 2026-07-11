@@ -29,10 +29,12 @@ Copyright:
 
 """
 
+import hashlib
 import json
 import os.path
 import threading
 import time
+import urllib.parse
 
 import requests
 from requests_toolbelt import MultipartEncoder
@@ -41,7 +43,9 @@ from compresso import config
 from compresso.libs import common, session, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.resumable_transfer import file_sha256
 from compresso.libs.singleton import SingletonType
+from compresso.libs.worker_capabilities import WorkerCapabilities
 
 _REMOTE_LIBRARIES_API = "/compresso/api/v2/settings/libraries"
 
@@ -328,6 +332,18 @@ class Links(metaclass=SingletonType):
                 message2=json_data.get("traceback", []),
                 level="error",
             )
+        return {}
+
+    def remote_api_post_bytes(self, remote_config: dict, endpoint: str, data: bytes, headers: dict):
+        request_handler = RequestHandler(
+            auth=remote_config.get("auth"),
+            username=remote_config.get("username"),
+            password=remote_config.get("password"),
+        )
+        address = self.__format_address(remote_config.get("address"))
+        response = request_handler.post(f"{address}{endpoint}", data=data, headers=headers, timeout=60)
+        if response.status_code == 200:
+            return response.json()
         return {}
 
     def remote_api_delete(self, remote_config: dict, endpoint: str, data: dict, timeout=2):
@@ -906,6 +922,13 @@ class Links(metaclass=SingletonType):
                 for library in results.get("libraries", []):
                     library_names.append(library.get("name"))
 
+                try:
+                    capabilities = self.remote_api_get(local_config, "/compresso/api/v2/system/capabilities")
+                    if capabilities.get("error"):
+                        capabilities = {}
+                except Exception:
+                    capabilities = {}
+
                 # Ensure that worker count is more than 0
                 if len(worker_list):
                     installations_with_info[local_config.get("uuid")] = {
@@ -917,6 +940,8 @@ class Links(metaclass=SingletonType):
                         "preloading_count": local_config.get("preloading_count"),
                         "library_names": library_names,
                         "available_slots": 0,
+                        "capabilities": capabilities,
+                        "scheduling_score": WorkerCapabilities.scheduling_score(capabilities) or 0,
                     }
 
                 available_workers = False
@@ -957,7 +982,15 @@ class Links(metaclass=SingletonType):
         """
         return True
 
-    def new_pending_task_create_on_remote_installation(self, remote_config: dict, abspath: str, library_id: int):
+    def new_pending_task_create_on_remote_installation(
+        self,
+        remote_config: dict,
+        abspath: str,
+        library_id: int,
+        job_id=None,
+        lease_token=None,
+        origin_installation_uuid=None,
+    ):
         """
         Create a new pending task on a remote installation.
         The remote installation will return the ID of a generated task.
@@ -980,6 +1013,12 @@ class Links(metaclass=SingletonType):
                 "library_id": library_id,
                 "type": "remote",
             }
+            if job_id:
+                data["job_id"] = job_id
+            if lease_token:
+                data["lease_token"] = lease_token
+            if origin_installation_uuid:
+                data["origin_installation_uuid"] = origin_installation_uuid
             res = request_handler.post(url, json=data, timeout=2)
             if res.status_code in [200, 400]:
                 return res.json()
@@ -1001,7 +1040,15 @@ class Links(metaclass=SingletonType):
             self._log(f"Failed to create remote pending task '{abspath}'", message2=str(e), level="error")
         return {}
 
-    def send_file_to_remote_installation(self, remote_config: dict, path: str):
+    def send_file_to_remote_installation(
+        self,
+        remote_config: dict,
+        path: str,
+        job_id=None,
+        lease_token=None,
+        origin_installation_uuid=None,
+        progress_callback=None,
+    ):
         """
         Send a file to a remote installation.
         The remote installation will return the ID of a generated task.
@@ -1011,7 +1058,32 @@ class Links(metaclass=SingletonType):
         :return:
         """
         try:
-            results = self.remote_api_post_file(remote_config, "/compresso/api/v2/upload/pending/file", path)
+            if job_id:
+                resumable_kwargs = {
+                    "lease_token": lease_token,
+                    "origin_installation_uuid": origin_installation_uuid,
+                }
+                if progress_callback:
+                    resumable_kwargs["progress_callback"] = progress_callback
+                return self._send_file_resumable(
+                    remote_config,
+                    path,
+                    job_id,
+                    **resumable_kwargs,
+                )
+            query = {
+                key: value
+                for key, value in {
+                    "job_id": job_id,
+                    "lease_token": lease_token,
+                    "origin_installation_uuid": origin_installation_uuid,
+                }.items()
+                if value
+            }
+            endpoint = "/compresso/api/v2/upload/pending/file"
+            if query:
+                endpoint = f"{endpoint}?{urllib.parse.urlencode(query)}"
+            results = self.remote_api_post_file(remote_config, endpoint, path)
             if results.get("error"):
                 results = {}
             return results
@@ -1020,6 +1092,116 @@ class Links(metaclass=SingletonType):
         except Exception as e:
             self._log("Failed to upload to remote installation", message2=str(e), level="error")
         return {}
+
+    def _send_file_resumable(
+        self,
+        remote_config,
+        path,
+        job_id,
+        lease_token=None,
+        origin_installation_uuid=None,
+        chunk_size=8 * 1024 * 1024,
+        progress_callback=None,
+    ):
+        total_size = os.path.getsize(path)
+        expected_checksum = file_sha256(path)
+        session = self.remote_api_post(
+            remote_config,
+            "/compresso/api/v2/transfer/session",
+            {
+                "job_id": job_id,
+                "filename": os.path.basename(path),
+                "total_size": total_size,
+                "expected_checksum": expected_checksum,
+                "lease_token": lease_token,
+                "origin_installation_uuid": origin_installation_uuid,
+            },
+            timeout=60,
+        )
+        if not session:
+            return {}
+        transfer_id = session["transfer_id"]
+        offset = int(session.get("offset", 0))
+        with open(path, "rb") as source:
+            source.seek(offset)
+            while offset < total_size:
+                chunk = source.read(chunk_size)
+                if not chunk:
+                    return {}
+                chunk_checksum = f"sha256:{hashlib.sha256(chunk).hexdigest()}"
+                status = self.remote_api_post_bytes(
+                    remote_config,
+                    f"/compresso/api/v2/transfer/chunk/{transfer_id}",
+                    chunk,
+                    {
+                        "Content-Type": "application/octet-stream",
+                        "X-Transfer-Offset": str(offset),
+                        "X-Chunk-Checksum": chunk_checksum,
+                    },
+                )
+                next_offset = int(status.get("offset", offset))
+                if next_offset != offset + len(chunk):
+                    return {}
+                offset = next_offset
+                if progress_callback:
+                    progress_callback()
+        return self.remote_api_post(
+            remote_config,
+            f"/compresso/api/v2/transfer/finalize/{transfer_id}",
+            {},
+            timeout=60,
+        )
+
+    def fetch_remote_task_completed_file_resumable(
+        self,
+        remote_config,
+        remote_task_id,
+        path,
+        chunk_size=8 * 1024 * 1024,
+    ):
+        manifest = self.remote_api_get(
+            remote_config,
+            f"/compresso/api/v2/transfer/source/{remote_task_id}/manifest",
+            timeout=60,
+        )
+        if not manifest:
+            return False
+        total_size = int(manifest["total_size"])
+        partial_path = f"{path}.part"
+        offset = os.path.getsize(partial_path) if os.path.exists(partial_path) else 0
+        if offset > total_size:
+            os.remove(partial_path)
+            offset = 0
+
+        request_handler = RequestHandler(
+            auth=remote_config.get("auth"),
+            username=remote_config.get("username"),
+            password=remote_config.get("password"),
+        )
+        address = self.__format_address(remote_config.get("address"))
+        with open(partial_path, "ab") as output:
+            while offset < total_size:
+                response = request_handler.get(
+                    f"{address}/compresso/api/v2/transfer/source/{remote_task_id}/chunk",
+                    params={"offset": offset, "limit": chunk_size},
+                    timeout=60,
+                )
+                if response.status_code != 200 or not response.content:
+                    return False
+                expected_chunk_checksum = response.headers.get("X-Chunk-Checksum")
+                actual_chunk_checksum = f"sha256:{hashlib.sha256(response.content).hexdigest()}"
+                if expected_chunk_checksum != actual_chunk_checksum:
+                    return False
+                output.write(response.content)
+                output.flush()
+                os.fsync(output.fileno())
+                offset += len(response.content)
+
+        if file_sha256(partial_path) != manifest.get("checksum"):
+            os.remove(partial_path)
+            return False
+        os.replace(partial_path, path)
+        return True
 
     def remove_task_from_remote_installation(self, remote_config: dict, remote_task_id: int):
         """

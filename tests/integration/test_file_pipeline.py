@@ -144,10 +144,11 @@ class TestFileMovePipeline:
         with open(source, "rb") as fh:
             assert fh.read() == b"PRECIOUS-ORIGINAL", "source content must be untouched"
         assert not os.path.exists(dest), "no destination should be created on failure"
-        # The failure path must not leave staging/backup artifacts and must clean the cache.
+        # The failure path must not leave staging/backup artifacts. The task
+        # cache directory stays available for retry/diagnostics.
         assert not os.path.exists(dest + ".compresso.part")
         assert not os.path.exists(source + ".compresso.bak")
-        assert not os.path.exists(self.cache)
+        assert os.path.exists(self.cache)
 
     def test_preexisting_destination_restored_when_final_move_fails(self):
         """Overwrite scenario: if the final move fails after the existing dest was
@@ -180,6 +181,7 @@ class TestFileMovePipeline:
         # The source must not have been removed (movement was not successful).
         assert os.path.exists(source), "source must be preserved when the move fails"
         assert not os.path.exists(dest + ".compresso.bak"), "rollback should consume the backup"
-        # The failed move must not orphan its staging file, and the cache is cleaned.
+        # The failed move must not orphan its staging file, and the completed
+        # encoded output must remain available for retry.
         assert not os.path.exists(dest + ".compresso.part"), "the staging part file must be cleaned up after a failed move"
-        assert not os.path.exists(self.cache), "cache directory should still be cleaned after rollback"
+        assert os.path.exists(cache), "encoded cache output must be retained after rollback"

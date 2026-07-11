@@ -75,6 +75,64 @@ class TestFetchAvailableRemoteInstallation:
         assert installation_id is None
         assert installation_info == {}
 
+    def test_prefers_installation_bound_by_persisted_lease(self):
+        foreman = _make_foreman()
+        foreman.available_remote_managers = {
+            "worker-b|M0": {"installation_uuid": "worker-b", "library_names": ["Movies"]},
+            "worker-a|M0": {"installation_uuid": "worker-a", "library_names": ["Movies"]},
+        }
+        foreman.remote_task_manager_threads = {}
+
+        installation_id, _ = foreman.fetch_available_remote_installation(
+            library_name="Movies",
+            preferred_installation_uuid="worker-a",
+        )
+
+        assert installation_id == "worker-a|M0"
+
+    def test_prefers_compatible_installation_with_highest_capacity_score(self):
+        foreman = _make_foreman()
+        foreman.available_remote_managers = {
+            "busy|M0": {
+                "library_names": ["Movies"],
+                "capabilities": {"video_encoders": ["hevc_videotoolbox"]},
+                "scheduling_score": 12.0,
+            },
+            "ready|M0": {
+                "library_names": ["Movies"],
+                "capabilities": {"video_encoders": ["hevc_videotoolbox"]},
+                "scheduling_score": 88.0,
+            },
+            "incompatible|M0": {
+                "library_names": ["Movies"],
+                "capabilities": {"video_encoders": ["libx265"]},
+                "scheduling_score": 99.0,
+            },
+        }
+        foreman.remote_task_manager_threads = {}
+
+        installation_id, _ = foreman.fetch_available_remote_installation(
+            library_name="Movies",
+            required_encoder="hevc_videotoolbox",
+        )
+
+        assert installation_id == "ready|M0"
+
+    def test_required_encoder_is_derived_from_library_plugin_settings(self):
+        foreman = _make_foreman()
+        foreman.current_config["settings"] = {
+            7: {
+                "enabled_plugins": [
+                    {
+                        "plugin_id": "encoding_presets",
+                        "settings": {"video_codec": "hevc", "video_encoder": "hevc_videotoolbox"},
+                    }
+                ]
+            }
+        }
+
+        assert foreman.get_required_video_encoder(7) == "hevc_videotoolbox"
+
 
 # ------------------------------------------------------------------
 # TestInitRemoteTaskManagerThread

@@ -96,6 +96,51 @@ class TestTasksModel:
         assert ordered[0].abspath == "/media/high.mkv"
         assert ordered[2].abspath == "/media/low.mkv"
 
+    def test_status_priority_composite_index(self, model_db):
+        assert (("status", "priority"), False) in Tasks._meta.indexes
+
+    def test_operational_summary_counts_statuses_and_remote_leases(self, model_db):
+        from compresso.libs.operations_status import OperationsStatus
+
+        now = datetime.datetime.now()
+        Tasks.create(abspath="/media/pending.mkv", type="local", library_id=1, status="pending")
+        Tasks.create(
+            abspath="/media/active.mkv",
+            type="local",
+            library_id=1,
+            status="in_progress",
+            lease_token="active",  # noqa: S106 - synthetic lease identifier
+            lease_expires_at=now + datetime.timedelta(hours=1),
+        )
+        Tasks.create(
+            abspath="/media/expired.mkv",
+            type="local",
+            library_id=1,
+            status="pending",
+            lease_token="expired",  # noqa: S106 - synthetic lease identifier
+            lease_expires_at=now - datetime.timedelta(hours=1),
+        )
+
+        summary = OperationsStatus.task_summary()
+
+        assert summary["pending"] == 2
+        assert summary["in_progress"] == 1
+        assert summary["active_remote_leases"] == 1
+        assert summary["expired_remote_leases"] == 1
+
+    def test_remote_identity_binding_is_idempotent_but_rejects_conflict(self, model_db):
+        from compresso.webserver.helpers.pending_tasks import bind_remote_task_identity
+
+        task = Tasks.create(abspath="/media/remote.mkv", type="remote", library_id=1, status="pending")
+        assert bind_remote_task_identity(task.id, "lease-a", "master-a") is True
+        assert bind_remote_task_identity(task.id, "lease-a", "master-a") is True
+        assert bind_remote_task_identity(task.id, "lease-b", "master-a") is False
+        assert bind_remote_task_identity(task.id, "lease-a", "master-b") is False
+
+        task = Tasks.get_by_id(task.id)
+        assert task.lease_token == "lease-a"  # noqa: S105 - synthetic lease fixture
+        assert task.remote_installation_uuid == "master-a"
+
     def test_retry_fields(self, model_db):
         task = Tasks.create(abspath="/media/retry.mkv", type="local", library_id=1, status="pending")
         task.retry_count = 2

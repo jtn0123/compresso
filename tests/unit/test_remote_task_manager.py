@@ -8,6 +8,7 @@ Covers __init__, get_info, _log, run, and all private runtime methods
 via name-mangling access (_RemoteTaskManager__method_name).
 """
 
+import hashlib
 import queue
 import threading
 import time
@@ -370,7 +371,29 @@ class TestProcessTaskQueueItem:
         mgr._RemoteTaskManager__set_finish_task_stats = MagicMock()
         mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor = MagicMock(return_value=success)
         mgr._RemoteTaskManager__unset_current_task = MagicMock()
+        mgr._acquire_remote_lease = MagicMock(return_value=True)
         return mgr, task, cq
+
+    def test_lease_conflict_requeues_without_marking_task_failed(self):
+        mgr, task, cq = self._setup()
+        mgr._acquire_remote_lease.return_value = False
+
+        mgr._RemoteTaskManager__process_task_queue_item()
+
+        task.set_status.assert_called_once_with("pending")
+        task.set_success.assert_not_called()
+        assert cq.empty()
+
+    @patch("compresso.libs.remote_task_manager.RemoteTaskLease")
+    def test_acquires_persisted_lease_for_selected_installation(self, lease_class):
+        mgr = _make_manager()
+        task = _make_task()
+        mgr.current_task = task
+        lease_class.acquire.return_value = "lease-token"
+
+        assert mgr._acquire_remote_lease() is True
+        assert mgr.lease_token == "lease-token"  # noqa: S105 - synthetic lease fixture
+        lease_class.acquire.assert_called_once_with(task.task, "test-uuid-1234")
 
     def test_resets_progress_fields(self):
         mgr, task, _ = self._setup()
@@ -671,7 +694,8 @@ class TestSendTaskFileUpload:
         ):
             mock_common.format_message.side_effect = lambda m, m2="": f"{m} {m2}".strip()
             mock_common.get_file_checksum.return_value = "CORRECT_CHECKSUM"
-            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+            with patch("compresso.libs.remote_task_manager.file_sha256", return_value="CORRECT_CHECKSUM"):
+                result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
         mgr.links.remove_task_from_remote_installation.assert_called_once()
@@ -1001,7 +1025,7 @@ class TestDownloadPhaseLocalPath:
             "task_success": True,
             "task_label": "remote_result-zzzzz-9999999999.mkv",
             "abspath": result_abspath,
-            "checksum": "abc123",
+            "checksum": f"sha256:{hashlib.sha256(b'\x01' * 16).hexdigest()}",
             "task_state": None,
         }
 
@@ -1111,6 +1135,7 @@ class TestDownloadPhaseNetworkDownload:
         with (
             patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
             patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote_task_manager.file_sha256", return_value="correcthash"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1148,7 +1173,8 @@ class TestDownloadPhaseNetworkDownload:
         ):
             mock_common.format_message.side_effect = lambda m, m2="": f"{m} {m2}".strip()
             mock_common.get_file_checksum.return_value = "WRONG_HASH"
-            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+            with patch("compresso.libs.remote_task_manager.file_sha256", return_value="WRONG_HASH"):
+                result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
         mgr.links.remove_task_from_remote_installation.assert_called()

@@ -286,25 +286,65 @@ class Foreman(threading.Thread):
             ].idle:
                 self.mark_worker_thread_as_redundant(thread)
 
-    def fetch_available_remote_installation(self, library_name=None):
-        # Fetch the first matching remote worker from the list
-        assigned_installation_id = None
-        assigned_installation_info = {}
+    def fetch_available_remote_installation(
+        self,
+        library_name=None,
+        preferred_installation_uuid=None,
+        required_encoder=None,
+    ):
+        candidates = []
         installation_ids = [t for t in self.available_remote_managers]
         for installation_id in installation_ids:
             if installation_id not in self.remote_task_manager_threads:
+                manager_info = self.available_remote_managers[installation_id]
                 # Check that a remote worker is on an installation with a matching library name
-                installation_library_names = self.available_remote_managers[installation_id].get("library_names", [])
+                installation_library_names = manager_info.get("library_names", [])
                 if library_name is not None and library_name not in installation_library_names:
                     continue
-                assigned_installation_info = self.available_remote_managers[installation_id]
-                assigned_installation_id = installation_id
-                break
-        return assigned_installation_id, assigned_installation_info
+                configured_uuid = manager_info.get("uuid") or manager_info.get("installation_uuid")
+                if preferred_installation_uuid and configured_uuid != preferred_installation_uuid:
+                    continue
+                encoders = manager_info.get("capabilities", {}).get("video_encoders", [])
+                if required_encoder and required_encoder not in encoders:
+                    continue
+                candidates.append((float(manager_info.get("scheduling_score", 0)), installation_id, manager_info))
+        if not candidates:
+            return None, {}
+        _, installation_id, installation_info = max(candidates, key=lambda candidate: candidate[0])
+        return installation_id, installation_info
 
-    def init_remote_task_manager_thread(self, library_name=None):
+    def get_required_video_encoder(self, library_id):
+        """Return the explicitly configured encoder for a library, if any."""
+        library_settings = self.current_config.get("settings", {}).get(library_id)
+        if library_settings is None:
+            library_settings = self.current_config.get("settings", {}).get(str(library_id), {})
+        for plugin in library_settings.get("enabled_plugins", []):
+            if plugin.get("plugin_id") != "encoding_presets":
+                continue
+            plugin_settings = plugin.get("settings") or {}
+            encoder = plugin_settings.get("video_encoder")
+            if encoder:
+                return encoder
+            return {
+                "h264": "libx264",
+                "hevc": "libx265",
+                "av1": "libsvtav1",
+                "vp9": "libvpx-vp9",
+            }.get(plugin_settings.get("video_codec"))
+        return None
+
+    def init_remote_task_manager_thread(
+        self,
+        library_name=None,
+        preferred_installation_uuid=None,
+        required_encoder=None,
+    ):
         # Fetch the installation ID and info
-        installation_id, installation_info = self.fetch_available_remote_installation(library_name=library_name)
+        installation_id, installation_info = self.fetch_available_remote_installation(
+            library_name=library_name,
+            preferred_installation_uuid=preferred_installation_uuid,
+            required_encoder=required_encoder,
+        )
 
         # Ensure a worker was assigned
         if not installation_info:
@@ -399,6 +439,8 @@ class Foreman(threading.Thread):
             remote_password = available_installations[installation_uuid].get("password", "")
             remote_library_names = available_installations[installation_uuid].get("library_names", [])
             available_slots = available_installations[installation_uuid].get("available_slots", 0)
+            capabilities = available_installations[installation_uuid].get("capabilities", {})
+            scheduling_score = available_installations[installation_uuid].get("scheduling_score", 0)
             for slot_number in range(available_slots):
                 remote_manager_id = f"{installation_uuid}|M{slot_number}"
                 if (
@@ -415,6 +457,8 @@ class Foreman(threading.Thread):
                     "username": remote_username,
                     "password": remote_password,
                     "library_names": remote_library_names,
+                    "capabilities": capabilities,
+                    "scheduling_score": scheduling_score,
                     "created": datetime.now(),
                 }
 
@@ -610,7 +654,14 @@ class Foreman(threading.Thread):
             # Place into queue for a remote link manager thread to collect
             self.remote_workers_pending_task_queue.put(item)
             # Spawn link manager thread to pickup task
-            if not self.init_remote_task_manager_thread(library_name=library_name):
+            preferred_installation_uuid = getattr(getattr(item, "task", None), "remote_installation_uuid", None)
+            manager_kwargs = {"library_name": library_name}
+            required_encoder = self.get_required_video_encoder(item.get_task_library_id())
+            if required_encoder:
+                manager_kwargs["required_encoder"] = required_encoder
+            if isinstance(preferred_installation_uuid, str) and preferred_installation_uuid:
+                manager_kwargs["preferred_installation_uuid"] = preferred_installation_uuid
+            if not self.init_remote_task_manager_thread(**manager_kwargs):
                 # Remove item from queue
                 self.remote_workers_pending_task_queue.get_nowait()
                 # Return failure. This will cause the item to be re-queued at the bottom of the list

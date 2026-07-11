@@ -88,29 +88,24 @@ class TestFileInCompressoIgnoreLockfile:
 class TestFileFailedInHistory:
     @patch("compresso.libs.filetest.history.History")
     def test_returns_true_for_failed_path(self, mock_history_cls):
-        mock_history_cls.return_value.get_historic_tasks_list_with_source_probe.return_value = [
-            {"abspath": "/media/video.mp4"}
-        ]
+        mock_history_cls.return_value.failed_path_exists.return_value = True
         ft = _make_filetest()
         assert ft.file_failed_in_history("/media/video.mp4") is True
+        mock_history_cls.return_value.failed_path_exists.assert_called_once_with("/media/video.mp4")
 
     @patch("compresso.libs.filetest.history.History")
     def test_returns_false_for_unknown_path(self, mock_history_cls):
-        mock_history_cls.return_value.get_historic_tasks_list_with_source_probe.return_value = [
-            {"abspath": "/media/other.mp4"}
-        ]
+        mock_history_cls.return_value.failed_path_exists.return_value = False
         ft = _make_filetest()
         assert ft.file_failed_in_history("/media/video.mp4") is False
 
     @patch("compresso.libs.filetest.history.History")
-    def test_caches_failed_paths(self, mock_history_cls):
+    def test_does_not_load_full_failed_history(self, mock_history_cls):
         mock_hist = mock_history_cls.return_value
-        mock_hist.get_historic_tasks_list_with_source_probe.return_value = [{"abspath": "/media/video.mp4"}]
+        mock_hist.failed_path_exists.return_value = True
         ft = _make_filetest()
         ft.file_failed_in_history("/media/video.mp4")
-        ft.file_failed_in_history("/media/video.mp4")
-        # History should only be queried once (cached after first call)
-        mock_hist.get_historic_tasks_list_with_source_probe.assert_called_once()
+        mock_hist.get_historic_tasks_list_with_source_probe.assert_not_called()
 
 
 # ------------------------------------------------------------------

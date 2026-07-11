@@ -30,6 +30,7 @@ Copyright:
 """
 
 import os
+import shutil
 import time
 
 import tornado.log
@@ -218,9 +219,24 @@ class ApiUploadHandler(BaseApiHandler):
 
             # Create task entry for the file
             pathname = os.path.join(self.cache_directory, self.meta["filename"])
-            task_info = pending_tasks.add_remote_tasks(pathname)
+            job_id = self.get_query_argument("job_id", None)
+            lease_token = self.get_query_argument("lease_token", None)
+            origin_installation_uuid = self.get_query_argument("origin_installation_uuid", None)
+            task_info = pending_tasks.add_remote_tasks(pathname, job_id=job_id)
             if not task_info:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to create task for uploaded file")
+                self.write_error()
+                return
+
+            identity_bound = pending_tasks.bind_remote_task_identity(
+                task_info.get("id"),
+                lease_token=lease_token,
+                origin_installation_uuid=origin_installation_uuid,
+            )
+            if os.path.realpath(task_info.get("abspath")) != os.path.realpath(pathname):
+                shutil.rmtree(self.cache_directory, ignore_errors=True)
+            if not identity_bound:
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Remote task identity conflicts with the existing job")
                 self.write_error()
                 return
 
@@ -230,17 +246,17 @@ class ApiUploadHandler(BaseApiHandler):
             checksum = common.get_file_checksum(task_info.get("abspath")) if include_checksum else None
 
             # Return the details of the generated task
-            response = self.build_response(
-                PendingTasksTableResultsSchema(),
-                {
-                    "id": task_info.get("id"),
-                    "abspath": task_info.get("abspath"),
-                    "priority": task_info.get("priority"),
-                    "type": task_info.get("type"),
-                    "status": task_info.get("status"),
-                    "checksum": checksum,
-                },
-            )
+            response_data = {
+                "id": task_info.get("id"),
+                "abspath": task_info.get("abspath"),
+                "priority": task_info.get("priority"),
+                "type": task_info.get("type"),
+                "status": task_info.get("status"),
+                "checksum": checksum,
+            }
+            if task_info.get("job_id"):
+                response_data["job_id"] = task_info["job_id"]
+            response = self.build_response(PendingTasksTableResultsSchema(), response_data)
             self.write_success(response)
             return
         except BaseApiError as bae:

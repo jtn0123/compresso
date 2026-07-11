@@ -199,6 +199,15 @@ class History:
 
         return query.dicts()
 
+    @staticmethod
+    def failed_path_exists(abspath):
+        """Use the composite history index instead of loading every failure."""
+        return (
+            CompletedTasks.select(CompletedTasks.id)
+            .where((CompletedTasks.abspath == abspath) & (CompletedTasks.task_success == False))  # noqa: E712
+            .exists()
+        )
+
     def get_historic_task_data_dictionary(self, task_id):
         """
         Read all data for a task and return a dictionary of that data

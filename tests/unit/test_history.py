@@ -344,6 +344,17 @@ class TestHistory:
         assert len(result) == 1
         assert result[0]["task_label"] == "movie_good.mkv"
 
+    @pytest.mark.unittest
+    def test_failed_path_exists_uses_path_and_failure_status(self):
+        self._create_task(label="failed.mkv", abspath="/media/failed.mkv", success=False)
+        self._create_task(label="success.mkv", abspath="/media/success.mkv", success=True)
+        self.db_connection.execute_sql("SELECT 1")
+
+        history = self._make_history()
+        assert history.failed_path_exists("/media/failed.mkv") is True
+        assert history.failed_path_exists("/media/success.mkv") is False
+        assert history.failed_path_exists("/media/missing.mkv") is False
+
     # ---------------------------------------------------------------
     # get_historic_task_data_dictionary
     # ---------------------------------------------------------------
