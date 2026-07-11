@@ -7,6 +7,7 @@ Unit tests for compresso/libs/scheduler.ScheduledTasksManager.
 Tests each scheduled method, schedule configuration, and the run loop.
 """
 
+import os
 import threading
 from unittest.mock import MagicMock, patch
 
@@ -327,7 +328,7 @@ class TestTransferCleanup:
 
         mgr.cleanup_stale_transfers()
 
-        store_class.assert_called_once_with("/cache/remote_transfers")
+        store_class.assert_called_once_with(os.path.join("/cache", "remote_transfers"))
         store_class.return_value.cleanup_stale.assert_called_once_with(max_age_seconds=48 * 60 * 60)
 
     @patch("compresso.libs.scheduler.task.Task")

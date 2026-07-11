@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import os
 
 import pytest
 
@@ -42,7 +43,7 @@ def test_checkpoint_write_is_valid_json(tmp_path):
     store.save(4, "/media/tv", "Shows/A")
 
     data = json.loads((tmp_path / "scan-checkpoints" / "library-4.json").read_text())
-    assert data["library_path"] == "/media/tv"
+    assert data["library_path"] == os.path.abspath("/media/tv")
     assert data["completed_root"] == "Shows/A"
 
 
