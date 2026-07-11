@@ -6,6 +6,7 @@ tests.unit.test_pending_tasks.py
 Unit tests for compresso.webserver.helpers.pending_tasks.
 """
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -237,7 +238,7 @@ class TestAddRemoteTasks:
 
         assert result["job_id"] == "stable-job"
         mock_task_instance.create_task_by_absolute_path.assert_called_once_with(
-            "/upload/file.mkv",
+            os.path.abspath("/upload/file.mkv"),
             task_type="remote",
             job_id="stable-job",
         )

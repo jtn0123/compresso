@@ -111,7 +111,7 @@ def test_create_rejects_non_positive_sample_size(tmp_path):
 
 
 @pytest.mark.unittest
-@pytest.mark.parametrize("relative_path", [None, "", "/absolute/movie.mkv", 42])
+@pytest.mark.parametrize("relative_path", [None, "", "/absolute/movie.mkv", r"C:\absolute\movie.mkv", 42])
 def test_verify_reports_malformed_manifest_paths_instead_of_crashing(tmp_path, relative_path):
     root = tmp_path / "media"
     root.mkdir()

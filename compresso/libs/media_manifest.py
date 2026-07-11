@@ -4,7 +4,9 @@
 
 import hashlib
 import json
+import ntpath
 import os
+import posixpath
 import random
 import subprocess
 import tempfile
@@ -29,6 +31,12 @@ MEDIA_EXTENSIONS = {
 }
 STREAM_TYPES = ("video", "audio", "subtitle", "data", "attachment")
 HDR_FIELDS = ("color_primaries", "color_transfer", "color_space")
+
+
+def _is_absolute_manifest_path(path):
+    """Reject absolute paths using either supported host path syntax."""
+    windows_drive, _ = ntpath.splitdrive(path)
+    return bool(windows_drive) or ntpath.isabs(path) or posixpath.isabs(path)
 
 
 def _sha256(path):
@@ -176,7 +184,7 @@ def verify_manifest(manifest_path, current_root=None, report_path=None):
         issues = []
         current_size = 0
         current_checksum = None
-        if not isinstance(relative_path, str) or not relative_path or os.path.isabs(relative_path):
+        if not isinstance(relative_path, str) or not relative_path or _is_absolute_manifest_path(relative_path):
             path = None
             issues.append("manifest relative_path is invalid")
         else:
