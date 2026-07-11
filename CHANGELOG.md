@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/jtn0123/compresso/compare/v1.13.0...v1.13.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* gate releases on exact candidate artifacts ([3f12a40](https://github.com/jtn0123/compresso/commit/3f12a406e79723111d8d61bcefe4b5e8a44adc12))
+
 # [1.13.0](https://github.com/jtn0123/compresso/compare/v1.12.1...v1.13.0) (2026-07-11)
 
 
