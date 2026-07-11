@@ -71,3 +71,35 @@ def test_release_publication_requires_version_and_commit_integrity_checks():
     assert "--expected-sha" in workflow
     assert "gh release create" in workflow
     assert "packages-dir: pypi-dist/" in workflow
+
+
+def test_release_configures_bot_identity_before_creating_annotated_tag():
+    workflow = _read(".github/workflows/release.yml")
+    publish_step = workflow.split("- name: Promote candidate commit and create draft release", 1)[1].split(
+        "- name: Publish distribution package to PyPI", 1
+    )[0]
+
+    assert 'git config user.name "github-actions[bot]"' in publish_step
+    assert 'git config user.email "41898282+github-actions[bot]@users.noreply.github.com"' in publish_step
+    assert publish_step.index("git config user.name") < publish_step.index('git tag -a "${RELEASE_TAG}"')
+
+
+def test_release_recovery_revalidates_exact_artifacts_before_publication():
+    recovery_path = WORKFLOWS / "recover_release.yml"
+
+    assert recovery_path.is_file()
+    workflow = recovery_path.read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in workflow
+    assert "source_run_id:" in workflow
+    assert "release_sha:" in workflow
+    assert "release_version:" in workflow
+    assert "release_tag:" in workflow
+    assert "packages: write" in workflow
+    assert "verify-release-integrity.py" in workflow
+    assert 'git merge-base --is-ancestor "${RELEASE_SHA}" origin/master' in workflow
+    assert 'test "${tag_sha}" = "${RELEASE_SHA}"' in workflow
+    assert "gh release download" in workflow
+    assert "cmp --silent" in workflow
+    assert 'docker buildx imagetools create -t "${image}:${RELEASE_VERSION}"' in workflow
+    assert 'docker buildx imagetools create -t "${image}:latest"' in workflow
+    assert 'gh release edit "${RELEASE_TAG}" --draft=false' in workflow
