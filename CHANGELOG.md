@@ -1,3 +1,16 @@
+# [1.13.0](https://github.com/jtn0123/compresso/compare/v1.12.1...v1.13.0) (2026-07-11)
+
+
+### Bug Fixes
+
+* constrain transfer paths and unblock quality gate ([3f67c50](https://github.com/jtn0123/compresso/commit/3f67c50cf853905d2493141258a0cea27430e979))
+* make path validation portable across CI hosts ([bb586c2](https://github.com/jtn0123/compresso/commit/bb586c256a96a06a88893e9268cc31484f5d8edc))
+
+
+### Features
+
+* harden distributed media processing for large libraries ([3406190](https://github.com/jtn0123/compresso/commit/3406190a7a7e9d915c903f3ada4137f1b33f2250))
+
 ## [1.12.1](https://github.com/jtn0123/compresso/compare/v1.12.0...v1.12.1) (2026-07-10)
 
 
