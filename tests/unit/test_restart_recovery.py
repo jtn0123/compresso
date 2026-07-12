@@ -179,6 +179,16 @@ def test_incomplete_finalization_task_is_preserved_for_replay(recovery_db, tmp_p
 
 
 @pytest.mark.unittest
+def test_incomplete_finalization_cache_is_protected_for_replay(recovery_db, tmp_path):
+    task = _task(tmp_path, "processed", cache_exists=True)
+
+    protected = TaskHandler.recover_tasks_on_startup(_settings(tmp_path), finalization_task_ids=[task.id])
+
+    assert Tasks.get_by_id(task.id).status == "processed"
+    assert os.path.realpath(task.cache_path) in protected
+
+
+@pytest.mark.unittest
 def test_interrupted_remote_lease_requeues_with_stable_binding(recovery_db, tmp_path):
     task = _task(tmp_path, "in_progress", cache_exists=False)
     task.job_id = "stable-job"

@@ -143,13 +143,15 @@ class TaskHandler(threading.Thread):
         task_obj.save()
 
     @staticmethod
-    def _reconcile_finalization_override(task_obj, committed_task_ids, finalization_task_ids, logger):
+    def _reconcile_finalization_override(task_obj, committed_task_ids, finalization_task_ids, protected_paths, logger):
         if task_obj.id in committed_task_ids:
             logger.warning("STARTUP_COMMITTED_TASK_FINALIZED id=%s", task_obj.id)
             task.TaskDataStore.clear_task(task_obj.id)
             Tasks.delete().where(Tasks.id == task_obj.id).execute()
             return True
         if task_obj.id in finalization_task_ids:
+            if TaskHandler._file_is_usable(task_obj.cache_path):
+                protected_paths.add(os.path.realpath(task_obj.cache_path))
             logger.warning("STARTUP_TASK_FINALIZATION_RESUMED id=%s status=%s", task_obj.id, task_obj.status)
             return True
         return False
@@ -178,7 +180,9 @@ class TaskHandler(threading.Thread):
 
                 for task_obj in task_batch:
                     last_task_id = task_obj.id
-                    if cls._reconcile_finalization_override(task_obj, committed_task_ids, finalization_task_ids, logger):
+                    if cls._reconcile_finalization_override(
+                        task_obj, committed_task_ids, finalization_task_ids, protected_paths, logger
+                    ):
                         continue
                     status = task_obj.status
                     source_path = task_obj.abspath

@@ -132,6 +132,8 @@ class FileOperationTracker:
 
     def mark_finalization_phase(self, phase):
         """Persist progress after the destructive file transaction commits."""
+        if self._state != "committed":
+            return
         self._finalization_phase = str(phase)
         self._persist()
 

@@ -413,8 +413,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         if not self._postprocess_local_file_safely():
             return
         try:
-            if self.write_history_log() is False:
-                raise RuntimeError("history persistence returned false")
+            history_written = self.write_history_log()
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in writing history log", message2=str(e), level="exception")
             self._defer_postprocess_failure(str(e))
@@ -422,6 +421,11 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         except Exception as e:
             self._log(f"TaskMetadataError in history log: {e}", level="exception")
             self._defer_postprocess_failure(str(e))
+            return
+        if history_written is False:
+            message = "history persistence returned false"
+            self._log("Failed to write history log", message2=message, level="error")
+            self._defer_postprocess_failure(message)
             return
         self._mark_finalization_phase("history_committed")
         try:

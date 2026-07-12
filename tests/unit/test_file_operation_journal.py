@@ -87,6 +87,16 @@ def test_task_deleted_phase_allows_journal_cleanup(tmp_path):
 
 
 @pytest.mark.unittest
+def test_finalization_phase_before_commit_is_a_noop(tmp_path):
+    tracker = _tracker(tmp_path)
+
+    tracker.mark_finalization_phase("history_committed")
+
+    assert tracker.finalization_phase is None
+    assert not list((tmp_path / "journals").glob("*.json"))
+
+
+@pytest.mark.unittest
 def test_resume_committed_restores_finalization_phase(tmp_path):
     tracker = _tracker(tmp_path)
     tracker.commit()
