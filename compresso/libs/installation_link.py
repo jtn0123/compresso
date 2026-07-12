@@ -403,6 +403,20 @@ class Links(metaclass=SingletonType):
                         f.write(chunk)
         return True
 
+    def _remote_validation_data(self, response, resource: str) -> tuple[bool, dict]:
+        """Return JSON from a successful remote validation request and log known failures."""
+        if response.status_code == 200:
+            return True, response.json()
+
+        if response.status_code in {400, 404, 405, 500}:
+            json_data = response.json()
+            self._log(
+                f"Error while fetching remote installation {resource}. Message: '{json_data.get('error')}'",
+                message2=json_data.get("traceback", []),
+                level="error",
+            )
+        return False, {}
+
     def validate_remote_installation(self, address: str, **kwargs):
         """
         Validate a remote Compresso installation by requesting
@@ -424,73 +438,38 @@ class Links(metaclass=SingletonType):
         # Fetch config
         url = f"{address}/compresso/api/v2/settings/configuration"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation config. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, system_configuration_data = self._remote_validation_data(res, "config")
+        if not valid:
             return {}
-        system_configuration_data = res.json()
 
         # Fetch settings
         url = f"{address}/compresso/api/v2/settings/read"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation settings. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, settings_data = self._remote_validation_data(res, "settings")
+        if not valid:
             return {}
-        settings_data = res.json()
 
         # Fetch version
         url = f"{address}/compresso/api/v2/version/read"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation version. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, version_data = self._remote_validation_data(res, "version")
+        if not valid:
             return {}
-        version_data = res.json()
 
-        # Fetch version
+        # Fetch session state
         url = f"{address}/compresso/api/v2/session/state"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation session state. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, session_data = self._remote_validation_data(res, "session state")
+        if not valid:
             return {}
-        session_data = res.json()
 
         # Fetch task count data
         data = {"start": 0, "length": 1}
         url = f"{address}/compresso/api/v2/pending/tasks"
         res = request_handler.post(url, json=data, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation pending task list. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, tasks_data = self._remote_validation_data(res, "pending task list")
+        if not valid:
             return {}
-        tasks_data = res.json()
 
         # Capacity is advisory: an older peer can omit it and still remain linked.
         capabilities = {}
