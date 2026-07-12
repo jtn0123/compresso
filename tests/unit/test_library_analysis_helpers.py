@@ -757,6 +757,62 @@ class TestIncrementalAnalysisMetadata:
         assert result["bitrate_mbps"] == 8
         mock_extract.assert_called_once_with("/media/movie.mkv")
 
+    @patch(ANALYSIS_MODULE + ".os.stat", side_effect=OSError("stat unavailable"))
+    @patch(ANALYSIS_MODULE + ".os.path.getsize", return_value=120_000_000)
+    @patch(
+        ANALYSIS_MODULE + ".extract_media_metadata",
+        return_value={"codec": "h264", "resolution": "1080p", "duration": 120, "bitrate_mbps": 8},
+    )
+    def test_probe_analysis_tolerates_stat_failure(self, _mock_extract, _mock_size, _mock_stat):
+        from compresso.webserver.helpers.library_analysis import _probe_analysis_file
+
+        result = _probe_analysis_file("/media/unstatable.mkv")
+
+        assert result["file_size"] == 120_000_000
+        assert "stat_size" not in result
+
+    @patch(ANALYSIS_MODULE + "._probe_analysis_file")
+    @patch(ANALYSIS_MODULE + "._persist_analysis_file")
+    @patch(ANALYSIS_MODULE + "._cached_analysis_file", return_value=(None, ("fp-new", "algo")))
+    def test_changed_file_marks_current_analysis_generation(self, _mock_cached, mock_persist, mock_probe):
+        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+
+        entry = {"codec": "hevc", "resolution": "4k", "file_size": 200, "bitrate_mbps": 2.5}
+        mock_probe.return_value = entry
+
+        result = _analyse_file_incremental("/media/changed.mkv", generation="scan-123")
+
+        assert result == entry
+        mock_persist.assert_called_once_with("/media/changed.mkv", ("fp-new", "algo"), entry, generation="scan-123")
+
+    @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_missing_cache_path_falls_back_to_fingerprint(self, mock_paths, mock_fingerprint):
+        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+
+        mock_paths.get_or_none.return_value = None
+
+        cached, fingerprint_info = _cached_analysis_file("/media/new.mkv")
+
+        assert cached is None
+        assert fingerprint_info == ("fp", "algo")
+        mock_fingerprint.assert_called_once_with("/media/new.mkv")
+
+    @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_incomplete_cached_entry_falls_back_to_fingerprint(self, mock_paths, mock_fingerprint):
+        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+
+        row = MagicMock()
+        row.file_metadata.metadata_json = json.dumps({"_compresso_library_analysis": {"codec": "h264", "resolution": "1080p"}})
+        mock_paths.get_or_none.return_value = row
+
+        cached, fingerprint_info = _cached_analysis_file("/media/incomplete.mkv")
+
+        assert cached is None
+        assert fingerprint_info == ("fp", "algo")
+        mock_fingerprint.assert_called_once_with("/media/incomplete.mkv")
+
     @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_corrupt_metadata_json_falls_back_to_reprobe(self, mock_paths, _mock_fingerprint):
@@ -861,6 +917,13 @@ class TestIncrementalAnalysisMetadata:
 
         stale.delete_instance.assert_called_once()
         outside.delete_instance.assert_not_called()
+
+    @patch(ANALYSIS_MODULE + ".os.path.realpath", side_effect=["/media/a.mkv", "/media", "/media"])
+    @patch(ANALYSIS_MODULE + ".os.path.commonpath", side_effect=ValueError("different drives"))
+    def test_path_scope_check_rejects_incomparable_paths(self, _mock_commonpath, _mock_realpath):
+        from compresso.webserver.helpers.library_analysis import _path_is_within
+
+        assert _path_is_within("/media/a.mkv", "/media") is False
 
 
 # ---------------------------------------------------------------------------
