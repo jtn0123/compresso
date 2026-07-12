@@ -296,6 +296,25 @@ class TestTaskDatabaseOps:
         t = Task()
         assert t.get_total_task_list_count() == 2
 
+    def test_get_runnable_task_count_excludes_non_pending_and_future_deferred(self, in_memory_db):
+        import datetime
+
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        Tasks.delete().execute()
+        Tasks.create(abspath="/media/ready.mkv", status="pending", library_id=1, deferred_until=None)
+        Tasks.create(
+            abspath="/media/deferred.mkv",
+            status="pending",
+            library_id=1,
+            deferred_until=datetime.datetime.now() + datetime.timedelta(hours=1),
+        )
+        Tasks.create(abspath="/media/approval.mkv", status="awaiting_approval", library_id=1)
+        Tasks.create(abspath="/media/complete.mkv", status="complete", library_id=1)
+
+        assert Task().get_runnable_task_count() == 1
+
     def test_get_task_list_filtered_and_sorted_with_search(self, in_memory_db):
         from compresso.libs.task import Task
         from compresso.libs.unmodels.tasks import Tasks

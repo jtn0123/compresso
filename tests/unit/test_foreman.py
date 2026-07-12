@@ -118,6 +118,26 @@ class TestFetchAvailableRemoteInstallation:
 
         assert installation_id == "ready|M0"
 
+    def test_capacity_score_is_penalized_by_existing_remote_queue_depth(self):
+        foreman = _make_foreman()
+        capabilities = {
+            "video_encoders": ["hevc_videotoolbox"],
+            "cpu": {"percent": 10},
+            "memory": {"percent": 20},
+            "cache_disk": {"free_bytes": 100 * 1024**3},
+        }
+        foreman.available_remote_managers = {
+            "queued|M0": {"library_names": ["Movies"], "capabilities": capabilities, "queue_depth": 5},
+            "ready|M0": {"library_names": ["Movies"], "capabilities": capabilities, "queue_depth": 0},
+        }
+        foreman.remote_task_manager_threads = {}
+
+        installation_id, _ = foreman.fetch_available_remote_installation(
+            library_name="Movies", required_encoder="hevc_videotoolbox"
+        )
+
+        assert installation_id == "ready|M0"
+
     def test_required_encoder_is_derived_from_library_plugin_settings(self):
         foreman = _make_foreman()
         foreman.current_config["settings"] = {

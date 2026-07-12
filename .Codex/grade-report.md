@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **31 of 37** addressable grade items are marked complete below.
+- **32 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -52,6 +52,7 @@
 - Structured API errors: **675 broad API/settings/plugin tests passed with 2 skips**, plus 70 focused boundary/transfer/notification/pending/preview tests. Malformed bodies are no longer echoed or double-written; unexpected details stay in correlated logs and client 500s use a stable public message.
 - Responsive/browser coverage: **433 frontend unit tests**, ESLint, production build, 4 desktop Chromium journeys, a Pixel 7 accessibility journey, and a focused WebKit smoke passed. The onboarding flow has a zero critical/serious axe result and keyboard-driven setup/plugin assertions; Firefox is enabled in CI because the local macOS launcher fails before browser context creation in this environment.
 - Security boundary follow-up: **938 plugin/worker/security tests passed with 3 skips**. External plugins now require an explicit ID allowlist at execution, remote archives require HTTPS plus a repository SHA-256, archive traversal/symlinks and shell commands are rejected, dependency installation is hash-locked wheel-only, and npm lifecycle execution is disabled. CSP forbids eval and inline scripts, all third-party Actions are immutable-SHA pinned, actionlint passes, and a local/CI pin-policy guard prevents drift.
+- Demand-aware scheduling: **315 focused scheduler, task, capability, Foreman, pending-API, and installation-link tests passed**. Distributed totals now use runnable non-deferred demand, bounded deterministic largest-remainder allocation, persisted recent throughput by codec, current CPU/memory/disk/thermal pressure, encoder compatibility, and remote queue depth.
 
 ---
 
@@ -381,7 +382,7 @@ The production library-analysis path now uses a single-flight streamed scan, sta
 - **Effort:** S
 - **Grade lift:** C+ → B- (halves a dominant external-process cost)
 
-#### G5 — Allocate distributed workers from runnable demand and measured throughput
+#### ~~G5~~ ✓ done 2026-07-12 — Allocate distributed workers from runnable demand and measured throughput
 
 - **Where:** `compresso/libs/scheduler.py:149-210`, `compresso/libs/task.py:362-364`, `compresso/libs/foreman.py:723-790`
 - **What's wrong:** Allocation counts every task status and does not rank compatible workers by queue depth, throughput, transfer cost, or thermal/capability state.

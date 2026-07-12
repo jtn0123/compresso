@@ -186,7 +186,9 @@ class Links(metaclass=SingletonType):
             "version": config_dict.get("version", "???"),
             "uuid": config_dict.get("uuid", "???"),
             "available": config_dict.get("available", False),
-            "task_count": config_dict.get("task_count", 0),
+            "task_count": config_dict.get("runnable_task_count", config_dict.get("task_count", 0)),
+            "runnable_task_count": config_dict.get("runnable_task_count", config_dict.get("task_count", 0)),
+            "capabilities": config_dict.get("capabilities", {}),
             "last_updated": config_dict.get("last_updated", time.time()),
         }
 
@@ -490,6 +492,15 @@ class Links(metaclass=SingletonType):
             return {}
         tasks_data = res.json()
 
+        # Capacity is advisory: an older peer can omit it and still remain linked.
+        capabilities = {}
+        url = f"{address}/compresso/api/v2/system/capabilities"
+        res = request_handler.get(url, timeout=2)
+        if res.status_code == 200:
+            capabilities = res.json()
+
+        runnable_task_count = int(tasks_data.get("runnableRecords", tasks_data.get("recordsFiltered", 0)))
+
         return {
             "system_configuration": system_configuration_data.get("configuration"),
             "settings": settings_data.get("settings"),
@@ -501,7 +512,9 @@ class Links(metaclass=SingletonType):
                 "email": session_data.get("email"),
                 "uuid": session_data.get("uuid"),
             },
-            "task_count": int(tasks_data.get("recordsTotal", 0)),
+            "task_count": runnable_task_count,
+            "runnable_task_count": runnable_task_count,
+            "capabilities": capabilities,
         }
 
     def update_all_remote_installation_links(self):  # noqa: C901 — multi-step remote link sync with error recovery
@@ -581,8 +594,11 @@ class Links(metaclass=SingletonType):
                 # Mark the installation as available
                 updated_config["available"] = True
 
-                # Append the current task count
-                updated_config["task_count"] = installation_data.get("task_count", 0)
+                # Append current runnable demand and measured worker capacity.
+                runnable_task_count = installation_data.get("runnable_task_count", installation_data.get("task_count", 0))
+                updated_config["task_count"] = runnable_task_count
+                updated_config["runnable_task_count"] = runnable_task_count
+                updated_config["capabilities"] = installation_data.get("capabilities", {})
 
                 merge_dict = {
                     "name": installation_data.get("settings", {}).get("installation_name"),
@@ -838,9 +854,12 @@ class Links(metaclass=SingletonType):
         updated_config["enable_receiving_tasks"] = configuration.get("enable_sending_tasks")
         updated_config["enable_sending_tasks"] = configuration.get("enable_receiving_tasks")
 
-        # Current task count
+        # Current runnable demand and measured capacity
         task_handler = task.Task()
-        updated_config["task_count"] = int(task_handler.get_total_task_list_count())
+        runnable_task_count = int(task_handler.get_runnable_task_count())
+        updated_config["task_count"] = runnable_task_count
+        updated_config["runnable_task_count"] = runnable_task_count
+        updated_config["capabilities"] = WorkerCapabilities().snapshot(self.settings)
 
         # Fetch local config for distributed_worker_count_target
         distributed_worker_count_target = self.settings.get_distributed_worker_count_target()
@@ -940,6 +959,7 @@ class Links(metaclass=SingletonType):
                         "preloading_count": local_config.get("preloading_count"),
                         "library_names": library_names,
                         "available_slots": 0,
+                        "queue_depth": current_pending_tasks,
                         "capabilities": capabilities,
                         "scheduling_score": WorkerCapabilities.scheduling_score(capabilities) or 0,
                     }

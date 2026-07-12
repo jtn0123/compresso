@@ -186,6 +186,7 @@ class ApiPendingHandler(BaseApiHandler):
                 {
                     "recordsTotal": task_list.get("recordsTotal"),
                     "recordsFiltered": task_list.get("recordsFiltered"),
+                    "runnableRecords": task_list.get("runnableRecords", 0),
                     "results": task_list.get("results"),
                 },
             )

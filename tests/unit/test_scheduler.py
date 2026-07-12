@@ -39,7 +39,6 @@ class TestScheduledTasksManagerInit:
     def test_init_attributes(self):
         mgr = _make_scheduler_manager()
         assert mgr.name == "ScheduledTasksManager"
-        assert mgr.force_local_worker_timer == 0
         assert not mgr.abort_flag.is_set()
         assert mgr.scheduler is not None
         assert mgr.get_health_snapshot()["consecutive_failures"] == 0
@@ -94,9 +93,12 @@ class TestSetWorkerCountBasedOnRemoteLinks:
         mock_config_cls.return_value = mock_settings
         mock_settings.get_remote_installations.return_value = []
         mock_task = MagicMock()
-        mock_task.get_total_task_list_count.return_value = 5
+        mock_task.get_runnable_task_count.return_value = 5
         mock_task_cls.return_value = mock_task
-        mgr.set_worker_count_based_on_remote_installation_links()
+        with patch("compresso.libs.scheduler.WorkerCapabilities") as capabilities:
+            capabilities.scheduling_score.return_value = 1
+            capabilities.return_value.snapshot.return_value = {}
+            mgr.set_worker_count_based_on_remote_installation_links()
         mock_settings.set_config_item.assert_not_called()
         mock_worker_group_cls.get_all_worker_groups.assert_not_called()
 
@@ -112,26 +114,27 @@ class TestSetWorkerCountBasedOnRemoteLinks:
             {"enable_distributed_worker_count": True, "task_count": 10},
         ]
         mock_task = MagicMock()
-        mock_task.get_total_task_list_count.return_value = 10
+        mock_task.get_runnable_task_count.return_value = 10
         mock_task_cls.return_value = mock_task
         mock_worker_group_cls.get_all_worker_groups.return_value = [
             {"id": 7, "number_of_workers": 1},
         ]
         mock_group = MagicMock()
         mock_worker_group_cls.return_value = mock_group
-        mgr.set_worker_count_based_on_remote_installation_links()
+        with patch("compresso.libs.scheduler.WorkerCapabilities") as capabilities:
+            capabilities.scheduling_score.return_value = 1
+            capabilities.return_value.snapshot.return_value = {}
+            mgr.set_worker_count_based_on_remote_installation_links()
         mock_worker_group_cls.assert_called_once_with(7)
         mock_group.set_number_of_workers.assert_called_once_with(2)
         mock_group.save.assert_called_once_with()
         mock_settings.set_config_item.assert_not_called()
 
-    @patch("compresso.libs.scheduler.time.time", return_value=99999)
     @patch("compresso.libs.scheduler.WorkerGroup")
     @patch("compresso.libs.scheduler.config.Config")
     @patch("compresso.libs.scheduler.task.Task")
-    def test_force_local_worker_timer(self, mock_task_cls, mock_config_cls, mock_worker_group_cls, mock_time):
+    def test_global_runnable_demand_is_bounded_by_target(self, mock_task_cls, mock_config_cls, mock_worker_group_cls):
         mgr = _make_scheduler_manager()
-        mgr.force_local_worker_timer = 0  # timer expired
         mock_settings = MagicMock()
         mock_config_cls.return_value = mock_settings
         mock_settings.get_distributed_worker_count_target.return_value = 2
@@ -139,20 +142,23 @@ class TestSetWorkerCountBasedOnRemoteLinks:
             {"enable_distributed_worker_count": True, "task_count": 100},
         ]
         mock_task = MagicMock()
-        mock_task.get_total_task_list_count.return_value = 5
+        mock_task.get_runnable_task_count.return_value = 5
         mock_task_cls.return_value = mock_task
         mock_worker_group_cls.get_all_worker_groups.return_value = [
             {"id": 3, "number_of_workers": 0},
         ]
         mock_group = MagicMock()
         mock_worker_group_cls.return_value = mock_group
-        mgr.set_worker_count_based_on_remote_installation_links()
+        with patch("compresso.libs.scheduler.WorkerCapabilities") as capabilities:
+            capabilities.scheduling_score.return_value = 1
+            capabilities.return_value.snapshot.return_value = {}
+            mgr.set_worker_count_based_on_remote_installation_links()
         mock_group.set_number_of_workers.assert_called_once_with(1)
 
     @patch("compresso.libs.scheduler.WorkerGroup")
     @patch("compresso.libs.scheduler.config.Config")
     @patch("compresso.libs.scheduler.task.Task")
-    def test_allocated_exceeds_target(self, mock_task_cls, mock_config_cls, mock_worker_group_cls):
+    def test_rounding_never_exceeds_global_target(self, mock_task_cls, mock_config_cls, mock_worker_group_cls):
         mgr = _make_scheduler_manager()
         mock_settings = MagicMock()
         mock_config_cls.return_value = mock_settings
@@ -161,16 +167,40 @@ class TestSetWorkerCountBasedOnRemoteLinks:
             {"enable_distributed_worker_count": True, "task_count": 100},
         ]
         mock_task = MagicMock()
-        mock_task.get_total_task_list_count.return_value = 1
+        mock_task.get_runnable_task_count.return_value = 1
         mock_task_cls.return_value = mock_task
         mock_worker_group_cls.get_all_worker_groups.return_value = [
             {"id": 5, "number_of_workers": 2},
         ]
         mock_group = MagicMock()
         mock_worker_group_cls.return_value = mock_group
-        mgr.set_worker_count_based_on_remote_installation_links()
-        # Target workers for local should be 0 since allocated > target
-        mock_group.set_number_of_workers.assert_called_once_with(0)
+        with patch("compresso.libs.scheduler.WorkerCapabilities") as capabilities:
+            capabilities.scheduling_score.return_value = 1
+            capabilities.return_value.snapshot.return_value = {}
+            mgr.set_worker_count_based_on_remote_installation_links()
+        mock_group.set_number_of_workers.assert_called_once_with(1)
+
+    def test_installation_allocation_prefers_measured_capacity_and_preserves_total(self):
+        allocations = _make_scheduler_manager()._installation_worker_allocations(
+            [
+                {"id": "fast-m4", "score": 9},
+                {"id": "slow-master", "score": 1},
+            ],
+            target_total=4,
+            runnable_demand=100,
+        )
+
+        assert allocations == {"fast-m4": 4, "slow-master": 0}
+        assert sum(allocations.values()) == 4
+
+    def test_installation_allocation_starts_no_workers_without_runnable_demand(self):
+        allocations = _make_scheduler_manager()._installation_worker_allocations(
+            [{"id": "master", "score": 10}],
+            target_total=4,
+            runnable_demand=0,
+        )
+
+        assert allocations == {"master": 0}
 
     @patch("compresso.libs.scheduler.WorkerGroup")
     def test_worker_total_preserves_existing_group_proportions(self, mock_worker_group_cls):
