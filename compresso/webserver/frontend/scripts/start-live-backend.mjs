@@ -28,7 +28,11 @@ for (const directory of ['cache', 'staging', 'library', 'wheel']) {
   mkdirSync(path.join(homeDir, directory), { recursive: true })
 }
 
-runChecked(bootstrapPython, ['-m', 'build', '--wheel', '--outdir', wheelDir], { cwd: repositoryRoot })
+runChecked(
+  bootstrapPython,
+  ['-m', 'build', '--no-isolation', '--skip-dependency-check', '--wheel', '--outdir', wheelDir],
+  { cwd: repositoryRoot },
+)
 runChecked(bootstrapPython, ['-m', 'venv', '--system-site-packages', venvDir])
 const packagedPython = path.join(venvDir, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')
 const wheel = readdirSync(wheelDir).find((name) => name.endsWith('.whl'))
