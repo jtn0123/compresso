@@ -34,6 +34,9 @@ PY
 
 cd "${ROOT_DIR}"
 
+echo "==> Checking immutable GitHub Action pins"
+bash scripts/check-action-pins.sh
+
 echo "==> Checking Python environment and lock drift"
 "${PYTHON_BIN}" -m pip check
 PYTHON_BIN="${PYTHON_BIN}" bash scripts/check-requirements-locks.sh
@@ -133,7 +136,7 @@ if [[ "${MODE}" == "full" ]]; then
     skip_gate "Playwright mocked and packaged live-backend tests (SKIP_E2E=1)"
   fi
 else
-  skip_gate "GitHub Actions lint"
+  skip_gate "GitHub Actions syntax lint (immutable pin policy still checked)"
   skip_gate "integration tests"
   skip_gate "release tooling and release contract tests"
   skip_gate "clean wheel artifact validation"

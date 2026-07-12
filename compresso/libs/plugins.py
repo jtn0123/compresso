@@ -39,6 +39,8 @@ import subprocess
 import sys
 import zipfile
 from operator import attrgetter
+from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -54,6 +56,7 @@ from compresso.libs.unplugins import PluginExecutor
 
 _PLUGIN_INFO_FILENAME = "info.json"
 _LOGGER_NAME = "Compresso.PluginsHandler"
+_SHA256_HEX_LENGTH = 64
 
 
 class PluginsHandler(metaclass=SingletonType):
@@ -293,6 +296,7 @@ class PluginsHandler(metaclass=SingletonType):
                         "tags": plugin.get("tags"),
                         "status": plugin_status,
                         "package_url": plugin_package_url,
+                        "package_sha256": plugin.get("package_sha256", plugin.get("sha256")),
                         "changelog_url": plugin_changelog_url,
                         "repo_name": repo_name,
                     }
@@ -472,16 +476,47 @@ class PluginsHandler(metaclass=SingletonType):
         :param plugin:
         :return:
         """
-        # Fetch remote zip file
+        package_url = plugin.get("package_url", "")
+        expected_digest = str(plugin.get("package_sha256") or "").lower()
+        if urlparse(package_url).scheme != "https":
+            raise ValueError("Remote plugins must be downloaded over HTTPS")
+        if len(expected_digest) != _SHA256_HEX_LENGTH or any(char not in "0123456789abcdef" for char in expected_digest):
+            raise ValueError("Remote plugin metadata must include a valid package_sha256 digest")
+
+        # Fetch the package and authenticate its bytes before extraction. The
+        # digest is supplied by the trusted repository metadata channel.
         destination = self.get_plugin_download_cache_path(plugin.get("plugin_id"), plugin.get("version"))
-        self.logger.debug("Downloading plugin '%s' to '%s'", plugin.get("package_url"), destination)
+        self.logger.debug("Downloading plugin '%s' to '%s'", package_url, destination)
         session = Session()
-        with session.requests_session.get(plugin.get("package_url"), stream=True, allow_redirects=True) as r:
-            r.raise_for_status()
-            with open(destination, "wb") as f:
-                for chunk in r.iter_content(chunk_size=128):
-                    f.write(chunk)
+        digest = hashlib.sha256()
+        try:
+            with session.requests_session.get(package_url, stream=True, allow_redirects=True, timeout=60) as r:
+                r.raise_for_status()
+                with open(destination, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=64 * 1024):
+                        if not chunk:
+                            continue
+                        digest.update(chunk)
+                        f.write(chunk)
+            if digest.hexdigest() != expected_digest:
+                raise ValueError("Downloaded plugin package does not match its repository SHA-256 digest")
+        except Exception:
+            if os.path.isfile(destination):
+                os.remove(destination)
+            raise
         return destination
+
+    @staticmethod
+    def _safe_extract_plugin_archive(zip_ref, plugin_directory):
+        destination = Path(plugin_directory).resolve()
+        for member in zip_ref.infolist():
+            member_path = (destination / member.filename).resolve()
+            if member_path != destination and destination not in member_path.parents:
+                raise ValueError(f"Plugin archive contains an unsafe path: {member.filename}")
+            # ZIP symlinks can escape the destination after extraction.
+            if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                raise ValueError(f"Plugin archive contains a forbidden symlink: {member.filename}")
+        zip_ref.extractall(str(destination))
 
     def install_plugin(self, zip_file, plugin_id=None):
         """
@@ -505,11 +540,21 @@ class PluginsHandler(metaclass=SingletonType):
         # Extract zip file contents
         self.logger.debug("Extracting plugin to '%s'", plugin_directory)
         with zipfile.ZipFile(zip_file, "r") as zip_ref:
-            zip_ref.extractall(str(plugin_directory))
+            self._safe_extract_plugin_archive(zip_ref, plugin_directory)
         # Read plugin info
         plugin_info = self.get_plugin_info(plugin_id)
+        if plugin_info.get("id") != plugin_id:
+            raise ValueError("Plugin archive info.json ID does not match the requested plugin ID")
+        # Only the built-in installer may create a bundled plugin. External
+        # archives cannot self-assert that trust level.
+        if plugin_info.get("bundled") is True:
+            plugin_info["bundled"] = False
+            info_path = os.path.join(str(plugin_directory), _PLUGIN_INFO_FILENAME)
+            with open(info_path, "w", encoding="utf-8") as info_file:
+                json.dump(plugin_info, info_file, indent=2)
+                info_file.write("\n")
         # Run through any required dependency installation
-        post_install_python_requirements = os.path.join(str(plugin_directory), "requirements.post-install.txt")
+        post_install_python_requirements = os.path.join(str(plugin_directory), "requirements.post-install.lock")
         if os.path.exists(post_install_python_requirements):
             self.install_plugin_requirements(plugin_directory, requirements_file=post_install_python_requirements)
         if plugin_info.get("defer_dependency_install", False):
@@ -521,7 +566,7 @@ class PluginsHandler(metaclass=SingletonType):
     @staticmethod
     def install_plugin_requirements(plugin_path, requirements_file=None):
         if requirements_file is None:
-            requirements_file = os.path.join(plugin_path, "requirements.txt")
+            requirements_file = os.path.join(plugin_path, "requirements.lock")
         install_target = os.path.join(plugin_path, "site-packages")
         # Check if the requirements file exists
         if not os.path.exists(requirements_file):
@@ -539,6 +584,8 @@ class PluginsHandler(metaclass=SingletonType):
                     "pip",
                     "install",
                     "--upgrade",
+                    "--require-hashes",
+                    "--only-binary=:all:",
                     "-r",
                     requirements_file,
                     f"--target={install_target}",
@@ -553,15 +600,9 @@ class PluginsHandler(metaclass=SingletonType):
         package_file = os.path.join(plugin_path, "package.json")
         if not os.path.exists(package_file):
             return
-        try:
-            subprocess.call(["npm", "install"], cwd=plugin_path, timeout=300)  # noqa: S603, S607 - trusted npm install for plugin dependencies
-        except subprocess.TimeoutExpired:
-            logging.getLogger(_LOGGER_NAME).error("Timed out running npm install for plugin at %s", plugin_path)
-            return
-        try:
-            subprocess.call(["npm", "run", "build"], cwd=plugin_path, timeout=300)  # noqa: S603, S607 - trusted npm build for plugin dependencies
-        except subprocess.TimeoutExpired:
-            logging.getLogger(_LOGGER_NAME).error("Timed out running npm build for plugin at %s", plugin_path)
+        raise ValueError(
+            "Plugin packages must ship pre-built frontend assets; automatic npm install/build is disabled for security"
+        )
 
     @staticmethod
     def write_plugin_data_to_db(plugin, plugin_directory):

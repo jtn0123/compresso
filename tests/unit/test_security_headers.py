@@ -64,8 +64,15 @@ class TestSecurityHeadersMixin:
         handler.set_html_security_headers()
 
         assert "Content-Security-Policy" in handler.headers
-        assert "default-src 'self'" in handler.headers["Content-Security-Policy"]
-        assert "frame-ancestors 'none'" in handler.headers["Content-Security-Policy"]
+        policy = handler.headers["Content-Security-Policy"]
+        assert "default-src 'self'" in policy
+        assert "script-src 'self'" in policy
+        assert "style-src-elem 'self'" in policy
+        assert "style-src-attr 'unsafe-inline'" in policy
+        assert "object-src 'none'" in policy
+        assert "frame-ancestors 'none'" in policy
+        assert "'unsafe-eval'" not in policy
+        assert "script-src 'self' 'unsafe-inline'" not in policy
         # Should also include the base security headers
         assert handler.headers["X-Content-Type-Options"] == "nosniff"
 

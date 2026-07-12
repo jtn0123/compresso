@@ -8,6 +8,7 @@ Covers plugin installation/removal, updates, repo management,
 listing/filtering, and version checking.
 """
 
+import hashlib
 import json
 import os
 import zipfile
@@ -101,6 +102,69 @@ class TestPluginPaths:
         path = handler.get_plugin_download_cache_path("my_plugin", "1.0.0")
         assert path.endswith("my_plugin-1.0.0.zip")
 
+    def test_archive_extraction_rejects_parent_traversal(self, tmp_path):
+        from compresso.libs.plugins import PluginsHandler
+
+        archive_path = tmp_path / "unsafe.zip"
+        destination = tmp_path / "plugin"
+        destination.mkdir()
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr("../escaped.txt", "nope")
+
+        with zipfile.ZipFile(archive_path) as archive, pytest.raises(ValueError, match="unsafe path"):
+            PluginsHandler._safe_extract_plugin_archive(archive, destination)
+        assert not (tmp_path / "escaped.txt").exists()
+
+    def test_external_archive_cannot_self_assert_bundled_trust(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        archive_path = tmp_path / "external.zip"
+        info = {"id": "external", "version": "1", "compatibility": [2], "bundled": True}
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr("info.json", json.dumps(info))
+            archive.writestr("plugin.py", "")
+
+        installed = handler.install_plugin(str(archive_path), "external")
+
+        assert installed["bundled"] is False
+        persisted = json.loads((tmp_path / "plugins" / "external" / "info.json").read_text())
+        assert persisted["bundled"] is False
+
+
+@pytest.mark.unittest
+class TestPluginDownloadTrust:
+    def test_rejects_non_https_and_missing_digest(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        with pytest.raises(ValueError, match="HTTPS"):
+            handler.download_plugin({"plugin_id": "p1", "version": "1", "package_url": "http://example/p.zip"})
+        with pytest.raises(ValueError, match="package_sha256"):
+            handler.download_plugin({"plugin_id": "p1", "version": "1", "package_url": "https://example/p.zip"})
+
+    def test_authenticates_downloaded_archive_digest(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        (tmp_path / "plugins").mkdir()
+        payload = b"authenticated plugin archive"
+        response = MagicMock()
+        response.iter_content.return_value = [payload]
+        response_context = MagicMock()
+        response_context.__enter__.return_value = response
+        session = MagicMock()
+        session.requests_session.get.return_value = response_context
+        plugin = {
+            "plugin_id": "p1",
+            "version": "1",
+            "package_url": "https://example/p.zip",
+            "package_sha256": hashlib.sha256(payload).hexdigest(),
+        }
+
+        with patch("compresso.libs.plugins.Session", return_value=session):
+            destination = handler.download_plugin(plugin)
+
+        assert (tmp_path / "plugins" / "p1-1.zip").read_bytes() == payload
+        assert destination.endswith("p1-1.zip")
+        session.requests_session.get.assert_called_once_with(
+            "https://example/p.zip", stream=True, allow_redirects=True, timeout=60
+        )
+
 
 @pytest.mark.unittest
 class TestGetDefaultRepo:
@@ -170,6 +234,18 @@ class TestGetPluginsInRepoData:
         ids = [p["plugin_id"] for p in result]
         assert "p1" not in ids
         assert "p2" in ids
+
+    def test_preserves_repository_package_digest(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        digest = "a" * 64
+        repo_data = {
+            "repo": {"name": "trusted", "repo_data_directory": "https://example.com/data"},
+            "plugins": [{"id": "p1", "name": "Plugin1", "version": "1.0", "compatibility": [2], "sha256": digest}],
+        }
+        with patch.object(handler, "get_plugin_info", return_value={}):
+            result = handler.get_plugins_in_repo_data(repo_data)
+
+        assert result[0]["package_sha256"] == digest
 
     def test_marks_installed_plugin_as_installed(self, tmp_path):
         handler = _make_handler(tmp_path)
@@ -458,11 +534,14 @@ class TestInstallPluginRequirements:
     def test_installs_when_requirements_exist(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
-        req_file = tmp_path / "requirements.txt"
-        req_file.write_text("requests>=2.0")
+        req_file = tmp_path / "requirements.lock"
+        req_file.write_text("requests==2.32.5 --hash=sha256:" + "0" * 64)
         with patch("subprocess.call") as mock_call:
             PluginsHandler.install_plugin_requirements(str(tmp_path))
         mock_call.assert_called_once()
+        command = mock_call.call_args.args[0]
+        assert "--require-hashes" in command
+        assert "--only-binary=:all:" in command
 
 
 @pytest.mark.unittest
@@ -474,14 +553,14 @@ class TestInstallNpmModules:
             PluginsHandler.install_npm_modules(str(tmp_path))
         mock_call.assert_not_called()
 
-    def test_runs_npm_when_package_json_exists(self, tmp_path):
+    def test_rejects_runtime_npm_build_when_package_json_exists(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
         pkg = tmp_path / "package.json"
         pkg.write_text('{"name": "test"}')
-        with patch("subprocess.call") as mock_call:
+        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="pre-built"):
             PluginsHandler.install_npm_modules(str(tmp_path))
-        assert mock_call.call_count == 2
+        mock_call.assert_not_called()
 
 
 @pytest.mark.unittest
@@ -491,7 +570,7 @@ class TestSubprocessTimeouts:
 
         from compresso.libs.plugins import PluginsHandler
 
-        req_file = tmp_path / "requirements.txt"
+        req_file = tmp_path / "requirements.lock"
         req_file.write_text("some-package")
         with (
             patch("subprocess.call", side_effect=subprocess.TimeoutExpired("pip", 300)),
@@ -501,30 +580,28 @@ class TestSubprocessTimeouts:
             # Should not raise — timeout is caught and logged
             PluginsHandler.install_plugin_requirements(str(tmp_path))
 
-    def test_npm_install_handles_timeout(self, tmp_path):
-        import subprocess
-
+    def test_npm_install_never_starts_subprocess(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
         pkg = tmp_path / "package.json"
         pkg.write_text('{"name": "test"}')
-        with patch("subprocess.call", side_effect=subprocess.TimeoutExpired("npm", 300)):
-            # Should not raise — timeout is caught and logged
+        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="pre-built"):
             PluginsHandler.install_npm_modules(str(tmp_path))
+        mock_call.assert_not_called()
 
-    def test_npm_install_passes_timeout_param(self, tmp_path):
+    def test_npm_install_has_no_runtime_escape_hatch(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
         pkg = tmp_path / "package.json"
         pkg.write_text('{"name": "test"}')
-        with patch("subprocess.call") as mock_call:
+        with patch("subprocess.call") as mock_call, pytest.raises(ValueError):
             PluginsHandler.install_npm_modules(str(tmp_path))
-        assert [call.kwargs.get("timeout") for call in mock_call.call_args_list] == [300, 300]
+        mock_call.assert_not_called()
 
     def test_pip_install_passes_timeout_param(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
-        req_file = tmp_path / "requirements.txt"
+        req_file = tmp_path / "requirements.lock"
         req_file.write_text("some-package")
         with patch("subprocess.call") as mock_call, patch("shutil.rmtree"), patch("os.makedirs"):
             PluginsHandler.install_plugin_requirements(str(tmp_path))

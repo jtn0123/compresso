@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **29 of 37** addressable grade items are marked complete below.
+- **31 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -51,6 +51,7 @@
 - Locked CI/local parity: canonical `--require-hashes` installs dry-ran successfully for runtime and development graphs; lock regeneration, actionlint, 10 release contract tests, 3 release-tool tests, and clean-wheel inspection passed. The fast lane passed **3,647 backend tests with 8 skips**, **431 frontend tests**, honest coverage, lint, type, audit, and production-build gates while listing every intentionally skipped full gate.
 - Structured API errors: **675 broad API/settings/plugin tests passed with 2 skips**, plus 70 focused boundary/transfer/notification/pending/preview tests. Malformed bodies are no longer echoed or double-written; unexpected details stay in correlated logs and client 500s use a stable public message.
 - Responsive/browser coverage: **433 frontend unit tests**, ESLint, production build, 4 desktop Chromium journeys, a Pixel 7 accessibility journey, and a focused WebKit smoke passed. The onboarding flow has a zero critical/serious axe result and keyboard-driven setup/plugin assertions; Firefox is enabled in CI because the local macOS launcher fails before browser context creation in this environment.
+- Security boundary follow-up: **938 plugin/worker/security tests passed with 3 skips**. External plugins now require an explicit ID allowlist at execution, remote archives require HTTPS plus a repository SHA-256, archive traversal/symlinks and shell commands are rejected, dependency installation is hash-locked wheel-only, and npm lifecycle execution is disabled. CSP forbids eval and inline scripts, all third-party Actions are immutable-SHA pinned, actionlint passes, and a local/CI pin-policy guard prevents drift.
 
 ---
 
@@ -274,6 +275,8 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 
 #### E4 — Isolate plugin installation and execution
 
+**Phase-one hardening complete 2026-07-12:** untrusted external plugin execution is now off by default, remote packages are digest-authenticated, installation scripts are constrained, and shell command strings are rejected. Full least-privilege process/container isolation remains open for explicitly trusted third-party Python runners.
+
 - **Where:** `compresso/libs/plugins.py:486-564`, `compresso/libs/workers.py:736-751`
 - **What's wrong:** Plugin ZIPs can trigger pip/npm install/build and runtime commands—including shell execution—with the full privileges of the Compresso process.
 - **Impact:** Major — a compromised plugin can read configuration, alter media, or execute arbitrary host commands.
@@ -281,7 +284,7 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 - **Effort:** L
 - **Grade lift:** C+ → B+ (turns a documented trust assumption into technical isolation)
 
-#### E5 — Restore meaningful production CSP protection
+#### ~~E5~~ ✓ done 2026-07-12 — Restore meaningful production CSP protection
 
 - **Where:** `compresso/webserver/security_headers.py:46-59`, `compresso/webserver/frontend/quasar.config.cjs`
 - **What's wrong:** Production permits both `unsafe-eval` and inline scripts/styles, sharply reducing CSP's value against future injection bugs.
@@ -290,7 +293,7 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 - **Effort:** M
 - **Grade lift:** C+ → B- (restores defense in depth)
 
-#### E6 — Pin every third-party GitHub Action to an immutable commit
+#### ~~E6~~ ✓ done 2026-07-12 — Pin every third-party GitHub Action to an immutable commit
 
 - **Where:** `.github/workflows/` (54 mutable-tag uses; examples in `python_lint_and_run_unit_tests.yml`, `integration_test_and_build_all_packages_ci.yml`, `release.yml`)
 - **What's wrong:** Most Actions use mutable major tags even though selected release steps are already SHA-pinned.
