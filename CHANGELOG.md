@@ -1,3 +1,10 @@
+## [1.13.4](https://github.com/jtn0123/compresso/compare/v1.13.3...v1.13.4) (2026-07-12)
+
+
+### Bug Fixes
+
+* supervise critical service threads ([#189](https://github.com/jtn0123/compresso/issues/189)) ([e9d9d3f](https://github.com/jtn0123/compresso/commit/e9d9d3f8b81b4b9d02e405cc0e9f34057f6922d3))
+
 ## [1.13.3](https://github.com/jtn0123/compresso/compare/v1.13.2...v1.13.3) (2026-07-12)
 
 
