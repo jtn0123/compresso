@@ -110,10 +110,17 @@ Node.js 24 is the supported frontend build baseline. Node 22 may still work loca
 
 The Python package build performs its own clean frontend install from the committed lockfile, so a pre-existing `node_modules` directory is not required.
 
-To mirror the main local validation gates from a prepared checkout, run:
+For the fast day-to-day validation lane, run:
 
 ```bash
-bash scripts/verify-local.sh
+bash scripts/verify-local.sh fast
+```
+
+Before merging or cutting a release, run the full CI-parity lane. It adds integration,
+release-tool, workflow, clean-wheel, and packaged browser checks:
+
+```bash
+bash scripts/verify-local.sh full
 ```
 
 For Docker-focused changes, run the local container preflight when Docker is available:

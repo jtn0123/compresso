@@ -11,7 +11,8 @@
 - [ ] `cd compresso/webserver/frontend && npx vitest run --coverage`
 - [ ] `cd compresso/webserver/frontend && npm run build:publish`
 - [ ] `cd compresso/webserver/frontend && npm run test:e2e`
-- [ ] `bash scripts/verify-local.sh`
+- [ ] `bash scripts/verify-local.sh fast`
+- [ ] `bash scripts/verify-local.sh full` (required before merge/release; note intentional skips)
 
 ## Notes
 

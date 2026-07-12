@@ -166,8 +166,8 @@ RUN \
             /tmp/*
 
 
-# Add pip requirements
-COPY /requirements.txt /tmp/requirements.txt
+# Add the audited, hash-locked runtime graph.
+COPY /requirements.lock /tmp/requirements.lock
 
 
 # Install Compresso python dependencies.
@@ -198,7 +198,7 @@ RUN \
             && python3.13 -m venv /opt/venv \
         && \
         echo "**** Install pip packages into virtualenv ****" \
-            && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
+            && /opt/venv/bin/pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
     && \
     echo "**** Section cleanup ****" \
         && apt-get clean autoclean -y \

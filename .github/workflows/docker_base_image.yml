@@ -5,7 +5,7 @@ on:
     branches: [master]
     paths:
       - 'docker/Dockerfile.base'
-      - 'requirements.txt'
+      - 'requirements.lock'
       - '.github/workflows/docker_base_image.yml'
   schedule:
     # Weekly on Saturday at 03:00 UTC (after the main CI schedule)

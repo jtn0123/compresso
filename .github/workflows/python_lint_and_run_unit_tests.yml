@@ -41,20 +41,20 @@ jobs:
       with:
         python-version: "3.13"
         cache: 'pip'
+        cache-dependency-path: requirements-dev.lock
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+        python -m pip install --require-hashes -r requirements-dev.lock
 
     - name: Audit dependencies for known vulnerabilities
       run: |
-        pip install pip-audit
-        # Audit the fully-resolved lockfiles so transitive dependencies are
-        # covered, not just the direct deps in the *.txt files.
-        pip-audit -r requirements.lock
-        pip-audit -r requirements-dev.lock
+        python -m pip_audit -r requirements.lock
+        python -m pip_audit -r requirements-dev.lock
+
+    - name: Verify dependency locks match source inputs
+      run: bash scripts/check-requirements-locks.sh
 
     - name: Clean local build artifacts
       run: |
@@ -95,13 +95,13 @@ jobs:
       with:
         python-version: "3.13"
         cache: 'pip'
+        cache-dependency-path: requirements-dev.lock
 
     - name: Install dependencies
       shell: bash
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+        python -m pip install --require-hashes -r requirements-dev.lock
 
     - name: Clean local build artifacts
       shell: bash
@@ -146,9 +146,11 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: "3.13"
+        cache: 'pip'
+        cache-dependency-path: requirements-dev.lock
 
     - name: Install coverage
-      run: pip install coverage
+      run: python -m pip install --require-hashes -r requirements-dev.lock
 
     - name: Download shard coverage
       uses: actions/download-artifact@v8

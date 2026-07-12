@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **24 of 37** addressable grade items are marked complete below.
+- **26 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -48,6 +48,7 @@
 - Library analysis: **56 focused helper tests** passed with single-flight starts, streamed traversal, generation cleanup, and stat-first cache hits.
 - Frontend coverage now inventories **all 113 application JS/Vue files**: 19.54% statements, 15.11% branches, 12.42% functions, and 19.39% lines, with honest ratchet floors at 19/15/12/19.
 - Packaged live E2E: **3 Playwright journeys passed** against an isolated wheel install, including reject, approve/file replacement, history persistence, and backend restart.
+- Locked CI/local parity: canonical `--require-hashes` installs dry-ran successfully for runtime and development graphs; lock regeneration, actionlint, 10 release contract tests, 3 release-tool tests, and clean-wheel inspection passed. The fast lane passed **3,647 backend tests with 8 skips**, **431 frontend tests**, honest coverage, lint, type, audit, and production-build gates while listing every intentionally skipped full gate.
 
 ---
 
@@ -304,7 +305,7 @@ Runtime/dev Python locks and npm locks exist, and live audits found no known vul
 
 ### Dependency improvements
 
-#### F1 — Install the same hash-locked Python graph that CI audits
+#### ~~F1~~ ✓ done 2026-07-12 — Install the same hash-locked Python graph that CI audits
 
 - **Where:** `requirements.lock`, `requirements-dev.lock`, `python_lint_and_run_unit_tests.yml:45-57,99-104`, `integration_test_and_build_all_packages_ci.yml:105-111`, `verify-local.yml:34-37`, `docker/Dockerfile.base:169-202`
 - **What's wrong:** Audits inspect lockfiles, but CI, integration, local parity, and Docker install unlocked `.txt` inputs whose transitives can drift.
@@ -427,7 +428,7 @@ CI is broad and unusually capable: cross-platform shards, integration, frontend,
 
 ### Developer-experience improvements
 
-#### I1 — Make local verification explicitly match fast and full CI modes
+#### ~~I1~~ ✓ done 2026-07-12 — Make local verification explicitly match fast and full CI modes
 
 - **Where:** `scripts/verify-local.sh:18-79`, `.github/workflows/python_lint_and_run_unit_tests.yml`, `.github/workflows/integration_test_and_build_all_packages_ci.yml`
 - **What's wrong:** The script claims parity but omits Ruff/format/Mypy, dev-lock audit, integration, release-tool tests, actionlint/contracts, and clean package/artifact validation.

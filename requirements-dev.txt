@@ -12,6 +12,7 @@ build==1.5.1
 yappi==1.7.6            # Thread-aware profiler for dev profiling
 mypy==2.2.0             # Gradual type checking
 pip-audit==2.10.1       # Dependency vulnerability auditing
+pip-tools==7.5.3       # Reproducible hash-locked dependency compilation
 
 # API schema exporting
 apispec==6.10.0

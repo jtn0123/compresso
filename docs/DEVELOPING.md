@@ -57,7 +57,7 @@ Then install the dependencies into that venv
 
 ```bash
 python3.13 -m pip install --upgrade pip
-python3.13 -m pip install --upgrade -r ./requirements.txt -r ./requirements-dev.txt
+python3.13 -m pip install --require-hashes -r ./requirements-dev.lock
 ```
 
 Then install the module:
@@ -145,13 +145,30 @@ Run the Python test suite from a host venv:
 python3.13 -m pytest
 ```
 
-To run the main local verification gates used for day-to-day changes:
+The fast lane runs lock drift/audits, Python lint/format/types/unit tests, and the
+frontend unit/lint/coverage/build gates:
 
 ```bash
-bash scripts/verify-local.sh
+bash scripts/verify-local.sh fast
 ```
 
-Set `SKIP_E2E=1` only when you intentionally want to skip local Playwright browser setup. CI still runs the smoke tests.
+The full lane additionally runs actionlint, integration and release-tool tests,
+clean wheel inspection, and mocked plus packaged live-backend Playwright tests:
+
+```bash
+bash scripts/verify-local.sh full
+```
+
+Every run prints any skipped gates. Set `SKIP_E2E=1` only when you intentionally
+want the full lane to skip local Playwright browser setup; CI still runs those checks.
+
+After changing either source requirements file, regenerate and verify both locks:
+
+```bash
+python3.13 -m piptools compile --generate-hashes --output-file=requirements.lock --strip-extras requirements.txt
+python3.13 -m piptools compile --allow-unsafe --generate-hashes --output-file=requirements-dev.lock --strip-extras requirements-dev.txt
+bash scripts/check-requirements-locks.sh
+```
 
 ### Frontend coverage ratchet
 
