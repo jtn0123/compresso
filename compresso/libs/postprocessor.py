@@ -52,6 +52,7 @@ from compresso.libs.notifications import Notifications
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.resumable_transfer import file_sha256
 from compresso.libs.task import TaskDataStore
+from compresso.libs.thread_health import ThreadHealthMixin
 
 """
 
@@ -64,7 +65,7 @@ This prevents conflicting copy operations or deleting a file that is also being 
 """
 
 
-class PostProcessor(threading.Thread):
+class PostProcessor(ThreadHealthMixin, threading.Thread):
     """
     PostProcessor
 
@@ -84,6 +85,7 @@ class PostProcessor(threading.Thread):
         self._disk_space_guard = None
         self.ffmpeg = None
         self.abort_flag.clear()
+        self._init_thread_health()
 
     def _log(self, message, message2="", level="info"):
         message = common.format_message(message, message2)
@@ -96,32 +98,42 @@ class PostProcessor(threading.Thread):
         self._log("Starting PostProcessor Monitor loop...")
         while not self.abort_flag.is_set():
             self.event.wait(1)
-
-            if not self.system_configuration_is_valid():
+            self._mark_thread_heartbeat()
+            try:
+                self._process_available_tasks()
+            except Exception as e:
+                self._mark_thread_error(e)
+                self._log("PostProcessor loop iteration failed; continuing", message2=str(e), level="exception")
                 self.event.wait(2)
-                continue
-
-            # Process completed transcodes (status='processed')
-            while not self.abort_flag.is_set() and not self.task_queue.task_list_processed_is_empty():
-                self.event.wait(0.2)
-                self.current_task = self.task_queue.get_next_processed_tasks()
-                if self.current_task:
-                    self._handle_task_safely(self._handle_processed_task)
-
-            # Process approved tasks (status='approved') — finalize file replacement
-            while not self.abort_flag.is_set() and not self.task_queue.task_list_approved_is_empty():
-                self.event.wait(0.2)
-                self.current_task = self.task_queue.get_next_approved_tasks()
-                if self.current_task:
-                    self._handle_task_safely(self._handle_approved_task)
 
         self._log("Leaving PostProcessor Monitor loop...")
+
+    def _process_available_tasks(self):
+        if not self.system_configuration_is_valid():
+            self.event.wait(2)
+            return
+
+        # Process completed transcodes (status='processed')
+        while not self.abort_flag.is_set() and not self.task_queue.task_list_processed_is_empty():
+            self.event.wait(0.2)
+            self.current_task = self.task_queue.get_next_processed_tasks()
+            if self.current_task:
+                self._handle_task_safely(self._handle_processed_task)
+
+        # Process approved tasks (status='approved') — finalize file replacement
+        while not self.abort_flag.is_set() and not self.task_queue.task_list_approved_is_empty():
+            self.event.wait(0.2)
+            self.current_task = self.task_queue.get_next_approved_tasks()
+            if self.current_task:
+                self._handle_task_safely(self._handle_approved_task)
 
     def _handle_task_safely(self, handler):
         """Contain a single task failure so the postprocessor thread stays alive."""
         try:
             handler()
+            self._mark_thread_success()
         except Exception as e:
+            self._mark_thread_error(e)
             self._log("Unexpected post-processing task failure", message2=str(e), level="exception")
             try:
                 self._defer_postprocess_failure(str(e))

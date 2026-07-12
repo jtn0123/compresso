@@ -42,6 +42,7 @@ class TestScheduledTasksManagerInit:
         assert mgr.force_local_worker_timer == 0
         assert not mgr.abort_flag.is_set()
         assert mgr.scheduler is not None
+        assert mgr.get_health_snapshot()["consecutive_failures"] == 0
 
     def test_stop_sets_abort_flag(self):
         mgr = _make_scheduler_manager()
@@ -413,3 +414,38 @@ class TestSchedulerRunLoop:
             mgr.run()
 
         assert run_count == 2
+        health = mgr.get_health_snapshot()
+        assert health["consecutive_failures"] == 0
+        assert health["last_success_at"] is not None
+        assert health["last_error"] == "job failed"
+
+    def test_failed_scheduled_job_records_health_before_recovery(self):
+        mgr = _make_scheduler_manager()
+        snapshots = []
+
+        def run_pending():
+            if not snapshots:
+                snapshots.append("failed")
+                raise RuntimeError("job failed")
+            snapshots.append(mgr.get_health_snapshot())
+            mgr.abort_flag.set()
+
+        mgr.scheduler.run_pending = MagicMock(side_effect=run_pending)
+        mgr.event.wait = MagicMock()
+
+        with patch.object(mgr, "manage_completed_tasks"):
+            mgr.run()
+
+        assert snapshots[1]["consecutive_failures"] == 1
+        assert snapshots[1]["last_error"] == "job failed"
+
+    def test_startup_cleanup_failure_does_not_kill_scheduler(self):
+        mgr = _make_scheduler_manager()
+        mgr.event.wait = MagicMock()
+        mgr.scheduler.run_pending = MagicMock(side_effect=mgr.abort_flag.set)
+
+        with patch.object(mgr, "manage_completed_tasks", side_effect=RuntimeError("cleanup failed")):
+            mgr.run()
+
+        mgr.scheduler.run_pending.assert_called_once()
+        assert mgr.get_health_snapshot()["last_error"] == "cleanup failed"

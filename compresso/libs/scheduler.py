@@ -45,11 +45,12 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.resumable_transfer import ResumableTransferStore
 from compresso.libs.session import Session
+from compresso.libs.thread_health import ThreadHealthMixin
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.libs.worker_group import WorkerGroup
 
 
-class ScheduledTasksManager(threading.Thread):
+class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
     """
     Manage any tasks that Compresso needs to execute at regular intervals
     """
@@ -62,6 +63,7 @@ class ScheduledTasksManager(threading.Thread):
         self.abort_flag.clear()
         self.scheduler = schedule.Scheduler()
         self.force_local_worker_timer = 0
+        self._init_thread_health()
 
     def stop(self):
         self.abort_flag.set()
@@ -80,7 +82,12 @@ class ScheduledTasksManager(threading.Thread):
         self.scheduler.every(1).minutes.do(self.set_worker_count_based_on_remote_installation_links)
         # Run a completed task cleanup every 60 minutes and on startup
         self.scheduler.every(12).hours.do(self.manage_completed_tasks)
-        self.manage_completed_tasks()
+        try:
+            self.manage_completed_tasks()
+            self._mark_thread_success()
+        except Exception as e:
+            self._mark_thread_error(e)
+            self.logger.exception("Startup completed-task cleanup failed; continuing scheduler loop")
         # Run preview cleanup every hour
         self.scheduler.every(1).hours.do(self.cleanup_old_previews)
         self.scheduler.every(1).hours.do(self.cleanup_stale_transfers)
@@ -91,10 +98,13 @@ class ScheduledTasksManager(threading.Thread):
         # Loop every 2 seconds to check if a task is due to be run
         while not self.abort_flag.is_set():
             self.event.wait(2)
+            self._mark_thread_heartbeat()
             # Check if scheduled task is due
             try:
                 self.scheduler.run_pending()
-            except Exception:
+                self._mark_thread_success()
+            except Exception as e:
+                self._mark_thread_error(e)
                 self.logger.exception("Scheduled task failed; continuing scheduler loop")
 
         # Clear any tasks and exit

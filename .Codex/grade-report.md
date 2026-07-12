@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **17 of 37** addressable grade items are marked complete below; A1 and G1 received meaningful partial fixes but remain open until supervision/health and bounded streaming are complete.
+- **18 of 37** addressable grade items are marked complete below; G1 received meaningful partial fixes but remains open until bounded streaming is complete.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -53,7 +53,7 @@ Compresso now has strong durability primitives—leases, resumable transfers, sc
 
 ### Architecture improvements
 
-#### A1 — Add fault containment and health supervision for critical service threads
+#### ~~A1~~ ✓ done 2026-07-12 — Add fault containment and health supervision for critical service threads
 
 - **Where:** `compresso/libs/postprocessor.py:95-118`, `compresso/libs/scheduler.py:69-99`, `compresso/service.py:100-138`
 - **What's wrong:** The postprocessor and scheduled-task loops have no per-iteration exception boundary. One unexpected database, filesystem, plugin, or cleanup exception can permanently end finalization or all recurring maintenance.

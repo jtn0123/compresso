@@ -95,6 +95,37 @@ class TestRootServiceStop:
 
 
 @pytest.mark.unittest
+class TestCriticalThreadSupervision:
+    def _make_service(self):
+        with patch("compresso.service.CompressoLogging") as mock_log, patch("compresso.service.startup.StartupState"):
+            mock_log.get_logger.return_value = MagicMock()
+            from compresso.service import RootService
+
+            return RootService()
+
+    def test_dead_critical_thread_fails_readiness_and_stops_service(self):
+        service = self._make_service()
+        dead_thread = MagicMock()
+        dead_thread.is_alive.return_value = False
+        service.threads = [{"name": "PostProcessor", "thread": dead_thread}]
+
+        assert service.monitor_critical_threads() is False
+        assert service.run_threads is False
+        service.startup_state.mark_error.assert_called_once()
+
+    def test_alive_critical_threads_publish_health_to_readiness(self):
+        service = self._make_service()
+        healthy_thread = MagicMock()
+        healthy_thread.is_alive.return_value = True
+        healthy_thread.get_health_snapshot.return_value = {"consecutive_failures": 0}
+        service.threads = [{"name": "ScheduledTasksManager", "thread": healthy_thread}]
+
+        assert service.monitor_critical_threads() is True
+        detail = service.startup_state.mark_ready.call_args.kwargs["detail"]
+        assert detail["ScheduledTasksManager"]["consecutive_failures"] == 0
+
+
+@pytest.mark.unittest
 class TestRootServiceSigHandle:
     @patch("compresso.service.CompressoLogging")
     @patch("compresso.service.startup.StartupState")
