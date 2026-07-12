@@ -577,25 +577,72 @@ class PostProcessor(threading.Thread):
         self._finalize_local_task()
 
     def _finalize_remote_task(self):
-        """Run the standard remote task postprocessing."""
+        """Finalize a remote task only after its file and history are durable."""
+        original_path = self.current_task.get_source_abspath()
         try:
-            self.post_process_remote_file()
+            final_path = self.post_process_remote_file()
+            if not final_path:
+                self._defer_postprocess_failure("remote file movement did not complete")
+                return False
         except (OSError, PermissionError, shutil.Error) as e:
             self._log("Exception in post-processing remote task file", message2=str(e), level="exception")
+            self._defer_postprocess_failure(str(e))
+            return False
         except Exception as e:
             self._log(f"FileOperationError in remote task: {e}", level="exception")
+            self._defer_postprocess_failure(str(e))
+            return False
         try:
-            self.dump_history_log()
+            self.dump_history_log(destination_path=final_path)
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in dumping history log for remote task", message2=str(e), level="exception")
+            self._discard_prepared_remote_output(final_path, original_path)
+            self._defer_postprocess_failure(str(e))
+            return False
         except Exception as e:
             self._log(f"TaskMetadataError in remote history: {e}", level="exception")
+            self._discard_prepared_remote_output(final_path, original_path)
+            self._defer_postprocess_failure(str(e))
+            return False
         try:
+            self.current_task.modify_path(final_path)
             self.current_task.set_status("complete")
         except (AttributeError, TypeError) as e:
             self._log("Exception in marking remote task as complete", message2=str(e), level="exception")
+            self._rollback_prepared_remote_output(final_path, original_path)
+            self._defer_postprocess_failure(str(e))
+            return False
         except Exception as e:
             self._log(f"TaskMetadataError marking complete: {e}", level="exception")
+            self._rollback_prepared_remote_output(final_path, original_path)
+            self._defer_postprocess_failure(str(e))
+            return False
+
+        # The encoded cache remains available until the file, history, path, and
+        # completion state are all durable. Cleanup is best-effort after success.
+        self.__cleanup_cache_files(self.current_task.get_cache_path())
+        return True
+
+    def _rollback_prepared_remote_output(self, final_path, original_path):
+        """Restore task identity before removing a prepared remote copy."""
+        try:
+            self.current_task.modify_path(original_path)
+        except Exception as error:
+            self._log("Unable to roll back remote task path", message2=str(error), level="exception")
+            return False
+        self._discard_prepared_remote_output(final_path, original_path)
+        return True
+
+    def _discard_prepared_remote_output(self, final_path, original_path):
+        """Remove a failed prepared copy while retaining the encoded cache."""
+        if not final_path or os.path.realpath(final_path) == os.path.realpath(original_path):
+            return
+        final_directory = os.path.dirname(final_path)
+        if os.path.basename(final_directory).startswith("compresso_remote_pending_library-"):
+            shutil.rmtree(final_directory, ignore_errors=True)
+            return
+        with contextlib.suppress(FileNotFoundError, OSError):
+            os.remove(final_path)
 
     def _cleanup_staging_files(self):
         """Remove the staging directory for the current task if it exists."""
@@ -800,25 +847,17 @@ class PostProcessor(threading.Thread):
 
     def post_process_remote_file(self):
         """
-        Process remote files.
-        Remote files are not processed by plugins. They are just sent back
-        to the OG installation and then the cache files are cleaned up here.
-        A remote file's source_data will be the download path where this
-        installation initial received and stored it.
+        Copy a remote task's encoded cache to its pending final location.
 
-        TODO: Should we move remote tasks to a permanent download location within the cache path? Possibly not...
-
-        :return:
+        The cache is deliberately retained until the caller has durably written
+        history and marked the task complete. The returned path is therefore a
+        prepared result, not permission to clean up the cache yet.
         """
-        # Read current task data
         cache_path = self.current_task.get_cache_path()
         source_data = self.current_task.get_source_data()
         destination_data = self.current_task.get_destination_data()
         def_cache_path = self.settings.get_cache_path()
-
-        remove_source_file = True
-        if def_cache_path not in destination_data["abspath"]:
-            remove_source_file = False
+        remove_source_file = self._path_is_within(source_data.get("abspath"), def_cache_path)
 
         self._log(f"Cache path: {def_cache_path}", level="debug")
         self._log(
@@ -830,7 +869,12 @@ class PostProcessor(threading.Thread):
         )
         self._log(f"Task cache path: {cache_path}", level="debug")
 
-        # Remove the source
+        if not os.path.exists(cache_path):
+            self._log(f"Final cache file '{cache_path}' does not exist!", level="warning")
+            return False
+
+        # Remove a temporary downloaded source only after confirming that the
+        # completed encoded cache exists and can be retained for recovery.
         if os.path.exists(source_data.get("abspath")) and remove_source_file:
             self._log(f"Removing remote source: {source_data.get('abspath')}")
             os.remove(source_data.get("abspath"))
@@ -839,42 +883,44 @@ class PostProcessor(threading.Thread):
         else:
             self._log(f"Remote source file '{source_data.get('abspath')}' does not exist!", level="warning")
 
-        # Copy final cache file to original directory
         random_string = f"{common.random_string()}-{int(time.time())}"
         library_tdir = os.path.join(
             os.path.dirname(source_data.get("abspath")), "compresso_remote_pending_library-" + random_string
         )
         cache_tdir = os.path.join(def_cache_path, "compresso_remote_pending_library-" + random_string)
 
-        if os.path.exists(cache_path) and remove_source_file:
-            self.__copy_file(cache_path, destination_data.get("abspath"), [], "DEFAULT", move=True)
-            tdir = cache_tdir
-        elif os.path.exists(cache_path) and not remove_source_file:
-            try:
-                tdir = library_tdir
-                os.mkdir(library_tdir)
-                capture_success = self.__copy_file(
-                    cache_path, os.path.join(library_tdir, os.path.basename(cache_path)), [], "DEFAULT", move=True
-                )
-                if not capture_success:
-                    raise OSError("Failed to copy back to network share")
-            except (OSError, PermissionError, shutil.Error):
-                os.mkdir(cache_tdir)
-                self.__copy_file(cache_path, os.path.join(cache_tdir, os.path.basename(cache_path)), [], "DEFAULT", move=True)
-                tdir = cache_tdir
-            finally:
-                self._log(f"tdir: {tdir}", level="debug")
-        else:
-            self._log(f"Final cache file '{cache_path}' does not exist!", level="warning")
-
-        # Cleanup cache files
-        self.__cleanup_cache_files(cache_path)
-
-        # Modify the task abspath - this may be different now
         if remove_source_file:
-            self.current_task.modify_path(destination_data.get("abspath"))
-        else:
-            self.current_task.modify_path(os.path.join(tdir, os.path.basename(cache_path)))
+            if not self.__copy_file(cache_path, destination_data.get("abspath"), [], "DEFAULT", move=False):
+                return False
+            return destination_data.get("abspath")
+
+        final_directory = library_tdir
+        try:
+            os.mkdir(library_tdir)
+            final_path = os.path.join(library_tdir, os.path.basename(cache_path))
+            if not self.__copy_file(cache_path, final_path, [], "DEFAULT", move=False):
+                raise OSError("Failed to copy back to network share")
+            return final_path
+        except (OSError, PermissionError, shutil.Error):
+            final_directory = cache_tdir
+            os.mkdir(cache_tdir)
+            final_path = os.path.join(cache_tdir, os.path.basename(cache_path))
+            if not self.__copy_file(cache_path, final_path, [], "DEFAULT", move=False):
+                return False
+            return final_path
+        finally:
+            self._log(f"tdir: {final_directory}", level="debug")
+
+    @staticmethod
+    def _path_is_within(path, directory):
+        if not path or not directory:
+            return False
+        normalized_path = os.path.normcase(os.path.realpath(path))
+        normalized_directory = os.path.normcase(os.path.realpath(directory))
+        try:
+            return os.path.commonpath([normalized_directory, normalized_path]) == normalized_directory
+        except ValueError:
+            return False
 
     def __cleanup_cache_files(self, cache_path):
         """
@@ -1106,17 +1152,18 @@ class PostProcessor(threading.Thread):
             self._log(f"Committed file metadata entries: {committed}", level="debug")
         return committed
 
-    def dump_history_log(self):
+    def dump_history_log(self, destination_path=None):
         self._log("Dumping remote task history log.", level="debug")
         task_dump = self.current_task.task_dump()
-        destination_data = self.current_task.get_destination_data()
+        destination_path = destination_path or self.current_task.get_destination_data().get("abspath")
+        task_dump["abspath"] = destination_path
 
         # Dump history log & task state as metadata in the file's path
-        tasks_data_file = os.path.join(os.path.dirname(destination_data.get("abspath")), "data.json")
+        tasks_data_file = os.path.join(os.path.dirname(destination_path), "data.json")
         task_state = TaskDataStore.export_task_state(self.current_task.get_task_id())
         checksum = None
         if task_dump.get("task_success", False):
-            checksum = file_sha256(destination_data.get("abspath"))
+            checksum = file_sha256(destination_path)
         result = common.json_dump_to_file(
             {
                 "task_label": task_dump.get("task_label", ""),

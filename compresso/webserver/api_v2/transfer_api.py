@@ -16,6 +16,11 @@ from compresso.webserver.helpers import pending_tasks
 MAX_CHUNK_SIZE = 8 * 1024 * 1024
 
 
+def _decode_path_parameter(value):
+    """Tornado's PathMatches may supply captured route values as bytes."""
+    return value.decode("ascii") if isinstance(value, bytes) else value
+
+
 def _read_file_chunk(path, offset, limit):
     with open(path, "rb") as source:
         source.seek(offset)
@@ -83,6 +88,7 @@ class ApiTransferHandler(BaseApiHandler):
 
     async def get_transfer_status(self, transfer_id=None):
         try:
+            transfer_id = _decode_path_parameter(transfer_id)
             self.write_success(self._store().status(transfer_id))
         except (KeyError, OSError, ValueError) as error:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
@@ -90,6 +96,7 @@ class ApiTransferHandler(BaseApiHandler):
 
     async def append_transfer_chunk(self, transfer_id=None):
         try:
+            transfer_id = _decode_path_parameter(transfer_id)
             if len(self.request.body) > MAX_CHUNK_SIZE:
                 raise ValueError("Transfer chunk exceeds maximum size")
             offset = int(self.request.headers.get("X-Transfer-Offset", "-1"))
@@ -102,6 +109,7 @@ class ApiTransferHandler(BaseApiHandler):
 
     async def finalize_transfer(self, transfer_id=None):
         try:
+            transfer_id = _decode_path_parameter(transfer_id)
             store = self._store()
             completed_path = store.finalize(transfer_id)
             manifest = store.get_manifest(transfer_id)
@@ -129,6 +137,7 @@ class ApiTransferHandler(BaseApiHandler):
 
     async def get_source_manifest(self, task_id=None):
         try:
+            task_id = _decode_path_parameter(task_id)
             task = self._completed_source(task_id)
             self.write_success(
                 {
@@ -145,6 +154,7 @@ class ApiTransferHandler(BaseApiHandler):
 
     async def get_source_chunk(self, task_id=None):
         try:
+            task_id = _decode_path_parameter(task_id)
             task = self._completed_source(task_id)
             offset = max(0, int(self.get_query_argument("offset", "0")))
             limit = min(MAX_CHUNK_SIZE, max(1, int(self.get_query_argument("limit", str(MAX_CHUNK_SIZE)))))

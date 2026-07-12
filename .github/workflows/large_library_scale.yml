@@ -1,0 +1,80 @@
+name: Large Library Scale Benchmark
+
+on:
+  pull_request:
+    branches:
+      - "master"
+    paths:
+      - "compresso/libs/libraryscanner.py"
+      - "compresso/libs/library_scale_benchmark.py"
+      - "scripts/library-scale-benchmark.py"
+      - "docs/performance/**"
+      - ".github/workflows/large_library_scale.yml"
+  schedule:
+    - cron: "17 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      entries:
+        description: Synthetic media entries to scan and schedule
+        required: true
+        default: "100000"
+        type: choice
+        options:
+          - "10000"
+          - "100000"
+          - "500000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: ${{ github.event_name == 'schedule' && '500k scheduled' || 'scale benchmark' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.lock
+
+      - name: Select benchmark tier
+        id: tier
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_ENTRIES: ${{ inputs.entries }}
+        run: |
+          if [[ "$EVENT_NAME" == "schedule" ]]; then
+            echo "entries=500000" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "entries=$MANUAL_ENTRIES" >> "$GITHUB_OUTPUT"
+          else
+            echo "entries=10000" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run metadata scan and SQLite scheduling benchmark
+        run: >-
+          python scripts/library-scale-benchmark.py
+          --entries ${{ steps.tier.outputs.entries }}
+          --output large-library-${{ steps.tier.outputs.entries }}.json
+          --assert-thresholds
+
+      - name: Upload benchmark result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: large-library-${{ steps.tier.outputs.entries }}
+          path: large-library-${{ steps.tier.outputs.entries }}.json
+          retention-days: 90

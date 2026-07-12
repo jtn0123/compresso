@@ -49,6 +49,8 @@ class TestSystemApiStatus(ApiTestBase):
                         "name": "NVIDIA GTX 1080",
                         "memory_total_mb": 8192,
                         "driver_version": "535.129.03",
+                        "hwaccel": "cuda",
+                        "index": 0,
                     },
                 ],
             },
@@ -85,6 +87,8 @@ class TestSystemApiStatus(ApiTestBase):
         assert data["disk"]["percent"] == 50.0
         assert data["uptime_seconds"] == 86400
         assert len(data["gpus"]) == 1
+        assert data["gpus"][0]["hwaccel"] == "cuda"
+        assert data["gpus"][0]["index"] == 0
 
     @patch(SYSTEM_API + ".time")
     @patch(SYSTEM_API + ".psutil")

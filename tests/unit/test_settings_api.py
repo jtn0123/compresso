@@ -25,6 +25,7 @@ def _mock_initialize(self, **kwargs):
         "debugging": False,
         "ui_port": 8888,
         "cache_path": "/tmp/compresso",
+        "api_auth_token": "must-not-leak",
     }
     self.config.get_remote_installations.return_value = []
 
@@ -47,6 +48,7 @@ class TestSettingsApiRead(ApiTestBase):
         data = self.parse_response(resp)
         assert "settings" in data
         assert data["settings"]["debugging"] is False
+        assert "api_auth_token" not in data["settings"]
 
     @patch(SETTINGS_API + ".config.Config")
     def test_write_settings(self, _mock_config_cls):
