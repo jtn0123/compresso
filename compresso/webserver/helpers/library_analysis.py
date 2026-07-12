@@ -52,10 +52,9 @@ def start_analysis(library_id):
     Returns immediately with status info.
     """
     with _analyses_lock:
-        if library_id in _active_analyses:
-            info = _active_analyses[library_id]
-            if info.get("status") == "running":
-                return {"status": "running", "progress": info.get("progress", {})}
+        existing = _active_analyses.get(library_id)
+        if existing and existing.get("status") == "running":
+            return {"status": "running", "progress": existing.get("progress", {})}
 
     # Validate library exists
     library = Library(library_id)
@@ -65,6 +64,9 @@ def start_analysis(library_id):
     info = {"status": "running", "progress": progress, "library_id": library_id}
 
     with _analyses_lock:
+        existing = _active_analyses.get(library_id)
+        if existing and existing.get("status") == "running":
+            return {"status": "running", "progress": existing.get("progress", {})}
         _active_analyses[library_id] = info
 
     thread = threading.Thread(
@@ -135,18 +137,10 @@ def _load_json_dict(value):
 def _probe_analysis_file(filepath):
     meta = extract_media_metadata(filepath)
     file_size = os.path.getsize(filepath)
-    bitrate_mbps = 0
-    try:
-        from compresso.libs.ffprobe_utils import probe_file
-
-        probe_data = probe_file(filepath, timeout=10)
-        if probe_data and probe_data.get("format"):
-            duration = float(probe_data["format"].get("duration", 0))
-            if duration > 0:
-                bit_rate = probe_data["format"].get("bit_rate")
-                bitrate_mbps = float(bit_rate) / 1000000 if bit_rate else file_size * 8 / duration / 1000000
-    except Exception as e:
-        logger.debug("Failed to probe bitrate for %s: %s", filepath, e)
+    bitrate_mbps = float(meta.get("bitrate_mbps", 0) or 0)
+    duration = float(meta.get("duration", 0) or 0)
+    if bitrate_mbps <= 0 and duration > 0:
+        bitrate_mbps = file_size * 8 / duration / 1000000
 
     return {
         "codec": _normalise_codec(meta.get("codec")),

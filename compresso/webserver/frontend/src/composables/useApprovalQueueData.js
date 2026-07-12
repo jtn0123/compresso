@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { displayBasename } from 'src/js/pathUtils'
 
 const EMPTY_SUMMARY = {
   total_count: 0,
@@ -15,8 +16,7 @@ const EMPTY_SUMMARY = {
 }
 
 export function fileName(abspath) {
-  if (!abspath) return ''
-  return abspath.split('/').pop()
+  return displayBasename(abspath)
 }
 
 export function formatSize(bytes) {

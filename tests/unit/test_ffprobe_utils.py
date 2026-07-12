@@ -126,6 +126,19 @@ class TestExtractMediaMetadata:
         result = self._call("/test/file.mkv")
         assert result["codec"] == "hevc"
 
+    @patch("compresso.libs.ffprobe_utils.probe_file")
+    def test_extracts_bitrate_from_same_probe(self, mock_probe):
+        mock_probe.return_value = {
+            "streams": [{"codec_type": "video", "codec_name": "hevc", "height": 1080}],
+            "format": {"duration": "120", "bit_rate": "8000000"},
+        }
+
+        result = self._call("/test/file.mkv")
+
+        assert result["duration"] == 120
+        assert result["bitrate_mbps"] == 8
+        mock_probe.assert_called_once_with("/test/file.mkv", timeout=30)
+
     @pytest.mark.parametrize(
         "height,expected",
         [

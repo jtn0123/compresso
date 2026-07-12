@@ -79,6 +79,29 @@ def _make_current_task(
     return mock_task
 
 
+@pytest.mark.unittest
+class TestPostprocessorFaultContainment:
+    def test_unexpected_task_failure_is_deferred_and_released(self):
+        pp = _make_postprocessor()
+        pp.current_task = _make_current_task()
+        handler = MagicMock(side_effect=RuntimeError("boom"))
+        pp._defer_postprocess_failure = MagicMock()
+
+        pp._handle_task_safely(handler)
+
+        pp._defer_postprocess_failure.assert_called_once_with("boom")
+        assert pp.current_task is None
+
+    def test_defer_failure_does_not_escape_or_retain_current_task(self):
+        pp = _make_postprocessor()
+        pp.current_task = _make_current_task()
+        pp._defer_postprocess_failure = MagicMock(side_effect=RuntimeError("database unavailable"))
+
+        pp._handle_task_safely(MagicMock(side_effect=RuntimeError("boom")))
+
+        assert pp.current_task is None
+
+
 # ------------------------------------------------------------------
 # TestPostProcessError
 # ------------------------------------------------------------------

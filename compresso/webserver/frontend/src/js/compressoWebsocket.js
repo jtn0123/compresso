@@ -2,6 +2,7 @@ import { Notify } from 'quasar'
 import { ref } from 'vue'
 import $compresso, { showEventToast } from './compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
+import { displayBasename } from 'src/js/pathUtils'
 
 const log = createLogger('WebSocket')
 
@@ -355,7 +356,7 @@ export const CompressoWebsocketHandler = function ($t) {
                       seenCompletedIds.add(task.id)
                       // Only toast if connected for >5s (skip initial load batch)
                       if (connectionAge > 5000) {
-                        const filename = task.abspath ? task.abspath.split('/').pop() : $t('toasts.unknownFile')
+                        const filename = task.abspath ? displayBasename(task.abspath) : $t('toasts.unknownFile')
                         if (task.success) {
                           const savings =
                             task.source_size && task.source_size > 0

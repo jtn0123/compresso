@@ -274,7 +274,7 @@ class TestRunAnalysisBitrate:
 
         mock_walk.return_value = [("/media", [], ["movie.mp4"])]
         mock_getsize.return_value = 1_000_000_000
-        mock_meta.return_value = _make_meta()
+        mock_meta.return_value = {**_make_meta(), "duration": 100.0, "bitrate_mbps": 20.0}
         mock_hist.return_value = {}
         mock_lib_cls.return_value.get_skip_codecs.return_value = []
 
@@ -286,11 +286,8 @@ class TestRunAnalysisBitrate:
 
         mock_cache_model.get_or_create.side_effect = capture
 
-        probe_data = _make_probe_data(duration=100.0, bit_rate="20000000")
-
-        with patch("compresso.libs.ffprobe_utils.probe_file", return_value=probe_data):
-            info = {"status": "running", "progress": {"checked": 0, "total": 0}}
-            _run_analysis(1, "/media", info)
+        info = {"status": "running", "progress": {"checked": 0, "total": 0}}
+        _run_analysis(1, "/media", info)
 
         assert saved["groups"][0]["avg_bitrate_mbps"] == pytest.approx(20.0, abs=0.1)
 
@@ -312,7 +309,7 @@ class TestRunAnalysisBitrate:
 
         mock_walk.return_value = [("/media", [], ["movie.mp4"])]
         mock_getsize.return_value = file_size
-        mock_meta.return_value = _make_meta()
+        mock_meta.return_value = {**_make_meta(), "duration": duration, "bitrate_mbps": 0}
         mock_hist.return_value = {}
         mock_lib_cls.return_value.get_skip_codecs.return_value = []
 
@@ -324,11 +321,8 @@ class TestRunAnalysisBitrate:
 
         mock_cache_model.get_or_create.side_effect = capture
 
-        probe_data = {"format": {"duration": str(duration)}}  # no bit_rate key
-
-        with patch("compresso.libs.ffprobe_utils.probe_file", return_value=probe_data):
-            info = {"status": "running", "progress": {"checked": 0, "total": 0}}
-            _run_analysis(1, "/media", info)
+        info = {"status": "running", "progress": {"checked": 0, "total": 0}}
+        _run_analysis(1, "/media", info)
 
         assert saved["groups"][0]["avg_bitrate_mbps"] == pytest.approx(expected_mbps, abs=0.1)
 
@@ -749,6 +743,19 @@ class TestIncrementalAnalysisMetadata:
         assert result == entry
         mock_probe.assert_called_once_with("/media/changed.mkv")
         mock_persist.assert_called_once_with("/media/changed.mkv", ("fp-new", "algo"), entry)
+
+    @patch(ANALYSIS_MODULE + ".os.path.getsize", return_value=120_000_000)
+    @patch(
+        ANALYSIS_MODULE + ".extract_media_metadata",
+        return_value={"codec": "h264", "resolution": "1080p", "duration": 120, "bitrate_mbps": 8},
+    )
+    def test_probe_analysis_reuses_metadata_probe_for_bitrate(self, mock_extract, _mock_size):
+        from compresso.webserver.helpers.library_analysis import _probe_analysis_file
+
+        result = _probe_analysis_file("/media/movie.mkv")
+
+        assert result["bitrate_mbps"] == 8
+        mock_extract.assert_called_once_with("/media/movie.mkv")
 
     @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")

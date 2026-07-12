@@ -180,6 +180,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { displayBasename } from 'src/js/pathUtils'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import WorkerMoreDetailsDialog from 'components/dashboard/workers/WorkerMoreDetailsDialog.vue'
 
@@ -270,7 +271,7 @@ function workerShortName(name) {
 
 function truncateFile(file) {
   if (!file) return ''
-  const name = file.split('/').pop()
+  const name = displayBasename(file)
   if (name.length > 25) return name.substring(0, 23) + '..'
   return name
 }

@@ -861,6 +861,7 @@ export default {
     }
 
     async function doApprove(ids) {
+      if (approving.value) return
       approving.value = true
       try {
         const payload = selectAllMode.value ? { all_matching: true, ...buildBulkFilterPayload() } : { id_list: ids }
@@ -1046,7 +1047,15 @@ export default {
 
     function handleKeydown(e) {
       if (showDetailDialog.value) {
-        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
+        const target = e.target
+        const isInteractiveTarget =
+          target instanceof Element &&
+          Boolean(
+            target.closest(
+              'input, textarea, select, button, a, [contenteditable="true"], [role="button"], [role="textbox"], [role="combobox"]',
+            ),
+          )
+        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !isInteractiveTarget) {
           e.preventDefault()
           approveFromDetail()
         }

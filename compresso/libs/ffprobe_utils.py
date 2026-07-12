@@ -77,6 +77,7 @@ def extract_media_metadata(filepath):
         "resolution": "",
         "container": "",
         "duration": 0,
+        "bitrate_mbps": 0,
     }
 
     # Container from file extension
@@ -95,6 +96,8 @@ def extract_media_metadata(filepath):
     # Extract duration from format level
     with contextlib.suppress(TypeError, ValueError):
         result["duration"] = float(probe_data.get("format", {}).get("duration", 0) or 0)
+    with contextlib.suppress(TypeError, ValueError):
+        result["bitrate_mbps"] = float(probe_data.get("format", {}).get("bit_rate", 0) or 0) / 1000000
 
     # Find the first video stream
     for stream in probe_data.get("streams", []):

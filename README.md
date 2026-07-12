@@ -24,7 +24,7 @@ docker run -d \
   -p 8888:8888 \
   -v /path/to/media:/library \
   -v compresso-config:/config \
-  jtn0123/compresso:latest
+  ghcr.io/jtn0123/compresso:latest
 ```
 
 Then open http://localhost:8888 in your browser.
@@ -32,6 +32,7 @@ Then open http://localhost:8888 in your browser.
 ### Supported Deploy Paths
 
 - **Docker (recommended)** — see [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`docs/FORK_DEPLOYMENT.md`](docs/FORK_DEPLOYMENT.md)
+- **20 TB rollout** — follow [`docs/20TB_MEDIA_COMPRESSION_RUNBOOK.md`](docs/20TB_MEDIA_COMPRESSION_RUNBOOK.md) before using a production library
 - **Source** — see [Install and Run](#install-and-run) below
 
 ---

@@ -89,6 +89,19 @@ def test_heartbeat_extends_only_matching_lease(lease_db):
 
 
 @pytest.mark.unittest
+def test_expired_lease_cannot_be_revived_by_heartbeat(lease_db):
+    task = _task()
+    now = datetime.datetime(2026, 1, 1, 12, 0, 0)
+    token = RemoteTaskLease.acquire(task, "worker-a", ttl_seconds=10, now=now)
+
+    assert RemoteTaskLease.heartbeat(task, token, now=now + datetime.timedelta(seconds=11)) is False
+
+    task = Tasks.get_by_id(task.id)
+    assert task.heartbeat_at == now
+    assert task.lease_expires_at == now + datetime.timedelta(seconds=10)
+
+
+@pytest.mark.unittest
 def test_completion_is_idempotent_but_rejects_conflicting_result(lease_db):
     task = _task()
     now = datetime.datetime(2026, 1, 1, 12, 0, 0)
@@ -102,6 +115,19 @@ def test_completion_is_idempotent_but_rejects_conflicting_result(lease_db):
     assert task.remote_result_checksum == "sha256:abc"
     assert task.remote_completed_at == now
     assert task.lease_expires_at is None
+
+
+@pytest.mark.unittest
+def test_expired_lease_cannot_submit_first_completion(lease_db):
+    task = _task()
+    now = datetime.datetime(2026, 1, 1, 12, 0, 0)
+    token = RemoteTaskLease.acquire(task, "worker-a", ttl_seconds=10, now=now)
+
+    assert RemoteTaskLease.complete(task, token, "sha256:late", now=now + datetime.timedelta(seconds=11)) is False
+
+    task = Tasks.get_by_id(task.id)
+    assert task.remote_result_checksum is None
+    assert task.remote_completed_at is None
 
 
 @pytest.mark.unittest

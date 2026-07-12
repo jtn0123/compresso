@@ -97,6 +97,33 @@ class TestSetConfigItem:
             c.set_config_item("debugging", True, save_settings=False)
         assert c.debugging is True
 
+    def test_saved_settings_are_owner_only(self, tmp_path):
+        c = _make_config(tmp_path)
+        c.set_config_item("api_auth_token", "super-secret", save_settings=False)
+
+        c._Config__write_settings_to_file()
+
+        settings_file = os.path.join(c.get_config_path(), "settings.json")
+        assert os.stat(settings_file).st_mode & 0o777 == 0o600
+        with open(settings_file) as infile:
+            assert json.load(infile)["api_auth_token"] == "super-secret"  # noqa: S105 - synthetic test token
+
+    def test_failed_settings_write_does_not_log_config_secrets(self, tmp_path):
+        c = _make_config(tmp_path)
+        c.set_config_item("api_auth_token", "super-secret", save_settings=False)
+
+        with (
+            patch(
+                "compresso.config.common.json_dump_to_file",
+                return_value={"success": False, "errors": ["disk full"]},
+            ),
+            patch("compresso.config.logger") as mock_logger,
+        ):
+            c.set_config_item("ui_port", 9999)
+
+        assert "super-secret" not in str(mock_logger.mock_calls)
+        mock_logger.exception.assert_called_once_with("Failed to write settings to file")
+
 
 @pytest.mark.unittest
 class TestSetBulkConfigItems:

@@ -296,6 +296,17 @@ describe('ApprovalQueue.vue', () => {
       const taskCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/tasks'))
       expect(taskCalls.length).toBeGreaterThanOrEqual(1)
     })
+
+    it('does not submit a second approval while one is active', async () => {
+      const wrapper = await mountApprovalQueue()
+      wrapper.vm.selected = [MOCK_TASKS[0]]
+      wrapper.vm.approving = true
+
+      await wrapper.vm.approveSelected()
+
+      const approveCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/approve'))
+      expect(approveCalls).toHaveLength(0)
+    })
   })
 
   // 7. Clicking reject opens the reject confirmation dialog
@@ -461,6 +472,40 @@ describe('ApprovalQueue.vue', () => {
       expect(approveCalls[0][1]).toEqual({ id_list: [1] })
       expect(wrapper.vm.showDetailDialog).toBe(false)
     })
+
+    it('does not approve when Enter comes from an interactive control', async () => {
+      const wrapper = await mountApprovalQueue()
+      await wrapper.vm.showDetail(1)
+      await flushPromises()
+      vi.clearAllMocks()
+      mockFetchSuccess()
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await flushPromises()
+
+      const approveCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/approve'))
+      expect(approveCalls).toHaveLength(0)
+      input.remove()
+      wrapper.unmount()
+    })
+
+    it('keeps Enter as an approval shortcut outside interactive controls', async () => {
+      const wrapper = await mountApprovalQueue()
+      await wrapper.vm.showDetail(1)
+      await flushPromises()
+      vi.clearAllMocks()
+      mockFetchSuccess()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+      await flushPromises()
+
+      const approveCalls = axios.post.mock.calls.filter(([url]) => url.includes('approval/approve'))
+      expect(approveCalls.length).toBeGreaterThanOrEqual(1)
+      expect(approveCalls.every(([, payload]) => payload.id_list?.[0] === 1)).toBe(true)
+      wrapper.unmount()
+    })
   })
 
   // Bonus: computed helpers
@@ -469,6 +514,7 @@ describe('ApprovalQueue.vue', () => {
       const wrapper = await mountApprovalQueue()
       expect(wrapper.vm.fileName('/media/movies/movie1.mkv')).toBe('movie1.mkv')
       expect(wrapper.vm.fileName('/path/to/file.mp4')).toBe('file.mp4')
+      expect(wrapper.vm.fileName('C:\\Media\\Movies\\file.mp4')).toBe('file.mp4')
       expect(wrapper.vm.fileName('')).toBe('')
       expect(wrapper.vm.fileName(null)).toBe('')
     })

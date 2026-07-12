@@ -232,6 +232,9 @@ class Task:
         :param priority_score:
         :return:
         """
+        if task_type not in {"local", "remote"}:
+            raise TaskError(f'Unable to create task with type "{task_type}". Type must be one of [local, remote].')
+
         try:
             # Record source file size at task creation
             source_size = 0
@@ -366,6 +369,15 @@ class Task:
     def get_task_list_filtered_and_sorted(
         self, order=None, start=0, length=None, search_value=None, id_list=None, status=None, task_type=None, library_ids=None
     ):
+        if start is None or int(start) < 0:
+            raise TaskError("Task list start must be zero or greater.")
+        if length is not None and not 0 <= int(length) <= 1000:
+            raise TaskError("Task list length must be between 0 and 1000.")
+        if task_type is not None and task_type not in {"local", "remote"}:
+            raise TaskError("Task type must be one of [local, remote].")
+
+        start = int(start)
+        length = int(length) if length is not None else None
         try:
             query = Tasks.select()
 

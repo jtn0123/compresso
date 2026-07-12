@@ -147,7 +147,7 @@
 
                         <q-item-section v-if="item.input_type === 'checkbox'">
                           <div
-                            @click="item.value = !item.value"
+                            @click.self="toggleCheckboxSetting(item)"
                             :style="
                               $q.dark.isActive ? 'background:rgba(255,255,255,.07)' : 'background:rgba(0, 0, 0, 0.05);'
                             "
@@ -294,6 +294,11 @@ import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { markdownToHTML } from 'src/js/markupParser'
 import { sanitizeHtml } from 'src/js/sanitize'
+import {
+  clonePluginSettings,
+  createSerializedSettingsSaver,
+  toggleEnabledCheckboxSetting,
+} from 'src/js/pluginSettingsUtils'
 import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
@@ -341,7 +346,6 @@ const status = ref(null)
 const settings = ref([])
 const originalSettings = ref([])
 const isHydratingSettings = ref(false)
-const isSavingSettings = ref(false)
 
 const directoryInputTarget = ref(null)
 const selectDirectoryInitialPath = ref('')
@@ -467,42 +471,43 @@ const resetPluginLibraryConfig = () => {
     })
 }
 
-const savePluginSettings = () => {
-  if (!settings.value.length) {
-    return
-  }
-  if (isSavingSettings.value) {
-    return
-  }
-  isSavingSettings.value = true
-  const data = {
-    plugin_id: props.pluginId,
-    settings: settings.value,
-  }
-  if (props.libraryId) {
-    data.library_id = props.libraryId
-  }
-  axios({
-    method: 'post',
-    url: getCompressoApiUrl('v2', 'plugins/settings/update'),
-    data: data,
-  })
-    .then(() => {
-      originalSettings.value = JSON.parse(JSON.stringify(settings.value))
-      fetchPluginData()
+const settingsSaver = createSerializedSettingsSaver({
+  snapshot: () => clonePluginSettings(settings.value),
+  hasChanges: () => settings.value.length > 0 && settingsHaveBeenModified(),
+  persist: (settingsSnapshot) => {
+    const data = {
+      plugin_id: props.pluginId,
+      settings: settingsSnapshot,
+    }
+    if (props.libraryId) {
+      data.library_id = props.libraryId
+    }
+    return axios({
+      method: 'post',
+      url: getCompressoApiUrl('v2', 'plugins/settings/update'),
+      data: data,
     })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('notifications.failedToSavePluginSettings'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
+  },
+  accept: (settingsSnapshot) => {
+    originalSettings.value = settingsSnapshot
+  },
+  refresh: fetchPluginData,
+  onError: () => {
+    $q.notify({
+      color: 'negative',
+      position: 'top',
+      message: t('notifications.failedToSavePluginSettings'),
+      icon: 'report_problem',
+      actions: [{ icon: 'close', color: 'white' }],
     })
-    .finally(() => {
-      isSavingSettings.value = false
-    })
+  },
+  defer: (callback) => nextTick(callback),
+})
+
+const savePluginSettings = () => settingsSaver.requestSave()
+
+const toggleCheckboxSetting = (item) => {
+  toggleEnabledCheckboxSetting(item)
 }
 
 const updateWithDirectoryBrowser = (input) => {
@@ -564,7 +569,7 @@ watch(
 watch(
   settings,
   () => {
-    if (isHydratingSettings.value || isSavingSettings.value) {
+    if (isHydratingSettings.value) {
       return
     }
     if (!settingsHaveBeenModified()) {

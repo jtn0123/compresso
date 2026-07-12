@@ -1,389 +1,450 @@
 # Codebase Grade Report
 
 **Project:** Compresso
-**Audited:** 2026-07-11
-**Baseline:** promoted `master` candidate `7f0d942f1e9750facdfcde2a0d88c94a0fa10a7b` plus release-recovery hardening `dcc5c0b`
+
+**Audited:** 2026-07-12
+
+**Baseline:** released `master` at `668ba24b8085f8d060fe0f861acfd88ebd307ccf` (`v1.13.2`)
+
 **Stack:** Python 3.13, Tornado, Peewee/SQLite, Vue 3, Quasar/Vite, pytest, Vitest, Playwright, GitHub Actions
 
 ## Summary
 
 | ID | Category | Grade | Items |
 |----|----------|-------|-------|
-| A | Architecture & Design | B | 3 |
-| B | Backend Quality | A- | 3 |
-| C | Frontend Quality | B- | 3 |
-| D | Testing & Reliability | B+ | 4 |
-| E | Security | B | 4 |
-| F | Dependencies & Tech Currency | A- | 3 |
-| G | Performance & Scalability | B | 4 |
-| H | Documentation & Onboarding | B+ | 3 |
-| I | Developer Experience & Tooling | B+ | 4 |
-| **Overall** | | **B+** | **31** |
+| A | Architecture & Design | B- | 3 |
+| B | Backend Quality | B | 5 |
+| C | Frontend Quality | C | 5 |
+| D | Testing & Reliability | B | 4 |
+| E | Security | C+ | 6 |
+| F | Dependencies & Tech Currency | B | 3 |
+| G | Performance & Scalability | C+ | 5 |
+| H | Documentation & Onboarding | C+ | 3 |
+| I | Developer Experience & Tooling | B | 3 |
+| **Overall** | | **B-** | **37** |
 
-**Top 5 highest-leverage remaining fixes:** E1, A1, C1, G2, D1
+**Top 5 highest-leverage fixes:** E1, A1, B1, C1, G1
 
-## 2026-07-11 NAS-free implementation update
+## Validation Snapshot
 
-- **B1 completed:** remote file, history, path, and completion writes now fail
-  closed; recoverable cache output is retained until every boundary succeeds.
-- **D1 materially advanced:** CI and `verify-local` now run a separate
-  real-backend Playwright project. It exposed and fixed the macOS GPU schema 500
-  and browser-visible API-token field. Packaged-wheel startup and seeded
-  approval/reject/restart journeys remain.
-- **D2/G1 metadata gate completed:** generated 10k, 100k, and 500k tiers now
-  record wall time, peak Python/RSS memory, SQLite size, indexed lookup latency,
-  and deep-page latency. Pull requests run 10k; scheduled CI runs 500k.
-- **D3 materially advanced:** a localhost master and worker now validate each
-  other through the real API, resume a checksummed transfer after process
-  restart, reject stale chunks, finalize idempotently, survive another restart,
-  and prove database isolation. Real encode handoff/download interruption and a
-  separate M4 remain.
-- **All-up evidence:** 3,588 backend unit tests, 21 integration tests, 416
-  frontend tests, Ruff, formatting, Mypy, frontend lint/coverage/build, 3 mocked
-  Playwright tests, and 3 real-backend Playwright tests pass.
+- PR `#184` merged cleanly, release `v1.13.2` published successfully, and no open PRs remained.
+- Ruff and formatting passed across the Python source/tests; Mypy passed across 232 source files.
+- Integration suite passed 21 tests; the full unit suite and post-merge cross-platform GitHub matrix were run against the merged revision.
+- Frontend passed 416 unit tests, ESLint, isolated coverage, and a production build.
+- Frontend coverage was 35.6% lines, 25.1% branches, and 24.9% functions, with 59 of 110 application files absent from the report.
+- Python and npm security audits reported no known vulnerabilities.
+- Focused repros confirmed stale-lease revival, duplicate analysis starts, unlimited negative pagination, invalid task types, scheduler exception propagation, and a download-link concurrency crash.
+- This remains a NAS-free audit: real-media quality, NAS behavior, and physical M4 interruption/thermal evidence are still outside the evidence boundary.
 
-## Evidence boundary
+### Implementation validation — `codex/audit-fix-batch`
 
-This rerun deliberately excludes NAS and real-media claims. It uses the merged source, live GitHub CI/release state, package and dependency audits, existing automated test results, and static inspection. M4 throughput, NAS I/O behavior, sleep/reconnect recovery, thermal throttling, and the 20 TB acceptance gates remain unproven rather than estimated.
-
-The merged release work fixes the confirmed `v1.13.0` publication race: release candidates are now versioned first, validated by exact SHA, and published only after the Python, frontend, integration, package, Docker, scan, signing, and SBOM gates. The first `1.13.1` publication attempt also exposed a missing tagger identity; `dcc5c0b` adds the regression and an exact-artifact GitHub/GHCR recovery workflow. The next engineering gains available without the NAS are the top five items above.
+- **15 of 37** addressable grade items are marked complete below; A1 and G1 received meaningful partial fixes but remain open until supervision/health and bounded streaming are complete.
+- Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
+- Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
+- Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
+- Frontend production dependency audit reported **0 vulnerabilities** after the compatible update batch.
 
 ---
 
-## A — Architecture & Design — B
+## A — Architecture & Design — B-
 
-The durable queue, resumable-transfer, disk-pressure, and file-operation journal layers are a strong foundation. However, destructive filesystem state and Peewee task state still cross separate durability domains in `postprocessor.py` and `task.py`, while critical behavior remains concentrated in very large modules such as `installation_link.py` and `postprocessor.py`. The v1/v2 API trees also retain parallel handler infrastructure.
+Compresso now has strong durability primitives—leases, resumable transfers, scan checkpoints, a replacement journal, and explicit disk guards. The overall design is held back by unsupervised critical threads, separate filesystem/database durability protocols, and very large orchestration modules that combine several state machines.
 
-### A1 — Coordinate filesystem journals and task-state commits
+### Architecture improvements
 
-- **Where:** `compresso/libs/postprocessor.py:536-550`, `compresso/libs/postprocessor.py:621-759`, `compresso/libs/file_operation_tracker.py:39-229`, `compresso/libs/task.py:285-349`
-- **What's wrong:** File replacement is journaled durably, but task status/path changes commit independently through Peewee. A crash between those boundaries requires recovery code to infer which side won instead of replaying one explicit state machine.
-- **Impact:** Major — an unlucky crash can leave the media state and authoritative task state disagreeing even though each subsystem is individually restart-safe.
-- **Fix:** Introduce a persisted finalization phase on the task record (`prepared`, `files_committed`, `task_committed`, `complete`). Make startup recovery advance or roll back from that phase and add crash-injection tests at every phase boundary.
+#### A1 — Add fault containment and health supervision for critical service threads
+
+- **Where:** `compresso/libs/postprocessor.py:95-118`, `compresso/libs/scheduler.py:69-99`, `compresso/service.py:100-138`
+- **What's wrong:** The postprocessor and scheduled-task loops have no per-iteration exception boundary. One unexpected database, filesystem, plugin, or cleanup exception can permanently end finalization or all recurring maintenance.
+- **Impact:** Major — the installation can remain superficially alive while essential work has stopped.
+- **Fix:** Contain each work item, record last-success/error and consecutive failures, expose thread health through readiness, and make the root service restart or fail visibly when a critical thread exits.
+- **Effort:** M
+- **Grade lift:** B- → B (prevents single exceptions from disabling whole subsystems)
+
+#### A2 — Unify file replacement, history, and task state into one replayable protocol
+
+- **Where:** `compresso/libs/postprocessor.py:386-412,801-846`, `compresso/libs/file_operation_tracker.py:106-125`, `compresso/libs/taskhandler.py:166-172`
+- **What's wrong:** Files, history/metadata, and task deletion commit in separate durability domains. Recovery can treat the file as committed and delete the task without replaying missing audit/statistics state.
+- **Impact:** Major — a crash can preserve media while silently losing authoritative history and operational evidence.
+- **Fix:** Persist explicit finalization phases on the task, make each phase idempotent, and replay or roll back every phase before deleting task/journal state. Add crash injection at each boundary.
 - **Effort:** L
-- **Grade lift:** B → B+ (creates one auditable recovery protocol across both durability domains)
+- **Grade lift:** B- → B+ (creates one auditable recovery state machine)
 
-### A2 — Split the critical orchestration modules by responsibility
+#### A3 — Split the largest orchestration modules by state-machine responsibility
 
-- **Where:** `compresso/libs/installation_link.py:1-1470`, `compresso/libs/postprocessor.py:1-1174`, `compresso/webserver/api_v2/pending_api.py:1-987`
-- **What's wrong:** Networking, retry policy, persistence, lifecycle transitions, formatting, and orchestration are bundled into modules over 900 lines. Changes to one concern require understanding several unrelated state machines.
-- **Impact:** Moderate — broad modules increase regression risk and slow future reliability work.
-- **Fix:** Extract installation transport/reconciliation, postprocess file-finalization/history, and pending-query/serialization services behind narrow interfaces. Move tests with each extracted unit before changing behavior.
+- **Where:** `compresso/libs/installation_link.py:1-1470`, `compresso/libs/postprocessor.py:1-1221`, `compresso/webserver/api_v2/pending_api.py:1-987`, `compresso/webserver/frontend/src/pages/ApprovalQueue.vue:1-1100`
+- **What's wrong:** Networking, retry policy, persistence, lifecycle transitions, serialization, and UI actions coexist in modules near or above 1,000 lines.
+- **Impact:** Moderate — small changes require understanding unrelated state machines and increase regression risk.
+- **Fix:** Extract transport/reconciliation, finalization/history, pending-query, and approval-data/action services behind narrow interfaces; move tests with each seam before behavior changes.
 - **Effort:** L
-- **Grade lift:** B → B+ (reduces coupling in the three highest-risk maintenance surfaces)
-
-### A3 — Consolidate API cross-cutting infrastructure
-
-- **Where:** `compresso/webserver/api_v1/base_api_handler.py:1-260`, `compresso/webserver/api_v2/base_api_handler.py:1-330`, `compresso/webserver/api_v1/`, `compresso/webserver/api_v2/`
-- **What's wrong:** v1 and v2 maintain parallel handler/error/routing conventions. Security, serialization, and error-policy fixes can land in one API generation without the other.
-- **Impact:** Moderate — duplicated infrastructure creates inconsistent behavior and repeated security maintenance.
-- **Fix:** Extract shared request security, error envelopes, logging, and response helpers into version-neutral modules; keep only schema and route compatibility in each API version.
-- **Effort:** L
-- **Grade lift:** B → B+ (removes a persistent cross-cutting duplication source)
+- **Grade lift:** B- → B (reduces coupling in the highest-risk maintenance surfaces)
 
 ---
 
-## B — Backend Quality — A-
+## B — Backend Quality — B
 
-The backend now has explicit retry/lease handling, durable transfer primitives, disk-space guards, validation schemas, broad failure-path coverage, and fail-closed remote finalization. Error responses still expose raw exception reasons in several handlers, and task setters perform many independent saves.
+The backend has strong schema coverage, checksummed transfers, retry/defer handling, and broad unit tests. Confirmed lifecycle defects remain around exceptional worker cleanup, lease expiry, task-domain validation, history transactions, and API error ownership.
 
-### B1 — Make remote finalization fail closed [completed]
+### Backend improvements
 
-- **Where:** `compresso/libs/postprocessor.py:579-598`, `compresso/libs/postprocessor.py:801-877`
-- **Result:** `_finalize_remote_task()` now requires durable file preparation, history, path, and completion state before success. Every failure returns false, defers retry, and retains the encoded cache; cleanup happens only after the complete transition.
-- **Evidence:** Focused regressions cover file exceptions, false copy results, history failures, destination-history overrides, cache retention, and successful cleanup order.
+#### ~~B1~~ ✓ done 2026-07-12 — Always release or defer a worker task after unexpected exceptions
+
+- **Where:** `compresso/libs/workers.py:102-128,209-282`
+- **What's wrong:** The loop logs unexpected exceptions but clears `current_task` only after a successful happy path. A failure can leave one worker retrying the same in-progress task forever.
+- **Impact:** Major — one malformed file, plugin failure, or database error can permanently consume a worker and strand work.
+- **Fix:** Wrap the task lifecycle in `try/finally`, persist a retry/defer or failed state, terminate residual subprocess state, and always detach the task. Add injected failures at each persistence boundary.
 - **Effort:** M
-- **Grade lift:** B+ → A- (closes the clearest remaining fail-open media path)
+- **Grade lift:** B → B+ (closes the clearest backend liveness defect)
 
-### B2 — Stop returning raw internal exception text to clients
+#### ~~B2~~ ✓ done 2026-07-12 — Enforce lease expiry during heartbeat and first completion
 
-- **Where:** `compresso/webserver/api_v2/base_api_handler.py:210-271`, `compresso/webserver/api_v2/plugins_api.py:353-435`, `compresso/webserver/api_v2/plugins_api.py:646-768`
-- **What's wrong:** Multiple handlers pass `str(exception)` into HTTP reason text, and JSON parsing errors can include the received request body. Internal paths, dependency messages, and operator-provided content can escape through API errors.
-- **Impact:** Moderate — clients receive unstable implementation details and potentially sensitive diagnostic content.
-- **Fix:** Define stable public error codes/messages, log exception details with a correlation ID, and return only the public envelope. Add response tests asserting that paths, bodies, and exception strings are absent.
-- **Effort:** M
-- **Grade lift:** B+ → A- (standardizes the remaining weak error boundary)
-
-### B3 — Reduce independent task saves in lifecycle transitions
-
-- **Where:** `compresso/libs/task.py:240-349`, `compresso/libs/postprocessor.py:494-528`, `compresso/libs/postprocessor.py:875-877`
-- **What's wrong:** Status, success, path, command log, and defer fields are saved through separate setter calls. Multi-field transitions can be partially visible and generate avoidable SQLite write pressure.
-- **Impact:** Moderate — partial transitions complicate recovery and increase lock contention under concurrent workers.
-- **Fix:** Add explicit transactional transition methods for defer, finalize, retry, and path replacement. Update all related fields in one Peewee atomic block and test rollback on injected database errors.
-- **Effort:** M
-- **Grade lift:** B+ → A- (makes lifecycle writes atomic and lowers write amplification)
-
----
-
-## C — Frontend Quality — B-
-
-The Vue/Quasar UI is useful, visually structured, localized in many paths, and backed by 416 unit tests plus Playwright smoke coverage. Maintainability is held back by several 1,000-1,550-line components, a nearly even split between Composition and Options API components, and repeated direct platform/inline-layout logic that conflicts with the frontend guide. Two repository links are clickable spans rather than semantic controls.
-
-### C1 — Decompose the largest workflow components
-
-- **Where:** `compresso/webserver/frontend/src/components/dashboard/completed/CompletedTasksListDialog.vue:1-1550`, `compresso/webserver/frontend/src/pages/ApprovalQueue.vue:1-1150`, `compresso/webserver/frontend/src/components/dashboard/pending/PendingTasksListDialog.vue:1-1055`, `compresso/webserver/frontend/src/components/preview/VideoCompare.vue:1-1001`
-- **What's wrong:** Data fetching, filters, dialogs, tables, formatting, actions, and responsive variants coexist in single components. Small UI changes require touching large stateful surfaces.
-- **Impact:** Major — these are core user journeys and their size makes regressions and incomplete refactors more likely.
-- **Fix:** Extract composables for data/actions, presentational table/card components, and focused dialog bodies. Keep route/page components as orchestration shells and migrate extracted code to `<script setup>` with targeted tests.
-- **Effort:** L
-- **Grade lift:** B- → B+ (removes the dominant frontend maintainability risk)
-
-### C2 — Finish the responsive-layout standard migration
-
-- **Where:** `compresso/webserver/frontend/src/pages/SettingsLink.vue:8-99`, `compresso/webserver/frontend/src/pages/SettingsWorkers.vue:10`, `compresso/webserver/frontend/src/pages/ApprovalQueue.vue:401-593`, `compresso/webserver/frontend/src/components/settings/plugins/partials/PluginInstallerManageRepos.vue:1-49`
-- **What's wrong:** Components still use `$q.platform.is.mobile`, fixed minimum widths, and inline layout strings despite the project standard requiring Quasar breakpoints, visibility classes, and responsive CSS.
-- **Impact:** Moderate — tablet, resized-window, and desktop-touch layouts can select the wrong structure or overflow.
-- **Fix:** Replace platform detection with `lt-md`/`gt-sm`, `$q.screen`, or `useMobile`; move fixed layout rules into scoped responsive CSS; add viewport tests at phone, tablet, and desktop widths.
-- **Effort:** M
-- **Grade lift:** B- → B (makes responsive behavior consistent and testable)
-
-### C3 — Replace clickable text spans with semantic links or buttons
-
-- **Where:** `compresso/webserver/frontend/src/components/settings/plugins/partials/PluginInstallerManageRepos.vue:62-68`, `compresso/webserver/frontend/src/components/settings/plugins/partials/PluginInstallerManageRepos.vue:92-99`
-- **What's wrong:** Repository URLs are `<span @click>` elements without keyboard semantics, focus behavior, or link destinations.
-- **Impact:** Moderate — keyboard and assistive-technology users cannot reliably activate an important plugin-management action.
-- **Fix:** Render sanitized URLs as `<a>` elements with safe `target`/`rel` attributes or use a semantic Quasar button. Add keyboard and accessible-name assertions.
+- **Where:** `compresso/libs/remote_task_lease.py:61-93`
+- **What's wrong:** Heartbeat and completion check token ownership but not whether the lease is still live. A stale worker can revive an expired lease or complete after its ownership window.
+- **Impact:** Major — distributed exactly-once ownership can break during disconnect/reconnect races.
+- **Fix:** Add `lease_expires_at > now` to heartbeat and first-completion predicates, and create a separate explicit reconciliation path for late identical results.
 - **Effort:** S
-- **Grade lift:** B- → B (closes a concrete accessibility failure)
+- **Grade lift:** B → B+ (makes the lease contract match its expiry semantics)
+
+#### ~~B3~~ ✓ done 2026-07-12 — Validate pagination and task types at both schema and domain boundaries
+
+- **Where:** `compresso/webserver/api_v2/schema/schemas.py:118-160`, `approval_schemas.py:28-60`, `pending_schemas.py:151-180`, `compresso/libs/task.py:243-280,366-406`
+- **What's wrong:** Negative/unlimited pagination is accepted, and task `type` accepts arbitrary strings even though lifecycle code handles only `local` and `remote`.
+- **Impact:** Major — one request can load an entire large table or create a permanently stuck unique-path task.
+- **Fix:** Require `start >= 0`, cap page sizes, restrict type to `local|remote`, and clamp/revalidate inside query and task-creation methods.
+- **Effort:** S
+- **Grade lift:** B → B+ (turns two reproduced API failures into rejected input)
+
+#### B4 — Make history persistence transactional and idempotent
+
+- **Where:** `compresso/libs/history.py:279-313`, `compresso/libs/postprocessor.py:386-412,1081-1103`
+- **What's wrong:** Completed-task, command-log, and statistics rows are independent writes. A false late result is ignored and finalization can delete the task after partial history.
+- **Impact:** Moderate — failures can lose statistics/logs or produce duplicate completed records on retry.
+- **Fix:** Use an idempotency key and one database transaction for all history rows; treat any false result as a deferred finalization failure.
+- **Effort:** M
+- **Grade lift:** B → B+ (makes task history an all-or-nothing boundary)
+
+#### B5 — Give the v2 API one structured error writer
+
+- **Where:** `compresso/webserver/api_v2/base_api_handler.py:210-233,267-340`, `compresso/webserver/api_v2/pending_api.py:529-535`
+- **What's wrong:** Request parsing writes an error and then raises, while many handlers catch and write again. Raw request bodies and exception strings can also become client-visible reasons.
+- **Impact:** Moderate — malformed requests can cause double-finish behavior and leak unstable or sensitive implementation details.
+- **Fix:** Make parsing raise a structured public error without writing, route expected/unexpected errors through one response owner, and log private diagnostics with correlation IDs.
+- **Effort:** M
+- **Grade lift:** B → B+ (standardizes the remaining weak API boundary)
 
 ---
 
-## D — Testing & Reliability — B+
+## C — Frontend Quality — C
 
-Python reliability evidence is unusually strong: 3,588 unit tests, 21 integration tests, deterministic fault tests/fuzzing, a 75% enforced floor, and cross-platform PR shards. Frontend CI runs Vitest coverage, lint, build, mocked Playwright, and a separate real-backend Playwright project. A two-process boundary drill and synthetic scale workflow now exist; packaged-wheel and real-machine interruption coverage remain incomplete.
+The Vue/Quasar interface is useful and has a coherent visual system, localization, and substantial unit coverage. Confirmed user-intent bugs, autosave races, disabled-control bypasses, platform-specific path handling, and accessibility/responsive failures prevent a professional B grade.
 
-### D1 — Add a packaged live-backend Playwright lane [both] [advanced]
+### Frontend improvements
 
-- **Where:** `compresso/webserver/frontend/tests/e2e/compresso-smoke.spec.js:1-260`, `compresso/webserver/frontend/playwright.config.js`, `.github/workflows/frontend_lint_and_build.yml:70-85`
-- **Result:** A separate real-backend project now boots Compresso with isolated config/cache/media roots and validates readiness, system/settings contracts, token redaction, dashboard websocket frames, and an empty approval queue. It caught and fixed a macOS GPU schema 500 and API-token exposure.
-- **Remaining:** Boot the packaged wheel rather than the source tree, seed approval/reject/settings/worker journeys, and add browser-visible restart and migration coverage.
+#### ~~C1~~ ✓ done 2026-07-12 — Scope approval keyboard shortcuts to safe focus contexts
+
+- **Where:** `compresso/webserver/frontend/src/pages/ApprovalQueue.vue:1047-1055`
+- **What's wrong:** A window-level Enter handler approves whenever the detail dialog is open, regardless of whether Reject, Close, preview, or another interactive control has focus.
+- **Impact:** Major — a normal keyboard action can replace the wrong media file.
+- **Fix:** Ignore editable/interactive targets, require an explicit modifier or focused Approve action, guard re-entry, and add keyboard tests for every dialog control.
+- **Effort:** S
+- **Grade lift:** C → C+ (removes the highest-risk frontend action bug)
+
+#### ~~C2~~ ✓ done 2026-07-12 — Serialize plugin autosaves without dropping edits
+
+- **Where:** `compresso/webserver/frontend/src/components/settings/plugins/PluginInfoDialog.vue:470-505,564-575`
+- **What's wrong:** Watcher events are discarded while a save is active; the first completion then refetches server state. A second edit can be overwritten without ever being sent.
+- **Impact:** Major — operators can lose configuration changes with no warning.
+- **Fix:** Queue one trailing save using immutable snapshots/version numbers, refetch only after the latest version is acknowledged, and test two edits around a delayed request.
 - **Effort:** M
-- **Grade lift:** B → B+ (adds the missing product-level release proof without requiring the NAS)
+- **Grade lift:** C → C+ (makes autosave preserve user intent)
 
-### D2 — Build a reproducible 500,000-entry scanner benchmark [BE] [metadata gate completed]
+#### ~~C3~~ ✓ done 2026-07-12 — Prevent disabled plugin settings from changing through wrapper events
 
-- **Where:** `tests/unit/test_benchmark.py`, `tests/unit/test_libraryscanner_coverage.py`, `compresso/libs/libraryscanner.py:261-350`, `.Codex/20tb-media-compression-plan.md:58-69`
-- **Result:** Generated 10k, 100k, and 500k metadata tiers now record wall time, Python/RSS memory, SQLite size, indexed lookup latency, and deep-page latency against versioned thresholds. Pull requests run 10k, scheduled CI runs 500k, and results are retained as artifacts.
-- **Remaining:** Add real directory traversal, file probing, concurrent SQLite contention, and large-queue UI measurements before treating the metadata result as the whole Phase D gate.
+- **Where:** `compresso/webserver/frontend/src/components/settings/plugins/PluginInfoDialog.vue:148-160,470-489`
+- **What's wrong:** The checkbox is disabled, but the parent click handler still toggles the bound value and the save request persists it.
+- **Impact:** Moderate — settings presented as immutable can still be modified.
+- **Fix:** Remove the wrapper handler or guard it on enabled state; use the checkbox event as the single owner and add a disabled-click regression.
+- **Effort:** S
+- **Grade lift:** C → C+ (restores the control contract)
+
+#### ~~C4~~ ✓ done 2026-07-12 — Centralize cross-platform path presentation
+
+- **Where:** `src/composables/useApprovalQueueData.js:17-20`, `src/boot/compressoWebsocket.js:358`, `src/components/dashboard/WorkersPanel.vue:273`, `src/pages/HealthCheck.vue:479`
+- **What's wrong:** Filename extraction splits only on `/`; Windows paths display as the entire absolute path.
+- **Impact:** Moderate — Windows deployments show broken labels in several core views.
+- **Fix:** Add one tested path-display utility supporting `/` and `\\`, then replace all ad hoc splits.
+- **Effort:** S
+- **Grade lift:** C → C+ (fixes a repeated platform defect)
+
+#### C5 — Enforce responsive and accessible interaction standards
+
+- **Where:** `frontend/index.html:10`, `SettingsLibrary.vue:10,92`, `SettingsLink.vue:8,99`, `FirstRunWizard.vue:2-4`, `PluginInstallerManageRepos.vue:62-99`
+- **What's wrong:** Browser zoom is disabled, platform detection replaces viewport breakpoints, several dialogs impose 400-560px minimum widths, and important actions use clickable spans.
+- **Impact:** Moderate — narrow windows, phones, keyboard users, and low-vision users can be blocked from core setup/actions.
+- **Fix:** Restore zoom, use `lt-md`/`useMobile`, maximize dialogs on small viewports, replace spans with semantic links/buttons, and add keyboard/mobile assertions.
 - **Effort:** M
-- **Grade lift:** B → B+ (turns the main scale claim into repeatable evidence)
+- **Grade lift:** C → B- (addresses the broadest UX/accessibility debt cluster)
 
-### D3 — Add a two-process distributed fault harness [BE] [advanced]
+---
 
-- **Where:** `tests/unit/test_remote_task_manager.py`, `tests/unit/test_restart_recovery.py`, `tests/unit/test_resumable_transfer.py`, `compresso/libs/remote_task_manager.py`, `compresso/libs/installation_link.py`
-- **Result:** A localhost master and worker now validate through the real API, resume a checksummed upload after worker restart, reject a stale chunk, finalize one task idempotently, survive another restart, and prove database isolation.
-- **Remaining:** Interrupt real encode handoff and result download, verify lease expiry/reconciliation and bounded cleanup, then repeat across the master/M4 machine boundary.
+## D — Testing & Reliability — B
+
+Python reliability evidence is broad: thousands of unit tests, integration tests, cross-platform shards, fault/fuzz coverage, and a 75% floor. Frontend testing passes but measures only imported files, and browser lanes do not yet prove packaged destructive workflows or diverse clients.
+
+### Testing improvements
+
+#### D1 — Measure every frontend source file and ratchet meaningful thresholds
+
+- **Where:** `compresso/webserver/frontend/vitest.config.js:11-20`, `compresso/webserver/frontend/src/`
+- **What's wrong:** No source include pattern means unimported files count as nonexistent; 59 of 110 application files were absent while 30/20/20/30 thresholds passed.
+- **Impact:** Major — core pages can have zero coverage without lowering the reported gate.
+- **Fix:** Include all JS/Vue source with intentional generated/vendor exclusions, add tests for uncovered core flows, and ratchet thresholds from the resulting honest baseline.
+- **Effort:** M
+- **Grade lift:** B → B+ (makes frontend coverage representative rather than selective)
+
+#### D2 — Exercise a packaged, state-changing release workflow end to end
+
+- **Where:** `frontend/tests/e2e-live/compresso-live-smoke.spec.js:3-52`, `frontend/scripts/start-live-backend.mjs:20-29`
+- **What's wrong:** Live E2E starts source through `PYTHONPATH` and checks mostly read-oriented startup contracts. It does not prove the wheel, migration, encode handoff, approval/reject, or restart workflow.
+- **Impact:** Major — a release can pass while the installed product's core media lifecycle is broken.
+- **Fix:** Install the built wheel in a disposable environment, seed a tiny media fixture, run queue→process→approve/reject→restart journeys, and assert disk/database outcomes.
 - **Effort:** L
-- **Grade lift:** B → B+ (bridges unit reliability work to the eventual real-machine canary)
+- **Grade lift:** B → B+ (adds genuine product-release proof)
 
-### D4 — Raise frontend coverage in measured steps [FE]
+#### ~~D3~~ ✓ done 2026-07-12 — Make mock E2E fail on unknown requests and runtime transport errors
 
-- **Where:** `compresso/webserver/frontend/vitest.config.js:11-20`, `compresso/webserver/frontend/src/components/`, `compresso/webserver/frontend/src/pages/`
-- **What's wrong:** CI permits 30% lines/statements, 20% functions, and 20% branches. The most stateful dialogs and settings flows have little direct component coverage relative to their size.
-- **Impact:** Moderate — frontend refactors can regress error/loading/action branches while the coverage gate remains green.
-- **Fix:** Add tests around the C1 extraction seams and ratchet thresholds after each batch, targeting at least 50% lines/statements and 40% functions/branches before the next broad UI refactor.
+- **Where:** `frontend/tests/e2e/compresso-smoke.spec.js:60-175,219-221`, `frontend/tests/e2e-live/compresso-live-smoke.spec.js:23-40`
+- **What's wrong:** Unknown mock endpoints receive a generic HTTP 200 success, and suites inconsistently ignore console errors, request failures, and unexpected non-2xx responses.
+- **Impact:** Moderate — renamed/misspelled endpoints and browser transport failures can leave smoke tests green.
+- **Fix:** Reject unknown routes, fail on unexpected console/request/HTTP errors, and add deliberate 4xx/5xx recovery scenarios.
+- **Effort:** S
+- **Grade lift:** B → B+ (raises the signal of the existing browser lanes)
+
+#### D4 — Add browser, mobile, and accessibility coverage
+
+- **Where:** `frontend/playwright.config.js:24-29`, `frontend/playwright.live.config.js:51-56`, `.github/workflows/frontend_lint_and_build.yml:85-92`
+- **What's wrong:** E2E runs only desktop Chromium and has no automated keyboard/axe gate despite responsive and accessibility requirements.
+- **Impact:** Moderate — Safari/WebKit, Firefox, mobile layouts, and semantic failures are detected only manually.
+- **Fix:** Add one mobile Chromium project, focused WebKit/Firefox smoke, axe checks, and keyboard traversal for approval/setup/plugin workflows.
+- **Effort:** M
+- **Grade lift:** B → B+ (covers declared client diversity and key accessibility contracts)
+
+---
+
+## E — Security — C+
+
+The project has schema validation, rate limiting, security headers, SSRF guards, CodeQL, Sonar, Trivy, signed images, SBOMs, and clean advisory scans. The effective trust boundary is still incomplete: first launch is unauthenticated on all interfaces, protected mode exempts sensitive reads and whole handler families, secrets are stored weakly, plugins have full process privileges, CSP is permissive, and most Actions use mutable tags.
+
+### Security improvements
+
+#### E1 — Make authentication cover sensitive reads, WebSockets, proxying, and plugin APIs
+
+- **Where:** `base_api_handler.py:53-73,141-193`, `settings_api.py:182-191`, `settings_link_mixin.py:147-169`, `websocket.py:56-171`, `proxy.py:116-189`, `plugins.py:121-205`
+- **What's wrong:** API auth protects only selected mutation routes. Sensitive settings can return remote passwords, while WebSockets, proxy, and plugin APIs bypass the guarded base handler.
+- **Impact:** Major — enabling auth does not actually create the boundary operators expect.
+- **Fix:** Add shared authentication middleware for every dynamic route, protect all sensitive reads, return password-present placeholders instead of secrets, and add unauthorized integration tests for each handler family.
+- **Effort:** M
+- **Grade lift:** C+ → B (closes the largest confidentiality and boundary gap)
+
+#### E2 — Use a safe first-launch network posture
+
+- **Where:** `compresso/config.py:77-80,149-156`, `compresso/libs/uiserver.py:205-215`, `README.md:19-30`
+- **What's wrong:** The default binds all interfaces with auth and CSRF disabled, while Quick Start publishes the port without an adjacent warning.
+- **Impact:** Major — a mistaken router/container exposure permits unauthenticated media-changing requests.
+- **Fix:** Bind loopback by default or require explicit trusted-LAN opt-in, generate a first-run token, and surface exposure mode in onboarding/readiness.
+- **Effort:** M
+- **Grade lift:** C+ → B- (reduces the most likely operator-driven exposure)
+
+#### ~~E3~~ ✓ done 2026-07-12 — Store configuration secrets atomically with mode 0600 and redact failures
+
+- **Where:** `compresso/config.py:263-273,323-327`, `compresso/libs/common.py:225-260`
+- **What's wrong:** Settings inherit the process umask and write failures log the complete configuration, including credentials.
+- **Impact:** Major — local users, backups, or logs can expose tokens, passwords, and webhooks.
+- **Fix:** Write/replace with explicit `0600`, secure backups, preserve ownership, and recursively redact secret fields from every log/response path.
+- **Effort:** S
+- **Grade lift:** C+ → B- (protects stored credentials with a narrow change)
+
+#### E4 — Isolate plugin installation and execution
+
+- **Where:** `compresso/libs/plugins.py:486-564`, `compresso/libs/workers.py:736-751`
+- **What's wrong:** Plugin ZIPs can trigger pip/npm install/build and runtime commands—including shell execution—with the full privileges of the Compresso process.
+- **Impact:** Major — a compromised plugin can read configuration, alter media, or execute arbitrary host commands.
+- **Fix:** Require trusted/signed sources, execute in a restricted container/process profile, default media to read-only, and grant network/filesystem capabilities explicitly.
 - **Effort:** L
-- **Grade lift:** B → B+ (makes the frontend gate commensurate with backend reliability)
+- **Grade lift:** C+ → B+ (turns a documented trust assumption into technical isolation)
+
+#### E5 — Restore meaningful production CSP protection
+
+- **Where:** `compresso/webserver/security_headers.py:46-59`, `compresso/webserver/frontend/quasar.config.cjs`
+- **What's wrong:** Production permits both `unsafe-eval` and inline scripts/styles, sharply reducing CSP's value against future injection bugs.
+- **Impact:** Moderate — a later XSS defect faces fewer browser-enforced barriers.
+- **Fix:** Audit the bundle, choose a CSP-compatible Vue build, externalize or hash/nonce inline content, and add browser assertions that eval/inline execution is rejected.
+- **Effort:** M
+- **Grade lift:** C+ → B- (restores defense in depth)
+
+#### E6 — Pin every third-party GitHub Action to an immutable commit
+
+- **Where:** `.github/workflows/` (54 mutable-tag uses; examples in `python_lint_and_run_unit_tests.yml`, `integration_test_and_build_all_packages_ci.yml`, `release.yml`)
+- **What's wrong:** Most Actions use mutable major tags even though selected release steps are already SHA-pinned.
+- **Impact:** Moderate — an altered tag can change trusted CI or release behavior without a repository diff.
+- **Fix:** Pin all external actions to reviewed SHAs with version comments and let Dependabot update those pins through review.
+- **Effort:** M
+- **Grade lift:** C+ → B- (closes broad CI supply-chain drift)
 
 ---
 
-## E — Security — B
+## F — Dependencies & Tech Currency — B
 
-The project has rate limiting, schema validation, SSRF guards, CSRF/token support, security headers, dependency audits, CodeQL, SonarCloud, Trivy, signed images, and SBOMs. Its default remains a trusted-LAN application rather than a hardened multi-user service: API auth and CSRF are off, reads remain unauthenticated when enabled, plugins execute installation/build code in-process, CSP permits eval/inline code, and many Actions use mutable tags.
+Runtime/dev Python locks and npm locks exist, and live audits found no known vulnerabilities. Reproducibility is weakened because tested/installed graphs differ, npm update automation is missing, and safe frontend updates plus an unused parser remain.
 
-### E1 — Make the network trust boundary explicit and safer by default
+### Dependency improvements
 
-- **Where:** `compresso/config.py:149-156`, `compresso/webserver/api_v2/base_api_handler.py:53-73`, `compresso/webserver/api_v2/base_api_handler.py:180-198`, `README.md:18-31`
-- **What's wrong:** `api_auth_enabled` and `csrf_protection_enabled` default to false, read-style POST routes bypass mutation protection, and quick start binds a web service without an adjacent trusted-LAN warning.
-- **Impact:** Major — a mistaken port exposure can reveal library/task data and permit state changes without a meaningful authentication boundary.
-- **Fix:** Default Docker/source installs to loopback or require an explicit trusted-LAN opt-in, generate a first-run token, protect reads when auth is enabled, and show the exposure mode prominently in onboarding/readiness. Preserve an explicit compatibility switch for existing trusted LAN installs.
+#### F1 — Install the same hash-locked Python graph that CI audits
+
+- **Where:** `requirements.lock`, `requirements-dev.lock`, `python_lint_and_run_unit_tests.yml:45-57,99-104`, `integration_test_and_build_all_packages_ci.yml:105-111`, `verify-local.yml:34-37`, `docker/Dockerfile.base:169-202`
+- **What's wrong:** Audits inspect lockfiles, but CI, integration, local parity, and Docker install unlocked `.txt` inputs whose transitives can drift.
+- **Impact:** Major — the code can run and ship with versions different from those that passed the security audit.
+- **Fix:** Make hash-locked installs canonical, derive cache keys from locks, and add a check that source requirement inputs regenerate without diff.
 - **Effort:** M
-- **Grade lift:** B → B+ (reduces the largest operator-dependent security risk)
+- **Grade lift:** B → B+ (aligns audit, test, package, and runtime graphs)
 
-### E2 — Isolate third-party plugin installation and execution
+#### ~~F2~~ ✓ done 2026-07-12 — Add Dependabot coverage for all npm lockfiles
 
-- **Where:** `compresso/libs/plugins.py:505-575`, `compresso/libs/unplugins/executor.py:400-575`, `docs/FORK_DEPLOYMENT.md:109-126`
-- **What's wrong:** Plugins may run pip/npm installs, builds, and Python plugin code with the Compresso process's filesystem and network privileges. Documentation warns operators, but there is no technical sandbox.
-- **Impact:** Major — a compromised or malicious plugin can read configuration, modify media, or execute arbitrary host commands.
-- **Fix:** Run plugin build/execution in a restricted subprocess/container profile with an explicit capability manifest, read-only media by default, bounded network access, and operator confirmation for elevated permissions.
+- **Where:** `.github/dependabot.yml:1-35`, `compresso/webserver/frontend/package-lock.json`, `compresso/webserver/package-lock.json`, `.github/release/package-lock.json`
+- **What's wrong:** Dependabot covers pip, Actions, and Docker but none of the three npm directories.
+- **Impact:** Moderate — JavaScript security and compatibility updates rely on manual discovery.
+- **Fix:** Add weekly npm entries per directory with grouped patch/minor updates and conservative PR limits.
+- **Effort:** S
+- **Grade lift:** B → B+ (completes automated dependency coverage)
+
+#### ~~F3~~ ✓ done 2026-07-12 — Remove dead dependencies and batch compatible frontend updates
+
+- **Where:** `compresso/webserver/frontend/package.json:20-63`, `src/js/markupParser.js:2`
+- **What's wrong:** `js-bbcode-parser` is declared but unused, and compatible updates are available for Axios, Quasar, Vue, Vitest, DOMPurify, and related tooling.
+- **Impact:** Moderate — unused/stale packages add supply-chain surface and future migration cost.
+- **Fix:** Remove the unused parser, batch patch/minor updates under full frontend gates, and isolate Quasar-app/router/ESLint majors into separate migration lanes.
+- **Effort:** M
+- **Grade lift:** B → B+ (keeps the supported stack current without upgrade bundling)
+
+---
+
+## G — Performance & Scalability — C+
+
+The metadata benchmark, indexes, bounded scan queues, worker caps, transfer chunks, disk guards, and restart handling are meaningful gains. The actual library-analysis path remains materially different from the benchmark and contains confirmed duplicate scans, O(file-count) memory, repeated probing/hashing, and event-loop blocking I/O.
+
+### Performance improvements
+
+#### G1 — Rebuild real library analysis as one bounded, single-flight pipeline
+
+- **Where:** `compresso/webserver/helpers/library_analysis.py:49-76,226-270`, `libraryanalysiscache.py:16-27`
+- **What's wrong:** Concurrent starts can launch duplicate scans, and each scan stores every path in a list then a set before probing.
+- **Impact:** Major — two requests can duplicate a 20 TB scan while each consumes memory proportional to file count.
+- **Fix:** Make start atomic, enforce one row/job per library, stream files in bounded batches, mark rows by analysis generation, and remove stale rows after the pass.
+- **Effort:** M
+- **Grade lift:** C+ → B (fixes the biggest gap between the benchmark and production path)
+
+#### ~~G2~~ ✓ done 2026-07-12 — Move remote transfer hashing and durable writes off Tornado's event loop
+
+- **Where:** `compresso/webserver/api_v2/transfer_api.py:97-169`, `compresso/libs/resumable_transfer.py:181-227`
+- **What's wrong:** Async handlers perform synchronous chunk/file hashing plus data and manifest `fsync` operations.
+- **Impact:** Major — large or slow transfers can freeze every web/API/readiness request on the process.
+- **Fix:** Use bounded worker threads for store operations/hashing, stream progress, and batch durability checkpoints while preserving crash recovery.
+- **Effort:** M
+- **Grade lift:** C+ → B- (keeps the control plane responsive during large transfers)
+
+#### G3 — Avoid content hashing unchanged files during cached analysis
+
+- **Where:** `compresso/webserver/helpers/library_analysis.py:160-177`, `compresso/libs/common.py:315-399`
+- **What's wrong:** Cache lookup computes a fingerprint first; large files reread ten 8 MiB samples even when unchanged.
+- **Impact:** Major — repeated cached analysis still creates heavy random NAS I/O across a huge library.
+- **Fix:** Gate content hashes behind persisted size/mtime/file-ID checks and hash only new or changed candidates.
+- **Effort:** M
+- **Grade lift:** C+ → B- (makes cache hits cheap enough for production use)
+
+#### ~~G4~~ ✓ done 2026-07-12 — Reuse one ffprobe result per analysis file
+
+- **Where:** `compresso/webserver/helpers/library_analysis.py:135-149`, `compresso/libs/ffprobe_utils.py:66-118`
+- **What's wrong:** Metadata extraction probes the file, then bitrate extraction launches ffprobe again for data already available in the first result.
+- **Impact:** Moderate — a 100,000-file analysis launches roughly 200,000 probe processes.
+- **Fix:** Return/reuse the original probe payload and derive codec, resolution, duration, and bitrate in one pass.
+- **Effort:** S
+- **Grade lift:** C+ → B- (halves a dominant external-process cost)
+
+#### G5 — Allocate distributed workers from runnable demand and measured throughput
+
+- **Where:** `compresso/libs/scheduler.py:149-210`, `compresso/libs/task.py:362-364`, `compresso/libs/foreman.py:723-790`
+- **What's wrong:** Allocation counts every task status and does not rank compatible workers by queue depth, throughput, transfer cost, or thermal/capability state.
+- **Impact:** Moderate — approval/deferred backlogs can attract workers despite no runnable work, starving the M4 or another installation.
+- **Fix:** Count only runnable non-deferred work, persist rolling per-capability throughput, and apply one deterministic allocation score with bounded rounded totals.
 - **Effort:** L
-- **Grade lift:** B → A- (turns a documented trust assumption into enforced isolation)
-
-### E3 — Remove `unsafe-eval` and reduce inline CSP allowances
-
-- **Where:** `compresso/webserver/security_headers.py:47-57`, `compresso/webserver/frontend/quasar.config.cjs`, `compresso/webserver/frontend/src/`
-- **What's wrong:** The production CSP permits `script-src 'unsafe-inline' 'unsafe-eval'` and inline styles. That materially weakens CSP as an XSS containment layer.
-- **Impact:** Moderate — a future injection bug has fewer browser-enforced barriers.
-- **Fix:** Inspect the production bundle for eval/inline requirements, select a CSP-compatible Vue build, move inline scripts/styles to hashed or nonce-backed assets, and add browser assertions for the final policy.
-- **Effort:** M
-- **Grade lift:** B → B+ (restores CSP's intended defense-in-depth value)
-
-### E4 — Pin all third-party GitHub Actions by commit SHA
-
-- **Where:** `.github/workflows/python_lint_and_run_unit_tests.yml:34-201`, `.github/workflows/frontend_lint_and_build.yml:31-85`, `.github/workflows/integration_test_and_build_all_packages_ci.yml:49-123`, `.github/workflows/issues-stale.yml:18-51`
-- **What's wrong:** Most actions use mutable major/version tags while only selected Docker/signing/publishing actions are pinned to immutable SHAs.
-- **Impact:** Moderate — a compromised or unexpectedly changed action tag can alter trusted CI and release execution.
-- **Fix:** Pin every external action to a reviewed commit SHA, retain version comments, and let Dependabot update the pins through review.
-- **Effort:** M
-- **Grade lift:** B → B+ (closes a broad release supply-chain gap)
+- **Grade lift:** C+ → B (turns existing telemetry into useful distributed scheduling)
 
 ---
 
-## F — Dependencies & Tech Currency — A-
+## H — Documentation & Onboarding — C+
 
-Python runtime/dev locks, frontend npm, and release-tool npm are reproducible; live `pip-audit` and `npm audit` checks found no known vulnerabilities. The frontend has several safe patch/minor updates and a few major migrations to plan, while Dependabot currently covers only root pip, Actions, and Docker. One declared BBCode parser is unused.
+Architecture, deployment, development, release recovery, and supply-chain controls are documented. The primary Docker command currently fails, the critical 20 TB runbook is hidden under `.Codex`, and licensing guidance contradicts the declared GPL license.
 
-### F1 — Add Dependabot coverage for every npm lock
+### Documentation improvements
 
-- **Where:** `.github/dependabot.yml:1-35`, `compresso/webserver/frontend/package-lock.json`, `.github/release/package-lock.json`, `compresso/webserver/package-lock.json`
-- **What's wrong:** Dependabot has no npm entries, so three JavaScript lockfiles rely on manual discovery even though CI audits only some of them.
-- **Impact:** Moderate — security and compatibility updates can age silently between manual audits.
-- **Fix:** Add separate weekly npm entries for the frontend, release tooling, and webserver directories with grouped patch/minor updates and conservative PR limits.
+#### ~~H1~~ ✓ done 2026-07-12 — Fix every Docker quick-start image reference
+
+- **Where:** `README.md:19-30`, `docker/docker-compose.yml:11-15`, `docs/CONFIGURATION.md:69-78`
+- **What's wrong:** Documentation uses `jtn0123/compresso:latest`, which denied public manifest access, while the published GHCR image resolved successfully.
+- **Impact:** Major — the shortest supported onboarding path cannot start the product.
+- **Fix:** Point all examples to GHCR or restore verified public Docker Hub publishing; add a CI smoke check for every documented image reference.
 - **Effort:** S
-- **Grade lift:** A- → A (completes automated dependency coverage)
+- **Grade lift:** C+ → B (restores the primary install path)
 
-### F2 — Land safe frontend updates and isolate major migrations
+#### ~~H2~~ ✓ done 2026-07-12 — Publish the 20 TB safety plan as supported operator documentation
 
-- **Where:** `compresso/webserver/frontend/package.json:20-63`, `compresso/webserver/frontend/package-lock.json`
-- **What's wrong:** Live registry comparison shows multiple available patch/minor updates and major gaps for Quasar build tooling, router, ESLint, and selected parsers. Mixing these into one upgrade would make regressions hard to attribute.
-- **Impact:** Moderate — delayed majors increase future migration cost, while stale patch/minor releases miss fixes.
-- **Fix:** First batch compatible patch/minor updates under the full frontend gate. Create separate migration briefs and branches for Quasar 3/router 5/ESLint 10, each with build, unit, Playwright, and browser-support evidence.
+- **Where:** `.Codex/20tb-media-compression-plan.md:1-191`, `docs/FORK_DEPLOYMENT.md:66-131`, `README.md`
+- **What's wrong:** Master/worker separation, staged 20-file→100 GB→500 GB→1 TB gates, and snapshot-backed batches live in an internal audit directory with no public-doc link.
+- **Impact:** Major — operators can deploy a large library without seeing the rules that define safe use.
+- **Fix:** Move the plan to `docs/LARGE_LIBRARY_RUNBOOK.md` and link it from README, deployment, and roadmap docs.
+- **Effort:** S
+- **Grade lift:** C+ → B (puts the safety contract on the supported path)
+
+#### H3 — Resolve the repository's license contradiction
+
+- **Where:** `LICENSE`, `setup.py:227-231`, `README.md:150-164`, copyright headers across `compresso/`
+- **What's wrong:** Metadata/LICENSE say GPL-3.0-only, while README and hundreds of source headers mix MIT permission text with “All Rights Reserved.”
+- **Impact:** Moderate — contributors and redistributors cannot confidently determine obligations.
+- **Fix:** Obtain the copyright-holder decision, then align LICENSE, metadata, README, headers, frontend license, and third-party notices in one reviewed change.
 - **Effort:** M
-- **Grade lift:** A- → A (keeps the supported stack current without risky upgrade bundling)
-
-### F3 — Remove the unused BBCode parser dependency
-
-- **Where:** `compresso/webserver/frontend/package.json:20-38`, `compresso/webserver/frontend/src/js/markupParser.js:1-6`
-- **What's wrong:** `js-bbcode-parser` is declared but source uses `xbbcode-parser`; no import or runtime reference uses the former package.
-- **Impact:** Minor — the unused package adds install and supply-chain surface with no product value.
-- **Fix:** Remove `js-bbcode-parser`, regenerate the lockfile, and run markup parser tests plus the production build.
-- **Effort:** S
-- **Grade lift:** A- → A (removes verified dependency clutter)
+- **Grade lift:** C+ → B- (removes the largest onboarding/legal ambiguity)
 
 ---
 
-## G — Performance & Scalability — B
+## I — Developer Experience & Tooling — B
 
-The code bounds scan queues, worker counts, transfer chunks, retries, and disk pressure, and it records worker metrics. The generated scanner-metadata/SQLite path now has 10k, 100k, and 500k measurements plus versioned thresholds and scheduled artifacts. NAS traversal, probing, concurrent worker contention, and UI scale remain unmeasured. Manifest creation/verification still materializes full lists, and scheduler decisions do not use observed throughput.
+CI is broad and unusually capable: cross-platform shards, integration, frontend, package reproducibility, Docker, CodeQL, Sonar, signing, SBOMs, and recovery workflows. Local parity does not actually mirror those gates, release semantics are not enforced, and master/release workflows duplicate substantial validation.
 
-### G1 — Prove and optimize the 500,000-entry scan path [metadata gate completed]
+### Developer-experience improvements
 
-- **Where:** `compresso/libs/libraryscanner.py:261-350`, `compresso/config.py:62`, `compresso/config.py:110`, `.Codex/20tb-media-compression-plan.md:58-69`
-- **Result:** The metadata-only 500,000-entry tier completed in 3.775 seconds with 4.00 MB RSS growth, an 81.56 MB SQLite queue, 0.0197 ms lookup p95, and 14.4042 ms deep-page p95 on the local arm64 baseline. The generator, method, machine class, limitations, thresholds, scheduled workflow, and artifact retention are versioned under `docs/performance/`.
-- **Remaining boundary:** Repeat on CI over time, then add NAS traversal, file probing, concurrent contention, and UI-scale measurements before treating this as the whole Phase D acceptance gate.
+#### I1 — Make local verification explicitly match fast and full CI modes
+
+- **Where:** `scripts/verify-local.sh:18-79`, `.github/workflows/python_lint_and_run_unit_tests.yml`, `.github/workflows/integration_test_and_build_all_packages_ci.yml`
+- **What's wrong:** The script claims parity but omits Ruff/format/Mypy, dev-lock audit, integration, release-tool tests, actionlint/contracts, and clean package/artifact validation.
+- **Impact:** Moderate — a developer can receive “Local verification complete” while required CI gates would still fail.
+- **Fix:** Add documented fast/full modes, run the canonical commands, and print an explicit skipped-gates summary.
 - **Effort:** M
-- **Grade lift:** B- → B (replaces the largest unsupported scale claim with evidence)
+- **Grade lift:** B → B+ (makes the local result truthful and actionable)
 
-### G2 — Stream media manifests and verification reports
+#### I2 — Enforce release-driving commit or PR-title conventions
 
-- **Where:** `compresso/libs/media_manifest.py:50-63`, `compresso/libs/media_manifest.py:125-156`, `compresso/libs/media_manifest.py:159-235`
-- **What's wrong:** `_media_files()` builds all paths, `create_manifest()` builds all file records, `verify_manifest()` loads the whole JSON document, and both retain all results before writing.
-- **Impact:** Major — large inventories consume memory proportional to the entire library and lose more progress if interrupted.
-- **Fix:** Add a versioned JSONL/SQLite manifest format with incremental fsync/checkpoints, streaming verification, resumable offsets, and a compact aggregate summary. Keep v1 JSON import compatibility.
-- **Effort:** M
-- **Grade lift:** B- → B+ (bounds memory and makes long inventory jobs resumable)
-
-### G3 — Feed capability and throughput telemetry into routing
-
-- **Where:** `compresso/libs/foreman.py:723-790`, `compresso/libs/worker_group.py:156-225`, `compresso/libs/installation_link.py`
-- **What's wrong:** Worker metrics are emitted, but assignment primarily checks local/remote availability and static worker grouping. It does not rank eligible workers by encoder capability, queue depth, recent throughput, transfer cost, or thermal state.
-- **Impact:** Moderate — the master and M4 can be used inefficiently even when both are healthy.
-- **Fix:** Persist rolling per-capability throughput/latency, expose remote queue/capability state, and rank only compatible workers using a simple documented score. Add deterministic scheduler tests before enabling adaptive routing.
-- **Effort:** L
-- **Grade lift:** B- → B (turns existing telemetry into useful scheduling decisions)
-
-### G4 — Define SQLite contention metrics and release thresholds
-
-- **Where:** `compresso/libs/db_migrate.py:120-131`, `compresso/libs/task.py:285-349`, `compresso/libs/taskqueue.py:1-180`, `README.md:147-148`
-- **What's wrong:** WAL/busy-timeout tuning and operator advice exist, but CI and readiness do not track write latency, lock retries, queue delay, or database size under load.
-- **Impact:** Moderate — growing contention can degrade scheduling gradually without a clear failure signal.
-- **Fix:** Instrument transaction latency/lock retries, expose them in readiness/metrics, and set warning/fail thresholds from the synthetic scan and two-process harness.
-- **Effort:** M
-- **Grade lift:** B- → B (makes the SQLite operating envelope observable)
-
----
-
-## H — Documentation & Onboarding — B+
-
-Architecture, deployment, security supply chain, development, release recovery, and operator guardrails are documented well. The corrective release sequence now matches the workflow. The most important 20 TB plan is still hidden under `.Codex`, the README quick start does not put the trusted-LAN warning beside the exposed port, and license prose contradicts the repository's GPL-3.0-only declaration.
-
-### H1 — Publish the 20 TB runbook in operator documentation
-
-- **Where:** `.Codex/20tb-media-compression-plan.md:1-177`, `.Codex/20tb-deep-reliability-audit.md:1-75`, `docs/FORK_DEPLOYMENT.md:66-128`, `README.md:117-133`
-- **What's wrong:** The authoritative master-only scan rule, separate-config rule, canary sequence, interruption drills, and scale gates live primarily in an internal `.Codex` directory.
-- **Impact:** Major — an operator can follow public deployment docs without seeing the safeguards that define safe large-library use.
-- **Fix:** Move the operational plan to `docs/LARGE_LIBRARY_RUNBOOK.md`, condense the audit evidence into an appendix, and link it from README, deployment, and roadmap documents.
+- **Where:** `docs/GENERATING_MASTER_RELEASE.md:3-17`, `.github/release/prepare-candidate.mjs:54-74`, `commitlint.config.js:1-3`, `.github/pull_request_template.md:1-18`
+- **What's wrong:** Conventional Commit syntax drives release selection, but commitlint is not installable from the root and no workflow validates merge titles.
+- **Impact:** Moderate — valid changes can silently produce no release or the wrong release level.
+- **Fix:** Add PR-title validation, wire a real local commitlint dependency/script, and document squash/merge-title expectations in the template.
 - **Effort:** S
-- **Grade lift:** B+ → A- (puts the critical safety contract in the supported documentation path)
+- **Grade lift:** B → B+ (protects the release trigger contract)
 
-### H2 — Resolve the license contradiction
+#### I3 — Remove duplicate validation from publication-bound master pushes
 
-- **Where:** `README.md:150-167`, `LICENSE:1-20`, `setup.py:230`, copyright headers across `compresso/`
-- **What's wrong:** The repository declares GPL-3.0-only but README and source headers include MIT-style permission language and “All Rights Reserved.” The effective licensing message is internally inconsistent.
-- **Impact:** Moderate — contributors and redistributors cannot confidently determine their obligations.
-- **Fix:** Have the copyright holder select the intended license, then align LICENSE, package metadata, README, headers, and third-party notices in one reviewed change.
+- **Where:** `.github/workflows/release.yml:3-16`, `python_lint_and_run_unit_tests.yml:3-10`, `frontend_lint_and_build.yml:3-10`, `integration_test_and_build_all_packages_ci.yml:3-9`
+- **What's wrong:** A master merge starts direct Python/frontend/package workflows while release validation repeats many gates against the candidate SHA.
+- **Impact:** Moderate — duplicated runners slow feedback and create noisy duplicate coverage/Sonar/status results.
+- **Fix:** Keep broad PR validation, make release-bound master validation owned by one workflow, and retain a clearly named scheduled/manual non-publishing package lane.
 - **Effort:** M
-- **Grade lift:** B+ → A- (removes the largest onboarding/legal ambiguity)
-
-### H3 — Put the trusted-LAN warning beside Quick Start
-
-- **Where:** `README.md:18-31`, `README.md:117-133`, `docs/FORK_DEPLOYMENT.md:45-55`
-- **What's wrong:** The Docker command exposes port 8888 before the README explains that Compresso is not a hardened public multi-user service.
-- **Impact:** Moderate — operators may expose the service based on the shortest documented path.
-- **Fix:** Add a concise warning immediately above/below Quick Start, show a loopback-bound example, and link directly to the network exposure model.
-- **Effort:** S
-- **Grade lift:** B+ → A- (makes the default onboarding path communicate the actual trust model)
-
----
-
-## I — Developer Experience & Tooling — B+
-
-The merged release pipeline is now exact-SHA gated, locked, regression-tested, and artifact-verifying, which is a large improvement from the previous C+ release-engineering grade. Local and CI tooling are broad and the PR matrix is strong. Remaining friction comes from publication recovery after the tag is pushed, duplicate master/release validation, incomplete local parity, and tracked IDE state.
-
-### I1 — Extend release recovery to optional external registries
-
-- **Where:** `.github/workflows/release.yml:182-255`, `.github/workflows/recover_release.yml:1-180`, `docs/GENERATING_MASTER_RELEASE.md:68-76`
-- **What's wrong:** Recovery now re-downloads and revalidates the exact GitHub artifacts, verifies/creates the tag and draft release, and idempotently republishes GHCR. Optional PyPI and Docker Hub recovery remain disabled/manual, and registry failure points are covered by contracts rather than an end-to-end failure drill.
-- **Impact:** Moderate — repositories that enable the optional registries can still need careful operator intervention after a partial external publish.
-- **Fix:** Add explicit recovery inputs for PyPI/Docker Hub, verify existing immutable package/image identities before skipping, reject mismatches, and exercise failures after tag, PyPI, GHCR, Docker Hub, and release publication in a sandbox repository.
-- **Effort:** M
-- **Grade lift:** B+ → A- (completes idempotent recovery across every supported registry)
-
-### I2 — Remove duplicate validation on release-bound master pushes
-
-- **Where:** `.github/workflows/release.yml:3-16`, `.github/workflows/python_lint_and_run_unit_tests.yml:3-10`, `.github/workflows/frontend_lint_and_build.yml:3-10`, `.github/workflows/integration_test_and_build_all_packages_ci.yml:3-9`
-- **What's wrong:** A merge to master starts direct Python, frontend, and package workflows while the release workflow repeats their gates against the candidate SHA. This consumes runners and produces duplicate Sonar/coverage/status noise.
-- **Impact:** Moderate — release feedback is slower and harder to interpret, with avoidable CI cost and queue contention.
-- **Fix:** Keep PR validation broad, make master publication validation owned by `release.yml`, and retain a clearly named scheduled/manual non-publishing package lane. Add workflow contract tests preventing duplicate publish-bound triggers.
-- **Effort:** M
-- **Grade lift:** B+ → A- (simplifies the release signal and shortens the critical path)
-
-### I3 — Bring `verify-local.sh` to canonical CI parity
-
-- **Where:** `scripts/verify-local.sh:22-79`, `.github/workflows/python_lint_and_run_unit_tests.yml:45-76`, `.github/workflows/integration_test_and_build_all_packages_ci.yml:43-127`, `.github/release/package.json`
-- **What's wrong:** The local script runs unit/frontend/browser checks but omits Ruff, format, mypy, dev-lock audit, integration tests, release-tool tests, workflow lint, and artifact-integrity verification.
-- **Impact:** Moderate — developers can receive “Local verification complete” and still fail canonical CI/release gates.
-- **Fix:** Add fast/full modes, run all static checks in fast mode, and include integration/package/release/actionlint checks in full mode. Print an explicit skipped-gate summary when tools such as Docker are unavailable.
-- **Effort:** M
-- **Grade lift:** B+ → A- (makes local success a trustworthy predictor of CI)
-
-### I4 — Stop tracking personal IDE state
-
-- **Where:** `.idea/`, `.idea/dataSources.local.xml`, `.idea/runConfigurations/`
-- **What's wrong:** Repository history includes user-specific JetBrains datasource, dictionary, module, and run-configuration state.
-- **Impact:** Minor — personal environment drift creates noisy diffs and accidental local metadata sharing.
-- **Fix:** Keep only intentionally shared run configurations if the team needs them, remove local datasource/dictionary/module files, and expand `.gitignore` accordingly.
-- **Effort:** S
-- **Grade lift:** B+ → A- (removes routine repository noise)
-
----
-
-## Remaining NAS-free execution order
-
-1. **E1** — safer network/auth defaults and onboarding.
-2. **A1** — coordinated filesystem/task finalization phases.
-3. **G2** — streaming/resumable manifests.
-4. Finish **D1** with packaged-wheel and restart/migration browser journeys.
-5. Finish **D3** with real encode-handoff/download interruption.
-6. **I1** — optional PyPI/Docker Hub recovery and sandbox failure drills.
-7. Then take the resulting build to the NAS/M4 canary and collect the evidence this audit deliberately does not invent.
+- **Grade lift:** B → B+ (simplifies the release signal and critical path)

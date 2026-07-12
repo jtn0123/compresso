@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+const runtimeErrorsByPage = new WeakMap()
+
 const approvalTasks = [
   {
     id: 101,
@@ -58,6 +60,9 @@ function json(body) {
 }
 
 async function installApiMocks(page, requests = []) {
+  await page.route('https://api.github.com/repos/jtn0123/compresso/releases/tags/*', (route) =>
+    route.fulfill(json({ tag_name: '0.0.0-e2e', body: 'Mock release notes' })),
+  )
   await page.route('**/compresso/api/v2/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -79,6 +84,7 @@ async function installApiMocks(page, requests = []) {
           settings: {
             onboarding_completed: true,
             approval_required: true,
+            release_notes_viewed: '0.0.0-e2e',
             libraries: [{ id: 1, name: 'Movies' }],
             remote_installations: [],
           },
@@ -88,8 +94,14 @@ async function installApiMocks(page, requests = []) {
     if (endpoint === 'settings/libraries') {
       return route.fulfill(json({ libraries: [{ id: 1, name: 'Movies' }] }))
     }
+    if (endpoint === 'settings/worker_groups') {
+      return route.fulfill(json({ worker_groups: [] }))
+    }
     if (endpoint === 'notifications/read') {
       return route.fulfill(json({ notifications: [] }))
+    }
+    if (endpoint === 'plugins/panels/enabled') {
+      return route.fulfill(json({ results: [] }))
     }
     if (endpoint === 'system/status') {
       return route.fulfill(
@@ -171,11 +183,13 @@ async function installApiMocks(page, requests = []) {
       return route.fulfill(json({ recordsFiltered: 0, results: [] }))
     }
 
-    return route.fulfill(json({ success: true }))
+    throw new Error(`Unhandled API mock: ${request.method()} ${endpoint}`)
   })
 }
 
 test.beforeEach(async ({ page }) => {
+  const runtimeErrors = []
+  runtimeErrorsByPage.set(page, runtimeErrors)
   await page.addInitScript(() => {
     class MockWebSocket {
       static CONNECTING = 0
@@ -216,9 +230,25 @@ test.beforeEach(async ({ page }) => {
     window.WebSocket = MockWebSocket
   })
 
-  page.on('pageerror', (error) => {
-    throw error
+  page.on('pageerror', (error) => runtimeErrors.push(`pageerror: ${error.message}`))
+  page.on('requestfailed', (request) =>
+    runtimeErrors.push(`requestfailed: ${request.method()} ${request.url()} (${request.failure()?.errorText || 'unknown'})`),
+  )
+  page.on('response', (response) => {
+    if (response.url().includes('/compresso/api/v2/') && response.status() >= 400) {
+      runtimeErrors.push(`response: ${response.status()} ${response.request().method()} ${response.url()}`)
+    }
   })
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      const source = message.location().url
+      runtimeErrors.push(`console: ${message.text()}${source ? ` (${source})` : ''}`)
+    }
+  })
+})
+
+test.afterEach(async ({ page }) => {
+  expect(runtimeErrorsByPage.get(page) || []).toEqual([])
 })
 
 test('loads the dashboard and opens pending/completed task dialogs', async ({ page }) => {
@@ -255,12 +285,21 @@ test('sends approval search filters and approve/reject requests', async ({ page 
     .poll(() => requests.filter((entry) => entry.endpoint === 'approval/tasks').at(-1)?.payload?.search_value)
     .toBe('Bunny')
 
-  await page.getByRole('button', { name: /^Approve$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^Approve$/ })
+    .first()
+    .click()
   await expect.poll(() => requests.some((entry) => entry.endpoint === 'approval/approve')).toBe(true)
 
-  await page.getByRole('button', { name: /^Reject$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^Reject$/ })
+    .first()
+    .click()
   await expect(page.getByText('What happens to rejected files?')).toBeVisible()
-  await page.getByRole('button', { name: /^Reject$/ }).last().click()
+  await page
+    .getByRole('button', { name: /^Reject$/ })
+    .last()
+    .click()
   await expect.poll(() => requests.some((entry) => entry.endpoint === 'approval/reject')).toBe(true)
 })
 

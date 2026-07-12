@@ -222,7 +222,7 @@ def random_string(string_length=5):
     return "".join(random.choice(letters) for i in range(string_length))  # noqa: S311 — not used for security/crypto
 
 
-def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
+def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True, file_mode=None):
     """Dump json data to a file. Optionally checks that the output json data is valid"""
     import json
     import shutil
@@ -230,6 +230,31 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True):
     import time
 
     result = {"errors": [], "success": False}
+
+    # Sensitive files use a same-directory temporary file so readers see either
+    # the old complete document or the new complete document, never a partial one.
+    if file_mode is not None:
+        temp_path = None
+        try:
+            output_dir = os.path.dirname(os.path.abspath(out_file))
+            file_descriptor, temp_path = tempfile.mkstemp(prefix=".json-write-", dir=output_dir, text=True)
+            os.chmod(temp_path, file_mode)
+            with os.fdopen(file_descriptor, "w") as outfile:
+                json.dump(json_data, outfile, sort_keys=True, indent=4)
+                outfile.flush()
+                os.fsync(outfile.fileno())
+            if check:
+                with open(temp_path) as infile:
+                    json.load(infile)
+            os.replace(temp_path, out_file)
+            temp_path = None
+            result["success"] = True
+        except Exception as e:
+            result["errors"].append(f"Exception in writing to file: {str(e)}")
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+        return result
 
     # If check param is flagged and there already exists a out file, create a temporary backup
     if rollback_on_fail and os.path.exists(out_file):

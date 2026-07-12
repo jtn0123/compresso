@@ -65,6 +65,8 @@ Do not expose Compresso directly to the public internet. If remote access is req
 
 ## Large-Library Guardrails
 
+For a 20 TB master/worker deployment, the progressive canary, fault-injection, soak, and batch gates in [20TB_MEDIA_COMPRESSION_RUNBOOK.md](20TB_MEDIA_COMPRESSION_RUNBOOK.md) are required operating procedure.
+
 - Put `/tmp/compresso` on fast local storage with enough headroom for multiple in-flight transcodes.
 - Keep `/config` on persistent storage so queue history, library settings, and migrations survive restarts.
 - Keep backups or snapshots of original media before enabling destructive or replacement-style workflows.

@@ -232,6 +232,17 @@ class TestTaskDatabaseOps:
         assert result is True
         assert task.task.job_id == "job-from-master"
 
+    def test_create_task_rejects_unknown_task_type_before_writing(self, in_memory_db):
+        from compresso.libs.exceptions import TaskError
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        self._create_library()
+        with pytest.raises(TaskError, match="Type must be one of"):
+            Task().create_task_by_absolute_path("/media/invalid.mkv", library_id=1, task_type="mystery")
+
+        assert Tasks.select().where(Tasks.abspath == "/media/invalid.mkv").count() == 0
+
     def test_create_task_duplicate_returns_false(self, in_memory_db):
         from compresso.libs.task import Task
 
@@ -296,6 +307,34 @@ class TestTaskDatabaseOps:
         result = list(t.get_task_list_filtered_and_sorted(search_value="alpha"))
         assert len(result) >= 1
         assert any("alpha" in str(r.get("abspath", "")) for r in result)
+
+    @pytest.mark.parametrize(
+        ("kwargs", "message"),
+        [
+            ({"start": -1}, "start"),
+            ({"length": -1}, "length"),
+            ({"length": 1001}, "length"),
+            ({"task_type": "mystery"}, "type"),
+        ],
+    )
+    def test_task_list_rejects_unsafe_domain_filters(self, in_memory_db, kwargs, message):
+        from compresso.libs.exceptions import TaskError
+        from compresso.libs.task import Task
+
+        with pytest.raises(TaskError, match=message):
+            Task().get_task_list_filtered_and_sorted(**kwargs)
+
+    def test_task_list_allows_internal_zero_length_for_unpaginated_queries(self, in_memory_db):
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        Tasks.delete().execute()
+        Tasks.create(abspath="/media/first.mkv", status="pending", library_id=1)
+        Tasks.create(abspath="/media/second.mkv", status="pending", library_id=1)
+
+        results = list(Task().get_task_list_filtered_and_sorted(start=0, length=0, status="pending"))
+
+        assert len(results) == 2
 
     def test_save_persists_changes(self, in_memory_db):
         from compresso.libs.task import Task

@@ -325,6 +325,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { displayBasename } from 'src/js/pathUtils'
 import { createLogger } from 'src/composables/useLogger'
 import FileInfoDialog from 'components/fileinfo/FileInfoDialog.vue'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
@@ -476,8 +477,7 @@ export default {
 
     function truncateFilename(filepath) {
       if (!filepath) return ''
-      const parts = filepath.split('/')
-      const name = parts[parts.length - 1]
+      const name = displayBasename(filepath)
       return name.length > 50 ? name.substring(0, 47) + '...' : name
     }
 

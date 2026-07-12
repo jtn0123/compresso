@@ -65,7 +65,13 @@ class RemoteTaskLease:
         expires_at = now + datetime.timedelta(seconds=ttl_seconds)
         updated = (
             Tasks.update(heartbeat_at=now, lease_expires_at=expires_at)
-            .where((Tasks.id == task.id) & (Tasks.lease_token == token) & Tasks.remote_completed_at.is_null())
+            .where(
+                (Tasks.id == task.id)
+                & (Tasks.lease_token == token)
+                & Tasks.remote_completed_at.is_null()
+                & Tasks.lease_expires_at.is_null(False)
+                & (Tasks.lease_expires_at > now)
+            )
             .execute()
         )
         return bool(updated)
@@ -84,10 +90,16 @@ class RemoteTaskLease:
                 heartbeat_at=now,
                 lease_expires_at=None,
             )
-            .where((Tasks.id == task.id) & (Tasks.lease_token == token) & Tasks.remote_result_checksum.is_null())
+            .where(
+                (Tasks.id == task.id)
+                & (Tasks.lease_token == token)
+                & Tasks.remote_result_checksum.is_null()
+                & Tasks.lease_expires_at.is_null(False)
+                & (Tasks.lease_expires_at > now)
+            )
             .execute()
         )
         if updated:
             return True
         current = Tasks.get_by_id(task.id)
-        return current.remote_result_checksum == result_checksum
+        return current.lease_token == token and current.remote_result_checksum == result_checksum
