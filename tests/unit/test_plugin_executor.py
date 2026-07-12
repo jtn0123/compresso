@@ -90,7 +90,8 @@ class TestPluginExecutorInit:
 class TestGetPluginDirectory:
     def test_returns_path_string(self, executor):
         result = executor._PluginExecutor__get_plugin_directory("my_plugin")
-        assert result == os.path.join(executor.plugins_directory, "my_plugin")
+        expected = os.path.realpath(os.path.join(executor.plugins_directory, "my_plugin"))
+        assert result == expected
 
     def test_different_plugin_ids(self, executor):
         r1 = executor._PluginExecutor__get_plugin_directory("plugin_a")
