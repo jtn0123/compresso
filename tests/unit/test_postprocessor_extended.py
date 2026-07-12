@@ -647,7 +647,7 @@ class TestPostProcessRemoteFile:
 
         result = pp.post_process_remote_file()
 
-        assert result == "/library/compresso_remote_pending_library-abc-1000/output.mkv"
+        assert result == os.path.join("/library", "compresso_remote_pending_library-abc-1000", "output.mkv")
         mock_cleanup.assert_not_called()
 
 
