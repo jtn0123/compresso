@@ -371,8 +371,8 @@ class Task:
     ):
         if start is None or int(start) < 0:
             raise TaskError("Task list start must be zero or greater.")
-        if length is not None and not 1 <= int(length) <= 1000:
-            raise TaskError("Task list length must be between 1 and 1000.")
+        if length is not None and not 0 <= int(length) <= 1000:
+            raise TaskError("Task list length must be between 0 and 1000.")
         if task_type is not None and task_type not in {"local", "remote"}:
             raise TaskError("Task type must be one of [local, remote].")
 
