@@ -5,7 +5,7 @@
     <div class="q-pa-none">
       <div class="row">
         <div class="col-sm-12 col-md-10 col-lg-8">
-          <div :class="$q.platform.is.mobile ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
+          <div :class="$q.screen.lt.md ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
             <q-form @submit="save" class="q-gutter-md">
               <!--START THIS INSTALLATION-->
               <h5 class="q-mb-none">{{ $t('components.settings.link.thisInstallation') }}</h5>
@@ -96,7 +96,7 @@
                       </q-item-label>
                     </q-item-section>
 
-                    <q-item-section v-if="!$q.platform.is.mobile">
+                    <q-item-section v-if="!$q.screen.lt.md">
                       <q-item-label lines="1">
                         <div class="row">
                           <div class="col-6 text-left">

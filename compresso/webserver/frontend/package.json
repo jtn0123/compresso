@@ -4,6 +4,7 @@
   "description": "Media library optimizer with approval workflow and compression dashboard",
   "productName": "Compresso",
   "author": "Josh.5 <jsunnex@gmail.com>",
+  "license": "GPL-3.0-only",
   "private": true,
   "scripts": {
     "lint": "eslint .",
@@ -37,6 +38,7 @@
     "xbbcode-parser": "^0.1.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
     "@babel/eslint-parser": "^7.28.6",
     "@playwright/test": "^1.61.1",
     "@quasar/app-vite": "2.4.1",

@@ -10,13 +10,17 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, 'tests/e2e/**', 'tests/e2e-live/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['lcov'],
+      include: ['src/**/*.{js,vue}'],
+      exclude: ['src/**/__tests__/**', 'src/test-utils/**'],
+      reporter: ['text-summary', 'lcov'],
       reportsDirectory: './coverage',
       thresholds: {
-        lines: 30,
-        functions: 20,
-        branches: 20,
-        statements: 30,
+        // Honest all-source baseline (2026-07-12). Ratchet upward as tests are
+        // added; never remove files from `include` to satisfy this gate.
+        lines: 19,
+        functions: 12,
+        branches: 15,
+        statements: 19,
       },
     },
   },

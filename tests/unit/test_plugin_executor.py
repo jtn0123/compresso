@@ -65,12 +65,33 @@ class TestPluginExecutorInit:
             assert "id" in pt
             assert "has_flow" in pt
 
+    def test_external_plugins_require_explicit_id_allowlist(self, executor, tmp_path, monkeypatch):
+        plugin_path = tmp_path / "external"
+        plugin_path.mkdir()
+        (plugin_path / "info.json").write_text('{"id":"external"}', encoding="utf-8")
+
+        trust_check = executor._PluginExecutor__is_plugin_trusted
+        monkeypatch.delenv("COMPRESSO_TRUSTED_PLUGIN_IDS", raising=False)
+        assert trust_check("external", str(plugin_path)) is False
+
+        monkeypatch.setenv("COMPRESSO_TRUSTED_PLUGIN_IDS", "other, external")
+        assert trust_check("external", str(plugin_path)) is True
+
+    def test_bundled_plugin_is_trusted_without_environment_override(self, executor, tmp_path, monkeypatch):
+        plugin_path = tmp_path / "bundled"
+        plugin_path.mkdir()
+        (plugin_path / "info.json").write_text('{"id":"bundled","bundled":true}', encoding="utf-8")
+        monkeypatch.delenv("COMPRESSO_TRUSTED_PLUGIN_IDS", raising=False)
+
+        assert executor._PluginExecutor__is_plugin_trusted("bundled", str(plugin_path)) is True
+
 
 @pytest.mark.unittest
 class TestGetPluginDirectory:
     def test_returns_path_string(self, executor):
         result = executor._PluginExecutor__get_plugin_directory("my_plugin")
-        assert result == os.path.join(executor.plugins_directory, "my_plugin")
+        expected = os.path.realpath(os.path.join(executor.plugins_directory, "my_plugin"))
+        assert result == expected
 
     def test_different_plugin_ids(self, executor):
         r1 = executor._PluginExecutor__get_plugin_directory("plugin_a")
@@ -78,6 +99,11 @@ class TestGetPluginDirectory:
         assert r1 != r2
         assert r1.endswith("plugin_a")
         assert r2.endswith("plugin_b")
+
+    @pytest.mark.parametrize("plugin_id", ["../outside", "../../etc", "", "."])
+    def test_rejects_plugin_path_traversal(self, executor, plugin_id):
+        """Runtime plugin lookup must reject IDs outside the plugin root."""
+        assert executor._PluginExecutor__get_plugin_directory(plugin_id) is None
 
 
 @pytest.mark.unittest

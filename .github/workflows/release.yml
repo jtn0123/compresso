@@ -25,13 +25,13 @@ jobs:
       base_sha: ${{ steps.commit.outputs.base_sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: master
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.10.0
           cache: npm
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload release metadata
         if: steps.candidate.outputs.release_created == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-candidate-${{ github.run_id }}
           path: ${{ runner.temp }}/release-candidate/
@@ -140,26 +140,26 @@ jobs:
       PYPI_PUBLISH_ENABLED: ${{ secrets.PYPI_TOKEN != '' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ needs.prepare_candidate.outputs.release_sha }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download release metadata
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: release-candidate-${{ github.run_id }}
           path: release-candidate
 
       - name: Download Python distribution
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: compresso-py-dist-data-${{ needs.prepare_candidate.outputs.release_version }}
           path: release-dist
 
       - name: Download SBOMs
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: sbom-*-${{ needs.prepare_candidate.outputs.release_sha }}
           path: release-sboms

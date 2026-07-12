@@ -31,10 +31,8 @@ Copyright:
 
 import os.path
 
-import tornado.log
-
 from compresso.libs import session
-from compresso.libs.library import Library
+from compresso.libs.library import Library, LibraryLookupError
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.pending_schemas import (
@@ -188,15 +186,14 @@ class ApiPendingHandler(BaseApiHandler):
                 {
                     "recordsTotal": task_list.get("recordsTotal"),
                     "recordsFiltered": task_list.get("recordsFiltered"),
+                    "runnableRecords": task_list.get("runnableRecords", 0),
                     "results": task_list.get("results"),
                 },
             )
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -271,9 +268,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -329,9 +324,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -406,9 +399,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -527,9 +518,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -603,9 +592,10 @@ class ApiPendingHandler(BaseApiHandler):
 
             try:
                 library = Library(library_id)
-            except Exception as e:
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
-                self.write_error()
+            except LibraryLookupError as exc:
+                self.handle_base_api_error(
+                    BaseApiError("Invalid library selection", private_detail=f"{type(exc).__name__}: {exc}")
+                )
                 return
 
             if not os.path.isabs(path):
@@ -633,9 +623,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -702,9 +690,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -764,9 +750,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -829,9 +813,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -901,9 +883,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -979,9 +959,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)

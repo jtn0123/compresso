@@ -29,6 +29,7 @@ Copyright:
 
 """
 
+import datetime
 import json
 import os
 import shutil
@@ -365,6 +366,13 @@ class Task:
     def get_total_task_list_count(self):
         task_query = Tasks.select().order_by(Tasks.id.desc())
         return task_query.count()
+
+    def get_runnable_task_count(self):
+        """Count work a worker could claim now, excluding approval and retry delays."""
+        now = datetime.datetime.now()
+        query = Tasks.select().where(Tasks.status == "pending")
+        query = query.where((Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= now))
+        return query.count()
 
     def get_task_list_filtered_and_sorted(
         self, order=None, start=0, length=None, search_value=None, id_list=None, status=None, task_type=None, library_ids=None

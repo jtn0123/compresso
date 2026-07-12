@@ -36,54 +36,20 @@ development environment.
 
 ### Opening Pull Requests
 
-Code contributions are very welcome. However, please understand that by opening a pull 
-requests you hand over copyright ownership of that work to the Compresso project and the
-project owner.
-Your contribution becomes licensed under the same license as the project and ownership
-is handed over to the project owner. 
-This extends upon paragraph 11 of the Terms & Conditions stipulated in the GPL v3.0
+Code contributions are very welcome. Contributors retain copyright in their work and,
+by submitting it, agree to license the contribution under GPL-3.0-only. GPL section 11
+addresses patents and does not transfer copyright. Any copyright assignment would require
+a separate written agreement. See [Licensing](./LICENSING.md).
 
 Open pull requests against `master` for release-bound work or `staging` for pre-release validation work. If you are unsure, use `master` unless a maintainer asks for `staging`.
 
-All new python file contributions must contain the following header:
+New Python files should contain a short SPDX header with the contributor's own name:
 
-```
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-    compresso.{{FILE_NAME}}
- 
-    Written by:               {{YOUR_NAME}} <{{YOUR_EMAIL}}>
-    Date:                     {{DAY_NAME}} {{MONTH}} {{DAY_NUMBER}} {{YEAR}}, ({{TIME}} {{AM_PM}})
- 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
- 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
-  
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
-  
-           THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
-
-"""
+```text
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) {{YEAR}} {{YOUR_NAME}}
 ```
 
-By adding this header you agree to relinquish copyright control to the Compresso project
-and its owner.
-
-Only submissions that conform to this will be merged into the mainline project. This ensures
-that Compresso as a project is free to grow following any path that opens up at the discretion
-of the project's owner.
+Do not replace or remove existing file-level license or copyright notices. Only submissions
+that conform to this will be merged into the mainline project. This ensures
+that Compresso as a project is free to grow while preserving prior grants and attribution.

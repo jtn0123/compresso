@@ -32,7 +32,6 @@ Copyright:
 import os
 import subprocess
 
-import tornado.log
 from tornado.ioloop import IOLoop
 
 from compresso.libs import session
@@ -236,9 +235,7 @@ class ApiDocsHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -299,9 +296,7 @@ class ApiDocsHandler(BaseApiHandler):
             self.set_header("Content-Disposition", "attachment; filename=CompressoLogs.zip")
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)

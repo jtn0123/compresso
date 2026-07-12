@@ -1,3 +1,5 @@
+import subprocess
+
 import versioninfo
 
 
@@ -31,3 +33,17 @@ def test_source_version_falls_back_to_package_metadata(monkeypatch, tmp_path):
     expected_version = str(versioninfo.version_info.__version__)
     assert versioninfo.version() == expected_version
     assert versioninfo.full_version() == expected_version
+
+
+def test_version_falls_back_when_git_has_no_reachable_tag(monkeypatch, tmp_path):
+    (tmp_path / "VERSION").write_text("4.5.6\n", encoding="utf-8")
+    monkeypatch.setattr(versioninfo, "is_git_vcs", lambda: True)
+    monkeypatch.setattr(versioninfo, "get_base_dir", lambda: str(tmp_path))
+
+    def untaggable_checkout():
+        raise subprocess.CalledProcessError(128, ["git", "describe"])
+
+    monkeypatch.setattr(versioninfo, "get_git_version_info", untaggable_checkout)
+
+    assert versioninfo.version() == "4.5.6"
+    assert versioninfo.full_version() == "4.5.6"

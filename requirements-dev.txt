@@ -9,9 +9,13 @@ pytest-split==0.11.0
 wheel==0.47.0
 setuptools==83.0.0
 build==1.5.1
+# build and pytest only declare this dependency on Windows. Pin it explicitly
+# so locks compiled on another OS retain its hash.
+colorama==0.4.6
 yappi==1.7.6            # Thread-aware profiler for dev profiling
 mypy==2.2.0             # Gradual type checking
 pip-audit==2.10.1       # Dependency vulnerability auditing
+pip-tools==7.5.3       # Reproducible hash-locked dependency compilation
 
 # API schema exporting
 apispec==6.10.0

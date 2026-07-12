@@ -38,6 +38,10 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.unmodels import EnabledPlugins, Libraries, LibraryPluginFlow, Plugins, Tags, Tasks
 
 
+class LibraryLookupError(ValueError):
+    """Raised when a requested library identifier is invalid or missing."""
+
+
 def generate_random_library_name():
     names = [
         "Willes",
@@ -269,10 +273,10 @@ class Library:
     def __init__(self, library_id: int):
         # Ensure library ID is not 0
         if library_id < 1:
-            raise Exception("Library ID cannot be less than 1")
+            raise LibraryLookupError("Library ID cannot be less than 1")
         model = Libraries.get_or_none(id=library_id)
         if model is None:
-            raise Exception(f"Unable to fetch library with ID {library_id}")
+            raise LibraryLookupError(f"Unable to fetch library with ID {library_id}")
         self.model = model
 
     @staticmethod

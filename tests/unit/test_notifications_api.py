@@ -248,6 +248,24 @@ class TestSaveNotificationChannelsEndpoint:
 
         handler.write_error.assert_called_once()
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("payload", [None, [], "invalid"])
+    async def test_rejects_non_object_json(self, payload):
+        """Channel settings accept only a JSON object at the request root."""
+        from compresso.webserver.api_v2.notifications_api import ApiNotificationsHandler
+
+        handler = object.__new__(ApiNotificationsHandler)
+        handler.config = MagicMock()
+        handler.request = MagicMock(body=json.dumps(payload).encode())
+        handler.write_success = MagicMock()
+        handler.set_status = MagicMock()
+        handler.write_error = MagicMock()
+
+        await handler.save_notification_channels()
+
+        handler.write_error.assert_called_once()
+        handler.config.set_config_item.assert_not_called()
+
 
 # ------------------------------------------------------------------
 # TestTestNotificationChannel
@@ -299,6 +317,24 @@ class TestTestNotificationChannelEndpoint:
 
         handler.write_error.assert_called_once()
         handler.write_success.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("payload", [None, [], "invalid"])
+    async def test_rejects_non_object_test_payload(self, payload):
+        """Notification test requests accept only a JSON object at the root."""
+        from compresso.webserver.api_v2.notifications_api import ApiNotificationsHandler
+
+        handler = object.__new__(ApiNotificationsHandler)
+        handler.request = MagicMock(body=json.dumps(payload).encode())
+        handler.write_success = MagicMock()
+        handler.set_status = MagicMock()
+        handler.write_error = MagicMock()
+
+        with patch(f"{NOTIF_MOD}.ExternalNotificationDispatcher") as dispatcher:
+            await handler.test_notification_channel()
+
+        handler.write_error.assert_called_once()
+        dispatcher.assert_not_called()
 
 
 if __name__ == "__main__":

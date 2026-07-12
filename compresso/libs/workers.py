@@ -754,28 +754,23 @@ class Worker(threading.Thread):
         # Convert file
         try:
             # Execute command
-            if isinstance(exec_command, list):
-                sub_proc = subprocess.Popen(  # noqa: S603 - trusted plugin exec_command
-                    exec_command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True,
-                    errors="replace",
-                )
-            elif isinstance(exec_command, str):
-                sub_proc = subprocess.Popen(  # noqa: S602 — shell=True required for string-type plugin exec_command
-                    exec_command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True,
-                    errors="replace",
-                    shell=True,
-                )
-            else:
+            if (
+                not isinstance(exec_command, list)
+                or not exec_command
+                or not all(isinstance(argument, str) for argument in exec_command)
+            ):
                 raise TypeError(
-                    f"Plugin's returned 'exec_command' object must be either a list"
-                    f" or a string. Received type {type(exec_command)}."
+                    "Plugin 'exec_command' must be a non-empty argv list of strings; shell command strings are forbidden"
                 )
+            sub_proc = subprocess.Popen(  # noqa: S603 - explicit argv from an operator-trusted plugin
+                exec_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                errors="replace",
+                shell=False,
+                start_new_session=True,
+            )
 
             # Fetch process using psutil for control (sending SIGSTOP on windows will not work)
             proc = psutil.Process(pid=sub_proc.pid)

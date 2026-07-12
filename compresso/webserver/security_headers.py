@@ -43,19 +43,23 @@ class SecurityHeadersMixin:
         """Additional headers appropriate for HTML responses (not JSON APIs)."""
         self.set_security_headers()
 
-        # Content Security Policy for the SPA frontend.
-        # - 'unsafe-inline' / 'unsafe-eval' required by Vue.js runtime
-        # - blob: needed for video preview playback
-        # - ws:/wss: needed for WebSocket connections
+        # Content Security Policy for the production SPA frontend. The Vite
+        # build emits external module scripts and does not require eval or
+        # inline JavaScript. Quasar still applies dynamic style attributes, so
+        # that narrowly-scoped exception remains in style-src-attr.
         self.set_header(
             "Content-Security-Policy",
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "base-uri 'self'; "
+            "object-src 'none'; "
+            "script-src 'self'; "
+            "style-src-elem 'self'; "
+            "style-src-attr 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "media-src 'self' blob:; "
             "connect-src 'self' ws: wss:; "
             "font-src 'self'; "
+            "form-action 'self'; "
             "frame-ancestors 'none'",
         )
 

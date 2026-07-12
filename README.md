@@ -110,10 +110,17 @@ Node.js 24 is the supported frontend build baseline. Node 22 may still work loca
 
 The Python package build performs its own clean frontend install from the committed lockfile, so a pre-existing `node_modules` directory is not required.
 
-To mirror the main local validation gates from a prepared checkout, run:
+For the fast day-to-day validation lane, run:
 
 ```bash
-bash scripts/verify-local.sh
+bash scripts/verify-local.sh fast
+```
+
+Before merging or cutting a release, run the full CI-parity lane. It adds integration,
+release-tool, workflow, clean-wheel, and packaged browser checks:
+
+```bash
+bash scripts/verify-local.sh full
 ```
 
 For Docker-focused changes, run the local container preflight when Docker is available:
@@ -153,21 +160,6 @@ SQLite can report "database is locked" under heavy concurrent access. Compresso 
 
 ## License and Contribution
 
-This projected is licensed under the GPL version 3.
-
-Copyright (C) Josh Sunnex - All Rights Reserved
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-This project contains libraries imported from external authors.
-Please refer to the source of these libraries for more information on their respective licenses.
+The combined Compresso distribution is provided under **GPL-3.0-only**. Historical files that carry an MIT permission notice retain that file-level grant; existing notices must not be removed. See [Licensing](docs/LICENSING.md), the full [GPL text](LICENSE), the retained [MIT notice](LICENSES/MIT.txt), and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ---

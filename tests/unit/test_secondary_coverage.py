@@ -330,13 +330,8 @@ class TestSessionStateBaseApiError(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
 
-    def test_get_session_state_base_api_error_silently_returns(self):
-        """BaseApiError in get_session_state is caught and logged, no 400 written (lines 141-142).
-
-        The branch just calls self.logger.error and returns — no status is set,
-        so the connection ends without a full HTTP response.  Tornado sends 200
-        with an empty body in that situation.
-        """
+    def test_get_session_state_base_api_error_returns_structured_400(self):
+        """Expected session errors use the shared v2 API response owner."""
 
         def _init_bae(self, **kwargs):
             _session_mock_initialize(self, **kwargs)
@@ -358,9 +353,11 @@ class TestSessionStateBaseApiError(ApiTestBase):
 
         with patch.object(ApiSessionHandler, "initialize", _init_bae):
             resp = self.get_json("/session/state")
-        # The BaseApiError branch just returns without writing an explicit HTTP
-        # response, so Tornado auto-sends 200 with an empty-ish body.
-        assert resp.code in (200, 500)
+        assert resp.code == 400
+        payload = json.loads(resp.body)
+        assert payload["error"] == "400: session broken"
+        assert payload["messages"] == {}
+        assert payload["error_id"]
 
 
 # ---------------------------------------------------------------------------
@@ -374,8 +371,8 @@ class TestSessionReloadBaseApiError(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
 
-    def test_session_reload_base_api_error_is_caught(self):
-        """BaseApiError in session_reload is silently caught (lines 194-195)."""
+    def test_session_reload_base_api_error_returns_structured_400(self):
+        """Expected reload errors use the shared v2 API response owner."""
 
         def _init_bae(self, **kwargs):
             _session_mock_initialize(self, **kwargs)
@@ -383,7 +380,8 @@ class TestSessionReloadBaseApiError(ApiTestBase):
 
         with patch.object(ApiSessionHandler, "initialize", _init_bae):
             resp = self.post_json("/session/reload", {})
-        assert resp.code in (200, 500)
+        assert resp.code == 400
+        assert json.loads(resp.body)["error"] == "400: reload broken"
 
 
 # ---------------------------------------------------------------------------
@@ -397,8 +395,8 @@ class TestSessionLogoutBaseApiError(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
 
-    def test_session_logout_base_api_error_is_caught(self):
-        """BaseApiError in session_logout is silently caught (lines 247-248)."""
+    def test_session_logout_base_api_error_returns_structured_400(self):
+        """Expected logout errors use the shared v2 API response owner."""
 
         def _init_bae(self, **kwargs):
             _session_mock_initialize(self, **kwargs)
@@ -406,7 +404,8 @@ class TestSessionLogoutBaseApiError(ApiTestBase):
 
         with patch.object(ApiSessionHandler, "initialize", _init_bae):
             resp = self.get_json("/session/logout")
-        assert resp.code in (200, 500)
+        assert resp.code == 400
+        assert json.loads(resp.body)["error"] == "400: logout broken"
 
 
 # ---------------------------------------------------------------------------
@@ -485,6 +484,21 @@ class TestGetAppAuthCode(ApiTestBase):
             resp = self.get_json("/session/get_app_auth_code")
         assert resp.code == 500
 
+    def test_get_app_auth_code_base_api_error_returns_structured_400(self):
+        """Expected authentication failures should preserve the structured error envelope."""
+
+        def _init_bae(self, **kwargs):
+            _session_mock_initialize(self, **kwargs)
+            self.session.init_device_auth_flow.side_effect = BaseApiError("Invalid authentication request")
+
+        with patch.object(ApiSessionHandler, "initialize", _init_bae):
+            resp = self.get_json("/session/get_app_auth_code")
+
+        assert resp.code == 400
+        payload = json.loads(resp.body)
+        assert payload["error"] == "400: Invalid authentication request"
+        assert payload["error_id"]
+
 
 # ---------------------------------------------------------------------------
 # session_api: get_funding_proposals BaseApiError (lines 388-389)
@@ -497,8 +511,8 @@ class TestFundingProposalsBaseApiError(ApiTestBase):
     __test__ = True
     handler_class = ApiSessionHandler
 
-    def test_get_funding_proposals_base_api_error_is_caught(self):
-        """BaseApiError in get_funding_proposals is silently caught (lines 388-389)."""
+    def test_get_funding_proposals_base_api_error_returns_structured_400(self):
+        """Expected portal errors use the shared v2 API response owner."""
 
         def _init_bae(self, **kwargs):
             _session_mock_initialize(self, **kwargs)
@@ -506,7 +520,8 @@ class TestFundingProposalsBaseApiError(ApiTestBase):
 
         with patch.object(ApiSessionHandler, "initialize", _init_bae):
             resp = self.get_json("/session/funding_proposals")
-        assert resp.code in (200, 500)
+        assert resp.code == 400
+        assert json.loads(resp.body)["error"] == "400: portal broken"
 
 
 # =============================================================================

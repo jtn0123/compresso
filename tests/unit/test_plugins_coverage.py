@@ -12,9 +12,9 @@ Target lines: 72-73, 161, 172, 187-188, 192-210, 389-390, 426-429,
 917-929, 939-942
 """
 
+import hashlib
 import json
 import os
-import subprocess
 import zipfile
 from unittest.mock import MagicMock, patch
 
@@ -267,14 +267,20 @@ class TestDownloadPlugin:
         plugins_dir.mkdir(parents=True, exist_ok=True)
         handler.settings.get_plugins_path.return_value = str(plugins_dir)
 
-        plugin = {"plugin_id": "my_plugin", "version": "1.0", "package_url": "http://example.com/plugin.zip"}
+        payload = b"data_chunk"
+        plugin = {
+            "plugin_id": "my_plugin",
+            "version": "1.0",
+            "package_url": "https://example.com/plugin.zip",
+            "package_sha256": hashlib.sha256(payload).hexdigest(),
+        }
         expected_dest = str(plugins_dir / "my_plugin-1.0.zip")
 
         mock_response = MagicMock()
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_response.raise_for_status = MagicMock()
-        mock_response.iter_content.return_value = [b"data_chunk"]
+        mock_response.iter_content.return_value = [payload]
 
         mock_session = MagicMock()
         mock_session.requests_session.get.return_value = mock_response
@@ -385,7 +391,7 @@ class TestInstallPlugin:
         mock_npm.assert_called_once()
 
     def test_install_plugin_with_post_install_requirements(self, tmp_path):
-        """If requirements.post-install.txt exists, it should be processed."""
+        """If requirements.post-install.lock exists, it should be processed."""
         handler = _make_handler(tmp_path)
         plugins_dir = tmp_path / "plugins"
         plugins_dir.mkdir(parents=True, exist_ok=True)
@@ -396,12 +402,12 @@ class TestInstallPlugin:
         zip_path = tmp_path / "post_req_plugin.zip"
         with zipfile.ZipFile(str(zip_path), "w") as zf:
             zf.writestr("info.json", json.dumps(info))
-            zf.writestr("requirements.post-install.txt", "some-package>=1.0")
+            zf.writestr("requirements.post-install.lock", "some-package==1.0 --hash=sha256:" + "0" * 64)
 
         plugin_dir = plugins_dir / plugin_id
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "info.json").write_text(json.dumps(info))
-        (plugin_dir / "requirements.post-install.txt").write_text("some-package>=1.0")
+        (plugin_dir / "requirements.post-install.lock").write_text("some-package==1.0 --hash=sha256:" + "0" * 64)
 
         with patch.object(handler, "install_plugin_requirements") as mock_req:
             handler.install_plugin(str(zip_path), plugin_id=plugin_id)
@@ -424,8 +430,8 @@ class TestInstallPluginRequirementsCleanup:
 
         plugin_dir = tmp_path / "my_plugin"
         plugin_dir.mkdir()
-        req_file = plugin_dir / "requirements.txt"
-        req_file.write_text("requests>=2.0")
+        req_file = plugin_dir / "requirements.lock"
+        req_file.write_text("requests==2.32.5 --hash=sha256:" + "0" * 64)
         site_pkgs = plugin_dir / "site-packages"
         site_pkgs.mkdir()  # existing installation
 
@@ -442,22 +448,18 @@ class TestInstallPluginRequirementsCleanup:
 
 
 @pytest.mark.unittest
-class TestInstallNpmModulesBuildTimeout:
-    def test_npm_build_timeout_is_caught_and_logged(self, tmp_path):
-        """A TimeoutExpired during npm build must be caught without re-raising."""
+class TestInstallNpmModulesBuildDisabled:
+    def test_npm_build_is_rejected_without_starting_a_process(self, tmp_path):
+        """Plugin installation must not execute package lifecycle scripts."""
         from compresso.libs.plugins import PluginsHandler
 
         plugin_dir = tmp_path / "npm_plugin"
         plugin_dir.mkdir()
         (plugin_dir / "package.json").write_text('{"name": "test"}')
 
-        def fake_call(cmd, *args, **kwargs):
-            if cmd[0] == "npm" and len(cmd) > 1 and cmd[1] == "run":
-                raise subprocess.TimeoutExpired(cmd, 300)
-
-        with patch("subprocess.call", side_effect=fake_call):
-            # Must not raise
+        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="pre-built"):
             PluginsHandler.install_npm_modules(str(plugin_dir))
+        mock_call.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

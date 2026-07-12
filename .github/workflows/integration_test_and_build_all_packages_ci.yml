@@ -46,13 +46,14 @@ jobs:
 
     steps:
       # Fetch shallow git repository
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       # Restore test video's cache
       - name: Restore test videos cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         id: test_videos_cache
         with:
           path: tests/support_/videos
@@ -68,23 +69,16 @@ jobs:
 
       # Setup python environment
       - name: Set up Python 3.13
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
-
-      # Restore the python cache if it exists
-      - name: Restore python cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          cache: "pip"
+          cache-dependency-path: requirements-dev.lock
 
       # Restore the apt cache if it exists
       - name: Restore apt cache
         id: apt-cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-cache-ffmpeg
@@ -107,8 +101,7 @@ jobs:
         if: success()
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          python -m pip install --require-hashes -r requirements-dev.lock
 
       # Run pytest unit tests
       - name: Test with pytest
@@ -120,7 +113,7 @@ jobs:
 
       - name: Upload integration coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: integration-coverage
           path: integration-coverage.xml
@@ -135,12 +128,13 @@ jobs:
         working-directory: compresso/webserver/frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -164,9 +158,10 @@ jobs:
     steps:
       # Fetch full git repository
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       # Checkout tags
       - name: Fetch tags
@@ -189,32 +184,24 @@ jobs:
 
       # Setup python environment
       - name: Set up Python 3.13
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
-
-      # Restore the python cache if it exists
-      - name: Restore python cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          cache: "pip"
+          cache-dependency-path: requirements-dev.lock
 
       # Install python dependencies for building compresso
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          python -m pip install --require-hashes -r requirements-dev.lock
 
       - name: Clean build artifacts
         run: |
           rm -rf build dist
 
       # Setup node environment for building compresso's webui
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
 
@@ -267,7 +254,7 @@ jobs:
           fi
 
       # Upload python package distribution data artifact
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: compresso-py-dist-data-${{ steps.py_build_data.outputs.py_version }}
           path: dist/
@@ -291,13 +278,14 @@ jobs:
       source_sha: ${{ steps.prepare.outputs.source_sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Download Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: ./artifacts/
 
@@ -404,13 +392,14 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Download Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: ./artifacts/
 
@@ -471,7 +460,7 @@ jobs:
 
       - name: Upload amd64 SBOM artifact
         if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sbom-amd64-${{ needs.docker_prepare.outputs.source_sha }}
           path: sbom-amd64.spdx.json
@@ -515,7 +504,7 @@ jobs:
           grep -q STARTUP_SUMMARY "${tmp_root}/config/.compresso/logs/compresso.log"
 
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: compresso-smoke:ci
           format: table
@@ -536,13 +525,14 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Download Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: ./artifacts/
 
@@ -600,7 +590,7 @@ jobs:
 
       - name: Upload arm64 SBOM artifact
         if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sbom-arm64-${{ needs.docker_prepare.outputs.source_sha }}
           path: sbom-arm64.spdx.json
@@ -664,13 +654,14 @@ jobs:
     steps:
       # Fetch shallow git repository
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       # Fetch all artifacts
       - name: Download Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: ./artifacts/
 

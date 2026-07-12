@@ -33,6 +33,7 @@ import copy
 import importlib
 import importlib.util
 import inspect
+import json
 import os
 import sys
 
@@ -115,12 +116,21 @@ class PluginExecutor:
 
     def __get_plugin_directory(self, plugin_id):
         """
-        Returns the path of the plugin by it's plugin ID
+        Return a contained plugin path for a plugin ID, or ``None`` when unsafe.
 
         :param plugin_id:
         :return:
         """
-        return os.path.join(self.plugins_directory, plugin_id)
+        plugins_directory = os.path.realpath(self.plugins_directory)
+        plugin_directory = os.path.realpath(os.path.join(plugins_directory, plugin_id))
+        try:
+            contained = os.path.commonpath((plugins_directory, plugin_directory)) == plugins_directory
+        except ValueError:
+            contained = False
+        if not contained or plugin_directory == plugins_directory:
+            self.logger.error("Refusing plugin path outside the configured plugin directory: %s", plugin_id)
+            return None
+        return plugin_directory
 
     @staticmethod
     def __include_plugin_site_packages(path):
@@ -142,6 +152,14 @@ class PluginExecutor:
         :param path:
         :return:
         """
+        if not self.__is_plugin_trusted(plugin_id, path):
+            self.logger.error(
+                "Refusing to load untrusted plugin '%s'. Bundled plugins are trusted; "
+                "explicitly allow external IDs with COMPRESSO_TRUSTED_PLUGIN_IDS.",
+                plugin_id,
+            )
+            return None
+
         # Set the module name
         module_name = f"{plugin_id}.plugin"
 
@@ -176,6 +194,21 @@ class PluginExecutor:
         except Exception as e:
             self.logger.exception("Exception encountered while importing module '%s'. %s", plugin_id, e)
             return None
+
+    @staticmethod
+    def __is_plugin_trusted(plugin_id, path):
+        info_path = os.path.join(path, "info.json")
+        try:
+            with open(info_path, encoding="utf-8") as info_file:
+                plugin_info = json.load(info_file)
+        except (OSError, ValueError, TypeError):
+            return False
+
+        if plugin_info.get("bundled") is True:
+            return True
+
+        trusted_ids = {item.strip() for item in os.environ.get("COMPRESSO_TRUSTED_PLUGIN_IDS", "").split(",") if item.strip()}
+        return plugin_id in trusted_ids
 
     def reload_plugin_module(self, plugin_id):
         """

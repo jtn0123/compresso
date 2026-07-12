@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **22 of 37** addressable grade items are marked complete below.
+- **33 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -46,6 +46,14 @@
 - Security hardening: **129 focused backend tests** and **17 focused frontend tests** passed; the broader backend suite passed **3,623 tests with 8 skips** before the final seven focused security cases were added, and the full frontend suite passed **431 tests** plus production build.
 - Finalization durability: **169 focused recovery/history/postprocessor/service tests** passed with crash-resumable file, history, metadata, and deletion phases.
 - Library analysis: **56 focused helper tests** passed with single-flight starts, streamed traversal, generation cleanup, and stat-first cache hits.
+- Frontend coverage now inventories **all 113 application JS/Vue files**: 19.54% statements, 15.11% branches, 12.42% functions, and 19.39% lines, with honest ratchet floors at 19/15/12/19.
+- Packaged live E2E: **3 Playwright journeys passed** against an isolated wheel install, including reject, approve/file replacement, history persistence, and backend restart.
+- Locked CI/local parity: canonical `--require-hashes` installs dry-ran successfully for runtime and development graphs; lock regeneration, actionlint, 10 release contract tests, 3 release-tool tests, and clean-wheel inspection passed. The fast lane passed **3,647 backend tests with 8 skips**, **431 frontend tests**, honest coverage, lint, type, audit, and production-build gates while listing every intentionally skipped full gate.
+- Structured API errors: **675 broad API/settings/plugin tests passed with 2 skips**, plus 70 focused boundary/transfer/notification/pending/preview tests. Malformed bodies are no longer echoed or double-written; unexpected details stay in correlated logs and client 500s use a stable public message.
+- Responsive/browser coverage: **433 frontend unit tests**, ESLint, production build, 4 desktop Chromium journeys, a Pixel 7 accessibility journey, and a focused WebKit smoke passed. The onboarding flow has a zero critical/serious axe result and keyboard-driven setup/plugin assertions; Firefox is enabled in CI because the local macOS launcher fails before browser context creation in this environment.
+- Security boundary follow-up: **938 plugin/worker/security tests passed with 3 skips**. External plugins now require an explicit ID allowlist at execution, remote archives require HTTPS plus a repository SHA-256, archive traversal/symlinks and shell commands are rejected, dependency installation is hash-locked wheel-only, and npm lifecycle execution is disabled. CSP forbids eval and inline scripts, all third-party Actions are immutable-SHA pinned, actionlint passes, and a local/CI pin-policy guard prevents drift.
+- Demand-aware scheduling: **315 focused scheduler, task, capability, Foreman, pending-API, and installation-link tests passed**. Distributed totals now use runnable non-deferred demand, bounded deterministic largest-remainder allocation, persisted recent throughput by codec, current CPU/memory/disk/thermal pressure, encoder compatibility, and remote queue depth.
+- License consistency: package history confirmed GPL-3.0-only metadata was chosen by the original copyright holder while earlier MIT file grants remain present. The combined distribution, Python/npm metadata, contributor policy, retained MIT notice, third-party/SBOM index, wheel contents, and a local/CI consistency gate are now aligned without deleting prior grants. **10 release contract tests passed**, all three npm lockfiles report zero vulnerabilities, and the clean wheel contains GPL, MIT, and third-party notices.
 
 ---
 
@@ -126,7 +134,7 @@ The backend has strong schema coverage, checksummed transfers, retry/defer handl
 - **Effort:** M
 - **Grade lift:** B → B+ (makes task history an all-or-nothing boundary)
 
-#### B5 — Give the v2 API one structured error writer
+#### ~~B5~~ ✓ done 2026-07-12 — Give the v2 API one structured error writer
 
 - **Where:** `compresso/webserver/api_v2/base_api_handler.py:210-233,267-340`, `compresso/webserver/api_v2/pending_api.py:529-535`
 - **What's wrong:** Request parsing writes an error and then raises, while many handlers catch and write again. Raw request bodies and exception strings can also become client-visible reasons.
@@ -179,7 +187,7 @@ The Vue/Quasar interface is useful and has a coherent visual system, localizatio
 - **Effort:** S
 - **Grade lift:** C → C+ (fixes a repeated platform defect)
 
-#### C5 — Enforce responsive and accessible interaction standards
+#### ~~C5~~ ✓ done 2026-07-12 — Enforce responsive and accessible interaction standards
 
 - **Where:** `frontend/index.html:10`, `SettingsLibrary.vue:10,92`, `SettingsLink.vue:8,99`, `FirstRunWizard.vue:2-4`, `PluginInstallerManageRepos.vue:62-99`
 - **What's wrong:** Browser zoom is disabled, platform detection replaces viewport breakpoints, several dialogs impose 400-560px minimum widths, and important actions use clickable spans.
@@ -196,7 +204,7 @@ Python reliability evidence is broad: thousands of unit tests, integration tests
 
 ### Testing improvements
 
-#### D1 — Measure every frontend source file and ratchet meaningful thresholds
+#### ~~D1~~ ✓ done 2026-07-12 — Measure every frontend source file and ratchet meaningful thresholds
 
 - **Where:** `compresso/webserver/frontend/vitest.config.js:11-20`, `compresso/webserver/frontend/src/`
 - **What's wrong:** No source include pattern means unimported files count as nonexistent; 59 of 110 application files were absent while 30/20/20/30 thresholds passed.
@@ -205,7 +213,7 @@ Python reliability evidence is broad: thousands of unit tests, integration tests
 - **Effort:** M
 - **Grade lift:** B → B+ (makes frontend coverage representative rather than selective)
 
-#### D2 — Exercise a packaged, state-changing release workflow end to end
+#### ~~D2~~ ✓ done 2026-07-12 — Exercise a packaged, state-changing release workflow end to end
 
 - **Where:** `frontend/tests/e2e-live/compresso-live-smoke.spec.js:3-52`, `frontend/scripts/start-live-backend.mjs:20-29`
 - **What's wrong:** Live E2E starts source through `PYTHONPATH` and checks mostly read-oriented startup contracts. It does not prove the wheel, migration, encode handoff, approval/reject, or restart workflow.
@@ -223,7 +231,7 @@ Python reliability evidence is broad: thousands of unit tests, integration tests
 - **Effort:** S
 - **Grade lift:** B → B+ (raises the signal of the existing browser lanes)
 
-#### D4 — Add browser, mobile, and accessibility coverage
+#### ~~D4~~ ✓ done 2026-07-12 — Add browser, mobile, and accessibility coverage
 
 - **Where:** `frontend/playwright.config.js:24-29`, `frontend/playwright.live.config.js:51-56`, `.github/workflows/frontend_lint_and_build.yml:85-92`
 - **What's wrong:** E2E runs only desktop Chromium and has no automated keyboard/axe gate despite responsive and accessibility requirements.
@@ -269,6 +277,8 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 
 #### E4 — Isolate plugin installation and execution
 
+**Phase-one hardening complete 2026-07-12:** untrusted external plugin execution is now off by default, remote packages are digest-authenticated, installation scripts are constrained, and shell command strings are rejected. Full least-privilege process/container isolation remains open for explicitly trusted third-party Python runners.
+
 - **Where:** `compresso/libs/plugins.py:486-564`, `compresso/libs/workers.py:736-751`
 - **What's wrong:** Plugin ZIPs can trigger pip/npm install/build and runtime commands—including shell execution—with the full privileges of the Compresso process.
 - **Impact:** Major — a compromised plugin can read configuration, alter media, or execute arbitrary host commands.
@@ -276,7 +286,7 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 - **Effort:** L
 - **Grade lift:** C+ → B+ (turns a documented trust assumption into technical isolation)
 
-#### E5 — Restore meaningful production CSP protection
+#### ~~E5~~ ✓ done 2026-07-12 — Restore meaningful production CSP protection
 
 - **Where:** `compresso/webserver/security_headers.py:46-59`, `compresso/webserver/frontend/quasar.config.cjs`
 - **What's wrong:** Production permits both `unsafe-eval` and inline scripts/styles, sharply reducing CSP's value against future injection bugs.
@@ -285,7 +295,7 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 - **Effort:** M
 - **Grade lift:** C+ → B- (restores defense in depth)
 
-#### E6 — Pin every third-party GitHub Action to an immutable commit
+#### ~~E6~~ ✓ done 2026-07-12 — Pin every third-party GitHub Action to an immutable commit
 
 - **Where:** `.github/workflows/` (54 mutable-tag uses; examples in `python_lint_and_run_unit_tests.yml`, `integration_test_and_build_all_packages_ci.yml`, `release.yml`)
 - **What's wrong:** Most Actions use mutable major tags even though selected release steps are already SHA-pinned.
@@ -302,7 +312,7 @@ Runtime/dev Python locks and npm locks exist, and live audits found no known vul
 
 ### Dependency improvements
 
-#### F1 — Install the same hash-locked Python graph that CI audits
+#### ~~F1~~ ✓ done 2026-07-12 — Install the same hash-locked Python graph that CI audits
 
 - **Where:** `requirements.lock`, `requirements-dev.lock`, `python_lint_and_run_unit_tests.yml:45-57,99-104`, `integration_test_and_build_all_packages_ci.yml:105-111`, `verify-local.yml:34-37`, `docker/Dockerfile.base:169-202`
 - **What's wrong:** Audits inspect lockfiles, but CI, integration, local parity, and Docker install unlocked `.txt` inputs whose transitives can drift.
@@ -373,7 +383,7 @@ The production library-analysis path now uses a single-flight streamed scan, sta
 - **Effort:** S
 - **Grade lift:** C+ → B- (halves a dominant external-process cost)
 
-#### G5 — Allocate distributed workers from runnable demand and measured throughput
+#### ~~G5~~ ✓ done 2026-07-12 — Allocate distributed workers from runnable demand and measured throughput
 
 - **Where:** `compresso/libs/scheduler.py:149-210`, `compresso/libs/task.py:362-364`, `compresso/libs/foreman.py:723-790`
 - **What's wrong:** Allocation counts every task status and does not rank compatible workers by queue depth, throughput, transfer cost, or thermal/capability state.
@@ -408,7 +418,7 @@ Architecture, deployment, development, release recovery, and supply-chain contro
 - **Effort:** S
 - **Grade lift:** C+ → B (puts the safety contract on the supported path)
 
-#### H3 — Resolve the repository's license contradiction
+#### ~~H3~~ ✓ done 2026-07-12 — Resolve the repository's license contradiction
 
 - **Where:** `LICENSE`, `setup.py:227-231`, `README.md:150-164`, copyright headers across `compresso/`
 - **What's wrong:** Metadata/LICENSE say GPL-3.0-only, while README and hundreds of source headers mix MIT permission text with “All Rights Reserved.”
@@ -425,7 +435,7 @@ CI is broad and unusually capable: cross-platform shards, integration, frontend,
 
 ### Developer-experience improvements
 
-#### I1 — Make local verification explicitly match fast and full CI modes
+#### ~~I1~~ ✓ done 2026-07-12 — Make local verification explicitly match fast and full CI modes
 
 - **Where:** `scripts/verify-local.sh:18-79`, `.github/workflows/python_lint_and_run_unit_tests.yml`, `.github/workflows/integration_test_and_build_all_packages_ci.yml`
 - **What's wrong:** The script claims parity but omits Ruff/format/Mypy, dev-lock audit, integration, release-tool tests, actionlint/contracts, and clean package/artifact validation.

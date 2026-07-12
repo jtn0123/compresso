@@ -111,14 +111,13 @@ class ApiPreviewHandler(BaseApiHandler):
             )
             self.write_success(response)
             return
-        except (ValueError, RuntimeError) as e:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
-            self.write_error()
+        except (ValueError, RuntimeError) as exc:
+            self.handle_base_api_error(
+                BaseApiError("Preview request could not be processed", private_detail=f"{type(exc).__name__}: {exc}")
+            )
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -173,9 +172,7 @@ class ApiPreviewHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -209,9 +206,7 @@ class ApiPreviewHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)

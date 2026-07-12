@@ -186,7 +186,9 @@ class Links(metaclass=SingletonType):
             "version": config_dict.get("version", "???"),
             "uuid": config_dict.get("uuid", "???"),
             "available": config_dict.get("available", False),
-            "task_count": config_dict.get("task_count", 0),
+            "task_count": config_dict.get("runnable_task_count", config_dict.get("task_count", 0)),
+            "runnable_task_count": config_dict.get("runnable_task_count", config_dict.get("task_count", 0)),
+            "capabilities": config_dict.get("capabilities", {}),
             "last_updated": config_dict.get("last_updated", time.time()),
         }
 
@@ -401,6 +403,20 @@ class Links(metaclass=SingletonType):
                         f.write(chunk)
         return True
 
+    def _remote_validation_data(self, response, resource: str) -> tuple[bool, dict]:
+        """Return JSON from a successful remote validation request and log known failures."""
+        if response.status_code == 200:
+            return True, response.json()
+
+        if response.status_code in {400, 404, 405, 500}:
+            json_data = response.json()
+            self._log(
+                f"Error while fetching remote installation {resource}. Message: '{json_data.get('error')}'",
+                message2=json_data.get("traceback", []),
+                level="error",
+            )
+        return False, {}
+
     def validate_remote_installation(self, address: str, **kwargs):
         """
         Validate a remote Compresso installation by requesting
@@ -422,73 +438,52 @@ class Links(metaclass=SingletonType):
         # Fetch config
         url = f"{address}/compresso/api/v2/settings/configuration"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation config. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, system_configuration_data = self._remote_validation_data(res, "config")
+        if not valid:
             return {}
-        system_configuration_data = res.json()
 
         # Fetch settings
         url = f"{address}/compresso/api/v2/settings/read"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation settings. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, settings_data = self._remote_validation_data(res, "settings")
+        if not valid:
             return {}
-        settings_data = res.json()
 
         # Fetch version
         url = f"{address}/compresso/api/v2/version/read"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation version. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, version_data = self._remote_validation_data(res, "version")
+        if not valid:
             return {}
-        version_data = res.json()
 
-        # Fetch version
+        # Fetch session state
         url = f"{address}/compresso/api/v2/session/state"
         res = request_handler.get(url, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation session state. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, session_data = self._remote_validation_data(res, "session state")
+        if not valid:
             return {}
-        session_data = res.json()
 
         # Fetch task count data
         data = {"start": 0, "length": 1}
         url = f"{address}/compresso/api/v2/pending/tasks"
         res = request_handler.post(url, json=data, timeout=2)
-        if res.status_code != 200:
-            if res.status_code in [400, 404, 405, 500]:
-                json_data = res.json()
-                self._log(
-                    f"Error while fetching remote installation pending task list. Message: '{json_data.get('error')}'",
-                    message2=json_data.get("traceback", []),
-                    level="error",
-                )
+        valid, tasks_data = self._remote_validation_data(res, "pending task list")
+        if not valid:
             return {}
-        tasks_data = res.json()
+
+        # Capacity is advisory: an older peer can omit it and still remain linked.
+        capabilities = {}
+        url = f"{address}/compresso/api/v2/system/capabilities"
+        res = request_handler.get(url, timeout=2)
+        if res.status_code == 200:
+            capabilities = res.json()
+
+        runnable_task_count = int(
+            tasks_data.get(
+                "runnableRecords",
+                tasks_data.get("recordsFiltered", tasks_data.get("recordsTotal", 0)),
+            )
+        )
 
         return {
             "system_configuration": system_configuration_data.get("configuration"),
@@ -501,7 +496,9 @@ class Links(metaclass=SingletonType):
                 "email": session_data.get("email"),
                 "uuid": session_data.get("uuid"),
             },
-            "task_count": int(tasks_data.get("recordsTotal", 0)),
+            "task_count": runnable_task_count,
+            "runnable_task_count": runnable_task_count,
+            "capabilities": capabilities,
         }
 
     def update_all_remote_installation_links(self):  # noqa: C901 — multi-step remote link sync with error recovery
@@ -581,8 +578,11 @@ class Links(metaclass=SingletonType):
                 # Mark the installation as available
                 updated_config["available"] = True
 
-                # Append the current task count
-                updated_config["task_count"] = installation_data.get("task_count", 0)
+                # Append current runnable demand and measured worker capacity.
+                runnable_task_count = installation_data.get("runnable_task_count", installation_data.get("task_count", 0))
+                updated_config["task_count"] = runnable_task_count
+                updated_config["runnable_task_count"] = runnable_task_count
+                updated_config["capabilities"] = installation_data.get("capabilities", {})
 
                 merge_dict = {
                     "name": installation_data.get("settings", {}).get("installation_name"),
@@ -838,9 +838,12 @@ class Links(metaclass=SingletonType):
         updated_config["enable_receiving_tasks"] = configuration.get("enable_sending_tasks")
         updated_config["enable_sending_tasks"] = configuration.get("enable_receiving_tasks")
 
-        # Current task count
+        # Current runnable demand and measured capacity
         task_handler = task.Task()
-        updated_config["task_count"] = int(task_handler.get_total_task_list_count())
+        runnable_task_count = int(task_handler.get_runnable_task_count())
+        updated_config["task_count"] = runnable_task_count
+        updated_config["runnable_task_count"] = runnable_task_count
+        updated_config["capabilities"] = WorkerCapabilities().snapshot(self.settings)
 
         # Fetch local config for distributed_worker_count_target
         distributed_worker_count_target = self.settings.get_distributed_worker_count_target()
@@ -940,6 +943,7 @@ class Links(metaclass=SingletonType):
                         "preloading_count": local_config.get("preloading_count"),
                         "library_names": library_names,
                         "available_slots": 0,
+                        "queue_depth": current_pending_tasks,
                         "capabilities": capabilities,
                         "scheduling_score": WorkerCapabilities.scheduling_score(capabilities) or 0,
                     }

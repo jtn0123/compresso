@@ -25,10 +25,10 @@ my_awesome_plugin/
     __init__.py          # Required (can be empty)
     info.json            # Required -- plugin metadata
     plugin.py            # Required -- contains runner functions and Settings class
-    requirements.txt     # Optional -- pip dependencies (installed to site-packages/)
+    requirements.lock    # Optional -- hash-locked wheel dependencies
     changelog.md         # Optional -- shown in the UI
     description.md       # Optional -- extended description shown in the UI
-    site-packages/       # Auto-created -- pip install target for requirements.txt
+    site-packages/       # Auto-created -- pip install target for requirements.lock
 ```
 
 ### info.json Schema
@@ -60,6 +60,12 @@ Every plugin must include an `info.json` file at its root. Here is the full sche
 | `compatibility` | `int[]`    | Yes      | List of plugin handler versions this plugin supports. Current version is `2`. |
 | `tags`          | `string`   | No       | Comma-separated tags for search/filtering. |
 | `bundled`       | `boolean`  | No       | Set to `true` only for plugins shipped with Compresso itself. |
+
+### Trust and packaging requirements
+
+Third-party plugin code runs with access to the Compresso process and media paths, so it is disabled by default even after installation. Operators must explicitly list reviewed plugin IDs in the comma-separated `COMPRESSO_TRUSTED_PLUGIN_IDS` environment variable. The `bundled` flag is reserved for plugins shipped and reviewed with Compresso; setting it in an external package does not make an untrusted repository safe.
+
+Repository metadata must publish a `package_sha256` (or `sha256`) digest for every HTTPS package URL. Compresso authenticates the complete archive before extraction, rejects path traversal and symlinks, and will not run npm during installation. Ship frontend assets already built. Python dependencies must be binary wheels pinned with hashes in `requirements.lock`; optional post-extraction dependencies use `requirements.post-install.lock` under the same rules.
 
 ### plugin.py Structure
 
@@ -195,7 +201,7 @@ def on_library_management_file_test(data, **kwargs):
 | `library_id`               | `int`                  | Yes      | The library for this task. |
 | `task_id`                  | `int`                  | No       | Unique task identifier. |
 | `worker_log`               | `list`                 | Yes      | Append log strings here for the UI tail display. |
-| `exec_command`             | `list` or `str`        | Yes      | The subprocess command for Compresso to execute. Set to `[]` to skip. |
+| `exec_command`             | `list[str]`            | Yes      | A non-empty argv list for Compresso to execute. Set to `[]` only when no subprocess is needed. Shell strings are rejected. |
 | `current_command`          | `list`                 | Yes      | List whose last entry is shown as "current command" in the UI. |
 | `command_progress_parser`  | `callable` or `None`   | Yes      | Function to parse STDOUT for progress reporting. `None` to skip. |
 | `file_in`                  | `str`                  | Yes      | Source file path. |
@@ -951,7 +957,7 @@ Ensure your runner functions:
 - **Use a git repo**: Compresso will not overwrite a plugin directory that contains a `.git` directory when installing from a repo. This protects your development copy.
 - **Check logs**: Compresso logs plugin errors to its standard logging output. Look for messages prefixed with the plugin executor class name.
 - **Test settings**: Verify your `Settings` class loads correctly by calling `get_setting()` and checking that defaults are returned.
-- **Dependencies**: If your plugin needs third-party Python packages, list them in `requirements.txt`. They will be installed to a `site-packages/` directory inside your plugin folder. You can also use `requirements.post-install.txt` for dependencies needed only after extraction.
+- **Dependencies**: If your plugin needs third-party Python packages, pin wheels and hashes in `requirements.lock`. They are installed to a `site-packages/` directory inside your plugin folder. Use `requirements.post-install.lock` only for dependencies needed after extraction. Runtime npm installation/build scripts are not supported; package compiled frontend assets.
 
 ---
 

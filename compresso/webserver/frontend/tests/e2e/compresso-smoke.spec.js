@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 
 const runtimeErrorsByPage = new WeakMap()
 
@@ -59,7 +60,8 @@ function json(body) {
   }
 }
 
-async function installApiMocks(page, requests = []) {
+async function installApiMocks(page, requests = [], options = {}) {
+  let onboardingCompleted = options.onboardingCompleted ?? true
   await page.route('https://api.github.com/repos/jtn0123/compresso/releases/tags/*', (route) =>
     route.fulfill(json({ tag_name: '0.0.0-e2e', body: 'Mock release notes' })),
   )
@@ -82,7 +84,7 @@ async function installApiMocks(page, requests = []) {
       return route.fulfill(
         json({
           settings: {
-            onboarding_completed: true,
+            onboarding_completed: onboardingCompleted,
             approval_required: true,
             release_notes_viewed: '0.0.0-e2e',
             libraries: [{ id: 1, name: 'Movies' }],
@@ -102,6 +104,31 @@ async function installApiMocks(page, requests = []) {
     }
     if (endpoint === 'plugins/panels/enabled') {
       return route.fulfill(json({ results: [] }))
+    }
+    if (endpoint === 'plugins/installed') {
+      return route.fulfill(json({ recordsFiltered: 0, results: [] }))
+    }
+    if (endpoint === 'plugins/installable') {
+      return route.fulfill(json({ plugins: [] }))
+    }
+    if (endpoint === 'plugins/repos/list') {
+      return route.fulfill(
+        json({
+          repos: [
+            {
+              id: 'official',
+              name: 'Official plugins',
+              icon: '',
+              path: 'https://github.com/jtn0123/compresso-plugins',
+              repo_html_url: 'https://github.com/jtn0123/compresso-plugins',
+            },
+          ],
+        }),
+      )
+    }
+    if (endpoint === 'settings/write') {
+      onboardingCompleted = true
+      return route.fulfill(json({ success: true }))
     }
     if (endpoint === 'system/status') {
       return route.fulfill(
@@ -230,9 +257,16 @@ test.beforeEach(async ({ page }) => {
     window.WebSocket = MockWebSocket
   })
 
-  page.on('pageerror', (error) => runtimeErrors.push(`pageerror: ${error.message}`))
+  page.on('pageerror', (error) => {
+    // WebKit reports this observer scheduling diagnostic as a page error even
+    // though the browser recovers without losing layout or interaction state.
+    if (error.message === 'ResizeObserver loop completed with undelivered notifications.') return
+    runtimeErrors.push(`pageerror: ${error.message}`)
+  })
   page.on('requestfailed', (request) =>
-    runtimeErrors.push(`requestfailed: ${request.method()} ${request.url()} (${request.failure()?.errorText || 'unknown'})`),
+    runtimeErrors.push(
+      `requestfailed: ${request.method()} ${request.url()} (${request.failure()?.errorText || 'unknown'})`,
+    ),
   )
   page.on('response', (response) => {
     if (response.url().includes('/compresso/api/v2/') && response.status() >= 400) {
@@ -251,7 +285,7 @@ test.afterEach(async ({ page }) => {
   expect(runtimeErrorsByPage.get(page) || []).toEqual([])
 })
 
-test('loads the dashboard and opens pending/completed task dialogs', async ({ page }) => {
+test('loads the dashboard and opens pending/completed task dialogs @cross-browser', async ({ page }) => {
   await installApiMocks(page)
 
   await page.goto('/compresso/ui/dashboard')
@@ -285,10 +319,9 @@ test('sends approval search filters and approve/reject requests', async ({ page 
     .poll(() => requests.filter((entry) => entry.endpoint === 'approval/tasks').at(-1)?.payload?.search_value)
     .toBe('Bunny')
 
-  await page
-    .getByRole('button', { name: /^Approve$/ })
-    .first()
-    .click()
+  const approveButton = page.getByRole('button', { name: /^Approve$/ }).first()
+  await approveButton.focus()
+  await page.keyboard.press('Enter')
   await expect.poll(() => requests.some((entry) => entry.endpoint === 'approval/approve')).toBe(true)
 
   await page
@@ -314,4 +347,41 @@ test('opens approval detail and starts the compare preview', async ({ page }) =>
   await page.getByTestId('approval-compare-quality').click()
   await expect(page.getByRole('button', { name: 'Side by Side' })).toBeVisible()
   await expect(page.getByRole('dialog').getByText('VMAF: 94.2').first()).toBeVisible()
+})
+
+test('onboarding and plugin controls stay usable on narrow keyboard layouts @mobile @accessibility', async ({
+  page,
+}) => {
+  await installApiMocks(page, [], { onboardingCompleted: false })
+
+  await page.goto('/compresso/ui/dashboard')
+
+  const onboarding = page.getByRole('dialog')
+  await expect(onboarding.getByText('Welcome to Compresso')).toBeVisible()
+  const dialogBounds = await onboarding.boundingBox()
+  expect(dialogBounds.width).toBeLessThanOrEqual(page.viewportSize().width)
+
+  const accessibility = await new AxeBuilder({ page }).include('.first-run-card').analyze()
+  expect(accessibility.violations.filter((violation) => ['critical', 'serious'].includes(violation.impact))).toEqual([])
+
+  await onboarding.getByRole('textbox').fill('/media/library')
+  for (let step = 0; step < 2; step += 1) {
+    const nextButton = onboarding.getByRole('button', { name: 'Next' })
+    await nextButton.focus()
+    await page.keyboard.press('Enter')
+  }
+  const finishButton = onboarding.getByRole('button', { name: 'Finish Setup' })
+  await finishButton.focus()
+  await page.keyboard.press('Enter')
+  await expect(onboarding).toBeHidden()
+
+  await page.goto('/compresso/ui/settings-plugins')
+  await page.getByRole('button', { name: 'Install Plugin From Repo' }).click()
+  await expect(page.getByRole('dialog').getByText('Plugin Installer')).toBeVisible()
+  await page.getByRole('button', { name: 'Repository List' }).click()
+
+  const repoLink = page.getByRole('link', { name: 'https://github.com/jtn0123/compresso-plugins' }).first()
+  await repoLink.focus()
+  await expect(repoLink).toBeFocused()
+  await expect(repoLink).toHaveAttribute('href', 'https://github.com/jtn0123/compresso-plugins')
 })

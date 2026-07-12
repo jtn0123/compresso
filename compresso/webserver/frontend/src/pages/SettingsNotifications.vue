@@ -3,7 +3,7 @@
     <div class="q-pa-none">
       <div class="row">
         <div class="col-sm-12 col-md-10 col-lg-8">
-          <div :class="$q.platform.is.mobile ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
+          <div :class="$q.screen.lt.md ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
             <PageHeader
               :title="$t('pages.settingsNotifications.title')"
               :subtitle="$t('pages.settingsNotifications.subtitle')"
@@ -99,8 +99,8 @@
             </q-card>
 
             <!-- Add/Edit Dialog -->
-            <q-dialog v-model="showDialog" persistent>
-              <q-card style="min-width: 500px">
+            <q-dialog v-model="showDialog" persistent :maximized="$q.screen.lt.md">
+              <q-card class="notification-dialog-card">
                 <q-card-section>
                   <div class="text-h6">
                     {{
@@ -467,7 +467,19 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
+.notification-dialog-card {
+  width: min(560px, calc(100vw - 32px));
+  max-width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .notification-dialog-card {
+    width: 100%;
+    min-height: 100%;
+  }
+}
+
 .page-with-mobile-quick-nav {
   padding-bottom: 24px;
 }

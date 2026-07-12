@@ -32,8 +32,6 @@ Copyright:
 import json
 import re
 
-import tornado.log
-
 from compresso import config
 from compresso.libs import session
 from compresso.libs.external_notifications import ExternalNotificationDispatcher
@@ -136,9 +134,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -202,9 +198,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -277,6 +271,8 @@ class ApiNotificationsHandler(BaseApiHandler):
         """
         try:
             body = json.loads(self.request.body)
+            if not isinstance(body, dict):
+                raise TypeError("Notification settings payload must be an object")
             channels = body.get("channels")
             if not isinstance(channels, list):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channels' must be a list")
@@ -285,9 +281,10 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.config.set_config_item("notification_channels", channels)
             self.write_success()
             return
-        except (json.JSONDecodeError, TypeError) as e:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
-            self.write_error()
+        except (json.JSONDecodeError, TypeError) as exc:
+            self.handle_base_api_error(
+                BaseApiError("Invalid notification settings payload", private_detail=f"{type(exc).__name__}: {exc}")
+            )
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -316,6 +313,8 @@ class ApiNotificationsHandler(BaseApiHandler):
         """
         try:
             body = json.loads(self.request.body)
+            if not isinstance(body, dict):
+                raise TypeError("Notification test payload must be an object")
             channel_config = body.get("channel")
             if not isinstance(channel_config, dict):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channel' must be an object")
@@ -325,9 +324,10 @@ class ApiNotificationsHandler(BaseApiHandler):
             result = dispatcher.test_channel(channel_config)
             self.write_success(result)
             return
-        except (json.JSONDecodeError, TypeError) as e:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
-            self.write_error()
+        except (json.JSONDecodeError, TypeError) as exc:
+            self.handle_base_api_error(
+                BaseApiError("Invalid notification test payload", private_detail=f"{type(exc).__name__}: {exc}")
+            )
             return
         except Exception as e:
             self.handle_unhandled_error(e)

@@ -7,7 +7,7 @@
 
       <div class="row">
         <div class="col q-ma-sm">
-          <div class="q-pa-md" :style="$q.platform.is.mobile ? '' : 'max-width: 70%'">
+          <div class="q-pa-md settings-workers-panel">
             <q-form @submit="save" class="q-gutter-md">
               <!--START WORKER GROUPS-->
               <h5 class="q-mb-none">{{ $t('components.settings.workers.workerGroups') }}</h5>
@@ -417,7 +417,11 @@ export default {
   },
 }
 </script>
-<style>
+<style scoped>
+.settings-workers-panel {
+  max-width: 70%;
+}
+
 .schedule-list-group {
   padding-left: 0;
   padding-right: 20px;
@@ -436,6 +440,10 @@ export default {
 }
 
 @media (max-width: 1023px) {
+  .settings-workers-panel {
+    max-width: 100%;
+  }
+
   .page-with-mobile-quick-nav {
     padding-bottom: 96px;
   }

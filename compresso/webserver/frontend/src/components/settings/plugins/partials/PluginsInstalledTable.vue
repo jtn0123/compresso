@@ -3,7 +3,7 @@
     <q-card-section class="q-pa-none">
       <div class="row q-gutter-xs q-mt-xs justify-between">
         <div class="col-auto">
-          <div :class="$q.platform.is.mobile ? 'col' : 'q-btn-group row no-wrap inline'">
+          <div :class="$q.screen.lt.md ? 'col' : 'q-btn-group row no-wrap inline'">
             <CompressoStandardButton
               @click="openPluginInstaller"
               icon-right="add"
@@ -11,14 +11,14 @@
             />
 
             <CompressoStandardButtonDropdown
-              :class="$q.platform.is.mobile ? 'q-my-sm' : ''"
+              :class="$q.screen.lt.md ? 'q-my-sm' : ''"
               :label="$t('components.plugins.installPluginFromFile')"
             >
               <div>
                 <div class="row no-wrap q-pa-md">
                   <div class="column">
                     <q-uploader
-                      :style="$q.platform.is.mobile ? 'max-width: 210px' : 'max-width: 300px'"
+                      :style="$q.screen.lt.md ? 'max-width: 210px' : 'max-width: 300px'"
                       :url="getUploadUrl()"
                       :label="$t('components.plugins.uploadZipLabel')"
                       color="secondary"

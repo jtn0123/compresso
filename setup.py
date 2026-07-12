@@ -228,7 +228,7 @@ setup(
     name=module_name,
     version=module_version,
     license="GPL-3.0-only",
-    license_files=("LICENSE",),
+    license_files=("LICENSE", "LICENSES/MIT.txt", "THIRD_PARTY_NOTICES.md"),
     author=module_author,
     author_email=module_email,
     maintainer=module_author,

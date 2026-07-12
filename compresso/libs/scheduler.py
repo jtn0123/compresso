@@ -29,8 +29,8 @@ Copyright:
 
 """
 
+import math
 import os
-import random
 import shutil
 import threading
 import time
@@ -47,6 +47,7 @@ from compresso.libs.resumable_transfer import ResumableTransferStore
 from compresso.libs.session import Session
 from compresso.libs.thread_health import ThreadHealthMixin
 from compresso.libs.unmodels.tasks import Tasks
+from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.libs.worker_group import WorkerGroup
 
 
@@ -62,7 +63,6 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         self.abort_flag = threading.Event()
         self.abort_flag.clear()
         self.scheduler = schedule.Scheduler()
-        self.force_local_worker_timer = 0
         self._init_thread_health()
 
     def stop(self):
@@ -159,12 +159,40 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             worker_group.set_number_of_workers(worker_count)
             worker_group.save()
 
+    @staticmethod
+    def _installation_worker_allocations(candidates, target_total, runnable_demand):
+        """Allocate a bounded global worker target by deterministic capacity score."""
+        target_total = min(max(0, int(target_total)), max(0, int(runnable_demand)))
+        if target_total == 0 or not candidates:
+            return {candidate["id"]: 0 for candidate in candidates}
+
+        weighted = []
+        for candidate in candidates:
+            try:
+                score = float(candidate.get("score", 0))
+            except (TypeError, ValueError):
+                score = 0
+            weighted.append((str(candidate["id"]), score if math.isfinite(score) and score > 0 else 1.0))
+
+        total_weight = sum(score for _, score in weighted)
+        quotas = {candidate_id: (score / total_weight) * target_total for candidate_id, score in weighted}
+        allocations = {candidate_id: int(quota) for candidate_id, quota in quotas.items()}
+        remaining = target_total - sum(allocations.values())
+        ranked_remainders = sorted(
+            allocations,
+            key=lambda candidate_id: (-(quotas[candidate_id] - allocations[candidate_id]), candidate_id),
+        )
+        for candidate_id in ranked_remainders[:remaining]:
+            allocations[candidate_id] += 1
+        return allocations
+
     def set_worker_count_based_on_remote_installation_links(self):
         settings = config.Config()
 
-        # Get local task count as int
+        # Count only work a worker could claim now. Approval, completed, and
+        # retry-deferred rows must not attract capacity.
         task_handler = task.Task()
-        local_task_count = int(task_handler.get_total_task_list_count())
+        local_task_count = int(task_handler.get_runnable_task_count())
 
         # Get target count
         target_count = int(settings.get_distributed_worker_count_target())
@@ -181,43 +209,32 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         # There is a link config with distributed worker counts enabled
         self.logger.info("Syncing distributed worker count for this installation")
 
-        # Get total tasks count of pending tasks across all linked_configs
+        # Get runnable demand across all linked installations.
         total_tasks = local_task_count
         for linked_config in linked_configs:
-            total_tasks += int(linked_config.get("task_count", 0))
+            total_tasks += int(linked_config.get("runnable_task_count", linked_config.get("task_count", 0)))
 
-        # From the counts fetched from all linked_configs, balance out the target count (including this installation)
-        allocated_worker_count = 0
-        for linked_config in linked_configs:
-            if linked_config.get("task_count", 0) == 0:
+        try:
+            local_capabilities = WorkerCapabilities().snapshot(settings)
+        except Exception:
+            local_capabilities = {}
+        candidates = [
+            {
+                "id": "__local__",
+                "score": WorkerCapabilities.scheduling_score(local_capabilities),
+            }
+        ]
+        for index, linked_config in enumerate(linked_configs):
+            if "available" in linked_config and not linked_config.get("available"):
                 continue
-            allocated_worker_count += round((int(linked_config.get("task_count", 0)) / total_tasks) * target_count)
-
-        # Calculate worker count for local
-        target_workers_for_this_installation = 0
-        if local_task_count > 0:
-            target_workers_for_this_installation = round((local_task_count / total_tasks) * target_count)
-
-        # If the total allocated worker count is now above our target, set this installation back to 0
-        if allocated_worker_count > target_count:
-            target_workers_for_this_installation = 0
-
-        # Every 10-12 minutes (make it random), give this installation at least 1 worker if it has pending tasks.
-        #       This should cause the pending task queue to sit idle if there is only one task in the queue and it will provide
-        #           rotation of workers when the pending task queue is close to the same.
-        #       EG. If time now (seconds) > time last checked (seconds) + 10mins (600 seconds) + random seconds within 2mins
-        time_now = time.time()
-        # noqa justification: S311 — jitter for scheduling, not crypto
-        time_to_next_force_local_worker = int(
-            self.force_local_worker_timer + 600 + random.randrange(120)  # noqa: S311
-        )
-        if (
-            time_now > time_to_next_force_local_worker
-            and (local_task_count > 1)
-            and (target_workers_for_this_installation < 1)
-        ):
-            target_workers_for_this_installation = 1
-            self.force_local_worker_timer = time_now
+            candidates.append(
+                {
+                    "id": str(linked_config.get("uuid") or linked_config.get("address") or f"remote-{index}"),
+                    "score": WorkerCapabilities.scheduling_score(linked_config.get("capabilities", {})),
+                }
+            )
+        allocations = self._installation_worker_allocations(candidates, target_count, total_tasks)
+        target_workers_for_this_installation = allocations.get("__local__", 0)
 
         self.logger.info("Configuring worker count as %s for this installation", target_workers_for_this_installation)
         self._set_local_worker_group_total(target_workers_for_this_installation)

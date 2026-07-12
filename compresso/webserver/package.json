@@ -4,7 +4,7 @@
   "private": true,
   "description": "Compresso webui.",
   "author": "Josh.5",
-  "license": "GPL-3.0",
+  "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jtn0123/compresso.git"

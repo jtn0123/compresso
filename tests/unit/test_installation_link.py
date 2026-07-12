@@ -83,11 +83,13 @@ class TestLinks:
             "uuid",
             "available",
             "task_count",
+            "runnable_task_count",
+            "capabilities",
             "last_updated",
         ]
         for key in expected_keys:
             assert key in result, f"Missing key: {key}"
-        assert len(result) == 17
+        assert len(result) == 19
 
     @pytest.mark.unittest
     def test_network_transfer_lock_acquire_release(self):

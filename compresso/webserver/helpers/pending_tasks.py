@@ -137,7 +137,12 @@ def prepare_filtered_pending_tasks(params, include_library=False):
     )
 
     # Build return data
-    return_data = {"recordsTotal": records_total_count, "recordsFiltered": records_filtered_count, "results": []}
+    return_data = {
+        "recordsTotal": records_total_count,
+        "recordsFiltered": records_filtered_count,
+        "runnableRecords": task_handler.get_runnable_task_count(),
+        "results": [],
+    }
 
     # Iterate over tasks and append them to the task data
     for pending_task in pending_task_results:

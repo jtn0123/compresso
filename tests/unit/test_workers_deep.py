@@ -550,7 +550,7 @@ class TestWorkerExecCommandSubprocess:
     @patch("compresso.libs.workers.psutil.Process")
     @patch("compresso.libs.workers.subprocess.Popen")
     @patch("compresso.libs.workers.common.ensure_dir")
-    def test_string_command_uses_shell(self, mock_ensure, mock_popen, mock_psutil_proc):
+    def test_string_command_is_rejected_without_shell(self, mock_ensure, mock_popen, mock_psutil_proc):
         worker = _make_worker()
         worker.worker_subprocess_monitor = _make_monitor()
         worker.worker_log = []
@@ -570,10 +570,8 @@ class TestWorkerExecCommandSubprocess:
             "current_command": [],
         }
         result = worker._Worker__exec_command_subprocess(data)
-        assert result is True
-        # Verify shell=True was passed
-        _, kwargs = mock_popen.call_args
-        assert kwargs.get("shell") is True
+        assert result is False
+        mock_popen.assert_not_called()
 
     def test_raises_on_invalid_command_type(self):
         worker = _make_worker()

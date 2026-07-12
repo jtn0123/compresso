@@ -45,8 +45,8 @@ from tornado.web import RequestHandler
 from compresso.webserver.request_auth import authorize_request
 from compresso.webserver.security_headers import SecurityHeadersMixin
 
-LOG_UNHANDLED_ERROR = "Unhandled error in %s.%s"
-LOG_BASE_API_ERROR = "BaseApiError.%s: %s"
+LOG_UNHANDLED_ERROR = "Unhandled error id=%s in %s.%s"
+LOG_BASE_API_ERROR = "Expected API error id=%s in %s: %s"
 CSRF_COOKIE_NAME = "compresso_csrf_token"
 CSRF_HEADER_NAME = "X-Compresso-CSRF-Token"
 READ_ONLY_POST_PATHS = (
@@ -73,12 +73,14 @@ READ_ONLY_POST_PATHS = (
 
 
 class BaseApiError(Exception):
-    """
-    Manage errors handled by the BaseApiHandler
-    """
+    """Expected API failure with an intentionally public response."""
 
-    def __init__(self, errmsg):
-        Exception.__init__(self, errmsg)
+    def __init__(self, public_message, *, messages=None, status_code=400, private_detail=None):
+        super().__init__(public_message)
+        self.public_message = public_message
+        self.messages = messages or {}
+        self.status_code = status_code
+        self.private_detail = private_detail or public_message
 
 
 class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
@@ -101,6 +103,7 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
     def initialize(self, **kwargs):
         self.params = kwargs.get("params", [])
+        self.error_messages = {}
 
     def prepare(self):
         """Check cross-cutting API guards before routing to handler methods."""
@@ -203,20 +206,23 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         # Ensure body can be JSON decoded
         try:
             json_data = json.loads(self.request.body)
-        except JSONDecodeError as e:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(e))
-            self.write_error()
-            received_body: Any = self.request.body
-            if isinstance(received_body, bytes):
-                received_body = received_body.decode("utf-8", errors="replace")
-            raise BaseApiError(f"Expected request body to be JSON. Received '{received_body}'") from e
+        except (JSONDecodeError, UnicodeDecodeError) as exc:
+            messages = {"body": ["Invalid JSON payload"]}
+            self.error_messages = messages
+            raise BaseApiError(
+                "Expected request body to be valid JSON",
+                messages=messages,
+                private_detail=f"{type(exc).__name__}: {exc}",
+            ) from exc
 
         request_validation_errors = schema.validate(json_data)
         if request_validation_errors:
             self.error_messages = request_validation_errors
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Failed request schema validation")
-            self.write_error()
-            raise BaseApiError(f"Failed schema validation: {str(request_validation_errors)}")
+            raise BaseApiError(
+                "Failed request schema validation",
+                messages=request_validation_errors,
+                private_detail=f"Schema validation failed: {request_validation_errors}",
+            )
 
         return schema.dump(schema.load(json_data))
 
@@ -252,8 +258,12 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
     def handle_base_api_error(self, exc: BaseApiError) -> None:
         """Standard handler for expected API errors."""
-        tornado.log.app_log.error(LOG_BASE_API_ERROR, self.route.get("call_method"), exc)
-        self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(exc))
+        error_id = secrets.token_hex(8)
+        call_method = self.route.get("call_method") if getattr(self, "route", None) else None
+        tornado.log.app_log.warning(LOG_BASE_API_ERROR, error_id, call_method, exc.private_detail)
+        self.error_messages = exc.messages
+        self._api_error_id = error_id
+        self.set_status(exc.status_code, reason=exc.public_message)
         self.write_error()
 
     def write_success(self, response=None):
@@ -271,9 +281,9 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
     def handle_unhandled_error(self, exc: Exception) -> None:
         """
-        Standard handling for an unexpected exception raised inside a handler:
-        log it against the current route, set a 500 status with the exception
-        text, and write the error response.
+        Standard handling for an unexpected exception raised inside a handler.
+        Private exception details remain in the correlated server log; clients
+        receive a stable public message and opaque error identifier.
 
         Centralising this keeps the per-handler ``except Exception`` arms to a
         single call rather than repeating the log/set_status/write_error trio.
@@ -282,9 +292,35 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         :return:
         """
         call_method = self.route.get("call_method") if getattr(self, "route", None) else None
-        tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, call_method)
-        self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(exc))
+        error_id = secrets.token_hex(8)
+        tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, error_id, self.__class__.__name__, call_method)
+        self.error_messages = {}
+        self._api_error_id = error_id
+        self.set_status(self.STATUS_ERROR_INTERNAL, reason="Internal server error")
         self.write_error()
+
+    def write_api_error(self, status_code, public_reason, *, messages=None, error_id=None, exc_info=None) -> None:
+        """Own the complete structured error response for v2 API handlers."""
+        if getattr(self, "_finished", False):
+            return
+
+        self.error_messages = messages or {}
+        if self.get_status() != status_code or self._reason != public_reason:
+            self.set_status(status_code, reason=public_reason)
+        response = {
+            "error": f"{status_code:d}: {public_reason}",
+            "messages": self.error_messages,
+        }
+        if error_id:
+            response["error_id"] = error_id
+
+        application = getattr(self, "application", None)
+        settings = application.settings if application is not None else {}
+        if settings.get("serve_traceback"):
+            effective_exc_info = exc_info or sys.exc_info()
+            if effective_exc_info and effective_exc_info[0]:
+                response["traceback"] = traceback.format_exception(*effective_exc_info)
+        self.finish(response)
 
     def write_error(self, status_code=None, **kwargs: Any) -> None:
         """
@@ -306,24 +342,37 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         """
         if status_code is None:
             status_code = self.get_status()
-        response = {
-            "error": f"{status_code:d}: {self._reason}",
-            "messages": {},
-        }
-        if self.error_messages:
-            response["messages"] = self.error_messages
-        if self.settings.get("serve_traceback"):
-            exc_info = kwargs.get("exc_info")
-            if not exc_info:
-                exc_info = sys.exc_info()
-            # in debug mode, try to send a traceback
-            traceback_lines = []
+        public_reason = self._reason
+        error_id = getattr(self, "_api_error_id", None)
+        if hasattr(self, "_api_error_id"):
+            del self._api_error_id
+        if status_code >= self.STATUS_ERROR_INTERNAL:
+            public_reason = "Internal server error"
+            if not error_id:
+                error_id = secrets.token_hex(8)
+                tornado.log.app_log.error(
+                    "API error reached structured writer id=%s status=%s",
+                    error_id,
+                    status_code,
+                    exc_info=kwargs.get("exc_info"),
+                )
+        self.write_api_error(
+            status_code,
+            public_reason,
+            messages=self.error_messages,
+            error_id=error_id,
+            exc_info=kwargs.get("exc_info"),
+        )
 
-            if exc_info and exc_info[0]:
-                for line in traceback.format_exception(*exc_info):
-                    traceback_lines.append(line)
-            response["traceback"] = traceback_lines
-        self.finish(response)
+    async def _invoke_route(self, route, *args, **kwargs):
+        """Invoke one routed method and own any exception it lets escape."""
+        self.route = route
+        try:
+            await getattr(self, route.get("call_method"))(*args, **kwargs)
+        except BaseApiError as exc:
+            self.handle_base_api_error(exc)
+        except Exception as exc:
+            self.handle_unhandled_error(exc)
 
     def handle_endpoint_not_found(self):
         """
@@ -386,7 +435,7 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
                         exc_info=True,
                     )
 
-                    await getattr(self, route.get("call_method"))(*params["path_args"], **params["path_kwargs"])
+                    await self._invoke_route(route, *params["path_args"], **params["path_kwargs"])
                     return
 
                 # This route matches the current request URI and does not have any params.
@@ -394,8 +443,7 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
                 tornado.log.app_log.debug(
                     f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True
                 )
-                self.route = route
-                await getattr(self, route.get("call_method"))()
+                await self._invoke_route(route)
                 return
 
         if matched_route_with_unsupported_method:

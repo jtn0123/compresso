@@ -1,19 +1,15 @@
 # Pull request
 
-## CLA
+## Licensing
 
-- [ ] I agree that by opening a pull requests I am handing over copyright ownership 
-of my work contained in that pull request to the Compresso project and the project 
-owner. My contribution will become licensed under the same license as the overall project. 
-This extends upon paragraph 11 of the Terms & Conditions stipulated in the GPL v3.0
+- [ ] I confirm that I have the right to submit this work and license my contribution under GPL-3.0-only. I understand that I retain copyright unless I sign a separate written assignment.
 
 
 ## Checklist 
 
 - [ ] I have ensured that my pull request targets `master` or `staging`, as appropriate for the change.
 
-- [ ] I have ensured that all new python file contributions contain the correct header as 
-stipulated in the [Contributing Docs](CONTRIBUTING.md).
+- [ ] I preserved existing license notices and used the SPDX header described in the [Contributing Docs](CONTRIBUTING.md) for new Python files.
 
 
 ## Description of the pull request

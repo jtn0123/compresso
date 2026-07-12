@@ -4,7 +4,7 @@
 
     <div class="q-pa-none">
       <div class="col-12 col-sm-12 col-md-10 col-lg-8">
-        <div :class="$q.platform.is.mobile ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
+        <div :class="$q.screen.lt.md ? 'q-ma-sm' : 'q-ma-sm q-pa-md'">
           <q-form class="q-gutter-md">
             <h5 class="q-mb-none">{{ $t('components.plugins.pathConfiguration') }}</h5>
             <PluginsInstalledTable />

@@ -394,8 +394,10 @@ class TestPendingApiTestTask(ApiTestBase):
 
     @patch("compresso.webserver.api_v2.pending_api.Library")
     def test_test_task_library_exception(self, mock_lib_cls):
+        from compresso.libs.library import LibraryLookupError
+
         mock_lib_cls.return_value = None
-        mock_lib_cls.side_effect = Exception("Library not found")
+        mock_lib_cls.side_effect = LibraryLookupError("Library not found")
         resp = self.post_json(
             "/pending/test",
             {
@@ -404,6 +406,19 @@ class TestPendingApiTestTask(ApiTestBase):
             },
         )
         assert resp.code == 400
+
+    @patch("compresso.webserver.api_v2.pending_api.Library")
+    def test_test_task_unexpected_library_exception_returns_500(self, mock_lib_cls):
+        """Unexpected library construction failures must retain the internal-error path."""
+        mock_lib_cls.side_effect = RuntimeError("Database unavailable")
+        resp = self.post_json(
+            "/pending/test",
+            {
+                "path": "/media/video.mp4",
+                "library_id": 999,
+            },
+        )
+        assert resp.code == 500
 
 
 # ------------------------------------------------------------------

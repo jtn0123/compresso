@@ -65,6 +65,17 @@ class ApiTransferHandler(BaseApiHandler):
         root = os.path.join(config.Config().get_cache_path(), "remote_transfers")
         return ResumableTransferStore(root)
 
+    def _handle_transfer_error(self, error):
+        """Map transfer failures to structured client-facing API errors."""
+        status_code = 404 if isinstance(error, KeyError) else 400
+        self.handle_base_api_error(
+            BaseApiError(
+                "Transfer request could not be completed",
+                status_code=status_code,
+                private_detail=f"{type(error).__name__}: {error}",
+            )
+        )
+
     async def begin_transfer(self):
         try:
             request = self.read_json_request(RequestTransferSessionSchema())
@@ -82,11 +93,10 @@ class ApiTransferHandler(BaseApiHandler):
                 metadata=metadata,
             )
             self.write_success(status)
-        except BaseApiError:
-            return
+        except BaseApiError as exc:
+            self.handle_base_api_error(exc)
         except (OSError, TypeError, ValueError) as error:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
-            self.write_error()
+            self._handle_transfer_error(error)
 
     async def get_transfer_status(self, transfer_id=None):
         try:
@@ -94,8 +104,7 @@ class ApiTransferHandler(BaseApiHandler):
             store = self._store()
             self.write_success(await asyncio.to_thread(store.status, transfer_id))
         except (KeyError, OSError, ValueError) as error:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
-            self.write_error()
+            self._handle_transfer_error(error)
 
     async def append_transfer_chunk(self, transfer_id=None):
         try:
@@ -108,8 +117,7 @@ class ApiTransferHandler(BaseApiHandler):
             status = await asyncio.to_thread(store.append, transfer_id, offset, self.request.body, chunk_checksum)
             self.write_success(status)
         except (KeyError, OSError, TypeError, ValueError) as error:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
-            self.write_error()
+            self._handle_transfer_error(error)
 
     async def finalize_transfer(self, transfer_id=None):
         try:
@@ -117,8 +125,7 @@ class ApiTransferHandler(BaseApiHandler):
             response = await asyncio.to_thread(self._finalize_transfer_sync, transfer_id)
             self.write_success(response)
         except (KeyError, OSError, TypeError, ValueError) as error:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
-            self.write_error()
+            self._handle_transfer_error(error)
 
     def _finalize_transfer_sync(self, transfer_id):
         store = self._store()
@@ -148,8 +155,7 @@ class ApiTransferHandler(BaseApiHandler):
             task_id = _decode_path_parameter(task_id)
             self.write_success(await asyncio.to_thread(self._source_manifest_sync, task_id))
         except (OSError, TypeError, ValueError) as error:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
-            self.write_error()
+            self._handle_transfer_error(error)
 
     def _source_manifest_sync(self, task_id):
         task = self._completed_source(task_id)
@@ -174,5 +180,4 @@ class ApiTransferHandler(BaseApiHandler):
             self.set_status(self.STATUS_SUCCESS)
             self.finish(chunk)
         except (OSError, TypeError, ValueError) as error:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
-            self.write_error()
+            self._handle_transfer_error(error)

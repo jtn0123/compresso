@@ -43,6 +43,7 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.libs.worker_group import WorkerGroup
 from compresso.libs.workers import Worker
 
@@ -304,13 +305,24 @@ class Foreman(threading.Thread):
                 configured_uuid = manager_info.get("uuid") or manager_info.get("installation_uuid")
                 if preferred_installation_uuid and configured_uuid != preferred_installation_uuid:
                     continue
-                encoders = manager_info.get("capabilities", {}).get("video_encoders", [])
-                if required_encoder and required_encoder not in encoders:
+                capabilities = manager_info.get("capabilities", {})
+                score = WorkerCapabilities.scheduling_score(capabilities, required_encoder)
+                if score is None:
                     continue
-                candidates.append((float(manager_info.get("scheduling_score", 0)), installation_id, manager_info))
+                if score <= 0:
+                    try:
+                        score = max(0.0, float(manager_info.get("scheduling_score", 0)))
+                    except (TypeError, ValueError):
+                        score = 0.0
+                try:
+                    queue_depth = max(0, int(manager_info.get("queue_depth", 0)))
+                except (TypeError, ValueError):
+                    queue_depth = 0
+                effective_score = float(score) / (1 + queue_depth)
+                candidates.append((effective_score, installation_id, manager_info))
         if not candidates:
             return None, {}
-        _, installation_id, installation_info = max(candidates, key=lambda candidate: candidate[0])
+        _, installation_id, installation_info = min(candidates, key=lambda candidate: (-candidate[0], candidate[1]))
         return installation_id, installation_info
 
     def get_required_video_encoder(self, library_id):
@@ -441,6 +453,7 @@ class Foreman(threading.Thread):
             available_slots = available_installations[installation_uuid].get("available_slots", 0)
             capabilities = available_installations[installation_uuid].get("capabilities", {})
             scheduling_score = available_installations[installation_uuid].get("scheduling_score", 0)
+            queue_depth = available_installations[installation_uuid].get("queue_depth", 0)
             for slot_number in range(available_slots):
                 remote_manager_id = f"{installation_uuid}|M{slot_number}"
                 if (
@@ -459,6 +472,7 @@ class Foreman(threading.Thread):
                     "library_names": remote_library_names,
                     "capabilities": capabilities,
                     "scheduling_score": scheduling_score,
+                    "queue_depth": queue_depth,
                     "created": datetime.now(),
                 }
 

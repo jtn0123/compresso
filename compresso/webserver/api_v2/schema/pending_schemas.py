@@ -129,6 +129,12 @@ class PendingTasksTableResultsSchema(BaseSchema):
 class PendingTasksSchema(TableRecordsSuccessSchema):
     """Schema for returning a list of pending task results"""
 
+    runnableRecords = fields.Int(
+        required=False,
+        load_default=0,
+        metadata={"description": "Pending tasks that are not deferred and can be claimed now"},
+    )
+
     results = fields.Nested(  # type: ignore[assignment]
         PendingTasksTableResultsSchema,
         required=True,
