@@ -52,8 +52,30 @@ class TestConfigInit:
     def test_default_values(self, tmp_path):
         c = _make_config(tmp_path)
         assert c.ui_port == 8888
+        assert c.ui_address == "127.0.0.1"
         assert c.debugging is False
         assert c.ssl_enabled is False
+
+    def test_generates_token_when_auth_enabled_without_one(self, tmp_path):
+        c = _make_config(tmp_path, env_vars={"api_auth_enabled": "true", "api_auth_token": ""})
+
+        assert len(c.get_api_auth_token()) >= 32
+
+    def test_preserves_existing_token_when_auth_enabled(self, tmp_path):
+        c = _make_config(
+            tmp_path,
+            env_vars={"api_auth_enabled": "true", "api_auth_token": "my-custom-token-abc123"},
+        )
+
+        assert c.get_api_auth_token() == "my-custom-token-abc123"
+
+    def test_keeps_generated_token_in_memory_when_persistence_fails(self, tmp_path):
+        from compresso.config import Config
+
+        with patch.object(Config, "_Config__write_settings_to_file", side_effect=OSError("disk full")):
+            c = _make_config(tmp_path, env_vars={"api_auth_enabled": "true", "api_auth_token": ""})
+
+        assert len(c.get_api_auth_token()) >= 32
 
     def test_config_path_override(self, tmp_path):
         config_path = str(tmp_path / "custom_config")
@@ -104,7 +126,8 @@ class TestSetConfigItem:
         c._Config__write_settings_to_file()
 
         settings_file = os.path.join(c.get_config_path(), "settings.json")
-        assert os.stat(settings_file).st_mode & 0o777 == 0o600
+        if os.name != "nt":
+            assert os.stat(settings_file).st_mode & 0o777 == 0o600
         with open(settings_file) as infile:
             assert json.load(infile)["api_auth_token"] == "super-secret"  # noqa: S105 - synthetic test token
 

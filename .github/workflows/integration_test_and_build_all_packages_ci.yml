@@ -488,6 +488,7 @@ jobs:
           mkdir -p "${tmp_root}/config" "${tmp_root}/library" "${tmp_root}/cache"
           docker run -d --rm --name compresso-smoke \
             -p 8888:8888 \
+            -e ui_address=0.0.0.0 \
             -e PUID=$(id -u) \
             -e PGID=$(id -g) \
             -v "${tmp_root}/config:/config" \

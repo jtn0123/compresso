@@ -14,6 +14,7 @@
 | `USE_CUSTOM_SUPPORT_API` | unset | `test` or `dev` to override the support API URL |
 | `PORT` | `8888` | Override the web UI / API port (forwarded to `--port` CLI arg) |
 | `HOME_DIR` | `~` (source), `/config` (Docker) | Override the home directory used to resolve `~/.compresso/` paths |
+| `ui_address` | `127.0.0.1` | Listen address. Container deployments must set `0.0.0.0`; source installs default to loopback for safety. |
 
 ## Volume Mounts
 
@@ -75,11 +76,12 @@ services:
     container_name: compresso
     restart: unless-stopped
     ports:
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=America/New_York
+      - ui_address=0.0.0.0
     volumes:
       - ./config:/config
       - /path/to/media:/library
@@ -88,3 +90,5 @@ services:
     # devices:
     #   - /dev/dri:/dev/dri
 ```
+
+The loopback host binding is the safe default. A master that must accept LAN workers can use `8888:8888` after enabling API authentication and restricting access with the host firewall.

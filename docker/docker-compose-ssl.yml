@@ -13,8 +13,9 @@ services:
     container_name: compresso-ssl-test
     image: compresso-ssl:test
     ports:
-      - 8888:8888
+      - 127.0.0.1:8888:8888
     environment:
+      - ui_address=0.0.0.0
       - PUID=1000
       - PGID=1000
       # SSL/TLS Configuration

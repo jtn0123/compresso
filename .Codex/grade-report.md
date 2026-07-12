@@ -38,11 +38,12 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **15 of 37** addressable grade items are marked complete below; A1 and G1 received meaningful partial fixes but remain open until supervision/health and bounded streaming are complete.
+- **17 of 37** addressable grade items are marked complete below; A1 and G1 received meaningful partial fixes but remain open until supervision/health and bounded streaming are complete.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
 - Frontend production dependency audit reported **0 vulnerabilities** after the compatible update batch.
+- Security hardening: **129 focused backend tests** and **17 focused frontend tests** passed; the broader backend suite passed **3,623 tests with 8 skips** before the final seven focused security cases were added, and the full frontend suite passed **431 tests** plus production build.
 
 ---
 
@@ -237,7 +238,7 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 
 ### Security improvements
 
-#### E1 — Make authentication cover sensitive reads, WebSockets, proxying, and plugin APIs
+#### ~~E1~~ ✓ done 2026-07-12 — Make authentication cover sensitive reads, WebSockets, proxying, and plugin APIs
 
 - **Where:** `base_api_handler.py:53-73,141-193`, `settings_api.py:182-191`, `settings_link_mixin.py:147-169`, `websocket.py:56-171`, `proxy.py:116-189`, `plugins.py:121-205`
 - **What's wrong:** API auth protects only selected mutation routes. Sensitive settings can return remote passwords, while WebSockets, proxy, and plugin APIs bypass the guarded base handler.
@@ -246,7 +247,7 @@ The project has schema validation, rate limiting, security headers, SSRF guards,
 - **Effort:** M
 - **Grade lift:** C+ → B (closes the largest confidentiality and boundary gap)
 
-#### E2 — Use a safe first-launch network posture
+#### ~~E2~~ ✓ done 2026-07-12 — Use a safe first-launch network posture
 
 - **Where:** `compresso/config.py:77-80,149-156`, `compresso/libs/uiserver.py:205-215`, `README.md:19-30`
 - **What's wrong:** The default binds all interfaces with auth and CSRF disabled, while Quick Start publishes the port without an adjacent warning.

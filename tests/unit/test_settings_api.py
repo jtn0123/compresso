@@ -104,7 +104,7 @@ class TestSettingsApiRead(ApiTestBase):
             "address": "10.0.0.2:8888",
             "auth": "None",
             "username": "",
-            "password": "",
+            "password": "stored-secret",
             "available": True,
             "name": "Remote",
             "version": "1.0.0",
@@ -128,6 +128,8 @@ class TestSettingsApiRead(ApiTestBase):
         assert resp.code == 200
         data = self.parse_response(resp)
         assert "link_config" in data
+        assert data["link_config"]["password"] == "********"  # noqa: S105 - response sentinel
+        assert "stored-secret" not in resp.body.decode()
 
     @patch(SETTINGS_LINK_MIXIN + ".Links")
     def test_link_write(self, mock_links_cls):
@@ -158,3 +160,34 @@ class TestSettingsApiRead(ApiTestBase):
             },
         )
         assert resp.code == 200
+
+    @patch(SETTINGS_LINK_MIXIN + ".Links")
+    def test_link_write_password_placeholder_preserves_stored_secret(self, mock_links_cls):
+        mock_links = MagicMock()
+        mock_links.read_remote_installation_link_config.return_value = {"password": "stored-secret"}
+        mock_links_cls.return_value = mock_links
+
+        resp = self.post_json(
+            "/settings/link/write",
+            {
+                "link_config": {
+                    "uuid": "remote-uuid",
+                    "address": "10.0.0.2:8888",
+                    "auth": "Basic",
+                    "username": "operator",
+                    "password": "********",
+                    "enable_receiving_tasks": False,
+                    "enable_sending_tasks": False,
+                    "enable_task_preloading": False,
+                    "preloading_count": 0,
+                    "enable_checksum_validation": False,
+                    "enable_config_missing_libraries": False,
+                    "enable_distributed_worker_count": False,
+                },
+                "distributed_worker_count_target": 0,
+            },
+        )
+
+        assert resp.code == 200
+        written = mock_links.update_single_remote_installation_link_config.call_args.args[0]
+        assert written["password"] == "stored-secret"  # noqa: S105 - synthetic test secret

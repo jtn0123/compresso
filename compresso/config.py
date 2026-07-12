@@ -32,6 +32,7 @@ Copyright:
 import contextlib
 import json
 import os
+import secrets
 
 from compresso import metadata
 from compresso.libs import common
@@ -76,7 +77,7 @@ class Config(metaclass=SingletonType):
     def __init__(self, config_path=None, **kwargs):
         # Set the default UI Port
         self.ui_port = DEFAULT_UI_PORT
-        self.ui_address = ""
+        self.ui_address = "127.0.0.1"
 
         # SSL/TLS settings
         self.ssl_enabled = False
@@ -185,6 +186,18 @@ class Config(metaclass=SingletonType):
 
         # Apply settings to the compresso logger
         self.__setup_compresso_logger()
+        self.__ensure_api_auth_token()
+
+    def __ensure_api_auth_token(self):
+        """Generate and persist a token when an operator enables auth without one."""
+        if not self.get_api_auth_enabled() or self.get_api_auth_token():
+            return
+        self.api_auth_token = secrets.token_urlsafe(32)
+        try:
+            self.__write_settings_to_file()
+        except Exception:
+            logger.exception("Failed to persist generated API auth token to settings.json")
+        logger.warning("API authentication was enabled without a token; generated one in settings.json")
 
     def __apply_large_library_safe_defaults(self):
         if not self.get_large_library_safe_defaults():

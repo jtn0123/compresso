@@ -29,7 +29,6 @@ Copyright:
 
 """
 
-import hmac
 import json
 import secrets
 import sys
@@ -43,13 +42,13 @@ import tornado.web
 from marshmallow import Schema, exceptions
 from tornado.web import RequestHandler
 
+from compresso.webserver.request_auth import authorize_request
 from compresso.webserver.security_headers import SecurityHeadersMixin
 
 LOG_UNHANDLED_ERROR = "Unhandled error in %s.%s"
 LOG_BASE_API_ERROR = "BaseApiError.%s: %s"
 CSRF_COOKIE_NAME = "compresso_csrf_token"
 CSRF_HEADER_NAME = "X-Compresso-CSRF-Token"
-API_TOKEN_HEADER_NAME = "X-Compresso-Api-Token"  # noqa: S105 - header name, not a token value
 READ_ONLY_POST_PATHS = (
     "/approval/tasks",
     "/approval/summary",
@@ -148,18 +147,6 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         self.write_error()
         return False
 
-    def _request_has_valid_api_token(self, expected_token):
-        if not expected_token:
-            return False
-
-        bearer_prefix = "Bearer "
-        auth_header = self.request.headers.get("Authorization", "")
-        if auth_header.startswith(bearer_prefix) and hmac.compare_digest(auth_header[len(bearer_prefix) :], expected_token):
-            return True
-
-        token_header = self.request.headers.get(API_TOKEN_HEADER_NAME, "")
-        return bool(token_header and hmac.compare_digest(token_header, expected_token))
-
     def _ensure_csrf_cookie(self):
         csrf_token = self.get_cookie(CSRF_COOKIE_NAME)
         if not csrf_token:
@@ -184,15 +171,14 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         csrf_enabled = self._explicit_bool(settings.get_csrf_protection_enabled())
         csrf_cookie = self._ensure_csrf_cookie() if csrf_enabled else ""
 
-        if not self._requires_mutation_protection():
-            return True
+        if self._request_api_path() != "/healthcheck/readiness" and not authorize_request(self):
+            return False
 
-        if self._explicit_bool(settings.get_api_auth_enabled()) and not self._request_has_valid_api_token(
-            settings.get_api_auth_token()
+        if (
+            self._requires_mutation_protection()
+            and csrf_enabled
+            and self.request.headers.get(CSRF_HEADER_NAME, "") != csrf_cookie
         ):
-            return self._finish_auth_error(self.STATUS_ERROR_UNAUTHORIZED, "Unauthorized")
-
-        if csrf_enabled and self.request.headers.get(CSRF_HEADER_NAME, "") != csrf_cookie:
             return self._finish_auth_error(self.STATUS_ERROR_FORBIDDEN, "Invalid CSRF token")
 
         return True

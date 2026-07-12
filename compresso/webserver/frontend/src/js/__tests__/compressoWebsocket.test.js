@@ -22,8 +22,9 @@ import { wsConnectionState, CompressoWebsocketHandler } from '../compressoWebsoc
 // WebSocket mock
 // ---------------------------------------------------------------------------
 class MockWebSocket {
-  constructor(url) {
+  constructor(url, protocols) {
     this.url = url
+    this.protocols = protocols
     this.readyState = MockWebSocket.CONNECTING
     this._listeners = {}
     MockWebSocket._lastInstance = this
@@ -259,6 +260,22 @@ describe('init() — basic', () => {
     handler.init()
 
     expect(wsConnectionState.value).toBe('connecting')
+  })
+
+  it('passes tab-scoped authentication as WebSocket protocols', () => {
+    vi.stubGlobal('window', {
+      location: { protocol: 'http:', host: 'localhost:8080' },
+      sessionStorage,
+      btoa,
+    })
+    sessionStorage.setItem('compresso-api-token', 'secret')
+    const handler = CompressoWebsocketHandler((k) => k)
+
+    handler.init()
+
+    expect(MockWebSocket._lastInstance.protocols[0]).toBe('compresso')
+    expect(MockWebSocket._lastInstance.protocols[1]).toMatch(/^compresso-auth\./)
+    expect(MockWebSocket._lastInstance.url).not.toContain('secret')
   })
 
   it('uses wss: when window.location.protocol is https:', () => {

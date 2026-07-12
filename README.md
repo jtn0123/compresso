@@ -21,13 +21,16 @@ Compresso is a media library optimizer with approval workflow, compression dashb
 ```bash
 docker run -d \
   --name compresso \
-  -p 8888:8888 \
+  -p 127.0.0.1:8888:8888 \
+  -e ui_address=0.0.0.0 \
   -v /path/to/media:/library \
   -v compresso-config:/config \
   ghcr.io/jtn0123/compresso:latest
 ```
 
 Then open http://localhost:8888 in your browser.
+
+The default publishes only to the Docker host. For a trusted-LAN master/worker setup, enable `api_auth_enabled`, use the generated token from the owner-only settings file, and deliberately publish `8888:8888` instead.
 
 ### Supported Deploy Paths
 

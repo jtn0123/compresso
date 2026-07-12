@@ -91,7 +91,7 @@ class TestApiMutationProtection(ApiTestBase):
 
     @patch("compresso.webserver.helpers.approval.prepare_approval_summary")
     @patch("compresso.config.Config", return_value=_Settings(api_auth_enabled=True, api_auth_token="secret"))  # noqa: S106
-    def test_read_only_post_endpoint_is_exempt_from_token_auth(self, _mock_config, mock_summary):
+    def test_auth_enabled_rejects_missing_token_on_read_endpoint(self, _mock_config, mock_summary):
         mock_summary.return_value = {
             "total_count": 0,
             "total_source_size": 0,
@@ -104,6 +104,29 @@ class TestApiMutationProtection(ApiTestBase):
             "codec_options": [],
         }
         resp = self.post_json("/approval/summary", {})
+        assert resp.code == 401
+        mock_summary.assert_not_called()
+
+    @patch("compresso.webserver.helpers.approval.prepare_approval_summary")
+    @patch("compresso.config.Config", return_value=_Settings(api_auth_enabled=True, api_auth_token="secret"))  # noqa: S106
+    def test_auth_enabled_accepts_token_on_read_endpoint(self, _mock_config, mock_summary):
+        mock_summary.return_value = {
+            "total_count": 0,
+            "total_source_size": 0,
+            "total_staged_size": 0,
+            "total_space_saved": 0,
+            "average_savings_percent": 0,
+            "largest_savings_file": "",
+            "largest_savings_bytes": 0,
+            "average_vmaf": None,
+            "codec_options": [],
+        }
+        resp = self.fetch(
+            "/compresso/api/v2/approval/summary",
+            method="POST",
+            body="{}",
+            headers={"Content-Type": "application/json", "X-Compresso-Api-Token": "secret"},
+        )
         assert resp.code == 200
         mock_summary.assert_called_once()
 
