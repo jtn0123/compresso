@@ -1,3 +1,10 @@
+## [1.13.3](https://github.com/jtn0123/compresso/compare/v1.13.2...v1.13.3) (2026-07-12)
+
+
+### Bug Fixes
+
+* harden audited reliability and scale paths ([#185](https://github.com/jtn0123/compresso/issues/185)) ([27ab7c0](https://github.com/jtn0123/compresso/commit/27ab7c0efd7c6a07bafa37459525e809ca4ae9a8))
+
 ## [1.13.2](https://github.com/jtn0123/compresso/compare/v1.13.1...v1.13.2) (2026-07-12)
 
 
