@@ -52,7 +52,9 @@ or encode and the job resumes or safely requeues without duplicate replacement.
 - [x] C2 Add H.264 and HEVC VideoToolbox presets with native quality controls.
 - [x] C3 Preserve HDR, subtitle, audio, and container behavior explicitly.
 - [ ] C4 Route jobs according to worker capabilities and measured throughput.
-- [ ] C5 Add a real master-to-macOS integration smoke test.
+- [~] C5 Add a real master-to-macOS integration smoke test. A two-process
+  localhost HTTP/restart drill now passes; the separate-machine M4 canary is
+  still required.
 
 Acceptance gate: a representative media set meets the selected quality and
 size targets with no unexpected stream or HDR loss.
@@ -66,7 +68,9 @@ size targets with no unexpected stream or HDR loss.
 - [x] D5 Add queue, transfer, worker, cache, and disk-pressure observability.
 
 Acceptance gate: at least 500,000 synthetic media entries scan and schedule
-without excessive memory growth, SQLite locking, or UI degradation.
+without excessive memory growth, SQLite locking, or UI degradation. The
+metadata enumeration/SQLite portion now passes; NAS traversal, file probing,
+concurrent contention, and UI behavior still need production-shaped evidence.
 
 ### Phase E: progressive production validation
 
@@ -118,10 +122,20 @@ C4-C5 and E1-E6 still need to be executed.
 
 ## Validation evidence
 
-- 3,555 unit tests passed; 8 environment-specific tests skipped.
-- 20 integration tests passed.
+- 3,579 unit tests passed; 8 environment-specific tests skipped.
+- 21 integration tests passed, including a two-process HTTP transfer/restart drill.
 - Repository-wide Ruff lint and format checks passed.
 - Mypy passed across 231 source files with only existing untyped-function notes.
+- Frontend validation passed 416 Vitest tests, lint, coverage thresholds, the
+  production build, 3 mocked Playwright journeys, and 3 real-backend Playwright
+  journeys.
+- A 500,000-entry metadata scan/scheduling benchmark completed in 3.775 seconds
+  on the local 10-core arm64 machine with 4.00 MB peak RSS growth, an 81.56 MB
+  SQLite queue, 0.0197 ms indexed lookup p95, and 14.4042 ms deep-page p95. See
+  `docs/performance/large-library-baseline.md` for method and limitations.
+- The localhost master/worker drill validated discovery over HTTP, resumed a
+  checksummed upload after worker restart, rejected a stale chunk, kept one task
+  across repeated finalization and restart, and preserved separate databases.
 - A local distributed fault drill passed repeated transfer-store restarts,
   injected chunk corruption rejection, durable offset recovery, and final
   SHA-256 validation.

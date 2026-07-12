@@ -10,17 +10,37 @@
 | ID | Category | Grade | Items |
 |----|----------|-------|-------|
 | A | Architecture & Design | B | 3 |
-| B | Backend Quality | B+ | 3 |
+| B | Backend Quality | A- | 3 |
 | C | Frontend Quality | B- | 3 |
-| D | Testing & Reliability | B | 4 |
+| D | Testing & Reliability | B+ | 4 |
 | E | Security | B | 4 |
 | F | Dependencies & Tech Currency | A- | 3 |
-| G | Performance & Scalability | B- | 4 |
+| G | Performance & Scalability | B | 4 |
 | H | Documentation & Onboarding | B+ | 3 |
 | I | Developer Experience & Tooling | B+ | 4 |
-| **Overall** | | **B** | **31** |
+| **Overall** | | **B+** | **31** |
 
-**Top 5 highest-leverage fixes:** B1, D1, E1, G1, A1
+**Top 5 highest-leverage remaining fixes:** E1, A1, C1, G2, D1
+
+## 2026-07-11 NAS-free implementation update
+
+- **B1 completed:** remote file, history, path, and completion writes now fail
+  closed; recoverable cache output is retained until every boundary succeeds.
+- **D1 materially advanced:** CI and `verify-local` now run a separate
+  real-backend Playwright project. It exposed and fixed the macOS GPU schema 500
+  and browser-visible API-token field. Packaged-wheel startup and seeded
+  approval/reject/restart journeys remain.
+- **D2/G1 metadata gate completed:** generated 10k, 100k, and 500k tiers now
+  record wall time, peak Python/RSS memory, SQLite size, indexed lookup latency,
+  and deep-page latency. Pull requests run 10k; scheduled CI runs 500k.
+- **D3 materially advanced:** a localhost master and worker now validate each
+  other through the real API, resume a checksummed transfer after process
+  restart, reject stale chunks, finalize idempotently, survive another restart,
+  and prove database isolation. Real encode handoff/download interruption and a
+  separate M4 remain.
+- **All-up evidence:** 3,579 backend unit tests, 21 integration tests, 416
+  frontend tests, Ruff, formatting, Mypy, frontend lint/coverage/build, 3 mocked
+  Playwright tests, and 3 real-backend Playwright tests pass.
 
 ## Evidence boundary
 
@@ -62,13 +82,12 @@ The durable queue, resumable-transfer, disk-pressure, and file-operation journal
 
 ## B — Backend Quality — B+
 
-The backend now has explicit retry/lease handling, durable transfer primitives, disk-space guards, validation schemas, and broad failure-path coverage. The most important remaining correctness defect is that remote postprocessing can log a file failure and still mark the task complete. Error responses also expose raw exception reasons in several handlers, and task setters perform many independent saves.
+The backend now has explicit retry/lease handling, durable transfer primitives, disk-space guards, validation schemas, broad failure-path coverage, and fail-closed remote finalization. Error responses still expose raw exception reasons in several handlers, and task setters perform many independent saves.
 
-#### B1 — Make remote finalization fail closed
+#### B1 — Make remote finalization fail closed [completed]
 - **Where:** `compresso/libs/postprocessor.py:579-598`, `compresso/libs/postprocessor.py:801-877`
-- **What's wrong:** `_finalize_remote_task()` catches errors from `post_process_remote_file()`, logs them, and then proceeds to `set_status("complete")`. A failed copy-back or path update can therefore be represented as a completed remote task.
-- **Impact:** Major — operators can trust a false success and clean up or move on while the expected media file was never finalized correctly.
-- **Fix:** Return a typed finalization result from `post_process_remote_file()`. On any copy, path, or history failure, preserve the recoverable artifact, mark the task retryable/failed, and prohibit the complete transition. Add regressions for every caught exception branch.
+- **Result:** `_finalize_remote_task()` now requires durable file preparation, history, path, and completion state before success. Every failure returns false, defers retry, and retains the encoded cache; cleanup happens only after the complete transition.
+- **Evidence:** Focused regressions cover file exceptions, false copy results, history failures, destination-history overrides, cache retention, and successful cleanup order.
 - **Effort:** M
 - **Grade lift:** B+ → A- (closes the clearest remaining fail-open media path)
 
@@ -122,9 +141,9 @@ The Vue/Quasar UI is useful, visually structured, localized in many paths, and b
 
 ## D — Testing & Reliability — B
 
-Python reliability evidence is unusually strong: 3,569 unit tests, integration coverage, deterministic fault tests/fuzzing, a 75% enforced floor, and cross-platform PR shards. Frontend CI runs Vitest coverage, lint, build, and Playwright. The grade remains B because Playwright mocks every backend request, frontend thresholds are low, and the distributed/scale claims do not yet have automated process-level acceptance harnesses.
+Python reliability evidence is unusually strong: 3,579 unit tests, 21 integration tests, deterministic fault tests/fuzzing, a 75% enforced floor, and cross-platform PR shards. Frontend CI runs Vitest coverage, lint, build, mocked Playwright, and a separate real-backend Playwright project. A two-process boundary drill and synthetic scale workflow now exist; packaged-wheel and real-machine interruption coverage remain incomplete.
 
-#### D1 — Add a packaged live-backend Playwright lane [both]
+#### D1 — Add a packaged live-backend Playwright lane [both] [advanced]
 - **Where:** `compresso/webserver/frontend/tests/e2e/compresso-smoke.spec.js:1-260`, `compresso/webserver/frontend/playwright.config.js`, `.github/workflows/frontend_lint_and_build.yml:70-85`
 - **What's wrong:** The only browser suite intercepts `/api/v2/**` and supplies synthetic responses, so it cannot detect route, schema, authentication, static-asset, websocket, migration, or packaged-startup integration failures.
 - **Impact:** Major — a release can pass while the actual browser and packaged backend cannot complete the main user journeys together.
@@ -132,7 +151,7 @@ Python reliability evidence is unusually strong: 3,569 unit tests, integration c
 - **Effort:** M
 - **Grade lift:** B → B+ (adds the missing product-level release proof without requiring the NAS)
 
-#### D2 — Build a reproducible 500,000-entry scanner benchmark [BE]
+#### D2 — Build a reproducible 500,000-entry scanner benchmark [BE] [metadata gate completed]
 - **Where:** `tests/unit/test_benchmark.py`, `tests/unit/test_libraryscanner_coverage.py`, `compresso/libs/libraryscanner.py:261-350`, `.Codex/20tb-media-compression-plan.md:58-69`
 - **What's wrong:** Scanner correctness is tested, but the documented 500,000-entry acceptance target has no generated fixture, peak-memory assertion, SQLite-latency threshold, or saved baseline.
 - **Impact:** Major — a scale regression can invalidate the 20 TB plan without affecting ordinary unit tests.
@@ -140,7 +159,7 @@ Python reliability evidence is unusually strong: 3,569 unit tests, integration c
 - **Effort:** M
 - **Grade lift:** B → B+ (turns the main scale claim into repeatable evidence)
 
-#### D3 — Add a two-process distributed fault harness [BE]
+#### D3 — Add a two-process distributed fault harness [BE] [advanced]
 - **Where:** `tests/unit/test_remote_task_manager.py`, `tests/unit/test_restart_recovery.py`, `tests/unit/test_resumable_transfer.py`, `compresso/libs/remote_task_manager.py`, `compresso/libs/installation_link.py`
 - **What's wrong:** The distributed layer has deep unit fault coverage but no test that boots two real Compresso processes and interrupts upload, lease, encode handoff, download, and restart across their actual HTTP boundary.
 - **Impact:** Major — serialization, process lifecycle, and real network-boundary defects remain invisible until the master/M4 canary.
@@ -228,13 +247,12 @@ Python runtime/dev locks, frontend npm, and release-tool npm are reproducible; l
 
 ## G — Performance & Scalability — B-
 
-The code now bounds scan queues, worker counts, transfer chunks, retries, and disk pressure, and it records worker metrics. The 20 TB scale claim still lacks measured acceptance evidence. Manifest creation/verification materializes full path, file, and result lists; scheduler decisions do not use observed throughput; and SQLite has conservative pragmas but no operational latency threshold.
+The code bounds scan queues, worker counts, transfer chunks, retries, and disk pressure, and it records worker metrics. The generated scanner-metadata/SQLite path now has 10k, 100k, and 500k measurements plus versioned thresholds and scheduled artifacts. NAS traversal, probing, concurrent worker contention, and UI scale remain unmeasured. Manifest creation/verification still materializes full lists, and scheduler decisions do not use observed throughput.
 
-#### G1 — Prove and optimize the 500,000-entry scan path
+#### G1 — Prove and optimize the 500,000-entry scan path [metadata gate completed]
 - **Where:** `compresso/libs/libraryscanner.py:261-350`, `compresso/config.py:62`, `compresso/config.py:110`, `.Codex/20tb-media-compression-plan.md:58-69`
-- **What's wrong:** Queue bounding exists, but there is no measured wall-time, peak-RSS, or SQLite-latency result at the documented 500,000-entry target.
-- **Impact:** Major — the master may stall, thrash, or accumulate database pressure before any encoding begins.
-- **Fix:** Implement D2, profile the first baseline, then optimize only measured hotspots. Store the dataset generator, command, machine class, and thresholds in `docs/performance/` and scheduled CI artifacts.
+- **Result:** The metadata-only 500,000-entry tier completed in 3.775 seconds with 4.00 MB RSS growth, an 81.56 MB SQLite queue, 0.0197 ms lookup p95, and 14.4042 ms deep-page p95 on the local arm64 baseline. The generator, method, machine class, limitations, thresholds, scheduled workflow, and artifact retention are versioned under `docs/performance/`.
+- **Remaining boundary:** Repeat on CI over time, then add NAS traversal, file probing, concurrent contention, and UI-scale measurements before treating this as the whole Phase D acceptance gate.
 - **Effort:** M
 - **Grade lift:** B- → B (replaces the largest unsupported scale claim with evidence)
 
