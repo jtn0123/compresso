@@ -46,18 +46,20 @@ def name():
 
 def version():
     if is_git_vcs():
-        git_version_info = get_git_version_info()
-        return git_version_info['short']
-    else:
-        return source_version()
+        try:
+            return get_git_version_info()['short']
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return source_version()
 
 
 def full_version():
     if is_git_vcs():
-        git_version_info = get_git_version_info()
-        return git_version_info['long']
-    else:
-        return source_version()
+        try:
+            return get_git_version_info()['long']
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return source_version()
 
 
 def source_version():
@@ -184,7 +186,9 @@ def get_git_version_info():
     :return:
     """
     # Fetch the last tag
-    last_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]).strip().decode("utf-8")
+    last_tag = subprocess.check_output(
+        ["git", "describe", "--tags", "--abbrev=0"], stderr=subprocess.DEVNULL
+    ).strip().decode("utf-8")
     # Fetch the current commit ID
     current_commit = subprocess.check_output(["git", "rev-parse", "--verify", "--short", "HEAD"]).strip().decode("utf-8")
 
