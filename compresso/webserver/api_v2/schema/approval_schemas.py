@@ -31,10 +31,12 @@ class RequestApprovalTasksSchema(BaseSchema):
     start = fields.Int(
         load_default=0,
         metadata={"description": "Pagination offset"},
+        validate=validate.Range(min=0),
     )
     length = fields.Int(
         load_default=10,
         metadata={"description": "Number of records to return"},
+        validate=validate.Range(min=1, max=1000),
     )
     search_value = fields.Str(
         load_default="",

@@ -270,7 +270,7 @@ class Config(metaclass=SingletonType):
             os.makedirs(self.get_config_path(), exist_ok=True)
         settings_file = os.path.join(self.get_config_path(), "settings.json")
         data = self.get_config_as_dict()
-        result = common.json_dump_to_file(data, settings_file)
+        result = common.json_dump_to_file(data, settings_file, file_mode=0o600)
         if not result["success"]:
             for message in result["errors"]:
                 logger.error(message)
@@ -324,7 +324,7 @@ class Config(metaclass=SingletonType):
             try:
                 self.__write_settings_to_file()
             except Exception:
-                logger.exception("Failed to write settings to file: %s", str(self.get_config_as_dict()))
+                logger.exception("Failed to write settings to file")
 
     def set_bulk_config_items(self, items, save_settings=True):
         """

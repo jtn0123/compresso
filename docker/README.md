@@ -19,7 +19,7 @@ The Python build performs a clean frontend install from the committed lockfile a
 ### Building the image
 Simply run this command from the root of the project:
 ```bash
-docker build -f ./docker/Dockerfile -t jtn0123/compresso:staging .
+docker build -f ./docker/Dockerfile -t ghcr.io/jtn0123/compresso:staging .
 ```
 
 A canonical production [`docker-compose.yml`](docker-compose.yml) is included in this directory as a starting point.
@@ -35,7 +35,7 @@ The Docker image uses a two-layer strategy for faster iteration:
    drivers, and Python pip dependencies. Rebuilt automatically on changes to
    `Dockerfile.base` or `requirements.txt`, and weekly via CI.
 
-2. **Application image** (`Dockerfile` → `jtn0123/compresso:latest`):
+2. **Application image** (`Dockerfile` → `ghcr.io/jtn0123/compresso:latest`):
    Installs the pre-built Compresso wheel and entrypoint scripts on top of the
    base image. Built on every push to master, staging, or dev branches.
 
@@ -46,4 +46,4 @@ layer (~1–2 minutes instead of ~10–15 minutes). To override the base image l
 docker build -f docker/Dockerfile --build-arg BASE_IMAGE=my-custom-base:latest -t compresso:local .
 ```
 
-Images are published to both Docker Hub (`jtn0123/compresso`) and GHCR (`ghcr.io/jtn0123/compresso`).
+Images are published to GHCR (`ghcr.io/jtn0123/compresso`).

@@ -72,7 +72,9 @@ class ApiTransferHandler(BaseApiHandler):
                 "lease_token": request.get("lease_token"),
                 "origin_installation_uuid": request.get("origin_installation_uuid"),
             }
-            status = self._store().begin(
+            store = self._store()
+            status = await asyncio.to_thread(
+                store.begin,
                 request["job_id"],
                 request["filename"],
                 request["total_size"],
@@ -89,7 +91,8 @@ class ApiTransferHandler(BaseApiHandler):
     async def get_transfer_status(self, transfer_id=None):
         try:
             transfer_id = _decode_path_parameter(transfer_id)
-            self.write_success(self._store().status(transfer_id))
+            store = self._store()
+            self.write_success(await asyncio.to_thread(store.status, transfer_id))
         except (KeyError, OSError, ValueError) as error:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
             self.write_error()
@@ -101,7 +104,8 @@ class ApiTransferHandler(BaseApiHandler):
                 raise ValueError("Transfer chunk exceeds maximum size")
             offset = int(self.request.headers.get("X-Transfer-Offset", "-1"))
             chunk_checksum = self.request.headers.get("X-Chunk-Checksum", "")
-            status = self._store().append(transfer_id, offset, self.request.body, chunk_checksum)
+            store = self._store()
+            status = await asyncio.to_thread(store.append, transfer_id, offset, self.request.body, chunk_checksum)
             self.write_success(status)
         except (KeyError, OSError, TypeError, ValueError) as error:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
@@ -110,23 +114,27 @@ class ApiTransferHandler(BaseApiHandler):
     async def finalize_transfer(self, transfer_id=None):
         try:
             transfer_id = _decode_path_parameter(transfer_id)
-            store = self._store()
-            completed_path = store.finalize(transfer_id)
-            manifest = store.get_manifest(transfer_id)
-            task_info = pending_tasks.add_remote_tasks(str(completed_path), job_id=manifest["job_id"])
-            metadata = manifest.get("metadata", {})
-            if not pending_tasks.bind_remote_task_identity(
-                task_info["id"],
-                lease_token=metadata.get("lease_token"),
-                origin_installation_uuid=metadata.get("origin_installation_uuid"),
-            ):
-                raise ValueError("Remote task identity conflicts with the existing job")
-            response = store.status(transfer_id)
-            response.update({"id": task_info["id"], "status": task_info["status"], "checksum": manifest["expected_checksum"]})
+            response = await asyncio.to_thread(self._finalize_transfer_sync, transfer_id)
             self.write_success(response)
         except (KeyError, OSError, TypeError, ValueError) as error:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
             self.write_error()
+
+    def _finalize_transfer_sync(self, transfer_id):
+        store = self._store()
+        completed_path = store.finalize(transfer_id)
+        manifest = store.get_manifest(transfer_id)
+        task_info = pending_tasks.add_remote_tasks(str(completed_path), job_id=manifest["job_id"])
+        metadata = manifest.get("metadata", {})
+        if not pending_tasks.bind_remote_task_identity(
+            task_info["id"],
+            lease_token=metadata.get("lease_token"),
+            origin_installation_uuid=metadata.get("origin_installation_uuid"),
+        ):
+            raise ValueError("Remote task identity conflicts with the existing job")
+        response = store.status(transfer_id)
+        response.update({"id": task_info["id"], "status": task_info["status"], "checksum": manifest["expected_checksum"]})
+        return response
 
     @staticmethod
     def _completed_source(task_id):
@@ -138,24 +146,25 @@ class ApiTransferHandler(BaseApiHandler):
     async def get_source_manifest(self, task_id=None):
         try:
             task_id = _decode_path_parameter(task_id)
-            task = self._completed_source(task_id)
-            self.write_success(
-                {
-                    "task_id": task.id,
-                    "job_id": task.job_id,
-                    "filename": os.path.basename(task.abspath),
-                    "total_size": os.path.getsize(task.abspath),
-                    "checksum": file_sha256(task.abspath),
-                }
-            )
+            self.write_success(await asyncio.to_thread(self._source_manifest_sync, task_id))
         except (OSError, TypeError, ValueError) as error:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(error))
             self.write_error()
 
+    def _source_manifest_sync(self, task_id):
+        task = self._completed_source(task_id)
+        return {
+            "task_id": task.id,
+            "job_id": task.job_id,
+            "filename": os.path.basename(task.abspath),
+            "total_size": os.path.getsize(task.abspath),
+            "checksum": file_sha256(task.abspath),
+        }
+
     async def get_source_chunk(self, task_id=None):
         try:
             task_id = _decode_path_parameter(task_id)
-            task = self._completed_source(task_id)
+            task = await asyncio.to_thread(self._completed_source, task_id)
             offset = max(0, int(self.get_query_argument("offset", "0")))
             limit = min(MAX_CHUNK_SIZE, max(1, int(self.get_query_argument("limit", str(MAX_CHUNK_SIZE)))))
             chunk = await asyncio.to_thread(_read_file_chunk, task.abspath, offset, limit)

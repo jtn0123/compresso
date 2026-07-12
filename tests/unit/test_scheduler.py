@@ -394,3 +394,22 @@ class TestSchedulerRunLoop:
         with patch.object(mgr, "manage_completed_tasks"):
             mgr.run()
         # After abort, jobs are cleared, so we just verify run completed
+
+    def test_failed_scheduled_job_does_not_kill_scheduler_loop(self):
+        mgr = _make_scheduler_manager()
+        run_count = 0
+
+        def run_pending():
+            nonlocal run_count
+            run_count += 1
+            if run_count == 1:
+                raise RuntimeError("job failed")
+            mgr.abort_flag.set()
+
+        mgr.scheduler.run_pending = MagicMock(side_effect=run_pending)
+        mgr.event.wait = MagicMock()
+
+        with patch.object(mgr, "manage_completed_tasks"):
+            mgr.run()
+
+        assert run_count == 2

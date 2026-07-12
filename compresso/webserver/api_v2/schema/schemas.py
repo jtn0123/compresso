@@ -122,11 +122,13 @@ class RequestTableDataSchema(BaseSchema):
         required=False,
         metadata={"description": "Start row number to select from", "example": 0},
         load_default=0,
+        validate=validate.Range(min=0),
     )
     length = fields.Int(
         required=False,
         metadata={"description": "Number of rows to select", "example": 10},
         load_default=10,
+        validate=validate.Range(min=1, max=1000),
     )
     search_value = fields.Str(
         required=False,

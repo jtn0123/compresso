@@ -125,6 +125,7 @@ class Worker(threading.Thread):
                 except Exception as e:
                     self.logger.error("WORKER_TASK_PROCESSING_FAILED worker=%s", self.name)
                     self.logger.exception("Exception in processing job with %s: %s", self.name, e)
+                    self._fail_current_task_after_unexpected_error(e)
 
         self.logger.info("Stopping worker")
         self.worker_subprocess_monitor.stop()
@@ -210,6 +211,27 @@ class Worker(threading.Thread):
         self.current_task = None
         self.worker_runners_info = {}
         self.worker_log = deque(maxlen=500)
+
+    def _fail_current_task_after_unexpected_error(self, error):
+        """Release a poisoned task so one exception cannot wedge a worker forever."""
+        failed_task = self.current_task
+        if failed_task is None:
+            return
+
+        if self.worker_subprocess_monitor is not None:
+            self.worker_subprocess_monitor.terminate_proc()
+
+        try:
+            failed_task.set_success(False)
+        except Exception:
+            self.logger.exception("Unable to persist failure for task after worker error: %s", error)
+
+        try:
+            self.complete_queue.put(failed_task)
+        except Exception:
+            self.logger.exception("Unable to queue failed task after worker error: %s", error)
+        finally:
+            self.__unset_current_task()
 
     def __process_task_queue_item(self):
         """

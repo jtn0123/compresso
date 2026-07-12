@@ -186,7 +186,7 @@ CONFIG_PATH="$PROJECT_BASE/dev_environment/config"
 if [[ -n $CONFIG_PREFIX ]]; then
     CONFIG_PATH="$PROJECT_BASE/dev_environment/config-$CONFIG_PREFIX"
 fi
-IMAGE_ID="$($DOCKER_CMD image inspect -f '{{.Id}}' "jtn0123/compresso:$IMAGE_TAG" 2>/dev/null || true)"
+IMAGE_ID="$($DOCKER_CMD image inspect -f '{{.Id}}' "ghcr.io/jtn0123/compresso:$IMAGE_TAG" 2>/dev/null || true)"
 config_string="debug=$DEBUG;use_custom_support_api=$USE_CUSTOM_SUPPORT_API;hw=${HW:-};cpus=$CPUS;memory=$MEMORY;cache=$CACHE_PATH;config_path=$CONFIG_PATH;port=$EXT_PORT;tag=$IMAGE_TAG;image_id=$IMAGE_ID;puid=$PUID;pgid=$PGID"
 if [[ -n $RUN_COMMAND ]]; then
     config_string="${config_string};run_cmd=$RUN_COMMAND"
@@ -216,7 +216,7 @@ start_container() {
         -v "$CACHE_PATH/remote_library":/tmp/compresso/remote_library:Z \
         -v /run/user/"$PUID":/run/user:ro,Z \
         "${DOCKER_PARAMS[@]}" \
-        jtn0123/compresso:"$IMAGE_TAG")
+        ghcr.io/jtn0123/compresso:"$IMAGE_TAG")
     echo "Started container: ${container_id}"
     sleep 1
     if ! container_running; then
@@ -298,10 +298,10 @@ run)
     ;;
 build)
     ensure_dist_artifacts
-    $DOCKER_CMD build -f "$PROJECT_BASE/docker/Dockerfile" -t jtn0123/compresso:"$IMAGE_TAG" "$PROJECT_BASE"
+    $DOCKER_CMD build -f "$PROJECT_BASE/docker/Dockerfile" -t ghcr.io/jtn0123/compresso:"$IMAGE_TAG" "$PROJECT_BASE"
     ;;
 pull)
-    $DOCKER_CMD pull jtn0123/compresso:"$IMAGE_TAG"
+    $DOCKER_CMD pull ghcr.io/jtn0123/compresso:"$IMAGE_TAG"
     ;;
 stop)
     if container_exists; then

@@ -90,6 +90,25 @@ class TestStartAnalysis:
         assert result["status"] == "running"
         assert result["progress"]["checked"] == 3
 
+    @patch(ANALYSIS_MODULE + ".threading")
+    @patch(ANALYSIS_MODULE + ".Library")
+    @patch(ANALYSIS_MODULE + "._active_analyses", {})
+    def test_analysis_registered_during_validation_is_not_overwritten(self, mock_library_cls, mock_threading):
+        from compresso.webserver.helpers import library_analysis
+
+        existing_progress = {"checked": 7, "total": 20}
+
+        def register_competing_analysis():
+            library_analysis._active_analyses[1] = {"status": "running", "progress": existing_progress}
+            return "/media/movies"
+
+        mock_library_cls.return_value.get_path.side_effect = register_competing_analysis
+
+        result = library_analysis.start_analysis(1)
+
+        assert result["progress"] is existing_progress
+        mock_threading.Thread.assert_not_called()
+
 
 @pytest.mark.unittest
 class TestLookupSavings:

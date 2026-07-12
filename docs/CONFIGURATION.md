@@ -71,7 +71,7 @@ environment:
 ```yaml
 services:
   compresso:
-    image: jtn0123/compresso:latest
+    image: ghcr.io/jtn0123/compresso:latest
     container_name: compresso
     restart: unless-stopped
     ports:

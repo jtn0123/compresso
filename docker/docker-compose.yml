@@ -10,7 +10,7 @@
 
 services:
   compresso:
-    image: jtn0123/compresso:latest
+    image: ghcr.io/jtn0123/compresso:latest
     ports:
       - "8888:8888"
     environment:

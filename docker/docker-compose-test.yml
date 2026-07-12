@@ -9,7 +9,7 @@
 services:
   compresso-testenv:
     container_name: compresso-testenv
-    image: jtn0123/compresso:latest
+    image: ghcr.io/jtn0123/compresso:latest
     ports:
       - 8888:8888
     # user: "1000:1000"

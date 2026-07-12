@@ -29,3 +29,41 @@ updates:
       - "dependencies"
       - "docker"
     open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/.github/release"
+    schedule:
+      interval: "weekly"
+    groups:
+      release-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "ci"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/compresso/webserver"
+    schedule:
+      interval: "weekly"
+    groups:
+      webserver-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/compresso/webserver/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      frontend-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "frontend"
+    open-pull-requests-limit: 5

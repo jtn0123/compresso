@@ -166,6 +166,7 @@ class RequestPendingTaskCreateSchema(BaseSchema):
     type = fields.Str(
         required=False,
         metadata={"description": "The type of pending task to create (local/remote)", "example": "local"},
+        validate=validate.OneOf(["local", "remote"]),
     )
     priority_score = fields.Int(
         required=False,

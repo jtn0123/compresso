@@ -9,6 +9,7 @@ Requires apispec: pip install apispec apispec-webframeworks
 """
 
 import pytest
+from marshmallow import ValidationError
 
 try:
     from apispec import APISpec
@@ -51,3 +52,23 @@ class TestSwaggerSpecGeneration:
         from compresso.webserver.api_v2.schema import schemas
 
         assert hasattr(schemas, "RequestTableDataSchema")
+
+    @pytest.mark.parametrize("payload", [{"start": -1}, {"length": 0}, {"length": 1001}])
+    def test_table_schema_rejects_unsafe_pagination(self, payload):
+        from compresso.webserver.api_v2.schema.schemas import RequestTableDataSchema
+
+        with pytest.raises(ValidationError):
+            RequestTableDataSchema().load(payload)
+
+    @pytest.mark.parametrize("payload", [{"start": -1}, {"length": 0}, {"length": 1001}])
+    def test_approval_schema_rejects_unsafe_pagination(self, payload):
+        from compresso.webserver.api_v2.schema.approval_schemas import RequestApprovalTasksSchema
+
+        with pytest.raises(ValidationError):
+            RequestApprovalTasksSchema().load(payload)
+
+    def test_pending_create_schema_rejects_unknown_task_type(self):
+        from compresso.webserver.api_v2.schema.pending_schemas import RequestPendingTaskCreateSchema
+
+        with pytest.raises(ValidationError):
+            RequestPendingTaskCreateSchema().load({"path": "/media/video.mkv", "type": "mystery"})

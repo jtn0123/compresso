@@ -106,16 +106,29 @@ class PostProcessor(threading.Thread):
                 self.event.wait(0.2)
                 self.current_task = self.task_queue.get_next_processed_tasks()
                 if self.current_task:
-                    self._handle_processed_task()
+                    self._handle_task_safely(self._handle_processed_task)
 
             # Process approved tasks (status='approved') — finalize file replacement
             while not self.abort_flag.is_set() and not self.task_queue.task_list_approved_is_empty():
                 self.event.wait(0.2)
                 self.current_task = self.task_queue.get_next_approved_tasks()
                 if self.current_task:
-                    self._handle_approved_task()
+                    self._handle_task_safely(self._handle_approved_task)
 
         self._log("Leaving PostProcessor Monitor loop...")
+
+    def _handle_task_safely(self, handler):
+        """Contain a single task failure so the postprocessor thread stays alive."""
+        try:
+            handler()
+        except Exception as e:
+            self._log("Unexpected post-processing task failure", message2=str(e), level="exception")
+            try:
+                self._defer_postprocess_failure(str(e))
+            except Exception:
+                self._log("Unable to defer failed post-processing task", level="exception")
+        finally:
+            self.current_task = None
 
     def _handle_processed_task(self):
         """Handle a task that just finished transcoding (status='processed')."""

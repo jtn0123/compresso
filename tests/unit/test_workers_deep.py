@@ -657,6 +657,30 @@ class TestWorkerRunLifecycle:
 
         assert worker.paused is True or worker.redundant_flag.is_set()
 
+    def test_unexpected_task_error_fails_and_releases_current_task(self):
+        worker = _make_worker()
+        failed_task = MagicMock()
+        worker.current_task = failed_task
+        worker.worker_subprocess_monitor = MagicMock()
+
+        worker._fail_current_task_after_unexpected_error(RuntimeError("boom"))
+
+        worker.worker_subprocess_monitor.terminate_proc.assert_called_once_with()
+        failed_task.set_success.assert_called_once_with(False)
+        assert worker.complete_queue.get_nowait() is failed_task
+        assert worker.current_task is None
+
+    def test_unexpected_task_error_releases_task_when_failure_save_fails(self):
+        worker = _make_worker()
+        failed_task = MagicMock()
+        failed_task.set_success.side_effect = RuntimeError("database unavailable")
+        worker.current_task = failed_task
+
+        worker._fail_current_task_after_unexpected_error(RuntimeError("boom"))
+
+        assert worker.complete_queue.get_nowait() is failed_task
+        assert worker.current_task is None
+
 
 # ==================================================================
 # Worker.__exec_worker_runners_on_set_task
