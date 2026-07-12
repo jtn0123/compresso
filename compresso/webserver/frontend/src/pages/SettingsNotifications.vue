@@ -467,7 +467,7 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
 .notification-dialog-card {
   width: min(560px, calc(100vw - 32px));
   max-width: 100%;

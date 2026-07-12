@@ -484,6 +484,21 @@ class TestGetAppAuthCode(ApiTestBase):
             resp = self.get_json("/session/get_app_auth_code")
         assert resp.code == 500
 
+    def test_get_app_auth_code_base_api_error_returns_structured_400(self):
+        """Expected authentication failures should preserve the structured error envelope."""
+
+        def _init_bae(self, **kwargs):
+            _session_mock_initialize(self, **kwargs)
+            self.session.init_device_auth_flow.side_effect = BaseApiError("Invalid authentication request")
+
+        with patch.object(ApiSessionHandler, "initialize", _init_bae):
+            resp = self.get_json("/session/get_app_auth_code")
+
+        assert resp.code == 400
+        payload = json.loads(resp.body)
+        assert payload["error"] == "400: Invalid authentication request"
+        assert payload["error_id"]
+
 
 # ---------------------------------------------------------------------------
 # session_api: get_funding_proposals BaseApiError (lines 388-389)

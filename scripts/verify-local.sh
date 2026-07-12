@@ -76,7 +76,6 @@ echo "Node $(node --version)"
 echo "==> Installing and verifying frontend dependencies"
 cd "${FRONTEND_DIR}"
 npm ci
-npm run test -- --run
 rm -rf coverage
 npm run lint
 npx vitest run --coverage

@@ -271,6 +271,8 @@ class ApiNotificationsHandler(BaseApiHandler):
         """
         try:
             body = json.loads(self.request.body)
+            if not isinstance(body, dict):
+                raise TypeError("Notification settings payload must be an object")
             channels = body.get("channels")
             if not isinstance(channels, list):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channels' must be a list")
@@ -311,6 +313,8 @@ class ApiNotificationsHandler(BaseApiHandler):
         """
         try:
             body = json.loads(self.request.body)
+            if not isinstance(body, dict):
+                raise TypeError("Notification test payload must be an object")
             channel_config = body.get("channel")
             if not isinstance(channel_config, dict):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channel' must be an object")

@@ -49,6 +49,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       # Restore test video's cache
       - name: Restore test videos cache
@@ -130,6 +131,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -159,6 +161,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       # Checkout tags
       - name: Fetch tags
@@ -279,6 +282,7 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Download Artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -392,6 +396,7 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Download Artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -524,6 +529,7 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       - name: Download Artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -651,6 +657,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.checkout_ref || github.sha }}
+          persist-credentials: false
 
       # Fetch all artifacts
       - name: Download Artifact

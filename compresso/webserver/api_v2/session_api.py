@@ -317,6 +317,9 @@ class ApiSessionHandler(BaseApiHandler):
             self.write_success(response)
             return
 
+        except BaseApiError as bae:
+            self.handle_base_api_error(bae)
+            return
         except Exception as e:
             self.handle_unhandled_error(e)
 

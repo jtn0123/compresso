@@ -45,7 +45,7 @@ Open pull requests against `master` for release-bound work or `staging` for pre-
 
 New Python files should contain a short SPDX header with the contributor's own name:
 
-```
+```text
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) {{YEAR}} {{YOUR_NAME}}
 ```
@@ -53,4 +53,3 @@ New Python files should contain a short SPDX header with the contributor's own n
 Do not replace or remove existing file-level license or copyright notices. Only submissions
 that conform to this will be merged into the mainline project. This ensures
 that Compresso as a project is free to grow while preserving prior grants and attribution.
-of the project's owner.

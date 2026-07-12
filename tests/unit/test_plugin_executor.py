@@ -99,6 +99,11 @@ class TestGetPluginDirectory:
         assert r1.endswith("plugin_a")
         assert r2.endswith("plugin_b")
 
+    @pytest.mark.parametrize("plugin_id", ["../outside", "../../etc", "", "."])
+    def test_rejects_plugin_path_traversal(self, executor, plugin_id):
+        """Runtime plugin lookup must reject IDs outside the plugin root."""
+        assert executor._PluginExecutor__get_plugin_directory(plugin_id) is None
+
 
 @pytest.mark.unittest
 class TestGetAllPluginTypes:

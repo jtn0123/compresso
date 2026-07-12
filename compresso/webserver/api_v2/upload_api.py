@@ -83,6 +83,15 @@ class ApiUploadHandler(BaseApiHandler):
         self.config = config.Config()
         self.frontend_messages = FrontendPushMessages()
 
+    def _handle_upload_error(self, error):
+        """Clear upload progress and route the failure through the shared API handlers."""
+        if self.frontend_messages:
+            self.frontend_messages.remove_item("receivingRemoteFile")
+        if isinstance(error, BaseApiError):
+            self.handle_base_api_error(error)
+        else:
+            self.handle_unhandled_error(error)
+
     def prepare(self):
         self.bytes_read = 0
         self.meta = dict()
@@ -260,14 +269,10 @@ class ApiUploadHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            if self.frontend_messages:
-                self.frontend_messages.remove_item("receivingRemoteFile")
-            self.handle_base_api_error(bae)
+            self._handle_upload_error(bae)
             return
         except Exception as e:
-            if self.frontend_messages:
-                self.frontend_messages.remove_item("receivingRemoteFile")
-            self.handle_unhandled_error(e)
+            self._handle_upload_error(e)
 
     async def upload_and_install_plugin(self):
         """
@@ -341,11 +346,7 @@ class ApiUploadHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            if self.frontend_messages:
-                self.frontend_messages.remove_item("receivingRemoteFile")
-            self.handle_base_api_error(bae)
+            self._handle_upload_error(bae)
             return
         except Exception as e:
-            if self.frontend_messages:
-                self.frontend_messages.remove_item("receivingRemoteFile")
-            self.handle_unhandled_error(e)
+            self._handle_upload_error(e)

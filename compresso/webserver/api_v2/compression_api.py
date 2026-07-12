@@ -134,8 +134,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -176,8 +175,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -259,8 +257,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -296,8 +293,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -334,8 +330,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -375,8 +370,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -428,8 +422,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -479,8 +472,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -561,8 +553,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except ValueError as ve:
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(ve))
-            self.write_error()
+            self.handle_base_api_error(BaseApiError(str(ve)))
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)

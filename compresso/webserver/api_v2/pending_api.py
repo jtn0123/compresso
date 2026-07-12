@@ -32,7 +32,7 @@ Copyright:
 import os.path
 
 from compresso.libs import session
-from compresso.libs.library import Library
+from compresso.libs.library import Library, LibraryLookupError
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.pending_schemas import (
@@ -592,7 +592,7 @@ class ApiPendingHandler(BaseApiHandler):
 
             try:
                 library = Library(library_id)
-            except Exception as exc:
+            except LibraryLookupError as exc:
                 self.handle_base_api_error(
                     BaseApiError("Invalid library selection", private_detail=f"{type(exc).__name__}: {exc}")
                 )

@@ -87,6 +87,17 @@ def test_transfer_status_accepts_tornado_byte_path_parameter(tmp_path):
 
 
 @pytest.mark.unittest
+def test_missing_transfer_uses_structured_404(tmp_path):
+    """Unknown transfer identifiers should be reported as not found."""
+    handler = _handler(ResumableTransferStore(tmp_path))
+
+    asyncio.run(handler.get_transfer_status("0" * 32))
+
+    handler.set_status.assert_called_once_with(404, reason="Transfer request could not be completed")
+    handler.write_error.assert_called_once()
+
+
+@pytest.mark.unittest
 def test_source_chunk_reads_file_off_event_loop(tmp_path):
     source = tmp_path / "movie.mkv"
     source.write_bytes(b"abcdefgh")

@@ -102,6 +102,16 @@ class TestPluginPaths:
         path = handler.get_plugin_download_cache_path("my_plugin", "1.0.0")
         assert path.endswith("my_plugin-1.0.0.zip")
 
+    @pytest.mark.parametrize(
+        ("plugin_id", "version"),
+        [("../escape", "1"), ("plugin", "../../../escape"), ("", "1"), ("plugin", "")],
+    )
+    def test_get_plugin_download_cache_path_rejects_untrusted_metadata(self, tmp_path, plugin_id, version):
+        """Repository metadata must not escape the plugin cache directory."""
+        handler = _make_handler(tmp_path)
+        with pytest.raises(ValueError):
+            handler.get_plugin_download_cache_path(plugin_id, version)
+
     def test_archive_extraction_rejects_parent_traversal(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
@@ -576,8 +586,18 @@ class TestSubprocessTimeouts:
             patch("subprocess.call", side_effect=subprocess.TimeoutExpired("pip", 300)),
             patch("shutil.rmtree"),
             patch("os.makedirs"),
+            pytest.raises(subprocess.TimeoutExpired),
         ):
-            # Should not raise — timeout is caught and logged
+            PluginsHandler.install_plugin_requirements(str(tmp_path))
+
+    def test_pip_install_propagates_nonzero_exit(self, tmp_path):
+        """A failed pip process must abort plugin installation."""
+        import subprocess
+
+        from compresso.libs.plugins import PluginsHandler
+
+        (tmp_path / "requirements.lock").write_text("some-package")
+        with patch("subprocess.call", return_value=1), pytest.raises(subprocess.CalledProcessError):
             PluginsHandler.install_plugin_requirements(str(tmp_path))
 
     def test_npm_install_never_starts_subprocess(self, tmp_path):

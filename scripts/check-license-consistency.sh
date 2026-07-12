@@ -30,7 +30,7 @@ while IFS= read -r file; do
     failures=$((failures + 1))
   fi
 done < <(
-  find compresso docs -type f \( -name '*.py' -o -name '*.md' \) \
+  find compresso docs devops tests/scripts_ -type f \( -name '*.py' -o -name '*.md' -o -name '*.sh' \) \
     -exec grep -FIl "Copyright (C) Josh Sunnex - All Rights Reserved" {} +
   grep -FIl "Copyright (C) Josh Sunnex - All Rights Reserved" setup.py README.md || true
 )

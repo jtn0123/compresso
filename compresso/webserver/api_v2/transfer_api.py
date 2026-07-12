@@ -66,9 +66,12 @@ class ApiTransferHandler(BaseApiHandler):
         return ResumableTransferStore(root)
 
     def _handle_transfer_error(self, error):
+        """Map transfer failures to structured client-facing API errors."""
+        status_code = 404 if isinstance(error, KeyError) else 400
         self.handle_base_api_error(
             BaseApiError(
                 "Transfer request could not be completed",
+                status_code=status_code,
                 private_detail=f"{type(error).__name__}: {error}",
             )
         )

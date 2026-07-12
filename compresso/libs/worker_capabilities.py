@@ -7,6 +7,7 @@ import os
 import platform
 import shutil
 import threading
+import time
 from collections import defaultdict
 
 import psutil
@@ -17,9 +18,13 @@ from compresso.libs.unmodels.compressionstats import CompressionStats
 
 
 class WorkerCapabilities:
+    _DYNAMIC_CACHE_TTL_SECONDS = 30
+
     def __init__(self, ffmpeg_info=None):
         self.ffmpeg_info = ffmpeg_info or Info()
         self._static_capabilities = None
+        self._dynamic_capabilities = None
+        self._dynamic_cached_at = 0.0
         self._lock = threading.Lock()
 
     @staticmethod
@@ -74,11 +79,22 @@ class WorkerCapabilities:
                     "total_bytes": int(disk.total),
                     "free_bytes": int(disk.free),
                 },
-                "thermal": self._thermal_snapshot(),
-                "performance": self._performance_snapshot(),
+                **self._dynamic_snapshot(),
             }
         )
         return capabilities
+
+    def _dynamic_snapshot(self):
+        """Cache sensor and historical-throughput reads for a short polling window."""
+        now = time.monotonic()
+        with self._lock:
+            if self._dynamic_capabilities is None or now - self._dynamic_cached_at >= self._DYNAMIC_CACHE_TTL_SECONDS:
+                self._dynamic_capabilities = {
+                    "thermal": self._thermal_snapshot(),
+                    "performance": self._performance_snapshot(),
+                }
+                self._dynamic_cached_at = now
+            return dict(self._dynamic_capabilities)
 
     @staticmethod
     def _thermal_snapshot():

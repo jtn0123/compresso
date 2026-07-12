@@ -143,7 +143,7 @@ async function completeOnboarding() {
 }
 
 .first-run-card :deep(.q-stepper__tab:not(.q-stepper__tab--active) .q-stepper__title) {
-  color: #616161 !important;
+  color: var(--compresso-grey-8) !important;
   opacity: 1;
 }
 

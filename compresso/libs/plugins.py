@@ -95,8 +95,14 @@ class PluginsHandler(metaclass=SingletonType):
         return plugin_directory
 
     def get_plugin_download_cache_path(self, plugin_id, plugin_version):
-        plugin_directory = self.settings.get_plugins_path()
-        return os.path.join(plugin_directory, f"{plugin_id}-{plugin_version}.zip")
+        """Return a cache path contained under the configured plugin directory."""
+        if not plugin_id or not plugin_version:
+            raise ValueError("Remote plugin metadata must include a plugin_id and version")
+        plugin_directory = os.path.realpath(self.settings.get_plugins_path())
+        cache_path = os.path.realpath(os.path.join(plugin_directory, f"{plugin_id}-{plugin_version}.zip"))
+        if os.path.commonpath((plugin_directory, cache_path)) != plugin_directory or cache_path == plugin_directory:
+            raise ValueError("Invalid remote plugin metadata: cache path traversal detected")
+        return cache_path
 
     @staticmethod
     def get_default_repo():
@@ -565,6 +571,7 @@ class PluginsHandler(metaclass=SingletonType):
 
     @staticmethod
     def install_plugin_requirements(plugin_path, requirements_file=None):
+        """Install a plugin's hash-locked wheel dependencies into its private target."""
         if requirements_file is None:
             requirements_file = os.path.join(plugin_path, "requirements.lock")
         install_target = os.path.join(plugin_path, "site-packages")
@@ -577,7 +584,7 @@ class PluginsHandler(metaclass=SingletonType):
         # Recreate the site-packages directory
         os.makedirs(install_target, exist_ok=True)
         try:
-            subprocess.call(  # noqa: S603 - trusted pip install for plugin dependencies
+            return_code = subprocess.call(  # noqa: S603 - trusted pip install for plugin dependencies
                 [
                     sys.executable,
                     "-m",
@@ -592,8 +599,11 @@ class PluginsHandler(metaclass=SingletonType):
                 ],
                 timeout=300,
             )
+            if isinstance(return_code, int) and return_code != 0:
+                raise subprocess.CalledProcessError(return_code, "pip install")
         except subprocess.TimeoutExpired:
             logging.getLogger(_LOGGER_NAME).error("Timed out installing pip requirements for plugin at %s", requirements_file)
+            raise
 
     @staticmethod
     def install_npm_modules(plugin_path):
