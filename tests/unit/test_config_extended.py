@@ -110,7 +110,8 @@ class TestSetConfigItem:
         c._Config__write_settings_to_file()
 
         settings_file = os.path.join(c.get_config_path(), "settings.json")
-        assert os.stat(settings_file).st_mode & 0o777 == 0o600
+        if os.name != "nt":
+            assert os.stat(settings_file).st_mode & 0o777 == 0o600
         with open(settings_file) as infile:
             assert json.load(infile)["api_auth_token"] == "super-secret"  # noqa: S105 - synthetic test token
 

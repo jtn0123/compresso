@@ -117,7 +117,8 @@ class TestJsonDumpToFile:
         result = common.json_dump_to_file({"api_auth_token": "secret"}, out_file, file_mode=0o600)
 
         assert result["success"] is True
-        assert os.stat(out_file).st_mode & 0o777 == 0o600
+        if os.name != "nt":
+            assert os.stat(out_file).st_mode & 0o777 == 0o600
         assert json.loads((tmp_path / "settings.json").read_text()) == {"api_auth_token": "secret"}
         assert list(tmp_path.glob(".json-write-*")) == []
 
