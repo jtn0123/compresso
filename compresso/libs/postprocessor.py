@@ -413,28 +413,40 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         if not self._postprocess_local_file_safely():
             return
         try:
-            self.write_history_log()
+            if self.write_history_log() is False:
+                raise RuntimeError("history persistence returned false")
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in writing history log", message2=str(e), level="exception")
+            self._defer_postprocess_failure(str(e))
+            return
         except Exception as e:
             self._log(f"TaskMetadataError in history log: {e}", level="exception")
+            self._defer_postprocess_failure(str(e))
+            return
+        self._mark_finalization_phase("history_committed")
         try:
             self.commit_task_metadata()
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in committing task metadata", message2=str(e), level="exception")
+            self._defer_postprocess_failure(str(e))
+            return
         except Exception as e:
             self._log(f"TaskMetadataError in commit: {e}", level="exception")
-        task_deleted = False
+            self._defer_postprocess_failure(str(e))
+            return
+        self._mark_finalization_phase("metadata_committed")
         try:
             # Clean up the staging directory for this task if it exists
             self._cleanup_staging_files()
             # Remove file from task queue
             self.current_task.delete()
-            task_deleted = True
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in removing task from task list", message2=str(e), level="exception")
+            self._defer_postprocess_failure(str(e))
+            return
 
-        self._finalize_file_operation_journal(task_deleted)
+        self._mark_finalization_phase("task_deleted")
+        self._finalize_file_operation_journal(True)
 
         # Dispatch external notification for task completion or failure
         try:
@@ -495,6 +507,19 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
 
     def _postprocess_local_file_safely(self):
         """Run the destructive file phase and defer all later finalization on failure."""
+        resumed = FileOperationTracker.resume_committed(
+            self._get_file_operation_journal_dir(),
+            task_id=self.current_task.get_task_id(),
+            logger=self.logger,
+        )
+        if resumed is not None:
+            self._file_operation_tracker = resumed
+            self._last_destination_files = list(resumed._created_paths)
+            self._log(
+                f"Resuming task finalization from phase {resumed.finalization_phase or 'file_committed'}",
+                level="warning",
+            )
+            return True
         try:
             if self.post_process_file() is False:
                 self._defer_postprocess_failure("file movement did not complete")
@@ -508,6 +533,14 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             self._defer_postprocess_failure(str(e))
             return False
         return True
+
+    def _get_file_operation_journal_dir(self):
+        config_path = self.settings.get_config_path()
+        return os.path.join(config_path, "recovery", "file_operations") if isinstance(config_path, str) else None
+
+    def _mark_finalization_phase(self, phase):
+        if self._file_operation_tracker is not None:
+            self._file_operation_tracker.mark_finalization_phase(phase)
 
     def _defer_postprocess_failure(self, reason):
         """Keep the task and encoded cache available for a safe later retry."""
@@ -705,13 +738,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         # Create a list for filling with destination paths
         destination_files = []
         # Create a tracker for safe file operations with rollback support
-        config_path = self.settings.get_config_path()
-        journal_dir = None
-        # Config.get_config_path() is a string API. Restrict this deliberately:
-        # generic PathLike objects such as test doubles can stringify into an
-        # unintended relative directory and leave recovery files in the CWD.
-        if isinstance(config_path, str):
-            journal_dir = os.path.join(config_path, "recovery", "file_operations")
+        journal_dir = self._get_file_operation_journal_dir()
         tracker = FileOperationTracker(
             self.logger,
             journal_dir=journal_dir,
@@ -826,6 +853,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             # Commit or rollback tracked file operations
             if file_move_processes_success:
                 tracker.commit()
+                tracker.mark_finalization_phase("file_committed")
             else:
                 self._log("Rolling back all tracked file operations due to failures", level="warning")
                 tracker.rollback()
@@ -1103,7 +1131,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         with contextlib.suppress(TypeError, ValueError):
             source_duration_seconds = float(source_meta.get("duration", 0))
 
-        history_logging.save_task_history(
+        history_saved = history_logging.save_task_history(
             {
                 "task_label": task_dump.get("task_label", ""),
                 "abspath": task_dump.get("abspath", ""),
@@ -1126,6 +1154,9 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
                 "encoding_speed_ratio": task_dump.get("encoding_speed_ratio", 0),
             }
         )
+
+        if not history_saved:
+            return False
 
         # Bump analysis cache version so frontend knows estimates may have changed
         try:
@@ -1156,6 +1187,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
                 "log": task_dump.get("log", ""),
             },
         )
+        return True
 
     def commit_task_metadata(self):
         """

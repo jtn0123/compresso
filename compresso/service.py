@@ -250,6 +250,7 @@ class RootService:
             protected_paths = TaskHandler.recover_tasks_on_startup(
                 settings,
                 committed_task_ids=operation_recovery["committed_task_ids"],
+                finalization_task_ids=operation_recovery.get("finalization_task_ids", []),
             )
             FileOperationTracker.finalize_committed(journal_dir)
             common.clean_files_in_cache_dir(settings.get_cache_path(), protected_paths=protected_paths)

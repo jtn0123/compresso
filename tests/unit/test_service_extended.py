@@ -402,7 +402,7 @@ class TestStartThreadsOrchestration:
         with (
             patch(
                 "compresso.service.FileOperationTracker.recover_all",
-                return_value={"rolled_back_task_ids": [], "committed_task_ids": []},
+                return_value={"rolled_back_task_ids": [], "committed_task_ids": [], "finalization_task_ids": [7]},
             ),
             patch("compresso.service.FileOperationTracker.finalize_committed"),
             patch("compresso.service.TaskHandler.recover_tasks_on_startup", return_value=[]),
@@ -419,6 +419,7 @@ class TestStartThreadsOrchestration:
             service.start_threads(mock_settings)
             mock_clean.assert_called_once()
             mock_tq_cls.assert_called_once()
+            service.startup_state.mark_ready.assert_called()
 
     @patch("compresso.service.common.clean_files_in_cache_dir", side_effect=Exception("fail"))
     def test_start_threads_cache_cleanup_failure_raises(self, mock_clean):
@@ -429,7 +430,7 @@ class TestStartThreadsOrchestration:
         with (
             patch(
                 "compresso.service.FileOperationTracker.recover_all",
-                return_value={"rolled_back_task_ids": [], "committed_task_ids": []},
+                return_value={"rolled_back_task_ids": [], "committed_task_ids": [], "finalization_task_ids": []},
             ),
             patch("compresso.service.FileOperationTracker.finalize_committed"),
             patch("compresso.service.TaskHandler.recover_tasks_on_startup", return_value=[]),

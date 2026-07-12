@@ -38,12 +38,13 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **18 of 37** addressable grade items are marked complete below; G1 received meaningful partial fixes but remains open until bounded streaming is complete.
+- **20 of 37** addressable grade items are marked complete below; G1 received meaningful partial fixes but remains open until bounded streaming is complete.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
 - Frontend production dependency audit reported **0 vulnerabilities** after the compatible update batch.
 - Security hardening: **129 focused backend tests** and **17 focused frontend tests** passed; the broader backend suite passed **3,623 tests with 8 skips** before the final seven focused security cases were added, and the full frontend suite passed **431 tests** plus production build.
+- Finalization durability: **169 focused recovery/history/postprocessor/service tests** passed with crash-resumable file, history, metadata, and deletion phases.
 
 ---
 
@@ -62,7 +63,7 @@ Compresso now has strong durability primitives—leases, resumable transfers, sc
 - **Effort:** M
 - **Grade lift:** B- → B (prevents single exceptions from disabling whole subsystems)
 
-#### A2 — Unify file replacement, history, and task state into one replayable protocol
+#### ~~A2~~ ✓ done 2026-07-12 — Unify file replacement, history, and task state into one replayable protocol
 
 - **Where:** `compresso/libs/postprocessor.py:386-412,801-846`, `compresso/libs/file_operation_tracker.py:106-125`, `compresso/libs/taskhandler.py:166-172`
 - **What's wrong:** Files, history/metadata, and task deletion commit in separate durability domains. Recovery can treat the file as committed and delete the task without replaying missing audit/statistics state.
@@ -115,7 +116,7 @@ The backend has strong schema coverage, checksummed transfers, retry/defer handl
 - **Effort:** S
 - **Grade lift:** B → B+ (turns two reproduced API failures into rejected input)
 
-#### B4 — Make history persistence transactional and idempotent
+#### ~~B4~~ ✓ done 2026-07-12 — Make history persistence transactional and idempotent
 
 - **Where:** `compresso/libs/history.py:279-313`, `compresso/libs/postprocessor.py:386-412,1081-1103`
 - **What's wrong:** Completed-task, command-log, and statistics rows are independent writes. A false late result is ignored and finalization can delete the task after partial history.

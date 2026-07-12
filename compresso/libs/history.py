@@ -30,6 +30,7 @@ Copyright:
 """
 
 import json
+import threading
 
 from peewee import fn
 
@@ -52,6 +53,8 @@ class History:
 
     Record statistical data for historical jobs
     """
+
+    _write_lock = threading.Lock()
 
     def __init__(self):
         self.name = __class__.__name__
@@ -284,29 +287,46 @@ class History:
         :return:
         """
         try:
-            # Create the new historical task entry
-            new_historic_task = self.create_historic_task_entry(task_data)
-            # Create an entry of the data from the source ffprobe
-            self.create_historic_task_ffmpeg_log_entry(new_historic_task, task_data.get("log", ""))
-            # Create compression stats entry for successful tasks
-            source_size = task_data.get("source_size", 0)
-            destination_size = task_data.get("destination_size", 0)
-            if task_data.get("task_success", False):
-                self.create_compression_stats_entry(
-                    new_historic_task,
-                    source_size=source_size,
-                    destination_size=destination_size,
-                    source_codec=task_data.get("source_codec", ""),
-                    destination_codec=task_data.get("destination_codec", ""),
-                    source_resolution=task_data.get("source_resolution", ""),
-                    library_id=task_data.get("library_id", 1),
-                    source_container=task_data.get("source_container", ""),
-                    destination_container=task_data.get("destination_container", ""),
-                    encoding_duration_seconds=task_data.get("encoding_duration_seconds", 0),
-                    avg_encoding_fps=task_data.get("avg_encoding_fps", 0),
-                    source_duration_seconds=task_data.get("source_duration_seconds", 0),
-                    encoding_speed_ratio=task_data.get("encoding_speed_ratio", 0),
+            # SqliteQueueDatabase cannot span multiple statements in an atomic
+            # block. Serialize this idempotent write set; the finalization
+            # journal replays any missing child row after interruption.
+            with self._write_lock:
+                identity = (
+                    (CompletedTasks.task_label == task_data["task_label"])
+                    & (CompletedTasks.abspath == task_data["abspath"])
+                    & (CompletedTasks.task_success == task_data["task_success"])
+                    & (CompletedTasks.start_time == task_data["start_time"])
+                    & (CompletedTasks.finish_time == task_data["finish_time"])
+                    & (CompletedTasks.processed_by_worker == task_data["processed_by_worker"])
                 )
+                new_historic_task = CompletedTasks.get_or_none(identity)
+                if new_historic_task is None:
+                    new_historic_task = self.create_historic_task_entry(task_data)
+                command_log_exists = (
+                    CompletedTasksCommandLogs.select()
+                    .where(CompletedTasksCommandLogs.completedtask_id == new_historic_task.id)
+                    .exists()
+                )
+                if not command_log_exists:
+                    self.create_historic_task_ffmpeg_log_entry(new_historic_task, task_data.get("log", ""))
+
+                stats_exist = CompressionStats.select().where(CompressionStats.completedtask == new_historic_task.id).exists()
+                if task_data.get("task_success", False) and not stats_exist:
+                    self.create_compression_stats_entry(
+                        new_historic_task,
+                        source_size=task_data.get("source_size", 0),
+                        destination_size=task_data.get("destination_size", 0),
+                        source_codec=task_data.get("source_codec", ""),
+                        destination_codec=task_data.get("destination_codec", ""),
+                        source_resolution=task_data.get("source_resolution", ""),
+                        library_id=task_data.get("library_id", 1),
+                        source_container=task_data.get("source_container", ""),
+                        destination_container=task_data.get("destination_container", ""),
+                        encoding_duration_seconds=task_data.get("encoding_duration_seconds", 0),
+                        avg_encoding_fps=task_data.get("avg_encoding_fps", 0),
+                        source_duration_seconds=task_data.get("source_duration_seconds", 0),
+                        encoding_speed_ratio=task_data.get("encoding_speed_ratio", 0),
+                    )
         except Exception as error:
             self.logger.exception("Failed to save historic task entry to database. %s", error)
             return False

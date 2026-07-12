@@ -142,8 +142,20 @@ class TaskHandler(threading.Thread):
         task_obj.deferred_until = None
         task_obj.save()
 
+    @staticmethod
+    def _reconcile_finalization_override(task_obj, committed_task_ids, finalization_task_ids, logger):
+        if task_obj.id in committed_task_ids:
+            logger.warning("STARTUP_COMMITTED_TASK_FINALIZED id=%s", task_obj.id)
+            task.TaskDataStore.clear_task(task_obj.id)
+            Tasks.delete().where(Tasks.id == task_obj.id).execute()
+            return True
+        if task_obj.id in finalization_task_ids:
+            logger.warning("STARTUP_TASK_FINALIZATION_RESUMED id=%s status=%s", task_obj.id, task_obj.status)
+            return True
+        return False
+
     @classmethod
-    def recover_tasks_on_startup(cls, settings, committed_task_ids=None):
+    def recover_tasks_on_startup(cls, settings, committed_task_ids=None, finalization_task_ids=None):
         """Reconcile persisted tasks before worker and postprocessor startup.
 
         Returns file paths that startup cache cleanup must preserve. Interrupted
@@ -155,6 +167,7 @@ class TaskHandler(threading.Thread):
         staging_path = settings.get_staging_path()
         clear_pending = settings.get_clear_pending_tasks_on_restart()
         committed_task_ids = set(committed_task_ids or [])
+        finalization_task_ids = set(finalization_task_ids or [])
 
         try:
             last_task_id = 0
@@ -165,10 +178,7 @@ class TaskHandler(threading.Thread):
 
                 for task_obj in task_batch:
                     last_task_id = task_obj.id
-                    if task_obj.id in committed_task_ids:
-                        logger.warning("STARTUP_COMMITTED_TASK_FINALIZED id=%s", task_obj.id)
-                        task.TaskDataStore.clear_task(task_obj.id)
-                        Tasks.delete().where(Tasks.id == task_obj.id).execute()
+                    if cls._reconcile_finalization_override(task_obj, committed_task_ids, finalization_task_ids, logger):
                         continue
                     status = task_obj.status
                     source_path = task_obj.abspath
