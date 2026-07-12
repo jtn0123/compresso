@@ -293,28 +293,47 @@ class TestFinalizeLocalTaskKeepBoth:
 class TestFinalizeRemoteTask:
     """Tests for PostProcessor._finalize_remote_task()."""
 
+    @patch(f"{PP_MOD}.PostProcessor._PostProcessor__cleanup_cache_files")
     @patch(f"{PP_MOD}.PostProcessor.dump_history_log")
-    @patch(f"{PP_MOD}.PostProcessor.post_process_remote_file")
-    def test_runs_remote_steps(self, mock_pprf, mock_dhl):
+    @patch(f"{PP_MOD}.PostProcessor.post_process_remote_file", return_value="/dst/output.mkv")
+    def test_runs_remote_steps(self, mock_pprf, mock_dhl, mock_cleanup):
         pp = _make_postprocessor()
         pp.current_task = _make_current_task(task_type="remote")
 
-        pp._finalize_remote_task()
+        result = pp._finalize_remote_task()
 
+        assert result is True
         mock_pprf.assert_called_once()
-        mock_dhl.assert_called_once()
+        mock_dhl.assert_called_once_with(destination_path="/dst/output.mkv")
         pp.current_task.set_status.assert_called_once_with("complete")
+        mock_cleanup.assert_called_once_with("/cache/compresso_file_conversion_xyz/output.mkv")
 
+    @patch(f"{PP_MOD}.PostProcessor._defer_postprocess_failure")
     @patch(f"{PP_MOD}.PostProcessor.dump_history_log")
     @patch(f"{PP_MOD}.PostProcessor.post_process_remote_file", side_effect=Exception("remote error"))
-    def test_continues_on_remote_error(self, mock_pprf, mock_dhl):
+    def test_defers_on_remote_file_error(self, mock_pprf, mock_dhl, mock_defer):
         pp = _make_postprocessor()
         pp.current_task = _make_current_task(task_type="remote")
 
-        pp._finalize_remote_task()
+        result = pp._finalize_remote_task()
 
-        mock_dhl.assert_called_once()
-        pp.current_task.set_status.assert_called_once_with("complete")
+        assert result is False
+        mock_dhl.assert_not_called()
+        mock_defer.assert_called_once_with("remote error")
+        pp.current_task.set_status.assert_not_called()
+
+    @patch(f"{PP_MOD}.PostProcessor._defer_postprocess_failure")
+    @patch(f"{PP_MOD}.PostProcessor.dump_history_log", side_effect=OSError("history unavailable"))
+    @patch(f"{PP_MOD}.PostProcessor.post_process_remote_file", return_value="/dst/output.mkv")
+    def test_defers_on_remote_history_error(self, mock_pprf, mock_dhl, mock_defer):
+        pp = _make_postprocessor()
+        pp.current_task = _make_current_task(task_type="remote")
+
+        result = pp._finalize_remote_task()
+
+        assert result is False
+        mock_defer.assert_called_once_with("history unavailable")
+        pp.current_task.set_status.assert_not_called()
 
 
 # ------------------------------------------------------------------
@@ -563,10 +582,36 @@ class TestPostProcessRemoteFile:
             cache_path="/cache/compresso_file_conversion_xyz/output.mkv",
         )
 
-        pp.post_process_remote_file()
+        result = pp.post_process_remote_file()
 
+        assert result == "/cache/output.mkv"
         mock_remove.assert_called()
-        mock_cleanup.assert_called_once()
+        mock_cleanup.assert_not_called()
+
+    @patch(f"{PP_MOD}.PostProcessor._PostProcessor__cleanup_cache_files")
+    @patch(f"{PP_MOD}.PostProcessor._PostProcessor__copy_file", return_value=False)
+    @patch(f"{PP_MOD}.os.path.exists", return_value=True)
+    @patch(f"{PP_MOD}.os.remove")
+    @patch(f"{PP_MOD}.common.random_string", return_value="abc")
+    @patch(f"{PP_MOD}.time.time", return_value=1000)
+    def test_remote_copy_failure_retains_cache_and_task_path(
+        self, mock_time, mock_random, mock_remove, mock_exists, mock_copy, mock_cleanup
+    ):
+        pp = _make_postprocessor()
+        pp.settings = MagicMock()
+        pp.settings.get_cache_path.return_value = "/cache"
+        pp.current_task = _make_current_task(
+            task_type="remote",
+            source_abspath="/cache/downloaded.mkv",
+            dest_abspath="/cache/output.mkv",
+            cache_path="/cache/compresso_file_conversion_xyz/output.mkv",
+        )
+
+        result = pp.post_process_remote_file()
+
+        assert result is False
+        mock_cleanup.assert_not_called()
+        pp.current_task.modify_path.assert_not_called()
 
     @patch(f"{PP_MOD}.PostProcessor._PostProcessor__cleanup_cache_files")
     @patch(f"{PP_MOD}.PostProcessor._PostProcessor__copy_file", return_value=True)
@@ -600,9 +645,10 @@ class TestPostProcessRemoteFile:
         # source exists, cache exists
         mock_exists.return_value = True
 
-        pp.post_process_remote_file()
+        result = pp.post_process_remote_file()
 
-        mock_cleanup.assert_called_once()
+        assert result == "/library/compresso_remote_pending_library-abc-1000/output.mkv"
+        mock_cleanup.assert_not_called()
 
 
 # ------------------------------------------------------------------

@@ -590,6 +590,35 @@ class TestDumpHistoryLog:
         with pytest.raises(Exception, match="Exception in dumping"):
             pp.dump_history_log()
 
+    @patch("compresso.libs.postprocessor.file_sha256", return_value="final-checksum")
+    @patch("compresso.libs.postprocessor.common.json_dump_to_file")
+    @patch("compresso.libs.postprocessor.TaskDataStore.export_task_state", return_value={})
+    def test_destination_override_keeps_task_path_unmodified_until_history_is_durable(
+        self, mock_export, mock_json_dump, mock_checksum
+    ):
+        pp = _make_postprocessor()
+        mock_task = MagicMock()
+        mock_task.task_dump.return_value = {
+            "task_label": "remote.mkv",
+            "abspath": "/remote/original.mkv",
+            "task_success": True,
+            "start_time": "",
+            "finish_time": "",
+            "processed_by_worker": "",
+            "log": "",
+        }
+        mock_task.get_task_id.return_value = "task-r3"
+        pp.current_task = mock_task
+        mock_json_dump.return_value = {"success": True, "errors": []}
+
+        pp.dump_history_log(destination_path="/pending/final.mkv")
+
+        payload, output_path = mock_json_dump.call_args.args
+        assert payload["abspath"] == "/pending/final.mkv"
+        assert payload["checksum"] == "final-checksum"
+        assert output_path == "/pending/data.json"
+        mock_task.modify_path.assert_not_called()
+
 
 # ------------------------------------------------------------------
 # TestRunLoopAbort
