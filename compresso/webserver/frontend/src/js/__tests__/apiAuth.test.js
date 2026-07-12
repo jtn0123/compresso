@@ -25,7 +25,10 @@ describe('API auth session', () => {
   })
 
   it('stores a token entered through the authentication prompt', () => {
-    vi.stubGlobal('prompt', vi.fn(() => ' entered-token '))
+    vi.stubGlobal(
+      'prompt',
+      vi.fn(() => ' entered-token '),
+    )
 
     expect(promptForApiToken()).toBe('entered-token')
     expect(getApiToken()).toBe('entered-token')
