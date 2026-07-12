@@ -499,7 +499,12 @@ class Links(metaclass=SingletonType):
         if res.status_code == 200:
             capabilities = res.json()
 
-        runnable_task_count = int(tasks_data.get("runnableRecords", tasks_data.get("recordsFiltered", 0)))
+        runnable_task_count = int(
+            tasks_data.get(
+                "runnableRecords",
+                tasks_data.get("recordsFiltered", tasks_data.get("recordsTotal", 0)),
+            )
+        )
 
         return {
             "system_configuration": system_configuration_data.get("configuration"),
