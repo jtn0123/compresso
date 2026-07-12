@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **22 of 37** addressable grade items are marked complete below.
+- **23 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -46,6 +46,7 @@
 - Security hardening: **129 focused backend tests** and **17 focused frontend tests** passed; the broader backend suite passed **3,623 tests with 8 skips** before the final seven focused security cases were added, and the full frontend suite passed **431 tests** plus production build.
 - Finalization durability: **169 focused recovery/history/postprocessor/service tests** passed with crash-resumable file, history, metadata, and deletion phases.
 - Library analysis: **56 focused helper tests** passed with single-flight starts, streamed traversal, generation cleanup, and stat-first cache hits.
+- Frontend coverage now inventories **all 113 application JS/Vue files**: 19.54% statements, 15.11% branches, 12.42% functions, and 19.39% lines, with honest ratchet floors at 19/15/12/19.
 
 ---
 
@@ -196,7 +197,7 @@ Python reliability evidence is broad: thousands of unit tests, integration tests
 
 ### Testing improvements
 
-#### D1 — Measure every frontend source file and ratchet meaningful thresholds
+#### ~~D1~~ ✓ done 2026-07-12 — Measure every frontend source file and ratchet meaningful thresholds
 
 - **Where:** `compresso/webserver/frontend/vitest.config.js:11-20`, `compresso/webserver/frontend/src/`
 - **What's wrong:** No source include pattern means unimported files count as nonexistent; 59 of 110 application files were absent while 30/20/20/30 thresholds passed.
