@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **23 of 37** addressable grade items are marked complete below.
+- **24 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -47,6 +47,7 @@
 - Finalization durability: **169 focused recovery/history/postprocessor/service tests** passed with crash-resumable file, history, metadata, and deletion phases.
 - Library analysis: **56 focused helper tests** passed with single-flight starts, streamed traversal, generation cleanup, and stat-first cache hits.
 - Frontend coverage now inventories **all 113 application JS/Vue files**: 19.54% statements, 15.11% branches, 12.42% functions, and 19.39% lines, with honest ratchet floors at 19/15/12/19.
+- Packaged live E2E: **3 Playwright journeys passed** against an isolated wheel install, including reject, approve/file replacement, history persistence, and backend restart.
 
 ---
 
@@ -206,7 +207,7 @@ Python reliability evidence is broad: thousands of unit tests, integration tests
 - **Effort:** M
 - **Grade lift:** B → B+ (makes frontend coverage representative rather than selective)
 
-#### D2 — Exercise a packaged, state-changing release workflow end to end
+#### ~~D2~~ ✓ done 2026-07-12 — Exercise a packaged, state-changing release workflow end to end
 
 - **Where:** `frontend/tests/e2e-live/compresso-live-smoke.spec.js:3-52`, `frontend/scripts/start-live-backend.mjs:20-29`
 - **What's wrong:** Live E2E starts source through `PYTHONPATH` and checks mostly read-oriented startup contracts. It does not prove the wheel, migration, encode handoff, approval/reject, or restart workflow.

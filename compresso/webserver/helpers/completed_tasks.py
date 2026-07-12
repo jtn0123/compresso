@@ -134,7 +134,7 @@ def prepare_filtered_completed_tasks(params):
             "id": task["id"],
             "task_label": task["task_label"],
             "task_success": task["task_success"],
-            "finish_time": task["finish_time"],
+            "finish_time": int(_parse_datetime_to_timestamp(task["finish_time"]) or 0),
             "has_metadata": task.get("abspath") in matched_paths,
         }
         return_data["results"].append(item)

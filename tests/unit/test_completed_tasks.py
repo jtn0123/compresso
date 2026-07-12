@@ -51,6 +51,25 @@ class TestParseDatetimeToTimestamp:
 class TestPrepareFilteredCompletedTasks:
     @patch("compresso.webserver.helpers.completed_tasks.FileMetadataPaths")
     @patch("compresso.webserver.helpers.completed_tasks.history")
+    def test_serializes_database_datetime_as_epoch_integer(self, mock_history_module, _mock_fmp):
+        finished = datetime(2026, 7, 12, 8, 0, 0)
+        mock_hist = MagicMock()
+        mock_history_module.History.return_value = mock_hist
+        mock_hist.get_total_historic_task_list_count.return_value = 1
+        mock_query = MagicMock()
+        mock_query.count.return_value = 1
+        task_row = {"id": 1, "task_label": "movie.mkv", "task_success": True, "finish_time": finished}
+        mock_query.__iter__ = MagicMock(side_effect=[iter([task_row]), iter([task_row])])
+        mock_hist.get_historic_task_list_filtered_and_sorted.return_value = mock_query
+
+        from compresso.webserver.helpers.completed_tasks import prepare_filtered_completed_tasks
+
+        result = prepare_filtered_completed_tasks({})
+
+        assert result["results"][0]["finish_time"] == int(finished.timestamp())
+
+    @patch("compresso.webserver.helpers.completed_tasks.FileMetadataPaths")
+    @patch("compresso.webserver.helpers.completed_tasks.history")
     def test_returns_correct_structure(self, mock_history_module, mock_fmp):
         mock_hist = MagicMock()
         mock_history_module.History.return_value = mock_hist
