@@ -772,6 +772,68 @@ class TestIncrementalAnalysisMetadata:
         assert cached is None
         assert fingerprint_info == ("fp", "algo")
 
+    @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint")
+    @patch(ANALYSIS_MODULE + ".os.stat")
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_matching_file_identity_skips_content_hash(self, mock_paths, mock_stat, mock_fingerprint):
+        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+
+        mock_stat.return_value = MagicMock(st_size=100, st_mtime_ns=200, st_dev=3, st_ino=4)
+        row = MagicMock()
+        row.file_metadata.fingerprint = "existing-fingerprint"
+        row.file_metadata.fingerprint_algo = "sampled_sha256_v1"
+        row.file_metadata.metadata_json = json.dumps(
+            {
+                "_compresso_library_analysis": {
+                    "codec": "h264",
+                    "resolution": "1080p",
+                    "file_size": 100,
+                    "bitrate_mbps": 2,
+                    "stat_size": 100,
+                    "stat_mtime_ns": 200,
+                    "stat_device": 3,
+                    "stat_inode": 4,
+                }
+            }
+        )
+        mock_paths.get_or_none.return_value = row
+
+        cached, fingerprint_info = _cached_analysis_file("/media/unchanged.mkv")
+
+        assert cached["codec"] == "h264"
+        assert fingerprint_info == ("existing-fingerprint", "sampled_sha256_v1")
+        mock_fingerprint.assert_not_called()
+
+    @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("changed", "algo"))
+    @patch(ANALYSIS_MODULE + ".os.stat")
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_changed_file_identity_defers_to_content_hash(self, mock_paths, mock_stat, mock_fingerprint):
+        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+
+        mock_stat.return_value = MagicMock(st_size=101, st_mtime_ns=201, st_dev=3, st_ino=4)
+        row = MagicMock()
+        row.file_metadata.metadata_json = json.dumps(
+            {
+                "_compresso_library_analysis": {
+                    "codec": "h264",
+                    "resolution": "1080p",
+                    "file_size": 100,
+                    "bitrate_mbps": 2,
+                    "stat_size": 100,
+                    "stat_mtime_ns": 200,
+                    "stat_device": 3,
+                    "stat_inode": 4,
+                }
+            }
+        )
+        mock_paths.get_or_none.return_value = row
+
+        cached, fingerprint_info = _cached_analysis_file("/media/changed.mkv")
+
+        assert cached is None
+        assert fingerprint_info == ("changed", "algo")
+        mock_fingerprint.assert_called_once_with("/media/changed.mkv")
+
     @patch(ANALYSIS_MODULE + ".os.path.exists", return_value=False)
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_missing_file_paths_are_removed_from_analysis_metadata(self, mock_paths, _mock_exists):
@@ -785,6 +847,20 @@ class TestIncrementalAnalysisMetadata:
 
         stale.delete_instance.assert_called_once()
         current.delete_instance.assert_not_called()
+
+    @patch(ANALYSIS_MODULE + "._path_is_within", side_effect=lambda path, _root: path.startswith("/media/"))
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_generation_cleanup_removes_only_stale_paths_in_library(self, mock_paths, _mock_within):
+        from compresso.webserver.helpers.library_analysis import _cleanup_stale_analysis_paths
+
+        stale = MagicMock(path="/media/stale.mkv")
+        outside = MagicMock(path="/other/keep.mkv")
+        mock_paths.select.return_value.where.return_value.iterator.return_value = iter([stale, outside])
+
+        _cleanup_stale_analysis_paths("/media", "new-generation")
+
+        stale.delete_instance.assert_called_once()
+        outside.delete_instance.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

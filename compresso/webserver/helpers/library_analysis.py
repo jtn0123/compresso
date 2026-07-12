@@ -13,6 +13,7 @@ import json
 import os
 import threading
 import time
+import uuid
 from datetime import datetime
 
 from compresso.libs import common
@@ -137,6 +138,16 @@ def _load_json_dict(value):
 def _probe_analysis_file(filepath):
     meta = extract_media_metadata(filepath)
     file_size = os.path.getsize(filepath)
+    try:
+        stat = os.stat(filepath)
+        stat_identity = {
+            "stat_size": stat.st_size,
+            "stat_mtime_ns": stat.st_mtime_ns,
+            "stat_device": stat.st_dev,
+            "stat_inode": stat.st_ino,
+        }
+    except OSError:
+        stat_identity = {}
     bitrate_mbps = float(meta.get("bitrate_mbps", 0) or 0)
     duration = float(meta.get("duration", 0) or 0)
     if bitrate_mbps <= 0 and duration > 0:
@@ -147,31 +158,43 @@ def _probe_analysis_file(filepath):
         "resolution": meta.get("resolution", "unknown"),
         "file_size": file_size,
         "bitrate_mbps": bitrate_mbps,
+        **stat_identity,
         "updated_at": datetime.now().isoformat(),
     }
 
 
 def _cached_analysis_file(filepath):
     try:
-        fingerprint, algo = common.get_file_fingerprint(filepath)
         path_row = FileMetadataPaths.get_or_none(FileMetadataPaths.path == filepath)
-        if not path_row or path_row.file_metadata.fingerprint != fingerprint:
-            return None, (fingerprint, algo)
+        if not path_row:
+            return None, common.get_file_fingerprint(filepath)
 
         metadata = _load_json_dict(path_row.file_metadata.metadata_json)
         cached = metadata.get(ANALYSIS_METADATA_KEY)
         if not isinstance(cached, dict):
-            return None, (fingerprint, algo)
+            return None, common.get_file_fingerprint(filepath)
         required = {"codec", "resolution", "file_size", "bitrate_mbps"}
         if not required.issubset(cached):
-            return None, (fingerprint, algo)
-        return cached, (fingerprint, algo)
+            return None, common.get_file_fingerprint(filepath)
+
+        stat = os.stat(filepath)
+        stat_matches = (
+            cached.get("stat_size") == stat.st_size
+            and cached.get("stat_mtime_ns") == stat.st_mtime_ns
+            and cached.get("stat_device") == stat.st_dev
+            and cached.get("stat_inode") == stat.st_ino
+        )
+        if stat_matches:
+            return cached, (path_row.file_metadata.fingerprint, path_row.file_metadata.fingerprint_algo)
+
+        fingerprint, algo = common.get_file_fingerprint(filepath)
+        return None, (fingerprint, algo)
     except Exception as e:
         logger.debug("Unable to read library analysis metadata cache for %s: %s", filepath, e)
         return None, None
 
 
-def _persist_analysis_file(filepath, fingerprint_info, entry):
+def _persist_analysis_file(filepath, fingerprint_info, entry, generation=None):
     if not fingerprint_info:
         return
     try:
@@ -199,21 +222,25 @@ def _persist_analysis_file(filepath, fingerprint_info, entry):
         )
         if path_row:
             path_row.updated_at = datetime.now()
-            path_row.path_type = "library_analysis"
+            path_row.path_type = f"library_analysis:{generation}" if generation else "library_analysis"
             path_row.save()
         else:
-            FileMetadataPaths.create(file_metadata=row.id, path=filepath, path_type="library_analysis")
+            path_type = f"library_analysis:{generation}" if generation else "library_analysis"
+            FileMetadataPaths.create(file_metadata=row.id, path=filepath, path_type=path_type)
     except Exception as e:
         logger.debug("Unable to persist library analysis metadata cache for %s: %s", filepath, e)
 
 
-def _analyse_file_incremental(filepath):
+def _analyse_file_incremental(filepath, generation=None):
     cached, fingerprint = _cached_analysis_file(filepath)
     if cached:
         return cached
 
     entry = _probe_analysis_file(filepath)
-    _persist_analysis_file(filepath, fingerprint, entry)
+    if generation:
+        _persist_analysis_file(filepath, fingerprint, entry, generation=generation)
+    else:
+        _persist_analysis_file(filepath, fingerprint, entry)
     return entry
 
 
@@ -227,50 +254,73 @@ def _cleanup_missing_analysis_paths(current_paths):
         logger.debug("Unable to clean stale library analysis metadata paths: %s", e)
 
 
+def _path_is_within(path, root):
+    try:
+        return os.path.commonpath((os.path.realpath(path), os.path.realpath(root))) == os.path.realpath(root)
+    except (TypeError, ValueError):
+        return False
+
+
+def _cleanup_stale_analysis_paths(library_path, generation):
+    """Remove prior-generation path markers without retaining every scanned path."""
+    try:
+        current_type = f"library_analysis:{generation}"
+        query = FileMetadataPaths.select().where(
+            FileMetadataPaths.path_type.startswith("library_analysis") & (FileMetadataPaths.path_type != current_type)
+        )
+        for path_row in query.iterator():
+            if _path_is_within(path_row.path, library_path):
+                path_row.delete_instance()
+    except Exception as e:
+        logger.debug("Unable to clean stale library analysis generations: %s", e)
+
+
 def _run_analysis(library_id, library_path, info):
     """
     Background thread: walk library, probe each media file, aggregate results.
     """
     try:
-        # Collect all files
-        all_files = []
+        generation = uuid.uuid4().hex
+        info["generation"] = generation
+        info["progress"]["total"] = 0
+        info["progress"]["checked"] = 0
+
+        # Group data: key = (codec, resolution). Files are consumed directly
+        # from os.walk so memory does not grow with library size.
+        groups = {}
         for root, _dirs, files in os.walk(library_path):
             for fname in files:
                 ext = os.path.splitext(fname)[1].lower()
-                if ext in _MEDIA_EXTENSIONS:
-                    all_files.append(os.path.join(root, fname))
-        _cleanup_missing_analysis_paths(all_files)
+                if ext not in _MEDIA_EXTENSIONS:
+                    continue
+                filepath = os.path.join(root, fname)
+                info["progress"]["total"] += 1
+                try:
+                    analysis_entry = _analyse_file_incremental(filepath, generation=generation)
+                    codec = analysis_entry.get("codec", "unknown")
+                    resolution = analysis_entry.get("resolution", "unknown")
+                    file_size = analysis_entry.get("file_size", 0)
+                    bitrate_mbps = analysis_entry.get("bitrate_mbps", 0)
 
-        info["progress"]["total"] = len(all_files)
-        info["progress"]["checked"] = 0
+                    key = (codec, resolution)
+                    if key not in groups:
+                        groups[key] = {
+                            "codec": codec,
+                            "resolution": resolution,
+                            "count": 0,
+                            "total_size_bytes": 0,
+                            "total_bitrate": 0,
+                        }
+                    groups[key]["count"] += 1
+                    groups[key]["total_size_bytes"] += file_size
+                    groups[key]["total_bitrate"] += bitrate_mbps
 
-        # Group data: key = (codec, resolution)
-        groups = {}
-        for filepath in all_files:
-            try:
-                analysis_entry = _analyse_file_incremental(filepath)
-                codec = analysis_entry.get("codec", "unknown")
-                resolution = analysis_entry.get("resolution", "unknown")
-                file_size = analysis_entry.get("file_size", 0)
-                bitrate_mbps = analysis_entry.get("bitrate_mbps", 0)
+                except Exception as e:
+                    logger.debug("Analysis skipped file %s: %s", filepath, str(e))
 
-                key = (codec, resolution)
-                if key not in groups:
-                    groups[key] = {
-                        "codec": codec,
-                        "resolution": resolution,
-                        "count": 0,
-                        "total_size_bytes": 0,
-                        "total_bitrate": 0,
-                    }
-                groups[key]["count"] += 1
-                groups[key]["total_size_bytes"] += file_size
-                groups[key]["total_bitrate"] += bitrate_mbps
+                info["progress"]["checked"] += 1
 
-            except Exception as e:
-                logger.debug("Analysis skipped file %s: %s", filepath, str(e))
-
-            info["progress"]["checked"] += 1
+        _cleanup_stale_analysis_paths(library_path, generation)
 
         # Cross-reference with historical CompressionStats for savings estimates
         historical = _get_historical_savings()

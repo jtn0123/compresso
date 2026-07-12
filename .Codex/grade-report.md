@@ -38,13 +38,14 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **20 of 37** addressable grade items are marked complete below; G1 received meaningful partial fixes but remains open until bounded streaming is complete.
+- **22 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
 - Frontend production dependency audit reported **0 vulnerabilities** after the compatible update batch.
 - Security hardening: **129 focused backend tests** and **17 focused frontend tests** passed; the broader backend suite passed **3,623 tests with 8 skips** before the final seven focused security cases were added, and the full frontend suite passed **431 tests** plus production build.
 - Finalization durability: **169 focused recovery/history/postprocessor/service tests** passed with crash-resumable file, history, metadata, and deletion phases.
+- Library analysis: **56 focused helper tests** passed with single-flight starts, streamed traversal, generation cleanup, and stat-first cache hits.
 
 ---
 
@@ -336,7 +337,7 @@ The metadata benchmark, indexes, bounded scan queues, worker caps, transfer chun
 
 ### Performance improvements
 
-#### G1 — Rebuild real library analysis as one bounded, single-flight pipeline
+#### ~~G1~~ ✓ done 2026-07-12 — Rebuild real library analysis as one bounded, single-flight pipeline
 
 - **Where:** `compresso/webserver/helpers/library_analysis.py:49-76,226-270`, `libraryanalysiscache.py:16-27`
 - **What's wrong:** Concurrent starts can launch duplicate scans, and each scan stores every path in a list then a set before probing.
@@ -354,7 +355,7 @@ The metadata benchmark, indexes, bounded scan queues, worker caps, transfer chun
 - **Effort:** M
 - **Grade lift:** C+ → B- (keeps the control plane responsive during large transfers)
 
-#### G3 — Avoid content hashing unchanged files during cached analysis
+#### ~~G3~~ ✓ done 2026-07-12 — Avoid content hashing unchanged files during cached analysis
 
 - **Where:** `compresso/webserver/helpers/library_analysis.py:160-177`, `compresso/libs/common.py:315-399`
 - **What's wrong:** Cache lookup computes a fingerprint first; large files reread ten 8 MiB samples even when unchanged.
