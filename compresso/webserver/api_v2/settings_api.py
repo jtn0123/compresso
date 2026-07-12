@@ -29,8 +29,6 @@ Copyright:
 
 """
 
-import tornado.log
-
 from compresso import config
 from compresso.libs.uiserver import CompressoDataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
@@ -191,9 +189,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -261,9 +257,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -319,9 +313,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)

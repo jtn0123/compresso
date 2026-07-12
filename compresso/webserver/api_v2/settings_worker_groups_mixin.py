@@ -6,8 +6,6 @@ compresso.settings_worker_groups_mixin.py
 Mixin providing worker group management endpoints for ApiSettingsHandler.
 """
 
-import tornado.log
-
 from compresso.libs.worker_group import WorkerGroup
 from compresso.webserver.api_v2.base_api_handler import BaseApiError
 from compresso.webserver.api_v2.schema.schemas import RequestDatabaseItemByIdSchema
@@ -68,9 +66,7 @@ class WorkerGroupsMixin:
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -144,9 +140,7 @@ class WorkerGroupsMixin:
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -206,9 +200,7 @@ class WorkerGroupsMixin:
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)
@@ -272,9 +264,7 @@ class WorkerGroupsMixin:
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
             self.handle_unhandled_error(e)

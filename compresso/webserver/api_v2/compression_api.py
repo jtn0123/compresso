@@ -7,9 +7,7 @@ API handler for compression statistics endpoints.
 
 """
 
-import tornado.log
-
-from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.compression_schemas import (
     CodecDistributionSchema,
     CompressionStatsSchema,
@@ -140,14 +138,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_compression_summary(self):
         """
@@ -186,14 +180,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_pending_estimate(self):
         """
@@ -225,14 +215,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     def _parse_library_id_arg(self):
         """Parse optional library_id from query string."""
@@ -277,14 +263,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_resolution_distribution(self):
         """
@@ -318,14 +300,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_container_distribution(self):
         """
@@ -360,14 +338,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_timeline(self):
         """
@@ -405,14 +379,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def start_library_analysis(self):
         """
@@ -462,14 +432,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_library_analysis_status(self):
         """
@@ -517,14 +483,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_optimization_progress(self):
         """
@@ -565,14 +527,10 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_encoding_speed_timeline(self):
         """
@@ -607,11 +565,7 @@ class ApiCompressionHandler(BaseApiHandler):
             self.write_error()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

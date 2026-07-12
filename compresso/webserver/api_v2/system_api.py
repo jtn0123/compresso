@@ -12,7 +12,6 @@ Exposes system-level metrics (CPU, RAM, disk, GPU, platform) via REST.
 import time
 
 import psutil
-import tornado.log
 
 from compresso import config
 from compresso.libs import session
@@ -21,7 +20,7 @@ from compresso.libs.operations_status import OperationsStatus
 from compresso.libs.system import System
 from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
 from compresso.libs.worker_capabilities import WorkerCapabilities
-from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.system_schemas import SystemStatusSuccessSchema
 
 
@@ -151,14 +150,10 @@ class ApiSystemHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_gpu_metrics(self):
         """
@@ -206,18 +201,14 @@ class ApiSystemHandler(BaseApiHandler):
             self.write_success(data)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_worker_capabilities(self):
         """Return hardware, encoder, and current-capacity data for scheduling."""
         try:
             self.write_success(WorkerCapabilities().snapshot(self.config))
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def get_operations_status(self):
         """Return queue, worker, transfer, checkpoint, and disk-pressure counters."""
@@ -230,6 +221,4 @@ class ApiSystemHandler(BaseApiHandler):
                 )
             )
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)

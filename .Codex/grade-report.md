@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **26 of 37** addressable grade items are marked complete below.
+- **27 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -49,6 +49,7 @@
 - Frontend coverage now inventories **all 113 application JS/Vue files**: 19.54% statements, 15.11% branches, 12.42% functions, and 19.39% lines, with honest ratchet floors at 19/15/12/19.
 - Packaged live E2E: **3 Playwright journeys passed** against an isolated wheel install, including reject, approve/file replacement, history persistence, and backend restart.
 - Locked CI/local parity: canonical `--require-hashes` installs dry-ran successfully for runtime and development graphs; lock regeneration, actionlint, 10 release contract tests, 3 release-tool tests, and clean-wheel inspection passed. The fast lane passed **3,647 backend tests with 8 skips**, **431 frontend tests**, honest coverage, lint, type, audit, and production-build gates while listing every intentionally skipped full gate.
+- Structured API errors: **675 broad API/settings/plugin tests passed with 2 skips**, plus 70 focused boundary/transfer/notification/pending/preview tests. Malformed bodies are no longer echoed or double-written; unexpected details stay in correlated logs and client 500s use a stable public message.
 
 ---
 
@@ -129,7 +130,7 @@ The backend has strong schema coverage, checksummed transfers, retry/defer handl
 - **Effort:** M
 - **Grade lift:** B → B+ (makes task history an all-or-nothing boundary)
 
-#### B5 — Give the v2 API one structured error writer
+#### ~~B5~~ ✓ done 2026-07-12 — Give the v2 API one structured error writer
 
 - **Where:** `compresso/webserver/api_v2/base_api_handler.py:210-233,267-340`, `compresso/webserver/api_v2/pending_api.py:529-535`
 - **What's wrong:** Request parsing writes an error and then raises, while many handlers catch and write again. Raw request bodies and exception strings can also become client-visible reasons.

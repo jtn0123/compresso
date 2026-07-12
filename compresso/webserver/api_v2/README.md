@@ -8,29 +8,32 @@
     - 404: for an incorrectly structured API endpoint. (self.STATUS_ERROR_ENDPOINT_NOT_FOUND)
     - 405: for a request to an API endpoint with a disallowed method. (self.STATUS_ERROR_METHOD_NOT_ALLOWED)
     - 500: status for internal errors and exception handling. (self.STATUS_ERROR_INTERNAL)
-1. All unsuccessful return codes listed above should be executed with:
+1. Expected request failures should raise a structured public error:
    ```
-    self.set_status(self.STATUS_ERROR_INTERNAL, reason="Unable to read privacy policy.")
-    self.write_error()
+    raise BaseApiError(
+        "Invalid request",
+        messages={"field": ["Required"]},
+        private_detail="Diagnostic detail for correlated server logs",
+    )
    ```
-   This will provide an error message in the format of:
+   The shared base handler owns the status and response body:
    ```
    {
-        "error": "500: Unable to read privacy policy.",
-        "messages": {},
-        "traceback": []
-    }
+        "error": "400: Invalid request",
+        "messages": {"field": ["Required"]},
+        "error_id": "opaque-correlation-id"
+   }
    ```
 1. The returned 'error' message should not be parsed by the client application. This message is subject to change.
-1. Catch all exceptions with:
+1. Endpoint methods may omit local exception handling because the router owns escaped expected and unexpected errors. If cleanup is required, delegate after cleanup:
     ```
     try:
         ...
     except BaseApiError as bae:
-        tornado.log.app_log.error("BaseApiError.{}: {}".format(self.route.get('call_method'), str(bae)))
-        return
+        cleanup()
+        self.handle_base_api_error(bae)
     except Exception as e:
-        self.set_status(self.ERROR_INTERNAL, reason=str(e))
-        self.write_error()
+        cleanup()
+        self.handle_unhandled_error(e)
     ```
-1. All endpoint functions must be wrapped in a broad exception capture as in the example above.
+1. Never return raw request bodies or unexpected exception text to clients. Use correlation IDs to find private diagnostics in server logs.

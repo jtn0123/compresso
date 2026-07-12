@@ -39,7 +39,7 @@ import tornado.web
 from compresso import config
 from compresso.libs import common, session
 from compresso.libs.frontend_push_messages import FrontendPushMessages
-from compresso.webserver.api_v2.base_api_handler import LOG_UNHANDLED_ERROR, BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.pending_schemas import PendingTasksTableResultsSchema
 from compresso.webserver.helpers import pending_tasks
 
@@ -260,18 +260,14 @@ class ApiUploadHandler(BaseApiHandler):
             self.write_success(response)
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             if self.frontend_messages:
                 self.frontend_messages.remove_item("receivingRemoteFile")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             if self.frontend_messages:
                 self.frontend_messages.remove_item("receivingRemoteFile")
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
 
     async def upload_and_install_plugin(self):
         """
@@ -345,15 +341,11 @@ class ApiUploadHandler(BaseApiHandler):
             self.write_success()
             return
         except BaseApiError as bae:
-            tornado.log.app_log.error(f"BaseApiError.{self.route.get('call_method')}: {bae!s}")
             if self.frontend_messages:
                 self.frontend_messages.remove_item("receivingRemoteFile")
-            self.set_status(self.STATUS_ERROR_EXTERNAL, reason=str(bae))
-            self.write_error()
+            self.handle_base_api_error(bae)
             return
         except Exception as e:
-            tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, self.__class__.__name__, self.route.get("call_method"))
             if self.frontend_messages:
                 self.frontend_messages.remove_item("receivingRemoteFile")
-            self.set_status(self.STATUS_ERROR_INTERNAL, reason=str(e))
-            self.write_error()
+            self.handle_unhandled_error(e)
