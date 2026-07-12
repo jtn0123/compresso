@@ -9,11 +9,16 @@ on:
     paths:
       - "scripts/verify-local.sh"
       - "scripts/check-action-pins.sh"
+      - "scripts/check-license-consistency.sh"
       - ".github/workflows/**"
       - ".github/workflows/verify-local.yml"
       - "requirements*.txt"
       - "requirements*.lock"
       - "pyproject.toml"
+      - "LICENSE"
+      - "LICENSES/**"
+      - "THIRD_PARTY_NOTICES.md"
+      - "docs/LICENSING.md"
       - "compresso/webserver/frontend/**"
 
 permissions:

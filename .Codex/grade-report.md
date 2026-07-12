@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **32 of 37** addressable grade items are marked complete below.
+- **33 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -53,6 +53,7 @@
 - Responsive/browser coverage: **433 frontend unit tests**, ESLint, production build, 4 desktop Chromium journeys, a Pixel 7 accessibility journey, and a focused WebKit smoke passed. The onboarding flow has a zero critical/serious axe result and keyboard-driven setup/plugin assertions; Firefox is enabled in CI because the local macOS launcher fails before browser context creation in this environment.
 - Security boundary follow-up: **938 plugin/worker/security tests passed with 3 skips**. External plugins now require an explicit ID allowlist at execution, remote archives require HTTPS plus a repository SHA-256, archive traversal/symlinks and shell commands are rejected, dependency installation is hash-locked wheel-only, and npm lifecycle execution is disabled. CSP forbids eval and inline scripts, all third-party Actions are immutable-SHA pinned, actionlint passes, and a local/CI pin-policy guard prevents drift.
 - Demand-aware scheduling: **315 focused scheduler, task, capability, Foreman, pending-API, and installation-link tests passed**. Distributed totals now use runnable non-deferred demand, bounded deterministic largest-remainder allocation, persisted recent throughput by codec, current CPU/memory/disk/thermal pressure, encoder compatibility, and remote queue depth.
+- License consistency: package history confirmed GPL-3.0-only metadata was chosen by the original copyright holder while earlier MIT file grants remain present. The combined distribution, Python/npm metadata, contributor policy, retained MIT notice, third-party/SBOM index, wheel contents, and a local/CI consistency gate are now aligned without deleting prior grants. **10 release contract tests passed**, all three npm lockfiles report zero vulnerabilities, and the clean wheel contains GPL, MIT, and third-party notices.
 
 ---
 
@@ -417,7 +418,7 @@ Architecture, deployment, development, release recovery, and supply-chain contro
 - **Effort:** S
 - **Grade lift:** C+ → B (puts the safety contract on the supported path)
 
-#### H3 — Resolve the repository's license contradiction
+#### ~~H3~~ ✓ done 2026-07-12 — Resolve the repository's license contradiction
 
 - **Where:** `LICENSE`, `setup.py:227-231`, `README.md:150-164`, copyright headers across `compresso/`
 - **What's wrong:** Metadata/LICENSE say GPL-3.0-only, while README and hundreds of source headers mix MIT permission text with “All Rights Reserved.”

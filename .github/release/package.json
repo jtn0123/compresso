@@ -1,6 +1,7 @@
 {
     "name": "compresso-release-tooling",
     "private": true,
+    "license": "GPL-3.0-only",
     "type": "module",
     "engines": {
         "node": ">=24.10.0"

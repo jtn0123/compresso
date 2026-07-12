@@ -37,6 +37,9 @@ cd "${ROOT_DIR}"
 echo "==> Checking immutable GitHub Action pins"
 bash scripts/check-action-pins.sh
 
+echo "==> Checking license metadata and retained notices"
+bash scripts/check-license-consistency.sh
+
 echo "==> Checking Python environment and lock drift"
 "${PYTHON_BIN}" -m pip check
 PYTHON_BIN="${PYTHON_BIN}" bash scripts/check-requirements-locks.sh
