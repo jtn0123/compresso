@@ -199,6 +199,8 @@ class TestFinalizeLocalTask:
     def test_runs_all_steps(self, mock_ppf, mock_whl, mock_ctm, mock_csf):
         pp = _make_postprocessor()
         pp.current_task = _make_current_task()
+        tracker = MagicMock(_state="committed")
+        pp._file_operation_tracker = tracker
 
         pp._finalize_local_task()
 
@@ -207,6 +209,8 @@ class TestFinalizeLocalTask:
         mock_ctm.assert_called_once()
         mock_csf.assert_called_once()
         pp.current_task.delete.assert_called_once()
+        phases = [call.args[0] for call in tracker.mark_finalization_phase.call_args_list]
+        assert phases == ["history_committed", "metadata_committed", "task_deleted"]
 
     @patch(f"{PP_MOD}.PostProcessor._cleanup_staging_files")
     @patch(f"{PP_MOD}.PostProcessor.commit_task_metadata")
@@ -241,15 +245,30 @@ class TestFinalizeLocalTask:
     @patch(f"{PP_MOD}.PostProcessor.commit_task_metadata", side_effect=Exception("meta error"))
     @patch(f"{PP_MOD}.PostProcessor.write_history_log")
     @patch(f"{PP_MOD}.PostProcessor.post_process_file")
-    def test_continues_on_metadata_error(self, mock_ppf, mock_whl, mock_ctm, mock_csf):
+    def test_metadata_error_preserves_task_for_replay(self, mock_ppf, mock_whl, mock_ctm, mock_csf):
         pp = _make_postprocessor()
         pp.current_task = _make_current_task()
 
         pp._finalize_local_task()
 
-        # Cleanup and delete still called
-        mock_csf.assert_called_once()
-        pp.current_task.delete.assert_called_once()
+        mock_csf.assert_not_called()
+        pp.current_task.delete.assert_not_called()
+        pp.current_task.task.save.assert_called()
+
+    @patch(f"{PP_MOD}.PostProcessor._cleanup_staging_files")
+    @patch(f"{PP_MOD}.PostProcessor.commit_task_metadata")
+    @patch(f"{PP_MOD}.PostProcessor.write_history_log", return_value=False)
+    @patch(f"{PP_MOD}.PostProcessor.post_process_file")
+    def test_history_failure_preserves_task_for_replay(self, mock_ppf, mock_whl, mock_ctm, mock_csf):
+        pp = _make_postprocessor()
+        pp.current_task = _make_current_task()
+
+        pp._finalize_local_task()
+
+        mock_ctm.assert_not_called()
+        mock_csf.assert_not_called()
+        pp.current_task.delete.assert_not_called()
+        pp.current_task.task.save.assert_called()
 
 
 # ------------------------------------------------------------------

@@ -30,7 +30,7 @@ def test_recovery_restores_original_after_crash_during_in_place_replace(tmp_path
     result = FileOperationTracker.recover_all(str(tmp_path / "journals"), MagicMock())
 
     assert original.read_bytes() == b"original"
-    assert result == {"rolled_back_task_ids": [42], "committed_task_ids": []}
+    assert result == {"rolled_back_task_ids": [42], "committed_task_ids": [], "finalization_task_ids": []}
     assert not list((tmp_path / "journals").glob("*.json"))
 
 
@@ -52,7 +52,7 @@ def test_recovery_removes_new_destination_and_restores_removed_source(tmp_path):
 
 
 @pytest.mark.unittest
-def test_committing_journal_keeps_destination_and_reports_completed_task(tmp_path):
+def test_committing_journal_keeps_destination_and_reports_resumable_finalization(tmp_path):
     original = tmp_path / "movie.mkv"
     original.write_bytes(b"original")
     tracker = _tracker(tmp_path)
@@ -65,12 +65,47 @@ def test_committing_journal_keeps_destination_and_reports_completed_task(tmp_pat
     result = FileOperationTracker.recover_all(str(tmp_path / "journals"), MagicMock())
 
     assert original.read_bytes() == b"encoded"
-    assert result == {"rolled_back_task_ids": [], "committed_task_ids": [42]}
+    assert result == {"rolled_back_task_ids": [], "committed_task_ids": [], "finalization_task_ids": [42]}
     assert list((tmp_path / "journals").glob("*.json"))
 
     FileOperationTracker.finalize_committed(str(tmp_path / "journals"))
 
+    assert list((tmp_path / "journals").glob("*.json"))
+
+
+@pytest.mark.unittest
+def test_task_deleted_phase_allows_journal_cleanup(tmp_path):
+    tracker = _tracker(tmp_path)
+    tracker.commit()
+    tracker.mark_finalization_phase("task_deleted")
+
+    result = FileOperationTracker.recover_all(str(tmp_path / "journals"), MagicMock())
+
+    assert result["committed_task_ids"] == [42]
+    FileOperationTracker.finalize_committed(str(tmp_path / "journals"))
     assert not list((tmp_path / "journals").glob("*.json"))
+
+
+@pytest.mark.unittest
+def test_finalization_phase_before_commit_is_a_noop(tmp_path):
+    tracker = _tracker(tmp_path)
+
+    tracker.mark_finalization_phase("history_committed")
+
+    assert tracker.finalization_phase is None
+    assert not list((tmp_path / "journals").glob("*.json"))
+
+
+@pytest.mark.unittest
+def test_resume_committed_restores_finalization_phase(tmp_path):
+    tracker = _tracker(tmp_path)
+    tracker.commit()
+    tracker.mark_finalization_phase("history_committed")
+
+    resumed = FileOperationTracker.resume_committed(str(tmp_path / "journals"), task_id=42, logger=MagicMock())
+
+    assert resumed is not None
+    assert resumed.finalization_phase == "history_committed"
 
 
 @pytest.mark.unittest
@@ -167,5 +202,5 @@ def test_commit_cleanup_failure_remains_recoverable(tmp_path):
     assert list((tmp_path / "journals").glob("*.json"))
 
     result = FileOperationTracker.recover_all(str(tmp_path / "journals"), MagicMock())
-    assert result["committed_task_ids"] == [42]
+    assert result["finalization_task_ids"] == [42]
     assert not backup.exists()

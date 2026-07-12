@@ -23,6 +23,7 @@ Unit tests for the History class from compresso/libs/history.py:
 import datetime
 import os
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -481,6 +482,61 @@ class TestHistory:
         history = self._make_history()
         with pytest.raises(Exception, match="Task data param empty"):
             history.create_historic_task_entry(None)
+
+    @pytest.mark.unittest
+    def test_save_task_history_is_transactional_and_idempotent(self):
+        from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, CompressionStats
+
+        history = self._make_history()
+        timestamp = datetime.datetime.now()
+        task_data = {
+            "task_label": "replay.mkv",
+            "abspath": "/media/replay.mkv",
+            "task_success": True,
+            "start_time": timestamp,
+            "finish_time": timestamp,
+            "processed_by_worker": "worker-1",
+            "log": "encoded",
+            "source_size": 100,
+            "destination_size": 50,
+        }
+
+        assert history.save_task_history(task_data) is True
+        assert history.save_task_history(task_data) is True
+        self.db_connection.execute_sql("SELECT 1")
+
+        assert CompletedTasks.select().count() == 1
+        assert CompletedTasksCommandLogs.select().count() == 1
+        assert CompressionStats.select().count() == 1
+
+    @pytest.mark.unittest
+    def test_save_task_history_replays_partial_rows(self):
+        from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, CompressionStats
+
+        history = self._make_history()
+        timestamp = datetime.datetime.now()
+        task_data = {
+            "task_label": "rollback.mkv",
+            "abspath": "/media/rollback.mkv",
+            "task_success": True,
+            "start_time": timestamp,
+            "finish_time": timestamp,
+            "processed_by_worker": "worker-1",
+        }
+
+        with patch.object(history, "create_compression_stats_entry", side_effect=RuntimeError("stats failed")):
+            assert history.save_task_history(task_data) is False
+
+        self.db_connection.execute_sql("SELECT 1")
+        assert CompletedTasks.select().count() == 1
+        assert CompletedTasksCommandLogs.select().count() == 1
+        assert CompressionStats.select().count() == 0
+
+        assert history.save_task_history(task_data) is True
+        self.db_connection.execute_sql("SELECT 1")
+        assert CompletedTasks.select().count() == 1
+        assert CompletedTasksCommandLogs.select().count() == 1
+        assert CompressionStats.select().count() == 1
 
     # ---------------------------------------------------------------
     # get_codec_distribution

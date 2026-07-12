@@ -47,6 +47,7 @@ class FileOperationTracker:
         self._operation_id = operation_id
         self._task_id = task_id
         self._state = "active"
+        self._finalization_phase = None
         self._journal_path = None
         if journal_dir and operation_id:
             safe_operation_id = str(operation_id).replace(os.sep, "_")
@@ -60,6 +61,7 @@ class FileOperationTracker:
             "operation_id": self._operation_id,
             "task_id": self._task_id,
             "state": self._state,
+            "finalization_phase": self._finalization_phase,
             "backups": [list(item) for item in self._backups],
             "created_paths": list(self._created_paths),
         }
@@ -124,6 +126,41 @@ class FileOperationTracker:
         self._persist()
         return True
 
+    @property
+    def finalization_phase(self):
+        return self._finalization_phase
+
+    def mark_finalization_phase(self, phase):
+        """Persist progress after the destructive file transaction commits."""
+        if self._state != "committed":
+            return
+        self._finalization_phase = str(phase)
+        self._persist()
+
+    @classmethod
+    def resume_committed(cls, journal_dir, task_id, logger):
+        """Load a committed task journal so later finalization phases can replay."""
+        if not journal_dir:
+            return None
+        operation_id = f"task-{task_id}"
+        journal_path = os.path.join(journal_dir, f"{operation_id}.json")
+        if not os.path.isfile(journal_path):
+            return None
+        with open(journal_path) as journal_file:
+            data = json.load(journal_file)
+        if data.get("state") not in {"committing", "commit_cleanup_pending", "committed"}:
+            return None
+        tracker = cls(logger)
+        tracker._journal_dir = journal_dir
+        tracker._operation_id = operation_id
+        tracker._task_id = task_id
+        tracker._journal_path = journal_path
+        tracker._state = data.get("state", "committed")
+        tracker._finalization_phase = data.get("finalization_phase")
+        tracker._backups = [tuple(item) for item in data.get("backups", [])]
+        tracker._created_paths = list(data.get("created_paths", []))
+        return tracker
+
     def finalize(self):
         """Remove the recovery marker after the owning task is fully finalized."""
         if self._journal_path and os.path.exists(self._journal_path):
@@ -181,7 +218,7 @@ class FileOperationTracker:
     @classmethod
     def recover_all(cls, journal_dir, logger):
         """Recover durable file-operation journals left by an interrupted run."""
-        result = {"rolled_back_task_ids": [], "committed_task_ids": []}
+        result = {"rolled_back_task_ids": [], "committed_task_ids": [], "finalization_task_ids": []}
         if not journal_dir or not os.path.isdir(journal_dir):
             return result
 
@@ -195,6 +232,7 @@ class FileOperationTracker:
                     data = json.load(journal_file)
                 task_id = data.get("task_id")
                 state = data.get("state", "active")
+                finalization_phase = data.get("finalization_phase")
                 backups = [tuple(item) for item in data.get("backups", [])]
                 created_paths = [os.path.realpath(path) for path in data.get("created_paths", [])]
 
@@ -203,7 +241,8 @@ class FileOperationTracker:
                         if os.path.exists(backup_path):
                             os.remove(backup_path)
                     if task_id is not None:
-                        result["committed_task_ids"].append(task_id)
+                        target = "committed_task_ids" if finalization_phase == "task_deleted" else "finalization_task_ids"
+                        result[target].append(task_id)
                 else:
                     missing_backups = [
                         backup_path for backup_path, _original_path in backups if not os.path.exists(backup_path)
@@ -240,8 +279,12 @@ class FileOperationTracker:
                 continue
             journal_path = os.path.join(journal_dir, journal_name)
             with open(journal_path) as journal_file:
-                state = json.load(journal_file).get("state", "active")
-            if state in {"committing", "commit_cleanup_pending", "committed"}:
+                data = json.load(journal_file)
+            state = data.get("state", "active")
+            if (
+                state in {"committing", "commit_cleanup_pending", "committed"}
+                and data.get("finalization_phase") == "task_deleted"
+            ):
                 os.remove(journal_path)
 
 
