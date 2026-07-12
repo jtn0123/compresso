@@ -126,7 +126,8 @@ class PluginAPIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
         self.name = "PluginAPI"
 
     def prepare(self):
-        authorize_request(self)
+        if not authorize_request(self):
+            return
 
     def get(self, path):
         self.handle_panel_request()

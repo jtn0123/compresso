@@ -1,4 +1,7 @@
 {
+  "apiAuth": {
+    "tokenPrompt": "This Compresso server requires an API token. Enter it to continue:"
+  },
   "a11y": {
     "logoAlt": "Compresso",
     "repoIconAlt": "{name} icon",

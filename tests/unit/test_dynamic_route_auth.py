@@ -51,6 +51,16 @@ class TestDynamicRouteAuth(tornado.testing.AsyncHTTPTestCase):
         assert response.code == 401
         resolve.assert_not_called()
 
+    def test_proxy_accepts_configured_token(self):
+        with patch("compresso.webserver.proxy.resolve_proxy_target", return_value=None) as resolve:
+            response = self.fetch(
+                "/proxy/test",
+                headers={"X-Compresso-Api-Token": "secret"},
+            )
+
+        assert response.code == 400
+        resolve.assert_called_once_with(None)
+
     def test_plugin_api_rejects_missing_token_before_loading_plugin(self):
         with patch("compresso.webserver.plugins.get_plugin_by_path") as get_plugin:
             response = self.fetch("/compresso/plugin_api/example/path")

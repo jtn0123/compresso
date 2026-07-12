@@ -61,6 +61,22 @@ class TestConfigInit:
 
         assert len(c.get_api_auth_token()) >= 32
 
+    def test_preserves_existing_token_when_auth_enabled(self, tmp_path):
+        c = _make_config(
+            tmp_path,
+            env_vars={"api_auth_enabled": "true", "api_auth_token": "my-custom-token-abc123"},
+        )
+
+        assert c.get_api_auth_token() == "my-custom-token-abc123"
+
+    def test_keeps_generated_token_in_memory_when_persistence_fails(self, tmp_path):
+        from compresso.config import Config
+
+        with patch.object(Config, "_Config__write_settings_to_file", side_effect=OSError("disk full")):
+            c = _make_config(tmp_path, env_vars={"api_auth_enabled": "true", "api_auth_token": ""})
+
+        assert len(c.get_api_auth_token()) >= 32
+
     def test_config_path_override(self, tmp_path):
         config_path = str(tmp_path / "custom_config")
         os.makedirs(config_path, exist_ok=True)

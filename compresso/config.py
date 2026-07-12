@@ -193,7 +193,10 @@ class Config(metaclass=SingletonType):
         if not self.get_api_auth_enabled() or self.get_api_auth_token():
             return
         self.api_auth_token = secrets.token_urlsafe(32)
-        self.__write_settings_to_file()
+        try:
+            self.__write_settings_to_file()
+        except Exception:
+            logger.exception("Failed to persist generated API auth token to settings.json")
         logger.warning("API authentication was enabled without a token; generated one in settings.json")
 
     def __apply_large_library_safe_defaults(self):

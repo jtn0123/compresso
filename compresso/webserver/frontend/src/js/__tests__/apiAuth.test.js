@@ -30,7 +30,8 @@ describe('API auth session', () => {
       vi.fn(() => ' entered-token '),
     )
 
-    expect(promptForApiToken()).toBe('entered-token')
+    expect(promptForApiToken('Translated API token prompt')).toBe('entered-token')
+    expect(globalThis.prompt).toHaveBeenCalledWith('Translated API token prompt')
     expect(getApiToken()).toBe('entered-token')
   })
 })

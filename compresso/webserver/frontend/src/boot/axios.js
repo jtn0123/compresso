@@ -3,25 +3,36 @@ import axios from 'axios'
 import { sharedLinksStore } from 'src/js/sharedLinksStore'
 import { getApiToken, promptForApiToken } from 'src/js/apiAuth'
 
+let translate = (key) => key
+
+export function isInternalRequestUrl(url) {
+  try {
+    return new URL(url || '/', window.location.origin).origin === window.location.origin
+  } catch {
+    return false
+  }
+}
+
+export function shouldRetryApiAuth(error) {
+  const request = error.config
+  return Boolean(
+    error.response?.status === 401 && request && isInternalRequestUrl(request.url) && !request.__compressoAuthRetried,
+  )
+}
+
 // Add interceptor to safely attach the proxy header only to internal requests
 axios.interceptors.request.use(
   (config) => {
     const target = sharedLinksStore.target
     if (target && target !== 'local' && !config.skipProxy) {
       // Determine if the request is destined for this Compresso instance (Internal)
-      // Relative URLs are internal. Absolute URLs must match the current origin.
-      const isAbsolute = config.url.startsWith('http://') || config.url.startsWith('https://')
-      const isInternal = !isAbsolute || config.url.startsWith(window.location.origin)
-
-      if (isInternal) {
+      if (isInternalRequestUrl(config.url)) {
         config.headers['X-Compresso-Target-Installation'] = target
       }
     }
     const token = getApiToken()
-    if (token) {
-      const isAbsolute = config.url.startsWith('http://') || config.url.startsWith('https://')
-      const isInternal = !isAbsolute || config.url.startsWith(window.location.origin)
-      if (isInternal) config.headers['X-Compresso-Api-Token'] = token
+    if (token && isInternalRequestUrl(config.url)) {
+      config.headers['X-Compresso-Api-Token'] = token
     }
     return config
   },
@@ -34,9 +45,9 @@ axios.interceptors.response.use(
   (response) => response,
   async (error) => {
     const request = error.config
-    if (error.response?.status === 401 && request && !request.__compressoAuthRetried) {
+    if (shouldRetryApiAuth(error)) {
       request.__compressoAuthRetried = true
-      const token = promptForApiToken()
+      const token = promptForApiToken(translate('apiAuth.tokenPrompt'))
       if (token) {
         request.headers['X-Compresso-Api-Token'] = token
         return axios(request)
@@ -64,6 +75,7 @@ export default boot(({ app }) => {
   app.config.globalProperties.$api = api
   // ^ ^ ^ this will allow you to use this.$api (for Vue Options API form)
   //       so you can easily perform requests against your app's API
+  translate = app.config.globalProperties.$t || translate
 })
 
 export { axios, api }

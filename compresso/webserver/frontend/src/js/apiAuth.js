@@ -30,7 +30,7 @@ export function getWebsocketProtocols() {
   return ['compresso', `${WEBSOCKET_AUTH_PROTOCOL_PREFIX}${encodeWebsocketToken(token)}`]
 }
 
-export function promptForApiToken() {
-  const token = globalThis.prompt('This Compresso server requires an API token. Enter it to continue:')
+export function promptForApiToken(promptText) {
+  const token = globalThis.prompt(promptText)
   return token === null ? '' : setApiToken(token)
 }
