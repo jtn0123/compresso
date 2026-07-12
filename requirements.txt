@@ -20,6 +20,12 @@ watchdog==6.0.0
 
 # Required for CLI only
 inquirer==3.4.1
+# blessed only declares these terminal helpers on Windows. Keep the small
+# pure-Python packages unconditional because pip-compile evaluates environment
+# markers on the compile host; otherwise a Linux/macOS-generated hash lock is
+# incomplete when installed on Windows.
+jinxed==2.1.0
+ansicon==1.89.0
 
 # Required for hosting the API docs
 swagger-ui-py==25.7.1

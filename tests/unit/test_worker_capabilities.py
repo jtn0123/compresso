@@ -140,9 +140,7 @@ def test_thermal_snapshot_reports_hottest_sensor_state():
     sensors = {
         "cpu": [SimpleNamespace(current=72.0), SimpleNamespace(current=88.0)],
     }
-    with patch(
-        "compresso.libs.worker_capabilities.psutil.sensors_temperatures", return_value=sensors, create=True
-    ):
+    with patch("compresso.libs.worker_capabilities.psutil.sensors_temperatures", return_value=sensors, create=True):
         thermal = WorkerCapabilities._thermal_snapshot()
 
     assert thermal == {"state": "hot", "max_celsius": 88.0}

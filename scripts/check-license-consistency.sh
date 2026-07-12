@@ -29,7 +29,11 @@ while IFS= read -r file; do
     echo "Historical copyright restriction lacks its accompanying permission notice: ${file}" >&2
     failures=$((failures + 1))
   fi
-done < <(rg -l "Copyright \(C\) Josh Sunnex - All Rights Reserved" compresso setup.py README.md docs --glob '*.py' --glob '*.md')
+done < <(
+  find compresso docs -type f \( -name '*.py' -o -name '*.md' \) \
+    -exec grep -FIl "Copyright (C) Josh Sunnex - All Rights Reserved" {} +
+  grep -FIl "Copyright (C) Josh Sunnex - All Rights Reserved" setup.py README.md || true
+)
 
 if ((failures > 0)); then
   exit 1

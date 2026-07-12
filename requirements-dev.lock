@@ -4,6 +4,10 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=requirements-dev.lock --strip-extras requirements-dev.txt
 #
+ansicon==1.89.0 \
+    --hash=sha256:e4d039def5768a47e4afec8e89e83ec3ae5a26bf00ad851f914d1240b444d2b1 \
+    --hash=sha256:f1def52d17f65c2c9682cf8370c03f541f410c1752d6a14029f97318e4b9dfec
+    # via -r requirements.txt
 apispec==6.10.0 \
     --hash=sha256:0a888555cd4aa5fb7176041be15684154fd8961055e1672e703abf737e8761bf \
     --hash=sha256:8ff23e0de9a0ceb62ff70047241126315bd17b8d0565a567934c0156f4ddbb43
@@ -351,6 +355,10 @@ jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
     # via swagger-ui-py
+jinxed==2.1.0 \
+    --hash=sha256:43b802d18b70e405d410fb66eb2837d1101e7e5ea922e666507bb43f34d11d09 \
+    --hash=sha256:7e755b831faa2443d44fb4ce7c0202eb9c3ed39bd5bf1193365888f4f6092b54
+    # via -r requirements.txt
 json-log-formatter==1.2.1 \
     --hash=sha256:1d4fd14495ad7e694aa576259ba81acaa69e6945d9d780f32ed25373d7d5ae93 \
     --hash=sha256:1e40432466c911ba2d106a302314b1c3b0019de44c762bef94e8f23138a415a7
