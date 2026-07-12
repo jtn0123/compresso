@@ -2,6 +2,7 @@ import { Notify } from 'quasar'
 import { ref } from 'vue'
 import $compresso, { showEventToast } from './compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
+import { getWebsocketProtocols } from 'src/js/apiAuth'
 import { displayBasename } from 'src/js/pathUtils'
 
 const log = createLogger('WebSocket')
@@ -153,7 +154,7 @@ export const CompressoWebsocketHandler = function ($t) {
 
         // Open WS connection
         wsConnectionState.value = 'connecting'
-        $compresso.ws = new WebSocket(new_uri)
+        $compresso.ws = new WebSocket(new_uri, getWebsocketProtocols())
         bindRegisteredListeners($compresso.ws)
       }
     }

@@ -36,6 +36,7 @@ import tornado.log
 import tornado.web
 
 from compresso.webserver.helpers import plugins
+from compresso.webserver.request_auth import authorize_request
 from compresso.webserver.security_headers import SecurityHeadersMixin
 
 
@@ -123,6 +124,9 @@ class PluginAPIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
 
     def initialize(self):
         self.name = "PluginAPI"
+
+    def prepare(self):
+        authorize_request(self)
 
     def get(self, path):
         self.handle_panel_request()

@@ -1,6 +1,7 @@
 import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 import { sharedLinksStore } from 'src/js/sharedLinksStore'
+import { getApiToken, promptForApiToken } from 'src/js/apiAuth'
 
 // Add interceptor to safely attach the proxy header only to internal requests
 axios.interceptors.request.use(
@@ -16,9 +17,31 @@ axios.interceptors.request.use(
         config.headers['X-Compresso-Target-Installation'] = target
       }
     }
+    const token = getApiToken()
+    if (token) {
+      const isAbsolute = config.url.startsWith('http://') || config.url.startsWith('https://')
+      const isInternal = !isAbsolute || config.url.startsWith(window.location.origin)
+      if (isInternal) config.headers['X-Compresso-Api-Token'] = token
+    }
     return config
   },
   (error) => {
+    return Promise.reject(error)
+  },
+)
+
+axios.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const request = error.config
+    if (error.response?.status === 401 && request && !request.__compressoAuthRetried) {
+      request.__compressoAuthRetried = true
+      const token = promptForApiToken()
+      if (token) {
+        request.headers['X-Compresso-Api-Token'] = token
+        return axios(request)
+      }
+    }
     return Promise.reject(error)
   },
 )

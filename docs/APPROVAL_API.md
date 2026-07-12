@@ -38,7 +38,7 @@ Reject also accepts `requeue: true` to return matching tasks to `pending` rather
 
 ## Auth
 
-By default, behavior is unchanged for trusted localhost/LAN installs. If `api_auth_enabled` is true, approve and reject require one of:
+Compresso binds to loopback by default. If `api_auth_enabled` is true, all approval reads and mutations require one of:
 
 ```bash
 Authorization: Bearer <token>
@@ -52,4 +52,4 @@ Cookie: compresso_csrf_token=<token>
 X-Compresso-CSRF-Token: <token>
 ```
 
-Read-only approval endpoints are exempt from token auth and CSRF mutation checks.
+Read-only approval endpoints are exempt only from CSRF mutation checks, not token authentication.

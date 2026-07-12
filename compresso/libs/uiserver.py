@@ -209,10 +209,16 @@ class UIServer(threading.Thread):
             )
 
             self.server.listen(int(self.config.get_ui_port()), address=self.config.get_ui_address())
+            address = self.config.get_ui_address()
+            loopback = address in ("127.0.0.1", "::1", "localhost")
+            exposure = "loopback" if loopback else "network"
+            auth_mode = "enabled" if self.config.get_api_auth_enabled() else "disabled"
             StartupState().mark_ready(
                 "ui_server_ready",
-                detail=f"{self.config.get_ui_address() or '0.0.0.0'}:{self.config.get_ui_port()}",  # noqa: S104
+                detail=f"{address}:{self.config.get_ui_port()} exposure={exposure} api_auth={auth_mode}",
             )
+            if not loopback and not self.config.get_api_auth_enabled():
+                self._log("UI is listening on a network interface without API authentication", level="warning")
             self._log(f"UI_SERVER_READY port={self.config.get_ui_port()}", level="info")
 
             self.io_loop = tornado.ioloop.IOLoop.current()

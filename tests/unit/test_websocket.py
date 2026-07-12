@@ -110,6 +110,30 @@ class TestOnMessage:
         handler.on_message(message)
 
 
+@pytest.mark.unittest
+class TestWebsocketAuthentication:
+    @patch(f"{WS_MOD}.authorize_request", return_value=False)
+    def test_prepare_rejects_unauthorized_handshake(self, mock_authorize):
+        handler = _make_handler()
+
+        handler.prepare()
+
+        mock_authorize.assert_called_once_with(handler, allow_websocket_protocol=True)
+
+    @patch(f"{WS_MOD}.authorize_request", return_value=True)
+    def test_prepare_accepts_authorized_handshake(self, mock_authorize):
+        handler = _make_handler()
+
+        handler.prepare()
+
+        mock_authorize.assert_called_once_with(handler, allow_websocket_protocol=True)
+
+    def test_selects_non_secret_websocket_protocol(self):
+        handler = _make_handler()
+
+        assert handler.select_subprotocol(["compresso", "compresso-auth.c2VjcmV0"]) == "compresso"
+
+
 # ------------------------------------------------------------------
 # TestOnClose
 # ------------------------------------------------------------------

@@ -36,13 +36,15 @@ Plugin file metadata uses `FileMetadata` and `FileMetadataPaths`, keyed by conte
 
 ## API Safety
 
-Compresso remains compatible with trusted localhost/LAN installs by default. Optional API protection can be enabled with:
+Compresso binds to `127.0.0.1` by default. Container templates explicitly bind `0.0.0.0`; use a host firewall or trusted LAN and enable API protection before exposing that port beyond the host.
+
+Optional API protection can be enabled with:
 
 - `api_auth_enabled=true`
-- `api_auth_token=<token>`
+- `api_auth_token=<token>` (generated into owner-only `settings.json` when omitted)
 - `csrf_protection_enabled=true`
 
-When token auth is enabled, mutating API requests require either `Authorization: Bearer <token>` or `X-Compresso-Api-Token: <token>`. Read-only endpoints remain available without a token.
+When token auth is enabled, every dynamic API, proxy, plugin API, and WebSocket request requires the token. The readiness endpoint remains public for container health checks. The browser asks for the token once per tab and keeps it in session storage.
 
 When CSRF protection is enabled, mutating browser-originating requests must echo the `compresso_csrf_token` cookie in `X-Compresso-CSRF-Token`.
 

@@ -52,8 +52,14 @@ class TestConfigInit:
     def test_default_values(self, tmp_path):
         c = _make_config(tmp_path)
         assert c.ui_port == 8888
+        assert c.ui_address == "127.0.0.1"
         assert c.debugging is False
         assert c.ssl_enabled is False
+
+    def test_generates_token_when_auth_enabled_without_one(self, tmp_path):
+        c = _make_config(tmp_path, env_vars={"api_auth_enabled": "true", "api_auth_token": ""})
+
+        assert len(c.get_api_auth_token()) >= 32
 
     def test_config_path_override(self, tmp_path):
         config_path = str(tmp_path / "custom_config")

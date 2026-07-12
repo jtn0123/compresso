@@ -50,6 +50,7 @@ from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
 from compresso.webserver.helpers import completed_tasks, pending_tasks
 from compresso.webserver.helpers.queue_eta import estimate_queue_eta
 from compresso.webserver.proxy import resolve_proxy_target
+from compresso.webserver.request_auth import authorize_request
 from compresso.webserver.security_headers import check_websocket_origin
 
 
@@ -117,6 +118,14 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
     def check_origin(self, origin):
         return check_websocket_origin(self, origin)
+
+    def prepare(self):
+        authorize_request(self, allow_websocket_protocol=True)
+
+    def select_subprotocol(self, subprotocols):
+        # Echo only the non-secret protocol. The credential is carried in a
+        # separate offered protocol and validated during prepare().
+        return "compresso" if "compresso" in subprotocols else None
 
     async def open(self):
         tornado.log.app_log.info("WS Opened")
