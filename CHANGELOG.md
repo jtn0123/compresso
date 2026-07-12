@@ -1,3 +1,11 @@
+## [1.13.2](https://github.com/jtn0123/compresso/compare/v1.13.1...v1.13.2) (2026-07-12)
+
+
+### Bug Fixes
+
+* address validation review findings ([8c77081](https://github.com/jtn0123/compresso/commit/8c7708189707d97693d42d836144fb5ae7921f88))
+* fail closed during remote finalization ([24d67c7](https://github.com/jtn0123/compresso/commit/24d67c7de76ec72092ff5f8216915233ed2290b1))
+
 ## [1.13.1](https://github.com/jtn0123/compresso/compare/v1.13.0...v1.13.1) (2026-07-11)
 
 
