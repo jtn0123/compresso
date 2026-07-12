@@ -17,7 +17,7 @@ from compresso.webserver.api_v2.schema.settings_schemas import (
     SettingsRemoteInstallationLinkConfigSchema,
 )
 
-PASSWORD_PRESENT_PLACEHOLDER = "********"  # noqa: S105 - response sentinel, never a credential
+MASKED_SECRET_SENTINEL = "********"  # noqa: S105
 
 
 class LinkSettingsMixin:
@@ -155,7 +155,7 @@ class LinkSettingsMixin:
                         "address": data.get("address"),
                         "auth": data.get("auth"),
                         "username": data.get("username"),
-                        "password": PASSWORD_PRESENT_PLACEHOLDER if data.get("password") else "",
+                        "password": MASKED_SECRET_SENTINEL if data.get("password") else "",
                         "available": data.get("available", False),
                         "name": data.get("name"),
                         "version": data.get("version"),
@@ -231,7 +231,7 @@ class LinkSettingsMixin:
             # Update a single remote installation config by matching the UUID
             links = Links()
             link_config = json_request.get("link_config")
-            if link_config.get("password") == PASSWORD_PRESENT_PLACEHOLDER:
+            if link_config.get("password") == MASKED_SECRET_SENTINEL:
                 existing = links.read_remote_installation_link_config(link_config.get("uuid"))
                 link_config["password"] = existing.get("password", "")
             links.update_single_remote_installation_link_config(

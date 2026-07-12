@@ -5,7 +5,7 @@ import hmac
 
 from compresso import config
 
-API_TOKEN_HEADER_NAME = "X-Compresso-Api-Token"  # noqa: S105 - header name, not a token value
+API_AUTH_HEADER_NAME = "X-Compresso-Api-Token"
 WEBSOCKET_AUTH_PROTOCOL_PREFIX = "compresso-auth."
 
 
@@ -28,7 +28,7 @@ def _decode_websocket_token(encoded_token):
     try:
         padding = "=" * (-len(encoded_token) % 4)
         return base64.urlsafe_b64decode(encoded_token + padding).decode("utf-8")
-    except (ValueError, UnicodeDecodeError):
+    except ValueError:
         return ""
 
 
@@ -50,7 +50,7 @@ def request_has_valid_api_token(request, expected_token, *, allow_websocket_prot
     if auth_header.startswith(bearer_prefix) and hmac.compare_digest(auth_header[len(bearer_prefix) :], expected_token):
         return True
 
-    token_header = request.headers.get(API_TOKEN_HEADER_NAME, "")
+    token_header = request.headers.get(API_AUTH_HEADER_NAME, "")
     if token_header and hmac.compare_digest(token_header, expected_token):
         return True
 
