@@ -333,15 +333,15 @@ Runtime/dev Python locks and npm locks exist, and live audits found no known vul
 
 ## G — Performance & Scalability — C+
 
-The metadata benchmark, indexes, bounded scan queues, worker caps, transfer chunks, disk guards, and restart handling are meaningful gains. The actual library-analysis path remains materially different from the benchmark and contains confirmed duplicate scans, O(file-count) memory, repeated probing/hashing, and event-loop blocking I/O.
+The production library-analysis path now uses a single-flight streamed scan, stat-first cache reuse, and one metadata probe per changed file. The main remaining performance caveat is synchronous transfer hashing and durable writes on Tornado's event loop.
 
 ### Performance improvements
 
 #### ~~G1~~ ✓ done 2026-07-12 — Rebuild real library analysis as one bounded, single-flight pipeline
 
 - **Where:** `compresso/webserver/helpers/library_analysis.py:49-76,226-270`, `libraryanalysiscache.py:16-27`
-- **What's wrong:** Concurrent starts can launch duplicate scans, and each scan stores every path in a list then a set before probing.
-- **Impact:** Major — two requests can duplicate a 20 TB scan while each consumes memory proportional to file count.
+- **Historical issue:** Concurrent starts could launch duplicate scans, and each scan stored every path in a list then a set before probing.
+- **Historical impact:** Major — two requests could duplicate a 20 TB scan while each consumed memory proportional to file count.
 - **Fix:** Make start atomic, enforce one row/job per library, stream files in bounded batches, mark rows by analysis generation, and remove stale rows after the pass.
 - **Effort:** M
 - **Grade lift:** C+ → B (fixes the biggest gap between the benchmark and production path)
@@ -358,8 +358,8 @@ The metadata benchmark, indexes, bounded scan queues, worker caps, transfer chun
 #### ~~G3~~ ✓ done 2026-07-12 — Avoid content hashing unchanged files during cached analysis
 
 - **Where:** `compresso/webserver/helpers/library_analysis.py:160-177`, `compresso/libs/common.py:315-399`
-- **What's wrong:** Cache lookup computes a fingerprint first; large files reread ten 8 MiB samples even when unchanged.
-- **Impact:** Major — repeated cached analysis still creates heavy random NAS I/O across a huge library.
+- **Historical issue:** Cache lookup computed a fingerprint first; large files reread ten 8 MiB samples even when unchanged.
+- **Historical impact:** Major — repeated cached analysis created heavy random NAS I/O across a huge library.
 - **Fix:** Gate content hashes behind persisted size/mtime/file-ID checks and hash only new or changed candidates.
 - **Effort:** M
 - **Grade lift:** C+ → B- (makes cache hits cheap enough for production use)

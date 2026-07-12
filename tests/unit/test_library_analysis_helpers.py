@@ -731,6 +731,39 @@ class TestIncrementalAnalysisMetadata:
 
     @patch(ANALYSIS_MODULE + "._probe_analysis_file")
     @patch(ANALYSIS_MODULE + "._persist_analysis_file")
+    @patch(ANALYSIS_MODULE + ".os.stat")
+    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
+    def test_unchanged_file_renews_generation_marker(self, mock_paths, mock_stat, mock_persist, mock_probe):
+        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+
+        mock_stat.return_value = MagicMock(st_size=100, st_mtime_ns=200, st_dev=3, st_ino=4)
+        cached_entry = {
+            "codec": "h264",
+            "resolution": "1080p",
+            "file_size": 100,
+            "bitrate_mbps": 2,
+            "stat_size": 100,
+            "stat_mtime_ns": 200,
+            "stat_device": 3,
+            "stat_inode": 4,
+        }
+        row = MagicMock(path_type="library_analysis:old-generation")
+        row.file_metadata.fingerprint = "existing-fingerprint"
+        row.file_metadata.fingerprint_algo = "sampled_sha256_v1"
+        row.file_metadata.metadata_json = json.dumps({"_compresso_library_analysis": cached_entry})
+        mock_paths.get_or_none.return_value = row
+
+        result = _analyse_file_incremental("/media/unchanged.mkv", generation="scan-123")
+
+        assert result == cached_entry
+        assert row.path_type == "library_analysis:scan-123"
+        assert isinstance(row.updated_at, datetime)
+        row.save.assert_called_once()
+        mock_probe.assert_not_called()
+        mock_persist.assert_not_called()
+
+    @patch(ANALYSIS_MODULE + "._probe_analysis_file")
+    @patch(ANALYSIS_MODULE + "._persist_analysis_file")
     @patch(ANALYSIS_MODULE + "._cached_analysis_file", return_value=(None, ("fp-new", "algo")))
     def test_changed_file_probes_and_persists_metadata(self, _mock_cached, mock_persist, mock_probe):
         from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
@@ -890,35 +923,21 @@ class TestIncrementalAnalysisMetadata:
         assert fingerprint_info == ("changed", "algo")
         mock_fingerprint.assert_called_once_with("/media/changed.mkv")
 
-    @patch(ANALYSIS_MODULE + ".os.path.exists", return_value=False)
-    @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
-    def test_missing_file_paths_are_removed_from_analysis_metadata(self, mock_paths, _mock_exists):
-        from compresso.webserver.helpers.library_analysis import _cleanup_missing_analysis_paths
-
-        stale = MagicMock(path="/media/missing.mkv")
-        current = MagicMock(path="/media/current.mkv")
-        mock_paths.select.return_value.where.return_value = [stale, current]
-
-        _cleanup_missing_analysis_paths({"/media/current.mkv"})
-
-        stale.delete_instance.assert_called_once()
-        current.delete_instance.assert_not_called()
-
     @patch(ANALYSIS_MODULE + "._path_is_within", side_effect=lambda path, _root: path.startswith("/media/"))
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_generation_cleanup_removes_only_stale_paths_in_library(self, mock_paths, _mock_within):
         from compresso.webserver.helpers.library_analysis import _cleanup_stale_analysis_paths
 
-        stale = MagicMock(path="/media/stale.mkv")
-        outside = MagicMock(path="/other/keep.mkv")
+        stale = MagicMock(id=1, path="/media/stale.mkv")
+        outside = MagicMock(id=2, path="/other/keep.mkv")
         mock_paths.select.return_value.where.return_value.iterator.return_value = iter([stale, outside])
 
         _cleanup_stale_analysis_paths("/media", "new-generation")
 
-        stale.delete_instance.assert_called_once()
-        outside.delete_instance.assert_not_called()
+        mock_paths.id.in_.assert_called_once_with([1])
+        mock_paths.delete.return_value.where.return_value.execute.assert_called_once()
 
-    @patch(ANALYSIS_MODULE + ".os.path.realpath", side_effect=["/media/a.mkv", "/media", "/media"])
+    @patch(ANALYSIS_MODULE + ".os.path.realpath", return_value="/media/a.mkv")
     @patch(ANALYSIS_MODULE + ".os.path.commonpath", side_effect=ValueError("different drives"))
     def test_path_scope_check_rejects_incomparable_paths(self, _mock_commonpath, _mock_realpath):
         from compresso.webserver.helpers.library_analysis import _path_is_within

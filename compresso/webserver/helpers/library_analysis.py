@@ -163,7 +163,7 @@ def _probe_analysis_file(filepath):
     }
 
 
-def _cached_analysis_file(filepath):
+def _cached_analysis_file(filepath, generation=None):
     try:
         path_row = FileMetadataPaths.get_or_none(FileMetadataPaths.path == filepath)
         if not path_row:
@@ -185,6 +185,12 @@ def _cached_analysis_file(filepath):
             and cached.get("stat_inode") == stat.st_ino
         )
         if stat_matches:
+            if generation:
+                current_type = f"library_analysis:{generation}"
+                if path_row.path_type != current_type:
+                    path_row.path_type = current_type
+                    path_row.updated_at = datetime.now()
+                    path_row.save()
             return cached, (path_row.file_metadata.fingerprint, path_row.file_metadata.fingerprint_algo)
 
         fingerprint, algo = common.get_file_fingerprint(filepath)
@@ -232,7 +238,7 @@ def _persist_analysis_file(filepath, fingerprint_info, entry, generation=None):
 
 
 def _analyse_file_incremental(filepath, generation=None):
-    cached, fingerprint = _cached_analysis_file(filepath)
+    cached, fingerprint = _cached_analysis_file(filepath, generation=generation)
     if cached:
         return cached
 
@@ -244,19 +250,9 @@ def _analyse_file_incremental(filepath, generation=None):
     return entry
 
 
-def _cleanup_missing_analysis_paths(current_paths):
+def _path_is_within(path, resolved_root):
     try:
-        current_paths = set(current_paths)
-        for path_row in FileMetadataPaths.select().where(FileMetadataPaths.path_type == "library_analysis"):
-            if path_row.path not in current_paths and not os.path.exists(path_row.path):
-                path_row.delete_instance()
-    except Exception as e:
-        logger.debug("Unable to clean stale library analysis metadata paths: %s", e)
-
-
-def _path_is_within(path, root):
-    try:
-        return os.path.commonpath((os.path.realpath(path), os.path.realpath(root))) == os.path.realpath(root)
+        return os.path.commonpath((os.path.realpath(path), resolved_root)) == resolved_root
     except (TypeError, ValueError):
         return False
 
@@ -264,13 +260,14 @@ def _path_is_within(path, root):
 def _cleanup_stale_analysis_paths(library_path, generation):
     """Remove prior-generation path markers without retaining every scanned path."""
     try:
+        resolved_library_path = os.path.realpath(library_path)
         current_type = f"library_analysis:{generation}"
         query = FileMetadataPaths.select().where(
             FileMetadataPaths.path_type.startswith("library_analysis") & (FileMetadataPaths.path_type != current_type)
         )
-        for path_row in query.iterator():
-            if _path_is_within(path_row.path, library_path):
-                path_row.delete_instance()
+        stale_ids = [path_row.id for path_row in query.iterator() if _path_is_within(path_row.path, resolved_library_path)]
+        if stale_ids:
+            FileMetadataPaths.delete().where(FileMetadataPaths.id.in_(stale_ids)).execute()
     except Exception as e:
         logger.debug("Unable to clean stale library analysis generations: %s", e)
 
