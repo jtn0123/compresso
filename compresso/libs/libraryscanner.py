@@ -47,6 +47,14 @@ from compresso.libs.plugins import PluginsHandler
 from compresso.libs.scan_checkpoint import ScanCheckpointStore
 
 
+def iter_sorted_library_directories(walk_entries):
+    """Yield deterministic, directory-sized scan batches from an os.walk iterable."""
+    for root, subfolders, files in walk_entries:
+        subfolders.sort()
+        files.sort()
+        yield root, files
+
+
 class LibraryScannerManager(threading.Thread):
     def __init__(self, data_queues, event):
         super().__init__(name="LibraryScannerManager")
@@ -306,11 +314,10 @@ class LibraryScannerManager(threading.Thread):
         total_file_count = 0
         current_file = ""
         percent_completed_string = ""
-        for root, subfolders, files in os.walk(library_path, followlinks=follow_symlinks):
+        walk_entries = os.walk(library_path, followlinks=follow_symlinks)
+        for root, files in iter_sorted_library_directories(walk_entries):
             if self.abort_flag.is_set():
                 break
-            subfolders.sort()
-            files.sort()
             if not resume_checkpoint_reached:
                 resume_checkpoint_reached = self.root_was_completed(root, library_path, completed_root)
                 continue

@@ -70,8 +70,11 @@ if [[ "${SKIP_E2E:-0}" != "1" ]]; then
     npx playwright install chromium
   fi
 
-  echo "==> Running frontend Playwright smoke tests"
-  npm run test:e2e
+  echo "==> Running mocked frontend Playwright smoke tests"
+  npm run test:e2e:run
+
+  echo "==> Running live-backend frontend Playwright smoke tests"
+  PYTHON_BIN="${PYTHON_BIN}" npm run test:e2e:live:run
 else
   echo "==> Skipping frontend Playwright smoke tests because SKIP_E2E=1"
 fi

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "tiers": {
+    "10000": {
+      "max_duration_seconds": 20,
+      "max_peak_rss_delta_mb": 128,
+      "max_sqlite_lookup_p95_ms": 100,
+      "max_sqlite_page_p95_ms": 100
+    },
+    "100000": {
+      "max_duration_seconds": 120,
+      "max_peak_rss_delta_mb": 256,
+      "max_sqlite_lookup_p95_ms": 150,
+      "max_sqlite_page_p95_ms": 150
+    },
+    "500000": {
+      "max_duration_seconds": 600,
+      "max_peak_rss_delta_mb": 512,
+      "max_sqlite_lookup_p95_ms": 250,
+      "max_sqlite_page_p95_ms": 250
+    }
+  }
+}

@@ -40,6 +40,8 @@ class SystemStatusGpuSchema(BaseSchema):
     """Schema for GPU info within system status"""
 
     type = fields.Str(required=True, metadata={"description": "GPU type", "example": "nvidia"})
+    hwaccel = fields.Str(required=True, metadata={"description": "FFmpeg hardware accelerator", "example": "nvenc"})
+    index = fields.Int(required=True, metadata={"description": "GPU device index", "example": 0})
     name = fields.Str(required=True, metadata={"description": "GPU name", "example": "RTX 3080"})
     memory_total_mb = fields.Int(required=True, metadata={"description": "GPU memory in MB", "example": 10240})
     driver_version = fields.Str(required=True, metadata={"description": "GPU driver version", "example": "535.129.03"})

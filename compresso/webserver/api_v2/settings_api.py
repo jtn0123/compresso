@@ -180,7 +180,8 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
                             InternalErrorSchema
         """
         try:
-            settings = self.config.get_config_as_dict()
+            settings = self.config.get_config_as_dict().copy()
+            settings.pop("api_auth_token", None)
             response = self.build_response(
                 SettingsReadAndWriteSchema(),
                 {

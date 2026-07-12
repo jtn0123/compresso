@@ -57,6 +57,25 @@ def test_begin_and_append_chunk_return_persisted_offsets(tmp_path):
 
 
 @pytest.mark.unittest
+def test_transfer_route_accepts_tornado_byte_path_parameter(tmp_path):
+    payload = b"route-boundary"
+    store = ResumableTransferStore(tmp_path)
+    session = store.begin("job-route", "movie.mkv", len(payload), _checksum(payload))
+    handler = _handler(
+        store,
+        payload,
+        {
+            "X-Transfer-Offset": "0",
+            "X-Chunk-Checksum": _checksum(payload),
+        },
+    )
+
+    asyncio.run(handler.append_transfer_chunk(session["transfer_id"].encode("ascii")))
+
+    assert handler.write_success.call_args.args[0]["offset"] == len(payload)
+
+
+@pytest.mark.unittest
 def test_source_chunk_reads_file_off_event_loop(tmp_path):
     source = tmp_path / "movie.mkv"
     source.write_bytes(b"abcdefgh")
