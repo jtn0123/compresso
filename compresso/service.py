@@ -81,6 +81,8 @@ def init_db(config_path):
 
 
 class RootService:
+    CRITICAL_THREAD_NAMES = frozenset({"PostProcessor", "ScheduledTasksManager", "TaskHandler", "Foreman"})
+
     def __init__(self):
         self.threads = []
         self.run_threads = True
@@ -359,6 +361,27 @@ class RootService:
 
     def stop(self):
         self.run_threads = False
+        self.event.set()
+
+    def monitor_critical_threads(self):
+        """Publish runtime health and fail visibly if a critical service exits."""
+        health = {}
+        for entry in self.threads:
+            name = entry["name"]
+            if name not in self.CRITICAL_THREAD_NAMES:
+                continue
+            thread = entry["thread"]
+            if not thread.is_alive():
+                message = f"CRITICAL_THREAD_EXITED name={name}"
+                self.logger.error(message)
+                self.startup_state.mark_error("threads_ready", message)
+                self.run_threads = False
+                self.event.set()
+                return False
+            snapshot = getattr(thread, "get_health_snapshot", None)
+            health[name] = snapshot() if snapshot else {"alive": True}
+        self.startup_state.mark_ready("threads_ready", detail=health)
+        return True
 
     def run(self):
         # Init the TaskDataStore and PluginChildProcess
@@ -441,14 +464,17 @@ class RootService:
             while self.run_threads:
                 try:
                     time.sleep(1)
+                    if self.run_threads:
+                        self.monitor_critical_threads()
                 except (KeyboardInterrupt, SystemExit):
                     break
         else:
             signal.signal(signal.SIGINT, self.sig_handle)
             signal.signal(signal.SIGTERM, self.sig_handle)
             while self.run_threads:
-                signal.pause()
-                time.sleep(0.5)
+                time.sleep(1)
+                if self.run_threads:
+                    self.monitor_critical_threads()
 
         # Received term signal. Stop everything
         self.stop_threads()

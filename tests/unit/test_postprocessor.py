@@ -637,5 +637,47 @@ class TestRunLoopAbort:
         # If we get here, the loop exited properly
 
 
+@pytest.mark.unittest
+class TestPostProcessorHealth:
+    def test_successful_task_records_health(self):
+        pp = _make_postprocessor()
+
+        pp._handle_task_safely(MagicMock())
+
+        health = pp.get_health_snapshot()
+        assert health["last_success_at"] is not None
+        assert health["consecutive_failures"] == 0
+
+    def test_failed_task_records_health(self):
+        pp = _make_postprocessor()
+        pp.current_task = MagicMock()
+        pp._defer_postprocess_failure = MagicMock()
+
+        pp._handle_task_safely(MagicMock(side_effect=RuntimeError("finalization failed")))
+
+        health = pp.get_health_snapshot()
+        assert health["last_error"] == "finalization failed"
+        assert health["consecutive_failures"] == 1
+
+    def test_loop_iteration_failure_is_contained(self):
+        pp = _make_postprocessor()
+        calls = 0
+
+        def process_available():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise RuntimeError("queue read failed")
+            pp.abort_flag.set()
+
+        pp._process_available_tasks = MagicMock(side_effect=process_available)
+        pp.event.wait = MagicMock()
+
+        pp.run()
+
+        assert calls == 2
+        assert pp.get_health_snapshot()["last_error"] == "queue read failed"
+
+
 if __name__ == "__main__":
     pytest.main(["-s", "--log-cli-level=INFO", __file__])
