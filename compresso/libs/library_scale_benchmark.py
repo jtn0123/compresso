@@ -173,6 +173,8 @@ def matching_threshold(entry_count: int, threshold_config: dict[str, Any]) -> di
     tiers = threshold_config.get("tiers", {})
     if not isinstance(tiers, dict):
         raise ValueError("threshold configuration has no tiers object")
+    if not tiers:
+        raise ValueError("threshold configuration has no tier entries")
     eligible = sorted(int(count) for count in tiers if int(count) >= entry_count)
     tier_key = str(eligible[0] if eligible else max(int(count) for count in tiers))
     selected = tiers[tier_key]

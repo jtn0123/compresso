@@ -76,6 +76,17 @@ def test_transfer_route_accepts_tornado_byte_path_parameter(tmp_path):
 
 
 @pytest.mark.unittest
+def test_transfer_status_accepts_tornado_byte_path_parameter(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    session = store.begin("job-status", "movie.mkv", 0, _checksum(b""))
+    handler = _handler(store)
+
+    asyncio.run(handler.get_transfer_status(session["transfer_id"].encode("ascii")))
+
+    assert handler.write_success.call_args.args[0]["transfer_id"] == session["transfer_id"]
+
+
+@pytest.mark.unittest
 def test_source_chunk_reads_file_off_event_loop(tmp_path):
     source = tmp_path / "movie.mkv"
     source.write_bytes(b"abcdefgh")
@@ -85,10 +96,25 @@ def test_source_chunk_reads_file_off_event_loop(tmp_path):
     handler.finish = MagicMock()
     task = SimpleNamespace(abspath=str(source))
 
-    with patch.object(ApiTransferHandler, "_completed_source", return_value=task):
-        asyncio.run(handler.get_source_chunk("7"))
+    with patch.object(ApiTransferHandler, "_completed_source", return_value=task) as completed_source:
+        asyncio.run(handler.get_source_chunk(b"7"))
 
+    completed_source.assert_called_once_with("7")
     handler.finish.assert_called_once_with(b"cde")
+
+
+@pytest.mark.unittest
+def test_source_manifest_decodes_tornado_byte_path_parameter(tmp_path):
+    source = tmp_path / "movie.mkv"
+    source.write_bytes(b"manifest")
+    handler = _handler(MagicMock())
+    task = SimpleNamespace(id=7, job_id="job-7", abspath=str(source))
+
+    with patch.object(ApiTransferHandler, "_completed_source", return_value=task) as completed_source:
+        asyncio.run(handler.get_source_manifest(b"7"))
+
+    completed_source.assert_called_once_with("7")
+    assert handler.write_success.call_args.args[0]["task_id"] == 7
 
 
 @pytest.mark.unittest
@@ -110,7 +136,7 @@ def test_finalize_creates_one_remote_task_from_verified_file(tmp_path):
         patch("compresso.webserver.api_v2.transfer_api.pending_tasks.bind_remote_task_identity") as bind_identity,
     ):
         add_task.return_value = {"id": 7, "status": "creating"}
-        asyncio.run(handler.finalize_transfer(session["transfer_id"]))
+        asyncio.run(handler.finalize_transfer(session["transfer_id"].encode("ascii")))
 
     completed_path = add_task.call_args.args[0]
     assert completed_path.endswith("movie.mkv")

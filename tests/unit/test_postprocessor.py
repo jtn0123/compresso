@@ -617,6 +617,7 @@ class TestDumpHistoryLog:
         assert payload["abspath"] == "/pending/final.mkv"
         assert payload["checksum"] == "final-checksum"
         assert output_path == os.path.join("/pending", "data.json")
+        mock_checksum.assert_called_once_with("/pending/final.mkv")
         mock_task.modify_path.assert_not_called()
 
 

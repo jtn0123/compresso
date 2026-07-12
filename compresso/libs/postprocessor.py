@@ -596,10 +596,12 @@ class PostProcessor(threading.Thread):
             self.dump_history_log(destination_path=final_path)
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in dumping history log for remote task", message2=str(e), level="exception")
+            self._discard_prepared_remote_output(final_path, original_path)
             self._defer_postprocess_failure(str(e))
             return False
         except Exception as e:
             self._log(f"TaskMetadataError in remote history: {e}", level="exception")
+            self._discard_prepared_remote_output(final_path, original_path)
             self._defer_postprocess_failure(str(e))
             return False
         try:
@@ -607,14 +609,12 @@ class PostProcessor(threading.Thread):
             self.current_task.set_status("complete")
         except (AttributeError, TypeError) as e:
             self._log("Exception in marking remote task as complete", message2=str(e), level="exception")
-            with contextlib.suppress(Exception):
-                self.current_task.modify_path(original_path)
+            self._rollback_prepared_remote_output(final_path, original_path)
             self._defer_postprocess_failure(str(e))
             return False
         except Exception as e:
             self._log(f"TaskMetadataError marking complete: {e}", level="exception")
-            with contextlib.suppress(Exception):
-                self.current_task.modify_path(original_path)
+            self._rollback_prepared_remote_output(final_path, original_path)
             self._defer_postprocess_failure(str(e))
             return False
 
@@ -622,6 +622,27 @@ class PostProcessor(threading.Thread):
         # completion state are all durable. Cleanup is best-effort after success.
         self.__cleanup_cache_files(self.current_task.get_cache_path())
         return True
+
+    def _rollback_prepared_remote_output(self, final_path, original_path):
+        """Restore task identity before removing a prepared remote copy."""
+        try:
+            self.current_task.modify_path(original_path)
+        except Exception as error:
+            self._log("Unable to roll back remote task path", message2=str(error), level="exception")
+            return False
+        self._discard_prepared_remote_output(final_path, original_path)
+        return True
+
+    def _discard_prepared_remote_output(self, final_path, original_path):
+        """Remove a failed prepared copy while retaining the encoded cache."""
+        if not final_path or os.path.realpath(final_path) == os.path.realpath(original_path):
+            return
+        final_directory = os.path.dirname(final_path)
+        if os.path.basename(final_directory).startswith("compresso_remote_pending_library-"):
+            shutil.rmtree(final_directory, ignore_errors=True)
+            return
+        with contextlib.suppress(FileNotFoundError, OSError):
+            os.remove(final_path)
 
     def _cleanup_staging_files(self):
         """Remove the staging directory for the current task if it exists."""
@@ -836,7 +857,7 @@ class PostProcessor(threading.Thread):
         source_data = self.current_task.get_source_data()
         destination_data = self.current_task.get_destination_data()
         def_cache_path = self.settings.get_cache_path()
-        remove_source_file = def_cache_path in destination_data["abspath"]
+        remove_source_file = self._path_is_within(source_data.get("abspath"), def_cache_path)
 
         self._log(f"Cache path: {def_cache_path}", level="debug")
         self._log(
@@ -889,6 +910,17 @@ class PostProcessor(threading.Thread):
             return final_path
         finally:
             self._log(f"tdir: {final_directory}", level="debug")
+
+    @staticmethod
+    def _path_is_within(path, directory):
+        if not path or not directory:
+            return False
+        normalized_path = os.path.normcase(os.path.realpath(path))
+        normalized_directory = os.path.normcase(os.path.realpath(directory))
+        try:
+            return os.path.commonpath([normalized_directory, normalized_path]) == normalized_directory
+        except ValueError:
+            return False
 
     def __cleanup_cache_files(self, cache_path):
         """

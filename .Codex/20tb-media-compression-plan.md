@@ -122,7 +122,7 @@ C4-C5 and E1-E6 still need to be executed.
 
 ## Validation evidence
 
-- 3,579 unit tests passed; 8 environment-specific tests skipped.
+- 3,588 unit tests passed; 8 environment-specific tests skipped.
 - 21 integration tests passed, including a two-process HTTP transfer/restart drill.
 - Repository-wide Ruff lint and format checks passed.
 - Mypy passed across 231 source files with only existing untyped-function notes.
@@ -180,9 +180,9 @@ C4-C5 and E1-E6 still need to be executed.
 7. Only after the 20-file canary passes, run E2 (100 GB), E3 (500 GB), and E4
    (1 TB) in that order. Record throughput separately for the master and M4 so
    C4 can be completed with measured data, not estimates.
-8. Benchmark a 500,000-entry synthetic scan before claiming the Phase D
-   acceptance gate. The bounded implementation is present, but this scale run
-   has not yet been executed.
+8. Retain the passing 500,000-entry metadata/SQLite benchmark as a regression
+   gate. Before claiming the whole Phase D acceptance gate, add NAS traversal,
+   file probing, concurrent contention, and large-queue UI evidence.
 9. Process production only in snapshot-backed 500 GB to 1 TB batches, creating
    and verifying a manifest for every batch.
 

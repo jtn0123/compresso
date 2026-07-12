@@ -63,39 +63,48 @@ class _CompressoProcess:
     def base_url(self) -> str:
         return f"http://127.0.0.1:{self.port}/compresso/api/v2"
 
-    def start(self):
-        self.home.mkdir(parents=True, exist_ok=True)
-        for directory in (self.home / "cache", self.home / "staging", self.home / "library"):
-            directory.mkdir(parents=True, exist_ok=True)
-        self.log_handle = (self.home / f"{self.name}.stdout.log").open("ab")
-        environment = {
-            **os.environ,
-            "HOME_DIR": str(self.home),
-            "PYTHONPATH": str(self.repository_root),
-            "cache_path": str(self.home / "cache"),
-            "staging_path": str(self.home / "staging"),
-            "library_path": str(self.home / "library"),
-        }
-        self.process = subprocess.Popen(  # noqa: S603 - fixed interpreter/module invocation
-            [sys.executable, "-m", "compresso", "--address", "127.0.0.1", "--port", str(self.port)],
-            cwd=self.repository_root,
-            env=environment,
-            stdout=self.log_handle,
-            stderr=subprocess.STDOUT,
-        )
-        deadline = time.monotonic() + 60
+    def start(self, bind_attempts: int = 3):
         last_error = None
-        while time.monotonic() < deadline:
-            if self.process.poll() is not None:
-                raise RuntimeError(f"{self.name} exited during startup; see {self.log_handle.name}")
-            try:
-                _status, readiness = _request_json(f"{self.base_url}/healthcheck/readiness")
-                if readiness.get("ready") is True:
-                    return
-            except (OSError, ValueError, urllib.error.URLError) as error:
-                last_error = error
-            time.sleep(0.1)
-        raise TimeoutError(f"{self.name} was not ready after 60 seconds: {last_error}")
+        for attempt in range(bind_attempts):
+            self.home.mkdir(parents=True, exist_ok=True)
+            for directory in (self.home / "cache", self.home / "staging", self.home / "library"):
+                directory.mkdir(parents=True, exist_ok=True)
+            self.log_handle = (self.home / f"{self.name}.stdout.log").open("ab")
+            environment = {
+                **os.environ,
+                "HOME_DIR": str(self.home),
+                "PYTHONPATH": str(self.repository_root),
+                "cache_path": str(self.home / "cache"),
+                "staging_path": str(self.home / "staging"),
+                "library_path": str(self.home / "library"),
+            }
+            self.process = subprocess.Popen(  # noqa: S603 - fixed interpreter/module invocation
+                [sys.executable, "-m", "compresso", "--address", "127.0.0.1", "--port", str(self.port)],
+                cwd=self.repository_root,
+                env=environment,
+                stdout=self.log_handle,
+                stderr=subprocess.STDOUT,
+            )
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                if self.process.poll() is not None:
+                    last_error = RuntimeError(f"{self.name} exited during startup on port {self.port}")
+                    break
+                try:
+                    _status, readiness = _request_json(f"{self.base_url}/healthcheck/readiness")
+                    if readiness.get("ready") is True:
+                        return
+                except (OSError, ValueError, urllib.error.URLError) as error:
+                    last_error = error
+                time.sleep(0.1)
+            else:
+                self.stop()
+                raise TimeoutError(f"{self.name} was not ready after 60 seconds: {last_error}")
+
+            self.stop()
+            if attempt + 1 < bind_attempts:
+                self.port = _free_port()
+        raise RuntimeError(f"{self.name} failed to bind after {bind_attempts} attempts: {last_error}")
 
     def stop(self):
         if self.process is not None and self.process.poll() is None:
@@ -112,6 +121,7 @@ class _CompressoProcess:
 
     def restart(self):
         self.stop()
+        self.port = _free_port()
         self.start()
 
 
@@ -181,6 +191,7 @@ def run_drill(size_mb: int = 3, chunk_mb: int = 1) -> dict[str, object]:
             if resumed.get("offset") != len(first_chunk):
                 raise RuntimeError(f"worker restart lost the durable transfer offset: {resumed}")
 
+            transfer_url = f"{worker.base_url}/transfer/chunk/{transfer_id}"
             try:
                 _post_chunk(transfer_url, first_chunk, 0)
             except urllib.error.HTTPError as error:

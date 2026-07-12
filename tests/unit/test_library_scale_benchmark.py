@@ -59,3 +59,9 @@ def test_threshold_selection_and_failures():
         "max_sqlite_page_p95_ms": 2,
     }
     assert threshold_failures(result, thresholds) == ["duration_seconds=3.0 exceeded max_duration_seconds=2.0"]
+
+
+@pytest.mark.unittest
+def test_empty_threshold_configuration_has_clear_error():
+    with pytest.raises(ValueError, match="no tier entries"):
+        matching_threshold(10_000, {"tiers": {}})

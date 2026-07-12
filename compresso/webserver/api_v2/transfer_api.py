@@ -137,6 +137,7 @@ class ApiTransferHandler(BaseApiHandler):
 
     async def get_source_manifest(self, task_id=None):
         try:
+            task_id = _decode_path_parameter(task_id)
             task = self._completed_source(task_id)
             self.write_success(
                 {
@@ -153,6 +154,7 @@ class ApiTransferHandler(BaseApiHandler):
 
     async def get_source_chunk(self, task_id=None):
         try:
+            task_id = _decode_path_parameter(task_id)
             task = self._completed_source(task_id)
             offset = max(0, int(self.get_query_argument("offset", "0")))
             limit = min(MAX_CHUNK_SIZE, max(1, int(self.get_query_argument("limit", str(MAX_CHUNK_SIZE)))))
