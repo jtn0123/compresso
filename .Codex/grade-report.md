@@ -38,7 +38,7 @@
 
 ### Implementation validation — `codex/audit-fix-batch`
 
-- **27 of 37** addressable grade items are marked complete below.
+- **29 of 37** addressable grade items are marked complete below.
 - Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
 - Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
 - Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
@@ -50,6 +50,7 @@
 - Packaged live E2E: **3 Playwright journeys passed** against an isolated wheel install, including reject, approve/file replacement, history persistence, and backend restart.
 - Locked CI/local parity: canonical `--require-hashes` installs dry-ran successfully for runtime and development graphs; lock regeneration, actionlint, 10 release contract tests, 3 release-tool tests, and clean-wheel inspection passed. The fast lane passed **3,647 backend tests with 8 skips**, **431 frontend tests**, honest coverage, lint, type, audit, and production-build gates while listing every intentionally skipped full gate.
 - Structured API errors: **675 broad API/settings/plugin tests passed with 2 skips**, plus 70 focused boundary/transfer/notification/pending/preview tests. Malformed bodies are no longer echoed or double-written; unexpected details stay in correlated logs and client 500s use a stable public message.
+- Responsive/browser coverage: **433 frontend unit tests**, ESLint, production build, 4 desktop Chromium journeys, a Pixel 7 accessibility journey, and a focused WebKit smoke passed. The onboarding flow has a zero critical/serious axe result and keyboard-driven setup/plugin assertions; Firefox is enabled in CI because the local macOS launcher fails before browser context creation in this environment.
 
 ---
 
@@ -183,7 +184,7 @@ The Vue/Quasar interface is useful and has a coherent visual system, localizatio
 - **Effort:** S
 - **Grade lift:** C → C+ (fixes a repeated platform defect)
 
-#### C5 — Enforce responsive and accessible interaction standards
+#### ~~C5~~ ✓ done 2026-07-12 — Enforce responsive and accessible interaction standards
 
 - **Where:** `frontend/index.html:10`, `SettingsLibrary.vue:10,92`, `SettingsLink.vue:8,99`, `FirstRunWizard.vue:2-4`, `PluginInstallerManageRepos.vue:62-99`
 - **What's wrong:** Browser zoom is disabled, platform detection replaces viewport breakpoints, several dialogs impose 400-560px minimum widths, and important actions use clickable spans.
@@ -227,7 +228,7 @@ Python reliability evidence is broad: thousands of unit tests, integration tests
 - **Effort:** S
 - **Grade lift:** B → B+ (raises the signal of the existing browser lanes)
 
-#### D4 — Add browser, mobile, and accessibility coverage
+#### ~~D4~~ ✓ done 2026-07-12 — Add browser, mobile, and accessibility coverage
 
 - **Where:** `frontend/playwright.config.js:24-29`, `frontend/playwright.live.config.js:51-56`, `.github/workflows/frontend_lint_and_build.yml:85-92`
 - **What's wrong:** E2E runs only desktop Chromium and has no automated keyboard/axe gate despite responsive and accessibility requirements.

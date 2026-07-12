@@ -1,9 +1,9 @@
 <template>
-  <q-dialog v-model="dialogVisible" persistent no-backdrop-dismiss>
-    <q-card style="min-width: 560px; max-width: 680px">
+  <q-dialog v-model="dialogVisible" persistent no-backdrop-dismiss :maximized="$q.screen.lt.md">
+    <q-card class="first-run-card">
       <q-card-section>
         <div class="text-h5">{{ t('onboarding.welcomeTitle') }}</div>
-        <div class="text-caption text-grey">{{ t('onboarding.welcomeSubtitle') }}</div>
+        <div class="text-caption text-grey-8">{{ t('onboarding.welcomeSubtitle') }}</div>
       </q-card-section>
 
       <q-stepper v-model="step" animated flat>
@@ -11,7 +11,7 @@
         <q-step :name="1" :title="t('onboarding.stepLibraryTitle')" icon="folder" :done="step > 1">
           <div class="q-mb-md">{{ t('onboarding.stepLibraryPrompt') }}</div>
           <q-input v-model="libraryPath" :label="t('onboarding.stepLibraryLabel')" outlined />
-          <div class="text-caption text-grey q-mt-xs">
+          <div class="text-caption text-grey-8 q-mt-xs">
             {{ t('onboarding.stepLibraryHint') }}
           </div>
         </q-step>
@@ -20,7 +20,7 @@
         <q-step :name="2" :title="t('onboarding.stepApprovalTitle')" icon="verified" :done="step > 2">
           <div class="q-mb-md">{{ t('onboarding.stepApprovalPrompt') }}</div>
           <q-option-group v-model="approvalMode" :options="approvalOptions" type="radio" />
-          <div class="text-caption text-grey q-mt-sm">
+          <div class="text-caption text-grey-8 q-mt-sm">
             {{ t('onboarding.stepApprovalHint') }}
           </div>
         </q-step>
@@ -29,7 +29,7 @@
         <q-step :name="3" :title="t('onboarding.stepWorkersTitle')" icon="memory" :done="step > 3">
           <div class="q-mb-md">{{ t('onboarding.stepWorkersPrompt') }}</div>
           <q-slider v-model="workerCount" :min="1" :max="4" :step="1" label snap markers />
-          <div class="text-caption text-grey q-mt-xs">
+          <div class="text-caption text-grey-8 q-mt-xs">
             {{ t('onboarding.stepWorkersHint', { count: workerCount }) }}
           </div>
         </q-step>
@@ -135,3 +135,22 @@ async function completeOnboarding() {
   }
 }
 </script>
+
+<style scoped>
+.first-run-card {
+  width: min(680px, calc(100vw - 32px));
+  max-width: 100%;
+}
+
+.first-run-card :deep(.q-stepper__tab:not(.q-stepper__tab--active) .q-stepper__title) {
+  color: #616161 !important;
+  opacity: 1;
+}
+
+@media (max-width: 1023px) {
+  .first-run-card {
+    width: 100%;
+    min-height: 100%;
+  }
+}
+</style>

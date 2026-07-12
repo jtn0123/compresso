@@ -1,6 +1,6 @@
 <template>
   <!--START QUICK NAV-->
-  <div v-if="$q.platform.is.mobile" class="mobile-quick-nav">
+  <div v-if="$q.screen.lt.md" class="mobile-quick-nav">
     <q-separator />
     <div class="row q-pa-sm">
       <div class="col-6 q-pr-xs">

@@ -26,5 +26,23 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'mobile-chromium',
+      grep: /@(mobile|accessibility)/,
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'firefox-smoke',
+      grep: /@cross-browser/,
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: { timeout: 30_000 },
+      },
+    },
+    {
+      name: 'webkit-smoke',
+      grep: /@cross-browser/,
+      use: { ...devices['Desktop Safari'] },
+    },
   ],
 })

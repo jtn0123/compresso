@@ -1,29 +1,29 @@
 <template>
   <component
-    :is="$q.platform.is.mobile ? 'div' : 'q-btn-group'"
-    :class="$q.platform.is.mobile ? 'column q-gutter-xs full-width' : ''"
+    :is="$q.screen.lt.md ? 'div' : 'q-btn-group'"
+    :class="$q.screen.lt.md ? 'column q-gutter-xs full-width' : ''"
   >
     <CompressoStandardButton
       @click="reloadAllReposData()"
-      v-if="$q.platform.is.mobile"
+      v-if="$q.screen.lt.md"
       class="full-width"
       :label="$t('components.plugins.refreshRepositories')"
     />
 
     <CompressoStandardButton
       @click="reloadAllReposData()"
-      v-if="!$q.platform.is.mobile"
+      v-if="!$q.screen.lt.md"
       :label="$t('components.plugins.refreshRepositories')"
     />
 
     <CompressoStandardButtonDropdown
       :label="$t('components.plugins.addRepository')"
-      :class="$q.platform.is.mobile ? 'full-width' : ''"
+      :class="$q.screen.lt.md ? 'full-width' : ''"
     >
       <div>
         <!--REPO DATA-->
         <div class="row no-wrap q-pa-md">
-          <div class="column" :style="$q.platform.is.mobile ? 'width: 100%' : 'min-width:400px'">
+          <div class="column" :style="$q.screen.lt.md ? 'width: 100%' : 'min-width:400px'">
             <q-btn
               color="secondary"
               icon="travel_explore"
@@ -45,8 +45,8 @@
     <CompressoStandardButtonDropdown
       auto-close
       :label="$t('components.plugins.repoList')"
-      :class="$q.platform.is.mobile ? 'full-width' : ''"
-      :fit="$q.platform.is.mobile"
+      :class="$q.screen.lt.md ? 'full-width' : ''"
+      :fit="$q.screen.lt.md"
     >
       <div v-for="repo in repoList" :key="repo.id">
         <!-- Mobile View (lt-md) -->
@@ -62,9 +62,15 @@
             <q-item-section style="overflow: hidden">
               <q-item-label class="text-weight-bold">{{ repo.name }}</q-item-label>
               <q-item-label caption class="ellipsis" style="max-width: 200px">
-                <span class="cursor-pointer clickable" @click="goToRepoSource(getRepoDisplayUrl(repo))">
+                <a
+                  class="repo-link"
+                  :href="getRepoDisplayUrl(repo)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  @click.prevent="goToRepoSource(getRepoDisplayUrl(repo))"
+                >
                   {{ getRepoDisplayUrl(repo) }}
-                </span>
+                </a>
               </q-item-label>
             </q-item-section>
 
@@ -93,9 +99,15 @@
                 <q-item-section>
                   <q-item-label>{{ $t('components.plugins.repoSource') }}</q-item-label>
                   <q-item-label caption>
-                    <span class="cursor-pointer clickable" @click="goToRepoSource(getRepoDisplayUrl(repo))">
+                    <a
+                      class="repo-link"
+                      :href="getRepoDisplayUrl(repo)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      @click.prevent="goToRepoSource(getRepoDisplayUrl(repo))"
+                    >
                       {{ getRepoDisplayUrl(repo) }}
-                    </span>
+                    </a>
                   </q-item-label>
                 </q-item-section>
               </q-item>
@@ -349,5 +361,17 @@ export default {
 .repo-info {
   flex: 1;
   min-width: 0;
+}
+
+.repo-link {
+  color: var(--q-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.repo-link:focus-visible {
+  outline: 3px solid var(--q-secondary);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 </style>

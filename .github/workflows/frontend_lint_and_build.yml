@@ -82,8 +82,8 @@ jobs:
       run: |
         test -f dist/spa/index.html
 
-    - name: Install Playwright browser
-      run: npx playwright install --with-deps chromium
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps chromium firefox webkit
 
     - name: Run mocked Playwright smoke tests
       run: npm run test:e2e:run

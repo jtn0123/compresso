@@ -7,7 +7,7 @@
 
       <div class="row">
         <div class="col q-ma-sm">
-          <div class="q-pa-md" :style="$q.platform.is.mobile ? '' : 'max-width: 70%'">
+          <div class="q-pa-md" :style="$q.screen.lt.md ? '' : 'max-width: 70%'">
             <q-form @submit="save" class="q-gutter-md">
               <!--START WORKER GROUPS-->
               <h5 class="q-mb-none">{{ $t('components.settings.workers.workerGroups') }}</h5>

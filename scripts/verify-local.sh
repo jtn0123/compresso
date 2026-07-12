@@ -120,11 +120,11 @@ if [[ "${MODE}" == "full" ]]; then
 
   if [[ "${SKIP_E2E:-0}" != "1" ]]; then
     cd "${FRONTEND_DIR}"
-    echo "==> Installing Playwright Chromium"
+    echo "==> Installing Playwright browsers"
     if [[ "$(uname -s)" == "Linux" ]]; then
-      npx playwright install --with-deps chromium
+      npx playwright install --with-deps chromium firefox webkit
     else
-      npx playwright install chromium
+      npx playwright install chromium firefox webkit
     fi
     echo "==> Running mocked and packaged live-backend browser tests"
     npm run test:e2e:run

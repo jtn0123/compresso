@@ -37,6 +37,7 @@
     "xbbcode-parser": "^0.1.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
     "@babel/eslint-parser": "^7.28.6",
     "@playwright/test": "^1.61.1",
     "@quasar/app-vite": "2.4.1",

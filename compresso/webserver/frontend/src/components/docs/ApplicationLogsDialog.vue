@@ -68,7 +68,7 @@
 
         <q-card-section class="system-log-section">
           <q-skeleton v-if="currentLog.length === 0" style="width: 100%" type="text" />
-          <div ref="logContainerRef" v-else :class="$q.platform.is.mobile ? '' : 'q-px-lg'" class="system-log-content">
+          <div ref="logContainerRef" v-else :class="$q.screen.lt.md ? '' : 'q-px-lg'" class="system-log-content">
             <p v-for="(line, index) in currentLog" :key="index" v-html="line"></p>
           </div>
         </q-card-section>
