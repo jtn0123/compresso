@@ -17,6 +17,7 @@ import tempfile
 import uuid
 import zipfile
 from collections.abc import Iterable
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -92,7 +93,7 @@ def _sha256(path: Path) -> str:
 def _database_integrity(path: Path) -> str:
     uri = f"file:{quote(path.as_posix(), safe='/')}?mode=ro"
     try:
-        with sqlite3.connect(uri, uri=True, timeout=10) as connection:
+        with closing(sqlite3.connect(uri, uri=True, timeout=10)) as connection:
             rows = connection.execute("PRAGMA integrity_check").fetchall()
     except sqlite3.Error as error:
         raise BackupError(f"SQLite integrity check failed: {type(error).__name__}") from error
@@ -107,10 +108,11 @@ def _snapshot_database(source: Path, destination: Path) -> None:
     source_uri = f"file:{quote(source.as_posix(), safe='/')}?mode=ro"
     try:
         with (
-            sqlite3.connect(source_uri, uri=True, timeout=10) as source_connection,
-            sqlite3.connect(destination) as destination_connection,
+            closing(sqlite3.connect(source_uri, uri=True, timeout=10)) as source_connection,
+            closing(sqlite3.connect(destination)) as destination_connection,
         ):
             source_connection.backup(destination_connection)
+            destination_connection.commit()
         _database_integrity(destination)
     except (sqlite3.Error, BackupError) as error:
         destination.unlink(missing_ok=True)

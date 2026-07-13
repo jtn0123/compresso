@@ -66,6 +66,28 @@ def test_create_and_rehearse_private_state_backup(tmp_path):
 
 
 @pytest.mark.unittest
+def test_backup_and_rehearsal_close_every_database_connection(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    real_connect = sqlite3.connect
+    connections = []
+
+    def tracked_connect(*args, **kwargs):
+        connection = real_connect(*args, **kwargs)
+        connections.append(connection)
+        return connection
+
+    with patch("compresso.ops.state_backup.sqlite3.connect", side_effect=tracked_connect):
+        create_state_backup(settings, "state.zip")
+        verify_state_backup(settings, "state.zip")
+
+    assert connections
+    for connection in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+            connection.execute("SELECT 1")
+
+
+@pytest.mark.unittest
 def test_rehearsal_rejects_tampered_payload(tmp_path):
     settings = _settings(tmp_path)
     _seed_state(tmp_path)
