@@ -103,3 +103,14 @@ def test_release_recovery_revalidates_exact_artifacts_before_publication():
     assert 'docker buildx imagetools create -t "${image}:${RELEASE_VERSION}"' in workflow
     assert 'docker buildx imagetools create -t "${image}:latest"' in workflow
     assert 'gh release edit "${RELEASE_TAG}" --draft=false' in workflow
+
+
+def test_issue_only_stale_jobs_cannot_close_pull_requests():
+    workflow = _read(".github/workflows/issues-stale.yml")
+
+    for step_name in ("Plugin Issues", "Documentation Issues"):
+        step = workflow.split(f"- name: {step_name}", 1)[1]
+        if "      - name:" in step:
+            step = step.split("      - name:", 1)[0]
+        assert "days-before-pr-stale: -1" in step
+        assert "days-before-pr-close: -1" in step

@@ -44,6 +44,8 @@ jobs:
             https://github.com/jtn0123/compresso and not against one of the core projects.
           days-before-stale: 0
           days-before-close: 0
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
           only-issue-labels: "invalid:plugin"
           stale-issue-label: "invalid:plugin"
 
@@ -56,5 +58,7 @@ jobs:
             https://github.com/jtn0123/compresso and not against one of the core projects.
           days-before-stale: 0
           days-before-close: 0
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
           only-issue-labels: "invalid:documentation"
           stale-issue-label: "invalid:documentation"
