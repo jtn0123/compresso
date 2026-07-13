@@ -391,6 +391,14 @@ test('onboarding and plugin controls stay usable on narrow keyboard layouts @mob
 
   const onboarding = page.getByRole('dialog')
   await expect(onboarding.getByText('Welcome to Compresso')).toBeVisible()
+  await expect
+    .poll(() =>
+      onboarding.evaluate(
+        (element) =>
+          element.getAnimations({ subtree: true }).filter((animation) => animation.playState === 'running').length,
+      ),
+    )
+    .toBe(0)
   const dialogBounds = await onboarding.boundingBox()
   expect(dialogBounds.width).toBeLessThanOrEqual(page.viewportSize().width)
 

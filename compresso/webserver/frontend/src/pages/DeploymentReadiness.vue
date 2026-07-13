@@ -6,21 +6,19 @@
       <AdmonitionBanner
         data-testid="deployment-gate"
         :type="readiness.ready ? 'tip' : 'caution'"
-        :title="
-          readiness.ready ? $t('pages.deploymentReadiness.ready') : $t('pages.deploymentReadiness.notReady')
-        "
+        :title="readiness.ready ? $t('pages.deploymentReadiness.ready') : $t('pages.deploymentReadiness.notReady')"
         class="q-mb-lg"
       >
         {{
-          readiness.ready
-            ? $t('pages.deploymentReadiness.readyDetail')
-            : $t('pages.deploymentReadiness.notReadyDetail')
+          readiness.ready ? $t('pages.deploymentReadiness.readyDetail') : $t('pages.deploymentReadiness.notReadyDetail')
         }}
       </AdmonitionBanner>
 
       <div v-if="loading" class="row q-col-gutter-md">
         <div v-for="index in 2" :key="index" class="col-12 col-md-6">
-          <q-card flat bordered><q-card-section><q-skeleton type="rect" height="180px" /></q-card-section></q-card>
+          <q-card flat bordered
+            ><q-card-section><q-skeleton type="rect" height="180px" /></q-card-section
+          ></q-card>
         </div>
       </div>
 
@@ -125,7 +123,12 @@
                     :data-testid="`doctor-check-${check.id || check.name}`"
                     class="nested-card q-pa-md row items-center"
                   >
-                    <q-icon :name="checkIcon(check.status)" :color="checkColor(check.status)" size="sm" class="q-mr-sm" />
+                    <q-icon
+                      :name="checkIcon(check.status)"
+                      :color="checkColor(check.status)"
+                      size="sm"
+                      class="q-mr-sm"
+                    />
                     <div class="col">
                       <div class="text-weight-medium">{{ check.summary || check.name }}</div>
                       <div v-if="check.detail" class="text-caption text-secondary">{{ check.detail }}</div>

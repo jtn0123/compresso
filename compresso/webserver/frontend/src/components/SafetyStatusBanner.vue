@@ -1,10 +1,5 @@
 <template>
-  <q-banner
-    v-if="pauseRequired"
-    data-testid="global-safety-banner"
-    class="bg-negative text-white"
-    dense
-  >
+  <q-banner v-if="pauseRequired" data-testid="global-safety-banner" class="bg-negative text-white" dense>
     <template #avatar><q-icon name="report_problem" /></template>
     {{ $t('pages.deploymentReadiness.globalPause') }}
     <template #action>
