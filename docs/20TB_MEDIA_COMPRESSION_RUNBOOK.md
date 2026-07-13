@@ -74,7 +74,7 @@ configured media library:
 ```bash
 export COMPRESSO_FAULT_LAB=1
 compresso fault-lab --scenario all --seed 20 \
-  --report /path/to/evidence/fault-lab-seed-20.json
+  --report fault-lab-seed-20.json
 ```
 
 For a persistent scratch workspace, initialize it explicitly before running:
@@ -82,7 +82,7 @@ For a persistent scratch workspace, initialize it explicitly before running:
 ```bash
 compresso fault-lab --workspace /path/to/empty/scratch --init-workspace
 compresso fault-lab --workspace /path/to/empty/scratch --scenario all \
-  --seed 20 --report /path/to/evidence/fault-lab-seed-20.json
+  --seed 20 --report fault-lab-seed-20.json
 ```
 
 The guard requires both `COMPRESSO_FAULT_LAB=1` and a generated marker for an

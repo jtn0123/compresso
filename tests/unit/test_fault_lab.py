@@ -7,6 +7,7 @@ import os
 import stat
 from collections import OrderedDict
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -108,10 +109,16 @@ def test_atomic_report_write_uses_private_permissions(tmp_path):
 def test_cli_refuses_unmarked_workspace_without_touching_report(tmp_path, monkeypatch):
     workspace = tmp_path / "unmarked"
     workspace.mkdir()
-    report = tmp_path / "report.json"
+    report = tmp_path / "userdata" / "fault-lab" / "report.json"
+    settings = MagicMock()
+    settings.get_userdata_path.return_value = str(tmp_path / "userdata")
+    settings.get_config_path.return_value = str(tmp_path / "config")
+    settings.get_cache_path.return_value = str(tmp_path / "cache")
+    settings.get_library_path.return_value = str(tmp_path / "library")
+    monkeypatch.setattr(fault_lab, "Config", lambda: settings)
     monkeypatch.setenv(fault_lab.ENABLE_ENV, "1")
 
-    exit_code = fault_lab.main(["--workspace", str(workspace), "--scenario", "all", "--report", str(report)])
+    exit_code = fault_lab.main(["--workspace", str(workspace), "--scenario", "all", "--report", report.name])
 
     assert exit_code == 2
     assert not report.exists()
@@ -241,7 +248,13 @@ def test_cli_initializes_explicit_workspace(tmp_path, monkeypatch, capsys):
 
 
 def test_cli_ephemeral_run_writes_report(tmp_path, monkeypatch):
-    report_path = tmp_path / "report.json"
+    report_path = tmp_path / "userdata" / "fault-lab" / "report.json"
+    settings = MagicMock()
+    settings.get_userdata_path.return_value = str(tmp_path / "userdata")
+    settings.get_config_path.return_value = str(tmp_path / "config")
+    settings.get_cache_path.return_value = str(tmp_path / "cache")
+    settings.get_library_path.return_value = str(tmp_path / "library")
+    monkeypatch.setattr(fault_lab, "Config", lambda: settings)
     monkeypatch.setenv(fault_lab.ENABLE_ENV, "1")
     monkeypatch.setattr(
         fault_lab,
@@ -249,7 +262,13 @@ def test_cli_ephemeral_run_writes_report(tmp_path, monkeypatch):
         OrderedDict({"tiny": lambda _context: {"synthetic": "verified"}}),
     )
 
-    exit_code = fault_lab.main(["--scenario", "tiny", "--report", str(report_path)])
+    exit_code = fault_lab.main(["--scenario", "tiny", "--report", report_path.name])
 
     assert exit_code == 0
     assert json.loads(report_path.read_text())["scenarios"][0]["evidence"] == {"synthetic": "verified"}
+
+
+@pytest.mark.parametrize("name", ["../escape.json", "/tmp/escape.json", "report.txt", "bad name.json"])
+def test_report_destination_rejects_paths_and_unsafe_names(tmp_path, name):
+    with pytest.raises(fault_lab.SafetyError, match="safe JSON filename"):
+        fault_lab.report_destination(str(tmp_path), name)

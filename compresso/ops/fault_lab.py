@@ -11,6 +11,7 @@ import hashlib
 import importlib
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -27,6 +28,7 @@ from compresso.libs.resumable_transfer import ResumableTransferStore, file_sha25
 
 ENABLE_ENV = "COMPRESSO_FAULT_LAB"
 MARKER_NAME = ".compresso-fault-lab.json"
+REPORT_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.json")
 MARKER_PAYLOAD = {"kind": "compresso-synthetic-fault-lab", "schema_version": 1}
 SCHEMA_VERSION = 1
 
@@ -69,6 +71,17 @@ def write_report(path: Path, payload: Mapping[str, Any]) -> None:
         if os.path.exists(temporary):
             os.unlink(temporary)
         raise
+
+
+def report_destination(userdata_path: str, name: str) -> Path:
+    """Resolve a CLI report filename inside the installation-owned evidence directory."""
+    if Path(name).name != name or REPORT_NAME_PATTERN.fullmatch(name) is None:
+        raise SafetyError("--report must be a safe JSON filename, not a path")
+    report_root = Path(userdata_path).expanduser().resolve() / "fault-lab"
+    destination = (report_root / name).resolve()
+    if destination.parent != report_root:
+        raise SafetyError("--report escapes the fault-lab evidence directory")
+    return destination
 
 
 def initialize_workspace(path: Path) -> Path:
@@ -420,7 +433,7 @@ def _run_main(args: argparse.Namespace) -> int:
         with tempfile.TemporaryDirectory(prefix="compresso-fault-lab-") as temporary:
             workspace = initialize_workspace(Path(temporary))
             report = FaultLab(workspace, seed=args.seed, protected_paths=protected).run(args.scenario)
-    write_report(Path(args.report), report)
+    write_report(report_destination(settings.get_userdata_path(), args.report), report)
     sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
     return 0 if report["overall_status"] == "pass" else 1
 
