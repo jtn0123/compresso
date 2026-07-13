@@ -121,6 +121,17 @@ class TestLinks:
         assert new_key is not False
 
     @pytest.mark.unittest
+    def test_network_transfer_lock_refresh_extends_slow_transfer_lease(self):
+        links = self._create_links()
+        links._network_transfer_lock = {}
+        with patch("compresso.libs.installation_link.time.time", return_value=100.0):
+            lock_key = links.acquire_network_transfer_lock("http://slow-nas", transfer_limit=1)
+        with patch("compresso.libs.installation_link.time.time", return_value=200.0):
+            assert links.refresh_network_transfer_lock(lock_key) is True
+
+        assert links._network_transfer_lock[lock_key]["expires"] == 200.0 + links.NETWORK_TRANSFER_LOCK_TTL_SECONDS
+
+    @pytest.mark.unittest
     def test_remote_api_get_constructs_url(self):
         links = self._create_links()
         mock_response = MagicMock()

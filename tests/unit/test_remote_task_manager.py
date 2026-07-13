@@ -10,6 +10,7 @@ via name-mangling access (_RemoteTaskManager__method_name).
 
 import hashlib
 import queue
+import shutil
 import threading
 import time
 from unittest.mock import MagicMock, patch
@@ -641,6 +642,17 @@ class TestSendTaskRemotePathCreation:
 
         assert result is False
 
+    def test_missing_remote_library_mapping_falls_back_to_send_file(self, tmp_path):
+        mgr, task, mock_library = self._base_setup(tmp_path)
+        mgr.links.get_the_remote_library_config_by_name.return_value = None
+        mgr.links.send_file_to_remote_installation.return_value = None
+
+        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        mgr.links.send_file_to_remote_installation.assert_called_once()
+
     def test_enable_remote_only_skips_path_creation(self, tmp_path):
         mgr, task, mock_library = self._base_setup(tmp_path)
         mgr.links.get_the_remote_library_config_by_name.return_value = {
@@ -749,6 +761,42 @@ class TestSendTaskFileUpload:
 
         mgr.links.acquire_network_transfer_lock.assert_called()
         assert result is False
+
+    def test_large_upload_progress_renews_network_lock(self, tmp_path):
+        mgr, task, mock_library = self._base_setup(tmp_path, file_size=200_000_001)
+        lock_key = "lock-abc"
+        mgr.links.acquire_network_transfer_lock.return_value = lock_key
+
+        def interrupted_upload(*_args, **kwargs):
+            assert kwargs["progress_callback"]() is True
+            return None
+
+        mgr.links.send_file_to_remote_installation.side_effect = interrupted_upload
+
+        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        mgr.links.refresh_network_transfer_lock.assert_called_once_with(lock_key)
+        mgr.links.release_network_transfer_lock.assert_called_once_with(lock_key)
+
+    def test_upload_stops_retrying_when_task_lease_is_lost(self, tmp_path):
+        mgr, task, mock_library = self._base_setup(tmp_path)
+        mgr.lease_token = hashlib.sha256(b"lost upload lease").hexdigest()
+        mgr._heartbeat_remote_lease = MagicMock(return_value=False)
+
+        def interrupted_upload(*_args, **kwargs):
+            assert kwargs["progress_callback"]() is False
+            return None
+
+        mgr.links.send_file_to_remote_installation.side_effect = interrupted_upload
+
+        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        mgr.links.send_file_to_remote_installation.assert_called_once()
+        mgr._RemoteTaskManager__write_failure_to_worker_log.assert_called_once()
 
     def test_upload_deadline_exceeded_returns_false(self, tmp_path):
         mgr, task, mock_library = self._base_setup(tmp_path)
@@ -998,6 +1046,29 @@ class TestPollingLoop:
 
         assert result is False
 
+    def test_polling_stops_immediately_when_remote_lease_is_lost(self, tmp_path):
+        mgr, mock_library = self._setup_polling(tmp_path)
+        mgr.lease_token = hashlib.sha256(b"poll lease").hexdigest()
+        mgr._heartbeat_remote_lease = MagicMock(return_value=False)
+        mgr.links.get_remote_pending_task_state.return_value = {"results": [{"id": 5, "status": "complete"}]}
+
+        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        mgr.links.fetch_remote_task_data.assert_not_called()
+        mgr._RemoteTaskManager__write_failure_to_worker_log.assert_called()
+
+    def test_malformed_remote_results_fail_closed_without_crashing(self, tmp_path):
+        mgr, mock_library = self._setup_polling(tmp_path)
+        mgr.links.get_remote_pending_task_state.return_value = {"results": "not-a-list"}
+
+        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        mgr._RemoteTaskManager__write_failure_to_worker_log.assert_called()
+
 
 # ===========================================================================
 # TestSendTaskToRemoteWorkerAndMonitor — download phase (local path branch)
@@ -1100,6 +1171,37 @@ class TestDownloadPhaseLocalPath:
         assert result is False
         mgr._RemoteTaskManager__write_failure_to_worker_log.assert_called()
 
+    def test_remote_result_cannot_select_existing_file_outside_library(self, tmp_path):
+        mgr, mock_library, _cache_dir = self._setup_download(tmp_path, abspath_exists=True)
+        outside = tmp_path.parent / "outside_result-zzzzz-9999999999.mkv"
+        outside.write_bytes(b"outside")
+        mgr.links.fetch_remote_task_data.return_value.update(
+            {
+                "abspath": str(outside),
+                "checksum": f"sha256:{hashlib.sha256(b'outside').hexdigest()}",
+            }
+        )
+
+        with (
+            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote_task_manager.shutil.copy", wraps=shutil.copy) as copy_file,
+        ):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        copy_file.assert_not_called()
+
+    def test_non_object_remote_task_state_fails_closed(self, tmp_path):
+        mgr, mock_library, _cache_dir = self._setup_download(tmp_path, abspath_exists=True)
+        mgr.links.fetch_remote_task_data.return_value["task_state"] = "not-an-object"
+
+        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        mgr._RemoteTaskManager__write_failure_to_worker_log.assert_called()
+
 
 # ===========================================================================
 # TestSendTaskToRemoteWorkerAndMonitor — download phase (network download branch)
@@ -1164,6 +1266,57 @@ class TestDownloadPhaseNetworkDownload:
 
         assert result is True
         mgr.links.remove_task_from_remote_installation.assert_called()
+
+    def test_resumable_download_progress_renews_lock_and_lease(self, tmp_path):
+        mgr, mock_library, cache_dir = self._setup_network_download(tmp_path)
+        lock_key = "lock-xyz"
+        mgr.lease_token = hashlib.sha256(b"test lease").hexdigest()
+        mgr.links.acquire_network_transfer_lock.return_value = lock_key
+        mgr._heartbeat_remote_lease = MagicMock(return_value=True)
+
+        def complete_download(_config, _task_id, path, *, progress_callback):
+            assert progress_callback() is True
+            with open(path, "wb") as output:
+                output.write(b"downloaded")
+            return True
+
+        mgr.links.fetch_remote_task_completed_file_resumable.side_effect = complete_download
+
+        with (
+            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote_task_manager.file_sha256", return_value="correcthash"),
+            patch("compresso.libs.remote_task_manager.RemoteTaskLease.complete", return_value=True),
+        ):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is True
+        mgr.links.refresh_network_transfer_lock.assert_called_once_with(lock_key)
+        mgr._heartbeat_remote_lease.assert_called()
+        mgr.links.release_network_transfer_lock.assert_called_once_with(lock_key)
+
+    def test_download_stops_retrying_when_task_lease_is_lost(self, tmp_path):
+        mgr, mock_library, cache_dir = self._setup_network_download(tmp_path)
+        lock_key = "lock-xyz"
+        mgr.lease_token = hashlib.sha256(b"lost download lease").hexdigest()
+        mgr.links.acquire_network_transfer_lock.return_value = lock_key
+        mgr._heartbeat_remote_lease = MagicMock(side_effect=[True, False, False])
+
+        def interrupted_download(_config, _task_id, _path, *, progress_callback):
+            assert progress_callback() is False
+            return False
+
+        mgr.links.fetch_remote_task_completed_file_resumable.side_effect = interrupted_download
+
+        with (
+            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+        ):
+            result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+        assert result is False
+        mgr.links.fetch_remote_task_completed_file_resumable.assert_called_once()
+        mgr._RemoteTaskManager__write_failure_to_worker_log.assert_called_once()
 
     def test_download_failure_returns_false(self, tmp_path):
         mgr, mock_library, cache_dir = self._setup_network_download(tmp_path)

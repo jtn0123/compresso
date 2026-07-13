@@ -662,8 +662,8 @@ class TestCheckRemoteWorkersInternals:
         assert uuid in result
         assert result[uuid]["available_workers"] is True
 
-    def test_adds_installation_with_busy_worker(self):
-        """Lines 930-933: busy (not idle) worker also counts."""
+    def test_does_not_advertise_busy_worker_without_preloading(self):
+        """A busy worker cannot accept another task unless queue preloading is enabled."""
         links = _make_links()
         links.settings = MagicMock()
         uuid = "b" * 21
@@ -680,8 +680,7 @@ class TestCheckRemoteWorkersInternals:
         ):
             result = links.check_remote_installation_for_available_workers()
 
-        assert uuid in result
-        assert result[uuid]["available_workers"] is True
+        assert uuid not in result
 
     def test_preloading_adds_extra_slots(self):
         """Lines 936-940: preloading expands available_slots."""
@@ -703,6 +702,27 @@ class TestCheckRemoteWorkersInternals:
             result = links.check_remote_installation_for_available_workers()
 
         assert result[uuid]["available_slots"] > 1
+        assert result[uuid]["available_slots"] == 4
+
+    def test_paused_worker_is_not_advertised_even_with_preloading(self):
+        links = _make_links()
+        links.settings = MagicMock()
+        uuid = "d" * 21
+        cfg = self._available_config(uuid=uuid, preloading=True, preloading_count=3)
+        links.settings.get_remote_installations.return_value = [cfg]
+
+        def api_get(config, endpoint, **kw):
+            if "workers" in endpoint:
+                return {"workers_status": [{"id": "w1", "idle": True, "paused": True}]}
+            return {"libraries": []}
+
+        with (
+            patch.object(links, "remote_api_get", side_effect=api_get),
+            patch.object(links, "remote_api_post", return_value={"recordsFiltered": 0}),
+        ):
+            result = links.check_remote_installation_for_available_workers()
+
+        assert uuid not in result
 
     def test_exception_in_try_block_continues(self):
         """Lines 942-948: generic exception → log and continue."""

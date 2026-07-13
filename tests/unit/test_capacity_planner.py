@@ -69,6 +69,25 @@ def test_library_analysis_iterator_is_bounded_sorted_and_media_only(tmp_path):
     assert relative == ["a/clip.mp4", "b/movie.mkv"]
 
 
+def test_library_analysis_iterator_rejects_symlinked_media(tmp_path):
+    outside = _write_media(tmp_path.parent, "outside.mkv", 5)
+    (tmp_path / "linked.mkv").symlink_to(outside)
+
+    with pytest.raises(ValueError, match="symbolic-link media"):
+        list(library_analysis.iter_media_files(tmp_path))
+
+
+def test_library_analysis_iterator_surfaces_walk_errors(tmp_path, monkeypatch):
+    def unreadable_walk(_root, *, onerror):
+        onerror(PermissionError("denied"))
+        return iter(())
+
+    monkeypatch.setattr(library_analysis.os, "walk", unreadable_walk)
+
+    with pytest.raises(PermissionError, match="denied"):
+        list(library_analysis.iter_media_files(tmp_path))
+
+
 def test_sampled_plan_inventory_is_exact_and_probe_selection_is_deterministic(tmp_path, monkeypatch):
     settings = FakeSettings(tmp_path / "settings")
     source = tmp_path / "library"
@@ -307,7 +326,7 @@ def test_partial_savings_evidence_reports_coverage_and_low_confidence(tmp_path, 
     assert report["savings"]["confidence"] == "low"
 
 
-def test_empty_inventory_and_short_runtime_history_remain_unknown(tmp_path, monkeypatch):
+def test_empty_inventory_is_rejected_instead_of_producing_a_zero_file_plan(tmp_path, monkeypatch):
     settings = FakeSettings(tmp_path / "settings")
     source = tmp_path / "library"
     source.mkdir()
@@ -317,11 +336,23 @@ def test_empty_inventory_and_short_runtime_history_remain_unknown(tmp_path, monk
         lambda _path: SimpleNamespace(total=1_000, used=100, free=900),
     )
 
-    report = planner.build_capacity_plan(settings, source, throughput_bytes_per_second=[100, 200])
+    with pytest.raises(ValueError, match="no supported media files"):
+        planner.build_capacity_plan(settings, source, throughput_bytes_per_second=[100, 200])
 
-    assert report["inventory"]["largest_file"] is None
-    assert report["runtime"]["status"] == "unknown"
-    assert report["runtime"]["historical_samples"] == 2
+
+def test_inventory_rejects_silently_unreadable_directories(tmp_path, monkeypatch):
+    settings = FakeSettings(tmp_path / "settings")
+    source = tmp_path / "library"
+    source.mkdir()
+
+    def unreadable(_source, *, on_error=None):
+        on_error(PermissionError("denied"))
+        return iter(())
+
+    monkeypatch.setattr(planner.library_analysis, "iter_media_files", unreadable)
+
+    with pytest.raises(ValueError, match="unreadable directory"):
+        planner.build_capacity_plan(settings, source)
 
 
 def test_cli_path_mode_saves_planner_result(tmp_path, monkeypatch, capsys):

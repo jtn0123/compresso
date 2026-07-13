@@ -179,6 +179,23 @@ def test_invalid_role_is_rejected(tmp_path):
         DeploymentDoctor(FakeSettings(tmp_path), "scheduler")
 
 
+def test_cache_nested_inside_library_fails_separation_check(tmp_path, monkeypatch):
+    settings = FakeSettings(tmp_path)
+    nested_cache = tmp_path / "library" / "nested-cache"
+    nested_cache.mkdir()
+    settings.get_cache_path = lambda: str(nested_cache)
+    monkeypatch.setattr(
+        "compresso.ops.doctor.shutil.disk_usage",
+        lambda _path: SimpleNamespace(total=10 * 1024**3, used=1, free=9 * 1024**3),
+    )
+
+    checks = DeploymentDoctor(settings, "master")._path_checks()
+
+    separation = next(check for check in checks if check.check_id == "path.cache_separation")
+    assert separation.status == "fail"
+    assert separation.blocking is True
+
+
 def test_load_latest_report_rejects_malformed_root(tmp_path):
     readiness = tmp_path / "readiness"
     readiness.mkdir()

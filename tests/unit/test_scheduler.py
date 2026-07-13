@@ -371,6 +371,9 @@ class TestTransferCleanup:
         artifact = cache_path / "remote_transfers" / "completed" / "transfer-1" / "movie.mkv"
         artifact.parent.mkdir(parents=True)
         artifact.write_bytes(b"encoded")
+        manifest = cache_path / "remote_transfers" / "manifests" / "transfer-1.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text("{}")
         settings = MagicMock()
         settings.get_cache_path.return_value = str(cache_path)
         settings.get_remote_artifact_retention_hours.return_value = 1
@@ -386,6 +389,7 @@ class TestTransferCleanup:
 
         task_class.return_value.delete_tasks_recursively.assert_called_once_with([7])
         assert not artifact.parent.exists()
+        assert not manifest.exists()
 
 
 @pytest.mark.unittest

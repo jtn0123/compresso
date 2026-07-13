@@ -38,6 +38,15 @@ def test_scan_checkpoint_recovers_from_corrupt_journal(tmp_path):
 
 
 @pytest.mark.unittest
+def test_scan_checkpoint_rejects_non_object_json_without_crashing(tmp_path):
+    checkpoint_dir = tmp_path / "scan-checkpoints"
+    checkpoint_dir.mkdir()
+    (checkpoint_dir / "library-7.json").write_text("[]")
+
+    assert ScanCheckpointStore(str(tmp_path)).load(7, "/media/movies") is None
+
+
+@pytest.mark.unittest
 def test_checkpoint_write_is_valid_json(tmp_path):
     store = ScanCheckpointStore(str(tmp_path))
     store.save(4, "/media/tv", "Shows/A")
@@ -53,3 +62,24 @@ def test_store_instances_share_lock_and_do_not_share_fixed_temp_filename(tmp_pat
     second = ScanCheckpointStore(str(tmp_path))
 
     assert first._lock is second._lock
+
+
+@pytest.mark.unittest
+@pytest.mark.parametrize("completed_root", ["../outside", "/absolute", r"..\outside"])
+def test_scan_checkpoint_rejects_unsafe_completed_root(tmp_path, completed_root):
+    store = ScanCheckpointStore(str(tmp_path))
+    store.save(7, "/media/movies", completed_root)
+
+    assert store.load(7, "/media/movies") is None
+
+
+@pytest.mark.unittest
+def test_scan_checkpoint_exposes_timestamp_for_mutation_detection(tmp_path):
+    store = ScanCheckpointStore(str(tmp_path))
+    store.save(7, "/media/movies", "B")
+
+    record = store.load_record(7, "/media/movies")
+
+    assert record["completed_root"] == "B"
+    assert isinstance(record["updated_at_ns"], int)
+    assert record["updated_at_ns"] > 0

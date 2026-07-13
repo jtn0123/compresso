@@ -32,6 +32,7 @@ Copyright:
 import hashlib
 import json
 import os.path
+import re
 import threading
 import time
 import urllib.parse
@@ -51,6 +52,7 @@ _REMOTE_LIBRARIES_API = "/compresso/api/v2/settings/libraries"
 
 
 class Links(metaclass=SingletonType):
+    NETWORK_TRANSFER_LOCK_TTL_SECONDS = 30 * 60
     _network_transfer_lock: dict = {}
     _transfer_lock = threading.RLock()
 
@@ -211,14 +213,25 @@ class Links(metaclass=SingletonType):
             for tx_lock in range(transfer_limit):
                 lock_key = f"[{lock_type}-{tx_lock}]-{url}"
                 if self._network_transfer_lock.get(lock_key, {}).get("expires", 0) < time_now:
-                    # Create new upload lock that will expire in 1 minute
+                    # Bound leaked locks, but do not let one slow NAS chunk outlive
+                    # an actively held transfer slot.
                     self._network_transfer_lock[lock_key] = {
-                        "expires": (time_now + 60),
+                        "expires": (time_now + self.NETWORK_TRANSFER_LOCK_TTL_SECONDS),
                     }
                     # Return success
                     return lock_key
             # Failed to acquire network transfer lock
             return False
+
+    def refresh_network_transfer_lock(self, lock_key):
+        """Renew an actively progressing transfer lease without changing its slot."""
+        if not lock_key:
+            return False
+        with self._transfer_lock:
+            if not self._network_transfer_lock.get(lock_key):
+                return False
+            self._network_transfer_lock[lock_key]["expires"] = time.time() + self.NETWORK_TRANSFER_LOCK_TTL_SECONDS
+            return True
 
     def release_network_transfer_lock(self, lock_key):
         """
@@ -227,6 +240,8 @@ class Links(metaclass=SingletonType):
         :param lock_key:
         :return:
         """
+        if not lock_key:
+            return False
         lock = self._transfer_lock
         with lock:
             # Expire the lock for this address
@@ -932,8 +947,14 @@ class Links(metaclass=SingletonType):
                 except Exception:
                     capabilities = {}
 
-                # Ensure that worker count is more than 0
-                if len(worker_list):
+                idle_slots = sum(bool(worker.get("idle")) and not bool(worker.get("paused")) for worker in worker_list)
+                active_nonpaused_workers = sum(not bool(worker.get("paused")) for worker in worker_list)
+                preload_slots = 0
+                if local_config.get("enable_task_preloading") and active_nonpaused_workers:
+                    preload_slots = max(0, int(max_pending_tasks) - current_pending_tasks)
+                available_slots = idle_slots + preload_slots
+
+                if available_slots:
                     installations_with_info[local_config.get("uuid")] = {
                         "address": local_config.get("address"),
                         "auth": local_config.get("auth"),
@@ -942,31 +963,12 @@ class Links(metaclass=SingletonType):
                         "enable_task_preloading": local_config.get("enable_task_preloading"),
                         "preloading_count": local_config.get("preloading_count"),
                         "library_names": library_names,
-                        "available_slots": 0,
+                        "available_slots": available_slots,
                         "queue_depth": current_pending_tasks,
                         "capabilities": capabilities,
                         "scheduling_score": WorkerCapabilities.scheduling_score(capabilities) or 0,
+                        "available_workers": bool(idle_slots),
                     }
-
-                available_workers = False
-                for worker in worker_list:
-                    # Add a slot for each worker regardless of its status
-                    installations_with_info[local_config.get("uuid")]["available_slots"] += 1
-                    if worker.get("idle") and not worker.get("paused"):
-                        # If any workers are idle and not paused then we have an available worker slot
-                        available_workers = True
-                        installations_with_info[local_config.get("uuid")]["available_workers"] = True
-                    elif not worker.get("idle"):
-                        # If any workers are busy with a task then also mark that as an an available worker slot
-                        available_workers = True
-                        installations_with_info[local_config.get("uuid")]["available_workers"] = True
-
-                # Check if this installation is configured for preloading
-                if available_workers and local_config.get("enable_task_preloading"):
-                    # Add more slots to fill up the pending task queue
-                    while not current_pending_tasks > max_pending_tasks:
-                        installations_with_info[local_config.get("uuid")]["available_slots"] += 1
-                        current_pending_tasks += 1
 
             except Exception as e:
                 self._log(
@@ -1147,8 +1149,8 @@ class Links(metaclass=SingletonType):
                 if next_offset != offset + len(chunk):
                     return {}
                 offset = next_offset
-                if progress_callback:
-                    progress_callback()
+                if progress_callback and progress_callback() is False:
+                    return {}
         return self.remote_api_post(
             remote_config,
             f"/compresso/api/v2/transfer/finalize/{transfer_id}",
@@ -1162,6 +1164,7 @@ class Links(metaclass=SingletonType):
         remote_task_id,
         path,
         chunk_size=8 * 1024 * 1024,
+        progress_callback=None,
     ):
         manifest = self.remote_api_get(
             remote_config,
@@ -1172,10 +1175,27 @@ class Links(metaclass=SingletonType):
             return False
         safe_path = os.path.realpath(path)
         cache_root = os.path.realpath(self.settings.get_cache_path())
-        if os.path.commonpath((cache_root, safe_path)) != cache_root:
+        try:
+            destination_is_safe = safe_path != cache_root and os.path.commonpath((cache_root, safe_path)) == cache_root
+        except ValueError:
+            destination_is_safe = False
+        if not destination_is_safe:
             raise ValueError("Remote transfer destination must be inside the Compresso cache")
-        total_size = int(manifest["total_size"])
+        if not isinstance(manifest, dict):
+            return False
+        total_size = manifest.get("total_size")
+        checksum = manifest.get("checksum")
+        if (
+            not isinstance(total_size, int)
+            or isinstance(total_size, bool)
+            or total_size < 0
+            or not isinstance(checksum, str)
+            or re.fullmatch(r"sha256:[a-f0-9]{64}", checksum) is None
+        ):
+            return False
         partial_path = f"{safe_path}.part"
+        if os.path.commonpath((cache_root, os.path.realpath(partial_path))) != cache_root:
+            raise ValueError("Remote transfer partial path must be inside the Compresso cache")
         offset = os.path.getsize(partial_path) if os.path.exists(partial_path) else 0
         if offset > total_size:
             os.remove(partial_path)  # NOSONAR - partial_path is constrained to cache_root above
@@ -1200,12 +1220,16 @@ class Links(metaclass=SingletonType):
                 actual_chunk_checksum = f"sha256:{hashlib.sha256(response.content).hexdigest()}"
                 if expected_chunk_checksum != actual_chunk_checksum:
                     return False
+                if len(response.content) > min(chunk_size, total_size - offset):
+                    return False
                 output.write(response.content)
                 output.flush()
                 os.fsync(output.fileno())
                 offset += len(response.content)
+                if progress_callback and progress_callback() is False:
+                    return False
 
-        if file_sha256(partial_path) != manifest.get("checksum"):
+        if os.path.getsize(partial_path) != total_size or file_sha256(partial_path) != checksum:
             os.remove(partial_path)  # NOSONAR - partial_path is constrained to cache_root above
             return False
         os.replace(partial_path, safe_path)  # NOSONAR - both paths are constrained to cache_root above

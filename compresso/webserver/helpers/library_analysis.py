@@ -48,13 +48,24 @@ _MEDIA_EXTENSIONS = {
 }
 
 
-def iter_media_files(library_path):
+def iter_media_files(library_path, *, on_error=None):
     """Yield media paths deterministically while bounding each directory batch."""
-    for root, directories, files in os.walk(library_path):
+
+    def raise_walk_error(error):
+        raise error
+
+    for root, directories, files in os.walk(library_path, onerror=on_error or raise_walk_error):
+        for directory in directories:
+            candidate = Path(root) / directory
+            if candidate.is_symlink():
+                raise ValueError(f"library analysis refuses symbolic-link directory: {candidate}")
         directories.sort()
         for filename in sorted(files):
             if os.path.splitext(filename)[1].lower() in _MEDIA_EXTENSIONS:
-                yield Path(root) / filename
+                candidate = Path(root) / filename
+                if candidate.is_symlink():
+                    raise ValueError(f"library analysis refuses symbolic-link media: {candidate}")
+                yield candidate
 
 
 def probe_analysis_file(filepath):

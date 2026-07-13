@@ -4,6 +4,7 @@
 
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -79,6 +80,65 @@ class ResumableTransferStore:
             raise ValueError("Transfer path escapes completed directory")
         return final_path
 
+    def _validate_manifest(self, manifest, transfer_id):
+        if not isinstance(manifest, dict):
+            raise ValueError("Transfer manifest must be an object")
+        if manifest.get("version") != 1 or manifest.get("transfer_id") != transfer_id:
+            raise ValueError("Transfer manifest identity mismatch")
+        state = manifest.get("state")
+        if state not in {"active", "finalizing", "complete"}:
+            raise ValueError("Transfer manifest state is invalid")
+        try:
+            total_size = manifest["total_size"]
+            offset = manifest["offset"]
+        except KeyError as error:
+            raise ValueError("Transfer manifest sizes are invalid") from error
+        if (
+            not isinstance(total_size, int)
+            or isinstance(total_size, bool)
+            or not isinstance(offset, int)
+            or isinstance(offset, bool)
+            or total_size < 0
+            or offset < 0
+            or offset > total_size
+        ):
+            raise ValueError("Transfer manifest sizes are invalid")
+        if state in {"finalizing", "complete"} and offset != total_size:
+            raise ValueError("Transfer manifest terminal offset is invalid")
+        checksum = manifest.get("expected_checksum")
+        if not isinstance(checksum, str) or re.fullmatch(r"sha256:[a-f0-9]{64}", checksum) is None:
+            raise ValueError("Transfer manifest checksum is invalid")
+        if not isinstance(manifest.get("job_id"), str) or not manifest["job_id"]:
+            raise ValueError("Transfer manifest job identity is invalid")
+        if not isinstance(manifest.get("metadata"), dict):
+            raise ValueError("Transfer manifest metadata is invalid")
+        updated_at = manifest.get("updated_at")
+        if (
+            not isinstance(updated_at, (int, float))
+            or isinstance(updated_at, bool)
+            or not math.isfinite(updated_at)
+            or updated_at < 0
+        ):
+            raise ValueError("Transfer manifest timestamp is invalid")
+        self._final_path(manifest)
+        return manifest
+
+    def _active_partial_size(self, manifest):
+        partial_path = self._partial_path(manifest["transfer_id"])
+        size = partial_path.stat().st_size if partial_path.exists() else 0
+        if size > manifest["total_size"]:
+            raise ValueError("Transfer partial artifact exceeds its declared size")
+        return size
+
+    @staticmethod
+    def _artifact_matches_manifest(path, manifest, *, checksum=False):
+        try:
+            if not path.is_file() or path.stat().st_size != int(manifest["total_size"]):
+                return False
+            return not checksum or file_sha256(path) == manifest["expected_checksum"]
+        except OSError:
+            return False
+
     def _write_manifest(self, manifest):
         fd, temporary_path = tempfile.mkstemp(prefix=".transfer-", suffix=".tmp", dir=self.manifest_dir)
         try:
@@ -107,15 +167,18 @@ class ResumableTransferStore:
             raise KeyError(f"Unknown transfer ID: {transfer_id}")
         with open(manifest_path) as source:
             manifest = json.load(source)
-        if manifest.get("transfer_id") != transfer_id:
-            raise ValueError("Transfer manifest identity mismatch")
+        self._validate_manifest(manifest, transfer_id)
         final_path = self._final_path(manifest)
         manifest["final_path"] = str(final_path)
         if manifest.get("state") == "finalizing" and final_path.is_file():
+            if not self._artifact_matches_manifest(final_path, manifest, checksum=True):
+                raise ValueError("Finalizing transfer artifact failed integrity validation")
             manifest["state"] = "complete"
             manifest["offset"] = manifest["total_size"]
             manifest["updated_at"] = self._now()
             self._write_manifest(manifest)
+        if manifest.get("state") == "complete" and not self._artifact_matches_manifest(final_path, manifest):
+            raise ValueError("Completed transfer artifact is missing or has the wrong size")
         return manifest
 
     @staticmethod
@@ -131,12 +194,17 @@ class ResumableTransferStore:
         }
 
     def begin(self, job_id, filename, total_size, expected_checksum, metadata=None):
+        if not isinstance(job_id, str) or not job_id:
+            raise ValueError("Invalid transfer job identity")
         filename = os.path.basename(filename)
         if not filename or filename in {".", ".."}:
             raise ValueError("Invalid transfer filename")
-        total_size = int(total_size)
+        if not isinstance(total_size, int) or isinstance(total_size, bool):
+            raise ValueError("Transfer size must be an integer")
         if total_size < 0:
             raise ValueError("Transfer size cannot be negative")
+        if not isinstance(expected_checksum, str) or re.fullmatch(r"sha256:[a-f0-9]{64}", expected_checksum) is None:
+            raise ValueError("Invalid transfer checksum")
         transfer_id = self._transfer_id(job_id, filename, total_size)
         with self._lock:
             manifest_path = self._manifest_path(transfer_id)
@@ -179,8 +247,7 @@ class ResumableTransferStore:
         with self._lock:
             manifest = self._load(transfer_id)
             if manifest.get("state") == "active":
-                partial_path = self._partial_path(transfer_id)
-                manifest["offset"] = partial_path.stat().st_size if partial_path.exists() else 0
+                manifest["offset"] = self._active_partial_size(manifest)
             return self._public_status(manifest)
 
     def append(self, transfer_id, offset, data, chunk_checksum):
@@ -240,13 +307,25 @@ class ResumableTransferStore:
         with self._lock:
             for manifest_path in self.manifest_dir.glob("*.json"):
                 try:
+                    transfer_id = manifest_path.stem
+                    self._validate_transfer_id(transfer_id)
                     with open(manifest_path) as source:
                         manifest = json.load(source)
-                except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                    self._validate_manifest(manifest, transfer_id)
+                    updated_at = float(manifest.get("updated_at", 0))
+                except (KeyError, OSError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError, OverflowError):
+                    transfer_id = manifest_path.stem
+                    if re.fullmatch(r"[a-f0-9]{32}", transfer_id):
+                        self._partial_path(transfer_id).unlink(missing_ok=True)
+                        shutil.rmtree(self.completed_dir / transfer_id, ignore_errors=True)
+                        removed.append(transfer_id)
+                    manifest_path.unlink(missing_ok=True)
                     continue
-                if manifest.get("state") == "complete" or float(manifest.get("updated_at", 0)) >= cutoff:
+                if manifest.get("state") == "complete":
+                    if self._artifact_matches_manifest(self._final_path(manifest), manifest):
+                        continue
+                elif updated_at >= cutoff:
                     continue
-                transfer_id = manifest["transfer_id"]
                 partial_path = self._partial_path(transfer_id)
                 if partial_path.exists():
                     partial_path.unlink()
@@ -263,14 +342,18 @@ class ResumableTransferStore:
                 try:
                     with open(manifest_path) as source:
                         manifest = json.load(source)
+                    transfer_id = manifest_path.stem
+                    self._validate_transfer_id(transfer_id)
+                    self._validate_manifest(manifest, transfer_id)
                     state = "complete" if manifest.get("state") == "complete" else "active"
+                    if state == "complete" and not self._artifact_matches_manifest(self._final_path(manifest), manifest):
+                        raise ValueError("completed artifact is unavailable")
                     result[state] += 1
                     offset = int(manifest.get("offset", 0))
                     if state == "active":
-                        partial_path = self._partial_path(manifest["transfer_id"])
-                        offset = partial_path.stat().st_size if partial_path.exists() else 0
+                        offset = self._active_partial_size(manifest)
                     result["bytes_received"] += offset
                     result["bytes_total"] += int(manifest.get("total_size", 0))
-                except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                except (KeyError, OSError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError, OverflowError):
                     result["corrupt"] += 1
         return result

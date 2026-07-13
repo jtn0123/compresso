@@ -67,11 +67,35 @@ class SafetyState:
             if not isinstance(raw, dict):
                 raise ValueError("invalid safety state")
             data: dict[str, Any] = raw
-            if data.get("schema_version") != self.SCHEMA_VERSION or not isinstance(data.get("events"), list):
+            events = data.get("events")
+            if (
+                data.get("schema_version") != self.SCHEMA_VERSION
+                or not isinstance(data.get("pause_required"), bool)
+                or not isinstance(events, list)
+                or not all(self._valid_event(event) for event in events)
+                or (any(event["active"] for event in events) and not data["pause_required"])
+            ):
                 raise ValueError("unsupported safety state schema")
             return data
         except (OSError, ValueError, TypeError) as exc:
             return self._recover_corrupt_state(exc)
+
+    @staticmethod
+    def _valid_event(event: Any) -> bool:
+        return (
+            isinstance(event, dict)
+            and isinstance(event.get("id"), str)
+            and bool(event["id"])
+            and isinstance(event.get("code"), str)
+            and bool(event["code"])
+            and isinstance(event.get("message"), str)
+            and bool(event["message"])
+            and isinstance(event.get("active"), bool)
+            and isinstance(event.get("occurrences"), int)
+            and not isinstance(event.get("occurrences"), bool)
+            and event["occurrences"] > 0
+            and (event.get("acknowledged_at") is None or isinstance(event.get("acknowledged_at"), str))
+        )
 
     def _recover_corrupt_state(self, exc: Exception) -> dict[str, Any]:
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
