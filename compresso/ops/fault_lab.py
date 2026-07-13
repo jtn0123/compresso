@@ -31,6 +31,7 @@ MARKER_NAME = ".compresso-fault-lab.json"
 REPORT_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.json")
 MARKER_PAYLOAD = {"kind": "compresso-synthetic-fault-lab", "schema_version": 1}
 SCHEMA_VERSION = 1
+SYNTHETIC_FILENAME = "synthetic.mkv"
 
 
 class SafetyError(RuntimeError):
@@ -115,6 +116,15 @@ def _reject_home_root(workspace: Path) -> None:
         raise SafetyError("fault-lab workspace cannot be the home directory or one of its parents")
 
 
+def authorize_workspace_path(workspace: Path, protected_paths: Iterable[Path] = ()) -> None:
+    """Apply the same path boundary checks before both initialization and execution."""
+    _reject_home_root(workspace)
+    for protected in protected_paths:
+        candidate = Path(protected).expanduser().resolve()
+        if _paths_overlap(workspace, candidate):
+            raise SafetyError(f"fault-lab workspace overlaps protected path: {candidate}")
+
+
 def validate_workspace(path: Path, protected_paths: Iterable[Path] = ()) -> Path:
     """Fail closed unless both the environment and on-disk marker authorize the lab."""
     if os.environ.get(ENABLE_ENV) != "1":
@@ -127,11 +137,7 @@ def validate_workspace(path: Path, protected_paths: Iterable[Path] = ()) -> Path
         raise SafetyError("fault-lab workspace marker is missing or invalid") from error
     if marker_payload != MARKER_PAYLOAD:
         raise SafetyError("fault-lab workspace marker has the wrong identity")
-    _reject_home_root(workspace)
-    for protected in protected_paths:
-        candidate = Path(protected).expanduser().resolve()
-        if _paths_overlap(workspace, candidate):
-            raise SafetyError(f"fault-lab workspace overlaps protected path: {candidate}")
+    authorize_workspace_path(workspace, protected_paths)
     return workspace
 
 
@@ -152,7 +158,7 @@ def run_transfer_restart(context: FaultContext) -> dict[str, Any]:
     root = context.fresh_directory("transfer-restart")
     payload = _deterministic_bytes(context.seed, 64 * 1024 + 37)
     store = ResumableTransferStore(root)
-    status = store.begin("restart-job", "synthetic.mkv", len(payload), _checksum(payload))
+    status = store.begin("restart-job", SYNTHETIC_FILENAME, len(payload), _checksum(payload))
     transfer_id = status["transfer_id"]
     offset = 0
     chunks = 0
@@ -175,7 +181,7 @@ def run_transfer_corruption(context: FaultContext) -> dict[str, Any]:
     root = context.fresh_directory("transfer-corruption")
     payload = b"deterministic-corruption-probe"
     store = ResumableTransferStore(root / "chunks")
-    status = store.begin("corrupt-job", "synthetic.mkv", len(payload), _checksum(payload))
+    status = store.begin("corrupt-job", SYNTHETIC_FILENAME, len(payload), _checksum(payload))
     try:
         store.append(status["transfer_id"], 0, payload, _checksum(b"wrong"))
     except ValueError:
@@ -186,7 +192,7 @@ def run_transfer_corruption(context: FaultContext) -> dict[str, Any]:
         raise InvariantViolation("corrupt chunk advanced the durable offset")
 
     damaged = ResumableTransferStore(root / "manifests")
-    damaged_status = damaged.begin("manifest-job", "synthetic.mkv", 1, _checksum(b"x"))
+    damaged_status = damaged.begin("manifest-job", SYNTHETIC_FILENAME, 1, _checksum(b"x"))
     damaged._manifest_path(damaged_status["transfer_id"]).write_text("not-json", encoding="utf-8")
     if damaged.summary()["corrupt"] != 1:
         raise InvariantViolation("damaged transfer manifest was not quarantined")
@@ -197,7 +203,7 @@ def run_stale_offset(context: FaultContext) -> dict[str, Any]:
     root = context.fresh_directory("stale-offset")
     payload = b"0123456789"
     store = ResumableTransferStore(root)
-    status = store.begin("offset-job", "synthetic.mkv", len(payload), _checksum(payload))
+    status = store.begin("offset-job", SYNTHETIC_FILENAME, len(payload), _checksum(payload))
     store.append(status["transfer_id"], 0, payload[:4], _checksum(payload[:4]))
     try:
         store.append(status["transfer_id"], 0, payload[4:], _checksum(payload[4:]))
@@ -220,7 +226,7 @@ def run_filesystem_faults(context: FaultContext) -> dict[str, Any]:
 
     payload = b"filesystem-retry-payload"
     store = ResumableTransferStore(root, fault_injector=inject)
-    status = store.begin("filesystem-job", "synthetic.mkv", len(payload), _checksum(payload))
+    status = store.begin("filesystem-job", SYNTHETIC_FILENAME, len(payload), _checksum(payload))
     observed = []
     for expected_error in (errno.ENOSPC, errno.EROFS):
         try:
@@ -250,7 +256,7 @@ def run_finalization_recovery(context: FaultContext) -> dict[str, Any]:
 
     payload = b"finalization-payload"
     store = ResumableTransferStore(root, fault_injector=inject)
-    status = store.begin("finalize-job", "synthetic.mkv", len(payload), _checksum(payload))
+    status = store.begin("finalize-job", SYNTHETIC_FILENAME, len(payload), _checksum(payload))
     store.append(status["transfer_id"], 0, payload, _checksum(payload))
     try:
         store.finalize(status["transfer_id"])
@@ -418,10 +424,7 @@ def _run_main(args: argparse.Namespace) -> int:
         if os.environ.get(ENABLE_ENV) != "1":
             raise SafetyError(f"set {ENABLE_ENV}=1 before initializing a synthetic lab")
         workspace = Path(args.workspace).expanduser().resolve()
-        _reject_home_root(workspace)
-        for path in protected:
-            if _paths_overlap(workspace, path.expanduser().resolve()):
-                raise SafetyError(f"fault-lab workspace overlaps protected path: {path}")
+        authorize_workspace_path(workspace, protected)
         initialize_workspace(workspace)
         sys.stdout.write(json.dumps({"workspace": str(workspace), "initialized": True}, sort_keys=True) + "\n")
         return 0
