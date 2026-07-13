@@ -213,7 +213,7 @@ class FileOperationTracker:
                     self._logger.info("FileOperationTracker: restored '%s' from backup", original_path)
                 else:
                     remaining_backups.append((backup_path, original_path))
-            except (OSError, shutil.Error) as e:
+            except OSError as e:
                 self._logger.error(
                     "FileOperationTracker: FAILED to restore '%s' from backup '%s': %s", original_path, backup_path, e
                 )
