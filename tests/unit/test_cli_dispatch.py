@@ -27,6 +27,17 @@ def test_doctor_subcommand_is_dispatched_without_starting_service(monkeypatch):
     legacy.assert_not_called()
 
 
+def test_fault_lab_subcommand_is_dispatched_without_starting_service(monkeypatch):
+    lab = MagicMock(return_value=2)
+    legacy = MagicMock()
+    monkeypatch.setattr(cli, "fault_lab_main", lab)
+    monkeypatch.setattr(cli, "service_main", legacy)
+
+    assert cli.main(["fault-lab", "--scenario", "all", "--report", "report.json"]) == 2
+    lab.assert_called_once_with(["--scenario", "all", "--report", "report.json"])
+    legacy.assert_not_called()
+
+
 def test_explicit_legacy_arguments_are_forwarded(monkeypatch):
     original_argv = list(cli.sys.argv)
     observed_argv = []

@@ -26,16 +26,21 @@ class ResumableTransferStore:
     _locks_guard = threading.Lock()
     _locks_by_root: dict[str, Any] = {}
 
-    def __init__(self, root_dir, now=time.time):
+    def __init__(self, root_dir, now=time.time, fault_injector=None):
         self.root_dir = Path(root_dir).resolve()
         self.partial_dir = self.root_dir / "partial"
         self.completed_dir = self.root_dir / "completed"
         self.manifest_dir = self.root_dir / "manifests"
         self._now = now
+        self._fault_injector = fault_injector
         with self._locks_guard:
             self._lock = self._locks_by_root.setdefault(str(self.root_dir), threading.RLock())
         for directory in (self.partial_dir, self.completed_dir, self.manifest_dir):
             directory.mkdir(parents=True, exist_ok=True)
+
+    def _inject_fault(self, operation, path):
+        if self._fault_injector is not None:
+            self._fault_injector(operation, path)
 
     @staticmethod
     def _checksum(data):
@@ -191,6 +196,7 @@ class ResumableTransferStore:
                 raise ValueError("Transfer chunk checksum mismatch")
             if current_offset + len(data) > int(manifest["total_size"]):
                 raise ValueError("Transfer chunk exceeds declared size")
+            self._inject_fault("append", partial_path)
             with open(partial_path, "ab") as output:
                 output.write(data)
                 output.flush()
@@ -220,6 +226,7 @@ class ResumableTransferStore:
             manifest["state"] = "finalizing"
             manifest["updated_at"] = self._now()
             self._write_manifest(manifest)
+            self._inject_fault("final_replace", final_path)
             os.replace(partial_path, final_path)  # NOSONAR - both paths are derived within the transfer root
             manifest["state"] = "complete"
             manifest["offset"] = manifest["total_size"]

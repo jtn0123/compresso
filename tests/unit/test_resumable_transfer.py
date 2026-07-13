@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import errno
 import hashlib
 import json
 import random
@@ -231,3 +232,25 @@ def test_transfer_store_rejects_untrusted_transfer_id():
 
     with pytest.raises(ValueError, match="transfer ID"):
         store._validate_transfer_id("../escape")
+
+
+@pytest.mark.unittest
+@pytest.mark.parametrize("error_number", [errno.ENOSPC, errno.EROFS])
+def test_injected_filesystem_failure_preserves_resume_offset(tmp_path, error_number):
+    failures = [error_number]
+
+    def inject(operation, _path):
+        if operation == "append" and failures:
+            raise OSError(failures.pop(), "synthetic filesystem fault")
+
+    payload = b"safe-media"
+    store = ResumableTransferStore(tmp_path, fault_injector=inject)
+    status = store.begin("fault-job", "movie.mkv", len(payload), _sha256(payload))
+
+    with pytest.raises(OSError) as raised:
+        store.append(status["transfer_id"], 0, payload, _sha256(payload))
+
+    assert raised.value.errno == error_number
+    assert store.status(status["transfer_id"])["offset"] == 0
+    store.append(status["transfer_id"], 0, payload, _sha256(payload))
+    assert store.finalize(status["transfer_id"]).read_bytes() == payload
