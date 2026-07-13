@@ -90,6 +90,19 @@ class RemoteTaskManager(threading.Thread):
         message = common.format_message(message, message2)
         getattr(self.logger, level)(message)
 
+    @staticmethod
+    def _existing_library_result(candidate_path, library_path):
+        """Return an existing result only after confining it to the local library."""
+        library_root = os.path.realpath(library_path)
+        candidate = os.path.realpath(candidate_path)
+        try:
+            confined = candidate != library_root and os.path.commonpath((library_root, candidate)) == library_root
+        except ValueError:
+            confined = False
+        if not confined or not os.path.isfile(candidate):
+            return None
+        return candidate
+
     def get_info(self):
         return {
             "name": self.name,
@@ -667,31 +680,16 @@ class RemoteTaskManager(threading.Thread):
                 f"Remote task #{remote_task_id} was successful, proceeding to download the completed file '{task_label}'",
                 level="debug",
             )
-            self._log(f"Remote task abspath {data.get('abspath')} to be transferred", level="debug")
+            self._log("Remote task result path will be transferred", level="debug")
             remote_result_path = data.get("abspath")
             if not isinstance(remote_result_path, str) or not remote_result_path:
                 self._log(f"Remote task result path was malformed for '{original_abspath}'", level="error")
                 self.__write_failure_to_worker_log()
                 return False
-            if os.path.exists(remote_result_path):
-                resolved_library_path = os.path.realpath(library_path)
-                resolved_result_path = os.path.realpath(remote_result_path)
-                try:
-                    result_is_in_library = (
-                        resolved_result_path != resolved_library_path
-                        and os.path.commonpath((resolved_library_path, resolved_result_path)) == resolved_library_path
-                    )
-                except ValueError:
-                    result_is_in_library = False
-                if not result_is_in_library:
-                    self._log(
-                        f"Remote task result path is outside the selected library '{remote_result_path}'",
-                        level="error",
-                    )
-                    self.__write_failure_to_worker_log()
-                    return False
+            local_result_path = self._existing_library_result(remote_result_path, library_path)
+            if local_result_path:
                 # /library/tvshows/show_name/season/compresso_remote_pending_library/file.mkv
-                task_cache_path = remote_result_path
+                task_cache_path = local_result_path
                 self.current_task.cache_path = task_cache_path
                 self._log(f"abspath exists - task cache path: '{task_cache_path}'", level="debug")
                 # need to get the file into the local instance /tmp/compresso/compresso_file_conversion... location
@@ -794,7 +792,7 @@ class RemoteTaskManager(threading.Thread):
                             self.links.release_network_transfer_lock(lock_key)
                     if not success:
                         self._log(
-                            f"Download interrupted; retaining resume state for '{os.path.basename(data.get('abspath'))}'",
+                            "Download interrupted; retaining resumable transfer state",
                             level="warning",
                         )
                         if self.lease_token:

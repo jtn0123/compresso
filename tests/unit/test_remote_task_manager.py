@@ -1158,7 +1158,6 @@ class TestDownloadPhaseLocalPath:
         assert result is False
 
     def test_copy_failure_returns_false(self, tmp_path):
-
         mgr, mock_library, cache_dir = self._setup_download(tmp_path, abspath_exists=True)
 
         with (
@@ -1171,7 +1170,7 @@ class TestDownloadPhaseLocalPath:
         assert result is False
         mgr._RemoteTaskManager__write_failure_to_worker_log.assert_called()
 
-    def test_remote_result_cannot_select_existing_file_outside_library(self, tmp_path):
+    def test_remote_result_outside_library_uses_checksummed_network_download(self, tmp_path):
         mgr, mock_library, _cache_dir = self._setup_download(tmp_path, abspath_exists=True)
         outside = tmp_path.parent / "outside_result-zzzzz-9999999999.mkv"
         outside.write_bytes(b"outside")
@@ -1181,6 +1180,14 @@ class TestDownloadPhaseLocalPath:
                 "checksum": f"sha256:{hashlib.sha256(b'outside').hexdigest()}",
             }
         )
+        mgr.links.acquire_network_transfer_lock.return_value = "lock-xyz"
+
+        def complete_download(_config, _task_id, path):
+            with open(path, "wb") as output:
+                output.write(b"outside")
+            return True
+
+        mgr.links.fetch_remote_task_completed_file.side_effect = complete_download
 
         with (
             patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
@@ -1189,8 +1196,9 @@ class TestDownloadPhaseLocalPath:
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
-        assert result is False
+        assert result is True
         copy_file.assert_not_called()
+        mgr.links.fetch_remote_task_completed_file.assert_called_once()
 
     def test_non_object_remote_task_state_fails_closed(self, tmp_path):
         mgr, mock_library, _cache_dir = self._setup_download(tmp_path, abspath_exists=True)
