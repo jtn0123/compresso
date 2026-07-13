@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from compresso.libs import common
 from compresso.libs.ffprobe_utils import extract_media_metadata
@@ -45,6 +46,25 @@ _MEDIA_EXTENSIONS = {
     ".ogv",
     ".3gp",
 }
+
+
+def iter_media_files(library_path):
+    """Yield media paths deterministically while bounding each directory batch."""
+    for root, directories, files in os.walk(library_path):
+        directories.sort()
+        for filename in sorted(files):
+            if os.path.splitext(filename)[1].lower() in _MEDIA_EXTENSIONS:
+                yield Path(root) / filename
+
+
+def probe_analysis_file(filepath):
+    """Read media metadata without updating analysis caches or task state."""
+    return _probe_analysis_file(filepath)
+
+
+def lookup_savings(historical, codec, resolution):
+    """Expose the analysis engine's evidence lookup for read-only planning."""
+    return _lookup_savings(historical, codec, resolution)
 
 
 def start_analysis(library_id):
@@ -285,37 +305,32 @@ def _run_analysis(library_id, library_path, info):
         # Group data: key = (codec, resolution). Files are consumed directly
         # from os.walk so memory does not grow with library size.
         groups = {}
-        for root, _dirs, files in os.walk(library_path):
-            for fname in files:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext not in _MEDIA_EXTENSIONS:
-                    continue
-                filepath = os.path.join(root, fname)
-                info["progress"]["total"] += 1
-                try:
-                    analysis_entry = _analyse_file_incremental(filepath, generation=generation)
-                    codec = analysis_entry.get("codec", "unknown")
-                    resolution = analysis_entry.get("resolution", "unknown")
-                    file_size = analysis_entry.get("file_size", 0)
-                    bitrate_mbps = analysis_entry.get("bitrate_mbps", 0)
+        for filepath in iter_media_files(library_path):
+            info["progress"]["total"] += 1
+            try:
+                analysis_entry = _analyse_file_incremental(str(filepath), generation=generation)
+                codec = analysis_entry.get("codec", "unknown")
+                resolution = analysis_entry.get("resolution", "unknown")
+                file_size = analysis_entry.get("file_size", 0)
+                bitrate_mbps = analysis_entry.get("bitrate_mbps", 0)
 
-                    key = (codec, resolution)
-                    if key not in groups:
-                        groups[key] = {
-                            "codec": codec,
-                            "resolution": resolution,
-                            "count": 0,
-                            "total_size_bytes": 0,
-                            "total_bitrate": 0,
-                        }
-                    groups[key]["count"] += 1
-                    groups[key]["total_size_bytes"] += file_size
-                    groups[key]["total_bitrate"] += bitrate_mbps
+                key = (codec, resolution)
+                if key not in groups:
+                    groups[key] = {
+                        "codec": codec,
+                        "resolution": resolution,
+                        "count": 0,
+                        "total_size_bytes": 0,
+                        "total_bitrate": 0,
+                    }
+                groups[key]["count"] += 1
+                groups[key]["total_size_bytes"] += file_size
+                groups[key]["total_bitrate"] += bitrate_mbps
 
-                except Exception as e:
-                    logger.debug("Analysis skipped file %s: %s", filepath, str(e))
+            except Exception as e:
+                logger.debug("Analysis skipped file %s: %s", filepath, str(e))
 
-                info["progress"]["checked"] += 1
+            info["progress"]["checked"] += 1
 
         _cleanup_stale_analysis_paths(library_path, generation)
 

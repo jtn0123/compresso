@@ -31,6 +31,22 @@ Run these in order. A failed gate sends the workflow back to the previous passin
 
 ## Canary procedure
 
+Create a read-only capacity plan before the canary. The default walks media
+metadata to count files and bytes, but probes only a deterministic 200-file
+sample. It does not create tasks, update library-analysis caches, hash the
+library, or modify media:
+
+```bash
+compresso plan --library-id 1 --sample-size 200 --output 20tb-capacity.json
+```
+
+An unconfigured source can be inspected with `--path /Volumes/Media`. Use
+`--full-inventory` only when every media file should be probed; this can be slow
+on a NAS. `--output` is a filename stored under the node's user-data `planning`
+directory. Treat `unknown` savings or runtime fields as missing evidence, not as
+zero. The runtime range is single-slot historical evidence; cluster runtime
+remains unknown until the master-plus-M4 canary records real throughput.
+
 Run the deployment doctor on each node before creating the canary manifest. An
 offline run records everything available on that machine and may finish with
 warnings. The final connected gate must be strict and must include the linked

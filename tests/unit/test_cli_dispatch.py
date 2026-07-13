@@ -38,6 +38,17 @@ def test_fault_lab_subcommand_is_dispatched_without_starting_service(monkeypatch
     legacy.assert_not_called()
 
 
+def test_plan_subcommand_is_dispatched_without_starting_service(monkeypatch):
+    plan = MagicMock(return_value=0)
+    legacy = MagicMock()
+    monkeypatch.setattr(cli, "planner_main", plan)
+    monkeypatch.setattr(cli, "service_main", legacy)
+
+    assert cli.main(["plan", "--path", "/media", "--output", "plan.json"]) == 0
+    plan.assert_called_once_with(["--path", "/media", "--output", "plan.json"])
+    legacy.assert_not_called()
+
+
 def test_explicit_legacy_arguments_are_forwarded(monkeypatch):
     original_argv = list(cli.sys.argv)
     observed_argv = []
