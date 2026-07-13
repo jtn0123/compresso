@@ -9,6 +9,7 @@ import sys
 from compresso.ops.doctor import main as doctor_main
 from compresso.ops.fault_lab import main as fault_lab_main
 from compresso.ops.planner import main as planner_main
+from compresso.ops.state_backup import main as state_main
 from compresso.service import main as service_main
 
 
@@ -20,6 +21,8 @@ def main(argv: list[str] | None = None):
         return fault_lab_main(arguments[1:])
     if arguments and arguments[0] == "plan":
         return planner_main(arguments[1:])
+    if arguments and arguments[0] == "state":
+        return state_main(arguments[1:])
     if argv is not None:
         previous = sys.argv
         try:

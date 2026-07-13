@@ -49,6 +49,17 @@ def test_plan_subcommand_is_dispatched_without_starting_service(monkeypatch):
     legacy.assert_not_called()
 
 
+def test_state_subcommand_is_dispatched_without_starting_service(monkeypatch):
+    state = MagicMock(return_value=0)
+    legacy = MagicMock()
+    monkeypatch.setattr(cli, "state_main", state)
+    monkeypatch.setattr(cli, "service_main", legacy)
+
+    assert cli.main(["state", "backup", "--output", "pre-nas.zip"]) == 0
+    state.assert_called_once_with(["backup", "--output", "pre-nas.zip"])
+    legacy.assert_not_called()
+
+
 def test_explicit_legacy_arguments_are_forwarded(monkeypatch):
     original_argv = list(cli.sys.argv)
     observed_argv = []
