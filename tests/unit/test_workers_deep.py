@@ -426,6 +426,7 @@ class TestWorkerProcessTaskQueueItem:
         mock_task.get_source_abspath.return_value = "/path/to/file.mp4"
         worker.current_task = mock_task
         worker.worker_log = []
+        worker._safety_event_recorder = MagicMock()
         check = SimpleNamespace(
             ok=False,
             phase="encode_cache",
@@ -436,12 +437,14 @@ class TestWorkerProcessTaskQueueItem:
 
         with patch.object(worker, "_check_task_disk_space", return_value=check):
             worker._Worker__process_task_queue_item()
+            worker._Worker__process_task_queue_item()
 
         mock_task.set_status.assert_not_called()
         mock_task.set_success.assert_not_called()
         assert worker.complete_queue.empty()
         assert worker.disk_pressure_paused is True
         assert worker.get_status()["pause_reason"] == "disk_pressure"
+        worker._safety_event_recorder.assert_called_once()
 
     def test_process_task_sets_status_and_completes(self):
         worker = _make_worker()

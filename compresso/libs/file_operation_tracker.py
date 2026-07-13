@@ -39,7 +39,7 @@ import tempfile
 class FileOperationTracker:
     """Track destructive file operations for rollback on failure."""
 
-    def __init__(self, logger, journal_dir=None, operation_id=None, task_id=None):
+    def __init__(self, logger, journal_dir=None, operation_id=None, task_id=None, failure_callback=None):
         self._logger = logger
         self._backups = []  # list of (backup_path, original_path)
         self._created_paths = []
@@ -47,6 +47,7 @@ class FileOperationTracker:
         self._operation_id = operation_id
         self._task_id = task_id
         self._state = "active"
+        self._failure_callback = failure_callback
         self._finalization_phase = None
         self._journal_path = None
         if journal_dir and operation_id:
@@ -211,6 +212,16 @@ class FileOperationTracker:
         if failed:
             self._state = "rollback_failed"
             self._persist()
+            if self._failure_callback is not None:
+                try:
+                    self._failure_callback(
+                        operation_id=self._operation_id,
+                        task_id=self._task_id,
+                        remaining_backups=len(self._backups),
+                        remaining_created_paths=len(self._created_paths),
+                    )
+                except Exception as error:
+                    self._logger.error("FileOperationTracker: failed to record rollback safety event: %s", error)
             return False
         self.finalize()
         return True

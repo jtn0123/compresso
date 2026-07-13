@@ -24,6 +24,7 @@ def _postprocessor():
     processor.current_task.get_cache_path.return_value = "/cache/encoded.mkv"
     processor.current_task.get_source_abspath.return_value = "/library/source.mkv"
     processor.current_task.get_destination_data.return_value = {"abspath": "/library/source.mkv"}
+    processor._safety_event_recorder = MagicMock()
     return processor
 
 
@@ -55,6 +56,7 @@ def test_low_staging_space_defers_without_falling_back_to_replacement():
     assert processor.current_task.task.status == "processed"
     assert processor.current_task.task.deferred_until is not None
     processor.current_task.task.save.assert_called()
+    processor._safety_event_recorder.assert_called_once()
 
 
 @pytest.mark.unittest
@@ -75,6 +77,7 @@ def test_low_finalization_space_defers_without_deleting_task_or_output():
     processor.current_task.delete.assert_not_called()
     assert processor.current_task.task.status == "processed"
     assert processor.current_task.task.deferred_until is not None
+    processor._safety_event_recorder.assert_called_once()
 
 
 @pytest.mark.unittest

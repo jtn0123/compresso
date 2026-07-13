@@ -171,7 +171,8 @@
     "healthCheck": "Health Check",
     "history": "History",
     "notifications": "Notifications",
-    "monitoring": "Monitoring"
+    "monitoring": "Monitoring",
+    "deploymentReadiness": "Deployment Readiness"
   },
   "status": {
     "cannotLoadImage": "Cannot load image",
@@ -955,6 +956,34 @@
     "back": "Back"
   },
   "pages": {
+    "deploymentReadiness": {
+      "title": "Deployment Readiness",
+      "ready": "Ready for a controlled batch",
+      "notReady": "Deployment gate is closed",
+      "readyDetail": "The latest doctor report is current and no durable safety pause is active.",
+      "notReadyDetail": "Resolve every safety event and refresh deployment-doctor evidence before starting more work.",
+      "loadFailed": "Readiness status unavailable",
+      "loadFailedDetail": "Compresso could not load deployment readiness.",
+      "safetyTitle": "Durable safety state",
+      "safetySubtitle": "Hard stops survive process and machine restarts.",
+      "paused": "Paused",
+      "running": "Running",
+      "active": "Active",
+      "resolved": "Resolved",
+      "acknowledgeResolved": "Acknowledge as resolved",
+      "noSafetyEvents": "No safety events have been recorded.",
+      "recheckResume": "Recheck and resume workers",
+      "doctorTitle": "Deployment doctor",
+      "doctorRequired": "Fresh doctor report required",
+      "doctorRequiredDetail": "Run compresso doctor on this node before opening the deployment gate.",
+      "missing": "Missing",
+      "expired": "Expired",
+      "generatedAt": "Generated {date}",
+      "unknownTime": "Unknown time",
+      "resumeFailed": "The safety recheck failed. Workers remain paused.",
+      "globalPause": "Workers are held by a durable safety pause.",
+      "reviewSafety": "Review safety"
+    },
     "healthCheck": {
       "title": "Health Check",
       "bannerText": "Health Check scans your media files for integrity issues. Healthy means the file passed all checks and is playable without errors. Warning means minor issues that may affect playback quality. Corrupted means the file failed integrity checks and may be unplayable.",
@@ -1250,6 +1279,10 @@
     "health": {
       "title": "Health Check",
       "subtitle": "Scan your library for integrity issues"
+    },
+    "readiness": {
+      "title": "Deployment Readiness",
+      "subtitle": "Doctor evidence, hard safety stops and guarded recovery"
     },
     "history": {
       "title": "Task History",

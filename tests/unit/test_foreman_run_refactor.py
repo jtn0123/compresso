@@ -35,6 +35,7 @@ def _make_foreman():
     fm.complete_queue = queue.Queue()
     fm.worker_threads = {}
     fm.paused_worker_threads = []
+    fm.safety_latched = False
     fm.remote_task_manager_threads = {}
     fm.abort_flag = threading.Event()
     fm.abort_flag.clear()
@@ -110,6 +111,20 @@ class TestSyncAndValidateWorkers:
 
         fm.resume_all_worker_threads.assert_called_once_with(recorded_paused_only=True)
         assert fm.paused_worker_threads == []
+
+    def test_durable_safety_latch_blocks_automatic_resume(self):
+        fm = _make_foreman()
+        fm.init_worker_threads = MagicMock()
+        fm.validate_worker_config = MagicMock(return_value=True)
+        fm.pause_all_worker_threads = MagicMock()
+        fm.resume_all_worker_threads = MagicMock()
+        fm.paused_worker_threads = ["w1"]
+        fm.safety_latched = True
+
+        assert fm._sync_and_validate_workers() is False
+        fm.pause_all_worker_threads.assert_called_once_with(record_paused=True)
+        fm.resume_all_worker_threads.assert_not_called()
+        assert fm.paused_worker_threads == ["w1"]
 
 
 @pytest.mark.unittest

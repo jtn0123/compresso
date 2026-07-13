@@ -140,6 +140,39 @@ async function installApiMocks(page, requests = [], options = {}) {
         }),
       )
     }
+    if (endpoint === 'system/safety') {
+      return route.fulfill(json({ pause_required: true, status: 'paused', events: [] }))
+    }
+    if (endpoint === 'system/readiness') {
+      return route.fulfill(
+        json({
+          ready: false,
+          doctor_report_expired: false,
+          doctor_report: {
+            overall_status: 'pass',
+            generated_at: '2026-07-12T12:00:00Z',
+            expires_at: '2026-07-13T12:00:00Z',
+            checks: [{ id: 'cache', status: 'pass', summary: 'Cache is writable' }],
+          },
+          safety: {
+            pause_required: true,
+            events: [
+              {
+                id: 'event-1',
+                code: 'disk-reserve',
+                message: 'Cache reserve breached',
+                active: true,
+                acknowledged_at: null,
+                first_seen_at: '2026-07-12T12:10:00Z',
+              },
+            ],
+          },
+        }),
+      )
+    }
+    if (endpoint === 'system/safety/acknowledge' || endpoint === 'system/safety/resume') {
+      return route.fulfill(json({ pause_required: false, status: 'ready', events: [] }))
+    }
     if (endpoint === 'compression/optimization-progress') {
       return route.fulfill(json({ total: 10, processed: 4, percent: 40 }))
     }
@@ -384,4 +417,21 @@ test('onboarding and plugin controls stay usable on narrow keyboard layouts @mob
   await repoLink.focus()
   await expect(repoLink).toBeFocused()
   await expect(repoLink).toHaveAttribute('href', 'https://github.com/jtn0123/compresso-plugins')
+})
+
+test('reviews and operates the durable deployment safety gate @cross-browser @mobile', async ({ page }) => {
+  const requests = []
+  await installApiMocks(page, requests)
+
+  await page.goto('/compresso/ui/readiness')
+
+  await expect(page.getByText('Deployment gate is closed')).toBeVisible()
+  await expect(page.getByText('Cache reserve breached')).toBeVisible()
+  await expect(page.getByText('Cache is writable')).toBeVisible()
+
+  await page.getByTestId('acknowledge-event-1').click()
+  await expect.poll(() => requests.some((entry) => entry.endpoint === 'system/safety/acknowledge')).toBe(true)
+
+  await page.getByTestId('resume-workers').click()
+  await expect.poll(() => requests.some((entry) => entry.endpoint === 'system/safety/resume')).toBe(true)
 })

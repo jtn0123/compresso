@@ -45,6 +45,7 @@ from compresso.libs import common
 from compresso.libs.disk_space_guard import DiskSpaceGuard
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.safety_state import record_safety_event
 from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
 
 
@@ -80,6 +81,7 @@ class Worker(threading.Thread):
         self._disk_space_guard = None
         self.disk_pressure_paused = False
         self.disk_pressure = None
+        self._safety_event_recorder = record_safety_event
 
         # Create 'redundancy' flag. When this is set, the worker should die
         self.redundant_flag = threading.Event()
@@ -254,6 +256,16 @@ class Worker(threading.Thread):
                     disk_check.path,
                     disk_check.free_bytes,
                     disk_check.required_bytes,
+                )
+                self._safety_event_recorder(
+                    config.Config(),
+                    None,
+                    "disk-reserve",
+                    "Cache disk free space is below the safe encoding reserve",
+                    phase=disk_check.phase,
+                    path=disk_check.path,
+                    free_bytes=disk_check.free_bytes,
+                    required_bytes=disk_check.required_bytes,
                 )
             self.disk_pressure_paused = True
             self.disk_pressure = disk_check.to_dict() if hasattr(disk_check, "to_dict") else vars(disk_check)

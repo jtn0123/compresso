@@ -82,6 +82,14 @@
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.healthCheck') }}</q-tooltip>
         </q-item>
 
+        <q-item clickable to="/ui/readiness" v-ripple :class="{ 'nav-active': $route.path === '/ui/readiness' }">
+          <q-item-section avatar><q-icon name="verified_user" size="20px" /></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.deploymentReadiness') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{
+            $t('navigation.deploymentReadiness')
+          }}</q-tooltip>
+        </q-item>
+
         <q-item clickable to="/ui/history" v-ripple :class="{ 'nav-active': $route.path === '/ui/history' }">
           <q-item-section avatar><q-icon name="history" size="20px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.history') }}</q-item-section>

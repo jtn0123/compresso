@@ -4,6 +4,22 @@ import { sharedLinksStore } from 'src/js/sharedLinksStore'
 import { getApiToken, promptForApiToken } from 'src/js/apiAuth'
 
 let translate = (key) => key
+const CSRF_COOKIE_NAME = 'compresso_csrf_token'
+const CSRF_HEADER_NAME = 'X-Compresso-CSRF-Token'
+
+export function getCsrfTokenFromCookie(cookie = globalThis.document?.cookie || '') {
+  const prefix = `${CSRF_COOKIE_NAME}=`
+  const item = cookie
+    .split(';')
+    .map((value) => value.trim())
+    .find((value) => value.startsWith(prefix))
+  if (!item) return ''
+  try {
+    return decodeURIComponent(item.slice(prefix.length))
+  } catch {
+    return ''
+  }
+}
 
 export function isInternalRequestUrl(url) {
   try {
@@ -33,6 +49,10 @@ axios.interceptors.request.use(
     const token = getApiToken()
     if (token && isInternalRequestUrl(config.url)) {
       config.headers['X-Compresso-Api-Token'] = token
+    }
+    const csrfToken = getCsrfTokenFromCookie()
+    if (csrfToken && isInternalRequestUrl(config.url)) {
+      config.headers[CSRF_HEADER_NAME] = csrfToken
     }
     return config
   },

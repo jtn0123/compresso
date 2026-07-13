@@ -51,6 +51,7 @@ from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.notifications import Notifications
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.resumable_transfer import file_sha256
+from compresso.libs.safety_state import record_safety_event
 from compresso.libs.task import TaskDataStore
 from compresso.libs.thread_health import ThreadHealthMixin
 
@@ -83,6 +84,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         self._last_destination_files = []
         self._file_operation_tracker = None
         self._disk_space_guard = None
+        self._safety_event_recorder = record_safety_event
         self.ffmpeg = None
         self.abort_flag.clear()
         self._init_thread_health()
@@ -588,6 +590,16 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         self.current_task.task.status = retry_status
         self.current_task.task.deferred_until = datetime.datetime.now() + datetime.timedelta(seconds=retry_seconds)
         self.current_task.task.save()
+        self._safety_event_recorder(
+            self.settings,
+            None,
+            "disk-reserve",
+            "Destination disk free space is below the safe file-operation reserve",
+            phase=disk_check.phase,
+            path=disk_check.path,
+            free_bytes=disk_check.free_bytes,
+            required_bytes=disk_check.required_bytes,
+        )
         self._log(
             f"DISK_PRESSURE_DEFERRED phase={disk_check.phase} path={disk_check.path} "
             f"free_bytes={disk_check.free_bytes} required_bytes={disk_check.required_bytes} "
@@ -748,6 +760,13 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             journal_dir=journal_dir,
             operation_id=f"task-{self.current_task.get_task_id()}",
             task_id=self.current_task.get_task_id(),
+            failure_callback=lambda **details: self._safety_event_recorder(
+                self.settings,
+                None,
+                "rollback-failure",
+                "A destructive file operation could not be rolled back",
+                **details,
+            ),
         )
         self._file_operation_tracker = tracker
         if self.current_task.task.success:

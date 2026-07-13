@@ -95,6 +95,15 @@ const routes = [
     },
   },
   {
+    path: '/ui/readiness',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ name: 'readiness', path: '', component: () => import('pages/DeploymentReadiness.vue') }],
+    meta: {
+      showHome: true,
+      showMainNavDrawer: true,
+    },
+  },
+  {
     path: '/ui/history',
     component: () => import('layouts/MainLayout.vue'),
     children: [{ name: 'history', path: '', component: () => import('pages/TaskHistory.vue') }],

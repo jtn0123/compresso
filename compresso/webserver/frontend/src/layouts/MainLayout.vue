@@ -121,6 +121,7 @@
     </q-drawer>
 
     <q-page-container>
+      <SafetyStatusBanner />
       <router-view v-slot="{ Component }">
         <transition name="page-fade" mode="out-in">
           <component :is="Component" />
@@ -147,6 +148,7 @@ import ThemeSwitch from 'components/ThemeSwitch'
 import PaletteSwitch from 'components/PaletteSwitch'
 import DrawerNotifications from 'components/drawers/DrawerNotifications'
 import SharedLinkDropdown from 'components/SharedLinkDropdown'
+import SafetyStatusBanner from 'components/SafetyStatusBanner.vue'
 import KeyboardShortcutsDialog from 'components/ui/KeyboardShortcutsDialog'
 import FirstRunWizard from 'components/ui/FirstRunWizard'
 import compressoGlobals, { getCompressoApiUrl, notificationsCount } from 'src/js/compressoGlobals'
@@ -160,6 +162,7 @@ const PAGE_HEADER_KEYS = {
   '/ui/approval': 'approval',
   '/ui/preview': 'preview',
   '/ui/health': 'health',
+  '/ui/readiness': 'readiness',
   '/ui/history': 'history',
   '/ui/data-panels': 'dataPanels',
   '/ui/settings-library': 'settings',
@@ -176,6 +179,7 @@ export default {
     ThemeSwitch,
     PaletteSwitch,
     SharedLinkDropdown,
+    SafetyStatusBanner,
     KeyboardShortcutsDialog,
     FirstRunWizard,
   },

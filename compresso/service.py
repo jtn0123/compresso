@@ -45,6 +45,7 @@ from compresso.libs.file_operation_tracker import FileOperationTracker
 from compresso.libs.foreman import Foreman
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.postprocessor import PostProcessor
+from compresso.libs.safety_state import record_safety_event
 from compresso.libs.scheduler import ScheduledTasksManager
 from compresso.libs.taskhandler import TaskHandler
 from compresso.libs.taskqueue import TaskQueue
@@ -255,6 +256,16 @@ class RootService:
             FileOperationTracker.finalize_committed(journal_dir)
             common.clean_files_in_cache_dir(settings.get_cache_path(), protected_paths=protected_paths)
         except Exception as e:
+            try:
+                record_safety_event(
+                    settings,
+                    None,
+                    "rollback-failure",
+                    "Startup file-operation recovery did not complete",
+                    error_type=type(e).__name__,
+                )
+            except (OSError, TypeError, ValueError) as safety_error:
+                self.logger.error("Unable to persist startup recovery safety event: %s", safety_error)
             message = f"STARTUP_CACHE_CLEANUP_FAILED cache_path={settings.get_cache_path()} error={str(e)}"
             self.logger.error(message)
             self.startup_state.mark_error("startup_validation", message)
