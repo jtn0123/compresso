@@ -100,6 +100,34 @@ def _validated_peer_base(peer: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
 
 
+def _configured_peer_base(settings: Any, selector: str) -> str:
+    """Resolve a CLI selector only through the persisted linked-peer allowlist."""
+    selected = selector.strip().casefold().rstrip("/")
+    if not selected:
+        raise ValueError("peer selector is empty")
+    remotes = settings.get_remote_installations()
+    if not isinstance(remotes, list):
+        raise ValueError("linked installation configuration is invalid")
+    for remote in remotes:
+        if not isinstance(remote, dict):
+            continue
+        address_value = remote.get("address")
+        if not isinstance(address_value, str) or not address_value.strip():
+            continue
+        candidates = {
+            str(remote.get("name") or "").strip().casefold(),
+            str(remote.get("uuid") or "").strip().casefold(),
+            address_value.strip().casefold().rstrip("/"),
+        }
+        if selected not in candidates:
+            continue
+        configured_address = address_value.strip()
+        if not configured_address.casefold().startswith(("http://", "https://")):
+            configured_address = "http://" + configured_address
+        return _validated_peer_base(configured_address)
+    raise ValueError("peer is not an existing linked installation")
+
+
 @dataclass(frozen=True)
 class CheckResult:
     """One stable readiness assertion with safe evidence and remediation."""
@@ -523,7 +551,7 @@ class DeploymentDoctor:
         local_compatibility = ".".join(local_version.split(".")[:2])
         for index, peer in enumerate(self.peers):
             try:
-                peer_base = _validated_peer_base(peer)
+                peer_base = _configured_peer_base(self.settings, peer)
             except ValueError as error:
                 checks.append(
                     self._result(
@@ -532,7 +560,7 @@ class DeploymentDoctor:
                         False,
                         f"Peer {index + 1} target is unsafe",
                         evidence={"peer": peer, "error": str(error)},
-                        remediation="Use an HTTP(S) origin on the trusted LAN/VPN; do not include credentials or a path.",
+                        remediation="Select an existing linked installation by name or UUID on the trusted LAN/VPN.",
                     )
                 )
                 continue

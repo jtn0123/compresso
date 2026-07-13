@@ -52,8 +52,9 @@ Do not expose Compresso directly to the public internet. If remote access is req
 
 - Run `compresso doctor --role master --strict` on the authoritative scanner or
   `compresso doctor --role worker --strict` on a remote worker. For the final
-  connected preflight, add `--peer <peer-origin>` (for example,
-  `--peer http://worker.local:8888`) and provide its API token through
+  connected preflight, add `--peer <linked-name-or-uuid>` (for example,
+  `--peer m4-worker`). The value must select an existing linked installation;
+  arbitrary network targets are rejected. Provide its API token through
   `COMPRESSO_DOCTOR_PEER_TOKEN`, or name another token variable with
   `--peer-token-env`.
 - Wait for `GET /compresso/api/v2/healthcheck/readiness` to return `200`.

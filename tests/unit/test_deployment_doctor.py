@@ -19,10 +19,11 @@ from compresso.ops.doctor import CheckResult, DeploymentDoctor, DoctorReport, lo
 class FakeSettings:
     """Minimal settings surface used by deployment-doctor tests."""
 
-    def __init__(self, root, *, scanner=True, address="127.0.0.1"):
+    def __init__(self, root, *, scanner=True, address="127.0.0.1", remotes=None):
         self.root = root
         self.scanner = scanner
         self.address = address
+        self.remotes = list(remotes or [])
         for name in ("config", "library", "cache", "userdata", "plugins"):
             (root / name).mkdir()
 
@@ -64,6 +65,9 @@ class FakeSettings:
 
     def get_ssl_enabled(self):
         return False
+
+    def get_remote_installations(self):
+        return list(self.remotes)
 
 
 def _addrinfo(ip):
@@ -172,7 +176,10 @@ def test_load_latest_report_rejects_malformed_root(tmp_path):
 
 
 def test_strict_master_passes_with_valid_database_and_ready_peer(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path)
+    settings = FakeSettings(
+        tmp_path,
+        remotes=[{"name": "worker-m4", "uuid": "worker-uuid", "address": "http://worker.local:8888"}],
+    )
     with sqlite3.connect(tmp_path / "config" / "compresso.db") as connection:
         connection.execute("CREATE TABLE readiness (id INTEGER PRIMARY KEY)")
     monkeypatch.setattr("compresso.ops.doctor.sys.version_info", (3, 13, 1))
@@ -201,7 +208,7 @@ def test_strict_master_passes_with_valid_database_and_ready_peer(tmp_path, monke
     report = DeploymentDoctor(
         settings,
         "master",
-        peers=["http://worker.local:8888"],
+        peers=["worker-m4"],
         peer_token=credential,
         strict=True,
         capability_probe=lambda _settings: capabilities,
@@ -237,6 +244,21 @@ def test_peer_probe_rejects_unsafe_targets_without_requesting(tmp_path, monkeypa
 
     assert len(checks) == 1
     assert checks[0].status == "fail"
+    assert checks[0].check_id == "peer.0.target"
+    get.assert_not_called()
+
+
+def test_peer_probe_rejects_linked_metadata_address_without_requesting(tmp_path, monkeypatch):
+    settings = FakeSettings(tmp_path, remotes=[{"name": "metadata", "address": "http://metadata.local"}])
+    get = MagicMock()
+    monkeypatch.setattr("compresso.ops.doctor.requests.get", get)
+    monkeypatch.setattr(
+        "compresso.ops.doctor.socket.getaddrinfo",
+        MagicMock(return_value=_addrinfo("169.254.169.254")),
+    )
+
+    checks = DeploymentDoctor(settings, "master", peers=["metadata"])._peer_checks()
+
     assert checks[0].check_id == "peer.0.target"
     get.assert_not_called()
 
@@ -285,7 +307,7 @@ def test_non_object_power_preferences_are_reported_as_warning(monkeypatch):
 
 
 def test_capability_probe_and_peer_failure_are_reported(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path)
+    settings = FakeSettings(tmp_path, remotes=[{"name": "offline", "address": "http://offline.local"}])
     monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.45")))
     monkeypatch.setattr("compresso.ops.doctor.shutil.which", lambda _name: None)
     monkeypatch.setattr(
@@ -313,14 +335,14 @@ def test_capability_probe_and_peer_failure_are_reported(tmp_path, monkeypatch):
 
 
 def test_peer_failure_is_attributed_to_the_endpoint(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path)
+    settings = FakeSettings(tmp_path, remotes=[{"uuid": "worker-id", "address": "http://worker.local"}])
     readiness = MagicMock()
     readiness.json.return_value = {"ready": True}
     get = MagicMock(side_effect=[readiness, doctor.requests.ConnectionError("version offline")])
     monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.45")))
     monkeypatch.setattr("compresso.ops.doctor.requests.get", get)
 
-    checks = DeploymentDoctor(settings, "master", peers=["http://worker.local"])._peer_checks()
+    checks = DeploymentDoctor(settings, "master", peers=["worker-id"])._peer_checks()
 
     assert len(checks) == 1
     assert checks[0].check_id == "peer.0.version"
@@ -328,7 +350,7 @@ def test_peer_failure_is_attributed_to_the_endpoint(tmp_path, monkeypatch):
 
 
 def test_malformed_peer_payloads_become_failed_checks(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path)
+    settings = FakeSettings(tmp_path, remotes=[{"name": "worker", "address": "http://worker.local"}])
     responses = []
     for payload in ([], ["not-version"], {"video_encoders": []}):
         response = MagicMock()
@@ -337,7 +359,7 @@ def test_malformed_peer_payloads_become_failed_checks(tmp_path, monkeypatch):
     monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.45")))
     monkeypatch.setattr("compresso.ops.doctor.requests.get", MagicMock(side_effect=responses))
 
-    checks = DeploymentDoctor(settings, "master", peers=["http://worker.local"])._peer_checks()
+    checks = DeploymentDoctor(settings, "master", peers=["worker"])._peer_checks()
 
     assert [check.check_id for check in checks] == ["peer.0.readiness", "peer.0.version", "peer.0.capabilities"]
     assert all(check.status == "fail" for check in checks)

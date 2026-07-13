@@ -41,7 +41,7 @@ stored in shell history:
 compresso doctor --role worker --output worker-readiness.json
 
 export COMPRESSO_DOCTOR_PEER_TOKEN="<worker API token>"
-compresso doctor --role master --peer http://m4-worker:8888 --strict \
+compresso doctor --role master --peer m4-worker --strict \
   --output master-readiness.json
 ```
 
