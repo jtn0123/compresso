@@ -172,6 +172,51 @@ def test_rehearsal_checks_temporary_disk_capacity_before_extracting(tmp_path):
 
 
 @pytest.mark.unittest
+def test_rehearsal_rejects_content_larger_than_its_declared_zip_size(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    create_state_backup(settings, "state.zip")
+    original_infolist = zipfile.ZipFile.infolist
+    original_open = zipfile.ZipFile.open
+    actual_sizes = {}
+
+    def forged_infolist(bundle):
+        infos = original_infolist(bundle)
+        for info in infos:
+            if info.filename == "config/settings.json":
+                actual_sizes[id(info)] = info.file_size
+                info.file_size = 1
+        return infos
+
+    def open_with_actual_size(bundle, member, *args, **kwargs):
+        if isinstance(member, zipfile.ZipInfo) and id(member) in actual_sizes:
+            member.file_size = actual_sizes[id(member)]
+        return original_open(bundle, member, *args, **kwargs)
+
+    with (
+        patch.object(zipfile.ZipFile, "infolist", forged_infolist),
+        patch.object(zipfile.ZipFile, "open", open_with_actual_size),
+        pytest.raises(BackupError, match="declared size"),
+    ):
+        verify_state_backup(settings, "state.zip")
+
+
+@pytest.mark.unittest
+def test_rehearsal_refuses_to_overwrite_existing_report(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    create_state_backup(settings, "state.zip")
+    verify_state_backup(settings, "state.zip", output_name="rehearsal.json")
+    report = tmp_path / "userdata" / "recovery-rehearsals" / "rehearsal.json"
+    original = report.read_bytes()
+
+    with pytest.raises(BackupError, match="Refusing to overwrite"):
+        verify_state_backup(settings, "state.zip", output_name="rehearsal.json")
+
+    assert report.read_bytes() == original
+
+
+@pytest.mark.unittest
 def test_cli_creates_and_rehearses_backup(tmp_path, monkeypatch, capsys):
     settings = _settings(tmp_path)
     _seed_state(tmp_path)

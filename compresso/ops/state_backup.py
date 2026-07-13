@@ -65,21 +65,32 @@ def _owned_directory(userdata_root: Path, name: str) -> Path:
     return destination
 
 
-def _private_atomic_json(path: Path, payload: dict[str, Any]) -> None:
+def _private_exclusive_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    reserved_destination = False
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as output:
             json.dump(payload, output, indent=2, sort_keys=True)
             output.write("\n")
             output.flush()
             os.fsync(output.fileno())
+        try:
+            reservation = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError as error:
+            raise BackupError("Refusing to overwrite an existing recovery rehearsal report") from error
+        else:
+            os.close(reservation)
+            reserved_destination = True
         os.replace(temporary, path)
+        reserved_destination = False
         if os.name != "nt":
             os.chmod(path, 0o600)
     finally:
         temporary.unlink(missing_ok=True)
+        if reserved_destination:
+            path.unlink(missing_ok=True)
 
 
 def _sha256(path: Path) -> str:
@@ -215,13 +226,15 @@ def _validate_entry(info: zipfile.ZipInfo) -> None:
         raise BackupError(f"unexpected archive entry: {info.filename}")
 
 
-def _copy_and_hash(source, destination: Path) -> tuple[str, int]:
+def _copy_and_hash(source, destination: Path, *, maximum_bytes: int, logical_name: str) -> tuple[str, int]:
     digest = hashlib.sha256()
     size = 0
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("xb") as output:
         while chunk := source.read(1024 * 1024):
             size += len(chunk)
+            if size > maximum_bytes:
+                raise BackupError(f"archive entry exceeds its declared size: {logical_name}")
             digest.update(chunk)
             output.write(chunk)
     return digest.hexdigest(), size
@@ -237,6 +250,7 @@ def verify_state_backup(settings: Any, archive_name: str, *, output_name: str | 
         with zipfile.ZipFile(archive) as bundle:
             infos = bundle.infolist()
             names = [info.filename for info in infos]
+            declared_sizes = {info.filename: info.file_size for info in infos}
             if len(names) != len(set(names)):
                 raise BackupError("duplicate archive entry detected")
             if len(infos) > MAX_ARCHIVE_ENTRIES + 1:
@@ -283,8 +297,15 @@ def verify_state_backup(settings: Any, archive_name: str, *, output_name: str | 
                     if not destination.is_relative_to(rehearsal_root):
                         raise BackupError(f"unsafe archive destination: {info.filename}")
                     with bundle.open(info) as source:
-                        digest, size = _copy_and_hash(source, destination)
+                        digest, size = _copy_and_hash(
+                            source,
+                            destination,
+                            maximum_bytes=declared_sizes[info.filename],
+                            logical_name=info.filename,
+                        )
                     expected = expected_files[info.filename]
+                    if declared_sizes[info.filename] != expected.get("size_bytes"):
+                        raise BackupError(f"declared size mismatch for {info.filename}")
                     if digest != expected.get("sha256") or size != expected.get("size_bytes"):
                         raise BackupError(f"checksum mismatch for {info.filename}")
                     if info.filename.endswith(".json"):
@@ -293,7 +314,7 @@ def verify_state_backup(settings: Any, archive_name: str, *, output_name: str | 
     except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as error:
         raise BackupError(f"Recovery rehearsal failed: {type(error).__name__}") from error
 
-    report_name = output_name or f"state-rehearsal-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
+    report_name = output_name or f"state-rehearsal-{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex}.json"
     report_path = _safe_owned_path(
         _owned_directory(userdata_root, "recovery-rehearsals"), report_name, REPORT_NAME_PATTERN, "--output"
     )
@@ -306,7 +327,7 @@ def verify_state_backup(settings: Any, archive_name: str, *, output_name: str | 
         "files_verified": len(expected_files),
         "database_integrity": database_integrity,
     }
-    _private_atomic_json(report_path, report)
+    _private_exclusive_json(report_path, report)
     report["report_path"] = str(report_path)
     return report
 
