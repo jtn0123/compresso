@@ -155,7 +155,8 @@ class TestRollback:
 
         error_log = MagicMock()
         log = MagicMock(error=error_log, warning=MagicMock(), info=MagicMock())
-        tracker = FileOperationTracker(log)
+        failure_callback = MagicMock()
+        tracker = FileOperationTracker(log, operation_id="task-9", task_id=9, failure_callback=failure_callback)
 
         tracker.safe_remove(str(f1))
         tracker.safe_remove(str(f2))
@@ -183,6 +184,12 @@ class TestRollback:
         assert not f2.exists()
         assert tracker._backups == [(str(backup_beta), str(f2))]
         assert tracker._state == "rollback_failed"
+        failure_callback.assert_called_once_with(
+            operation_id="task-9",
+            task_id=9,
+            remaining_backups=1,
+            remaining_created_paths=0,
+        )
 
     def test_rollback_partial_failure_on_move_error(self, tmp_path):
         """If shutil.move raises mid-rollback, the OTHER entry must still restore.

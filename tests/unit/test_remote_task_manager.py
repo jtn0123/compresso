@@ -395,6 +395,22 @@ class TestProcessTaskQueueItem:
         assert mgr.lease_token == "lease-token"  # noqa: S105 - synthetic lease fixture
         lease_class.acquire.assert_called_once_with(task.task, "test-uuid-1234")
 
+    @patch("compresso.libs.remote_task_manager.RemoteTaskLease")
+    def test_lease_conflict_records_hard_safety_event(self, lease_class):
+        mgr = _make_manager()
+        task = _make_task()
+        mgr.current_task = task
+        mgr.safety_event_recorder = MagicMock()
+        lease_class.acquire.return_value = None
+
+        assert mgr._acquire_remote_lease() is False
+        mgr.safety_event_recorder.assert_called_once_with(
+            "duplicate-lease",
+            "A remote task already has a different active owner",
+            installation_uuid="test-uuid-1234",
+            task_id=task.get_task_id(),
+        )
+
     def test_resets_progress_fields(self):
         mgr, task, _ = self._setup()
         mgr.worker_subprocess_percent = "50"
@@ -685,6 +701,7 @@ class TestSendTaskFileUpload:
         mgr, task, mock_library = self._base_setup(tmp_path)
         inst_info = _make_installation_info(enable_checksum_validation=True)
         mgr.installation_info = inst_info
+        mgr.safety_event_recorder = MagicMock()
 
         mgr.links.send_file_to_remote_installation.return_value = {"id": 99, "checksum": "BAD_CHECKSUM"}
 
@@ -699,6 +716,12 @@ class TestSendTaskFileUpload:
 
         assert result is False
         mgr.links.remove_task_from_remote_installation.assert_called_once()
+        mgr.safety_event_recorder.assert_called_once_with(
+            "manifest-corruption",
+            "A remote upload checksum did not match its source",
+            task_id=task.get_task_id(),
+            phase="upload",
+        )
 
     def test_redundant_flag_exits_upload_loop(self, tmp_path):
         mgr, task, mock_library = self._base_setup(tmp_path, file_size=200_000_001)
@@ -1161,6 +1184,7 @@ class TestDownloadPhaseNetworkDownload:
         mgr, mock_library, cache_dir = self._setup_network_download(tmp_path)
         inst_info = _make_installation_info(enable_checksum_validation=True)
         mgr.installation_info = inst_info
+        mgr.safety_event_recorder = MagicMock()
 
         lock_key = "lock-xyz"
         mgr.links.acquire_network_transfer_lock.return_value = lock_key
@@ -1178,6 +1202,12 @@ class TestDownloadPhaseNetworkDownload:
 
         assert result is False
         mgr.links.remove_task_from_remote_installation.assert_called()
+        mgr.safety_event_recorder.assert_called_once_with(
+            "manifest-corruption",
+            "A downloaded remote result did not match its manifest checksum",
+            task_id=mgr.current_task.get_task_id(),
+            phase="download",
+        )
 
     def test_redundant_flag_during_download_loop_returns_false(self, tmp_path):
         mgr, mock_library, cache_dir = self._setup_network_download(tmp_path)

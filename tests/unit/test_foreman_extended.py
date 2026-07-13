@@ -486,6 +486,16 @@ class TestPauseResumeWorkerThreads:
         assert result is True
         assert not mock_thread.paused_flag.is_set()
 
+    def test_resume_worker_thread_rejects_safety_latch(self):
+        foreman = _make_foreman()
+        worker = MagicMock()
+        worker.paused_flag.is_set.return_value = True
+        foreman.worker_threads = {"w-0": worker}
+        foreman.safety_latched = True
+
+        assert foreman.resume_worker_thread("w-0") is False
+        worker.paused_flag.clear.assert_not_called()
+
     def test_resume_removes_from_paused_list(self):
         foreman = _make_foreman()
         mock_thread = MagicMock()

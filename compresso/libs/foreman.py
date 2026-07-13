@@ -43,6 +43,7 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.safety_state import SafetyState, record_safety_event
 from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.libs.worker_group import WorkerGroup
 from compresso.libs.workers import Worker
@@ -56,6 +57,11 @@ class Foreman(threading.Thread):
         self.task_queue = task_queue
         self.data_queues = data_queues
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        try:
+            self.safety_latched = bool(SafetyState(settings.get_userdata_path()).snapshot()["pause_required"])
+        except (OSError, TypeError, ValueError) as exc:
+            self.logger.error("Unable to load durable safety state; workers will remain paused: %s", exc)
+            self.safety_latched = True
         self.workers_pending_task_queue = queue.Queue(maxsize=1)
         self.remote_workers_pending_task_queue = queue.Queue(maxsize=1)
         self.complete_queue = queue.Queue()
@@ -373,6 +379,9 @@ class Foreman(threading.Thread):
             self.complete_queue,
             self.event,
         )
+        thread.safety_event_recorder = lambda code, message, **details: record_safety_event(
+            self.settings, self, code, message, **details
+        )
         thread.daemon = True
         thread.start()
         self.remote_task_manager_threads[installation_id] = thread
@@ -478,6 +487,9 @@ class Foreman(threading.Thread):
 
     def start_worker_thread(self, worker_id, worker_name, worker_group):
         thread = Worker(worker_id, worker_name, worker_group, self.workers_pending_task_queue, self.complete_queue, self.event)
+        thread._safety_event_recorder = lambda settings, _foreman, code, message, **details: record_safety_event(
+            settings, self, code, message, **details
+        )
         thread.daemon = True
         thread.start()
         self.worker_threads[worker_id] = thread
@@ -592,6 +604,9 @@ class Foreman(threading.Thread):
         :rtype:
         """
         self.logger.debug("Asked to resume Worker ID %s", worker_id)
+        if getattr(self, "safety_latched", False):
+            self.logger.warning("Refusing to resume Worker ID '%s' while the durable safety latch is active.", worker_id)
+            return False
         if worker_id not in self.worker_threads:
             self.logger.warning("Asked to resume Worker ID '%s', but this was not found.", worker_id)
             return False
@@ -726,6 +741,10 @@ class Foreman(threading.Thread):
 
         valid_config = self.validate_worker_config()
         if not valid_config:
+            self.pause_all_worker_threads(record_paused=True)
+            return False
+
+        if getattr(self, "safety_latched", False):
             self.pause_all_worker_threads(record_paused=True)
             return False
 

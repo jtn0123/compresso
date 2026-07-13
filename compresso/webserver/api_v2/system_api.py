@@ -9,7 +9,9 @@ Date:                     19 Mar 2026
 Exposes system-level metrics (CPU, RAM, disk, GPU, platform) via REST.
 """
 
+import shutil
 import time
+from datetime import UTC, datetime
 
 import psutil
 
@@ -17,11 +19,13 @@ from compresso import config
 from compresso.libs import session
 from compresso.libs.gpu_monitor import GpuMonitor
 from compresso.libs.operations_status import OperationsStatus
+from compresso.libs.safety_state import SafetyState
 from compresso.libs.system import System
 from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
 from compresso.libs.worker_capabilities import WorkerCapabilities
+from compresso.ops.doctor import load_latest_report
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.system_schemas import SystemStatusSuccessSchema
+from compresso.webserver.api_v2.schema.system_schemas import SafetyAcknowledgeRequestSchema, SystemStatusSuccessSchema
 
 
 class ApiSystemHandler(BaseApiHandler):
@@ -50,6 +54,26 @@ class ApiSystemHandler(BaseApiHandler):
             "path_pattern": r"/system/operations",
             "supported_methods": ["GET"],
             "call_method": "get_operations_status",
+        },
+        {
+            "path_pattern": r"/system/readiness",
+            "supported_methods": ["GET"],
+            "call_method": "get_readiness",
+        },
+        {
+            "path_pattern": r"/system/safety",
+            "supported_methods": ["GET"],
+            "call_method": "get_safety",
+        },
+        {
+            "path_pattern": r"/system/safety/acknowledge",
+            "supported_methods": ["POST"],
+            "call_method": "acknowledge_safety",
+        },
+        {
+            "path_pattern": r"/system/safety/resume",
+            "supported_methods": ["POST"],
+            "call_method": "resume_safety",
         },
     ]
 
@@ -220,5 +244,108 @@ class ApiSystemHandler(BaseApiHandler):
                     data_queues=self.compresso_data_queues,
                 )
             )
+        except Exception as e:
+            self.handle_unhandled_error(e)
+
+    def _safety_store(self):
+        return SafetyState(self.config.get_userdata_path())
+
+    async def get_safety(self):
+        """Return the persistent safety latch and its bounded event history."""
+        try:
+            self.write_success(self._safety_store().snapshot())
+        except Exception as e:
+            self.handle_unhandled_error(e)
+
+    async def get_readiness(self):
+        """Combine the latest deployment-doctor evidence with the safety latch."""
+        try:
+            report = load_latest_report(self.config.get_userdata_path())
+            expired = None
+            if report is not None:
+                try:
+                    expires_at = datetime.fromisoformat(str(report["expires_at"]).replace("Z", "+00:00"))
+                    expired = expires_at.astimezone(UTC) <= datetime.now(UTC)
+                except (KeyError, TypeError, ValueError):
+                    expired = True
+            safety = self._safety_store().snapshot()
+            ready = bool(
+                report and report.get("overall_status") == "pass" and expired is False and not safety.get("pause_required")
+            )
+            self.write_success(
+                {
+                    "ready": ready,
+                    "doctor_report": report,
+                    "doctor_report_expired": expired,
+                    "safety": safety,
+                }
+            )
+        except Exception as e:
+            self.handle_unhandled_error(e)
+
+    async def acknowledge_safety(self):
+        """Record that an operator investigated and resolved a safety event."""
+        try:
+            request = self.read_json_request(SafetyAcknowledgeRequestSchema())
+            actor = request.get("actor") or "operator"
+            store = self._safety_store()
+            event = store.acknowledge(request["event_id"], actor=actor)
+            if event.get("active"):
+                store.clear(event["code"], resolution=f"Acknowledged as resolved by {actor}")
+            self.write_success(store.snapshot())
+        except KeyError as exc:
+            self.handle_base_api_error(BaseApiError("Unknown safety event", status_code=404, private_detail=str(exc)))
+        except BaseApiError as exc:
+            self.handle_base_api_error(exc)
+        except Exception as e:
+            self.handle_unhandled_error(e)
+
+    async def resume_safety(self):
+        """Recheck local capacity, release the latch, then resume local workers."""
+        try:
+            store = self._safety_store()
+            minimum_free = float(self.config.get_minimum_free_space_gb()) * 1024**3
+            cache_path = self.config.get_cache_path()
+            free_bytes = shutil.disk_usage(cache_path).free
+            if free_bytes < minimum_free:
+                store.trigger(
+                    "disk-reserve",
+                    "Cache disk free space is below the configured reserve",
+                    details={"free_bytes": free_bytes, "required_bytes": int(minimum_free)},
+                )
+                if self.foreman is not None:
+                    self.foreman.safety_latched = True
+                    self.foreman.pause_all_worker_threads(record_paused=True)
+                raise BaseApiError(
+                    "Safety recheck failed",
+                    messages={"disk_reserve": ["Cache disk free space remains below the configured reserve"]},
+                    status_code=409,
+                )
+
+            snapshot = store.snapshot()
+            active_disk = next(
+                (event for event in snapshot.get("events", []) if event.get("code") == "disk-reserve" and event.get("active")),
+                None,
+            )
+            if active_disk and active_disk.get("acknowledged_at"):
+                store.clear("disk-reserve", resolution="Cache disk reserve recheck passed")
+
+            allowed, reasons = store.can_release()
+            if not allowed:
+                raise BaseApiError(
+                    "Safety pause cannot be released",
+                    messages={"safety": reasons},
+                    status_code=409,
+                )
+            result = store.release_pause()
+            if self.foreman is not None:
+                self.foreman.safety_latched = False
+                if not self.foreman.resume_all_worker_threads(recorded_paused_only=True):
+                    self.foreman.safety_latched = True
+                    store.trigger("worker-resume-failure", "One or more workers could not be resumed")
+                    raise BaseApiError("Workers could not be resumed", status_code=409)
+            self.write_success(result)
+        except BaseApiError as exc:
+            self.handle_base_api_error(exc)
         except Exception as e:
             self.handle_unhandled_error(e)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isInternalRequestUrl, shouldRetryApiAuth } from '../axios'
+import { getCsrfTokenFromCookie, isInternalRequestUrl, shouldRetryApiAuth } from '../axios'
 
 describe('Axios API authentication boundary', () => {
   it('recognizes only relative and same-origin URLs as internal', () => {
@@ -29,5 +29,10 @@ describe('Axios API authentication boundary', () => {
         config: { url: '/api/v2/status', __compressoAuthRetried: true },
       }),
     ).toBe(false)
+  })
+
+  it('reads and decodes only the Compresso CSRF cookie', () => {
+    expect(getCsrfTokenFromCookie('theme=dark; compresso_csrf_token=safe%2Btoken; session=other')).toBe('safe+token')
+    expect(getCsrfTokenFromCookie('compresso_csrf_token_extra=wrong')).toBe('')
   })
 })

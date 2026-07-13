@@ -64,3 +64,10 @@ class SystemStatusSuccessSchema(BaseSchema):
     gpus = fields.List(fields.Nested(SystemStatusGpuSchema), required=True)
     platform = fields.Nested(SystemStatusPlatformSchema, required=True)
     uptime_seconds = fields.Int(required=True, metadata={"description": "System uptime in seconds", "example": 86400})
+
+
+class SafetyAcknowledgeRequestSchema(BaseSchema):
+    """Operator acknowledgement of a durable safety event."""
+
+    event_id = fields.Str(required=True)
+    actor = fields.Str(load_default="operator")

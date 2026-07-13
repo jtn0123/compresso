@@ -22,6 +22,9 @@ def _mock_initialize(self, **kwargs):
     self.params = kwargs.get("params")
     self.compresso_data_queues = {}
     self.config = MagicMock()
+    self.config.get_userdata_path.return_value = "/tmp/compresso-test-userdata"
+    self.config.get_cache_path.return_value = "/"
+    self.config.get_minimum_free_space_gb.return_value = 5.0
     self.foreman = MagicMock()
 
 
@@ -165,3 +168,74 @@ class TestSystemApiStatus(ApiTestBase):
 
         assert resp.code == 200
         assert self.parse_response(resp)["tasks"]["pending"] == 2
+
+    @patch(SYSTEM_API + ".SafetyState")
+    def test_get_safety_status(self, mock_state_cls):
+        mock_state_cls.return_value.snapshot.return_value = {
+            "status": "paused",
+            "pause_required": True,
+            "events": [{"id": "event-1", "code": "disk-reserve", "active": True}],
+        }
+
+        resp = self.get_json("/system/safety")
+
+        assert resp.code == 200
+        assert self.parse_response(resp)["pause_required"] is True
+
+    @patch(SYSTEM_API + ".load_latest_report")
+    @patch(SYSTEM_API + ".SafetyState")
+    def test_get_readiness_combines_doctor_and_safety(self, mock_state_cls, mock_load_report):
+        mock_state_cls.return_value.snapshot.return_value = {"pause_required": False, "events": []}
+        mock_load_report.return_value = {
+            "overall_status": "pass",
+            "expires_at": "2099-01-01T00:00:00+00:00",
+        }
+
+        resp = self.get_json("/system/readiness")
+
+        assert resp.code == 200
+        data = self.parse_response(resp)
+        assert data["ready"] is True
+        assert data["doctor_report_expired"] is False
+
+    @patch(SYSTEM_API + ".SafetyState")
+    def test_acknowledge_safety_event(self, mock_state_cls):
+        store = mock_state_cls.return_value
+        store.acknowledge.return_value = {"id": "event-1", "code": "manifest-corruption", "active": True}
+        store.clear.return_value = {"id": "event-1", "active": False}
+        store.snapshot.return_value = {"pause_required": True, "events": []}
+
+        resp = self.post_json("/system/safety/acknowledge", {"event_id": "event-1", "actor": "Justin"})
+
+        assert resp.code == 200
+        store.acknowledge.assert_called_once_with("event-1", actor="Justin")
+        store.clear.assert_called_once_with("manifest-corruption", resolution="Acknowledged as resolved by Justin")
+
+    @patch(SYSTEM_API + ".shutil.disk_usage")
+    @patch(SYSTEM_API + ".SafetyState")
+    def test_resume_safety_pause_after_recheck(self, mock_state_cls, mock_disk_usage):
+        store = mock_state_cls.return_value
+        store.snapshot.return_value = {"events": []}
+        store.can_release.return_value = (True, [])
+        store.release_pause.return_value = {"pause_required": False, "status": "ready", "events": []}
+        mock_disk_usage.return_value = MagicMock(free=20 * 1024**3)
+        self.handler_class.initialize = _mock_initialize
+
+        resp = self.post_json("/system/safety/resume", {})
+
+        assert resp.code == 200
+        assert self.parse_response(resp)["pause_required"] is False
+        store.release_pause.assert_called_once()
+
+    @patch(SYSTEM_API + ".shutil.disk_usage")
+    @patch(SYSTEM_API + ".SafetyState")
+    def test_resume_rejects_failed_disk_recheck(self, mock_state_cls, mock_disk_usage):
+        store = mock_state_cls.return_value
+        store.snapshot.return_value = {"events": []}
+        mock_disk_usage.return_value = MagicMock(free=1024)
+
+        resp = self.post_json("/system/safety/resume", {})
+
+        assert resp.code == 409
+        store.trigger.assert_called_once()
+        store.release_pause.assert_not_called()

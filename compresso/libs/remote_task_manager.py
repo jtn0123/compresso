@@ -73,6 +73,7 @@ class RemoteTaskManager(threading.Thread):
         self.links = Links()
         self.lease_token = None
         self.origin_installation_uuid = None
+        self.safety_event_recorder = None
 
         # Create 'redundancy' flag. When this is set, the worker should die
         self.redundant_flag = threading.Event()
@@ -202,6 +203,13 @@ class RemoteTaskManager(threading.Thread):
         installation_uuid = self.installation_info.get("installation_uuid") or self.installation_info.get("uuid")
         self.lease_token = RemoteTaskLease.acquire(self.current_task.task, installation_uuid)
         if not self.lease_token:
+            if self.safety_event_recorder is not None:
+                self.safety_event_recorder(
+                    "duplicate-lease",
+                    "A remote task already has a different active owner",
+                    installation_uuid=installation_uuid,
+                    task_id=self.current_task.get_task_id(),
+                )
             self._log(
                 f"Unable to acquire remote task lease for installation '{installation_uuid}'",
                 level="warning",
@@ -394,6 +402,13 @@ class RemoteTaskManager(threading.Thread):
 
             # Compare uploaded file md5checksum
             if info.get("checksum") != initial_checksum:
+                if self.safety_event_recorder is not None:
+                    self.safety_event_recorder(
+                        "manifest-corruption",
+                        "A remote upload checksum did not match its source",
+                        task_id=self.current_task.get_task_id(),
+                        phase="upload",
+                    )
                 self._log(f"The uploaded file did not return a correct checksum '{original_abspath}'", level="error")
                 # Send request to terminate the remote worker then return
                 self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
@@ -516,6 +531,14 @@ class RemoteTaskManager(threading.Thread):
             elif not all_task_states:
                 # Connection failed -- apply exponential backoff
                 consecutive_poll_failures += 1
+                if consecutive_poll_failures == 3 and self.lease_token and self.safety_event_recorder is not None:
+                    self.safety_event_recorder(
+                        "remote-poll-loss",
+                        "Three consecutive remote status polls failed while this node held the task lease",
+                        task_id=self.current_task.get_task_id(),
+                        installation_uuid=self.installation_info.get("installation_uuid")
+                        or self.installation_info.get("uuid"),
+                    )
                 if first_failure_time is None:
                     first_failure_time = time_now
                 polling_delay = min(60, 5 * (2 ** min(consecutive_poll_failures, 4)))
@@ -729,6 +752,13 @@ class RemoteTaskManager(threading.Thread):
             expected_checksum = data.get("checksum")
             downloaded_checksum = file_sha256(task_cache_path)
             if not expected_checksum or expected_checksum == "UNKNOWN" or downloaded_checksum != expected_checksum:
+                if self.safety_event_recorder is not None:
+                    self.safety_event_recorder(
+                        "manifest-corruption",
+                        "A downloaded remote result did not match its manifest checksum",
+                        task_id=self.current_task.get_task_id(),
+                        phase="download",
+                    )
                 self._log(f"The downloaded file did not produce a correct checksum '{task_cache_path}'", level="error")
                 self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
                 self.__write_failure_to_worker_log()
@@ -739,6 +769,12 @@ class RemoteTaskManager(threading.Thread):
                 self.lease_token,
                 downloaded_checksum,
             ):
+                if self.safety_event_recorder is not None:
+                    self.safety_event_recorder(
+                        "duplicate-lease",
+                        "A conflicting remote completion attempted to close this task lease",
+                        task_id=self.current_task.get_task_id(),
+                    )
                 self._log(f"Conflicting remote completion received for '{original_abspath}'", level="error")
                 self.__write_failure_to_worker_log()
                 return False
