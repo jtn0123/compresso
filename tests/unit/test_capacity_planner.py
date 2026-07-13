@@ -6,6 +6,7 @@ import json
 import os
 import sqlite3
 import stat
+from contextlib import closing
 from types import SimpleNamespace
 
 import pytest
@@ -63,7 +64,7 @@ def test_library_analysis_iterator_is_bounded_sorted_and_media_only(tmp_path):
     _write_media(tmp_path, "a/clip.mp4", 4)
     _write_media(tmp_path, "a/readme.txt", 3)
 
-    relative = [str(path.relative_to(tmp_path)) for path in library_analysis.iter_media_files(tmp_path)]
+    relative = [path.relative_to(tmp_path).as_posix() for path in library_analysis.iter_media_files(tmp_path)]
 
     assert relative == ["a/clip.mp4", "b/movie.mkv"]
 
@@ -226,7 +227,7 @@ def test_source_path_rejects_protected_and_non_directory_paths(tmp_path):
 def test_library_id_resolution_reads_sqlite_without_mutating_it(tmp_path):
     settings = FakeSettings(tmp_path)
     database_path = tmp_path / "config" / "compresso.db"
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection, connection:
         connection.execute("CREATE TABLE libraries (id INTEGER PRIMARY KEY, name TEXT, path TEXT, skip_codecs TEXT)")
         connection.execute(
             "INSERT INTO libraries(id, name, path, skip_codecs) VALUES (7, 'Movies', '/Volumes/Media', '[\"hevc\"]')"
@@ -251,7 +252,7 @@ def test_invalid_sample_size_is_rejected(tmp_path):
 def test_historical_evidence_reads_savings_and_throughput(tmp_path):
     settings = FakeSettings(tmp_path)
     database_path = tmp_path / "config" / "compresso.db"
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection, connection:
         connection.execute(
             "CREATE TABLE compressionstats (source_size INTEGER, destination_size INTEGER, source_codec TEXT, "
             "source_resolution TEXT, encoding_duration_seconds REAL, library_id INTEGER)"
