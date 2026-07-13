@@ -54,9 +54,10 @@ Do not expose Compresso directly to the public internet. If remote access is req
   `compresso doctor --role worker --strict` on a remote worker. For the final
   connected preflight, add `--peer <linked-name-or-uuid>` (for example,
   `--peer m4-worker`). The value must select an existing linked installation;
-  arbitrary network targets are rejected. Provide its API token through
-  `COMPRESSO_DOCTOR_PEER_TOKEN`, or name another token variable with
-  `--peer-token-env`.
+  arbitrary network targets and non-HTTPS linked addresses are rejected.
+  Provide its API token through `COMPRESSO_DOCTOR_PEER_TOKEN`, or name another
+  token variable with `--peer-token-env`. If `--output` is supplied, it must be
+  a JSON filename stored under the user-data `readiness` directory.
 - Wait for `GET /compresso/api/v2/healthcheck/readiness` to return `200`.
 - Treat any `503` response as "startup is not complete yet" and inspect the returned `stages`, `details`, and `errors`.
 - Confirm the startup logs include `STARTUP_SUMMARY` lines before enabling real work.

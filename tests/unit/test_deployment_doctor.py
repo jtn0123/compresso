@@ -138,6 +138,18 @@ def test_offline_master_report_is_persisted_atomically(tmp_path, monkeypatch):
     assert not list(saved_path.parent.glob("*.tmp"))
 
 
+def test_report_output_is_confined_to_readiness_directory(tmp_path):
+    report = DoctorReport.create("master", [])
+
+    saved = report.save(tmp_path, "operator-evidence.json")
+
+    assert saved == tmp_path / "readiness" / "operator-evidence.json"
+    with pytest.raises(ValueError, match="filename"):
+        report.save(tmp_path, str(tmp_path / "outside.json"))
+    with pytest.raises(ValueError, match="filename"):
+        report.save(tmp_path, "../outside.json")
+
+
 def test_worker_fails_when_scanner_is_enabled(tmp_path, monkeypatch):
     settings = FakeSettings(tmp_path, scanner=True)
     monkeypatch.setattr("compresso.ops.doctor.sys.version_info", (3, 13, 1))
@@ -178,7 +190,7 @@ def test_load_latest_report_rejects_malformed_root(tmp_path):
 def test_strict_master_passes_with_valid_database_and_ready_peer(tmp_path, monkeypatch):
     settings = FakeSettings(
         tmp_path,
-        remotes=[{"name": "worker-m4", "uuid": "worker-uuid", "address": "http://worker.local:8888"}],
+        remotes=[{"name": "worker-m4", "uuid": "worker-uuid", "address": "https://worker.local:8888"}],
     )
     with sqlite3.connect(tmp_path / "config" / "compresso.db") as connection:
         connection.execute("CREATE TABLE readiness (id INTEGER PRIMARY KEY)")
@@ -249,7 +261,7 @@ def test_peer_probe_rejects_unsafe_targets_without_requesting(tmp_path, monkeypa
 
 
 def test_peer_probe_rejects_linked_metadata_address_without_requesting(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path, remotes=[{"name": "metadata", "address": "http://metadata.local"}])
+    settings = FakeSettings(tmp_path, remotes=[{"name": "metadata", "address": "https://metadata.local"}])
     get = MagicMock()
     monkeypatch.setattr("compresso.ops.doctor.requests.get", get)
     monkeypatch.setattr(
@@ -260,6 +272,18 @@ def test_peer_probe_rejects_linked_metadata_address_without_requesting(tmp_path,
     checks = DeploymentDoctor(settings, "master", peers=["metadata"])._peer_checks()
 
     assert checks[0].check_id == "peer.0.target"
+    get.assert_not_called()
+
+
+def test_peer_probe_rejects_linked_plain_http_address_without_requesting(tmp_path, monkeypatch):
+    settings = FakeSettings(tmp_path, remotes=[{"name": "worker", "address": "http://worker.local"}])
+    get = MagicMock()
+    monkeypatch.setattr("compresso.ops.doctor.requests.get", get)
+
+    checks = DeploymentDoctor(settings, "master", peers=["worker"])._peer_checks()
+
+    assert checks[0].check_id == "peer.0.target"
+    assert "HTTPS" in checks[0].evidence["error"]
     get.assert_not_called()
 
 
@@ -307,7 +331,7 @@ def test_non_object_power_preferences_are_reported_as_warning(monkeypatch):
 
 
 def test_capability_probe_and_peer_failure_are_reported(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path, remotes=[{"name": "offline", "address": "http://offline.local"}])
+    settings = FakeSettings(tmp_path, remotes=[{"name": "offline", "address": "https://offline.local"}])
     monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.45")))
     monkeypatch.setattr("compresso.ops.doctor.shutil.which", lambda _name: None)
     monkeypatch.setattr(
@@ -325,7 +349,7 @@ def test_capability_probe_and_peer_failure_are_reported(tmp_path, monkeypatch):
     report = DeploymentDoctor(
         settings,
         "master",
-        peers=["http://offline.local"],
+        peers=["offline"],
         capability_probe=fail_capabilities,
     ).run()
 
@@ -335,7 +359,7 @@ def test_capability_probe_and_peer_failure_are_reported(tmp_path, monkeypatch):
 
 
 def test_peer_failure_is_attributed_to_the_endpoint(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path, remotes=[{"uuid": "worker-id", "address": "http://worker.local"}])
+    settings = FakeSettings(tmp_path, remotes=[{"uuid": "worker-id", "address": "https://worker.local"}])
     readiness = MagicMock()
     readiness.json.return_value = {"ready": True}
     get = MagicMock(side_effect=[readiness, doctor.requests.ConnectionError("version offline")])
@@ -350,7 +374,7 @@ def test_peer_failure_is_attributed_to_the_endpoint(tmp_path, monkeypatch):
 
 
 def test_malformed_peer_payloads_become_failed_checks(tmp_path, monkeypatch):
-    settings = FakeSettings(tmp_path, remotes=[{"name": "worker", "address": "http://worker.local"}])
+    settings = FakeSettings(tmp_path, remotes=[{"name": "worker", "address": "https://worker.local"}])
     responses = []
     for payload in ([], ["not-version"], {"video_encoders": []}):
         response = MagicMock()
@@ -373,8 +397,8 @@ def test_doctor_main_saves_and_prints_report(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(doctor, "Config", MagicMock(return_value=settings))
     monkeypatch.setattr(doctor, "DeploymentDoctor", MagicMock(return_value=runner))
 
-    exit_code = doctor.main(["--role", "worker", "--output", str(tmp_path / "doctor.json")])
+    exit_code = doctor.main(["--role", "worker", "--output", "doctor.json"])
 
     assert exit_code == 0
-    assert (tmp_path / "doctor.json").is_file()
+    assert (tmp_path / "userdata" / "readiness" / "doctor.json").is_file()
     assert json.loads(capsys.readouterr().out)["report_id"] == report.report_id

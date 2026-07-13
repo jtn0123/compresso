@@ -46,7 +46,9 @@ compresso doctor --role master --peer m4-worker --strict \
 ```
 
 Reports expire after 24 hours. Do not begin a batch from an expired report or
-when the strict command exits nonzero.
+when the strict command exits nonzero. Connected peer probes require the linked
+installation address to use HTTPS. `--output` accepts a filename, not a path;
+reports are stored under the node's user-data `readiness` directory.
 
 Create a manifest before Compresso touches the copied canary:
 

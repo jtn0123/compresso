@@ -11,6 +11,7 @@ import json
 import os
 import platform
 import plistlib
+import re
 import shutil
 import socket
 import sqlite3
@@ -34,6 +35,7 @@ from compresso.webserver.request_auth import API_AUTH_HEADER_NAME
 SCHEMA_VERSION = 1
 REPORT_TTL_HOURS = 24
 SECRET_KEYS = ("authorization", "cookie", "password", "secret", "token")
+REPORT_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,126}\.json")
 PEER_API_PATHS = {
     "readiness": "/compresso/api/v2/healthcheck/readiness",
     "version": "/compresso/api/v2/version/read",
@@ -71,11 +73,22 @@ def _atomic_json_write(path: Path, payload: dict[str, Any]) -> None:
         raise
 
 
+def _report_destination(report_dir: Path, output_name: str | None, default_name: str) -> Path:
+    name = output_name or default_name
+    if Path(name).name != name or REPORT_NAME_PATTERN.fullmatch(name) is None:
+        raise ValueError("report output must be a JSON filename without directory components")
+    root = report_dir.resolve()
+    destination = (root / name).resolve()
+    if not destination.is_relative_to(root):
+        raise ValueError("report output filename escapes the readiness directory")
+    return destination
+
+
 def _validated_peer_base(peer: str) -> str:
-    """Return a normalized HTTP(S) origin after rejecting unsafe targets."""
+    """Return a normalized HTTPS origin after rejecting unsafe targets."""
     parsed = urlsplit(peer)
-    if parsed.scheme not in {"http", "https"}:
-        raise ValueError("peer URL must use http or https")
+    if parsed.scheme != "https":
+        raise ValueError("peer URL must use HTTPS")
     if not parsed.hostname or parsed.username is not None or parsed.password is not None:
         raise ValueError("peer URL must contain a host and no embedded credentials")
     if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
@@ -122,8 +135,8 @@ def _configured_peer_base(settings: Any, selector: str) -> str:
         if selected not in candidates:
             continue
         configured_address = address_value.strip()
-        if not configured_address.casefold().startswith(("http://", "https://")):
-            configured_address = "http://" + configured_address
+        if not configured_address.casefold().startswith("https://"):
+            raise ValueError("linked peer address must use HTTPS")
         return _validated_peer_base(configured_address)
     raise ValueError("peer is not an existing linked installation")
 
@@ -206,9 +219,13 @@ class DoctorReport:
             "checks": [check.to_dict() for check in self.checks],
         }
 
-    def save(self, userdata_path: str, output_path: str | None = None) -> Path:
+    def save(self, userdata_path: str, output_name: str | None = None) -> Path:
         report_dir = Path(userdata_path) / "readiness"
-        destination = Path(output_path) if output_path else report_dir / f"{self.generated_at:%Y%m%dT%H%M%SZ}-{self.role}.json"
+        destination = _report_destination(
+            report_dir,
+            output_name,
+            f"{self.generated_at:%Y%m%dT%H%M%SZ}-{self.role}.json",
+        )
         payload = self.to_dict()
         _atomic_json_write(destination, payload)
         _atomic_json_write(report_dir / "latest.json", payload)
@@ -686,7 +703,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Environment variable containing the peer API token.",
     )
     parser.add_argument("--strict", action="store_true")
-    parser.add_argument("--output")
+    parser.add_argument("--output", help="JSON filename stored under the user-data readiness directory.")
     parser.add_argument("--config-path")
     args = parser.parse_args(argv)
     settings = Config(config_path=args.config_path) if args.config_path else Config()
