@@ -67,11 +67,31 @@ Verify every result:
 
 Do not advance if the command exits nonzero, a file is unaccounted for, or visual/audio inspection finds a regression.
 
-Exercise resumable transfer independently before a large batch:
+Exercise the complete synthetic fault laboratory before a large batch. The
+one-command form creates a marked ephemeral workspace and never reads the
+configured media library:
 
 ```bash
-./scripts/distributed-fault-drill.py --size-mb 102400 --chunk-mb 8
+export COMPRESSO_FAULT_LAB=1
+compresso fault-lab --scenario all --seed 20 \
+  --report /path/to/evidence/fault-lab-seed-20.json
 ```
+
+For a persistent scratch workspace, initialize it explicitly before running:
+
+```bash
+compresso fault-lab --workspace /path/to/empty/scratch --init-workspace
+compresso fault-lab --workspace /path/to/empty/scratch --scenario all \
+  --seed 20 --report /path/to/evidence/fault-lab-seed-20.json
+```
+
+The guard requires both `COMPRESSO_FAULT_LAB=1` and a generated marker for an
+explicit workspace. It rejects config, cache, library, user-data, repository,
+and home-directory overlap. The ordered run covers restart/resume, corrupt
+chunks and checkpoints, stale offsets, injected disk-full/read-only failures,
+interrupted finalization, duplicate lease contention, a real two-process HTTP
+restart, 10,000/100,000-entry queues, and a compact FFprobe-verified media
+fixture. Any failed invariant stops the remaining scenarios and exits nonzero.
 
 ## Readiness interpretation
 

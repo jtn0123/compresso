@@ -7,6 +7,7 @@ from __future__ import annotations
 import sys
 
 from compresso.ops.doctor import main as doctor_main
+from compresso.ops.fault_lab import main as fault_lab_main
 from compresso.service import main as service_main
 
 
@@ -14,6 +15,8 @@ def main(argv: list[str] | None = None):
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments and arguments[0] == "doctor":
         return doctor_main(arguments[1:])
+    if arguments and arguments[0] == "fault-lab":
+        return fault_lab_main(arguments[1:])
     if argv is not None:
         previous = sys.argv
         try:
