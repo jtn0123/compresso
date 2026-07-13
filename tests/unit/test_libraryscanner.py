@@ -8,6 +8,7 @@ Tests library scanning logic, file traversal, schedule configuration,
 and thread management.
 """
 
+import os
 import queue
 import threading
 from types import SimpleNamespace
@@ -309,7 +310,7 @@ class TestScanLibraryPath:
             mgr.scan_library_path("Media", "/media/lib", 1)
 
         checkpoint_store.clear.assert_called_once_with(1)
-        assert queued == ["/media/lib/new-before-checkpoint.mkv"]
+        assert queued == [os.path.join("/media/lib", "new-before-checkpoint.mkv")]
 
     @patch("compresso.libs.libraryscanner.os.path.exists", return_value=False)
     def test_path_not_exists(self, mock_exists):
