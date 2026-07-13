@@ -76,6 +76,34 @@ merely to clear the banner; preserve the evidence and reconcile the affected
 task or file first. The resume action always rechecks the configured cache-disk
 reserve before it releases workers.
 
+Create and rehearse a private control-plane backup before the first canary and
+after every material configuration change:
+
+```bash
+compresso state backup --output pre-nas-control-plane.zip
+compresso state rehearse --archive pre-nas-control-plane.zip \
+  --output pre-nas-rehearsal.json
+```
+
+The backup command uses SQLite's online backup API, verifies the snapshot with
+`PRAGMA integrity_check`, and includes `settings.json`, durable file-operation
+journals, and small safety/readiness/planning evidence. Archives are confined to
+the node's user-data `backups` directory; rehearsal reports are confined to
+`recovery-rehearsals`. The rehearsal rejects path traversal, symbolic links,
+duplicate entries, oversized archives, unexpected files, invalid JSON, checksum
+changes, and a damaged database while extracting only into a disposable
+directory. A passing rehearsal does not mutate the live installation.
+
+These archives contain API credentials and other private configuration. Keep
+them owner-readable, copy them only to encrypted backup storage, and never
+attach them to an issue or release. They do not contain cache files, plugins, or
+media and are not a substitute for NAS snapshots or verified media backups.
+
+For an actual recovery, stop Compresso, preserve the failed config directory,
+rehearse the selected archive again, and restore its database/settings only into
+the stopped installation. Start with workers held, run `compresso doctor`, and
+reconcile any preserved file-operation journals before resuming a batch.
+
 Create a manifest before Compresso touches the copied canary:
 
 ```bash
