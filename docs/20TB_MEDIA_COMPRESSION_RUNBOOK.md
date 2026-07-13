@@ -66,6 +66,16 @@ when the strict command exits nonzero. Connected peer probes require the linked
 installation address to use HTTPS. `--output` accepts a filename, not a path;
 reports are stored under the node's user-data `readiness` directory.
 
+Open **Deployment Readiness** at `/compresso/ui/readiness` before starting or
+resuming a batch. This page combines the latest doctor report with the durable
+safety latch. A hard event pauses every local worker and survives both process
+and machine restarts. The global red banner remains visible until the event has
+been investigated, acknowledged as resolved, and the guarded resume recheck
+passes. Do not acknowledge checksum, lease, lost-contact, or rollback events
+merely to clear the banner; preserve the evidence and reconcile the affected
+task or file first. The resume action always rechecks the configured cache-disk
+reserve before it releases workers.
+
 Create a manifest before Compresso touches the copied canary:
 
 ```bash
