@@ -96,6 +96,12 @@ def _paths_overlap(left: Path, right: Path) -> bool:
     return left == right or left.is_relative_to(right) or right.is_relative_to(left)
 
 
+def _reject_home_root(workspace: Path) -> None:
+    home = Path.home().resolve()
+    if workspace == home or home.is_relative_to(workspace):
+        raise SafetyError("fault-lab workspace cannot be the home directory or one of its parents")
+
+
 def validate_workspace(path: Path, protected_paths: Iterable[Path] = ()) -> Path:
     """Fail closed unless both the environment and on-disk marker authorize the lab."""
     if os.environ.get(ENABLE_ENV) != "1":
@@ -108,6 +114,7 @@ def validate_workspace(path: Path, protected_paths: Iterable[Path] = ()) -> Path
         raise SafetyError("fault-lab workspace marker is missing or invalid") from error
     if marker_payload != MARKER_PAYLOAD:
         raise SafetyError("fault-lab workspace marker has the wrong identity")
+    _reject_home_root(workspace)
     for protected in protected_paths:
         candidate = Path(protected).expanduser().resolve()
         if _paths_overlap(workspace, candidate):
@@ -383,7 +390,7 @@ class FaultLab:
 
 
 def _protected_paths(settings: Any) -> list[Path]:
-    paths = [Path.cwd(), Path.home(), Path(__file__).resolve().parents[2]]
+    paths = [Path.cwd(), Path(__file__).resolve().parents[2]]
     for getter_name in ("get_config_path", "get_cache_path", "get_library_path", "get_userdata_path"):
         value = getattr(settings, getter_name)()
         if value:
@@ -398,6 +405,7 @@ def _run_main(args: argparse.Namespace) -> int:
         if os.environ.get(ENABLE_ENV) != "1":
             raise SafetyError(f"set {ENABLE_ENV}=1 before initializing a synthetic lab")
         workspace = Path(args.workspace).expanduser().resolve()
+        _reject_home_root(workspace)
         for path in protected:
             if _paths_overlap(workspace, path.expanduser().resolve()):
                 raise SafetyError(f"fault-lab workspace overlaps protected path: {path}")

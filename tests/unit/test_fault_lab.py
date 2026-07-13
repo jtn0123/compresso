@@ -4,6 +4,7 @@
 
 import json
 import os
+import stat
 from collections import OrderedDict
 from types import SimpleNamespace
 
@@ -22,7 +23,11 @@ def test_initialize_and_validate_workspace_requires_explicit_lab_environment(tmp
 
     monkeypatch.setenv(fault_lab.ENABLE_ENV, "1")
     assert fault_lab.validate_workspace(workspace) == workspace.resolve()
-    assert (workspace / fault_lab.MARKER_NAME).stat().st_mode & 0o777 == 0o600
+    mode = (workspace / fault_lab.MARKER_NAME).stat().st_mode
+    assert mode & stat.S_IRUSR
+    assert mode & stat.S_IWUSR
+    if os.name != "nt":
+        assert mode & 0o777 == 0o600
 
 
 def test_workspace_without_marker_and_protected_workspace_are_rejected(tmp_path, monkeypatch):
@@ -92,7 +97,11 @@ def test_atomic_report_write_uses_private_permissions(tmp_path):
     fault_lab.write_report(destination, payload)
 
     assert json.loads(destination.read_text()) == payload
-    assert destination.stat().st_mode & 0o777 == 0o600
+    mode = destination.stat().st_mode
+    assert mode & stat.S_IRUSR
+    assert mode & stat.S_IWUSR
+    if os.name != "nt":
+        assert mode & 0o777 == 0o600
     assert not list(destination.parent.glob("*.tmp"))
 
 
@@ -127,6 +136,22 @@ def test_environment_value_must_be_exactly_one(tmp_path, monkeypatch):
         fault_lab.validate_workspace(workspace)
 
     assert os.environ[fault_lab.ENABLE_ENV] == "true"
+
+
+def test_dedicated_home_child_is_allowed_but_home_itself_is_rejected(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    child = home / "labs" / "run-20"
+    fault_lab.initialize_workspace(child)
+    monkeypatch.setattr(fault_lab.Path, "home", lambda: home)
+    monkeypatch.setenv(fault_lab.ENABLE_ENV, "1")
+
+    assert fault_lab.validate_workspace(child) == child.resolve()
+
+    direct_home = tmp_path / "home-itself"
+    fault_lab.initialize_workspace(direct_home)
+    monkeypatch.setattr(fault_lab.Path, "home", lambda: direct_home)
+    with pytest.raises(fault_lab.SafetyError, match="home"):
+        fault_lab.validate_workspace(direct_home)
 
 
 def test_initialize_rejects_nonempty_and_wrong_marker_workspaces(tmp_path):
