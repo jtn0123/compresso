@@ -65,7 +65,10 @@ def test_store_instances_share_lock_and_do_not_share_fixed_temp_filename(tmp_pat
 
 
 @pytest.mark.unittest
-@pytest.mark.parametrize("completed_root", ["../outside", "/absolute", r"..\outside"])
+@pytest.mark.parametrize(
+    "completed_root",
+    ["../outside", "/absolute", r"..\outside", r"C:\absolute", r"\rooted", r"\\server\share\media"],
+)
 def test_scan_checkpoint_rejects_unsafe_completed_root(tmp_path, completed_root):
     store = ScanCheckpointStore(str(tmp_path))
     store.save(7, "/media/movies", completed_root)

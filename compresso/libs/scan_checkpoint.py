@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 from contextlib import suppress
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
 CHECKPOINT_MTIME_SLOP_NS = 2_000_000_000
@@ -44,7 +45,9 @@ class ScanCheckpointStore:
         updated_at_ns = data.get("updated_at_ns")
         if not isinstance(completed_root, str) or not completed_root:
             return None
-        if os.path.isabs(completed_root) or ".." in completed_root.replace("\\", "/").split("/"):
+        posix_path = PurePosixPath(completed_root)
+        windows_path = PureWindowsPath(completed_root)
+        if posix_path.is_absolute() or windows_path.anchor or ".." in completed_root.replace("\\", "/").split("/"):
             return None
         if not isinstance(updated_at_ns, int) or isinstance(updated_at_ns, bool) or updated_at_ns <= 0:
             return None
