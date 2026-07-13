@@ -31,6 +31,23 @@ Run these in order. A failed gate sends the workflow back to the previous passin
 
 ## Canary procedure
 
+Run the deployment doctor on each node before creating the canary manifest. An
+offline run records everything available on that machine and may finish with
+warnings. The final connected gate must be strict and must include the linked
+worker. Supply the worker token through an environment variable so it is not
+stored in shell history:
+
+```bash
+compresso doctor --role worker --output worker-readiness.json
+
+export COMPRESSO_DOCTOR_PEER_TOKEN="<worker API token>"
+compresso doctor --role master --peer http://m4-worker:8888 --strict \
+  --output master-readiness.json
+```
+
+Reports expire after 24 hours. Do not begin a batch from an expired report or
+when the strict command exits nonzero.
+
 Create a manifest before Compresso touches the copied canary:
 
 ```bash

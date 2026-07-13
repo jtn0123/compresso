@@ -247,7 +247,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            '%s=%s.service:main' % (module_name, module_name)
+            '%s=%s.cli:main' % (module_name, module_name)
         ]
     },
     cmdclass=cmd_class,

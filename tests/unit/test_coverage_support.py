@@ -91,13 +91,13 @@ def fake_apispec(monkeypatch):
 
 @pytest.mark.unittest
 def test_main_module_invokes_service_main(monkeypatch):
-    fake_service = types.ModuleType("compresso.service")
-    fake_service.main = MagicMock()
-    monkeypatch.setitem(sys.modules, "compresso.service", fake_service)
+    fake_cli = types.ModuleType("compresso.cli")
+    fake_cli.main = MagicMock()
+    monkeypatch.setitem(sys.modules, "compresso.cli", fake_cli)
 
     runpy.run_module("compresso.__main__", run_name="__main__")
 
-    fake_service.main.assert_called_once_with()
+    fake_cli.main.assert_called_once_with()
 
 
 @pytest.mark.unittest
