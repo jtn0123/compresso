@@ -70,7 +70,7 @@ class SafetyState:
             if data.get("schema_version") != self.SCHEMA_VERSION or not isinstance(data.get("events"), list):
                 raise ValueError("unsupported safety state schema")
             return data
-        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        except (OSError, ValueError, TypeError) as exc:
             return self._recover_corrupt_state(exc)
 
     def _recover_corrupt_state(self, exc: Exception) -> dict[str, Any]:

@@ -172,7 +172,19 @@ class FileOperationTracker:
         self._state = "rolling_back"
         self._persist()
         backup_by_original = {os.path.realpath(original): backup for backup, original in self._backups}
-        failed = False
+        remaining_created_paths = self._remove_created_paths_for_rollback(backup_by_original)
+        remaining_backups = self._restore_backups_for_rollback()
+        self._backups = list(reversed(remaining_backups))
+        self._created_paths = list(reversed(remaining_created_paths))
+        if self._backups or self._created_paths:
+            self._state = "rollback_failed"
+            self._persist()
+            self._notify_rollback_failure()
+            return False
+        self.finalize()
+        return True
+
+    def _remove_created_paths_for_rollback(self, backup_by_original):
         remaining_created_paths = []
         for created_path in reversed(self._created_paths):
             backup_path = backup_by_original.get(os.path.realpath(created_path))
@@ -182,16 +194,17 @@ class FileOperationTracker:
                     created_path,
                     backup_path,
                 )
-                failed = True
                 remaining_created_paths.append(created_path)
                 continue
             try:
                 if os.path.exists(created_path):
                     os.remove(created_path)
-            except (OSError, PermissionError) as e:
+            except OSError as e:
                 self._logger.error("FileOperationTracker: failed to remove created path '%s': %s", created_path, e)
-                failed = True
                 remaining_created_paths.append(created_path)
+        return remaining_created_paths
+
+    def _restore_backups_for_rollback(self):
         remaining_backups = []
         for backup_path, original_path in reversed(self._backups):
             try:
@@ -199,32 +212,26 @@ class FileOperationTracker:
                     shutil.move(backup_path, original_path)
                     self._logger.info("FileOperationTracker: restored '%s' from backup", original_path)
                 else:
-                    failed = True
                     remaining_backups.append((backup_path, original_path))
-            except (OSError, PermissionError, shutil.Error) as e:
+            except (OSError, shutil.Error) as e:
                 self._logger.error(
                     "FileOperationTracker: FAILED to restore '%s' from backup '%s': %s", original_path, backup_path, e
                 )
-                failed = True
                 remaining_backups.append((backup_path, original_path))
-        self._backups = list(reversed(remaining_backups))
-        self._created_paths = list(reversed(remaining_created_paths))
-        if failed:
-            self._state = "rollback_failed"
-            self._persist()
-            if self._failure_callback is not None:
-                try:
-                    self._failure_callback(
-                        operation_id=self._operation_id,
-                        task_id=self._task_id,
-                        remaining_backups=len(self._backups),
-                        remaining_created_paths=len(self._created_paths),
-                    )
-                except Exception as error:
-                    self._logger.error("FileOperationTracker: failed to record rollback safety event: %s", error)
-            return False
-        self.finalize()
-        return True
+        return remaining_backups
+
+    def _notify_rollback_failure(self):
+        if self._failure_callback is None:
+            return
+        try:
+            self._failure_callback(
+                operation_id=self._operation_id,
+                task_id=self._task_id,
+                remaining_backups=len(self._backups),
+                remaining_created_paths=len(self._created_paths),
+            )
+        except Exception as error:
+            self._logger.error("FileOperationTracker: failed to record rollback safety event: %s", error)
 
     @classmethod
     def recover_all(cls, journal_dir, logger):
