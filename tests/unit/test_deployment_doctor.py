@@ -4,10 +4,11 @@
 
 import json
 import secrets
+import socket
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, mock_open
 
 import pytest
 
@@ -63,6 +64,12 @@ class FakeSettings:
 
     def get_ssl_enabled(self):
         return False
+
+
+def _addrinfo(ip):
+    if ":" in ip:
+        return [(socket.AF_INET6, socket.SOCK_STREAM, 0, "", (ip, 0, 0, 0))]
+    return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", (ip, 0))]
 
 
 def test_report_status_and_strict_warning_behavior():
@@ -187,6 +194,7 @@ def test_strict_master_passes_with_valid_database_and_ready_peer(tmp_path, monke
         responses.append(response)
     get = MagicMock(side_effect=responses)
     monkeypatch.setattr("compresso.ops.doctor.requests.get", get)
+    monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.44")))
     capabilities = {"video_encoders": ["libx264"], "platform": {"system": "Linux", "machine": "x86_64"}}
 
     credential = secrets.token_urlsafe(8)
@@ -206,6 +214,31 @@ def test_strict_master_passes_with_valid_database_and_ready_peer(tmp_path, monke
     assert next(check for check in report.checks if check.check_id == "peer.0.version").status == "pass"
     assert next(check for check in report.checks if check.check_id == "peer.0.capabilities").status == "pass"
     assert all(call.kwargs["headers"]["X-Compresso-Api-Token"] == credential for call in get.call_args_list)
+    assert all(call.kwargs["allow_redirects"] is False for call in get.call_args_list)
+
+
+@pytest.mark.parametrize(
+    ("peer", "resolved_ip"),
+    [
+        ("file:///etc/passwd", "192.168.1.44"),
+        ("http://user:password@worker.local:8888", "192.168.1.44"),
+        ("http://worker.local:8888/untrusted-path", "192.168.1.44"),
+        ("http://metadata.local", "169.254.169.254"),
+        ("http://localhost:8888", "127.0.0.1"),
+    ],
+)
+def test_peer_probe_rejects_unsafe_targets_without_requesting(tmp_path, monkeypatch, peer, resolved_ip):
+    settings = FakeSettings(tmp_path)
+    get = MagicMock()
+    monkeypatch.setattr("compresso.ops.doctor.requests.get", get)
+    monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo(resolved_ip)))
+
+    checks = DeploymentDoctor(settings, "master", peers=[peer])._peer_checks()
+
+    assert len(checks) == 1
+    assert checks[0].status == "fail"
+    assert checks[0].check_id == "peer.0.target"
+    get.assert_not_called()
 
 
 def test_corrupt_database_and_untrusted_plugin_are_blockers(tmp_path, monkeypatch):
@@ -228,8 +261,32 @@ def test_corrupt_database_and_untrusted_plugin_are_blockers(tmp_path, monkeypatc
     assert report.overall_status == "fail"
 
 
+def test_non_object_plugin_manifest_is_reported_as_untrusted(tmp_path, monkeypatch):
+    settings = FakeSettings(tmp_path)
+    plugin = tmp_path / "plugins" / "malformed"
+    plugin.mkdir()
+    (plugin / "info.json").write_text("[]", encoding="utf-8")
+
+    check = next(
+        item for item in DeploymentDoctor(settings, "master")._security_checks() if item.check_id == "security.plugins"
+    )
+
+    assert check.status == "fail"
+    assert check.evidence["untrusted_plugin_ids"] == ["malformed"]
+
+
+def test_non_object_power_preferences_are_reported_as_warning(monkeypatch):
+    monkeypatch.setattr("builtins.open", mock_open(read_data=b"plist"))
+    monkeypatch.setattr("compresso.ops.doctor.plistlib.load", MagicMock(return_value=[]))
+
+    check = DeploymentDoctor._mac_power_check()
+
+    assert check.status == "warn"
+
+
 def test_capability_probe_and_peer_failure_are_reported(tmp_path, monkeypatch):
     settings = FakeSettings(tmp_path)
+    monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.45")))
     monkeypatch.setattr("compresso.ops.doctor.shutil.which", lambda _name: None)
     monkeypatch.setattr(
         "compresso.ops.doctor.shutil.disk_usage",
@@ -253,6 +310,37 @@ def test_capability_probe_and_peer_failure_are_reported(tmp_path, monkeypatch):
     assert next(check for check in report.checks if check.check_id == "capability.snapshot").status == "fail"
     assert next(check for check in report.checks if check.check_id == "peer.0.readiness").status == "fail"
     assert next(check for check in report.checks if check.check_id == "path.cache_reserve").status == "fail"
+
+
+def test_peer_failure_is_attributed_to_the_endpoint(tmp_path, monkeypatch):
+    settings = FakeSettings(tmp_path)
+    readiness = MagicMock()
+    readiness.json.return_value = {"ready": True}
+    get = MagicMock(side_effect=[readiness, doctor.requests.ConnectionError("version offline")])
+    monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.45")))
+    monkeypatch.setattr("compresso.ops.doctor.requests.get", get)
+
+    checks = DeploymentDoctor(settings, "master", peers=["http://worker.local"])._peer_checks()
+
+    assert len(checks) == 1
+    assert checks[0].check_id == "peer.0.version"
+    assert checks[0].evidence["endpoint"] == "version"
+
+
+def test_malformed_peer_payloads_become_failed_checks(tmp_path, monkeypatch):
+    settings = FakeSettings(tmp_path)
+    responses = []
+    for payload in ([], ["not-version"], {"video_encoders": []}):
+        response = MagicMock()
+        response.json.return_value = payload
+        responses.append(response)
+    monkeypatch.setattr("compresso.ops.doctor.socket.getaddrinfo", MagicMock(return_value=_addrinfo("192.168.1.45")))
+    monkeypatch.setattr("compresso.ops.doctor.requests.get", MagicMock(side_effect=responses))
+
+    checks = DeploymentDoctor(settings, "master", peers=["http://worker.local"])._peer_checks()
+
+    assert [check.check_id for check in checks] == ["peer.0.readiness", "peer.0.version", "peer.0.capabilities"]
+    assert all(check.status == "fail" for check in checks)
 
 
 def test_doctor_main_saves_and_prints_report(tmp_path, monkeypatch, capsys):

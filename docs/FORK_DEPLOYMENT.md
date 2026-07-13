@@ -50,9 +50,12 @@ Do not expose Compresso directly to the public internet. If remote access is req
 
 ## Verify Readiness
 
-- Run `compresso doctor --role master` on the authoritative scanner or
-  `compresso doctor --role worker` on a remote worker. Use `--strict` and
-  `--peer` for the final connected preflight.
+- Run `compresso doctor --role master --strict` on the authoritative scanner or
+  `compresso doctor --role worker --strict` on a remote worker. For the final
+  connected preflight, add `--peer <peer-origin>` (for example,
+  `--peer http://worker.local:8888`) and provide its API token through
+  `COMPRESSO_DOCTOR_PEER_TOKEN`, or name another token variable with
+  `--peer-token-env`.
 - Wait for `GET /compresso/api/v2/healthcheck/readiness` to return `200`.
 - Treat any `503` response as "startup is not complete yet" and inspect the returned `stages`, `details`, and `errors`.
 - Confirm the startup logs include `STARTUP_SUMMARY` lines before enabling real work.

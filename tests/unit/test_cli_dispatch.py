@@ -8,10 +8,11 @@ from compresso import cli
 
 
 def test_no_subcommand_preserves_legacy_service_entrypoint(monkeypatch):
+    monkeypatch.setattr(cli.sys, "argv", ["compresso"])
     legacy = MagicMock(return_value=None)
     monkeypatch.setattr(cli, "service_main", legacy)
 
-    assert cli.main([]) is None
+    assert cli.main() is None
     legacy.assert_called_once_with()
 
 
@@ -27,8 +28,17 @@ def test_doctor_subcommand_is_dispatched_without_starting_service(monkeypatch):
 
 
 def test_explicit_legacy_arguments_are_forwarded(monkeypatch):
-    legacy = MagicMock(return_value="served")
+    original_argv = list(cli.sys.argv)
+    observed_argv = []
+
+    def capture_argv():
+        observed_argv.append(list(cli.sys.argv))
+        return "served"
+
+    legacy = MagicMock(side_effect=capture_argv)
     monkeypatch.setattr(cli, "service_main", legacy)
 
     assert cli.main(["--port", "9999"]) == "served"
     legacy.assert_called_once_with()
+    assert observed_argv == [[original_argv[0], "--port", "9999"]]
+    assert cli.sys.argv == original_argv

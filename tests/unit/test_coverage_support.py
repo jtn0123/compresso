@@ -90,14 +90,16 @@ def fake_apispec(monkeypatch):
 
 
 @pytest.mark.unittest
-def test_main_module_invokes_service_main(monkeypatch):
+def test_main_module_propagates_cli_exit_code(monkeypatch):
     fake_cli = types.ModuleType("compresso.cli")
-    fake_cli.main = MagicMock()
+    fake_cli.main = MagicMock(return_value=3)
     monkeypatch.setitem(sys.modules, "compresso.cli", fake_cli)
 
-    runpy.run_module("compresso.__main__", run_name="__main__")
+    with pytest.raises(SystemExit) as raised:
+        runpy.run_module("compresso.__main__", run_name="__main__")
 
     fake_cli.main.assert_called_once_with()
+    assert raised.value.code == 3
 
 
 @pytest.mark.unittest

@@ -6,11 +6,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import ipaddress
 import json
 import os
 import platform
 import plistlib
 import shutil
+import socket
 import sqlite3
 import sys
 import tempfile
@@ -20,6 +22,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -31,6 +34,11 @@ from compresso.webserver.request_auth import API_AUTH_HEADER_NAME
 SCHEMA_VERSION = 1
 REPORT_TTL_HOURS = 24
 SECRET_KEYS = ("authorization", "cookie", "password", "secret", "token")
+PEER_API_PATHS = {
+    "readiness": "/compresso/api/v2/healthcheck/readiness",
+    "version": "/compresso/api/v2/version/read",
+    "capabilities": "/compresso/api/v2/system/capabilities",
+}
 
 
 def _utc_now() -> datetime:
@@ -61,6 +69,35 @@ def _atomic_json_write(path: Path, payload: dict[str, Any]) -> None:
         if os.path.exists(temporary):
             os.unlink(temporary)
         raise
+
+
+def _validated_peer_base(peer: str) -> str:
+    """Return a normalized HTTP(S) origin after rejecting unsafe targets."""
+    parsed = urlsplit(peer)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("peer URL must use http or https")
+    if not parsed.hostname or parsed.username is not None or parsed.password is not None:
+        raise ValueError("peer URL must contain a host and no embedded credentials")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("peer URL must be an origin without a path, query, or fragment")
+    try:
+        port = parsed.port
+        addresses = socket.getaddrinfo(parsed.hostname, port, type=socket.SOCK_STREAM)
+    except (OSError, ValueError) as error:
+        raise ValueError("peer host could not be safely resolved") from error
+    if not addresses:
+        raise ValueError("peer host did not resolve")
+    for _family, _kind, _protocol, _canonical, sockaddr in addresses:
+        address = ipaddress.ip_address(sockaddr[0])
+        if (
+            address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_reserved
+            or address.is_unspecified
+        ):
+            raise ValueError("peer host resolves to a blocked address")
+    return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
 
 
 @dataclass(frozen=True)
@@ -376,6 +413,9 @@ class DeploymentDoctor:
                 except (OSError, json.JSONDecodeError):
                     untrusted.append(info_path.parent.name)
                     continue
+                if not isinstance(info, dict):
+                    untrusted.append(info_path.parent.name)
+                    continue
                 plugin_id = str(info.get("id") or info_path.parent.name)
                 if not info.get("bundled") and plugin_id not in trusted:
                     untrusted.append(plugin_id)
@@ -449,7 +489,7 @@ class DeploymentDoctor:
         try:
             with open(power_preferences, "rb") as source:
                 preferences = plistlib.load(source)
-            custom = preferences.get("Custom Profile", {})
+            custom = preferences.get("Custom Profile", {}) if isinstance(preferences, dict) else {}
             ac_profile = custom.get("AC Power", {}) if isinstance(custom, dict) else {}
             sleep_disabled = int(ac_profile.get("System Sleep Timer", -1)) == 0
         except (OSError, plistlib.InvalidFileException, TypeError, ValueError):
@@ -482,22 +522,38 @@ class DeploymentDoctor:
         local_version = metadata.read_version_string("short")
         local_compatibility = ".".join(local_version.split(".")[:2])
         for index, peer in enumerate(self.peers):
+            try:
+                peer_base = _validated_peer_base(peer)
+            except ValueError as error:
+                checks.append(
+                    self._result(
+                        f"peer.{index}.target",
+                        "network",
+                        False,
+                        f"Peer {index + 1} target is unsafe",
+                        evidence={"peer": peer, "error": str(error)},
+                        remediation="Use an HTTP(S) origin on the trusted LAN/VPN; do not include credentials or a path.",
+                    )
+                )
+                continue
             headers = {"Accept": "application/json"}
             if self.peer_token:
                 headers[API_AUTH_HEADER_NAME] = self.peer_token
-            endpoints = {
-                "readiness": "/compresso/api/v2/healthcheck/readiness",
-                "version": "/compresso/api/v2/version/read",
-                "capabilities": "/compresso/api/v2/system/capabilities",
-            }
             payloads = {}
+            current_endpoint = "readiness"
             try:
-                for name, path in endpoints.items():
-                    response = requests.get(peer.rstrip("/") + path, headers=headers, timeout=5)
+                for name, path in PEER_API_PATHS.items():
+                    current_endpoint = name
+                    response = requests.get(
+                        peer_base + path,
+                        headers=headers,
+                        timeout=5,
+                        allow_redirects=False,
+                    )
                     response.raise_for_status()
                     payloads[name] = response.json()
                 readiness = payloads["readiness"]
-                ready = bool(readiness.get("ready", readiness.get("success", False)))
+                ready = bool(isinstance(readiness, dict) and readiness.get("ready", readiness.get("success", False)))
                 checks.append(
                     self._result(
                         f"peer.{index}.readiness",
@@ -508,7 +564,8 @@ class DeploymentDoctor:
                         remediation="Start the peer and resolve its readiness errors.",
                     )
                 )
-                peer_version = str(payloads["version"].get("version") or "")
+                version_payload = payloads["version"]
+                peer_version = str(version_payload.get("version") or "") if isinstance(version_payload, dict) else ""
                 peer_compatibility = ".".join(peer_version.split(".")[:2])
                 compatible = bool(peer_compatibility and peer_compatibility == local_compatibility)
                 checks.append(
@@ -540,11 +597,11 @@ class DeploymentDoctor:
             except (OSError, ValueError, requests.RequestException) as error:
                 checks.append(
                     self._result(
-                        f"peer.{index}.readiness",
+                        f"peer.{index}.{current_endpoint}",
                         "network",
                         False,
-                        f"Peer {index + 1} could not be reached",
-                        evidence={"peer": peer, "error": str(error)},
+                        f"Peer {index + 1} {current_endpoint} endpoint failed",
+                        evidence={"peer": peer, "endpoint": current_endpoint, "error": str(error)},
                         remediation="Verify the trusted LAN/VPN address and peer service.",
                     )
                 )
