@@ -31,6 +31,12 @@ REPORT_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.json")
 MAX_ARCHIVE_ENTRIES = 2_000
 MAX_UNCOMPRESSED_BYTES = 32 * 1024**3
 MAX_MANIFEST_BYTES = 4 * 1024**2
+TEMPORARY_SPACE_RESERVE_BYTES = 512 * 1024**2
+MANIFEST_ARCHIVE_PATH = "manifest.json"
+DATABASE_FILENAME = "compresso.db"
+DATABASE_ARCHIVE_PATH = f"config/{DATABASE_FILENAME}"
+SETTINGS_ARCHIVE_PATH = "config/settings.json"
+BACKUP_KIND = "compresso-control-plane-backup"
 
 
 class BackupError(RuntimeError):
@@ -157,7 +163,7 @@ def _write_archive(destination: Path, files: list[tuple[str, Path]], generated_a
     }
     manifest = {
         "schema_version": SCHEMA_VERSION,
-        "kind": "compresso-control-plane-backup",
+        "kind": BACKUP_KIND,
         "generated_at": generated_at,
         "files": manifest_files,
     }
@@ -169,7 +175,7 @@ def _write_archive(destination: Path, files: list[tuple[str, Path]], generated_a
             with zipfile.ZipFile(archive_file, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
                 for logical_name, source in files:
                     bundle.write(source, logical_name)
-                bundle.writestr("manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+                bundle.writestr(MANIFEST_ARCHIVE_PATH, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
             archive_file.flush()
             os.fsync(archive_file.fileno())
         os.replace(temporary, destination)
@@ -188,14 +194,14 @@ def create_state_backup(settings: Any, output_name: str) -> dict[str, Any]:
     if destination.exists():
         raise BackupError("Refusing to overwrite an existing state backup")
     with tempfile.TemporaryDirectory(prefix=".state-backup-", dir=destination.parent) as temporary:
-        snapshot = Path(temporary) / "compresso.db"
-        _snapshot_database(config_root / "compresso.db", snapshot)
-        files: list[tuple[str, Path]] = [("config/compresso.db", snapshot)]
+        snapshot = Path(temporary) / DATABASE_FILENAME
+        _snapshot_database(config_root / DATABASE_FILENAME, snapshot)
+        files: list[tuple[str, Path]] = [(DATABASE_ARCHIVE_PATH, snapshot)]
         settings_file = config_root / "settings.json"
         if settings_file.is_symlink():
             raise BackupError("Refusing to back up a symbolic-link settings file")
         if settings_file.is_file() and not settings_file.is_symlink():
-            files.append(("config/settings.json", settings_file))
+            files.append((SETTINGS_ARCHIVE_PATH, settings_file))
         files.extend(_journal_files(config_root))
         files.extend(_evidence_files(userdata_root))
         if len(files) > MAX_ARCHIVE_ENTRIES:
@@ -217,12 +223,12 @@ def _validate_entry(info: zipfile.ZipInfo) -> None:
     if stat.S_ISLNK(info.external_attr >> 16):
         raise BackupError(f"archive entry is a symbolic link: {info.filename}")
     allowed = (
-        info.filename == "manifest.json"
-        or info.filename in {"config/compresso.db", "config/settings.json"}
+        info.filename == MANIFEST_ARCHIVE_PATH
+        or info.filename in {DATABASE_ARCHIVE_PATH, SETTINGS_ARCHIVE_PATH}
         or (len(path.parts) == 4 and path.parts[:3] == ("config", "recovery", "file_operations"))
         or (len(path.parts) == 3 and path.parts[0] == "userdata" and path.parts[1] in {"safety", "readiness", "planning"})
     )
-    if not allowed or (info.filename != "config/compresso.db" and not info.filename.endswith(".json")):
+    if not allowed or (info.filename != DATABASE_ARCHIVE_PATH and not info.filename.endswith(".json")):
         raise BackupError(f"unexpected archive entry: {info.filename}")
 
 
@@ -240,6 +246,104 @@ def _copy_and_hash(source, destination: Path, *, maximum_bytes: int, logical_nam
     return digest.hexdigest(), size
 
 
+def _validate_archive_inventory(
+    bundle: zipfile.ZipFile,
+) -> tuple[list[zipfile.ZipInfo], list[str], dict[str, int], Path]:
+    infos = bundle.infolist()
+    names = [info.filename for info in infos]
+    declared_sizes = {info.filename: info.file_size for info in infos}
+    if len(names) != len(set(names)):
+        raise BackupError("duplicate archive entry detected")
+    if len(infos) > MAX_ARCHIVE_ENTRIES + 1:
+        raise BackupError("archive contains too many entries")
+    uncompressed_bytes = sum(declared_sizes.values())
+    if uncompressed_bytes > MAX_UNCOMPRESSED_BYTES:
+        raise BackupError("archive expands beyond the rehearsal safety limit")
+    temporary_root = Path(tempfile.gettempdir()).resolve()
+    if shutil.disk_usage(temporary_root).free < uncompressed_bytes + TEMPORARY_SPACE_RESERVE_BYTES:
+        raise BackupError("Insufficient temporary disk space for recovery rehearsal")
+    for info in infos:
+        _validate_entry(info)
+    if MANIFEST_ARCHIVE_PATH not in names:
+        raise BackupError("archive manifest is missing")
+    return infos, names, declared_sizes, temporary_root
+
+
+def _read_manifest(bundle: zipfile.ZipFile) -> dict[str, Any]:
+    manifest_info = bundle.getinfo(MANIFEST_ARCHIVE_PATH)
+    if manifest_info.file_size > MAX_MANIFEST_BYTES:
+        raise BackupError("archive manifest is too large")
+    manifest = json.loads(bundle.read(MANIFEST_ARCHIVE_PATH))
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != SCHEMA_VERSION
+        or manifest.get("kind") != BACKUP_KIND
+        or not isinstance(manifest.get("files"), dict)
+    ):
+        raise BackupError("archive manifest is invalid")
+    return manifest
+
+
+def _valid_manifest_metadata(logical_name: Any, metadata: Any) -> bool:
+    return (
+        isinstance(logical_name, str)
+        and isinstance(metadata, dict)
+        and re.fullmatch(r"[0-9a-f]{64}", str(metadata.get("sha256", ""))) is not None
+        and isinstance(metadata.get("size_bytes"), int)
+        and metadata["size_bytes"] >= 0
+    )
+
+
+def _validate_manifest_files(
+    manifest: dict[str, Any], names: list[str], declared_sizes: dict[str, int]
+) -> dict[str, dict[str, Any]]:
+    expected_files: dict[str, dict[str, Any]] = manifest["files"]
+    if set(expected_files) != set(names) - {MANIFEST_ARCHIVE_PATH}:
+        raise BackupError("archive entries do not match the manifest")
+    for logical_name, metadata in expected_files.items():
+        if not _valid_manifest_metadata(logical_name, metadata):
+            raise BackupError("archive manifest contains invalid file metadata")
+        if declared_sizes[logical_name] != metadata["size_bytes"]:
+            raise BackupError(f"declared size mismatch for {logical_name}")
+    return expected_files
+
+
+def _extract_entry(
+    bundle: zipfile.ZipFile,
+    info: zipfile.ZipInfo,
+    rehearsal_root: Path,
+    expected: dict[str, Any],
+    declared_size: int,
+) -> None:
+    destination = rehearsal_root.joinpath(*PurePosixPath(info.filename).parts).resolve()
+    if not destination.is_relative_to(rehearsal_root):
+        raise BackupError(f"unsafe archive destination: {info.filename}")
+    with bundle.open(info) as source:
+        digest, size = _copy_and_hash(
+            source,
+            destination,
+            maximum_bytes=declared_size,
+            logical_name=info.filename,
+        )
+    if digest != expected["sha256"] or size != expected["size_bytes"]:
+        raise BackupError(f"checksum mismatch for {info.filename}")
+    if info.filename.endswith(".json"):
+        json.loads(destination.read_text(encoding="utf-8"))
+
+
+def _extract_and_verify_database(
+    bundle: zipfile.ZipFile,
+    infos: list[zipfile.ZipInfo],
+    rehearsal_root: Path,
+    expected_files: dict[str, dict[str, Any]],
+    declared_sizes: dict[str, int],
+) -> str:
+    for info in infos:
+        if info.filename != MANIFEST_ARCHIVE_PATH:
+            _extract_entry(bundle, info, rehearsal_root, expected_files[info.filename], declared_sizes[info.filename])
+    return _database_integrity(rehearsal_root / DATABASE_ARCHIVE_PATH)
+
+
 def verify_state_backup(settings: Any, archive_name: str, *, output_name: str | None = None) -> dict[str, Any]:
     """Extract into an isolated temporary directory and prove recovery invariants."""
     userdata_root = Path(settings.get_userdata_path()).expanduser().resolve()
@@ -248,69 +352,14 @@ def verify_state_backup(settings: Any, archive_name: str, *, output_name: str | 
         raise BackupError("State backup archive is missing or is not a regular file")
     try:
         with zipfile.ZipFile(archive) as bundle:
-            infos = bundle.infolist()
-            names = [info.filename for info in infos]
-            declared_sizes = {info.filename: info.file_size for info in infos}
-            if len(names) != len(set(names)):
-                raise BackupError("duplicate archive entry detected")
-            if len(infos) > MAX_ARCHIVE_ENTRIES + 1:
-                raise BackupError("archive contains too many entries")
-            uncompressed_bytes = sum(info.file_size for info in infos)
-            if uncompressed_bytes > MAX_UNCOMPRESSED_BYTES:
-                raise BackupError("archive expands beyond the rehearsal safety limit")
-            temporary_root = Path(tempfile.gettempdir()).resolve()
-            if shutil.disk_usage(temporary_root).free < uncompressed_bytes + 512 * 1024**2:
-                raise BackupError("Insufficient temporary disk space for recovery rehearsal")
-            for info in infos:
-                _validate_entry(info)
-            if "manifest.json" not in names:
-                raise BackupError("archive manifest is missing")
-            manifest_info = bundle.getinfo("manifest.json")
-            if manifest_info.file_size > MAX_MANIFEST_BYTES:
-                raise BackupError("archive manifest is too large")
-            manifest = json.loads(bundle.read("manifest.json"))
-            if (
-                not isinstance(manifest, dict)
-                or manifest.get("schema_version") != SCHEMA_VERSION
-                or manifest.get("kind") != "compresso-control-plane-backup"
-                or not isinstance(manifest.get("files"), dict)
-            ):
-                raise BackupError("archive manifest is invalid")
-            expected_files = manifest["files"]
-            if set(expected_files) != set(names) - {"manifest.json"}:
-                raise BackupError("archive entries do not match the manifest")
-            for logical_name, metadata in expected_files.items():
-                if (
-                    not isinstance(logical_name, str)
-                    or not isinstance(metadata, dict)
-                    or re.fullmatch(r"[0-9a-f]{64}", str(metadata.get("sha256", ""))) is None
-                    or not isinstance(metadata.get("size_bytes"), int)
-                    or metadata["size_bytes"] < 0
-                ):
-                    raise BackupError("archive manifest contains invalid file metadata")
+            infos, names, declared_sizes, temporary_root = _validate_archive_inventory(bundle)
+            manifest = _read_manifest(bundle)
+            expected_files = _validate_manifest_files(manifest, names, declared_sizes)
             with tempfile.TemporaryDirectory(prefix="compresso-recovery-rehearsal-", dir=temporary_root) as temporary:
                 rehearsal_root = Path(temporary)
-                for info in infos:
-                    if info.filename == "manifest.json":
-                        continue
-                    destination = rehearsal_root.joinpath(*PurePosixPath(info.filename).parts).resolve()
-                    if not destination.is_relative_to(rehearsal_root):
-                        raise BackupError(f"unsafe archive destination: {info.filename}")
-                    with bundle.open(info) as source:
-                        digest, size = _copy_and_hash(
-                            source,
-                            destination,
-                            maximum_bytes=declared_sizes[info.filename],
-                            logical_name=info.filename,
-                        )
-                    expected = expected_files[info.filename]
-                    if declared_sizes[info.filename] != expected.get("size_bytes"):
-                        raise BackupError(f"declared size mismatch for {info.filename}")
-                    if digest != expected.get("sha256") or size != expected.get("size_bytes"):
-                        raise BackupError(f"checksum mismatch for {info.filename}")
-                    if info.filename.endswith(".json"):
-                        json.loads(destination.read_text(encoding="utf-8"))
-                database_integrity = _database_integrity(rehearsal_root / "config" / "compresso.db")
+                database_integrity = _extract_and_verify_database(
+                    bundle, infos, rehearsal_root, expected_files, declared_sizes
+                )
     except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as error:
         raise BackupError(f"Recovery rehearsal failed: {type(error).__name__}") from error
 
