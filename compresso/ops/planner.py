@@ -117,9 +117,10 @@ def _select_inventory(source: Path, sample_size: int, full_inventory: bool, seed
     total_bytes = 0
     media_files = 0
     unreadable_files = 0
+    traversal_errors: list[OSError] = []
     largest: tuple[int, str] = (0, "")
     all_entries = []
-    for path in library_analysis.iter_media_files(source):
+    for path in library_analysis.iter_media_files(source, on_error=traversal_errors.append):
         try:
             size = path.stat().st_size
         except OSError:
@@ -139,6 +140,11 @@ def _select_inventory(source: Path, sample_size: int, full_inventory: bool, seed
             heapq.heappush(sample_heap, item)
         elif item > sample_heap[0]:
             heapq.heapreplace(sample_heap, item)
+    if traversal_errors:
+        suffix = "y" if len(traversal_errors) == 1 else "ies"
+        raise ValueError(f"planning source contains {len(traversal_errors)} unreadable director{suffix}")
+    if media_files == 0:
+        raise ValueError("planning source contains no supported media files")
     if full_inventory:
         selected = all_entries
     else:

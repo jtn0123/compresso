@@ -3,6 +3,7 @@ import os
 import sqlite3
 import stat
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,19 +17,36 @@ def _settings(tmp_path):
     settings = MagicMock()
     settings.get_config_path.return_value = str(tmp_path / "config")
     settings.get_userdata_path.return_value = str(tmp_path / "userdata")
+    settings.get_cache_path.return_value = str(tmp_path / "cache")
+    settings.get_library_path.return_value = str(tmp_path / "library")
     return settings
 
 
 def _seed_state(tmp_path):
     config = tmp_path / "config"
     config.mkdir()
+    (tmp_path / "cache").mkdir()
+    (tmp_path / "library").mkdir()
     with sqlite3.connect(config / "compresso.db") as connection:
-        connection.execute("CREATE TABLE jobs (id INTEGER PRIMARY KEY, name TEXT)")
-        connection.execute("INSERT INTO jobs(name) VALUES ('canary')")
+        connection.execute("CREATE TABLE libraries (id INTEGER PRIMARY KEY, name TEXT, path TEXT NOT NULL)")
+        connection.execute("INSERT INTO libraries(name, path) VALUES ('Media', ?)", (str(tmp_path / "library"),))
+        connection.execute("CREATE TABLE tasks (id INTEGER PRIMARY KEY, abspath TEXT, library_id INTEGER, status TEXT)")
     (config / "settings.json").write_text(json.dumps({"api_auth_token": "private-token"}))
     journal = config / "recovery" / "file_operations"
     journal.mkdir(parents=True)
-    (journal / "task-7.json").write_text(json.dumps({"state": "committed", "task_id": 7}))
+    (journal / "task-7.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "operation_id": "task-7",
+                "state": "committed",
+                "task_id": 7,
+                "finalization_phase": None,
+                "backups": [],
+                "created_paths": [],
+            }
+        )
+    )
     safety = tmp_path / "userdata" / "safety"
     safety.mkdir(parents=True)
     (safety / "state.json").write_text(json.dumps({"schema_version": 1, "pause_required": False, "events": []}))
@@ -252,3 +270,121 @@ def test_backup_rejects_symlinked_owned_directory(tmp_path):
 
     with pytest.raises(BackupError, match="symbolic-link user-data directory"):
         create_state_backup(settings, "state.zip")
+
+
+@pytest.mark.unittest
+def test_create_requires_object_settings_file(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    (tmp_path / "config" / "settings.json").write_text("[]")
+
+    with pytest.raises(BackupError, match="JSON object"):
+        create_state_backup(settings, "state.zip")
+
+    assert not (tmp_path / "userdata" / "backups" / "state.zip").exists()
+
+
+@pytest.mark.unittest
+def test_create_rejects_invalid_recovery_journal(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    journal = tmp_path / "config" / "recovery" / "file_operations" / "task-7.json"
+    journal.write_text(json.dumps({"state": "committed", "task_id": 7}))
+
+    with pytest.raises(BackupError, match="journal is invalid"):
+        create_state_backup(settings, "state.zip")
+
+
+@pytest.mark.unittest
+def test_create_rejects_invalid_journal_finalization_phase(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    journal = tmp_path / "config" / "recovery" / "file_operations" / "task-7.json"
+    payload = json.loads(journal.read_text())
+    payload["finalization_phase"] = "skip-safety"
+    journal.write_text(json.dumps(payload))
+
+    with pytest.raises(BackupError, match="finalization phase"):
+        create_state_backup(settings, "state.zip")
+
+
+@pytest.mark.unittest
+def test_create_rejects_journal_paths_outside_configured_roots(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    journal = tmp_path / "config" / "recovery" / "file_operations" / "task-7.json"
+    payload = json.loads(journal.read_text())
+    payload["created_paths"] = [str(tmp_path.parent / "unowned-media.mkv")]
+    journal.write_text(json.dumps(payload))
+
+    with pytest.raises(BackupError, match="outside configured roots"):
+        create_state_backup(settings, "state.zip")
+
+
+@pytest.mark.unittest
+def test_create_requires_settings_file(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    (tmp_path / "config" / "settings.json").unlink()
+
+    with pytest.raises(BackupError, match="settings.json is missing"):
+        create_state_backup(settings, "state.zip")
+
+
+@pytest.mark.unittest
+def test_concurrent_creates_cannot_both_publish_same_backup_name(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(create_state_backup, settings, "state.zip") for _ in range(2)]
+    results = []
+    for future in futures:
+        try:
+            results.append(future.result())
+        except BackupError as error:
+            results.append(error)
+
+    assert sum(isinstance(result, dict) for result in results) == 1
+    assert sum(isinstance(result, BackupError) for result in results) == 1
+    assert (tmp_path / "userdata" / "backups" / "state.zip").is_file()
+
+
+@pytest.mark.unittest
+def test_archive_uses_staged_settings_snapshot_when_live_file_changes(tmp_path):
+    settings = _settings(tmp_path)
+    _seed_state(tmp_path)
+    settings_file = tmp_path / "config" / "settings.json"
+    original = settings_file.read_bytes()
+    real_write_archive = state_backup._write_archive
+
+    def mutate_live_settings(destination, files, generated_at):
+        settings_file.write_text(json.dumps({"api_auth_token": "changed"}))
+        return real_write_archive(destination, files, generated_at)
+
+    with patch("compresso.ops.state_backup._write_archive", side_effect=mutate_live_settings):
+        created = create_state_backup(settings, "state.zip")
+
+    with zipfile.ZipFile(created["archive_path"]) as bundle:
+        assert bundle.read("config/settings.json") == original
+
+
+@pytest.mark.unittest
+def test_integrity_check_rejects_non_compresso_sqlite_database(tmp_path):
+    database = tmp_path / "placeholder.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
+
+    with pytest.raises(BackupError, match="required Compresso tables"):
+        state_backup._database_integrity(database)
+
+
+@pytest.mark.unittest
+def test_integrity_check_rejects_tables_without_compresso_schema(tmp_path):
+    database = tmp_path / "placeholder.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE libraries (id INTEGER PRIMARY KEY)")
+        connection.execute("CREATE TABLE tasks (id INTEGER PRIMARY KEY)")
+
+    with pytest.raises(BackupError, match="required Compresso columns"):
+        state_backup._database_integrity(database)

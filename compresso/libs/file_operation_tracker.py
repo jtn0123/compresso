@@ -35,6 +35,17 @@ import os
 import shutil
 import tempfile
 
+JOURNAL_STATES = {
+    "active",
+    "rolling_back",
+    "rollback_failed",
+    "committing",
+    "commit_cleanup_pending",
+    "committed",
+}
+JOURNAL_FINALIZATION_PHASES = {None, "file_committed", "history_committed", "metadata_committed", "task_deleted"}
+COMMITTED_STATES = {"committing", "commit_cleanup_pending", "committed"}
+
 
 class FileOperationTracker:
     """Track destructive file operations for rollback on failure."""
@@ -65,6 +76,48 @@ class FileOperationTracker:
             "finalization_phase": self._finalization_phase,
             "backups": [list(item) for item in self._backups],
             "created_paths": list(self._created_paths),
+        }
+
+    @staticmethod
+    def _validate_journal(data, journal_name, *, expected_operation_id=None, expected_task_id=None):
+        if not isinstance(data, dict) or data.get("version") != 1:
+            raise ValueError("file-operation journal schema is invalid")
+        operation_id = data.get("operation_id")
+        if not isinstance(operation_id, str) or not operation_id or f"{operation_id}.json" != journal_name:
+            raise ValueError("file-operation journal identity is invalid")
+        task_id = data.get("task_id")
+        if task_id is not None and (not isinstance(task_id, int) or isinstance(task_id, bool)):
+            raise ValueError("file-operation journal task identity is invalid")
+        if expected_operation_id is not None and operation_id != expected_operation_id:
+            raise ValueError("file-operation journal identity does not match the requested operation")
+        if expected_task_id is not None and task_id != expected_task_id:
+            raise ValueError("file-operation journal identity does not match the requested task")
+        state = data.get("state")
+        if state not in JOURNAL_STATES:
+            raise ValueError("file-operation journal state is invalid")
+        finalization_phase = data.get("finalization_phase")
+        if finalization_phase not in JOURNAL_FINALIZATION_PHASES:
+            raise ValueError("file-operation journal finalization phase is invalid")
+        if finalization_phase is not None and state not in COMMITTED_STATES:
+            raise ValueError("file-operation journal phase is inconsistent with its state")
+        backups = data.get("backups")
+        created_paths = data.get("created_paths")
+        if not isinstance(backups, list) or not isinstance(created_paths, list):
+            raise ValueError("file-operation journal paths are invalid")
+        normalized_backups = []
+        for pair in backups:
+            if not isinstance(pair, list) or len(pair) != 2 or not all(isinstance(item, str) and item for item in pair):
+                raise ValueError("file-operation journal backup pair is invalid")
+            backup_path, original_path = pair
+            if os.path.abspath(backup_path) != f"{os.path.abspath(original_path)}.compresso.bak":
+                raise ValueError("file-operation journal backup is not owned by its original path")
+            normalized_backups.append((backup_path, original_path))
+        if not all(isinstance(path, str) and path for path in created_paths):
+            raise ValueError("file-operation journal created paths are invalid")
+        return {
+            **data,
+            "backups": normalized_backups,
+            "created_paths": list(created_paths),
         }
 
     def _persist(self):
@@ -149,7 +202,13 @@ class FileOperationTracker:
             return None
         with open(journal_path) as journal_file:
             data = json.load(journal_file)
-        if data.get("state") not in {"committing", "commit_cleanup_pending", "committed"}:
+        data = cls._validate_journal(
+            data,
+            os.path.basename(journal_path),
+            expected_operation_id=operation_id,
+            expected_task_id=task_id,
+        )
+        if data.get("state") not in COMMITTED_STATES:
             return None
         tracker = cls(logger)
         tracker._journal_dir = journal_dir
@@ -248,13 +307,14 @@ class FileOperationTracker:
             try:
                 with open(journal_path) as journal_file:
                     data = json.load(journal_file)
+                data = cls._validate_journal(data, journal_name)
                 task_id = data.get("task_id")
                 state = data.get("state", "active")
                 finalization_phase = data.get("finalization_phase")
-                backups = [tuple(item) for item in data.get("backups", [])]
+                backups = data["backups"]
                 created_paths = [os.path.realpath(path) for path in data.get("created_paths", [])]
 
-                if state in {"committing", "commit_cleanup_pending", "committed"}:
+                if state in COMMITTED_STATES:
                     for backup_path, _original_path in backups:
                         if os.path.exists(backup_path):
                             os.remove(backup_path)

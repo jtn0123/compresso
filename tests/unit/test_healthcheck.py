@@ -13,6 +13,8 @@ import datetime
 import os
 import subprocess
 import tempfile
+import threading
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -69,6 +71,81 @@ class TestHealthCheckQuickCheck:
         ok, err = mgr.quick_check("/test/file.mkv")
         assert ok is False
         assert "zero or negative" in err
+
+    @patch("compresso.libs.healthcheck.probe_file")
+    @patch("compresso.libs.healthcheck.os.path.exists", return_value=True)
+    def test_nonfinite_duration_is_not_reported_healthy(self, mock_exists, mock_probe):
+        mock_probe.return_value = {
+            "streams": [{"codec_type": "video"}],
+            "format": {"duration": "NaN"},
+        }
+        mgr = self._make_manager()
+
+        ok, err = mgr.quick_check("/test/file.mkv")
+
+        assert ok is False
+        assert "duration" in err.lower()
+
+
+@pytest.mark.unittest
+def test_file_lock_registry_does_not_allow_third_check_to_overlap_waiter():
+    from compresso.libs.healthcheck import HealthCheckManager
+
+    HealthCheckManager._file_locks.clear()
+    manager = HealthCheckManager()
+    first_started = threading.Event()
+    release_first = threading.Event()
+    second_started = threading.Event()
+    release_second = threading.Event()
+    third_started = threading.Event()
+    call_guard = threading.Lock()
+    calls = [0]
+
+    def controlled_check(_path):
+        with call_guard:
+            calls[0] += 1
+            call = calls[0]
+        if call == 1:
+            first_started.set()
+            release_first.wait(2)
+        elif call == 2:
+            second_started.set()
+            release_second.wait(2)
+        else:
+            third_started.set()
+        return True, ""
+
+    def health_row():
+        return SimpleNamespace(
+            status="unchecked",
+            check_mode="",
+            library_id=1,
+            error_detail="",
+            last_checked=None,
+            error_count=0,
+            save=lambda: None,
+        )
+
+    with (
+        patch.object(manager, "quick_check", side_effect=controlled_check),
+        patch("compresso.libs.healthcheck.HealthStatus.get_or_create", side_effect=lambda **_kwargs: (health_row(), False)),
+    ):
+        first = threading.Thread(target=manager.check_file, args=("/media/movie.mkv",))
+        second = threading.Thread(target=manager.check_file, args=("/media/movie.mkv",))
+        third = threading.Thread(target=manager.check_file, args=("/media/movie.mkv",))
+        first.start()
+        assert first_started.wait(1)
+        second.start()
+        release_first.set()
+        assert second_started.wait(1)
+        third.start()
+        assert not third_started.wait(0.2)
+        release_second.set()
+        first.join(2)
+        second.join(2)
+        third.join(2)
+
+    assert third_started.is_set()
 
     @patch("compresso.libs.healthcheck.probe_file")
     @patch("compresso.libs.healthcheck.os.path.exists", return_value=True)

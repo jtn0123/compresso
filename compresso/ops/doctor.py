@@ -353,10 +353,12 @@ class DeploymentDoctor:
                     remediation=f"Provide a {'writable' if writable else 'readable'} {name} directory.",
                 )
             )
-        cache = os.path.realpath(self.settings.get_cache_path())
-        config = os.path.realpath(self.settings.get_config_path())
-        library = os.path.realpath(self.settings.get_library_path())
-        separated = cache not in {config, library}
+        cache = Path(self.settings.get_cache_path()).expanduser().resolve()
+        config = Path(self.settings.get_config_path()).expanduser().resolve()
+        library = Path(self.settings.get_library_path()).expanduser().resolve()
+        separated = not any(
+            cache == durable or cache.is_relative_to(durable) or durable.is_relative_to(cache) for durable in (config, library)
+        )
         checks.append(
             self._result(
                 "path.cache_separation",

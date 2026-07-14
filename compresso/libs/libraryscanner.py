@@ -44,7 +44,7 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
-from compresso.libs.scan_checkpoint import ScanCheckpointStore
+from compresso.libs.scan_checkpoint import CHECKPOINT_MTIME_SLOP_NS, ScanCheckpointStore
 
 
 def iter_sorted_library_directories(walk_entries):
@@ -306,7 +306,9 @@ class LibraryScannerManager(threading.Thread):
         follow_symlinks = self.settings.get_follow_symlinks()
         queue_limit = self.get_scan_queue_limit()
         checkpoint_store = self.get_scan_checkpoint_store()
-        completed_root = checkpoint_store.load(library_id, library_path) if checkpoint_store else None
+        checkpoint = checkpoint_store.load_record(library_id, library_path) if checkpoint_store else None
+        completed_root = checkpoint["completed_root"] if checkpoint else None
+        checkpoint_updated_at_ns = checkpoint["updated_at_ns"] if checkpoint else None
         if completed_root and not os.path.isdir(os.path.join(library_path, completed_root)):
             checkpoint_store.clear(library_id)
             completed_root = None
@@ -319,8 +321,17 @@ class LibraryScannerManager(threading.Thread):
             if self.abort_flag.is_set():
                 break
             if not resume_checkpoint_reached:
-                resume_checkpoint_reached = self.root_was_completed(root, library_path, completed_root)
-                continue
+                try:
+                    changed_since_checkpoint = os.stat(root).st_mtime_ns >= checkpoint_updated_at_ns - CHECKPOINT_MTIME_SLOP_NS
+                except OSError:
+                    changed_since_checkpoint = True
+                if changed_since_checkpoint:
+                    checkpoint_store.clear(library_id)
+                    completed_root = None
+                    resume_checkpoint_reached = True
+                else:
+                    resume_checkpoint_reached = self.root_was_completed(root, library_path, completed_root)
+                    continue
             if self.settings.get_debugging():
                 self.logger.debug(json.dumps(files, indent=2))
             # Add all files in this path that match our container filter

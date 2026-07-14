@@ -8,7 +8,10 @@ import tempfile
 import threading
 import time
 from contextlib import suppress
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
+
+CHECKPOINT_MTIME_SLOP_NS = 2_000_000_000
 
 
 class ScanCheckpointStore:
@@ -24,16 +27,31 @@ class ScanCheckpointStore:
         return os.path.join(self.root, f"library-{int(library_id)}.json")
 
     def load(self, library_id, library_path):
+        record = self.load_record(library_id, library_path)
+        return record["completed_root"] if record else None
+
+    def load_record(self, library_id, library_path):
         path = self._path(library_id)
         try:
             with self._lock, open(path, encoding="utf-8") as checkpoint_file:
                 data = json.load(checkpoint_file)
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return None
+        if not isinstance(data, dict):
+            return None
         if data.get("library_path") != os.path.abspath(library_path):
             return None
         completed_root = data.get("completed_root")
-        return completed_root if isinstance(completed_root, str) else None
+        updated_at_ns = data.get("updated_at_ns")
+        if not isinstance(completed_root, str) or not completed_root:
+            return None
+        posix_path = PurePosixPath(completed_root)
+        windows_path = PureWindowsPath(completed_root)
+        if posix_path.is_absolute() or windows_path.anchor or ".." in completed_root.replace("\\", "/").split("/"):
+            return None
+        if not isinstance(updated_at_ns, int) or isinstance(updated_at_ns, bool) or updated_at_ns <= 0:
+            return None
+        return {"completed_root": completed_root, "updated_at_ns": updated_at_ns}
 
     def save(self, library_id, library_path, completed_root):
         os.makedirs(self.root, exist_ok=True)
@@ -43,6 +61,7 @@ class ScanCheckpointStore:
             "library_path": os.path.abspath(library_path),
             "completed_root": completed_root,
             "updated_at": time.time(),
+            "updated_at_ns": time.time_ns(),
         }
         with self._lock:
             fd, temporary_path = tempfile.mkstemp(prefix=".scan-checkpoint-", suffix=".tmp", dir=self.root)

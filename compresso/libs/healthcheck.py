@@ -8,11 +8,13 @@ Health check manager for validating media file integrity.
 """
 
 import datetime
+import math
 import os
 import queue
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 
 from compresso.libs.ffprobe_utils import probe_file
 from compresso.libs.logs import CompressoLogging
@@ -41,6 +43,7 @@ class HealthCheckManager:
     _worker_count_requested = 1
 
     _file_locks: dict = {}
+    _file_lock_users: dict = {}
     _file_locks_lock = threading.Lock()
 
     def __init__(self):
@@ -70,8 +73,8 @@ class HealthCheckManager:
         if duration is not None:
             try:
                 dur = float(duration)
-                if dur <= 0:
-                    return False, "File has zero or negative duration"
+                if not math.isfinite(dur) or dur <= 0:
+                    return False, "File has zero or negative or invalid duration"
             except (ValueError, TypeError):
                 pass
 
@@ -129,6 +132,24 @@ class HealthCheckManager:
                 HealthCheckManager._file_locks[filepath] = threading.Lock()
             return HealthCheckManager._file_locks[filepath]
 
+    @contextmanager
+    def _hold_file_lock(self, filepath):
+        with HealthCheckManager._file_locks_lock:
+            file_lock = HealthCheckManager._file_locks.setdefault(filepath, threading.Lock())
+            HealthCheckManager._file_lock_users[filepath] = HealthCheckManager._file_lock_users.get(filepath, 0) + 1
+        try:
+            with file_lock:
+                yield
+        finally:
+            with HealthCheckManager._file_locks_lock:
+                remaining = HealthCheckManager._file_lock_users.get(filepath, 1) - 1
+                if remaining <= 0:
+                    HealthCheckManager._file_lock_users.pop(filepath, None)
+                    if HealthCheckManager._file_locks.get(filepath) is file_lock:
+                        HealthCheckManager._file_locks.pop(filepath, None)
+                else:
+                    HealthCheckManager._file_lock_users[filepath] = remaining
+
     def check_file(self, filepath, library_id=1, mode="quick"):
         """
         Check a single file and store the result.
@@ -138,8 +159,7 @@ class HealthCheckManager:
         :param mode: 'quick' or 'thorough'
         :return: dict with status info
         """
-        file_lock = self._get_file_lock(filepath)
-        with file_lock:
+        with self._hold_file_lock(filepath):
             # Mark as checking
             health, _ = HealthStatus.get_or_create(
                 abspath=filepath, defaults={"library_id": library_id, "status": "checking", "check_mode": mode}
@@ -176,10 +196,6 @@ class HealthCheckManager:
                 "last_checked": str(health.last_checked),
                 "error_count": health.error_count,
             }
-
-        # Release the per-file lock to prevent unbounded growth
-        with HealthCheckManager._file_locks_lock:
-            HealthCheckManager._file_locks.pop(filepath, None)
 
         return result
 
@@ -486,6 +502,7 @@ class HealthCheckManager:
                 HealthCheckManager._cancel_event.clear()
             with HealthCheckManager._file_locks_lock:
                 HealthCheckManager._file_locks.clear()
+                HealthCheckManager._file_lock_users.clear()
 
     @classmethod
     def is_scanning(cls):

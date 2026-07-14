@@ -8,8 +8,10 @@ Tests library scanning logic, file traversal, schedule configuration,
 and thread management.
 """
 
+import os
 import queue
 import threading
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -275,6 +277,40 @@ class TestScanLibraryPath:
         mgr.files_to_test.get_nowait()
 
         assert mgr.scan_work_is_pending() is True
+
+    def test_changed_earlier_root_invalidates_checkpoint_and_is_scanned(self):
+        mgr = _make_scanner()
+        mgr.settings.get_debugging.return_value = False
+        mgr.settings.get_concurrent_file_testers.return_value = 0
+        mgr.settings.get_follow_symlinks.return_value = False
+        mgr.settings.get_library_scan_queue_limit.return_value = 10
+        checkpoint_store = MagicMock()
+        checkpoint_store.load_record.return_value = {"completed_root": "B", "updated_at_ns": 100}
+        queued = []
+
+        def capture_path(path):
+            queued.append(path)
+            mgr.abort_flag.set()
+
+        with (
+            patch.object(mgr, "get_scan_checkpoint_store", return_value=checkpoint_store),
+            patch.object(mgr.files_to_test, "put", side_effect=capture_path),
+            patch("compresso.libs.libraryscanner.os.path.exists", return_value=True),
+            patch("compresso.libs.libraryscanner.os.path.isdir", return_value=True),
+            patch("compresso.libs.libraryscanner.os.stat", return_value=SimpleNamespace(st_mtime_ns=200)),
+            patch(
+                "compresso.libs.libraryscanner.os.walk",
+                return_value=[("/media/lib", ["B"], ["new-before-checkpoint.mkv"]), ("/media/lib/B", [], [])],
+            ),
+            patch("compresso.libs.libraryscanner.FrontendPushMessages", return_value=MagicMock()),
+            patch("compresso.libs.libraryscanner.CompressoLogging"),
+            patch("compresso.libs.libraryscanner.PluginsHandler", return_value=MagicMock()),
+            patch("compresso.libs.libraryscanner.gc"),
+        ):
+            mgr.scan_library_path("Media", "/media/lib", 1)
+
+        checkpoint_store.clear.assert_called_once_with(1)
+        assert queued == [os.path.join("/media/lib", "new-before-checkpoint.mkv")]
 
     @patch("compresso.libs.libraryscanner.os.path.exists", return_value=False)
     def test_path_not_exists(self, mock_exists):

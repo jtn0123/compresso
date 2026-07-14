@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import os
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +16,14 @@ def _tracker(tmp_path, task_id=42):
         operation_id=f"task-{task_id}",
         task_id=task_id,
     )
+
+
+def _write_journal(tmp_path, payload, task_id=42):
+    journal_dir = tmp_path / "journals"
+    journal_dir.mkdir(exist_ok=True)
+    path = journal_dir / f"task-{task_id}.json"
+    path.write_text(json.dumps(payload))
+    return path
 
 
 @pytest.mark.unittest
@@ -106,6 +115,85 @@ def test_resume_committed_restores_finalization_phase(tmp_path):
 
     assert resumed is not None
     assert resumed.finalization_phase == "history_committed"
+
+
+@pytest.mark.unittest
+def test_recovery_rejects_non_object_journal_as_controlled_failure(tmp_path):
+    journal = _write_journal(tmp_path, [])
+
+    with pytest.raises(RuntimeError, match="file-operation journal"):
+        FileOperationTracker.recover_all(str(tmp_path / "journals"), MagicMock())
+
+    assert journal.exists()
+
+
+@pytest.mark.unittest
+def test_recovery_rejects_unknown_state_without_deleting_created_file(tmp_path):
+    created = tmp_path / "encoded.mkv"
+    created.write_bytes(b"keep")
+    journal = _write_journal(
+        tmp_path,
+        {
+            "version": 1,
+            "operation_id": "task-42",
+            "task_id": 42,
+            "state": "commited",
+            "finalization_phase": None,
+            "backups": [],
+            "created_paths": [str(created)],
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="file-operation journal"):
+        FileOperationTracker.recover_all(str(tmp_path / "journals"), MagicMock())
+
+    assert created.read_bytes() == b"keep"
+    assert journal.exists()
+
+
+@pytest.mark.unittest
+def test_resume_committed_rejects_mismatched_task_identity(tmp_path):
+    _write_journal(
+        tmp_path,
+        {
+            "version": 1,
+            "operation_id": "task-99",
+            "task_id": 99,
+            "state": "committed",
+            "finalization_phase": "history_committed",
+            "backups": [],
+            "created_paths": [],
+        },
+    )
+
+    with pytest.raises(ValueError, match="identity"):
+        FileOperationTracker.resume_committed(str(tmp_path / "journals"), task_id=42, logger=MagicMock())
+
+
+@pytest.mark.unittest
+def test_recovery_rejects_unowned_backup_pair_without_replacing_original(tmp_path):
+    original = tmp_path / "movie.mkv"
+    original.write_bytes(b"current")
+    unrelated = tmp_path / "unrelated.bak"
+    unrelated.write_bytes(b"other")
+    _write_journal(
+        tmp_path,
+        {
+            "version": 1,
+            "operation_id": "task-42",
+            "task_id": 42,
+            "state": "active",
+            "finalization_phase": None,
+            "backups": [[str(unrelated), str(original)]],
+            "created_paths": [],
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="file-operation journal"):
+        FileOperationTracker.recover_all(str(tmp_path / "journals"), MagicMock())
+
+    assert original.read_bytes() == b"current"
+    assert unrelated.read_bytes() == b"other"
 
 
 @pytest.mark.unittest

@@ -86,6 +86,40 @@ class TestSafetyState:
         assert snapshot["events"][0]["code"] == "safety-state-corrupt"
         assert list(state_dir.glob("state.corrupt-*.json"))
 
+    def test_malformed_event_fails_closed_instead_of_crashing_snapshot(self, tmp_path):
+        state_dir = Path(tmp_path) / "safety"
+        state_dir.mkdir()
+        (state_dir / "state.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "pause_required": False,
+                    "updated_at": None,
+                    "released_at": None,
+                    "events": ["not-an-event"],
+                }
+            )
+        )
+
+        snapshot = SafetyState(tmp_path).snapshot()
+
+        assert snapshot["pause_required"] is True
+        assert snapshot["events"][0]["code"] == "safety-state-corrupt"
+
+    def test_active_event_cannot_coexist_with_ready_persisted_state(self, tmp_path):
+        store = SafetyState(tmp_path)
+        store.trigger("disk-reserve", "Cache reserve breached")
+        state_path = Path(tmp_path) / "safety" / "state.json"
+        state = json.loads(state_path.read_text())
+        state["pause_required"] = False
+        state_path.write_text(json.dumps(state))
+
+        snapshot = SafetyState(tmp_path).snapshot()
+
+        assert snapshot["pause_required"] is True
+        assert snapshot["status"] == "paused"
+        assert snapshot["events"][0]["code"] == "safety-state-corrupt"
+
     def test_history_is_bounded(self, tmp_path):
         start = datetime(2026, 1, 1, tzinfo=UTC)
         ticks = iter(start + timedelta(seconds=index) for index in range(20))

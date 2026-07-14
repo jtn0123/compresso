@@ -29,6 +29,7 @@ Copyright:
 
 """
 
+import contextlib
 import math
 import os
 import shutil
@@ -341,7 +342,13 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             artifact_path = os.path.realpath(remote_task.abspath)
             try:
                 if os.path.commonpath([transfer_completed_root, artifact_path]) == transfer_completed_root:
+                    transfer_id = os.path.basename(os.path.dirname(artifact_path))
                     shutil.rmtree(os.path.dirname(artifact_path), ignore_errors=True)
+                    manifest_path = os.path.join(
+                        settings.get_cache_path(), "remote_transfers", "manifests", f"{transfer_id}.json"
+                    )
+                    with contextlib.suppress(OSError):
+                        os.remove(manifest_path)
             except ValueError:
                 continue
         if expired_ids:

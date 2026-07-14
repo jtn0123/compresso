@@ -150,7 +150,7 @@ def test_begin_repairs_partial_larger_than_declared_transfer(tmp_path):
 
 
 @pytest.mark.unittest
-def test_cleanup_skips_corrupt_manifest_and_continues_with_valid_stale_transfer(tmp_path):
+def test_cleanup_removes_corrupt_manifest_and_continues_with_valid_stale_transfer(tmp_path):
     clock = [100.0]
     store = ResumableTransferStore(tmp_path, now=lambda: clock[0])
     stale = store.begin("stale", "stale.mkv", 4, _sha256(b"data"))
@@ -160,7 +160,71 @@ def test_cleanup_skips_corrupt_manifest_and_continues_with_valid_stale_transfer(
     removed = store.cleanup_stale(100)
 
     assert removed == [stale["transfer_id"]]
-    assert (tmp_path / "manifests" / "corrupt.json").exists()
+    assert not (tmp_path / "manifests" / "corrupt.json").exists()
+
+
+@pytest.mark.unittest
+def test_complete_transfer_is_not_reported_when_artifact_is_missing(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    payload = b"complete"
+    status = store.begin("job", "movie.mkv", len(payload), _sha256(payload))
+    store.append(status["transfer_id"], 0, payload, _sha256(payload))
+    completed = store.finalize(status["transfer_id"])
+    completed.unlink()
+
+    with pytest.raises(ValueError, match="missing or has the wrong size"):
+        store.status(status["transfer_id"])
+
+    assert store.summary()["corrupt"] == 1
+    assert store.cleanup_stale(1) == [status["transfer_id"]]
+    assert not store._manifest_path(status["transfer_id"]).exists()
+
+
+@pytest.mark.unittest
+def test_finalizing_recovery_rehashes_artifact_before_marking_complete(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    payload = b"complete"
+    status = store.begin("job", "movie.mkv", len(payload), _sha256(payload))
+    store.append(status["transfer_id"], 0, payload, _sha256(payload))
+    completed = store.finalize(status["transfer_id"])
+    completed.write_bytes(b"corrupt!")
+    manifest_path = store._manifest_path(status["transfer_id"])
+    manifest = json.loads(manifest_path.read_text())
+    manifest["state"] = "finalizing"
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="integrity validation"):
+        ResumableTransferStore(tmp_path).status(status["transfer_id"])
+
+
+@pytest.mark.unittest
+def test_cleanup_removes_invalid_manifest_and_owned_artifacts(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    transfer_id = "a" * 32
+    store._manifest_path(transfer_id).write_text(json.dumps({}))
+    store._partial_path(transfer_id).write_bytes(b"partial")
+    completed = store.completed_dir / transfer_id
+    completed.mkdir()
+    (completed / "movie.mkv").write_bytes(b"corrupt")
+
+    removed = store.cleanup_stale(1)
+
+    assert removed == [transfer_id]
+    assert not store._manifest_path(transfer_id).exists()
+    assert not store._partial_path(transfer_id).exists()
+    assert not completed.exists()
+
+
+@pytest.mark.unittest
+def test_cleanup_removes_non_utf8_manifest_without_aborting(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    transfer_id = "b" * 32
+    store._manifest_path(transfer_id).write_bytes(b"\xff\xfe")
+    store._partial_path(transfer_id).write_bytes(b"partial")
+
+    assert store.cleanup_stale(1) == [transfer_id]
+    assert not store._manifest_path(transfer_id).exists()
+    assert not store._partial_path(transfer_id).exists()
 
 
 @pytest.mark.unittest
@@ -232,6 +296,93 @@ def test_transfer_store_rejects_untrusted_transfer_id():
 
     with pytest.raises(ValueError, match="transfer ID"):
         store._validate_transfer_id("../escape")
+
+
+@pytest.mark.unittest
+@pytest.mark.parametrize(
+    ("job_id", "checksum", "message"),
+    [("", f"sha256:{'0' * 64}", "job identity"), ("job", "sha256:not-hex", "checksum")],
+)
+def test_begin_rejects_invalid_identity_and_checksum(tmp_path, job_id, checksum, message):
+    store = ResumableTransferStore(tmp_path)
+
+    with pytest.raises(ValueError, match=message):
+        store.begin(job_id, "movie.mkv", 1, checksum)
+
+
+@pytest.mark.unittest
+@pytest.mark.parametrize("total_size", [True, 1.5, "1"])
+def test_begin_rejects_noninteger_transfer_size(tmp_path, total_size):
+    store = ResumableTransferStore(tmp_path)
+
+    with pytest.raises(ValueError, match="must be an integer"):
+        store.begin("job", "movie.mkv", total_size, _sha256(b"x"))
+
+
+@pytest.mark.unittest
+def test_manifest_rejects_noninteger_sizes(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    status = store.begin("job", "movie.mkv", 1, _sha256(b"x"))
+    manifest_path = store._manifest_path(status["transfer_id"])
+    manifest = json.loads(manifest_path.read_text())
+    manifest["total_size"] = 1.5
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="sizes are invalid"):
+        store.status(status["transfer_id"])
+
+
+@pytest.mark.unittest
+def test_manifest_rejects_non_object_metadata(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    status = store.begin("job", "movie.mkv", 1, _sha256(b"x"))
+    manifest_path = store._manifest_path(status["transfer_id"])
+    manifest = json.loads(manifest_path.read_text())
+    manifest["metadata"] = "not-an-object"
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="metadata"):
+        store.get_manifest(status["transfer_id"])
+
+
+@pytest.mark.unittest
+def test_complete_manifest_requires_terminal_offset(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    payload = b"done"
+    status = store.begin("job", "movie.mkv", len(payload), _sha256(payload))
+    store.append(status["transfer_id"], 0, payload, _sha256(payload))
+    store.finalize(status["transfer_id"])
+    manifest_path = store._manifest_path(status["transfer_id"])
+    manifest = json.loads(manifest_path.read_text())
+    manifest["offset"] = 0
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="terminal offset"):
+        store.status(status["transfer_id"])
+
+
+@pytest.mark.unittest
+def test_nonfinite_manifest_timestamp_is_cleaned_as_corrupt(tmp_path):
+    store = ResumableTransferStore(tmp_path, now=lambda: 1_000.0)
+    status = store.begin("job", "movie.mkv", 1, _sha256(b"x"))
+    manifest_path = store._manifest_path(status["transfer_id"])
+    manifest = json.loads(manifest_path.read_text())
+    manifest["updated_at"] = float("inf")
+    manifest_path.write_text(json.dumps(manifest))
+
+    assert store.cleanup_stale(1) == [status["transfer_id"]]
+
+
+@pytest.mark.unittest
+def test_status_rejects_partial_larger_than_declared_transfer(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    status = store.begin("job", "movie.mkv", 4, _sha256(b"data"))
+    store._partial_path(status["transfer_id"]).write_bytes(b"oversized")
+
+    with pytest.raises(ValueError, match="partial artifact exceeds"):
+        store.status(status["transfer_id"])
+
+    assert store.summary()["corrupt"] == 1
 
 
 @pytest.mark.unittest

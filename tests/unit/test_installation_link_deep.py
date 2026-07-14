@@ -397,6 +397,18 @@ class TestSendFileToRemoteInstallation:
         assert result["id"] == 7
         assert offsets == [(4, b"efg"), (7, b"hij")]
 
+    def test_resumable_upload_stops_when_lease_heartbeat_fails(self, tmp_path):
+        source = tmp_path / "movie.mkv"
+        source.write_bytes(b"abcdefghij")
+        links = _create_links()
+        links.remote_api_post = MagicMock(return_value={"transfer_id": "a" * 32, "offset": 0, "complete": False})
+        links.remote_api_post_bytes = MagicMock(return_value={"offset": 3})
+
+        result = links._send_file_resumable({}, str(source), "job-1", chunk_size=3, progress_callback=lambda: False)
+
+        assert result == {}
+        links.remote_api_post.assert_called_once()
+
     def test_resumable_download_continues_existing_partial_file(self, tmp_path):
         payload = b"abcdefghij"
         destination = tmp_path / "movie.mkv"
@@ -424,6 +436,30 @@ class TestSendFileToRemoteInstallation:
         assert destination.read_bytes() == payload
         assert not (tmp_path / "movie.mkv.part").exists()
 
+    def test_resumable_download_stops_when_lease_heartbeat_fails(self, tmp_path):
+        payload = b"abcdefghij"
+        destination = tmp_path / "movie.mkv"
+        links = _create_links()
+        links.settings.get_cache_path.return_value = str(tmp_path)
+        links.remote_api_get = MagicMock(
+            return_value={
+                "total_size": len(payload),
+                "checksum": f"sha256:{hashlib.sha256(payload).hexdigest()}",
+            }
+        )
+        response = MagicMock(status_code=200, content=payload[:3])
+        response.headers = {"X-Chunk-Checksum": f"sha256:{hashlib.sha256(payload[:3]).hexdigest()}"}
+        request_handler = MagicMock()
+        request_handler.get.return_value = response
+
+        with patch("compresso.libs.installation_link.RequestHandler", return_value=request_handler):
+            success = links.fetch_remote_task_completed_file_resumable(
+                {}, 7, str(destination), chunk_size=3, progress_callback=lambda: False
+            )
+
+        assert success is False
+        assert (tmp_path / "movie.mkv.part").read_bytes() == payload[:3]
+
     def test_resumable_download_discards_full_corrupt_partial_for_next_retry(self, tmp_path):
         payload = b"good"
         destination = tmp_path / "movie.mkv"
@@ -448,6 +484,60 @@ class TestSendFileToRemoteInstallation:
 
         with pytest.raises(ValueError, match="inside the Compresso cache"):
             links.fetch_remote_task_completed_file_resumable({}, 7, str(tmp_path / "outside.mkv"))
+
+    def test_resumable_download_rejects_malformed_manifest_size(self, tmp_path):
+        destination = tmp_path / "movie.mkv"
+        links = _create_links()
+        links.settings.get_cache_path.return_value = str(tmp_path)
+        links.remote_api_get = MagicMock(
+            return_value={
+                "total_size": -1,
+                "checksum": f"sha256:{hashlib.sha256(b'').hexdigest()}",
+            }
+        )
+
+        assert links.fetch_remote_task_completed_file_resumable({}, 7, str(destination)) is False
+        assert not destination.exists()
+
+    def test_resumable_download_rejects_chunk_beyond_declared_size(self, tmp_path):
+        declared = b"data"
+        oversized = b"data!"
+        destination = tmp_path / "movie.mkv"
+        links = _create_links()
+        links.settings.get_cache_path.return_value = str(tmp_path)
+        links.remote_api_get = MagicMock(
+            return_value={
+                "total_size": len(declared),
+                "checksum": f"sha256:{hashlib.sha256(oversized).hexdigest()}",
+            }
+        )
+        response = MagicMock(status_code=200, content=oversized)
+        response.headers = {"X-Chunk-Checksum": f"sha256:{hashlib.sha256(oversized).hexdigest()}"}
+        request_handler = MagicMock()
+        request_handler.get.return_value = response
+
+        with patch("compresso.libs.installation_link.RequestHandler", return_value=request_handler):
+            assert links.fetch_remote_task_completed_file_resumable({}, 7, str(destination)) is False
+
+        assert not destination.exists()
+
+    def test_resumable_download_rejects_cache_root_as_file_destination(self, tmp_path):
+        cache_root = tmp_path / "cache"
+        cache_root.mkdir()
+        sibling_partial = tmp_path / "cache.part"
+        links = _create_links()
+        links.settings.get_cache_path.return_value = str(cache_root)
+        links.remote_api_get = MagicMock(
+            return_value={
+                "total_size": 0,
+                "checksum": f"sha256:{hashlib.sha256(b'').hexdigest()}",
+            }
+        )
+
+        with pytest.raises(ValueError, match="inside the Compresso cache"):
+            links.fetch_remote_task_completed_file_resumable({}, 7, str(cache_root))
+
+        assert not sibling_partial.exists()
 
     def test_uses_resumable_protocol_for_stable_remote_job(self):
         links = _create_links()

@@ -103,6 +103,7 @@ def test_verify_rejects_manifest_path_that_escapes_root(tmp_path):
     manifest_path.write_text(
         json.dumps(
             {
+                "version": 1,
                 "root": str(root),
                 "files": [{"relative_path": "../outside.mkv", "size_bytes": 7, "media": {}}],
             }
@@ -131,7 +132,9 @@ def test_verify_reports_malformed_manifest_paths_instead_of_crashing(tmp_path, r
     root.mkdir()
     manifest_path = tmp_path / "before.json"
     manifest_path.write_text(
-        json.dumps({"root": str(root), "files": [{"relative_path": relative_path, "size_bytes": 1, "media": {}}]})
+        json.dumps(
+            {"version": 1, "root": str(root), "files": [{"relative_path": relative_path, "size_bytes": 1, "media": {}}]}
+        )
     )
 
     report = verify_manifest(str(manifest_path), str(root))
@@ -145,9 +148,121 @@ def test_verify_empty_manifest_fails_closed(tmp_path):
     root = tmp_path / "media"
     root.mkdir()
     manifest_path = tmp_path / "before.json"
-    manifest_path.write_text(json.dumps({"root": str(root), "files": []}))
+    manifest_path.write_text(json.dumps({"version": 1, "root": str(root), "files": []}))
 
     report = verify_manifest(str(manifest_path), str(root))
 
     assert report["failed"] == 1
     assert report["files"][0]["issues"] == ["manifest contains no files"]
+
+
+@pytest.mark.unittest
+def test_create_manifest_rejects_empty_media_root(tmp_path):
+    root = tmp_path / "media"
+    root.mkdir()
+
+    with pytest.raises(ValueError, match="no supported media"):
+        create_manifest(str(root), str(tmp_path / "manifest.json"))
+
+
+@pytest.mark.unittest
+def test_create_manifest_rejects_symlinked_media(tmp_path):
+    root = tmp_path / "media"
+    root.mkdir()
+    outside = tmp_path / "outside.mkv"
+    outside.write_bytes(b"outside")
+    (root / "linked.mkv").symlink_to(outside)
+
+    with pytest.raises(ValueError, match="symbolic-link"):
+        create_manifest(str(root), str(tmp_path / "manifest.json"))
+
+
+@pytest.mark.unittest
+def test_create_manifest_rejects_symlinked_directory(tmp_path):
+    root = tmp_path / "media"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "movie.mkv").write_bytes(b"outside")
+    (root / "linked").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symbolic-link directory"):
+        create_manifest(str(root), str(tmp_path / "manifest.json"))
+
+
+@pytest.mark.unittest
+def test_create_manifest_surfaces_directory_walk_errors(tmp_path, monkeypatch):
+    root = tmp_path / "media"
+    root.mkdir()
+
+    def unreadable_walk(_root, *, onerror):
+        onerror(PermissionError("denied"))
+        return iter(())
+
+    monkeypatch.setattr("compresso.libs.media_manifest.os.walk", unreadable_walk)
+
+    with pytest.raises(OSError, match="could not read"):
+        create_manifest(str(root), str(tmp_path / "manifest.json"))
+
+
+@pytest.mark.unittest
+def test_verify_rejects_duplicate_entries_and_unexpected_outputs(tmp_path, monkeypatch):
+    root = tmp_path / "media"
+    root.mkdir()
+    (root / "a.mkv").write_bytes(b"aaaa")
+    (root / "unexpected.mkv").write_bytes(b"extra")
+    summary = {"streams": {}, "chapters": 0, "duration_seconds": 1.0, "video": {}}
+    monkeypatch.setattr("compresso.libs.media_manifest.probe_media", lambda _path: summary)
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "root": str(root),
+                "files": [
+                    {"relative_path": "a.mkv", "size_bytes": 4, "checksum": "unused", "media": summary},
+                    {"relative_path": "a.mkv", "size_bytes": 4, "checksum": "unused", "media": summary},
+                ],
+            }
+        )
+    )
+
+    report = verify_manifest(str(manifest_path), str(root))
+
+    assert report["failed"] == 2
+    assert any(result["issues"] == ["manifest relative_path is duplicated"] for result in report["files"])
+    assert any(result["issues"] == ["unexpected output file is not present in the manifest"] for result in report["files"])
+
+
+@pytest.mark.unittest
+def test_verify_rejects_unknown_version_and_nonfinite_duration(tmp_path, monkeypatch):
+    root = tmp_path / "media"
+    root.mkdir()
+    (root / "a.mkv").write_bytes(b"aaaa")
+    monkeypatch.setattr(
+        "compresso.libs.media_manifest.probe_media",
+        lambda _path: {"streams": {}, "chapters": 0, "duration_seconds": 1.0, "video": {}},
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": 999,
+                "root": str(root),
+                "files": [
+                    {
+                        "relative_path": "a.mkv",
+                        "size_bytes": 4,
+                        "checksum": "unused",
+                        "media": {"streams": {}, "chapters": 0, "duration_seconds": float("nan"), "video": {}},
+                    }
+                ],
+            }
+        )
+    )
+
+    report = verify_manifest(str(manifest_path), str(root))
+
+    assert report["failed"] == 2
+    assert any("manifest version is unsupported" in result["issues"] for result in report["files"])
+    assert any("duration is not finite" in result["issues"] for result in report["files"])
