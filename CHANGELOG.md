@@ -1,3 +1,10 @@
+## [1.13.5](https://github.com/jtn0123/compresso/compare/v1.13.4...v1.13.5) (2026-07-14)
+
+
+### Bug Fixes
+
+* harden distributed media recovery ([#199](https://github.com/jtn0123/compresso/issues/199)) ([8d64a93](https://github.com/jtn0123/compresso/commit/8d64a937d547d9b5e9b86ced3e90c420129cfe10))
+
 ## [1.13.4](https://github.com/jtn0123/compresso/compare/v1.13.3...v1.13.4) (2026-07-12)
 
 
