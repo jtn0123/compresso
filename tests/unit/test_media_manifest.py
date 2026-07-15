@@ -235,6 +235,31 @@ def test_verify_rejects_duplicate_entries_and_unexpected_outputs(tmp_path, monke
 
 
 @pytest.mark.unittest
+def test_verify_normalizes_manifest_paths_for_inventory_matching(tmp_path, monkeypatch):
+    root = tmp_path / "media"
+    root.mkdir()
+    (root / "a.mkv").write_bytes(b"aaaa")
+    summary = {"streams": {}, "chapters": 0, "duration_seconds": 1.0, "video": {}}
+    monkeypatch.setattr("compresso.libs.media_manifest.probe_media", lambda _path: summary)
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "root": str(root),
+                "files": [{"relative_path": "./a.mkv", "size_bytes": 4, "checksum": "unused", "media": summary}],
+            }
+        )
+    )
+
+    report = verify_manifest(str(manifest_path), str(root))
+
+    assert report["total"] == 1
+    assert report["passed"] == 1
+    assert report["failed"] == 0
+
+
+@pytest.mark.unittest
 def test_verify_rejects_unknown_version_and_nonfinite_duration(tmp_path, monkeypatch):
     root = tmp_path / "media"
     root.mkdir()

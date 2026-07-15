@@ -235,7 +235,24 @@ class TaskHandler(threading.Thread):
             logger.warning("STARTUP_APPROVAL_RESTAGE id=%s", task_obj.id)
         elif transition.action is StartupRecoveryAction.RESTORE_CACHE:
             os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
-            shutil.copy2(staged_path, cache_path)
+            try:
+                shutil.copy2(staged_path, cache_path)
+            except (OSError, shutil.Error) as error:
+                logger.error("STARTUP_APPROVED_CACHE_RESTORE_FAILED id=%s error=%s", task_obj.id, error)
+                if cache_path:
+                    try:
+                        os.remove(cache_path)
+                    except FileNotFoundError:
+                        pass
+                    except OSError as cleanup_error:
+                        logger.error(
+                            "STARTUP_APPROVED_PARTIAL_CACHE_CLEANUP_FAILED id=%s error=%s",
+                            task_obj.id,
+                            cleanup_error,
+                        )
+                if staged_path:
+                    protected_paths.add(os.path.realpath(staged_path))
+                return
             logger.warning("STARTUP_APPROVED_CACHE_RESTORED id=%s", task_obj.id)
 
         if transition.protect_cache and cache_path:

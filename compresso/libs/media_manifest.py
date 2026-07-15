@@ -53,11 +53,16 @@ def _manifest_entry_path_transition(root, relative_path, seen_relative_paths):
     """Validate and resolve one manifest path while tracking duplicates."""
     if not isinstance(relative_path, str) or not relative_path or _is_absolute_manifest_path(relative_path):
         return ManifestEntryPathTransition(None, ("manifest relative_path is invalid",), False)
-    if relative_path in seen_relative_paths:
+    normalized_path = os.path.normpath(relative_path)
+    if normalized_path in seen_relative_paths:
         return ManifestEntryPathTransition(None, ("manifest relative_path is duplicated",), False)
-    seen_relative_paths.add(relative_path)
-    path = os.path.realpath(os.path.join(root, relative_path))
-    if os.path.commonpath((root, path)) != root:
+    seen_relative_paths.add(normalized_path)
+    path = os.path.realpath(os.path.join(root, normalized_path))
+    try:
+        common_root = os.path.commonpath((root, path))
+    except ValueError:
+        common_root = None
+    if common_root != root:
         return ManifestEntryPathTransition(path, ("manifest path escapes verification root",), True)
     return ManifestEntryPathTransition(path, (), True)
 
@@ -84,10 +89,10 @@ def _verify_manifest_entry(root, expected, seen_relative_paths):
         if not os.path.isfile(path):
             issues.append("output file is missing")
         else:
-            current_size = os.path.getsize(path)
-            if current_size <= 0:
-                issues.append("output file is empty")
             try:
+                current_size = os.path.getsize(path)
+                if current_size <= 0:
+                    issues.append("output file is empty")
                 current_media = probe_media(path)
                 issues.extend(compare_media_summaries(expected.get("media", {}), current_media))
                 current_checksum = _sha256(path)
@@ -303,7 +308,7 @@ def verify_manifest(manifest_path, current_root=None, report_path=None):
         total_before += before_size
         total_after += current_size
         if include_expected:
-            expected_relative_paths.add(result["relative_path"])
+            expected_relative_paths.add(os.path.normpath(result["relative_path"]))
         results.append(result)
     try:
         current_relative_paths = {os.path.relpath(path, root) for path in _media_files(root)}

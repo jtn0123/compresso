@@ -136,6 +136,45 @@ def test_remote_task_execution_uses_typed_phases_in_order():
     assert context.remote_task_status == "pending"
 
 
+@pytest.mark.unittest
+def test_library_assignment_failure_requests_remote_cleanup():
+    from compresso.libs.remote_task_manager import RemoteTaskContext, UploadPhaseResult
+
+    mgr = _make_manager()
+    mgr.current_task = _make_task()
+    mgr.links.get_the_remote_library_config_by_name.return_value = {"id": 1, "path": "/remote/media"}
+    mgr._create_remote_task_from_library_path = MagicMock(
+        return_value=UploadPhaseResult(True, remote_task_id=7, remote_task_status="pending")
+    )
+    mgr._set_remote_task_library = MagicMock(return_value=False)
+    context = RemoteTaskContext("/data/library/video.mkv", "http://remote:8001", "Media", "/data/library")
+
+    result = mgr._upload_phase(context)
+
+    assert result.succeeded is False
+    assert result.cleanup_remote is True
+
+
+@pytest.mark.unittest
+def test_cleanup_phase_reports_remote_delete_failure():
+    from compresso.libs.remote_task_manager import RemoteTaskContext
+
+    mgr = _make_manager()
+    mgr.links.remove_task_from_remote_installation.return_value = None
+    context = RemoteTaskContext(
+        "/data/library/video.mkv",
+        "http://remote:8001",
+        "Media",
+        "/data/library",
+        remote_task_id=7,
+    )
+
+    result = mgr._cleanup_phase(context)
+
+    assert result.succeeded is False
+    assert result.remote_removed is False
+
+
 # ===========================================================================
 # TestInit
 # ===========================================================================

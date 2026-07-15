@@ -428,6 +428,7 @@ class RemoteTaskManager(threading.Thread):
                 False,
                 result.remote_task_id,
                 result.remote_task_status,
+                cleanup_remote=True,
             )
         if not self._start_remote_task(context, result):
             return UploadPhaseResult(
@@ -1023,8 +1024,9 @@ class RemoteTaskManager(threading.Thread):
         return FinalizationPhaseResult(True)
 
     def _cleanup_phase(self, context) -> CleanupPhaseResult:
-        self.links.remove_task_from_remote_installation(
+        response = self.links.remove_task_from_remote_installation(
             self.installation_info,
             context.remote_task_id,
         )
-        return CleanupPhaseResult(succeeded=True, remote_removed=True)
+        remote_removed = bool(response.get("success")) if isinstance(response, dict) else bool(response)
+        return CleanupPhaseResult(succeeded=remote_removed, remote_removed=remote_removed)

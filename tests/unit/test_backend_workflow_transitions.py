@@ -3,10 +3,11 @@
 """Transition-table contracts for the backend workflow simplification."""
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
-from compresso.libs.media_manifest import _manifest_entry_path_transition
+from compresso.libs.media_manifest import _manifest_entry_path_transition, _verify_manifest_entry
 from compresso.libs.postprocessor import PostProcessor
 from compresso.libs.taskhandler import StartupRecoveryAction, TaskHandler
 
@@ -73,6 +74,8 @@ def test_startup_recovery_transition_table(
         ("history_committed", "metadata_persisted", "metadata_committed"),
         ("metadata_committed", "task_removed", "task_deleted"),
         ("history_committed", "history_persisted", "history_committed"),
+        ("metadata_committed", "history_persisted", "metadata_committed"),
+        ("task_deleted", "metadata_persisted", "task_deleted"),
         (None, "history_persisted", "history_committed"),
     ],
 )
@@ -127,3 +130,88 @@ def test_manifest_entry_path_transition_table(tmp_path, relative_path, seen, exp
         assert transition.path == str(Path(tmp_path, "video.mkv").resolve())
     else:
         assert expected_issue in transition.issues
+
+
+@pytest.mark.unittest
+def test_manifest_entry_paths_use_normalized_duplicate_keys(tmp_path):
+    seen = set()
+
+    first = _manifest_entry_path_transition(str(tmp_path), "./video.mkv", seen)
+    second = _manifest_entry_path_transition(str(tmp_path), "video.mkv", seen)
+
+    assert first.issues == ()
+    assert second.issues == ("manifest relative_path is duplicated",)
+
+
+@pytest.mark.unittest
+def test_manifest_entry_cross_drive_path_is_reported_as_escape(tmp_path, monkeypatch):
+    def cross_drive(_paths):
+        raise ValueError("Paths do not have the same drive")
+
+    monkeypatch.setattr("compresso.libs.media_manifest.os.path.commonpath", cross_drive)
+
+    transition = _manifest_entry_path_transition(str(tmp_path), "video.mkv", set())
+
+    assert transition.issues == ("manifest path escapes verification root",)
+
+
+@pytest.mark.unittest
+def test_manifest_entry_size_race_becomes_a_verification_issue(tmp_path, monkeypatch):
+    media_path = tmp_path / "video.mkv"
+    media_path.write_bytes(b"media")
+    monkeypatch.setattr("compresso.libs.media_manifest.os.path.getsize", MagicMock(side_effect=OSError("vanished")))
+
+    result, _before_size, current_size, _include_expected = _verify_manifest_entry(
+        str(tmp_path),
+        {"relative_path": "video.mkv", "size_bytes": 5, "media": {}},
+        set(),
+    )
+
+    assert current_size == 0
+    assert result["issues"] == ["output probe failed: vanished"]
+
+
+@pytest.mark.unittest
+@pytest.mark.parametrize(
+    ("phase", "history_calls", "metadata_calls", "remove_calls"),
+    [
+        ("file_committed", 1, 1, 1),
+        ("history_committed", 0, 1, 1),
+        ("metadata_committed", 0, 0, 1),
+    ],
+)
+def test_local_finalization_resumes_after_last_committed_phase(phase, history_calls, metadata_calls, remove_calls):
+    processor = PostProcessor.__new__(PostProcessor)
+    processor._file_operation_tracker = MagicMock(finalization_phase=phase)
+    processor._postprocess_local_file_safely = MagicMock(return_value=True)
+    processor._persist_local_history = MagicMock(return_value=True)
+    processor._persist_local_metadata = MagicMock(return_value=True)
+    processor._remove_finalized_local_task = MagicMock(return_value=True)
+    processor._mark_finalization_transition = MagicMock()
+    processor._finalize_file_operation_journal = MagicMock()
+    processor._dispatch_completion_notification = MagicMock()
+
+    processor._finalize_local_task_with_capacity()
+
+    assert processor._persist_local_history.call_count == history_calls
+    assert processor._persist_local_metadata.call_count == metadata_calls
+    assert processor._remove_finalized_local_task.call_count == remove_calls
+
+
+@pytest.mark.unittest
+def test_failed_file_journal_commit_defers_finalization():
+    processor = PostProcessor.__new__(PostProcessor)
+    processor._log = MagicMock()
+    tracker = MagicMock()
+    tracker.commit.return_value = False
+
+    transition = processor._transition_postprocess_journal(
+        tracker,
+        task_success=True,
+        movement_success=True,
+        cache_path="/cache/video.mkv",
+    )
+
+    assert transition.succeeded is False
+    assert transition.cleanup_cache is False
+    tracker.mark_finalization_phase.assert_not_called()

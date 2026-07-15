@@ -65,6 +65,15 @@ class PostprocessCompletionTransition:
     succeeded: bool
 
 
+FINALIZATION_PHASE_ORDER = {
+    None: 0,
+    "file_committed": 0,
+    "history_committed": 1,
+    "metadata_committed": 2,
+    "task_deleted": 3,
+}
+
+
 """
 
 The post-processor handles all tasks carried out on completion of a workers task.
@@ -424,16 +433,20 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         """Finalize a local task after disk-capacity preflight succeeds."""
         if not self._postprocess_local_file_safely():
             return
-        if not self._persist_local_history():
-            return
-        self._mark_finalization_transition("history_persisted")
-        if not self._persist_local_metadata():
-            return
-        self._mark_finalization_transition("metadata_persisted")
-        if not self._remove_finalized_local_task():
-            return
+        phase = self._current_finalization_phase()
+        if self._finalization_step_pending(phase, "history_committed"):
+            if not self._persist_local_history():
+                return
+            self._mark_finalization_transition("history_persisted")
+        if self._finalization_step_pending(phase, "metadata_committed"):
+            if not self._persist_local_metadata():
+                return
+            self._mark_finalization_transition("metadata_persisted")
+        if self._finalization_step_pending(phase, "task_deleted"):
+            if not self._remove_finalized_local_task():
+                return
+            self._mark_finalization_transition("task_removed")
 
-        self._mark_finalization_transition("task_removed")
         self._finalize_file_operation_journal(True)
         self._dispatch_completion_notification()
 
@@ -547,7 +560,19 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             "task_removed": "task_deleted",
         }
         target = target_phases[event]
-        return current_phase if current_phase == target else target
+        if FINALIZATION_PHASE_ORDER.get(current_phase, 0) >= FINALIZATION_PHASE_ORDER[target]:
+            return current_phase
+        return target
+
+    def _current_finalization_phase(self):
+        if self._file_operation_tracker is None:
+            return None
+        phase = self._file_operation_tracker.finalization_phase
+        return phase if phase in FINALIZATION_PHASE_ORDER else None
+
+    @staticmethod
+    def _finalization_step_pending(current_phase, target_phase):
+        return FINALIZATION_PHASE_ORDER.get(current_phase, 0) < FINALIZATION_PHASE_ORDER[target_phase]
 
     def _mark_finalization_transition(self, event):
         current_phase = None
@@ -568,7 +593,14 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
     def _transition_postprocess_journal(self, tracker, task_success, movement_success, cache_path):
         transition = self._postprocess_completion_transition(task_success, movement_success)
         if transition.commit_journal:
-            tracker.commit()
+            if not tracker.commit():
+                self._log("File-operation journal commit remains pending", level="warning")
+                return PostprocessCompletionTransition(
+                    commit_journal=False,
+                    rollback_journal=False,
+                    cleanup_cache=False,
+                    succeeded=False,
+                )
             tracker.mark_finalization_phase("file_committed")
         elif transition.rollback_journal:
             self._log("Rolling back all tracked file operations due to failures", level="warning")
