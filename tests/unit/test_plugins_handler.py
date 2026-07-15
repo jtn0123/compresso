@@ -220,7 +220,8 @@ class TestUpdatePluginRepos:
             patch.object(handler, "fetch_remote_repo_data", return_value={"repo": {}}),
             patch.object(handler, "get_repo_cache_file", return_value="/fake/repo-cache.json"),
             patch("compresso.libs.plugins.os.path.exists", return_value=True),
-            patch("builtins.open", MagicMock()),
+            patch("compresso.libs.plugins.atomic_json_write") as atomic_write,
         ):
             result = handler.update_plugin_repos()
             assert result is True
+            atomic_write.assert_called_once_with("/fake/repo-cache.json", {"repo": {}}, mode=0o600)

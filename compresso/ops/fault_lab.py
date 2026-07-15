@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from compresso.config import Config
+from compresso.libs.json_state import atomic_json_write
 from compresso.libs.library_scale_benchmark import run_benchmark
 from compresso.libs.resumable_transfer import ResumableTransferStore, file_sha256
 
@@ -57,21 +58,7 @@ def _deterministic_bytes(seed: int, length: int) -> bytes:
 
 def write_report(path: Path, payload: Mapping[str, Any]) -> None:
     """Atomically persist a private JSON report."""
-    destination = Path(path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{destination.name}-", suffix=".tmp", dir=destination.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as output:
-            json.dump(payload, output, indent=2, sort_keys=True)
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, destination)
-    except Exception:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
-        raise
+    atomic_json_write(path, payload, mode=0o600)
 
 
 def report_destination(userdata_path: str, name: str) -> Path:

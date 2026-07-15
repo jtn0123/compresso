@@ -16,7 +16,6 @@ import shutil
 import socket
 import sqlite3
 import sys
-import tempfile
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -29,6 +28,7 @@ import requests
 
 from compresso import metadata
 from compresso.config import Config
+from compresso.libs.json_state import atomic_json_write
 from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.webserver.request_auth import API_AUTH_HEADER_NAME
 
@@ -58,19 +58,7 @@ def _redact(value: Any, key: str = "") -> Any:
 
 
 def _atomic_json_write(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}-", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as output:
-            json.dump(payload, output, indent=2, sort_keys=True)
-            output.flush()
-            os.fsync(output.fileno())
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, path)
-    except Exception:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
-        raise
+    atomic_json_write(path, payload, mode=0o600)
 
 
 def _report_destination(report_dir: Path, output_name: str | None, default_name: str) -> Path:

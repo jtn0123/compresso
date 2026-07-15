@@ -1257,6 +1257,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
                 "task_state": task_state,
             },
             tasks_data_file,
+            file_mode=0o600,
         )
         if not result["success"]:
             for message in result["errors"]:

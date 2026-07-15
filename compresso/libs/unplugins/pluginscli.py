@@ -41,6 +41,7 @@ import requests
 
 from compresso import config
 from compresso.libs import common
+from compresso.libs.json_state import atomic_json_write
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.task import TaskDataStore
 from compresso.libs.unplugins import PluginExecutor
@@ -352,8 +353,7 @@ class PluginsCLI:
             "compatibility": [PluginsHandler.version],
         }
         if not os.path.exists(info_file):
-            with open(info_file, "w") as outfile:
-                json.dump(plugin_info, outfile, sort_keys=True, indent=4)
+            atomic_json_write(info_file, plugin_info, mode=0o600)
 
         # Create requirements.txt file
         common.touch(os.path.join(new_plugin_path, "requirements.txt"))

@@ -47,6 +47,7 @@ import requests
 from compresso import config
 from compresso.libs import common
 from compresso.libs.frontend_push_messages import FrontendPushMessages
+from compresso.libs.json_state import atomic_json_write
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.session import Session
@@ -191,8 +192,7 @@ class PluginsHandler(metaclass=SingletonType):
             repo_cache = self.get_repo_cache_file(repo_id)
             self.logger.info("Repo cache file '%s'.", repo_cache)
             try:
-                with open(repo_cache, "w") as f:
-                    json.dump(repo_data, f, indent=4)
+                atomic_json_write(repo_cache, repo_data, mode=0o600)
             except json.JSONDecodeError as e:
                 self.logger.error("Unable to update plugin repo '%s'. %s", repo_path, str(e))
         return True
@@ -556,9 +556,7 @@ class PluginsHandler(metaclass=SingletonType):
         if plugin_info.get("bundled") is True:
             plugin_info["bundled"] = False
             info_path = os.path.join(str(plugin_directory), _PLUGIN_INFO_FILENAME)
-            with open(info_path, "w", encoding="utf-8") as info_file:
-                json.dump(plugin_info, info_file, indent=2)
-                info_file.write("\n")
+            atomic_json_write(info_path, plugin_info, mode=0o600)
         # Run through any required dependency installation
         post_install_python_requirements = os.path.join(str(plugin_directory), "requirements.post-install.lock")
         if os.path.exists(post_install_python_requirements):

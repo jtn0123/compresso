@@ -2,7 +2,6 @@
 
 """Synthetic, metadata-only large-library scanner and SQLite benchmark."""
 
-import json
 import math
 import os
 import platform
@@ -18,6 +17,7 @@ from typing import Any
 
 import psutil
 
+from compresso.libs.json_state import atomic_json_write
 from compresso.libs.libraryscanner import iter_sorted_library_directories
 
 
@@ -203,5 +203,4 @@ def threshold_failures(result: dict[str, object], thresholds: dict[str, float]) 
 
 
 def write_result(result: dict[str, object], output_path: Path):
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    atomic_json_write(output_path, result, mode=0o600)

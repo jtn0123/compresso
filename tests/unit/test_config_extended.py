@@ -83,6 +83,34 @@ class TestConfigInit:
         c = _make_config(tmp_path)
         assert c.get_config_path() is not None
 
+    @pytest.mark.parametrize("invalid_shape", [None, [], ["setting"], "unsafe", 42])
+    def test_invalid_settings_shape_is_ignored_with_conservative_defaults(self, tmp_path, invalid_shape):
+        config_path = tmp_path / "config"
+        config_path.mkdir()
+        settings_path = config_path / "settings.json"
+        original = json.dumps(invalid_shape)
+        settings_path.write_text(original, encoding="utf-8")
+
+        with (
+            patch("compresso.config.common") as mock_common,
+            patch("compresso.config.CompressoLogging"),
+            patch("compresso.config.metadata") as mock_meta,
+            patch("compresso.config.logger") as mock_logger,
+        ):
+            mock_common.get_home_dir.return_value = str(tmp_path)
+            mock_common.get_default_library_path.return_value = str(tmp_path / "library")
+            mock_common.get_default_cache_path.return_value = str(tmp_path / "cache")
+            mock_meta.read_version_string.return_value = "1.0.0-test"
+            from compresso.config import Config
+
+            settings = Config(config_path=str(config_path))
+
+        assert settings.get_ui_address() == "127.0.0.1"
+        assert settings.get_enable_library_scanner() is False
+        assert settings.get_default_worker_cap() == 2
+        assert settings_path.read_text(encoding="utf-8") == original
+        mock_logger.error.assert_called()
+
 
 @pytest.mark.unittest
 class TestConfigDictMethods:

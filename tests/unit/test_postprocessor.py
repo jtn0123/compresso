@@ -7,6 +7,7 @@ Unit tests for compresso.libs.postprocessor.PostProcessor.
 
 """
 
+import json
 import os
 import shutil
 import tempfile
@@ -565,6 +566,7 @@ class TestDumpHistoryLog:
         assert call_args[0]["task_label"] == "remote.mkv"
         assert call_args[0]["checksum"] == "verified-checksum"
         assert "data.json" in call_args[1]
+        assert mock_json_dump.call_args.kwargs == {"file_mode": 0o600}
 
     @patch("compresso.libs.postprocessor.common.json_dump_to_file")
     @patch("compresso.libs.postprocessor.TaskDataStore.export_task_state", return_value={})
@@ -589,6 +591,30 @@ class TestDumpHistoryLog:
 
         with pytest.raises(Exception, match="Exception in dumping"):
             pp.dump_history_log()
+
+    @patch("compresso.libs.postprocessor.TaskDataStore.export_task_state", return_value={})
+    def test_remote_task_data_file_is_owner_only(self, mock_export, tmp_path):
+        pp = _make_postprocessor()
+        destination = tmp_path / "remote.mkv"
+        mock_task = MagicMock()
+        mock_task.task_dump.return_value = {
+            "task_label": "remote.mkv",
+            "task_success": False,
+            "start_time": "",
+            "finish_time": "",
+            "processed_by_worker": "m4-worker",
+            "log": "",
+        }
+        mock_task.get_destination_data.return_value = {"abspath": str(destination)}
+        mock_task.get_task_id.return_value = "task-private"
+        pp.current_task = mock_task
+
+        pp.dump_history_log()
+
+        data_path = tmp_path / "data.json"
+        assert json.loads(data_path.read_text(encoding="utf-8"))["processed_by_worker"] == "m4-worker"
+        if os.name != "nt":
+            assert data_path.stat().st_mode & 0o777 == 0o600
 
     @patch("compresso.libs.postprocessor.file_sha256", return_value="final-checksum")
     @patch("compresso.libs.postprocessor.common.json_dump_to_file")
@@ -617,6 +643,7 @@ class TestDumpHistoryLog:
         assert payload["abspath"] == "/pending/final.mkv"
         assert payload["checksum"] == "final-checksum"
         assert output_path == os.path.join("/pending", "data.json")
+        assert mock_json_dump.call_args.kwargs == {"file_mode": 0o600}
         mock_checksum.assert_called_once_with("/pending/final.mkv")
         mock_task.modify_path.assert_not_called()
 

@@ -170,9 +170,15 @@ class TestSetSetting:
                 patch.object(instance, "get_profile_directory", return_value="/fake/profile"),
                 patch("os.path.exists", return_value=True),
                 patch("builtins.open", mock_open(read_data=settings_data)),
+                patch("compresso.libs.unplugins.settings.atomic_json_write") as atomic_write,
             ):
                 result = instance.set_setting("opt1", "new_value")
                 assert result is True
+                atomic_write.assert_called_once_with(
+                    os.path.join("/fake/profile", "settings.json"),
+                    {"opt1": "new_value"},
+                    mode=0o600,
+                )
 
     def test_set_invalid_key_returns_false(self):
         cls = _make_settings_class(settings={"opt1": "default"})

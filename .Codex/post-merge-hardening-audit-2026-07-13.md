@@ -10,8 +10,8 @@ This audit is the tracking document for the ordered 20 TB master-plus-M4 hardeni
 | PR | Scope | Findings | Status |
 |---|---|---|---|
 | 1 | Secure the master/worker boundary | 1-5 | Merged as PR #200 (`9d1507fb`) after all required checks passed |
-| 2 | Bound and clean file transfers | 6-9 | Implemented on `codex/20tb-transfer-hardening`; merge validation pending |
-| 3 | Make configuration and JSON state crash-safe | 13-14 | Not started |
+| 2 | Bound and clean file transfers | 6-9 | Merged as PR #201 (`e2cc35ba`) after all required checks passed |
+| 3 | Make configuration and JSON state crash-safe | 13-14 | Implemented on `codex/20tb-atomic-json`; merge validation pending |
 | 4 | Stream large health scans safely | 15-17 | Not started |
 | 5 | Make plugin installation transactional | 10-12 | Not started |
 | 6 | Simplify critical backend workflows | 18 | Not started |
@@ -23,7 +23,7 @@ PR 1 secured and deprecated v1, made service-token requests CSRF-independent whi
 
 PR #199 merged cleanly and the merged application still passes its automated baseline. The previous two fuzz audits fixed 40 real defects, and none of those items are repeated here.
 
-There is meaningful hardening work left. PR #200 closed the validated network-boundary findings. The remaining transfer merge gate, crash-safety, health-scan, plugin, complexity, and frontend work is tracked above.
+There is meaningful hardening work left. PRs #200 and #201 closed the validated network-boundary and transfer findings. The remaining crash-safety merge gate, health-scan, plugin, complexity, and frontend work is tracked above.
 
 Current safe boundary:
 

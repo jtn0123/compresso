@@ -8,11 +8,12 @@ import math
 import os
 import re
 import shutil
-import tempfile
 import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from compresso.libs.json_state import atomic_json_write
 
 MANIFEST_GLOB = "*.json"
 
@@ -211,17 +212,7 @@ class ResumableTransferStore:
             return False
 
     def _write_manifest(self, manifest):
-        fd, temporary_path = tempfile.mkstemp(prefix=".transfer-", suffix=".tmp", dir=self.manifest_dir)
-        try:
-            with os.fdopen(fd, "w") as output:
-                json.dump(manifest, output, sort_keys=True)
-                output.flush()
-                os.fsync(output.fileno())
-            os.replace(temporary_path, self._manifest_path(manifest["transfer_id"]))
-        except Exception:
-            if os.path.exists(temporary_path):
-                os.remove(temporary_path)
-            raise
+        atomic_json_write(self._manifest_path(manifest["transfer_id"]), manifest, mode=0o600)
 
     def _reset_partial(self, manifest):
         partial_path = self._partial_path(manifest["transfer_id"])

@@ -43,6 +43,7 @@ import requests
 from json_log_formatter import JSONFormatter
 
 from compresso.libs.frontend_push_messages import FrontendPushMessages
+from compresso.libs.json_state import atomic_json_write
 from compresso.libs.notifications import Notifications
 
 _FORWARD_HANDLER_NAME = "Compresso.ForwardLogHandler"
@@ -583,10 +584,7 @@ class ForwardLogHandler(logging.Handler):
         """Write the state file atomically; caller must hold `_state_lock`."""
         try:
             os.makedirs(self.buffer_path, exist_ok=True)
-            temp_path = f"{self._buffer_state_path}.tmp"
-            with open(temp_path, "w", encoding="utf-8") as handle:
-                json.dump({"files": self._buffer_state}, handle)
-            os.replace(temp_path, self._buffer_state_path)
+            atomic_json_write(self._buffer_state_path, {"files": self._buffer_state}, mode=0o600)
         except (OSError, PermissionError) as exc:
             logging.getLogger(_FORWARD_HANDLER_NAME).warning(
                 "Failed to persist log buffer state: %s",

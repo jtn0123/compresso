@@ -400,10 +400,11 @@ class TestCreateNewPluginsFromArgs:
 class TestCreateNewPluginFiles:
     @patch("compresso.libs.unplugins.pluginscli.PluginsHandler")
     @patch("compresso.libs.unplugins.pluginscli.common.touch")
+    @patch("compresso.libs.unplugins.pluginscli.atomic_json_write")
     @patch("builtins.open", mock_open())
     @patch("os.path.exists", return_value=False)
     @patch("os.makedirs")
-    def test_creates_plugin_files(self, mock_mkdirs, mock_exists, mock_touch, mock_ph_cls):
+    def test_creates_plugin_files(self, mock_mkdirs, mock_exists, atomic_write, mock_touch, mock_ph_cls):
         pluginscli = _import_pluginscli()
         cli = _make_cli(pluginscli)
         mock_ph_cls.version = 1
@@ -411,14 +412,16 @@ class TestCreateNewPluginFiles:
         type_details = [{"runner": "on_worker_process", "runner_docstring": "Process file"}]
         cli.create_new_plugin_files(details, type_details)
         mock_mkdirs.assert_called()
+        atomic_write.assert_called_once()
         mock_ph_cls.write_plugin_data_to_db.assert_called_once()
 
     @patch("compresso.libs.unplugins.pluginscli.PluginsHandler")
     @patch("compresso.libs.unplugins.pluginscli.common.touch")
+    @patch("compresso.libs.unplugins.pluginscli.atomic_json_write")
     @patch("builtins.open", mock_open())
     @patch("os.path.exists", return_value=False)
     @patch("os.makedirs")
-    def test_handles_db_exception(self, mock_mkdirs, mock_exists, mock_touch, mock_ph_cls):
+    def test_handles_db_exception(self, mock_mkdirs, mock_exists, atomic_write, mock_touch, mock_ph_cls):
         pluginscli = _import_pluginscli()
         cli = _make_cli(pluginscli)
         mock_ph_cls.version = 1
