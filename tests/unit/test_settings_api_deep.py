@@ -76,7 +76,7 @@ class TestSettingsApiWriteEdge(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    def test_write_settings_strips_remote_installations(self):
+    def test_write_settings_rejects_remote_installations(self):
         resp = self.post_json(
             "/settings/write",
             {
@@ -86,7 +86,7 @@ class TestSettingsApiWriteEdge(ApiTestBase):
                 },
             },
         )
-        assert resp.code == 200
+        assert resp.code == 400
 
     def test_write_settings_exception(self):
         def _mock_init_error(self, **kwargs):

@@ -10,10 +10,21 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+import tornado.web
 
 from compresso.libs.singleton import SingletonType
+from compresso.webserver.api_v1.base_api_handler import BaseApiHandler as V1BaseApiHandler
 from compresso.webserver.api_v2.approval_api import ApiApprovalHandler
 from tests.unit.api_test_base import ApiTestBase
+
+
+def _test_token(label):
+    return f"test-{label}"
+
+
+TEST_SERVICE_TOKEN = _test_token("service")
+TEST_V1_TOKEN = _test_token("v1")
+TEST_WORKER_TOKEN = _test_token("worker")
 
 
 class _Settings:
@@ -152,3 +163,72 @@ class TestApiMutationProtection(ApiTestBase):
         )
         assert resp.code == 200
         mock_approve.assert_called_once_with([1])
+
+    @patch("compresso.webserver.helpers.approval.approve_tasks")
+    @patch(
+        "compresso.config.Config",
+        return_value=_Settings(
+            api_auth_enabled=True,
+            api_auth_token=TEST_SERVICE_TOKEN,
+            csrf_protection_enabled=True,
+        ),
+    )
+    def test_valid_service_token_does_not_require_browser_csrf(self, _mock_config, mock_approve):
+        resp = self.fetch(
+            "/compresso/api/v2/approval/approve",
+            method="POST",
+            body=json.dumps({"id_list": [1]}),
+            headers={"Content-Type": "application/json", "X-Compresso-Api-Token": TEST_SERVICE_TOKEN},
+        )
+
+        assert resp.code == 200
+        mock_approve.assert_called_once_with([1])
+
+
+class _V1ProbeHandler(V1BaseApiHandler):
+    def initialize(self, **kwargs):
+        super().initialize(**kwargs)
+        self.params = kwargs.get("params", [])
+
+    def get(self, path):
+        self.finish({"success": True})
+
+
+@pytest.mark.unittest
+class TestV1ApiGuards(ApiTestBase):
+    __test__ = True
+    handler_class = _V1ProbeHandler
+
+    def get_app(self):
+        return tornado.web.Application([(r"/compresso/api/v1/(.*)", _V1ProbeHandler)])
+
+    @patch(
+        "compresso.config.Config",
+        return_value=_Settings(api_auth_enabled=True, api_auth_token=TEST_V1_TOKEN),
+    )
+    def test_v1_rejects_missing_api_token_and_marks_deprecation(self, _mock_config):
+        resp = self.fetch("/compresso/api/v1/read")
+
+        assert resp.code == 401
+        assert resp.headers["Deprecation"] == "true"
+        assert "deprecated" in resp.headers["Warning"].lower()
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+
+    @patch("compresso.config.Config", return_value=_Settings(csrf_protection_enabled=True))
+    def test_v1_legacy_mutating_get_requires_csrf_for_browser_auth(self, _mock_config):
+        resp = self.fetch("/compresso/api/v1/pending/rescan")
+
+        assert resp.code == 403
+
+    @patch(
+        "compresso.config.Config",
+        return_value=_Settings(api_auth_enabled=True, api_auth_token=TEST_WORKER_TOKEN, csrf_protection_enabled=True),
+    )
+    def test_v1_legacy_mutating_get_accepts_explicit_service_token(self, _mock_config):
+        resp = self.fetch(
+            "/compresso/api/v1/pending/rescan",
+            headers={"X-Compresso-Api-Token": TEST_WORKER_TOKEN},
+        )
+
+        assert resp.code == 200
+        assert resp.headers.get("X-RateLimit-Remaining") is not None

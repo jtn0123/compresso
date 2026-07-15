@@ -84,6 +84,29 @@
               </template>
             </q-input>
           </div>
+
+          <div class="q-gutter-sm q-mt-sm">
+            <q-input
+              outlined
+              color="primary"
+              v-model="apiToken"
+              :type="showApiToken ? 'password' : 'text'"
+              :label="$t('components.settings.link.apiToken')"
+              :hint="$t('components.settings.link.apiTokenHint')"
+            >
+              <template #append>
+                <q-icon
+                  :name="showApiToken ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="$t('a11y.togglePasswordVisibility')"
+                  @click="showApiToken = !showApiToken"
+                  @keyup.enter="showApiToken = !showApiToken"
+                />
+              </template>
+            </q-input>
+          </div>
         </q-card-section>
 
         <q-separator />
@@ -247,7 +270,9 @@ const authType = ref('None')
 const authOptions = ref(['None', 'Basic'])
 const username = ref(null)
 const password = ref(null)
+const apiToken = ref(null)
 const showPassword = ref(true)
+const showApiToken = ref(true)
 const available = ref(false)
 const name = ref('')
 const version = ref('')
@@ -305,6 +330,7 @@ const currentSnapshot = computed(() => {
     authType: authType.value,
     username: username.value,
     password: password.value,
+    apiToken: apiToken.value,
     enableReceivingTasks: enableReceivingTasks.value,
     enableSendingTasks: enableSendingTasks.value,
     enableTaskPreloading: enableTaskPreloading.value,
@@ -335,7 +361,9 @@ const resetState = () => {
   authType.value = 'None'
   username.value = null
   password.value = null
+  apiToken.value = null
   showPassword.value = true
+  showApiToken.value = true
   available.value = false
   name.value = ''
   version.value = ''
@@ -363,6 +391,7 @@ const fetchInstallationLinkConfig = (uuid) => {
     authType.value = linkConfig.auth
     username.value = linkConfig.username
     password.value = linkConfig.password
+    apiToken.value = linkConfig.api_token
     available.value = linkConfig.available
     name.value = linkConfig.name
     version.value = linkConfig.version
@@ -386,6 +415,7 @@ const saveInstallationLinkConfig = async () => {
       auth: authType.value,
       username: username.value,
       password: password.value,
+      api_token: apiToken.value,
       enable_receiving_tasks: enableReceivingTasks.value,
       enable_sending_tasks: enableSendingTasks.value,
       enable_task_preloading: enableTaskPreloading.value,

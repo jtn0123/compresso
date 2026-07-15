@@ -42,7 +42,7 @@ import tornado.web
 from marshmallow import Schema, exceptions
 from tornado.web import RequestHandler
 
-from compresso.webserver.request_auth import authorize_request
+from compresso.webserver.request_auth import authorize_request, request_has_valid_api_token
 from compresso.webserver.security_headers import SecurityHeadersMixin
 
 LOG_UNHANDLED_ERROR = "Unhandled error id=%s in %s.%s"
@@ -131,7 +131,7 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
     def _request_api_path(self):
         path = self.request.path
-        marker = "/api/v2"
+        marker = f"/api/v{self.api_version}"
         if marker in path:
             return path.split(marker, 1)[1] or "/"
         return path
@@ -173,6 +173,11 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         settings = config.Config()
         csrf_enabled = self._explicit_bool(settings.get_csrf_protection_enabled())
         csrf_cookie = self._ensure_csrf_cookie() if csrf_enabled else ""
+        api_auth_enabled = self._explicit_bool(settings.get_api_auth_enabled())
+        service_authenticated = api_auth_enabled and request_has_valid_api_token(
+            self.request,
+            settings.get_api_auth_token(),
+        )
 
         if self._request_api_path() != "/healthcheck/readiness" and not authorize_request(self):
             return False
@@ -180,6 +185,7 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         if (
             self._requires_mutation_protection()
             and csrf_enabled
+            and not service_authenticated
             and self.request.headers.get(CSRF_HEADER_NAME, "") != csrf_cookie
         ):
             return self._finish_auth_error(self.STATUS_ERROR_FORBIDDEN, "Invalid CSRF token")
@@ -405,7 +411,8 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
         :return:
         """
-        request_api_base = self.request.uri.split("api/v2")[0] + "api/v2"
+        api_marker = f"api/v{self.api_version}"
+        request_api_base = self.request.path.split(api_marker)[0] + api_marker
         # request_api_endpoint = re.sub('^/(compresso/)*api/v\d', '', self.request.uri)
         matched_route_with_unsupported_method = False
         for route in self.routes:

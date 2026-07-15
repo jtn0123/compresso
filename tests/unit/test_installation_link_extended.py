@@ -25,6 +25,14 @@ from compresso.libs.installation_link import Links, RequestHandler
 from compresso.libs.singleton import SingletonType
 
 
+def _test_secret(label):
+    return f"test-{label}"
+
+
+TEST_BASIC_PASSWORD = _test_secret("basic-password")
+TEST_WORKER_API_TOKEN = _test_secret("worker-api-token")
+
+
 @pytest.fixture(autouse=True)
 def reset_singletons():
     SingletonType._instances = {}
@@ -67,6 +75,9 @@ class TestRequestHandlerInit:
     def test_none_password_defaults_to_empty(self):
         handler = RequestHandler(auth="basic", username="u", password=None)
         assert handler.password == ""
+
+    def test_api_token_defaults_to_empty(self):
+        assert RequestHandler().api_token == ""
 
 
 @pytest.mark.unittest
@@ -120,6 +131,24 @@ class TestRequestHandlerMethods:
         mock_delete.assert_called_once()
         args, kwargs = mock_delete.call_args
         assert isinstance(kwargs["auth"], HTTPBasicAuth)
+
+    @patch("compresso.libs.installation_link.requests.get")
+    def test_worker_api_token_is_added_without_overwriting_other_headers(self, mock_get):
+        handler = RequestHandler(
+            auth="basic",
+            username="worker",
+            password=TEST_BASIC_PASSWORD,
+            api_token=TEST_WORKER_API_TOKEN,
+        )
+
+        handler.get("http://worker.example/status", headers={"Accept": "application/json"})
+
+        headers = mock_get.call_args.kwargs["headers"]
+        assert headers == {
+            "Accept": "application/json",
+            "X-Compresso-Api-Token": TEST_WORKER_API_TOKEN,
+        }
+        assert isinstance(mock_get.call_args.kwargs["auth"], HTTPBasicAuth)
 
 
 # ==================================================================

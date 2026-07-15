@@ -8,9 +8,65 @@ import tornado.web
 
 from compresso import config
 from compresso.libs.installation_link import Links
-from compresso.webserver.request_auth import authorize_request
+from compresso.webserver.request_auth import API_AUTH_HEADER_NAME, authorize_request
+from compresso.webserver.security_headers import SecurityHeadersMixin
 
 _HTTP_SCHEME = "http://"
+
+PROXY_REQUEST_HEADER_ALLOWLIST = (
+    "Accept",
+    "Accept-Encoding",
+    "Accept-Language",
+    "Content-Type",
+    "Content-Encoding",
+    "Cache-Control",
+    "If-Match",
+    "If-None-Match",
+    "If-Modified-Since",
+    "If-Unmodified-Since",
+    "If-Range",
+    "Range",
+    "X-Transfer-Offset",
+    "X-Chunk-Checksum",
+)
+PROXY_RESPONSE_HEADER_ALLOWLIST = (
+    "Content-Type",
+    "Content-Disposition",
+    "Content-Encoding",
+    "Cache-Control",
+    "ETag",
+    "Last-Modified",
+    "Accept-Ranges",
+    "Content-Range",
+    "Expires",
+    "Retry-After",
+    "X-Transfer-Offset",
+    "X-Chunk-Checksum",
+)
+TARGET_CREDENTIAL_HEADERS = ("Authorization", API_AUTH_HEADER_NAME)
+BLOCKED_REDIRECT_STATUSES = frozenset((301, 302, 303, 307, 308))
+
+
+def _allowed_headers(headers, allowlist):
+    return {name: value for name in allowlist if (value := headers.get(name)) is not None}
+
+
+def build_proxy_request_headers(inbound_headers, target_credentials):
+    """Copy only protocol metadata, then apply credentials for the selected worker."""
+    headers = _allowed_headers(inbound_headers, PROXY_REQUEST_HEADER_ALLOWLIST)
+    headers.update(_allowed_headers(target_credentials, TARGET_CREDENTIAL_HEADERS))
+    return headers
+
+
+def build_proxy_response_headers(upstream_headers):
+    """Return only response metadata safe to expose through the master."""
+    return _allowed_headers(upstream_headers, PROXY_RESPONSE_HEADER_ALLOWLIST)
+
+
+def is_blocked_proxy_redirect(status_code):
+    """Return whether an upstream response would redirect the proxy client."""
+    return status_code in BLOCKED_REDIRECT_STATUSES
+
 
 _BLOCKED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),  # Loopback
@@ -110,15 +166,22 @@ def resolve_proxy_target(target_id):
         auth_bytes = auth_str.encode("ascii")
         base64_bytes = base64.b64encode(auth_bytes)
         auth_headers["Authorization"] = f"Basic {base64_bytes.decode('ascii')}"
+    api_token = str(target_config.get("api_token") or "")
+    if api_token:
+        auth_headers[API_AUTH_HEADER_NAME] = api_token
 
     return {"url_base": url_base, "headers": auth_headers, "config": target_config}
 
 
-class ProxyHandler(tornado.web.RequestHandler):
+class ProxyHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
     SUPPORTED_METHODS = ("GET", "HEAD", "POST", "DELETE", "PATCH", "PUT", "OPTIONS")
 
+    def set_default_headers(self):
+        self.set_security_headers()
+
     async def prepare(self):
-        authorize_request(self)
+        if not authorize_request(self):
+            return
 
     async def _handle_request(self, method):
         target_id = self.request.headers.get("X-Compresso-Target-Installation")
@@ -137,13 +200,7 @@ class ProxyHandler(tornado.web.RequestHandler):
         url = f"{target_info['url_base']}{path}"
 
         # Prepare headers
-        headers = self.request.headers.copy()
-        for h in ["Host", "Content-Length", "Transfer-Encoding", "Connection", "X-Compresso-Target-Installation"]:
-            if h in headers:
-                del headers[h]
-
-        # Add Auth
-        headers.update(target_info["headers"])
+        headers = build_proxy_request_headers(self.request.headers, target_info["headers"])
 
         # Override Host to target? optional, but some servers require it matching
         # headers['Host'] = ...
@@ -156,10 +213,14 @@ class ProxyHandler(tornado.web.RequestHandler):
                 url, method=method, headers=headers, body=body, follow_redirects=False, raise_error=False
             )
 
+            if is_blocked_proxy_redirect(response.code):
+                self.set_status(502)
+                self.write({"error": "Worker redirect blocked"})
+                return
+
             self.set_status(response.code)
-            for k, v in response.headers.get_all():
-                if k.lower() not in ["content-length", "transfer-encoding", "connection", "server"]:
-                    self.set_header(k, v)
+            for key, value in build_proxy_response_headers(response.headers).items():
+                self.set_header(key, value)
 
             if response.body:
                 self.write(response.body)

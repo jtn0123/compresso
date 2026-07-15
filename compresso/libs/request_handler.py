@@ -32,6 +32,8 @@ Copyright:
 import requests
 from requests.auth import HTTPBasicAuth
 
+from compresso.webserver.request_auth import API_AUTH_HEADER_NAME
+
 DEFAULT_TIMEOUT = 30
 
 
@@ -47,6 +49,7 @@ class RequestHandler:
         self.password = ""
         if kwargs.get("password"):
             self.password = kwargs.get("password")
+        self.api_token = str(kwargs.get("api_token") or "")
 
     def __get_request_auth(self):
         request_auth = None
@@ -54,22 +57,30 @@ class RequestHandler:
             request_auth = HTTPBasicAuth(self.username, self.password)
         return request_auth
 
-    def get(self, url, **kwargs):
+    def __prepare_kwargs(self, kwargs):
         kwargs.setdefault("timeout", self.timeout)
+        if self.api_token:
+            headers = dict(kwargs.get("headers") or {})
+            headers[API_AUTH_HEADER_NAME] = self.api_token
+            kwargs["headers"] = headers
+        return kwargs
+
+    def get(self, url, **kwargs):
+        kwargs = self.__prepare_kwargs(kwargs)
         return requests.get(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def post(self, url, **kwargs):
-        kwargs.setdefault("timeout", self.timeout)
+        kwargs = self.__prepare_kwargs(kwargs)
         return requests.post(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def put(self, url, **kwargs):
-        kwargs.setdefault("timeout", self.timeout)
+        kwargs = self.__prepare_kwargs(kwargs)
         return requests.put(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def patch(self, url, **kwargs):
-        kwargs.setdefault("timeout", self.timeout)
+        kwargs = self.__prepare_kwargs(kwargs)
         return requests.patch(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above
 
     def delete(self, url, **kwargs):
-        kwargs.setdefault("timeout", self.timeout)
+        kwargs = self.__prepare_kwargs(kwargs)
         return requests.delete(url, auth=self.__get_request_auth(), **kwargs)  # noqa: S113 — timeout set via kwargs.setdefault above

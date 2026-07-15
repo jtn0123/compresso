@@ -80,7 +80,7 @@ class ApiPluginsHandler(BaseApiHandler):
 
     def set_default_headers(self):
         """Set the default response header to be JSON."""
-        self.set_header("Content-Type", 'application/json; charset="utf-8"')
+        super().set_default_headers()
 
     def get(self, path):
         self.action_route()

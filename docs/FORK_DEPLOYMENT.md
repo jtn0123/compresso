@@ -48,6 +48,12 @@ Compresso is designed for trusted localhost, trusted LAN, or VPN access. The bui
 
 Do not expose Compresso directly to the public internet. If remote access is required, put it behind a reverse proxy that provides TLS, authentication, and network allowlisting. Keep replacement-style workflows disabled until proxy access, mounts, backups, and plugin behavior have been validated.
 
+For linked installations, use a different API token on every node and store the
+destination node's token in that link's **Worker API token** field. The token is
+local-only and masked after save. Do not put `api_auth_token`,
+`remote_installations`, or `notification_channels` into `/settings/write`;
+protected settings are managed through their dedicated interfaces.
+
 ## Verify Readiness
 
 - Run `compresso doctor --role master --strict` on the authoritative scanner or

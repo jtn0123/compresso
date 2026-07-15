@@ -163,6 +163,15 @@ class Links(metaclass=SingletonType):
         address = address.rstrip("/")
         return address
 
+    @staticmethod
+    def _request_handler(remote_config):
+        return RequestHandler(
+            auth=remote_config.get("auth"),
+            username=remote_config.get("username"),
+            password=remote_config.get("password"),
+            api_token=remote_config.get("api_token"),
+        )
+
     def __merge_config_dicts(self, config_dict, compare_dict):
         for key in config_dict:
             if config_dict.get(key) != compare_dict.get(key) and compare_dict.get(key) is not None:
@@ -177,6 +186,7 @@ class Links(metaclass=SingletonType):
             "auth": config_dict.get("auth", "None"),
             "username": config_dict.get("username", ""),
             "password": config_dict.get("password", ""),
+            "api_token": config_dict.get("api_token", ""),
             "enable_receiving_tasks": config_dict.get("enable_receiving_tasks", False),
             "enable_sending_tasks": config_dict.get("enable_sending_tasks", False),
             "enable_task_preloading": config_dict.get("enable_task_preloading", True),
@@ -257,11 +267,7 @@ class Links(metaclass=SingletonType):
         :param timeout:
         :return:
         """
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         url = f"{address}{endpoint}"
         res = request_handler.get(url, timeout=timeout)
@@ -288,11 +294,7 @@ class Links(metaclass=SingletonType):
         :param timeout:
         :return:
         """
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         url = f"{address}{endpoint}"
         res = request_handler.post(url, json=data, timeout=timeout)
@@ -320,11 +322,7 @@ class Links(metaclass=SingletonType):
         :param path:
         :return:
         """
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         url = f"{address}{endpoint}"
         # NOTE: If you remove a content type from the upload (text/plain) the file upload fails
@@ -352,11 +350,7 @@ class Links(metaclass=SingletonType):
         return {}
 
     def remote_api_post_bytes(self, remote_config: dict, endpoint: str, data: bytes, headers: dict):
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         response = request_handler.post(f"{address}{endpoint}", data=data, headers=headers, timeout=60)
         if response.status_code == 200:
@@ -373,11 +367,7 @@ class Links(metaclass=SingletonType):
         :param timeout:
         :return:
         """
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         url = f"{address}{endpoint}"
         res = request_handler.delete(url, json=data, timeout=timeout)
@@ -403,11 +393,7 @@ class Links(metaclass=SingletonType):
         :param path:
         :return:
         """
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         url = f"{address}{endpoint}"
         with request_handler.get(url, stream=True) as r:
@@ -448,6 +434,7 @@ class Links(metaclass=SingletonType):
             auth=kwargs.get("auth"),
             username=kwargs.get("username"),
             password=kwargs.get("password"),
+            api_token=kwargs.get("api_token"),
         )
 
         # Fetch config
@@ -565,6 +552,7 @@ class Links(metaclass=SingletonType):
                     auth=local_config.get("auth"),
                     username=local_config.get("username"),
                     password=local_config.get("password"),
+                    api_token=local_config.get("api_token"),
                 )
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, OSError) as e:
                 self._record_link_failure(link_uuid)
@@ -805,11 +793,7 @@ class Links(metaclass=SingletonType):
         :param remote_config:
         :return:
         """
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         url = f"{address}/compresso/api/v2/settings/link/read"
         data = {"uuid": self.session.uuid}
@@ -833,11 +817,7 @@ class Links(metaclass=SingletonType):
         :param configuration:
         :return:
         """
-        request_handler = RequestHandler(
-            auth=configuration.get("auth"),
-            username=configuration.get("username"),
-            password=configuration.get("password"),
-        )
+        request_handler = self._request_handler(configuration)
         address = self.__format_address(configuration.get("address"))
         url = f"{address}/compresso/api/v2/settings/link/write"
 
@@ -866,6 +846,9 @@ class Links(metaclass=SingletonType):
         # Remove some of the other fields. These will need to be adjusted on the remote instance manually
         del updated_config["address"]
         del updated_config["available"]
+        # This token authenticates requests *to* the peer. It is local-only
+        # credential state and must never be synchronized back to that peer.
+        updated_config.pop("api_token", None)
 
         data = {"link_config": updated_config, "distributed_worker_count_target": distributed_worker_count_target}
         res = request_handler.post(url, json=data, timeout=2)
@@ -960,6 +943,7 @@ class Links(metaclass=SingletonType):
                         "auth": local_config.get("auth"),
                         "username": local_config.get("username"),
                         "password": local_config.get("password"),
+                        "api_token": local_config.get("api_token"),
                         "enable_task_preloading": local_config.get("enable_task_preloading"),
                         "preloading_count": local_config.get("preloading_count"),
                         "library_names": library_names,
@@ -1007,11 +991,7 @@ class Links(metaclass=SingletonType):
         :return:
         """
         try:
-            request_handler = RequestHandler(
-                auth=remote_config.get("auth"),
-                username=remote_config.get("username"),
-                password=remote_config.get("password"),
-            )
+            request_handler = self._request_handler(remote_config)
             address = self.__format_address(remote_config.get("address"))
             url = f"{address}/compresso/api/v2/pending/create"
             data = {
@@ -1201,11 +1181,7 @@ class Links(metaclass=SingletonType):
             os.remove(partial_path)  # NOSONAR - partial_path is constrained to cache_root above
             offset = 0
 
-        request_handler = RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-        )
+        request_handler = self._request_handler(remote_config)
         address = self.__format_address(remote_config.get("address"))
         with open(partial_path, "ab") as output:  # NOSONAR - partial_path is constrained to cache_root above
             while offset < total_size:

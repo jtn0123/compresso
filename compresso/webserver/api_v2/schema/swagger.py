@@ -48,6 +48,11 @@ API_VERSION = "2"
 OPENAPI_SPEC_SECURITY = {
     "components": {
         "securitySchemes": {
+            "ApiToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Compresso-Api-Token",
+            },
             "BasicAuth": {
                 "type": "http",
                 "scheme": "basic",
@@ -55,6 +60,7 @@ OPENAPI_SPEC_SECURITY = {
         },
     },
     "security": [
+        {"ApiToken": []},
         {"BasicAuth": []},
     ],
 }

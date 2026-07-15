@@ -1,7 +1,9 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 import tornado.httpclient
+import tornado.httputil
 import tornado.testing
 import tornado.web
 import tornado.websocket
@@ -60,6 +62,57 @@ class TestDynamicRouteAuth(tornado.testing.AsyncHTTPTestCase):
 
         assert response.code == 400
         resolve.assert_called_once_with(None)
+
+    def test_proxy_replaces_master_credentials_with_unique_worker_credentials(self):
+        captured = {}
+
+        class _WorkerClient:
+            async def fetch(self, url, **kwargs):
+                captured["url"] = url
+                captured["headers"] = dict(kwargs["headers"])
+                return SimpleNamespace(
+                    code=200,
+                    body=b'{"worker": "ok"}',
+                    headers=tornado.httputil.HTTPHeaders(
+                        {
+                            "Content-Type": "application/json",
+                            "Set-Cookie": "worker-cookie=blocked",
+                        }
+                    ),
+                )
+
+        target = {
+            "url_base": "http://worker.local:8888",
+            "headers": {
+                "Authorization": "Basic d29ya2VyOmJhc2lj",
+                "X-Compresso-Api-Token": "worker-unique-token",
+            },
+            "config": {"uuid": "worker-one"},
+        }
+        with (
+            patch("compresso.webserver.proxy.resolve_proxy_target", return_value=target),
+            patch("compresso.webserver.proxy.tornado.httpclient.AsyncHTTPClient", return_value=_WorkerClient()),
+        ):
+            response = self.fetch(
+                "/proxy/compresso/api/v2/version/read",
+                headers={
+                    "X-Compresso-Target-Installation": "worker-one",
+                    "X-Compresso-Api-Token": "secret",
+                    "Authorization": "Bearer secret",
+                    "Cookie": "master-cookie=blocked",
+                    "X-Compresso-CSRF-Token": "master-csrf",
+                    "Accept": "application/json",
+                },
+            )
+
+        assert response.code == 200
+        assert captured["headers"]["X-Compresso-Api-Token"] == "worker-unique-token"
+        assert captured["headers"]["Authorization"] == "Basic d29ya2VyOmJhc2lj"
+        assert captured["headers"]["Accept"] == "application/json"
+        assert "secret" not in repr(captured["headers"])
+        assert "Cookie" not in captured["headers"]
+        assert "X-Compresso-CSRF-Token" not in captured["headers"]
+        assert response.headers.get("Set-Cookie") is None
 
     def test_plugin_api_rejects_missing_token_before_loading_plugin(self):
         with patch("compresso.webserver.plugins.get_plugin_by_path") as get_plugin:

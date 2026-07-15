@@ -29,29 +29,37 @@ Copyright:
 
 """
 
-import re
-
 import tornado.log
 import tornado.routing
-import tornado.web
-from tornado.web import RequestHandler
 
-from compresso.webserver.security_headers import SecurityHeadersMixin
+from compresso.webserver.api_v2.base_api_handler import BaseApiHandler as V2BaseApiHandler
 
 
-class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
+class BaseApiHandler(V2BaseApiHandler):
+    """Deprecated v1 router with the same cross-cutting guards as API v2."""
+
+    api_version = 1
     routes: list = []
+    MUTATING_GET_PATHS = frozenset({"/pending/rescan", "/plugins/repos/fetch"})
 
     def set_default_headers(self):
-        self.set_header("Content-Type", 'application/json; charset="utf-8"')
-        self.set_security_headers()
+        super().set_default_headers()
+        self.set_header("Deprecation", "true")
+        self.set_header("Warning", '299 Compresso "API v1 is deprecated and will be removed in the next major release"')
+
+    def _requires_mutation_protection(self):
+        if self.request.method == "GET" and self._request_api_path() in self.MUTATING_GET_PATHS:
+            return True
+        return super()._requires_mutation_protection()
 
     def handle_404(self):
         self.set_status(404)
         self.write("404 Not Found")
 
     def action_route(self):
-        request_api_endpoint = re.sub("^/compresso", "", self.request.uri)
+        request_api_endpoint = self.request.uri.split("?", 1)[0]
+        if request_api_endpoint.startswith("/compresso"):
+            request_api_endpoint = request_api_endpoint[len("/compresso") :]
         for route in self.routes:
             # Check if the rout supports the supported http methods
             supported_methods = route.get("supported_methods")

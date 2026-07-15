@@ -238,6 +238,16 @@
                         :label="$t('components.settings.link.password')"
                       />
                     </template>
+
+                    <q-input
+                      outlined
+                      color="primary"
+                      v-model="newRemoteInstallationApiToken"
+                      type="password"
+                      :label="$t('components.settings.link.apiToken')"
+                      :hint="$t('components.settings.link.apiTokenHint')"
+                      class="q-mt-md"
+                    />
                   </div>
                 </CompressoDialogPopup>
               </div>
@@ -345,6 +355,7 @@ export default {
       newRemoteInstallationAuthenticationOptions: ref(['None', 'Basic']),
       newRemoteInstallationUsername: ref(null),
       newRemoteInstallationPassword: ref(null),
+      newRemoteInstallationApiToken: ref(null),
       activeRemoteInstallationUuid: ref(''),
     }
   },
@@ -478,6 +489,7 @@ export default {
         auth: this.newRemoteInstallationAuthenticationType,
         username: this.newRemoteInstallationUsername,
         password: this.newRemoteInstallationPassword,
+        api_token: this.newRemoteInstallationApiToken,
       }
       axios({
         method: 'post',
@@ -505,6 +517,7 @@ export default {
               auth: this.newRemoteInstallationAuthenticationType,
               username: this.newRemoteInstallationUsername,
               password: this.newRemoteInstallationPassword,
+              api_token: this.newRemoteInstallationApiToken,
               enable_receiving_tasks: false,
               enable_sending_tasks: false,
               name: name,
@@ -523,6 +536,7 @@ export default {
                 auth: this.newRemoteInstallationAuthenticationType,
                 username: this.newRemoteInstallationUsername,
                 password: this.newRemoteInstallationPassword,
+                api_token: this.newRemoteInstallationApiToken,
                 enable_receiving_tasks: false,
                 enable_sending_tasks: false,
               },

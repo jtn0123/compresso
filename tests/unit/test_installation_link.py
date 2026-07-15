@@ -71,6 +71,7 @@ class TestLinks:
             "auth",
             "username",
             "password",
+            "api_token",
             "enable_receiving_tasks",
             "enable_sending_tasks",
             "enable_task_preloading",
@@ -89,7 +90,7 @@ class TestLinks:
         ]
         for key in expected_keys:
             assert key in result, f"Missing key: {key}"
-        assert len(result) == 19
+        assert len(result) == 20
 
     @pytest.mark.unittest
     def test_network_transfer_lock_acquire_release(self):
