@@ -11,19 +11,19 @@ This audit is the tracking document for the ordered 20 TB master-plus-M4 hardeni
 |---|---|---|---|
 | 1 | Secure the master/worker boundary | 1-5 | Merged as PR #200 (`9d1507fb`) after all required checks passed |
 | 2 | Bound and clean file transfers | 6-9 | Merged as PR #201 (`e2cc35ba`) after all required checks passed |
-| 3 | Make configuration and JSON state crash-safe | 13-14 | Implemented on `codex/20tb-atomic-json`; merge validation pending |
-| 4 | Stream large health scans safely | 15-17 | Not started |
+| 3 | Make configuration and JSON state crash-safe | 13-14 | Merged as PR #202 (`3f2d7058`) after all required checks passed |
+| 4 | Stream large health scans safely | 15-17 | Implemented on `codex/20tb-streaming-health`; merge validation pending |
 | 5 | Make plugin installation transactional | 10-12 | Not started |
 | 6 | Simplify critical backend workflows | 18 | Not started |
 | 7 | Test and simplify the task dialogs | 19-20 | Not started |
 
-PR 1 secured and deprecated v1, made service-token requests CSRF-independent while preserving browser CSRF enforcement, sanitized general settings, rejected protected settings writes, added a local-only masked token per remote, and allow-listed proxy request/response metadata. PR 2 retires legacy media upload, bounds and reserves resumable-transfer capacity, latches disk exhaustion, adds intentional abandonment, and separates the 64 MiB plugin upload path.
+PR 1 secured and deprecated v1, made service-token requests CSRF-independent while preserving browser CSRF enforcement, sanitized general settings, rejected protected settings writes, added a local-only masked token per remote, and allow-listed proxy request/response metadata. PR 2 retires legacy media upload, bounds and reserves resumable-transfer capacity, latches disk exhaustion, adds intentional abandonment, and separates the 64 MiB plugin upload path. PR 3 routes persistent JSON state through a shared fsynced atomic writer, rejects invalid settings shapes conservatively, and protects remote task metadata with owner-only permissions. PR 4 streams deterministic discovery through the configured bounded queue, reports traversal failure and explicit phases, checks cancellation throughout the pipeline, and scales workers in both directions.
 
 ## Executive verdict
 
 PR #199 merged cleanly and the merged application still passes its automated baseline. The previous two fuzz audits fixed 40 real defects, and none of those items are repeated here.
 
-There is meaningful hardening work left. PRs #200 and #201 closed the validated network-boundary and transfer findings. The remaining crash-safety merge gate, health-scan, plugin, complexity, and frontend work is tracked above.
+There is meaningful hardening work left. PRs #200 through #202 closed the validated network-boundary, transfer, and crash-safety findings. The remaining health-scan merge gate, plugin, complexity, and frontend work is tracked above.
 
 Current safe boundary:
 
@@ -101,6 +101,7 @@ Replace the health check's private `os.walk`/list/queue pipeline with the bounde
 - `npm audit --audit-level=high`: 0 vulnerabilities.
 - Deterministic probes reproduced findings 1-6, 9, 11, 13, and 14.
 - Structural measurements covered complexity, frontend coverage, component similarity, and a 100,000/500,000-path health inventory fixture.
+- PR 4 branch validation passed the complete synthetic fault laboratory (all 10 scenarios), a 500,000-entry threshold gate at 147,075 entries/second with 3.94 MiB peak RSS growth, and `verify-local.sh fast` with 3,892 Python tests plus 444 frontend tests.
 
 ## Candidates checked and rejected
 

@@ -81,6 +81,25 @@ class HealthCheckLibraryScanResponseSchema(BaseSuccessSchema):
     message = fields.Str()
 
 
+class HealthCheckProgressSchema(BaseSchema):
+    """Backward-compatible progress with explicit discovery and terminal state."""
+
+    phase = fields.Str(metadata={"description": "idle, discovering, checking, cancelling, complete, cancelled, or failed"})
+    total = fields.Int()
+    discovered = fields.Int()
+    discovery_complete = fields.Boolean()
+    checked = fields.Int()
+    cancelled = fields.Boolean()
+    error = fields.Str(allow_none=True)
+    library_id = fields.Int(allow_none=True)
+    worker_count = fields.Int()
+    max_workers = fields.Int()
+    workers = fields.Dict(keys=fields.Str(), values=fields.Raw())
+    start_time = fields.Float(allow_none=True)
+    files_per_second = fields.Float()
+    eta_seconds = fields.Int()
+
+
 class HealthCheckSummaryResponseSchema(BaseSuccessSchema):
     """Schema for health summary response"""
 
@@ -91,7 +110,7 @@ class HealthCheckSummaryResponseSchema(BaseSuccessSchema):
     checking = fields.Int()
     total = fields.Int()
     scanning = fields.Boolean()
-    scan_progress = fields.Raw()
+    scan_progress = fields.Nested(HealthCheckProgressSchema)
 
 
 class HealthCheckStatusResponseSchema(BaseSuccessSchema):
@@ -117,7 +136,7 @@ class HealthCheckWorkersResponseSchema(BaseSuccessSchema):
 
     worker_count = fields.Int()
     scanning = fields.Boolean()
-    scan_progress = fields.Raw()
+    scan_progress = fields.Nested(HealthCheckProgressSchema)
 
 
 class HealthCheckReadinessErrorSchema(BaseSchema):

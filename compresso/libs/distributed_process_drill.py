@@ -74,9 +74,17 @@ class _CompressoProcess:
                 **os.environ,
                 "HOME_DIR": str(self.home),
                 "PYTHONPATH": str(self.repository_root),
+                "config_path": str(self.home / "config"),
                 "cache_path": str(self.home / "cache"),
+                "log_path": str(self.home / "logs"),
+                "plugins_path": str(self.home / "plugins"),
                 "staging_path": str(self.home / "staging"),
                 "library_path": str(self.home / "library"),
+                "userdata_path": str(self.home / "userdata"),
+                # The drill's isolated 1-3 MiB fixture must not inherit the
+                # host's production reserve. Real deployments keep the 5 GiB
+                # default; this process can only write below its temporary home.
+                "minimum_free_space_gb": "0",
             }
             self.process = subprocess.Popen(  # noqa: S603 - fixed interpreter/module invocation
                 [sys.executable, "-m", "compresso", "--address", "127.0.0.1", "--port", str(self.port)],

@@ -6,6 +6,7 @@ import json
 import os
 import sqlite3
 import stat
+import threading
 from contextlib import closing
 from types import SimpleNamespace
 
@@ -86,6 +87,21 @@ def test_library_analysis_iterator_surfaces_walk_errors(tmp_path, monkeypatch):
 
     with pytest.raises(PermissionError, match="denied"):
         list(library_analysis.iter_media_files(tmp_path))
+
+
+def test_library_analysis_iterator_stops_during_directory_traversal(tmp_path, monkeypatch):
+    cancel_event = threading.Event()
+
+    def cancelling_walk(_root, *, onerror):
+        yield str(tmp_path), [], ["first.mkv"]
+        cancel_event.set()
+        yield str(tmp_path / "later"), [], ["second.mkv"]
+
+    monkeypatch.setattr(library_analysis.os, "walk", cancelling_walk)
+
+    files = list(library_analysis.iter_media_files(tmp_path, cancel_event=cancel_event))
+
+    assert [path.name for path in files] == ["first.mkv"]
 
 
 def test_sampled_plan_inventory_is_exact_and_probe_selection_is_deterministic(tmp_path, monkeypatch):

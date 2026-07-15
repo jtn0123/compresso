@@ -42,30 +42,54 @@ _MEDIA_EXTENSIONS = {
     ".mpg",
     ".mpeg",
     ".m2ts",
+    ".mts",
+    ".mxf",
+    ".rmvb",
     ".vob",
     ".ogv",
     ".3gp",
 }
 
 
-def iter_media_files(library_path, *, on_error=None):
+def _raise_walk_error(error):
+    raise error
+
+
+def _cancelled(cancel_event):
+    return cancel_event is not None and cancel_event.is_set()
+
+
+def _validate_media_directories(root, directories, cancel_event):
+    for directory in directories:
+        if _cancelled(cancel_event):
+            return False
+        candidate = Path(root) / directory
+        if candidate.is_symlink():
+            raise ValueError(f"library analysis refuses symbolic-link directory: {candidate}")
+    return True
+
+
+def _iter_directory_media(root, files, cancel_event):
+    for filename in sorted(files):
+        if _cancelled(cancel_event):
+            return
+        if os.path.splitext(filename)[1].lower() not in _MEDIA_EXTENSIONS:
+            continue
+        candidate = Path(root) / filename
+        if candidate.is_symlink():
+            raise ValueError(f"library analysis refuses symbolic-link media: {candidate}")
+        yield candidate
+
+
+def iter_media_files(library_path, *, on_error=None, cancel_event=None):
     """Yield media paths deterministically while bounding each directory batch."""
-
-    def raise_walk_error(error):
-        raise error
-
-    for root, directories, files in os.walk(library_path, onerror=on_error or raise_walk_error):
-        for directory in directories:
-            candidate = Path(root) / directory
-            if candidate.is_symlink():
-                raise ValueError(f"library analysis refuses symbolic-link directory: {candidate}")
+    for root, directories, files in os.walk(library_path, onerror=on_error or _raise_walk_error):
+        if _cancelled(cancel_event):
+            return
+        if not _validate_media_directories(root, directories, cancel_event):
+            return
         directories.sort()
-        for filename in sorted(files):
-            if os.path.splitext(filename)[1].lower() in _MEDIA_EXTENSIONS:
-                candidate = Path(root) / filename
-                if candidate.is_symlink():
-                    raise ValueError(f"library analysis refuses symbolic-link media: {candidate}")
-                yield candidate
+        yield from _iter_directory_media(root, files, cancel_event)
 
 
 def probe_analysis_file(filepath):

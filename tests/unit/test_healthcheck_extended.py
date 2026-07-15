@@ -12,6 +12,8 @@ import os
 import queue
 import threading
 import time
+import tracemalloc
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,8 +28,13 @@ def reset_healthcheck_class_state():
         HealthCheckManager._scanning = False
         HealthCheckManager._cancel_event.clear()
         HealthCheckManager._scan_progress = {
+            "phase": "idle",
             "total": 0,
+            "discovered": 0,
+            "discovery_complete": False,
             "checked": 0,
+            "cancelled": False,
+            "error": None,
             "library_id": None,
             "worker_count": 0,
             "max_workers": 1,
@@ -37,6 +44,7 @@ def reset_healthcheck_class_state():
             "eta_seconds": 0,
         }
         HealthCheckManager._worker_count_requested = 1
+        HealthCheckManager._retire_worker_ids.clear()
     with HealthCheckManager._file_locks_lock:
         HealthCheckManager._file_locks.clear()
     yield
@@ -44,6 +52,7 @@ def reset_healthcheck_class_state():
         HealthCheckManager._scanning = False
         HealthCheckManager._cancel_event.clear()
         HealthCheckManager._worker_count_requested = 1
+        HealthCheckManager._retire_worker_ids.clear()
 
 
 # ------------------------------------------------------------------
@@ -126,8 +135,13 @@ class TestScanningState:
     def test_get_scan_progress_has_expected_keys(self):
         progress = HealthCheckManager.get_scan_progress()
         expected_keys = {
+            "phase",
             "total",
+            "discovered",
+            "discovery_complete",
             "checked",
+            "cancelled",
+            "error",
             "library_id",
             "worker_count",
             "max_workers",
@@ -224,6 +238,26 @@ class TestScanWorker:
         assert HealthCheckManager._scan_progress["files_per_second"] > 0
 
     @patch("compresso.libs.logs.CompressoLogging.get_logger")
+    def test_scan_worker_does_not_estimate_eta_until_discovery_finishes(self, mock_get_logger):
+        mock_get_logger.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        file_queue = queue.Queue()
+        file_queue.put("/test/file1.mkv")
+        HealthCheckManager._scan_progress.update(
+            {
+                "start_time": time.time() - 1,
+                "total": 100,
+                "discovered": 100,
+                "discovery_complete": False,
+            }
+        )
+
+        with patch.object(mgr, "check_file"):
+            mgr._scan_worker(0, file_queue, library_id=1, mode="quick")
+
+        assert HealthCheckManager._scan_progress["eta_seconds"] == 0
+
+    @patch("compresso.libs.logs.CompressoLogging.get_logger")
     def test_scan_worker_registers_and_clears_worker_status(self, mock_get_logger):
         mock_get_logger.return_value = MagicMock()
         mgr = HealthCheckManager()
@@ -236,8 +270,15 @@ class TestScanWorker:
 
         mgr._scan_worker(5, file_queue, library_id=1, mode="quick")
 
-        # Worker should have set its final status to idle
-        assert HealthCheckManager._scan_progress["workers"][5]["status"] == "idle"
+        assert 5 not in HealthCheckManager._scan_progress["workers"]
+
+    @pytest.mark.parametrize("phase", ["complete", "cancelled", "failed"])
+    def test_finish_scan_clears_eta_for_every_terminal_phase(self, phase):
+        HealthCheckManager._scan_progress["eta_seconds"] = 42
+
+        HealthCheckManager._finish_scan(phase, "boom" if phase == "failed" else None)
+
+        assert HealthCheckManager._scan_progress["eta_seconds"] == 0
 
 
 # ------------------------------------------------------------------
@@ -281,6 +322,207 @@ class TestRunLibraryScan:
         assert HealthCheckManager._scanning is False
         progress = HealthCheckManager.get_scan_progress()
         assert progress["total"] == 0
+        assert progress["phase"] == "complete"
+        assert progress["discovery_complete"] is True
+
+    @patch("compresso.libs.logs.CompressoLogging.get_logger")
+    def test_run_library_scan_surfaces_unreadable_directory_as_failure(self, mock_get_logger):
+        mock_get_logger.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        mock_library = MagicMock(path="/unreadable/library")
+
+        def unreadable_walk(_root, *, onerror=None):
+            if onerror:
+                onerror(PermissionError("denied"))
+            return iter(())
+
+        with (
+            patch("compresso.libs.unmodels.Libraries") as mock_lib_cls,
+            patch("compresso.webserver.helpers.library_analysis.os.walk", side_effect=unreadable_walk),
+        ):
+            mock_lib_cls.get_by_id.return_value = mock_library
+            HealthCheckManager._scanning = True
+            mgr._run_library_scan(1, "quick")
+
+        progress = HealthCheckManager.get_scan_progress()
+        assert progress["phase"] == "failed"
+        assert "denied" in progress["error"]
+        assert progress["discovery_complete"] is False
+
+    @patch("compresso.libs.logs.CompressoLogging.get_logger")
+    def test_run_library_scan_cancels_during_directory_discovery(self, mock_get_logger):
+        mock_get_logger.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        mock_library = MagicMock(path="/media/library")
+
+        def cancelling_walk(_root, *, onerror=None):
+            yield "/media/library", [], ["first.mkv"]
+            HealthCheckManager._cancel_event.set()
+            yield "/media/library/later", [], [f"later-{index}.mkv" for index in range(20)]
+
+        with (
+            patch("compresso.libs.unmodels.Libraries") as mock_lib_cls,
+            patch("compresso.webserver.helpers.library_analysis.os.walk", side_effect=cancelling_walk),
+            patch.object(mgr, "check_file"),
+        ):
+            mock_lib_cls.get_by_id.return_value = mock_library
+            HealthCheckManager._scanning = True
+            mgr._run_library_scan(1, "quick")
+
+        progress = HealthCheckManager.get_scan_progress()
+        assert progress["phase"] == "cancelled"
+        assert progress["cancelled"] is True
+        assert progress["discovered"] < 21
+        assert progress["discovery_complete"] is False
+
+    @patch("compresso.libs.logs.CompressoLogging.get_logger")
+    def test_run_library_scan_bounds_queue_for_500000_synthetic_paths(self, mock_get_logger, monkeypatch):
+        mock_get_logger.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        mock_library = MagicMock(path="/synthetic/library")
+        queues = []
+        real_queue = queue.Queue
+
+        class RecordingQueue(real_queue):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.maximum_observed = 0
+                queues.append(self)
+
+            def put(self, item, block=True, timeout=None):
+                super().put(item, block=block, timeout=timeout)
+                self.maximum_observed = max(self.maximum_observed, self.qsize())
+
+        monkeypatch.setattr("compresso.libs.healthcheck.queue.Queue", RecordingQueue)
+        monkeypatch.setattr(
+            "compresso.libs.healthcheck.iter_media_files",
+            lambda _path, *, cancel_event: (Path(f"/synthetic/{index}.mkv") for index in range(500_000)),
+        )
+        monkeypatch.setattr(mgr, "check_file", lambda _filepath, **_kwargs: None)
+
+        tracemalloc.start()
+        try:
+            with (
+                patch("compresso.libs.unmodels.Libraries") as mock_lib_cls,
+                patch("compresso.libs.healthcheck.Config") as config_cls,
+            ):
+                mock_lib_cls.get_by_id.return_value = mock_library
+                config_cls.return_value.get_library_scan_queue_limit.return_value = 17
+                HealthCheckManager._scanning = True
+                mgr._run_library_scan(1, "quick")
+        finally:
+            _, peak_bytes = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+        progress = HealthCheckManager.get_scan_progress()
+        assert progress["phase"] == "complete"
+        assert progress["discovered"] == 500_000
+        assert progress["checked"] == 500_000
+        assert queues[0].maxsize == 17
+        assert queues[0].maximum_observed <= 17
+        assert peak_bytes < 32 * 1024**2
+
+    @patch("compresso.libs.logs.CompressoLogging.get_logger")
+    def test_run_library_scan_cancels_while_queue_and_worker_are_blocked(self, mock_get_logger, monkeypatch):
+        mock_get_logger.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        mock_library = MagicMock(path="/synthetic/library")
+        check_started = threading.Event()
+        release_check = threading.Event()
+        check_failures = []
+
+        def media_paths(_path, *, cancel_event):
+            index = 0
+            while not cancel_event.is_set():
+                yield Path(f"/synthetic/{index}.mkv")
+                index += 1
+
+        def blocking_check(_filepath, **_kwargs):
+            check_started.set()
+            if not release_check.wait(timeout=3):
+                check_failures.append("release_check was not set in time")
+
+        monkeypatch.setattr("compresso.libs.healthcheck.iter_media_files", media_paths)
+        with (
+            patch("compresso.libs.unmodels.Libraries") as mock_lib_cls,
+            patch("compresso.libs.healthcheck.Config") as config_cls,
+            patch.object(mgr, "check_file", side_effect=blocking_check),
+        ):
+            mock_lib_cls.get_by_id.return_value = mock_library
+            config_cls.return_value.get_library_scan_queue_limit.return_value = 1
+            HealthCheckManager._scanning = True
+            scan_thread = threading.Thread(target=mgr._run_library_scan, args=(1, "quick"))
+            scan_thread.start()
+            assert check_started.wait(timeout=3)
+            assert HealthCheckManager.cancel_scan() is True
+            assert HealthCheckManager.get_scan_progress()["phase"] == "cancelling"
+            release_check.set()
+            scan_thread.join(timeout=5)
+
+        assert not scan_thread.is_alive()
+        assert not check_failures, check_failures
+        progress = HealthCheckManager.get_scan_progress()
+        assert progress["phase"] == "cancelled"
+        assert progress["cancelled"] is True
+        assert progress["discovery_complete"] is False
+
+    @patch("compresso.libs.logs.CompressoLogging.get_logger")
+    def test_run_library_scan_scales_workers_up_and_down_live(self, mock_get_logger, monkeypatch):
+        mock_get_logger.return_value = MagicMock()
+        mgr = HealthCheckManager()
+        mock_library = MagicMock(path="/synthetic/library")
+        active = 0
+        maximum_active = 0
+        active_lock = threading.Lock()
+
+        def media_paths(_path, *, cancel_event):
+            for index in range(160):
+                if cancel_event.is_set():
+                    return
+                yield Path(f"/synthetic/{index}.mkv")
+
+        def slow_check(_filepath, **_kwargs):
+            nonlocal active, maximum_active
+            with active_lock:
+                active += 1
+                maximum_active = max(maximum_active, active)
+            time.sleep(0.01)
+            with active_lock:
+                active -= 1
+
+        def wait_until(predicate, timeout=5):
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                if predicate():
+                    return True
+                time.sleep(0.01)
+            return False
+
+        monkeypatch.setattr("compresso.libs.healthcheck.iter_media_files", media_paths)
+        with (
+            patch("compresso.libs.unmodels.Libraries") as mock_lib_cls,
+            patch("compresso.libs.healthcheck.Config") as config_cls,
+            patch.object(mgr, "check_file", side_effect=slow_check) as check_file,
+        ):
+            mock_lib_cls.get_by_id.return_value = mock_library
+            config_cls.return_value.get_library_scan_queue_limit.return_value = 32
+            HealthCheckManager._scanning = True
+            scan_thread = threading.Thread(target=mgr._run_library_scan, args=(1, "quick"))
+            scan_thread.start()
+            assert wait_until(lambda: HealthCheckManager.get_scan_progress()["checked"] >= 3)
+            HealthCheckManager.set_worker_count(4)
+            assert wait_until(lambda: maximum_active >= 3)
+            HealthCheckManager.set_worker_count(1)
+            assert wait_until(lambda: HealthCheckManager.get_scan_progress()["worker_count"] <= 1)
+            assert wait_until(lambda: len(HealthCheckManager.get_scan_progress()["workers"]) <= 1)
+            scan_thread.join(timeout=8)
+
+        assert not scan_thread.is_alive()
+        assert maximum_active >= 3
+        assert check_file.call_count == 160
+        progress = HealthCheckManager.get_scan_progress()
+        assert progress["phase"] == "complete"
+        assert progress["workers"] == {}
 
     @patch("compresso.libs.logs.CompressoLogging.get_logger")
     def test_run_library_scan_filters_media_extensions(self, mock_get_logger):
@@ -291,7 +533,22 @@ class TestRunLibraryScan:
         mock_library.path = "/media/library"
 
         walk_result = [
-            ("/media/library", [], ["video.mkv", "audio.mp3", "movie.mp4", "readme.txt", "clip.avi"]),
+            (
+                "/media/library",
+                [],
+                [
+                    "video.mkv",
+                    "audio.mp3",
+                    "movie.mp4",
+                    "readme.txt",
+                    "clip.avi",
+                    "archive.mts",
+                    "professional.mxf",
+                    "legacy.rmvb",
+                    "disc.vob",
+                    "alternate.ogv",
+                ],
+            ),
         ]
 
         checked_files = []
@@ -305,8 +562,8 @@ class TestRunLibraryScan:
             HealthCheckManager._scanning = True
             mgr._run_library_scan(1, "quick")
 
-        # Should only include .mkv, .mp4, .avi (not .mp3, .txt)
-        assert len(checked_files) == 3
+        # Preserve every format accepted by the previous health-specific walker.
+        assert len(checked_files) == 8
         extensions = {os.path.splitext(f)[1] for f in checked_files}
         assert ".txt" not in extensions
         assert ".mp3" not in extensions

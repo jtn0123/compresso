@@ -248,6 +248,34 @@ describe('HealthCheck.vue', () => {
       expect(wrapper.vm.scanning).toBe(false)
     })
 
+    it.each([
+      ['discovering', 'pages.healthCheck.phaseDiscovering', 'info'],
+      ['checking', 'pages.healthCheck.phaseChecking', 'info'],
+      ['cancelling', 'pages.healthCheck.phaseCancelling', 'warning'],
+      ['complete', 'pages.healthCheck.phaseComplete', 'positive'],
+      ['cancelled', 'pages.healthCheck.phaseCancelled', 'warning'],
+      ['failed', 'pages.healthCheck.phaseFailed', 'negative'],
+    ])('distinguishes the %s scan phase', async (phase, label, color) => {
+      const wrapper = await mountHealthCheck()
+      wrapper.vm.scanProgress = { ...wrapper.vm.scanProgress, phase }
+      wrapper.vm.scanning = ['discovering', 'checking', 'cancelling'].includes(phase)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.scanPhaseLabel).toBe(label)
+      expect(wrapper.vm.scanPhaseColor).toBe(color)
+      expect(wrapper.vm.showScanProgress).toBe(true)
+    })
+
+    it('keeps terminal failure details visible after scanning stops', async () => {
+      const wrapper = await mountHealthCheck()
+      wrapper.vm.scanProgress = { ...wrapper.vm.scanProgress, phase: 'failed', error: 'Directory is unreadable' }
+      wrapper.vm.scanning = false
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="scan-progress"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Directory is unreadable')
+    })
+
     it('formatEta returns human-readable time', async () => {
       const wrapper = await mountHealthCheck()
       expect(wrapper.vm.formatEta(null)).toBe('--')
@@ -404,6 +432,7 @@ describe('HealthCheck.vue', () => {
 
       const cancelCalls = axios.post.mock.calls.filter(([url]) => url.includes('healthcheck/cancel-scan'))
       expect(cancelCalls.length).toBe(1)
+      expect(wrapper.vm.scanPhase).toBe('cancelling')
     })
   })
 

@@ -35,6 +35,24 @@ def test_checked_in_schema_contains_bounded_resumable_transfer_contract():
 
 
 @pytest.mark.unittest
+def test_checked_in_schema_documents_health_discovery_and_terminal_state():
+    schema_path = Path(__file__).parents[2] / "compresso" / "webserver" / "docs" / "api_schema_v2.json"
+    schemas = json.loads(schema_path.read_text(encoding="utf-8"))["components"]["schemas"]
+    progress = schemas["HealthCheckProgress"]["properties"]
+
+    assert {
+        "phase",
+        "discovered",
+        "discovery_complete",
+        "cancelled",
+        "error",
+    }.issubset(progress)
+    assert schemas["HealthCheckSummaryResponse"]["properties"]["scan_progress"] == {
+        "$ref": "#/components/schemas/HealthCheckProgress"
+    }
+
+
+@pytest.mark.unittest
 class TestCompressoSpecPlugin:
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_operations_from_urlspec_yields_operations(self):

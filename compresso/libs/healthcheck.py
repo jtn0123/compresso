@@ -16,9 +16,30 @@ import threading
 import time
 from contextlib import contextmanager
 
+from compresso.config import Config
 from compresso.libs.ffprobe_utils import probe_file
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.healthstatus import HealthStatus
+from compresso.webserver.helpers.library_analysis import iter_media_files
+
+
+def _initial_scan_progress(library_id=None, max_workers=1):
+    return {
+        "phase": "idle" if library_id is None else "discovering",
+        "total": 0,
+        "discovered": 0,
+        "discovery_complete": False,
+        "checked": 0,
+        "cancelled": False,
+        "error": None,
+        "library_id": library_id,
+        "worker_count": 0,
+        "max_workers": max_workers,
+        "workers": {},
+        "start_time": None if library_id is None else time.time(),
+        "files_per_second": 0.0,
+        "eta_seconds": 0,
+    }
 
 
 class HealthCheckManager:
@@ -29,18 +50,9 @@ class HealthCheckManager:
     _lock = threading.Lock()
     _scanning = False
     _cancel_event = threading.Event()
-    _scan_progress: dict = {
-        "total": 0,
-        "checked": 0,
-        "library_id": None,
-        "worker_count": 0,
-        "max_workers": 1,
-        "workers": {},
-        "start_time": None,
-        "files_per_second": 0.0,
-        "eta_seconds": 0,
-    }
+    _scan_progress: dict = _initial_scan_progress()
     _worker_count_requested = 1
+    _retire_worker_ids: set[int] = set()
 
     _file_locks: dict = {}
     _file_lock_users: dict = {}
@@ -310,6 +322,11 @@ class HealthCheckManager:
                 return False
             HealthCheckManager._scanning = True
             HealthCheckManager._cancel_event.clear()
+            HealthCheckManager._retire_worker_ids.clear()
+            HealthCheckManager._scan_progress = _initial_scan_progress(
+                library_id=library_id,
+                max_workers=HealthCheckManager._worker_count_requested,
+            )
 
         thread = threading.Thread(
             target=self._run_library_scan,
@@ -319,8 +336,11 @@ class HealthCheckManager:
         thread.start()
         return True
 
-    def _scan_worker(self, worker_id, file_queue, library_id, mode):
+    def _scan_worker(self, worker_id, file_queue, library_id, mode, discovery_done=None):
         """Worker thread that pulls files from the queue and checks them."""
+        if discovery_done is None:
+            discovery_done = threading.Event()
+            discovery_done.set()
         with HealthCheckManager._lock:
             HealthCheckManager._scan_progress["workers"][worker_id] = {
                 "status": "idle",
@@ -328,15 +348,17 @@ class HealthCheckManager:
             }
 
         while True:
-            # Check for cancellation
-            if HealthCheckManager._cancel_event.is_set():
+            with HealthCheckManager._lock:
+                retire_requested = worker_id in HealthCheckManager._retire_worker_ids
+            if HealthCheckManager._cancel_event.is_set() or retire_requested:
                 break
 
             try:
-                filepath = file_queue.get(timeout=0.5)
+                filepath = file_queue.get(timeout=0.1)
             except queue.Empty:
-                # Queue is empty, worker is done
-                break
+                if discovery_done.is_set():
+                    break
+                continue
 
             with HealthCheckManager._lock:
                 HealthCheckManager._scan_progress["workers"][worker_id] = {
@@ -348,158 +370,176 @@ class HealthCheckManager:
                 self.check_file(filepath, library_id=library_id, mode=mode)
             except Exception as e:
                 self.logger.error("Health check failed for %s: %s", filepath, str(e))
-
-            with HealthCheckManager._lock:
-                HealthCheckManager._scan_progress["checked"] += 1
-                checked = HealthCheckManager._scan_progress["checked"]
-                start_time = HealthCheckManager._scan_progress["start_time"]
-                total = HealthCheckManager._scan_progress["total"]
-                if start_time and checked > 0:
-                    elapsed = time.time() - start_time
-                    fps = checked / elapsed if elapsed > 0 else 0.0
-                    HealthCheckManager._scan_progress["files_per_second"] = round(fps, 2)
-                    remaining = total - checked
-                    HealthCheckManager._scan_progress["eta_seconds"] = int(remaining / fps) if fps > 0 else 0
+            finally:
+                file_queue.task_done()
+                self._record_checked_file()
 
         with HealthCheckManager._lock:
-            HealthCheckManager._scan_progress["workers"][worker_id] = {
-                "status": "idle",
-                "current_file": "",
-            }
+            HealthCheckManager._scan_progress["workers"].pop(worker_id, None)
+            HealthCheckManager._retire_worker_ids.discard(worker_id)
+
+    @staticmethod
+    def _record_checked_file():
+        with HealthCheckManager._lock:
+            progress = HealthCheckManager._scan_progress
+            progress["checked"] += 1
+            checked = progress["checked"]
+            start_time = progress["start_time"]
+            if not start_time or checked <= 0:
+                return
+            elapsed = time.time() - start_time
+            fps = checked / elapsed if elapsed > 0 else 0.0
+            progress["files_per_second"] = round(fps, 2)
+            if not progress["discovery_complete"]:
+                progress["eta_seconds"] = 0
+                return
+            remaining = max(0, progress["total"] - checked)
+            progress["eta_seconds"] = int(remaining / fps) if fps > 0 else 0
+
+    @staticmethod
+    def _drain_scan_queue(file_queue):
+        while True:
+            try:
+                file_queue.get_nowait()
+            except queue.Empty:
+                return
+            else:
+                file_queue.task_done()
+
+    def _discover_media(self, library_path, file_queue, discovery_done, discovery_errors):
+        completed = False
+        try:
+            for filepath in iter_media_files(library_path, cancel_event=HealthCheckManager._cancel_event):
+                if HealthCheckManager._cancel_event.is_set():
+                    break
+                with HealthCheckManager._lock:
+                    progress = HealthCheckManager._scan_progress
+                    progress["discovered"] += 1
+                    progress["total"] = progress["discovered"]
+                while not HealthCheckManager._cancel_event.is_set():
+                    try:
+                        file_queue.put(str(filepath), timeout=0.1)
+                    except queue.Full:
+                        continue
+                    break
+            completed = not HealthCheckManager._cancel_event.is_set()
+        except Exception as error:
+            discovery_errors.append(error)
+            self.logger.error("Health scan discovery failed: %s", str(error))
+        finally:
+            with HealthCheckManager._lock:
+                progress = HealthCheckManager._scan_progress
+                progress["discovery_complete"] = completed and not discovery_errors
+                if progress["discovery_complete"]:
+                    progress["phase"] = "checking"
+            discovery_done.set()
+
+    def _start_scan_worker(self, worker_id, workers, file_queue, library_id, mode, discovery_done):
+        worker = threading.Thread(
+            target=self._scan_worker,
+            args=(worker_id, file_queue, library_id, mode, discovery_done),
+            daemon=True,
+            name=f"HealthCheck-{library_id}-{worker_id}",
+        )
+        workers[worker_id] = worker
+        worker.start()
+
+    def _sync_worker_pool(self, workers, next_worker_id, file_queue, library_id, mode, discovery_done):
+        live_ids = [worker_id for worker_id, worker in workers.items() if worker.is_alive()]
+        with HealthCheckManager._lock:
+            requested = HealthCheckManager._worker_count_requested
+            active_ids = [worker_id for worker_id in live_ids if worker_id not in HealthCheckManager._retire_worker_ids]
+            if len(active_ids) > requested:
+                retiring = sorted(active_ids, reverse=True)[: len(active_ids) - requested]
+                HealthCheckManager._retire_worker_ids.update(retiring)
+                for worker_id in retiring:
+                    worker_progress = HealthCheckManager._scan_progress["workers"].get(worker_id)
+                    if worker_progress is not None:
+                        worker_progress["retiring"] = True
+                active_ids = [worker_id for worker_id in active_ids if worker_id not in retiring]
+            HealthCheckManager._scan_progress["worker_count"] = len(live_ids)
+            HealthCheckManager._scan_progress["max_workers"] = requested
+
+        may_have_work = not discovery_done.is_set() or not file_queue.empty()
+        for _ in range(max(0, requested - len(active_ids)) if may_have_work else 0):
+            self._start_scan_worker(next_worker_id, workers, file_queue, library_id, mode, discovery_done)
+            next_worker_id += 1
+        return next_worker_id
+
+    @staticmethod
+    def _finish_scan(phase, error=None):
+        with HealthCheckManager._lock:
+            progress = HealthCheckManager._scan_progress
+            progress["phase"] = phase
+            progress["cancelled"] = phase == "cancelled"
+            progress["error"] = error
+            progress["worker_count"] = 0
+            progress["eta_seconds"] = 0
+            if phase == "complete":
+                progress["discovery_complete"] = True
 
     def _run_library_scan(self, library_id, mode):
-        """Run library scan in background thread using a worker pool."""
+        """Stream library discovery through a bounded, live-scalable worker pool."""
+        with HealthCheckManager._lock:
+            HealthCheckManager._scan_progress = _initial_scan_progress(
+                library_id=library_id,
+                max_workers=HealthCheckManager._worker_count_requested,
+            )
+            HealthCheckManager._retire_worker_ids.clear()
         try:
             from compresso.libs.unmodels import Libraries
 
             try:
                 library = Libraries.get_by_id(library_id)
                 library_path = library.path
-            except Exception:
+            except Exception as error:
                 self.logger.error("Library %s not found", library_id)
+                self._finish_scan("failed", f"Library {library_id} not found: {error}")
                 return
 
-            # Collect media files
-            media_extensions = {
-                ".mkv",
-                ".mp4",
-                ".avi",
-                ".mov",
-                ".wmv",
-                ".flv",
-                ".webm",
-                ".m4v",
-                ".mpg",
-                ".mpeg",
-                ".ts",
-                ".vob",
-                ".3gp",
-                ".m2ts",
-                ".mts",
-                ".ogv",
-                ".mxf",
-                ".rmvb",
-            }
+            file_queue = queue.Queue(maxsize=Config().get_library_scan_queue_limit())
+            discovery_done = threading.Event()
+            discovery_errors = []
+            workers = {}
+            producer = threading.Thread(
+                target=self._discover_media,
+                args=(library_path, file_queue, discovery_done, discovery_errors),
+                daemon=True,
+                name=f"HealthDiscovery-{library_id}",
+            )
+            producer.start()
+            next_worker_id = 0
 
-            files_to_check = []
-            for root, _dirs, files in os.walk(library_path):
-                for filename in files:
-                    ext = os.path.splitext(filename)[1].lower()
-                    if ext in media_extensions:
-                        files_to_check.append(os.path.join(root, filename))
-
-            with HealthCheckManager._lock:
-                HealthCheckManager._scan_progress = {
-                    "total": len(files_to_check),
-                    "checked": 0,
-                    "library_id": library_id,
-                    "worker_count": 0,
-                    "max_workers": HealthCheckManager._worker_count_requested,
-                    "workers": {},
-                    "start_time": time.time(),
-                    "files_per_second": 0.0,
-                    "eta_seconds": 0,
-                }
-
-            self.logger.info("Health scan: checking %d files in library %s", len(files_to_check), library_id)
-
-            if not files_to_check:
-                self.logger.info("Health scan complete for library %s (no files)", library_id)
-                return
-
-            # Put all files into a queue
-            file_queue = queue.Queue()
-            for filepath in files_to_check:
-                file_queue.put(filepath)
-
-            # Spawn initial workers
-            workers = []
-            initial_count = HealthCheckManager._worker_count_requested
-            for i in range(initial_count):
-                t = threading.Thread(
-                    target=self._scan_worker,
-                    args=(i, file_queue, library_id, mode),
-                    daemon=True,
-                )
-                t.start()
-                workers.append(t)
-
-            with HealthCheckManager._lock:
-                HealthCheckManager._scan_progress["worker_count"] = initial_count
-
-            next_worker_id = initial_count
-
-            # Monitor loop: check for worker count changes and track alive workers
-            while any(t.is_alive() for t in workers) or not file_queue.empty():
+            while True:
+                next_worker_id = self._sync_worker_pool(workers, next_worker_id, file_queue, library_id, mode, discovery_done)
                 if HealthCheckManager._cancel_event.is_set():
-                    # Drain the queue to stop workers
-                    while not file_queue.empty():
-                        try:
-                            file_queue.get_nowait()
-                        except queue.Empty:
-                            break
-                    self.logger.info("Health scan cancelled for library %s", library_id)
+                    self._drain_scan_queue(file_queue)
+                live_workers = any(worker.is_alive() for worker in workers.values())
+                if discovery_done.is_set() and file_queue.empty() and not live_workers:
                     break
+                time.sleep(0.05)
 
-                time.sleep(0.5)
+            producer.join(timeout=5.0)
+            for worker in workers.values():
+                worker.join(timeout=5.0)
 
-                with HealthCheckManager._lock:
-                    requested = HealthCheckManager._worker_count_requested
-                    current_alive = sum(1 for t in workers if t.is_alive())
-                    HealthCheckManager._scan_progress["worker_count"] = current_alive
-                    HealthCheckManager._scan_progress["max_workers"] = requested
-
-                # Spawn more workers if requested count increased and queue has items
-                if current_alive < requested and not file_queue.empty():
-                    new_count = requested - current_alive
-                    for _ in range(new_count):
-                        if file_queue.empty():
-                            break
-                        t = threading.Thread(
-                            target=self._scan_worker,
-                            args=(next_worker_id, file_queue, library_id, mode),
-                            daemon=True,
-                        )
-                        t.start()
-                        workers.append(t)
-                        next_worker_id += 1
-
-                # Break if queue is empty and no workers alive
-                if file_queue.empty() and not any(t.is_alive() for t in workers):
-                    break
-
-            # Join all threads
-            for t in workers:
-                t.join(timeout=5.0)
-
-            self.logger.info("Health scan complete for library %s", library_id)
+            if discovery_errors:
+                self._finish_scan("failed", str(discovery_errors[0]))
+            elif HealthCheckManager._cancel_event.is_set():
+                self.logger.info("Health scan cancelled for library %s", library_id)
+                self._finish_scan("cancelled")
+            else:
+                self.logger.info("Health scan complete for library %s", library_id)
+                self._finish_scan("complete")
 
         except Exception as e:
             self.logger.error("Library scan failed: %s", str(e))
+            self._finish_scan("failed", str(e))
         finally:
             with self._lock:
                 HealthCheckManager._scanning = False
                 HealthCheckManager._cancel_event.clear()
+                HealthCheckManager._retire_worker_ids.clear()
             with HealthCheckManager._file_locks_lock:
                 HealthCheckManager._file_locks.clear()
                 HealthCheckManager._file_lock_users.clear()
@@ -527,6 +567,7 @@ class HealthCheckManager:
         with cls._lock:
             if cls._scanning:
                 cls._cancel_event.set()
+                cls._scan_progress["phase"] = "cancelling"
                 return True
             return False
 
