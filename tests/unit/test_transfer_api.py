@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from compresso.libs.resumable_transfer import ResumableTransferStore
+from compresso.libs.resumable_transfer import ResumableTransferStore, TransferStorageError
+from compresso.libs.safety_state import SafetyState
 from compresso.webserver.api_v2.transfer_api import ApiTransferHandler
 
 
@@ -76,6 +77,24 @@ def test_transfer_route_accepts_tornado_byte_path_parameter(tmp_path):
 
 
 @pytest.mark.unittest
+def test_chunk_larger_than_eight_mib_limit_is_rejected_without_advancing_offset(tmp_path):
+    payload = b"12345"
+    store = ResumableTransferStore(tmp_path)
+    session = store.begin("job-limit", "movie.mkv", len(payload), _checksum(payload))
+    handler = _handler(
+        store,
+        payload,
+        {"X-Transfer-Offset": "0", "X-Chunk-Checksum": _checksum(payload)},
+    )
+
+    with patch("compresso.webserver.api_v2.transfer_api.MAX_CHUNK_SIZE", 4):
+        asyncio.run(handler.append_transfer_chunk(session["transfer_id"]))
+
+    handler.write_error.assert_called_once()
+    assert store.status(session["transfer_id"])["offset"] == 0
+
+
+@pytest.mark.unittest
 def test_transfer_status_accepts_tornado_byte_path_parameter(tmp_path):
     store = ResumableTransferStore(tmp_path)
     session = store.begin("job-status", "movie.mkv", 0, _checksum(b""))
@@ -95,6 +114,54 @@ def test_missing_transfer_uses_structured_404(tmp_path):
 
     handler.set_status.assert_called_once_with(404, reason="Transfer request could not be completed")
     handler.write_error.assert_called_once()
+
+
+@pytest.mark.unittest
+def test_storage_failure_returns_507_and_triggers_durable_safety_latch(tmp_path):
+    handler = _handler(ResumableTransferStore(tmp_path))
+    error = TransferStorageError("Cache disk reserve would be breached", free_bytes=4, required_bytes=8)
+
+    with patch("compresso.webserver.api_v2.transfer_api.record_safety_event") as record_safety:
+        handler._handle_transfer_error(error)
+
+    record_safety.assert_called_once()
+    handler.set_status.assert_called_once_with(507, reason="Transfer storage reserve exhausted")
+    handler.write_error.assert_called_once()
+
+
+@pytest.mark.unittest
+def test_storage_failure_persists_disk_reserve_latch(tmp_path):
+    handler = _handler(ResumableTransferStore(tmp_path / "transfers"))
+    settings = MagicMock()
+    settings.get_cache_path.return_value = str(tmp_path / "cache")
+    settings.get_userdata_path.return_value = str(tmp_path / "userdata")
+    error = TransferStorageError("disk full", free_bytes=4, required_bytes=8, reserved_bytes=2)
+    running_threads = MagicMock()
+    running_threads.get_compresso_running_thread.return_value = None
+
+    with (
+        patch("compresso.webserver.api_v2.transfer_api.config.Config", return_value=settings),
+        patch("compresso.libs.uiserver.CompressoRunningThreads", return_value=running_threads),
+    ):
+        handler._handle_transfer_error(error)
+
+    snapshot = SafetyState(settings.get_userdata_path()).snapshot()
+    assert snapshot["pause_required"] is True
+    assert any(event["code"] == "disk-reserve" and event["active"] for event in snapshot["events"])
+    handler.set_status.assert_called_once_with(507, reason="Transfer storage reserve exhausted")
+
+
+@pytest.mark.unittest
+def test_delete_route_abandons_incomplete_transfer(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    session = store.begin("job-delete", "movie.mkv", 4, _checksum(b"data"))
+    handler = _handler(store)
+
+    asyncio.run(handler.abandon_transfer(session["transfer_id"].encode("ascii")))
+
+    assert handler.write_success.call_args.args[0]["abandoned"] is True
+    with pytest.raises(KeyError):
+        store.status(session["transfer_id"])
 
 
 @pytest.mark.unittest

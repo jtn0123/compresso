@@ -7,6 +7,8 @@ Tests for OpenAPI schema generation and Swagger output.
 
 """
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,6 +20,18 @@ try:
     import apispec  # noqa: F401
 except ModuleNotFoundError:
     apispec_available = False
+
+
+@pytest.mark.unittest
+def test_checked_in_schema_contains_bounded_resumable_transfer_contract():
+    schema_path = Path(__file__).parents[2] / "compresso" / "webserver" / "docs" / "api_schema_v2.json"
+    paths = json.loads(schema_path.read_text(encoding="utf-8"))["paths"]
+
+    assert "507" in paths["/transfer/session"]["post"]["responses"]
+    assert "delete" in paths["/transfer/session/{transfer_id}"]
+    assert paths["/upload/pending/file"]["post"]["deprecated"] is True
+    assert "410" in paths["/upload/pending/file"]["post"]["responses"]
+    assert "413" in paths["/upload/plugin/file"]["post"]["responses"]
 
 
 @pytest.mark.unittest

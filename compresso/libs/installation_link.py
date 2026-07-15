@@ -35,7 +35,6 @@ import os.path
 import re
 import threading
 import time
-import urllib.parse
 
 import requests
 from requests_toolbelt import MultipartEncoder
@@ -1044,35 +1043,21 @@ class Links(metaclass=SingletonType):
         :return:
         """
         try:
-            if job_id:
-                resumable_kwargs = {
-                    "lease_token": lease_token,
-                    "origin_installation_uuid": origin_installation_uuid,
-                }
-                if progress_callback:
-                    resumable_kwargs["progress_callback"] = progress_callback
-                return self._send_file_resumable(
-                    remote_config,
-                    path,
-                    job_id,
-                    **resumable_kwargs,
-                )
-            query = {
-                key: value
-                for key, value in {
-                    "job_id": job_id,
-                    "lease_token": lease_token,
-                    "origin_installation_uuid": origin_installation_uuid,
-                }.items()
-                if value
+            if not job_id:
+                self._log("Refusing distributed upload without a stable job ID", level="error")
+                return {}
+            resumable_kwargs = {
+                "lease_token": lease_token,
+                "origin_installation_uuid": origin_installation_uuid,
             }
-            endpoint = "/compresso/api/v2/upload/pending/file"
-            if query:
-                endpoint = f"{endpoint}?{urllib.parse.urlencode(query)}"
-            results = self.remote_api_post_file(remote_config, endpoint, path)
-            if results.get("error"):
-                results = {}
-            return results
+            if progress_callback:
+                resumable_kwargs["progress_callback"] = progress_callback
+            return self._send_file_resumable(
+                remote_config,
+                path,
+                job_id,
+                **resumable_kwargs,
+            )
         except requests.exceptions.RequestException as e:
             self._log("Request to upload to remote installation failed", message2=str(e), level="warning")
         except Exception as e:

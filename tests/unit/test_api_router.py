@@ -8,7 +8,13 @@ import tornado.routing
 import tornado.testing
 import tornado.web
 
-from compresso.webserver.api_request_router import APIRequestRouter
+from compresso.webserver.api_request_router import APIRequestRouter, endpoint_handler_name
+
+
+@pytest.mark.unittest
+def test_plugin_upload_uses_separate_bounded_handler():
+    assert endpoint_handler_name("v2", "upload", "/compresso/api/v2/upload/plugin/file") == "ApiPluginUploadHandler"
+    assert endpoint_handler_name("v2", "upload", "/compresso/api/v2/upload/pending/file") == "ApiUploadHandler"
 
 
 class ApiRouterTestBase(tornado.testing.AsyncHTTPTestCase):
@@ -37,6 +43,27 @@ class ApiRouterTestBase(tornado.testing.AsyncHTTPTestCase):
 @pytest.mark.unittest
 class TestApiRouter(ApiRouterTestBase):
     __test__ = True
+
+    def test_legacy_pending_upload_returns_resumable_successors(self):
+        response = self.fetch(
+            "/compresso/api/v2/upload/pending/file",
+            method="POST",
+            body=b"legacy-body-is-not-written",
+            headers={"Content-Type": "application/octet-stream"},
+        )
+
+        assert response.code == 410
+        assert self.parse_response(response)["successor"]["create"].endswith("/transfer/session")
+
+    def test_plugin_upload_routes_to_bounded_framework_handler(self):
+        response = self.fetch(
+            "/compresso/api/v2/upload/plugin/file",
+            method="POST",
+            body=b"",
+            headers={"Content-Type": "multipart/form-data; boundary=test"},
+        )
+
+        assert response.code == 400
 
     @patch("compresso.libs.session.Session")
     def test_version_route_resolves_through_router(self, _mock_session):

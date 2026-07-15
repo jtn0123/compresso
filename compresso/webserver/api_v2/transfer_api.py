@@ -6,8 +6,11 @@ import asyncio
 import hashlib
 import os
 
+import tornado.log
+
 from compresso import config
-from compresso.libs.resumable_transfer import ResumableTransferStore, file_sha256
+from compresso.libs.resumable_transfer import ResumableTransferStore, TransferStorageError, file_sha256
+from compresso.libs.safety_state import record_safety_event
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.transfer_schemas import RequestTransferSessionSchema
@@ -40,6 +43,11 @@ class ApiTransferHandler(BaseApiHandler):
             "call_method": "get_transfer_status",
         },
         {
+            "path_pattern": r"/transfer/session/(?P<transfer_id>[a-f0-9]{32})",
+            "supported_methods": ["DELETE"],
+            "call_method": "abandon_transfer",
+        },
+        {
             "path_pattern": r"/transfer/chunk/(?P<transfer_id>[a-f0-9]{32})",
             "supported_methods": ["POST"],
             "call_method": "append_transfer_chunk",
@@ -62,21 +70,69 @@ class ApiTransferHandler(BaseApiHandler):
     ]
 
     def _store(self):
-        root = os.path.join(config.Config().get_cache_path(), "remote_transfers")
-        return ResumableTransferStore(root)
+        settings = config.Config()
+        root = os.path.join(settings.get_cache_path(), "remote_transfers")
+        minimum_free_bytes = 0
+        if settings.get_disk_space_guard_enabled():
+            minimum_free_bytes = int(settings.get_minimum_free_space_gb() * 1024**3)
+        maximum_file_size_bytes = int(settings.get_maximum_transfer_file_size_gb() * 1024**3)
+        return ResumableTransferStore(
+            root,
+            maximum_file_size_bytes=maximum_file_size_bytes,
+            minimum_free_bytes=minimum_free_bytes,
+        )
 
     def _handle_transfer_error(self, error):
         """Map transfer failures to structured client-facing API errors."""
-        status_code = 404 if isinstance(error, KeyError) else 400
+        if isinstance(error, TransferStorageError):
+            settings = config.Config()
+            try:
+                record_safety_event(
+                    settings,
+                    None,
+                    "disk-reserve",
+                    "Remote transfer paused because the cache reserve would be breached",
+                    phase="transfer",
+                    path=settings.get_cache_path(),
+                    free_bytes=error.free_bytes,
+                    required_bytes=error.required_bytes,
+                    reserved_bytes=error.reserved_bytes,
+                )
+            except Exception:
+                # Preserve the storage response even if the secondary safety recorder
+                # cannot be reached, while recording the secondary failure.
+                tornado.log.app_log.exception("Failed to persist the transfer disk-reserve safety latch")
+            status_code = 507
+            public_message = "Transfer storage reserve exhausted"
+        else:
+            status_code = 404 if isinstance(error, KeyError) else 400
+            public_message = "Transfer request could not be completed"
         self.handle_base_api_error(
             BaseApiError(
-                "Transfer request could not be completed",
+                public_message,
                 status_code=status_code,
                 private_detail=f"{type(error).__name__}: {error}",
             )
         )
 
     async def begin_transfer(self):
+        """Create or resume a bounded checksummed media transfer.
+        ---
+        description: Create or resume a media transfer using a stable job ID.
+        requestBody:
+          required: true
+          content:
+            application/json:
+              schema:
+                RequestTransferSessionSchema
+        responses:
+          200:
+            description: Transfer session created or resumed.
+          400:
+            description: Invalid transfer metadata or configured file-size limit exceeded.
+          507:
+            description: Cache capacity or disk reserve is exhausted.
+        """
         try:
             request = self.read_json_request(RequestTransferSessionSchema())
             metadata = {
@@ -99,6 +155,15 @@ class ApiTransferHandler(BaseApiHandler):
             self._handle_transfer_error(error)
 
     async def get_transfer_status(self, transfer_id=None):
+        """Read the durable offset for a resumable transfer.
+        ---
+        description: Return the current offset and completion state for a transfer.
+        responses:
+          200:
+            description: Current transfer state.
+          404:
+            description: Unknown transfer ID.
+        """
         try:
             transfer_id = _decode_path_parameter(transfer_id)
             store = self._store()
@@ -106,7 +171,44 @@ class ApiTransferHandler(BaseApiHandler):
         except (KeyError, OSError, ValueError) as error:
             self._handle_transfer_error(error)
 
+    async def abandon_transfer(self, transfer_id=None):
+        """Delete an intentionally abandoned incomplete transfer session.
+        ---
+        description: Delete an incomplete transfer manifest, partial file, and owned completed directory.
+        responses:
+          200:
+            description: Transfer session abandoned.
+          400:
+            description: Completed transfers cannot be abandoned.
+          404:
+            description: Unknown transfer ID.
+        """
+        try:
+            transfer_id = _decode_path_parameter(transfer_id)
+            store = self._store()
+            self.write_success(await asyncio.to_thread(store.abandon, transfer_id))
+        except (KeyError, OSError, ValueError) as error:
+            self._handle_transfer_error(error)
+
     async def append_transfer_chunk(self, transfer_id=None):
+        """Append one checksummed chunk at the declared offset.
+        ---
+        description: Append at most 8 MiB after validating offset, chunk checksum, and disk reserve.
+        requestBody:
+          required: true
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        responses:
+          200:
+            description: Chunk accepted and durable offset advanced.
+          400:
+            description: Invalid offset, size, or checksum.
+          507:
+            description: Cache disk reserve would be breached.
+        """
         try:
             transfer_id = _decode_path_parameter(transfer_id)
             if len(self.request.body) > MAX_CHUNK_SIZE:
@@ -120,6 +222,17 @@ class ApiTransferHandler(BaseApiHandler):
             self._handle_transfer_error(error)
 
     async def finalize_transfer(self, transfer_id=None):
+        """Verify and publish a complete transferred file.
+        ---
+        description: Verify the complete SHA-256 checksum and create the worker task exactly once.
+        responses:
+          200:
+            description: Transfer verified and finalized.
+          400:
+            description: Transfer is incomplete or failed checksum validation.
+          404:
+            description: Unknown transfer ID.
+        """
         try:
             transfer_id = _decode_path_parameter(transfer_id)
             response = await asyncio.to_thread(self._finalize_transfer_sync, transfer_id)
@@ -151,6 +264,15 @@ class ApiTransferHandler(BaseApiHandler):
         return task
 
     async def get_source_manifest(self, task_id=None):
+        """Return metadata for resumable result download.
+        ---
+        description: Return size and SHA-256 metadata for a completed worker task.
+        responses:
+          200:
+            description: Completed task transfer manifest.
+          400:
+            description: Completed output is unavailable.
+        """
         try:
             task_id = _decode_path_parameter(task_id)
             self.write_success(await asyncio.to_thread(self._source_manifest_sync, task_id))
@@ -168,6 +290,15 @@ class ApiTransferHandler(BaseApiHandler):
         }
 
     async def get_source_chunk(self, task_id=None):
+        """Download one checksummed result chunk.
+        ---
+        description: Return at most 8 MiB from a completed worker task with offset and checksum headers.
+        responses:
+          200:
+            description: Binary result chunk.
+          400:
+            description: Completed output or requested range is unavailable.
+        """
         try:
             task_id = _decode_path_parameter(task_id)
             task = await asyncio.to_thread(self._completed_source, task_id)

@@ -47,7 +47,7 @@ from .session_api import ApiSessionHandler
 from .settings_api import ApiSettingsHandler
 from .system_api import ApiSystemHandler
 from .transfer_api import ApiTransferHandler
-from .upload_api import ApiUploadHandler
+from .upload_api import ApiPluginUploadHandler, ApiUploadHandler
 from .version_api import ApiVersionHandler
 from .workers_api import ApiWorkersHandler
 
@@ -70,6 +70,7 @@ __all__ = (
     "ApiSettingsHandler",
     "ApiSystemHandler",
     "ApiTransferHandler",
+    "ApiPluginUploadHandler",
     "ApiUploadHandler",
     "ApiVersionHandler",
     "ApiWorkersHandler",

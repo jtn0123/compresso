@@ -4,10 +4,13 @@ import errno
 import hashlib
 import json
 import random
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 import pytest
 
-from compresso.libs.resumable_transfer import ResumableTransferStore
+from compresso.libs.resumable_transfer import ResumableTransferStore, TransferStorageError
 
 
 def _sha256(data):
@@ -27,6 +30,93 @@ def test_interrupted_transfer_resumes_from_persisted_offset(tmp_path):
     assert resumed["transfer_id"] == status["transfer_id"]
     assert resumed["offset"] == 4
     assert resumed["complete"] is False
+
+
+@pytest.mark.unittest
+def test_begin_rejects_file_above_configured_maximum_before_creating_manifest(tmp_path):
+    store = ResumableTransferStore(tmp_path, maximum_file_size_bytes=9)
+    checksum = _sha256(b"x" * 10)
+
+    with pytest.raises(ValueError, match="maximum"):
+        store.begin("job-too-large", "movie.mkv", 10, checksum)
+
+    assert list((tmp_path / "manifests").iterdir()) == []
+
+
+@pytest.mark.unittest
+def test_concurrent_sessions_reserve_all_remaining_bytes(tmp_path):
+    disk = SimpleNamespace(total=100, used=0, free=100)
+    store = ResumableTransferStore(
+        tmp_path,
+        minimum_free_bytes=10,
+        disk_usage=lambda _path: disk,
+    )
+    store.begin("job-one", "one.mkv", 60, _sha256(b"x" * 60))
+
+    store.begin("job-two", "two.mkv", 30, _sha256(b"y" * 30))
+    checksum = _sha256(b"z")
+    with pytest.raises(TransferStorageError, match="reserved"):
+        store.begin("job-three", "three.mkv", 1, checksum)
+
+    assert len(list((tmp_path / "manifests").glob("*.json"))) == 2
+
+
+@pytest.mark.unittest
+def test_simultaneous_session_creation_cannot_overcommit_shared_reservation(tmp_path):
+    disk = SimpleNamespace(total=100, used=0, free=100)
+    store = ResumableTransferStore(tmp_path, disk_usage=lambda _path: disk)
+    barrier = threading.Barrier(2)
+
+    def create_session(index):
+        barrier.wait()
+        try:
+            store.begin(f"job-{index}", f"movie-{index}.mkv", 60, _sha256(bytes([index]) * 60))
+            return "created"
+        except TransferStorageError:
+            return "rejected"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(create_session, (1, 2)))
+
+    assert sorted(results) == ["created", "rejected"]
+    assert len(list((tmp_path / "manifests").glob("*.json"))) == 1
+
+
+@pytest.mark.unittest
+def test_append_rechecks_free_space_and_retains_resumable_state(tmp_path):
+    disk = SimpleNamespace(total=100, used=0, free=100)
+    store = ResumableTransferStore(
+        tmp_path,
+        minimum_free_bytes=10,
+        disk_usage=lambda _path: disk,
+    )
+    session = store.begin("job-one", "one.mkv", 20, _sha256(b"x" * 20))
+    disk.free = 14
+    chunk = b"12345"
+    chunk_checksum = _sha256(chunk)
+
+    with pytest.raises(TransferStorageError, match="reserve"):
+        store.append(session["transfer_id"], 0, chunk, chunk_checksum)
+
+    assert store.status(session["transfer_id"])["offset"] == 0
+    assert store._manifest_path(session["transfer_id"]).exists()
+
+
+@pytest.mark.unittest
+def test_abandon_removes_owned_partial_manifest_and_completed_directory(tmp_path):
+    store = ResumableTransferStore(tmp_path)
+    session = store.begin("job-abandon", "movie.mkv", 10, _sha256(b"x" * 10))
+    store.append(session["transfer_id"], 0, b"123", _sha256(b"123"))
+    completed_dir = store.completed_dir / session["transfer_id"]
+    completed_dir.mkdir()
+    (completed_dir / "leftover").write_bytes(b"old")
+
+    result = store.abandon(session["transfer_id"])
+
+    assert result == {"transfer_id": session["transfer_id"], "abandoned": True}
+    assert not store._manifest_path(session["transfer_id"]).exists()
+    assert not store._partial_path(session["transfer_id"]).exists()
+    assert not completed_dir.exists()
 
 
 @pytest.mark.unittest

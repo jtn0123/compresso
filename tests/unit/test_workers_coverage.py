@@ -28,6 +28,7 @@ import queue
 import subprocess
 import threading
 from collections import deque
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -379,6 +380,7 @@ class TestProcessTaskEncodingSpeedStats:
         worker.worker_subprocess_monitor = mock_monitor
 
         with (
+            patch.object(worker, "_check_task_disk_space", return_value=SimpleNamespace(ok=True)),
             patch.object(worker, "_Worker__exec_worker_runners_on_set_task", return_value=True),
             patch.object(worker, "_Worker__set_start_task_stats"),
             patch.object(worker, "_Worker__set_finish_task_stats"),
@@ -401,6 +403,7 @@ class TestProcessTaskEncodingSpeedStats:
         worker.worker_subprocess_monitor = None
 
         with (
+            patch.object(worker, "_check_task_disk_space", return_value=SimpleNamespace(ok=True)),
             patch.object(worker, "_Worker__exec_worker_runners_on_set_task", return_value=True),
             patch.object(worker, "_Worker__set_start_task_stats"),
             patch.object(worker, "_Worker__set_finish_task_stats"),

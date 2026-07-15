@@ -312,6 +312,7 @@ class TestStartupAndWorkerCap:
         assert c.get_minimum_free_space_gb() == 5.0
         assert c.get_disk_space_output_multiplier() == 1.25
         assert c.get_disk_space_retry_seconds() == 60
+        assert c.get_maximum_transfer_file_size_gb() == 1024.0
         assert c.get_transfer_partial_retention_hours() == 48
         assert c.get_remote_artifact_retention_hours() == 168
 

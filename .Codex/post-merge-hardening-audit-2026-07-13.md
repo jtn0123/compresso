@@ -1,7 +1,7 @@
 # Post-Merge Hardening and Simplification Audit
 
 Date: 2026-07-13  
-Baseline: `origin/master` at `2a80560e` (`chore(release): 1.13.5 [skip ci]`)
+Baseline: `origin/master` at `9d1507fb` (`fix: secure master worker boundary (#200)`)
 
 ## Implementation tracking
 
@@ -9,26 +9,26 @@ This audit is the tracking document for the ordered 20 TB master-plus-M4 hardeni
 
 | PR | Scope | Findings | Status |
 |---|---|---|---|
-| 1 | Secure the master/worker boundary | 1-5 | Implemented on `codex/20tb-security-boundary`; merge validation pending |
-| 2 | Bound and clean file transfers | 6-9 | Not started |
+| 1 | Secure the master/worker boundary | 1-5 | Merged as PR #200 (`9d1507fb`) after all required checks passed |
+| 2 | Bound and clean file transfers | 6-9 | Implemented on `codex/20tb-transfer-hardening`; merge validation pending |
 | 3 | Make configuration and JSON state crash-safe | 13-14 | Not started |
 | 4 | Stream large health scans safely | 15-17 | Not started |
 | 5 | Make plugin installation transactional | 10-12 | Not started |
 | 6 | Simplify critical backend workflows | 18 | Not started |
 | 7 | Test and simplify the task dialogs | 19-20 | Not started |
 
-PR 1 secures and deprecates v1, makes service-token requests CSRF-independent while preserving browser CSRF enforcement, sanitizes general settings, rejects protected settings writes, adds a local-only masked token per remote, and allow-lists proxy request/response metadata. Until it merges, the original findings below remain the authority for `master`.
+PR 1 secured and deprecated v1, made service-token requests CSRF-independent while preserving browser CSRF enforcement, sanitized general settings, rejected protected settings writes, added a local-only masked token per remote, and allow-listed proxy request/response metadata. PR 2 retires legacy media upload, bounds and reserves resumable-transfer capacity, latches disk exhaustion, adds intentional abandonment, and separates the 64 MiB plugin upload path.
 
 ## Executive verdict
 
 PR #199 merged cleanly and the merged application still passes its automated baseline. The previous two fuzz audits fixed 40 real defects, and none of those items are repeated here.
 
-There is meaningful hardening work left. The original audit found that a token-protected master was not safe to expose directly to a worker network: legacy API-v1 handlers bypassed authentication, rate limiting, and CSRF protection; the broad settings response returned linked-node passwords; and the proxy forwarded master credentials to the selected remote node. PR 1 addresses those code findings; the remaining transfer, crash-safety, health-scan, plugin, complexity, and frontend work is tracked above.
+There is meaningful hardening work left. PR #200 closed the validated network-boundary findings. The remaining transfer merge gate, crash-safety, health-scan, plugin, complexity, and frontend work is tracked above.
 
 Current safe boundary:
 
 - A copied, loopback-only 20-file canary remains reasonable.
-- Do not expose the Compresso port directly for the master-plus-M4 topology until findings 1-5 are fixed. A temporary reverse proxy that blocks `/compresso/api/v1/**` and strips sensitive proxy headers reduces risk, but is not a substitute for fixing the app.
+- The master-plus-M4 control plane may now be tested on a restricted LAN using unique per-node tokens and host firewall rules; this does not authorize media processing beyond copied canaries.
 - Do not begin the 100 GB fault run until findings 6-9 and 13-17 are addressed.
 - The application remains unsuitable for an unattended, monolithic 20 TB destructive run.
 

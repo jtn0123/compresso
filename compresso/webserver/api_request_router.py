@@ -38,6 +38,13 @@ import tornado.web
 from compresso import config
 
 
+def endpoint_handler_name(api_version, endpoint, path):
+    """Select the one split upload handler while preserving legacy routing."""
+    if endpoint == "upload" and path == f"/compresso/api/{api_version}/upload/plugin/file":
+        return "ApiPluginUploadHandler"
+    return f"Api{endpoint.title()}Handler"
+
+
 class Handle404(tornado.web.RequestHandler):
     def initialize(self, **kwargs):
         """No-op — 404 handler requires no initialization."""
@@ -68,7 +75,7 @@ class APIRequestRouter(tornado.routing.Router):
         endpoint = request.path.split("/")[4]  # Set the endpoint
         params = list(filter(None, request.path.split("/")[4:]))  # Set the request params
 
-        endpoint_handler = f"Api{endpoint.title()}Handler"
+        endpoint_handler = endpoint_handler_name(api_version, endpoint, request.path)
 
         # Check if the handler exists - Otherwise set it to 404
         try:
