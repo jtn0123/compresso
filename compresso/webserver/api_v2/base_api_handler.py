@@ -412,7 +412,7 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         :return:
         """
         api_marker = f"api/v{self.api_version}"
-        request_api_base = self.request.uri.split(api_marker)[0] + api_marker
+        request_api_base = self.request.path.split(api_marker)[0] + api_marker
         # request_api_endpoint = re.sub('^/(compresso/)*api/v\d', '', self.request.uri)
         matched_route_with_unsupported_method = False
         for route in self.routes:

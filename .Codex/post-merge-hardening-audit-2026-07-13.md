@@ -70,7 +70,9 @@ Current safe boundary:
 1. Retire the handwritten multipart parser in favor of the resumable transfer protocol (#6).
 2. Enforce a configured maximum file size, reserve disk before accepting a session, recheck during progress, and latch/pause on reserve failure (#7 and #9).
 3. Track and clean abandoned upload sessions deterministically (#8).
-4. Make every persistent JSON write use one atomic, fsynced implementation (#13-14).
+4. Validate decoded configuration as an object before passing it to
+   `set_bulk_config_items()` (#13).
+5. Make every persistent JSON write use one atomic, fsynced implementation (#14).
 
 ### Batch C: make plugin installation transactional
 

@@ -10,7 +10,6 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-import tornado.testing
 import tornado.web
 
 from compresso.libs.singleton import SingletonType
@@ -188,6 +187,7 @@ class TestApiMutationProtection(ApiTestBase):
 
 class _V1ProbeHandler(V1BaseApiHandler):
     def initialize(self, **kwargs):
+        super().initialize(**kwargs)
         self.params = kwargs.get("params", [])
 
     def get(self, path):
@@ -195,9 +195,9 @@ class _V1ProbeHandler(V1BaseApiHandler):
 
 
 @pytest.mark.unittest
-class TestV1ApiGuards(tornado.testing.AsyncHTTPTestCase):
-    def runTest(self):
-        pass
+class TestV1ApiGuards(ApiTestBase):
+    __test__ = True
+    handler_class = _V1ProbeHandler
 
     def get_app(self):
         return tornado.web.Application([(r"/compresso/api/v1/(.*)", _V1ProbeHandler)])

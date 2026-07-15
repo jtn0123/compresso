@@ -44,6 +44,7 @@ PROXY_RESPONSE_HEADER_ALLOWLIST = (
     "X-Chunk-Checksum",
 )
 TARGET_CREDENTIAL_HEADERS = ("Authorization", API_AUTH_HEADER_NAME)
+BLOCKED_REDIRECT_STATUSES = frozenset((301, 302, 303, 307, 308))
 
 
 def _allowed_headers(headers, allowlist):
@@ -60,6 +61,11 @@ def build_proxy_request_headers(inbound_headers, target_credentials):
 def build_proxy_response_headers(upstream_headers):
     """Return only response metadata safe to expose through the master."""
     return _allowed_headers(upstream_headers, PROXY_RESPONSE_HEADER_ALLOWLIST)
+
+
+def is_blocked_proxy_redirect(status_code):
+    """Return whether an upstream response would redirect the proxy client."""
+    return status_code in BLOCKED_REDIRECT_STATUSES
 
 
 _BLOCKED_NETWORKS = [
@@ -207,7 +213,7 @@ class ProxyHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
                 url, method=method, headers=headers, body=body, follow_redirects=False, raise_error=False
             )
 
-            if 300 <= response.code < 400:
+            if is_blocked_proxy_redirect(response.code):
                 self.set_status(502)
                 self.write({"error": "Worker redirect blocked"})
                 return

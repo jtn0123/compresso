@@ -100,6 +100,12 @@ class TestResolveProxyTarget:
 
 @pytest.mark.unittest
 class TestProxyHeaderBoundary:
+    def test_only_actual_redirect_statuses_are_blocked(self):
+        from compresso.webserver.proxy import is_blocked_proxy_redirect
+
+        assert not is_blocked_proxy_redirect(304)
+        assert all(is_blocked_proxy_redirect(status) for status in (301, 302, 303, 307, 308))
+
     def test_request_headers_allow_only_transfer_metadata_and_worker_credentials(self):
         from compresso.webserver.proxy import build_proxy_request_headers
 
