@@ -1,3 +1,10 @@
+## [1.13.6](https://github.com/jtn0123/compresso/compare/v1.13.5...v1.13.6) (2026-07-15)
+
+
+### Bug Fixes
+
+* secure master worker boundary ([#200](https://github.com/jtn0123/compresso/issues/200)) ([9d1507f](https://github.com/jtn0123/compresso/commit/9d1507fb9579ffb2206f96385155bd099b285f3a))
+
 ## [1.13.5](https://github.com/jtn0123/compresso/compare/v1.13.4...v1.13.5) (2026-07-14)
 
 
