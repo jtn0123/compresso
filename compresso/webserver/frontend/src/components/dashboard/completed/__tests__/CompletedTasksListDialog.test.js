@@ -32,6 +32,24 @@ import axios from 'axios'
 import { shallowMountWithQuasar } from 'src/test-utils'
 import CompletedTasksListDialog from '../CompletedTasksListDialog.vue'
 
+const slotStub = { template: '<div><slot /></div>' }
+const taskShellStub = {
+  props: ['rows'],
+  template: '<div><slot v-for="row in rows" name="body" :row="row" /></div>',
+}
+const mountCompletedDialog = (props = {}) =>
+  shallowMountWithQuasar(CompletedTasksListDialog, {
+    props,
+    global: {
+      stubs: {
+        CompressoDialogWindow: slotStub,
+        CompressoStandardButtonDropdown: slotStub,
+        TaskListTableShell: taskShellStub,
+        'q-slide-transition': slotStub,
+      },
+    },
+  })
+
 const makeTasks = (start, count, hasMetadata = false) =>
   Array.from({ length: count }, (_, index) => ({
     id: start + index,
@@ -54,7 +72,7 @@ async function mountDialog({ tasks = makeTasks(1, 2), total = tasks.length, prop
     if (method === 'post' && url === '/api/history/tasks') return Promise.resolve(taskResponse(tasks, total))
     return Promise.resolve({ data: {} })
   })
-  const wrapper = shallowMountWithQuasar(CompletedTasksListDialog, { props })
+  const wrapper = mountCompletedDialog(props)
   await flushPromises()
   return wrapper
 }
@@ -177,7 +195,7 @@ describe('CompletedTasksListDialog interactions', () => {
       }
       return Promise.resolve({ data: {} })
     })
-    const wrapper = shallowMountWithQuasar(CompletedTasksListDialog)
+    const wrapper = mountCompletedDialog()
     await flushPromises()
     const vm = state(wrapper)
     const done = vi.fn()
@@ -200,7 +218,7 @@ describe('CompletedTasksListDialog interactions', () => {
       }
       return Promise.resolve({ data: {} })
     })
-    const wrapper = shallowMountWithQuasar(CompletedTasksListDialog)
+    const wrapper = mountCompletedDialog()
     await flushPromises()
     const vm = state(wrapper)
 
@@ -216,9 +234,7 @@ describe('CompletedTasksListDialog interactions', () => {
 
     state(wrapper).openDetailsDialog(42)
 
-    expect(quasar.dialog).toHaveBeenCalledWith(
-      expect.objectContaining({ componentProps: { completedTaskId: 42 } }),
-    )
+    expect(quasar.dialog).toHaveBeenCalledWith(expect.objectContaining({ componentProps: { completedTaskId: 42 } }))
   })
 
   it('notifies when an action has no selection or a fetch fails', async () => {

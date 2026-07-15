@@ -29,6 +29,23 @@ import axios from 'axios'
 import { shallowMountWithQuasar } from 'src/test-utils'
 import PendingTasksListDialog from '../PendingTasksListDialog.vue'
 
+const slotStub = { template: '<div><slot /></div>' }
+const taskShellStub = {
+  props: ['rows'],
+  template: '<div><slot v-for="row in rows" name="body" :row="row" /></div>',
+}
+const mountPendingDialog = () =>
+  shallowMountWithQuasar(PendingTasksListDialog, {
+    global: {
+      stubs: {
+        CompressoDialogWindow: slotStub,
+        CompressoStandardButtonDropdown: slotStub,
+        TaskListTableShell: taskShellStub,
+        'q-slide-transition': slotStub,
+      },
+    },
+  })
+
 const makeTasks = (start, count) =>
   Array.from({ length: count }, (_, index) => ({
     id: start + index,
@@ -54,7 +71,7 @@ async function mountDialog({ tasks = makeTasks(1, 2), total = tasks.length } = {
     if (method === 'post' && url === '/api/pending/tasks') return Promise.resolve(taskResponse(tasks, total))
     return Promise.resolve({ data: {} })
   })
-  const wrapper = shallowMountWithQuasar(PendingTasksListDialog)
+  const wrapper = mountPendingDialog()
   await flushPromises()
   return wrapper
 }
@@ -160,7 +177,7 @@ describe('PendingTasksListDialog interactions', () => {
       }
       return Promise.resolve({ data: {} })
     })
-    const wrapper = shallowMountWithQuasar(PendingTasksListDialog)
+    const wrapper = mountPendingDialog()
     await flushPromises()
     const vm = state(wrapper)
     const done = vi.fn()
@@ -185,7 +202,7 @@ describe('PendingTasksListDialog interactions', () => {
       }
       return Promise.resolve({ data: {} })
     })
-    const wrapper = shallowMountWithQuasar(PendingTasksListDialog)
+    const wrapper = mountPendingDialog()
     await flushPromises()
     const vm = state(wrapper)
 
@@ -213,7 +230,7 @@ describe('PendingTasksListDialog interactions', () => {
       return Promise.reject(new Error('offline'))
     })
 
-    const wrapper = shallowMountWithQuasar(PendingTasksListDialog)
+    const wrapper = mountPendingDialog()
     await flushPromises()
 
     expect(state(wrapper).loading).toBe(false)
