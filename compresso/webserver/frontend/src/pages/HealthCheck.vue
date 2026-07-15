@@ -107,6 +107,7 @@
                 color="negative"
                 :label="$t('pages.healthCheck.cancelScan')"
                 outline
+                :disable="scanPhase === 'cancelling'"
                 @click="cancelScan"
               />
             </div>
@@ -146,7 +147,26 @@
           </div>
 
           <!-- Scan Progress Panel -->
-          <div v-if="scanning" class="q-mt-md">
+          <div v-if="showScanProgress" class="q-mt-md" data-testid="scan-progress">
+            <q-banner dense rounded class="q-mb-sm" :class="`bg-${scanPhaseColor} text-white`" data-testid="scan-phase">
+              <div class="row items-center no-wrap">
+                <q-icon :name="scanPhaseIcon" size="sm" class="q-mr-sm" />
+                <div>
+                  <div class="text-weight-medium">{{ scanPhaseLabel }}</div>
+                  <div v-if="scanPhase === 'discovering'" class="text-caption">
+                    {{
+                      $t('pages.healthCheck.discoveryCounts', {
+                        discovered: scanProgress.discovered || 0,
+                        checked: scanProgress.checked || 0,
+                      })
+                    }}
+                  </div>
+                  <div v-if="scanPhase === 'failed' && scanProgress.error" class="text-caption">
+                    {{ scanProgress.error }}
+                  </div>
+                </div>
+              </div>
+            </q-banner>
             <div class="row items-center q-mb-sm">
               <div class="col">
                 <q-linear-progress :value="scanProgressPercent" color="primary" size="20px" rounded>
@@ -167,10 +187,13 @@
                   {{ $t('pages.healthCheck.filesPerSec') }}
                 </span>
               </div>
-              <div class="col-auto">
+              <div v-if="scanProgress.discovery_complete" class="col-auto">
                 <span class="text-caption">
                   {{ $t('pages.healthCheck.etaLabel') }} {{ formatEta(scanProgress.eta_seconds) }}
                 </span>
+              </div>
+              <div v-else-if="scanPhase === 'discovering'" class="col-auto">
+                <span class="text-caption">{{ $t('pages.healthCheck.etaAfterDiscovery') }}</span>
               </div>
             </div>
             <!-- Per-worker status -->
@@ -341,7 +364,18 @@ export default {
     const loadingSummary = ref(true)
     const summary = ref({ healthy: 0, warning: 0, corrupted: 0, unchecked: 0, checking: 0, total: 0 })
     const scanning = ref(false)
-    const scanProgress = ref({ total: 0, checked: 0, workers: {}, files_per_second: 0, eta_seconds: 0 })
+    const scanProgress = ref({
+      phase: 'idle',
+      total: 0,
+      discovered: 0,
+      discovery_complete: false,
+      checked: 0,
+      cancelled: false,
+      error: null,
+      workers: {},
+      files_per_second: 0,
+      eta_seconds: 0,
+    })
     const workerCount = ref(1)
     const scanProgressPercent = ref(0)
     const selectedLibraryId = ref(1)
@@ -398,6 +432,36 @@ export default {
       { label: t('pages.healthCheck.filterCorrupted'), value: 'corrupted' },
       { label: t('pages.healthCheck.filterUnchecked'), value: 'unchecked' },
     ])
+
+    const scanPhase = computed(() => scanProgress.value.phase || (scanning.value ? 'checking' : 'idle'))
+    const showScanProgress = computed(
+      () => scanning.value || ['complete', 'cancelled', 'failed'].includes(scanPhase.value),
+    )
+    const scanPhaseLabel = computed(() => {
+      const labels = {
+        discovering: 'pages.healthCheck.phaseDiscovering',
+        checking: 'pages.healthCheck.phaseChecking',
+        cancelling: 'pages.healthCheck.phaseCancelling',
+        complete: 'pages.healthCheck.phaseComplete',
+        cancelled: 'pages.healthCheck.phaseCancelled',
+        failed: 'pages.healthCheck.phaseFailed',
+      }
+      return t(labels[scanPhase.value] || 'pages.healthCheck.phaseIdle')
+    })
+    const scanPhaseColor = computed(() => {
+      if (scanPhase.value === 'failed') return 'negative'
+      if (scanPhase.value === 'cancelled' || scanPhase.value === 'cancelling') return 'warning'
+      if (scanPhase.value === 'complete') return 'positive'
+      return 'info'
+    })
+    const scanPhaseIcon = computed(() => {
+      if (scanPhase.value === 'failed') return 'error'
+      if (scanPhase.value === 'cancelled') return 'cancel'
+      if (scanPhase.value === 'complete') return 'check_circle'
+      if (scanPhase.value === 'cancelling') return 'pending'
+      if (scanPhase.value === 'discovering') return 'travel_explore'
+      return 'fact_check'
+    })
 
     function getStatusColor(status) {
       if (status === 'healthy') return 'positive'
@@ -540,6 +604,7 @@ export default {
     async function cancelScan() {
       try {
         await axios.post(getCompressoApiUrl('v2', 'healthcheck/cancel-scan'))
+        scanProgress.value = { ...scanProgress.value, phase: 'cancelling' }
         $q.notify({ type: 'info', message: t('pages.healthCheck.scanCancelRequested') })
       } catch (error) {
         log.error('Error cancelling scan: ' + error)
@@ -674,6 +739,11 @@ export default {
       scanning,
       scanProgress,
       scanProgressPercent,
+      scanPhase,
+      showScanProgress,
+      scanPhaseLabel,
+      scanPhaseColor,
+      scanPhaseIcon,
       workerCount,
       selectedLibraryId,
       scanMode,

@@ -1054,6 +1054,59 @@
                 ],
                 "additionalProperties": false
             },
+            "HealthCheckProgress": {
+                "type": "object",
+                "properties": {
+                    "phase": {
+                        "type": "string",
+                        "description": "idle, discovering, checking, cancelling, complete, cancelled, or failed"
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "discovered": {
+                        "type": "integer"
+                    },
+                    "discovery_complete": {
+                        "type": "boolean"
+                    },
+                    "checked": {
+                        "type": "integer"
+                    },
+                    "cancelled": {
+                        "type": "boolean"
+                    },
+                    "error": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "library_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "worker_count": {
+                        "type": "integer"
+                    },
+                    "max_workers": {
+                        "type": "integer"
+                    },
+                    "workers": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "start_time": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "files_per_second": {
+                        "type": "number"
+                    },
+                    "eta_seconds": {
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
             "HealthCheckSummaryResponse": {
                 "type": "object",
                 "properties": {
@@ -1083,7 +1136,9 @@
                     "scanning": {
                         "type": "boolean"
                     },
-                    "scan_progress": {}
+                    "scan_progress": {
+                        "$ref": "#/components/schemas/HealthCheckProgress"
+                    }
                 },
                 "required": [
                     "success"
@@ -1208,7 +1263,9 @@
                     "scanning": {
                         "type": "boolean"
                     },
-                    "scan_progress": {}
+                    "scan_progress": {
+                        "$ref": "#/components/schemas/HealthCheckProgress"
+                    }
                 },
                 "required": [
                     "success"
