@@ -53,7 +53,7 @@ def test_snapshot_caches_dynamic_sensor_and_performance_reads_within_ttl():
     probe = WorkerCapabilities(ffmpeg_info=MagicMock())
 
     with (
-        patch("compresso.libs.worker_capabilities.time.monotonic", side_effect=[100.0, 110.0, 131.0]),
+        patch("compresso.libs.worker_capabilities.monotonic", side_effect=[100.0, 110.0, 131.0]),
         patch.object(probe, "_thermal_snapshot", side_effect=[{"state": "nominal"}, {"state": "warm"}]) as thermal,
         patch.object(probe, "_performance_snapshot", side_effect=[{"sample_count": 1}, {"sample_count": 2}]) as performance,
         patch(

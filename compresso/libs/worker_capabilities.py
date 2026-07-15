@@ -7,8 +7,8 @@ import os
 import platform
 import shutil
 import threading
-import time
 from collections import defaultdict
+from time import monotonic
 
 import psutil
 
@@ -86,7 +86,7 @@ class WorkerCapabilities:
 
     def _dynamic_snapshot(self):
         """Cache sensor and historical-throughput reads for a short polling window."""
-        now = time.monotonic()
+        now = monotonic()
         with self._lock:
             if self._dynamic_capabilities is None or now - self._dynamic_cached_at >= self._DYNAMIC_CACHE_TTL_SECONDS:
                 self._dynamic_capabilities = {
