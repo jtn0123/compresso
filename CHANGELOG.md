@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/jtn0123/compresso/compare/v1.13.6...v1.14.0) (2026-07-15)
+
+
+### Features
+
+* bound resumable media transfers ([#201](https://github.com/jtn0123/compresso/issues/201)) ([e2cc35b](https://github.com/jtn0123/compresso/commit/e2cc35ba5cd5e9610fed0d0feacbdec37d451726))
+
 ## [1.13.6](https://github.com/jtn0123/compresso/compare/v1.13.5...v1.13.6) (2026-07-15)
 
 
