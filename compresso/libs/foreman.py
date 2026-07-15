@@ -458,6 +458,7 @@ class Foreman(threading.Thread):
             remote_auth = available_installations[installation_uuid].get("auth", "None")
             remote_username = available_installations[installation_uuid].get("username", "")
             remote_password = available_installations[installation_uuid].get("password", "")
+            remote_api_token = available_installations[installation_uuid].get("api_token", "")
             remote_library_names = available_installations[installation_uuid].get("library_names", [])
             available_slots = available_installations[installation_uuid].get("available_slots", 0)
             capabilities = available_installations[installation_uuid].get("capabilities", {})
@@ -478,6 +479,7 @@ class Foreman(threading.Thread):
                     "auth": remote_auth,
                     "username": remote_username,
                     "password": remote_password,
+                    "api_token": remote_api_token,
                     "library_names": remote_library_names,
                     "capabilities": capabilities,
                     "scheduling_score": scheduling_score,

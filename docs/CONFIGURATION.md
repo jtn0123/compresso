@@ -91,4 +91,4 @@ services:
     #   - /dev/dri:/dev/dri
 ```
 
-The loopback host binding is the safe default. A master that must accept LAN workers can use `8888:8888` after enabling API authentication and restricting access with the host firewall.
+The loopback host binding is the safe default. A master that must accept LAN workers can use `8888:8888` after enabling API authentication and restricting access with the host firewall. Configure a unique destination `api_token` on each remote link; it is masked on read and is not returned by the general settings endpoint. Basic authentication remains supported independently. API v1 is authenticated and rate-limited but deprecated for removal in the next major release.

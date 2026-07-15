@@ -44,8 +44,12 @@ Optional API protection can be enabled with:
 - `api_auth_token=<token>` (generated into owner-only `settings.json` when omitted)
 - `csrf_protection_enabled=true`
 
-When token auth is enabled, every dynamic API, proxy, plugin API, and WebSocket request requires the token. The readiness endpoint remains public for container health checks. The browser asks for the token once per tab and keeps it in session storage.
+When token auth is enabled, every dynamic API, proxy, plugin API, and WebSocket request requires the token. This includes deprecated API v1 routes; v1 responses carry deprecation headers and v1 will be removed in the next major release. The readiness endpoint remains public for container health checks. The browser asks for the token once per tab and keeps it in session storage.
 
-When CSRF protection is enabled, mutating browser-originating requests must echo the `compresso_csrf_token` cookie in `X-Compresso-CSRF-Token`.
+When CSRF protection is enabled, mutating browser-originating requests must echo the `compresso_csrf_token` cookie in `X-Compresso-CSRF-Token`. A request carrying the installation's valid API token is treated as non-cookie service authentication and does not also need a browser CSRF cookie.
+
+Each remote-link record can store a separate `api_token` for the destination worker while continuing to use optional Basic authentication. The token is local-only: it is sent to that worker in `X-Compresso-Api-Token`, masked by the dedicated link API, omitted from general settings responses, and never synchronized back to the worker. Proxy requests discard browser cookies, master credentials, CSRF/origin headers, and target-selection headers before applying the selected worker's credentials. Proxy responses expose only required content, cache, range, checksum, and transfer metadata.
+
+`GET /compresso/api/v2/settings/read` is a public browser serializer, not a configuration backup endpoint. It omits the master API token, notification credentials, and remote authentication fields. Those values are managed only through their dedicated endpoints; `/settings/write` rejects protected keys.
 
 Public internet exposure still requires a reverse proxy with TLS and authentication. Do not expose Compresso directly.

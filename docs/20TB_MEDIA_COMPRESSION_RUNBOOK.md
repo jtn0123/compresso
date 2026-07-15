@@ -8,6 +8,7 @@ This runbook is the release gate for compressing a 20 TB media library with one 
 - Every remote machine runs its own Compresso installation, database, and fast local cache.
 - Only the master scans the production library. Never share a Compresso SQLite database between machines.
 - Keep traffic on a trusted LAN or VPN. Put TLS and authentication at a reverse proxy before crossing an untrusted network.
+- Give every node its own API token. In the master's M4 link, store the M4 worker's token; in the M4's master link, store the master's token. Never reuse the master token as a shared cluster secret.
 - Start the M4 worker with one concurrent encode. Increase concurrency only from measured thermal, memory, and throughput evidence.
 
 ## Non-negotiable safeguards
@@ -65,6 +66,12 @@ Reports expire after 24 hours. Do not begin a batch from an expired report or
 when the strict command exits nonzero. Connected peer probes require the linked
 installation address to use HTTPS. `--output` accepts a filename, not a path;
 reports are stored under the node's user-data `readiness` directory.
+
+Configure each remote under **Settings > Links**. The optional worker API token
+is independent of Basic authentication and is masked after saving. A masked
+`********` value means "keep the stored token"; clearing the field removes it.
+The general settings API intentionally returns only remote status and scheduling
+fields, never remote usernames, passwords, or tokens.
 
 Open **Deployment Readiness** at `/compresso/ui/readiness` before starting or
 resuming a batch. This page combines the latest doctor report with the durable

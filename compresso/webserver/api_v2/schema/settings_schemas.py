@@ -146,6 +146,11 @@ class RequestSettingsRemoteInstallationAddressValidationSchema(BaseSchema):
         metadata={"description": "An optional password", "example": "bar"},
         allow_none=True,
     )
+    api_token = fields.Str(
+        required=False,
+        metadata={"description": "An optional API token unique to this remote installation", "example": ""},
+        allow_none=True,
+    )
 
 
 class SettingsRemoteInstallationDataSchema(BaseSchema):
@@ -178,6 +183,7 @@ class SettingsRemoteInstallationLinkConfigSchema(BaseSchema):
                 "auth": "None",
                 "username": "",
                 "password": "",
+                "api_token": "",
                 "available": True,
                 "name": "API schema generated",
                 "version": "0.1.3",

@@ -501,6 +501,8 @@
         "authentication": "Authentication",
         "username": "Username",
         "password": "Password",
+        "apiToken": "Worker API token",
+        "apiTokenHint": "Optional token used only when this installation contacts that worker",
         "add": "Add",
         "connection": "Connection",
         "remoteTaskProcessing": "Remote Task Processing",

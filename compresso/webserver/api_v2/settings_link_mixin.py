@@ -76,6 +76,7 @@ class LinkSettingsMixin:
                 auth=json_request.get("auth"),
                 username=json_request.get("username"),
                 password=json_request.get("password"),
+                api_token=json_request.get("api_token"),
             )
 
             response = self.build_response(
@@ -152,6 +153,7 @@ class LinkSettingsMixin:
                         "auth": data.get("auth"),
                         "username": data.get("username"),
                         "password": MASKED_SECRET_SENTINEL if data.get("password") else "",
+                        "api_token": MASKED_SECRET_SENTINEL if data.get("api_token") else "",
                         "available": data.get("available", False),
                         "name": data.get("name"),
                         "version": data.get("version"),
@@ -225,9 +227,11 @@ class LinkSettingsMixin:
             # Update a single remote installation config by matching the UUID
             links = Links()
             link_config = json_request.get("link_config")
-            if link_config.get("password") == MASKED_SECRET_SENTINEL:
+            masked_fields = [field for field in ("password", "api_token") if link_config.get(field) == MASKED_SECRET_SENTINEL]
+            if masked_fields:
                 existing = links.read_remote_installation_link_config(link_config.get("uuid"))
-                link_config["password"] = existing.get("password", "")
+                for field in masked_fields:
+                    link_config[field] = existing.get(field, "")
             links.update_single_remote_installation_link_config(
                 link_config, json_request.get("distributed_worker_count_target", 0)
             )

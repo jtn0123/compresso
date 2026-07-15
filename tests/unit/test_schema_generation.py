@@ -154,3 +154,9 @@ class TestSwaggerConstants:
         assert "BasicAuth" in OPENAPI_SPEC_SECURITY["components"]["securitySchemes"]
         assert OPENAPI_SPEC_SECURITY["components"]["securitySchemes"]["BasicAuth"]["scheme"] == "basic"
         assert {"BasicAuth": []} in OPENAPI_SPEC_SECURITY["security"]
+        assert OPENAPI_SPEC_SECURITY["components"]["securitySchemes"]["ApiToken"] == {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-Compresso-Api-Token",
+        }
+        assert {"ApiToken": []} in OPENAPI_SPEC_SECURITY["security"]

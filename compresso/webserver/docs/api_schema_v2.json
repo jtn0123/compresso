@@ -12,6 +12,11 @@
     ],
     "components": {
         "securitySchemes": {
+            "ApiToken": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Compresso-Api-Token"
+            },
             "BasicAuth": {
                 "type": "http",
                 "scheme": "basic"
@@ -24,11 +29,14 @@
                     "start": {
                         "type": "integer",
                         "default": 0,
+                        "minimum": 0,
                         "description": "Pagination offset"
                     },
                     "length": {
                         "type": "integer",
                         "default": 10,
+                        "minimum": 1,
+                        "maximum": 1000,
                         "description": "Number of records to return"
                     },
                     "search_value": {
@@ -48,6 +56,50 @@
                         "type": "boolean",
                         "default": false,
                         "description": "Include library name in results"
+                    },
+                    "order_by": {
+                        "type": "string",
+                        "default": "finish_time",
+                        "enum": [
+                            "id",
+                            "abspath",
+                            "priority",
+                            "type",
+                            "status",
+                            "library_id",
+                            "start_time",
+                            "finish_time",
+                            "source_size",
+                            "vmaf_score",
+                            "ssim_score"
+                        ],
+                        "description": "Column to order results by",
+                        "example": "finish_time"
+                    },
+                    "order_direction": {
+                        "type": "string",
+                        "default": "desc",
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "description": "Order direction ('asc' or 'desc')",
+                        "example": "desc"
+                    },
+                    "codec": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Filter by source or staged codec",
+                        "example": "hevc",
+                        "nullable": true
+                    },
+                    "quality_min": {
+                        "type": "number",
+                        "default": 0.0,
+                        "minimum": 0.0,
+                        "maximum": 100.0,
+                        "description": "Minimum VMAF score to include",
+                        "example": 85
                     }
                 },
                 "additionalProperties": false
@@ -101,6 +153,16 @@
                         "type": "string",
                         "default": ""
                     },
+                    "vmaf_score": {
+                        "type": "number",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "ssim_score": {
+                        "type": "number",
+                        "default": null,
+                        "nullable": true
+                    },
                     "library_id": {
                         "type": "integer",
                         "default": null,
@@ -140,21 +202,94 @@
                 ],
                 "additionalProperties": false
             },
-            "RequestApprovalAction": {
+            "ApprovalSummaryResponse": {
                 "type": "object",
                 "properties": {
-                    "id_list": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "This is always \"True\" when a request succeeds",
+                        "example": true
+                    },
+                    "total_count": {
+                        "type": "integer"
+                    },
+                    "total_source_size": {
+                        "type": "integer"
+                    },
+                    "total_staged_size": {
+                        "type": "integer"
+                    },
+                    "total_space_saved": {
+                        "type": "integer"
+                    },
+                    "average_savings_percent": {
+                        "type": "number"
+                    },
+                    "largest_savings_file": {
+                        "type": "string"
+                    },
+                    "largest_savings_bytes": {
+                        "type": "integer"
+                    },
+                    "average_vmaf": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "codec_options": {
                         "type": "array",
-                        "minItems": 1,
-                        "description": "List of task IDs to approve or reject",
                         "items": {
-                            "type": "integer"
+                            "type": "string"
                         }
                     }
                 },
                 "required": [
-                    "id_list"
+                    "success"
                 ],
+                "additionalProperties": false
+            },
+            "RequestApprovalAction": {
+                "type": "object",
+                "properties": {
+                    "search_value": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Search filter when all_matching is true"
+                    },
+                    "library_ids": {
+                        "type": "array",
+                        "default": [],
+                        "description": "Library filter when all_matching is true",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "codec": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Codec filter when all_matching is true",
+                        "nullable": true
+                    },
+                    "quality_min": {
+                        "type": "number",
+                        "default": 0.0,
+                        "minimum": 0.0,
+                        "maximum": 100.0,
+                        "description": "Minimum VMAF filter when all_matching is true"
+                    },
+                    "id_list": {
+                        "type": "array",
+                        "default": [],
+                        "description": "List of task IDs to approve or reject",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "all_matching": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, approve all tasks matching the current filter instead of explicit IDs"
+                    }
+                },
                 "additionalProperties": false
             },
             "BaseSuccess": {
@@ -174,9 +309,35 @@
             "RequestRejectAction": {
                 "type": "object",
                 "properties": {
+                    "search_value": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Search filter when all_matching is true"
+                    },
+                    "library_ids": {
+                        "type": "array",
+                        "default": [],
+                        "description": "Library filter when all_matching is true",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "codec": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Codec filter when all_matching is true",
+                        "nullable": true
+                    },
+                    "quality_min": {
+                        "type": "number",
+                        "default": 0.0,
+                        "minimum": 0.0,
+                        "maximum": 100.0,
+                        "description": "Minimum VMAF filter when all_matching is true"
+                    },
                     "id_list": {
                         "type": "array",
-                        "minItems": 1,
+                        "default": [],
                         "description": "List of task IDs to reject",
                         "items": {
                             "type": "integer"
@@ -186,11 +347,13 @@
                         "type": "boolean",
                         "default": false,
                         "description": "If true, requeue the tasks as pending instead of deleting them"
+                    },
+                    "all_matching": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, reject all tasks matching the current filter instead of explicit IDs"
                     }
                 },
-                "required": [
-                    "id_list"
-                ],
                 "additionalProperties": false
             },
             "RequestApprovalDetail": {
@@ -271,6 +434,16 @@
                     "staged_container": {
                         "type": "string",
                         "default": ""
+                    },
+                    "vmaf_score": {
+                        "type": "number",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "ssim_score": {
+                        "type": "number",
+                        "default": null,
+                        "nullable": true
                     }
                 },
                 "additionalProperties": false
@@ -298,12 +471,15 @@
                     "start": {
                         "type": "integer",
                         "default": 0,
+                        "minimum": 0,
                         "description": "Start row number to select from",
                         "example": 0
                     },
                     "length": {
                         "type": "integer",
                         "default": 10,
+                        "minimum": 1,
+                        "maximum": 1000,
                         "description": "Number of rows to select",
                         "example": 10
                     },
@@ -575,6 +751,24 @@
                     },
                     "percent": {
                         "type": "number"
+                    }
+                },
+                "required": [
+                    "success"
+                ],
+                "additionalProperties": false
+            },
+            "EncodingSpeedTimeline": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "This is always \"True\" when a request succeeds",
+                        "example": true
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {}
                     }
                 },
                 "required": [
@@ -902,12 +1096,15 @@
                     "start": {
                         "type": "integer",
                         "default": 0,
+                        "minimum": 0,
                         "description": "Start row number to select from",
                         "example": 0
                     },
                     "length": {
                         "type": "integer",
                         "default": 10,
+                        "minimum": 1,
+                        "maximum": 1000,
                         "description": "Number of rows to select",
                         "example": 10
                     },
@@ -1284,12 +1481,15 @@
                     "start": {
                         "type": "integer",
                         "default": 0,
+                        "minimum": 0,
                         "description": "Start row number to select from",
                         "example": 0
                     },
                     "length": {
                         "type": "integer",
                         "default": 10,
+                        "minimum": 1,
+                        "maximum": 1000,
                         "description": "Number of rows to select",
                         "example": 10
                     },
@@ -1630,12 +1830,15 @@
                     "start": {
                         "type": "integer",
                         "default": 0,
+                        "minimum": 0,
                         "description": "Start row number to select from",
                         "example": 0
                     },
                     "length": {
                         "type": "integer",
                         "default": 10,
+                        "minimum": 1,
+                        "maximum": 1000,
                         "description": "Number of rows to select",
                         "example": 10
                     },
@@ -1668,6 +1871,20 @@
                     "order_by": {
                         "type": "string",
                         "default": "priority",
+                        "enum": [
+                            "id",
+                            "abspath",
+                            "priority",
+                            "type",
+                            "status",
+                            "library_id",
+                            "start_time",
+                            "finish_time",
+                            "source_size",
+                            "retry_count",
+                            "max_retries",
+                            "deferred_until"
+                        ],
                         "example": "priority"
                     },
                     "order_direction": {
@@ -1737,6 +1954,10 @@
                         "type": "string",
                         "description": "The name of the library for which this task was created",
                         "example": "Default"
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "Stable cross-installation job identifier"
                     }
                 },
                 "required": [
@@ -1769,6 +1990,11 @@
                         "items": {
                             "$ref": "#/components/schemas/PendingTasksTableResults"
                         }
+                    },
+                    "runnableRecords": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Pending tasks that are not deferred and can be claimed now"
                     }
                 },
                 "required": [
@@ -1914,6 +2140,10 @@
                     },
                     "type": {
                         "type": "string",
+                        "enum": [
+                            "local",
+                            "remote"
+                        ],
                         "description": "The type of pending task to create (local/remote)",
                         "example": "local"
                     },
@@ -1921,6 +2151,18 @@
                         "type": "integer",
                         "description": "Apply a priority score to the created task to either increase or decrease its position in the queue",
                         "example": 1000
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "Stable job identifier supplied by the master"
+                    },
+                    "lease_token": {
+                        "type": "string",
+                        "description": "Current master lease token"
+                    },
+                    "origin_installation_uuid": {
+                        "type": "string",
+                        "description": "Installation UUID that owns the job"
                     }
                 },
                 "required": [
@@ -2046,12 +2288,15 @@
                     "start": {
                         "type": "integer",
                         "default": 0,
+                        "minimum": 0,
                         "description": "Start row number to select from",
                         "example": 0
                     },
                     "length": {
                         "type": "integer",
                         "default": 10,
+                        "minimum": 1,
+                        "maximum": 1000,
                         "description": "Number of rows to select",
                         "example": 10
                     },
@@ -2600,28 +2845,6 @@
                 ],
                 "additionalProperties": false
             },
-            "PluginTypesResults": {
-                "type": "object",
-                "properties": {
-                    "results": {
-                        "type": "array",
-                        "description": "List of Plugin Type IDs supported by this installation",
-                        "example": [
-                            "library_management.file_test",
-                            "postprocessor.file_move",
-                            "postprocessor.task_result",
-                            "worker.process"
-                        ],
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "required": [
-                    "results"
-                ],
-                "additionalProperties": false
-            },
             "PluginFlowDataResults": {
                 "type": "object",
                 "properties": {
@@ -2663,6 +2886,45 @@
                     "name",
                     "plugin_id",
                     "version"
+                ],
+                "additionalProperties": false
+            },
+            "PluginFlowResults": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "minItems": 0,
+                        "description": "Results",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PluginFlowDataResults"
+                        }
+                    }
+                },
+                "required": [
+                    "results"
+                ],
+                "additionalProperties": false
+            },
+            "PluginTypesResults": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "description": "List of Plugin Type IDs supported by this installation",
+                        "example": [
+                            "library_management.file_test",
+                            "postprocessor.file_move",
+                            "postprocessor.task_result",
+                            "worker.process"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "results"
                 ],
                 "additionalProperties": false
             },
@@ -2930,6 +3192,12 @@
                         "description": "An optional password",
                         "example": "bar",
                         "nullable": true
+                    },
+                    "api_token": {
+                        "type": "string",
+                        "description": "An optional API token unique to this remote installation",
+                        "example": "",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -3103,6 +3371,7 @@
                             "auth": "None",
                             "username": "",
                             "password": "",
+                            "api_token": "",
                             "available": true,
                             "name": "API schema generated",
                             "version": "0.1.3",
@@ -3519,6 +3788,16 @@
                         "description": "GPU type",
                         "example": "nvidia"
                     },
+                    "hwaccel": {
+                        "type": "string",
+                        "description": "FFmpeg hardware accelerator",
+                        "example": "nvenc"
+                    },
+                    "index": {
+                        "type": "integer",
+                        "description": "GPU device index",
+                        "example": 0
+                    },
                     "name": {
                         "type": "string",
                         "description": "GPU name",
@@ -3537,6 +3816,8 @@
                 },
                 "required": [
                     "driver_version",
+                    "hwaccel",
+                    "index",
                     "memory_total_mb",
                     "name",
                     "type"
@@ -3757,6 +4038,9 @@
     },
     "security": [
         {
+            "ApiToken": []
+        },
+        {
             "BasicAuth": []
         }
     ],
@@ -3782,6 +4066,34 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApprovalTasksResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/approval/summary": {
+            "post": {
+                "description": "Aggregate tasks awaiting approval with optional filters.",
+                "requestBody": {
+                    "description": "Filter parameters.",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestApprovalTasks"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Aggregate summary for tasks awaiting approval.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApprovalSummaryResponse"
                                 }
                             }
                         }
@@ -4084,6 +4396,23 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/OptimizationProgress"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/compression/encoding-speed": {
+            "get": {
+                "description": "Returns encoding speed data over time for charting.",
+                "responses": {
+                    "200": {
+                        "description": "Returns encoding speed timeline data.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EncodingSpeedTimeline"
                                 }
                             }
                         }
@@ -4987,6 +5316,81 @@
                 }
             }
         },
+        "/notifications/channels": {
+            "get": {
+                "description": "Returns the list of configured external notification channels with webhook URLs partially masked.",
+                "responses": {
+                    "200": {
+                        "description": "List of configured notification channels."
+                    },
+                    "500": {
+                        "description": "Internal error"
+                    }
+                }
+            }
+        },
+        "/notifications/channels/save": {
+            "post": {
+                "description": "Save the full list of notification channels to config.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "channels": {
+                                        "type": "array"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Channels saved successfully."
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "description": "Internal error"
+                    }
+                }
+            }
+        },
+        "/notifications/channels/test": {
+            "post": {
+                "description": "Send a test notification to a single channel.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "channel": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Test result with success boolean."
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "description": "Internal error"
+                    }
+                }
+            }
+        },
         "/pending/tasks": {
             "post": {
                 "description": "Returns a list of pending tasks.",
@@ -5851,48 +6255,8 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Successful request; Returns success status",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BaseSuccess"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request; Check `messages` for any validation errors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadRequest"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Bad request; Requested endpoint not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadEndpoint"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Bad request; Requested method is not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadMethod"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal error; Check `error` for exception",
+                    "410": {
+                        "description": "Endpoint is deprecated",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6389,7 +6753,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PluginsInstallableResults"
+                                    "$ref": "#/components/schemas/PluginFlowResults"
                                 }
                             }
                         }
@@ -6510,11 +6874,11 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Sample response: Save the plugin flow for a requested plugin type.",
+                        "description": "Successful request; Returns success status",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PluginsInstallableResults"
+                                    "$ref": "#/components/schemas/BaseSuccess"
                                 }
                             }
                         }
@@ -8226,6 +8590,63 @@
                 "responses": {
                     "200": {
                         "description": "Sample response: Returns system status metrics.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SystemStatusSuccess"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request; Check `messages` for any validation errors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequest"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Bad request; Requested endpoint not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadEndpoint"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Bad request; Requested method is not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadMethod"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error; Check `error` for exception",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system/gpu-metrics": {
+            "get": {
+                "description": "Returns real-time GPU utilization metrics and rolling history.",
+                "responses": {
+                    "200": {
+                        "description": "Sample response: Returns GPU metrics and history.",
                         "content": {
                             "application/json": {
                                 "schema": {

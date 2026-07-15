@@ -40,6 +40,44 @@ from compresso.webserver.api_v2.settings_library_mixin import LibrarySettingsMix
 from compresso.webserver.api_v2.settings_link_mixin import LinkSettingsMixin
 from compresso.webserver.api_v2.settings_worker_groups_mixin import WorkerGroupsMixin
 
+PROTECTED_SETTINGS = frozenset({"api_auth_token", "notification_channels", "remote_installations"})
+PUBLIC_REMOTE_INSTALLATION_FIELDS = (
+    "address",
+    "name",
+    "uuid",
+    "available",
+    "version",
+    "last_updated",
+    "enable_receiving_tasks",
+    "enable_sending_tasks",
+    "enable_task_preloading",
+    "preloading_count",
+    "enable_checksum_validation",
+    "enable_config_missing_libraries",
+    "enable_distributed_worker_count",
+    "distributed_worker_count_target",
+    "task_count",
+    "runnable_task_count",
+    "capabilities",
+)
+
+
+def serialize_public_settings(raw_settings):
+    """Return settings safe for browser clients and logs."""
+    settings = dict(raw_settings)
+    settings.pop("api_auth_token", None)
+    settings.pop("notification_channels", None)
+
+    public_remotes = []
+    remote_installations = settings.get("remote_installations", [])
+    if isinstance(remote_installations, list):
+        for remote in remote_installations:
+            if not isinstance(remote, dict):
+                continue
+            public_remotes.append({field: remote[field] for field in PUBLIC_REMOTE_INSTALLATION_FIELDS if field in remote})
+    settings["remote_installations"] = public_remotes
+    return settings
+
 
 class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMixin, BaseApiHandler):
     config = None
@@ -178,8 +216,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
                             InternalErrorSchema
         """
         try:
-            settings = self.config.get_config_as_dict().copy()
-            settings.pop("api_auth_token", None)
+            settings = serialize_public_settings(self.config.get_config_as_dict())
             response = self.build_response(
                 SettingsReadAndWriteSchema(),
                 {
@@ -244,15 +281,17 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             # Get settings dict from request
             settings_dict = json_request.get("settings", {})
 
-            # Remove config items that should not be saved through this API endpoint
-            remove_settings = ["remote_installations"]
-            for remove_setting in remove_settings:
-                if settings_dict.get(remove_setting):
-                    del settings_dict[remove_setting]
+            protected_keys = sorted(PROTECTED_SETTINGS.intersection(settings_dict))
+            if protected_keys:
+                raise BaseApiError(
+                    "Protected settings require their dedicated endpoint",
+                    messages={"settings": protected_keys},
+                    private_detail=f"Rejected protected settings: {', '.join(protected_keys)}",
+                )
 
             # Save settings - writing to file.
             # Throws exception if settings fail to save
-            self.config.set_bulk_config_items(json_request.get("settings", {}))
+            self.config.set_bulk_config_items(settings_dict)
 
             self.write_success()
             return
