@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/jtn0123/compresso/compare/v1.16.0...v1.16.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* harden backend workflow edge cases ([d3c4f48](https://github.com/jtn0123/compresso/commit/d3c4f4850935308662c23369c073598ea33f31df))
+
 # [1.16.0](https://github.com/jtn0123/compresso/compare/v1.15.0...v1.16.0) (2026-07-15)
 
 
