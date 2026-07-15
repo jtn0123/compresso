@@ -39,6 +39,22 @@ def _make_handler(tmp_path):
     return handler
 
 
+def _plugin_info(plugin_id, **overrides):
+    info = {
+        "id": plugin_id,
+        "plugin_id": plugin_id,
+        "name": "Test Plugin",
+        "author": "Compresso",
+        "version": "1.0",
+        "tags": "test",
+        "description": "Test plugin",
+        "icon": "",
+        "compatibility": [2],
+    }
+    info.update(overrides)
+    return info
+
+
 @pytest.mark.unittest
 class TestPluginRepoId:
     def test_get_plugin_repo_id_returns_int(self):
@@ -128,12 +144,17 @@ class TestPluginPaths:
     def test_external_archive_cannot_self_assert_bundled_trust(self, tmp_path):
         handler = _make_handler(tmp_path)
         archive_path = tmp_path / "external.zip"
-        info = {"id": "external", "version": "1", "compatibility": [2], "bundled": True}
+        info = _plugin_info("external", bundled=True)
         with zipfile.ZipFile(archive_path, "w") as archive:
             archive.writestr("info.json", json.dumps(info))
             archive.writestr("plugin.py", "")
 
-        installed = handler.install_plugin(str(archive_path), "external")
+        with (
+            patch.object(handler, "_snapshot_plugin_record", return_value=None),
+            patch.object(handler, "write_plugin_data_to_db", return_value=True),
+            patch("compresso.libs.plugins.PluginExecutor"),
+        ):
+            installed = handler.install_plugin(str(archive_path), "external")
 
         assert installed["bundled"] is False
         persisted = json.loads((tmp_path / "plugins" / "external" / "info.json").read_text())
@@ -443,15 +464,12 @@ class TestInstallPluginFromPath:
         handler = _make_handler(tmp_path)
         # Create a valid zip with info.json
         zip_path = tmp_path / "plugin.zip"
-        info = {"id": "zip_plugin", "name": "Zip Plugin", "version": "1.0", "compatibility": [2]}
+        info = _plugin_info("zip_plugin")
         with zipfile.ZipFile(str(zip_path), "w") as zf:
             zf.writestr("info.json", json.dumps(info))
 
         with (
             patch.object(handler, "install_plugin", return_value=info),
-            patch.object(handler, "write_plugin_data_to_db", return_value=True),
-            patch.object(handler, "get_plugin_path", return_value=str(tmp_path / "plugins" / "zip_plugin")),
-            patch("compresso.libs.plugins.PluginExecutor"),
         ):
             result = handler.install_plugin_from_path_on_disk(str(zip_path))
         assert result is True
@@ -563,12 +581,12 @@ class TestInstallNpmModules:
             PluginsHandler.install_npm_modules(str(tmp_path))
         mock_call.assert_not_called()
 
-    def test_rejects_runtime_npm_build_when_package_json_exists(self, tmp_path):
+    def test_rejects_package_json_without_lockfile(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
         pkg = tmp_path / "package.json"
         pkg.write_text('{"name": "test"}')
-        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="pre-built"):
+        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="package-lock.json"):
             PluginsHandler.install_npm_modules(str(tmp_path))
         mock_call.assert_not_called()
 
@@ -600,12 +618,12 @@ class TestSubprocessTimeouts:
         with patch("subprocess.call", return_value=1), pytest.raises(subprocess.CalledProcessError):
             PluginsHandler.install_plugin_requirements(str(tmp_path))
 
-    def test_npm_install_never_starts_subprocess(self, tmp_path):
+    def test_npm_install_without_lock_never_starts_subprocess(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
         pkg = tmp_path / "package.json"
         pkg.write_text('{"name": "test"}')
-        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="pre-built"):
+        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="package-lock.json"):
             PluginsHandler.install_npm_modules(str(tmp_path))
         mock_call.assert_not_called()
 
