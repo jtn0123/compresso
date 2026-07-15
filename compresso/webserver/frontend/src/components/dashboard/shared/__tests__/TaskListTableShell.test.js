@@ -9,6 +9,12 @@ const buttonStub = {
   template: '<button @click="$emit(\'click\')">{{ label }}</button>',
 }
 
+const iconButtonStub = {
+  name: 'QBtn',
+  emits: ['click'],
+  template: '<button @click="$emit(\'click\')" />',
+}
+
 const stubs = {
   'q-slide-transition': { template: '<div><slot /></div>' },
   'q-infinite-scroll': {
@@ -28,6 +34,7 @@ const stubs = {
   'q-item-label': { template: '<span><slot /></span>' },
   'q-spinner-dots': true,
   'q-inner-loading': true,
+  'q-btn': iconButtonStub,
   CompressoStandardButton: buttonStub,
 }
 
@@ -89,11 +96,7 @@ describe('TaskListTableShell', () => {
     buttonWithLabel(wrapper, 'More').vm.$emit('click')
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('load-more')).toHaveLength(1)
-    wrapper
-      .findAllComponents({ name: 'CompressoStandardButton' })
-      .filter((button) => button.props('label') === '')
-      .at(-1)
-      .vm.$emit('click')
+    wrapper.findComponent({ name: 'QBtn' }).vm.$emit('click')
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('scroll-top')).toHaveLength(1)
   })

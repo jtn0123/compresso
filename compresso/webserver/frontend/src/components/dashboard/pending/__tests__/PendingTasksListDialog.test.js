@@ -21,10 +21,6 @@ vi.mock('quasar', () => ({
 vi.mock('src/js/compressoGlobals', () => ({
   getCompressoApiUrl: (_version, endpoint) => `/api/${endpoint}`,
 }))
-vi.mock('src/composables/useMobile', () => ({
-  useMobile: () => ({ isMobile: false }),
-}))
-
 import axios from 'axios'
 import { shallowMountWithQuasar } from 'src/test-utils'
 import PendingTasksListDialog from '../PendingTasksListDialog.vue'
@@ -105,9 +101,10 @@ describe('PendingTasksListDialog interactions', () => {
     vm.toggleSelectPage(true)
     expect(vm.getSelectionPayload()).toEqual({ selection_mode: 'explicit', id_list: [1, 2] })
 
-    vm.selectAllMatchingResults()
     vm.searchValue = 'concert'
     vm.libraryFilters = [7]
+    await flushPromises()
+    vm.selectAllMatchingResults()
     vm.toggleRowSelection(vm.rows[0], false)
     expect(vm.selectedCount).toBe(79)
     expect(vm.getSelectionPayload()).toEqual({
@@ -192,13 +189,13 @@ describe('PendingTasksListDialog interactions', () => {
 
   it('refreshes the loaded head without discarding the loaded tail', async () => {
     const first = makeTasks(1, 51)
-    const refreshed = [{ id: 99, abspath: '/media/new.mkv', library_name: 'Movies' }, ...makeTasks(2, 49)]
+    const refreshed = [{ id: 99, abspath: '/media/new.mkv', library_name: 'Movies' }, ...makeTasks(1, 49)]
     let taskCalls = 0
     axios.mockImplementation(({ method, url }) => {
       if (method === 'get') return Promise.resolve(libraries)
       if (url === '/api/pending/tasks') {
         taskCalls += 1
-        return Promise.resolve(taskResponse(taskCalls === 1 ? first : refreshed, 51))
+        return Promise.resolve(taskResponse(taskCalls === 1 ? first : refreshed, taskCalls === 1 ? 51 : 52))
       }
       return Promise.resolve({ data: {} })
     })
@@ -208,9 +205,9 @@ describe('PendingTasksListDialog interactions', () => {
 
     await vm.fetchPendingTasks({ refreshTop: true, silent: true })
 
-    expect(vm.rows).toHaveLength(51)
+    expect(vm.rows).toHaveLength(52)
     expect(vm.rows[0].id).toBe(99)
-    expect(vm.rows[50].id).toBe(51)
+    expect(vm.rows[51].id).toBe(51)
   })
 
   it('notifies instead of mutating when an action has no selection', async () => {

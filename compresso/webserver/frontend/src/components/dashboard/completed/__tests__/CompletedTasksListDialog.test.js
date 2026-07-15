@@ -24,10 +24,6 @@ vi.mock('src/js/compressoGlobals', () => ({
 vi.mock('src/js/dateTools', () => ({
   default: { printDateTimeString: (value) => `date:${value}` },
 }))
-vi.mock('src/composables/useMobile', () => ({
-  useMobile: () => ({ isMobile: false }),
-}))
-
 import axios from 'axios'
 import { shallowMountWithQuasar } from 'src/test-utils'
 import CompletedTasksListDialog from '../CompletedTasksListDialog.vue'
@@ -119,11 +115,12 @@ describe('CompletedTasksListDialog interactions', () => {
     vm.toggleRowSelection(vm.rows[0], true)
     expect(vm.getSelectionPayload()).toEqual({ selection_mode: 'explicit', id_list: [1] })
 
-    vm.selectAllMatchingResults()
     vm.searchValue = 'holiday'
     vm.statusFilter = 'success'
     vm.sinceDate = '2026-01-01'
     vm.beforeDate = '2026-02-01'
+    await flushPromises()
+    vm.selectAllMatchingResults()
     vm.toggleRowSelection(vm.rows[1], false)
     expect(vm.selectedCount).toBe(119)
     expect(vm.getSelectionPayload()).toEqual({
@@ -209,12 +206,12 @@ describe('CompletedTasksListDialog interactions', () => {
 
   it('refreshes the loaded head while retaining the loaded tail', async () => {
     const first = makeTasks(1, 51)
-    const refreshed = [{ ...makeTasks(99, 1)[0], task_label: 'Newest' }, ...makeTasks(2, 49)]
+    const refreshed = [{ ...makeTasks(99, 1)[0], task_label: 'Newest' }, ...makeTasks(1, 49)]
     let calls = 0
     axios.mockImplementation(({ url }) => {
       if (url === '/api/history/tasks') {
         calls += 1
-        return Promise.resolve(taskResponse(calls === 1 ? first : refreshed, 51))
+        return Promise.resolve(taskResponse(calls === 1 ? first : refreshed, calls === 1 ? 51 : 52))
       }
       return Promise.resolve({ data: {} })
     })
@@ -224,9 +221,9 @@ describe('CompletedTasksListDialog interactions', () => {
 
     await vm.fetchCompletedTasks({ refreshTop: true, silent: true })
 
-    expect(vm.rows).toHaveLength(51)
+    expect(vm.rows).toHaveLength(52)
     expect(vm.rows[0].id).toBe(99)
-    expect(vm.rows[50].id).toBe(51)
+    expect(vm.rows[51].id).toBe(51)
   })
 
   it('opens task details through the Quasar dialog boundary', async () => {

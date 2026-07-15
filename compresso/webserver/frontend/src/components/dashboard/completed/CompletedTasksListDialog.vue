@@ -151,7 +151,6 @@
         :loading="loading"
         :all-loaded="allLoaded"
         :error="error"
-        :is-mobile="isMobile"
         :show-scroll-top="showScrollTop"
         :selection-visible="(allPageSelected || selectAllMatching) && actionsExpanded"
         :show-select-all-prompt="showSelectAllMatchingPrompt"
@@ -501,7 +500,6 @@ import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import dateTools from 'src/js/dateTools'
-import { useMobile } from 'src/composables/useMobile'
 import { useTaskDialogScroll } from 'src/composables/useTaskDialogScroll'
 import { useTaskListController } from 'src/composables/useTaskListController'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
@@ -524,8 +522,6 @@ const emit = defineEmits(['hide'])
 
 const { t } = useI18n()
 const $q = useQuasar()
-const { isMobile } = useMobile()
-
 const dialogRef = ref(null)
 const metadataDialogRef = ref(null)
 const metadataDialogTaskId = ref('')

@@ -10,18 +10,27 @@
           <div class="task-list-selection-banner__actions">
             <CompressoStandardButton
               v-if="showSelectAllPrompt"
+              outline
+              color="secondary"
               dense
               :label="selectionSelectAllLabel"
               @click="$emit('select-all-matching')"
             />
-            <CompressoStandardButton v-else dense :label="selectionClearLabel" @click="$emit('clear-selection')" />
+            <CompressoStandardButton
+              v-else
+              outline
+              color="secondary"
+              dense
+              :label="selectionClearLabel"
+              @click="$emit('clear-selection')"
+            />
           </div>
         </div>
       </div>
     </q-slide-transition>
 
     <div :id="scrollerId" ref="tableWrapperRef" class="task-list-table-wrapper" @scroll.passive="onScroll">
-      <div :class="[isMobile ? 'q-px-none' : 'q-px-sm', 'task-list-body q-pa-sm']">
+      <div class="task-list-body q-pa-sm">
         <div v-if="error && rows.length === 0" class="task-list-state text-negative">
           <q-icon size="2em" name="error_outline" />
           <div>{{ errorLabel }}</div>
@@ -76,11 +85,12 @@
         </q-inner-loading>
 
         <div v-show="showScrollTop" class="task-list-scroll-top">
-          <CompressoStandardButton
-            round
+          <q-btn
+            flat
             dense
+            round
+            color="secondary"
             icon="keyboard_arrow_up"
-            :label="''"
             :aria-label="scrollToTopLabel"
             :title="scrollToTopLabel"
             @click="$emit('scroll-top')"
@@ -102,7 +112,6 @@ defineProps({
   allLoaded: { type: Boolean, default: true },
   error: { type: [Error, Object, String], default: null },
   showScrollTop: { type: Boolean, default: false },
-  isMobile: { type: Boolean, default: false },
   selectionVisible: { type: Boolean, default: false },
   showSelectAllPrompt: { type: Boolean, default: false },
   selectionPageText: { type: String, default: '' },
@@ -220,6 +229,13 @@ defineExpose({ tableWrapperRef, manualLoadMore })
   .task-list-selection-banner__center {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 599px) {
+  .task-list-body {
+    padding-right: 0;
+    padding-left: 0;
   }
 }
 </style>

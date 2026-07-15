@@ -1,4 +1,3 @@
-import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { useTaskListController } from '../useTaskListController'
 
@@ -25,7 +24,7 @@ describe('useTaskListController', () => {
       .fn()
       .mockResolvedValueOnce({ rows: rows(1, 2), total: 3 })
       .mockResolvedValueOnce({ rows: rows(3, 1), total: 3 })
-      .mockResolvedValueOnce({ rows: [{ id: 9 }, { id: 2 }], total: 3 })
+      .mockResolvedValueOnce({ rows: [{ id: 9 }, { id: 1 }], total: 3 })
     const { controller } = makeController({ fetchPage })
 
     await controller.fetchTasks({ reset: true })
@@ -33,7 +32,7 @@ describe('useTaskListController', () => {
     await controller.fetchTasks({ refreshTop: true, silent: true })
 
     expect(fetchPage.mock.calls.map(([request]) => request.start)).toEqual([0, 2, 0])
-    expect(controller.rows.value).toEqual([{ id: 9 }, { id: 2 }, { id: 3 }])
+    expect(controller.rows.value).toEqual([{ id: 9 }, { id: 1 }, { id: 2 }])
     expect(controller.offset.value).toBe(3)
     expect(controller.allLoaded.value).toBe(true)
   })
@@ -92,9 +91,10 @@ describe('useTaskListController', () => {
     expect(onFetchError).toHaveBeenCalledWith(failure)
   })
 
-  it('finishes infinite scrolling immediately when busy or complete', async () => {
+  it('finishes infinite scrolling immediately when busy or complete', () => {
+    const fetchPage = vi.fn().mockResolvedValue({ rows: rows(1, 2), total: 4 })
     const { controller } = makeController({
-      fetchPage: vi.fn().mockResolvedValue({ rows: rows(1, 2), total: 4 }),
+      fetchPage,
     })
     const done = vi.fn()
 
@@ -102,8 +102,15 @@ describe('useTaskListController', () => {
     expect(done).toHaveBeenCalledWith(true)
 
     controller.totalCount.value = 4
+    controller.loading.value = true
     controller.loadMore(2, done)
-    await flushPromises()
     expect(done).toHaveBeenLastCalledWith(false)
+    expect(fetchPage).not.toHaveBeenCalled()
+
+    controller.loading.value = false
+    controller.loadingMore.value = true
+    controller.loadMore(3, done)
+    expect(done).toHaveBeenLastCalledWith(false)
+    expect(fetchPage).not.toHaveBeenCalled()
   })
 })

@@ -91,11 +91,8 @@ export function useTaskListController({ fetchPage, buildFiltersPayload = () => (
 
   const mergePage = (pageRows, { reset, refreshTop }) => {
     if (refreshTop && rows.value.length > 0) {
-      const updated = [...rows.value]
-      pageRows.forEach((row, index) => {
-        updated[index] = row
-      })
-      rows.value = updated
+      const refreshedIds = new Set(pageRows.map((row) => row.id))
+      rows.value = [...pageRows, ...rows.value.filter((row) => !refreshedIds.has(row.id))]
     } else if (reset || refreshTop) {
       rows.value = pageRows
     } else {
