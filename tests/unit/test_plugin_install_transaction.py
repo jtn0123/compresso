@@ -334,7 +334,7 @@ def test_npm_dependencies_use_lockfile_without_lifecycle_scripts(tmp_path):
     with patch("subprocess.call", return_value=0) as call:
         PluginsHandler.install_npm_modules(str(tmp_path))
 
-    assert Path(call.call_args.args[0][0]).name == "npm"
+    assert Path(call.call_args.args[0][0]).stem.casefold() == "npm"
     assert call.call_args.args[0][1:] == ["ci", "--ignore-scripts", "--omit=dev"]
     assert call.call_args.kwargs["cwd"] == str(tmp_path)
 
