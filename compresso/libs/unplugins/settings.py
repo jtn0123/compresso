@@ -35,6 +35,7 @@ import os
 import sys
 
 from compresso import config
+from compresso.libs.json_state import atomic_json_write
 
 _SETTINGS_FILENAME = "settings.json"
 
@@ -98,8 +99,7 @@ class PluginSettings:
         """
         plugin_settings_file = self.__get_plugin_settings_file(force_library_settings=True)
 
-        with open(plugin_settings_file, "w") as f:
-            json.dump(self.settings_configured, f, indent=2)
+        atomic_json_write(plugin_settings_file, self.settings_configured, mode=0o600)
 
     def __import_configured_settings(self):
         """

@@ -29,11 +29,11 @@ Copyright:
 
 """
 
-import contextlib
 import json
 import os
 import shutil
-import tempfile
+
+from compresso.libs.json_state import atomic_json_write
 
 JOURNAL_STATES = {
     "active",
@@ -124,17 +124,7 @@ class FileOperationTracker:
         if not self._journal_path:
             return
         os.makedirs(self._journal_dir, exist_ok=True)
-        fd, temporary_path = tempfile.mkstemp(prefix=".file-operation-", suffix=".tmp", dir=self._journal_dir)
-        try:
-            with os.fdopen(fd, "w") as journal_file:
-                json.dump(self._journal_data(), journal_file, sort_keys=True)
-                journal_file.flush()
-                os.fsync(journal_file.fileno())
-            os.replace(temporary_path, self._journal_path)
-        except Exception:
-            with contextlib.suppress(OSError):
-                os.remove(temporary_path)
-            raise
+        atomic_json_write(self._journal_path, self._journal_data(), mode=0o600)
 
     def record_created(self, filepath):
         """Persist that rollback must remove a newly created destination."""

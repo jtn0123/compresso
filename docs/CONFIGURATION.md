@@ -116,3 +116,18 @@ recheck. Operators can intentionally abandon an incomplete session with
 
 Plugin ZIP uploads remain separate from media ingress. They use the framework's
 ordinary multipart parser and are limited to 64 MiB compressed.
+
+## Crash-safe JSON state
+
+Installation-owned JSON state is written through one same-directory atomic
+writer. It flushes and `fsync`s the temporary file, replaces the prior document
+atomically, and `fsync`s the parent directory where the platform supports it.
+This covers `settings.json`, resumable-transfer manifests, the durable safety
+latch, recovery journals, scan checkpoints, log-forwarding offsets, media
+manifests, plugin settings, and operational reports.
+
+The root of `settings.json` must be a JSON object. A syntactically valid list,
+string, number, boolean, or null value is logged and ignored without rewriting
+the file. Startup then retains conservative defaults: loopback UI binding,
+library scanning disabled, and the safe worker cap. Remote task `data.json`
+files and sensitive configuration/state files are created owner-readable only.

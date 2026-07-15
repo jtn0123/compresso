@@ -10,9 +10,10 @@ import os
 import posixpath
 import random
 import subprocess
-import tempfile
 import time
 from collections import Counter
+
+from compresso.libs.json_state import atomic_json_write
 
 MEDIA_EXTENSIONS = {
     ".3gp",
@@ -49,19 +50,7 @@ def _sha256(path):
 
 
 def _atomic_json_write(path, data):
-    destination = os.path.abspath(path)
-    os.makedirs(os.path.dirname(destination), exist_ok=True)
-    fd, temporary_path = tempfile.mkstemp(prefix=".manifest-", suffix=".tmp", dir=os.path.dirname(destination))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as output:
-            json.dump(data, output, indent=2, sort_keys=True)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary_path, destination)
-    except Exception:
-        if os.path.exists(temporary_path):
-            os.unlink(temporary_path)
-        raise
+    atomic_json_write(path, data, mode=0o600)
 
 
 def probe_media(path):

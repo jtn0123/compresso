@@ -4,12 +4,13 @@
 
 import json
 import os
-import tempfile
 import threading
 import time
 from contextlib import suppress
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
+
+from compresso.libs.json_state import atomic_json_write
 
 CHECKPOINT_MTIME_SLOP_NS = 2_000_000_000
 
@@ -64,17 +65,7 @@ class ScanCheckpointStore:
             "updated_at_ns": time.time_ns(),
         }
         with self._lock:
-            fd, temporary_path = tempfile.mkstemp(prefix=".scan-checkpoint-", suffix=".tmp", dir=self.root)
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as checkpoint_file:
-                    json.dump(data, checkpoint_file, sort_keys=True)
-                    checkpoint_file.flush()
-                    os.fsync(checkpoint_file.fileno())
-                os.replace(temporary_path, path)
-            except Exception:
-                with suppress(OSError):
-                    os.unlink(temporary_path)
-                raise
+            atomic_json_write(path, data, mode=0o600)
 
     def clear(self, library_id):
         with self._lock, suppress(FileNotFoundError):

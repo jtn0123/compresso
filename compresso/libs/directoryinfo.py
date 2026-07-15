@@ -33,6 +33,8 @@ import configparser
 import json
 import os
 
+from compresso.libs.json_state import atomic_json_write
+
 
 class CompressoDirectoryInfoException(Exception):
     def __init__(self, message, path):
@@ -177,8 +179,7 @@ class CompressoDirectoryInfo:
         :return:
         """
         if self.json_data is not None:
-            with open(self.path, "w") as outfile:
-                json.dump(self.json_data, outfile, indent=2)
+            atomic_json_write(self.path, self.json_data)
             return
         elif self.config_parser:
             with open(self.path, "w") as outfile:

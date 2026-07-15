@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from compresso.libs.json_state import atomic_json_write
+
 _LOCKS_GUARD = threading.Lock()
 _LOCKS: dict[str, threading.RLock] = {}
 
@@ -129,20 +131,7 @@ class SafetyState:
 
     def _write(self, state: dict[str, Any]) -> None:
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        temp_path = self.path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-        payload = json.dumps(state, indent=2, sort_keys=True) + "\n"
-        try:
-            descriptor = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                handle.write(payload)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temp_path, self.path)
-            if os.name != "nt":
-                os.chmod(self.path, 0o600)
-        finally:
-            with suppress(OSError):
-                temp_path.unlink(missing_ok=True)
+        atomic_json_write(self.path, state, mode=0o600)
 
     @staticmethod
     def _public(state: dict[str, Any]) -> dict[str, Any]:

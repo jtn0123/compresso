@@ -24,6 +24,7 @@ from typing import Any
 from urllib.parse import quote
 
 from compresso.config import Config
+from compresso.libs.json_state import atomic_json_write
 
 SCHEMA_VERSION = 1
 ARCHIVE_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.zip")
@@ -87,30 +88,16 @@ def _owned_directory(userdata_root: Path, name: str) -> Path:
 
 def _private_exclusive_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    temporary = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    reserved_destination = False
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
-            json.dump(payload, output, indent=2, sort_keys=True)
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        try:
-            reservation = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        except FileExistsError as error:
-            raise BackupError("Refusing to overwrite an existing recovery rehearsal report") from error
-        else:
-            os.close(reservation)
-            reserved_destination = True
-        os.replace(temporary, path)
-        reserved_destination = False
-        if os.name != "nt":
-            os.chmod(path, 0o600)
-    finally:
-        temporary.unlink(missing_ok=True)
-        if reserved_destination:
-            path.unlink(missing_ok=True)
+        reservation = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as error:
+        raise BackupError("Refusing to overwrite an existing recovery rehearsal report") from error
+    os.close(reservation)
+    try:
+        atomic_json_write(path, payload, mode=0o600)
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
 
 
 def _sha256(path: Path) -> str:

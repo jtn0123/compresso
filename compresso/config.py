@@ -265,6 +265,10 @@ class Config(metaclass=SingletonType):
                     data = json.load(infile)
             except Exception as e:
                 logger.exception("Exception in reading saved settings from file: %s", e)
+                return
+            if not isinstance(data, dict):
+                logger.error("Ignoring settings file because its JSON root is not an object: %s", settings_file)
+                return
             # Set data to Config class
             self.set_bulk_config_items(data, save_settings=False)
 

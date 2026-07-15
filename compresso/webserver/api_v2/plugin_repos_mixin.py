@@ -15,6 +15,7 @@ import tornado.log
 from tornado.ioloop import IOLoop
 
 from compresso import config as compresso_config
+from compresso.libs.json_state import atomic_json_write
 from compresso.webserver.api_v2.base_api_handler import BaseApiError
 from compresso.webserver.api_v2.schema.plugin_schemas import (
     PluginReposListResultsSchema,
@@ -33,8 +34,7 @@ class PluginReposMixin:
 
     @staticmethod
     def _write_json_file(path, data):
-        with open(path, "w") as f:
-            json.dump(data, f)
+        atomic_json_write(path, data, mode=0o600)
 
     async def update_repo_list(self):
         """

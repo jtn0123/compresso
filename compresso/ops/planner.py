@@ -9,17 +9,16 @@ import contextlib
 import hashlib
 import heapq
 import json
-import os
 import re
 import shutil
 import sqlite3
 import sys
-import tempfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from compresso.config import Config
+from compresso.libs.json_state import atomic_json_write
 from compresso.webserver.helpers import library_analysis
 
 SCHEMA_VERSION = 1
@@ -358,20 +357,7 @@ def _plan_destination(settings: Any, output_name: str) -> Path:
 
 def save_plan(settings: Any, output_name: str, payload: dict[str, Any]) -> Path:
     destination = _plan_destination(settings, output_name)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{destination.name}-", suffix=".tmp", dir=destination.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as output:
-            json.dump(payload, output, indent=2, sort_keys=True)
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, destination)
-    except Exception:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
-        raise
+    atomic_json_write(destination, payload, mode=0o600)
     return destination
 
 
