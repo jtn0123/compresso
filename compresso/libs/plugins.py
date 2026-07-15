@@ -517,6 +517,28 @@ class PluginsHandler(metaclass=SingletonType):
         return PurePosixPath(*parts)
 
     @classmethod
+    def _validate_archive_member(cls, member, seen_paths):
+        member_path = cls._normalized_archive_path(member)
+        duplicate_key = member_path.as_posix().casefold()
+        if duplicate_key in seen_paths:
+            raise ValueError(f"Plugin archive contains a duplicate path: {member.filename}")
+        seen_paths.add(duplicate_key)
+
+        if member.flag_bits & 0x1:
+            raise ValueError(f"Plugin archive contains an encrypted member: {member.filename}")
+        if member.create_system == 3:
+            file_type = stat.S_IFMT(member.external_attr >> 16)
+            if file_type not in {0, stat.S_IFREG, stat.S_IFDIR}:
+                raise ValueError(f"Plugin archive contains a forbidden file type: {member.filename}")
+        if member.file_size > MAX_PLUGIN_ENTRY_BYTES:
+            raise ValueError(f"Plugin archive entry is too large: {member.filename}")
+        if member.file_size and (
+            member.compress_size == 0 or member.file_size / member.compress_size > MAX_PLUGIN_COMPRESSION_RATIO
+        ):
+            raise ValueError(f"Plugin archive exceeds the maximum compression ratio: {member.filename}")
+        return member_path
+
+    @classmethod
     def _validate_archive_members(cls, members):
         if len(members) > MAX_PLUGIN_ARCHIVE_ENTRIES:
             raise ValueError(f"Plugin archive contains too many entries (maximum {MAX_PLUGIN_ARCHIVE_ENTRIES})")
@@ -526,29 +548,11 @@ class PluginsHandler(metaclass=SingletonType):
         compressed_size = 0
         normalized_members = []
         for member in members:
-            member_path = cls._normalized_archive_path(member)
-            duplicate_key = member_path.as_posix().casefold()
-            if duplicate_key in seen_paths:
-                raise ValueError(f"Plugin archive contains a duplicate path: {member.filename}")
-            seen_paths.add(duplicate_key)
-
-            if member.flag_bits & 0x1:
-                raise ValueError(f"Plugin archive contains an encrypted member: {member.filename}")
-            if member.create_system == 3:
-                file_type = stat.S_IFMT(member.external_attr >> 16)
-                if file_type not in {0, stat.S_IFREG, stat.S_IFDIR}:
-                    raise ValueError(f"Plugin archive contains a forbidden file type: {member.filename}")
-            if member.file_size > MAX_PLUGIN_ENTRY_BYTES:
-                raise ValueError(f"Plugin archive entry is too large: {member.filename}")
-
+            member_path = cls._validate_archive_member(member, seen_paths)
             expanded_size += member.file_size
             compressed_size += member.compress_size
             if expanded_size > MAX_PLUGIN_EXPANDED_BYTES:
                 raise ValueError("Plugin archive exceeds the maximum total expanded size")
-            if member.file_size and (
-                member.compress_size == 0 or member.file_size / member.compress_size > MAX_PLUGIN_COMPRESSION_RATIO
-            ):
-                raise ValueError(f"Plugin archive exceeds the maximum compression ratio: {member.filename}")
             normalized_members.append((member, member_path))
 
         if expanded_size and (compressed_size == 0 or expanded_size / compressed_size > MAX_PLUGIN_COMPRESSION_RATIO):
@@ -632,32 +636,14 @@ class PluginsHandler(metaclass=SingletonType):
 
         staging = Path(tempfile.mkdtemp(prefix=f".{plugin_id}.staging-", dir=plugins_root))
         rollback = None
-        live_moved = False
         promoted = False
         snapshot = None
         executor = PluginExecutor()
         try:
-            self._extract_validated_plugin_archive(zip_ref, staging, normalized_members)
-            if plugin_info.get("bundled") is True:
-                plugin_info = dict(plugin_info, bundled=False)
-                atomic_json_write(staging / _PLUGIN_INFO_FILENAME, plugin_info, mode=0o600)
-
-            post_install_requirements = staging / "requirements.post-install.lock"
-            if post_install_requirements.exists():
-                self.install_plugin_requirements(staging, requirements_file=post_install_requirements)
-            if plugin_info.get("defer_dependency_install", False):
-                self.install_plugin_requirements(staging)
-                self.install_npm_modules(staging)
-
+            plugin_info = self._prepare_plugin_staging(zip_ref, plugin_info, normalized_members, staging)
             snapshot = self._snapshot_plugin_record(plugin_id)
-            if plugin_directory.exists():
-                rollback = Path(tempfile.mkdtemp(prefix=f".{plugin_id}.rollback-", dir=plugins_root))
-                rollback.rmdir()
-                os.replace(plugin_directory, rollback)
-                live_moved = True
-            os.replace(staging, plugin_directory)
+            rollback = self._promote_plugin_staging(plugin_id, staging, plugin_directory, plugins_root)
             promoted = True
-
             installed_info = dict(plugin_info, plugin_id=plugin_id)
             if not self.write_plugin_data_to_db(installed_info, str(plugin_directory)):
                 raise RuntimeError(f"Failed to persist database metadata for plugin '{plugin_id}'")
@@ -666,25 +652,57 @@ class PluginsHandler(metaclass=SingletonType):
                 shutil.rmtree(rollback, ignore_errors=True)
             return installed_info
         except Exception:
-            if promoted and plugin_directory.exists():
-                shutil.rmtree(plugin_directory)
-            if live_moved and rollback is not None and rollback.exists():
-                os.replace(rollback, plugin_directory)
-            if promoted or live_moved:
-                try:
-                    self._restore_plugin_record(plugin_id, snapshot)
-                except Exception:
-                    self.logger.exception("Failed to restore database metadata for plugin '%s'", plugin_id)
-                try:
-                    executor.reload_plugin_module(plugin_id)
-                except Exception:
-                    self.logger.exception("Failed to restore loaded module for plugin '%s'", plugin_id)
+            if promoted:
+                self._rollback_plugin_install(plugin_id, plugin_directory, rollback, snapshot, executor)
             raise
         finally:
             if staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
             if rollback is not None and rollback.exists():
                 shutil.rmtree(rollback, ignore_errors=True)
+
+    def _prepare_plugin_staging(self, zip_ref, plugin_info, normalized_members, staging):
+        self._extract_validated_plugin_archive(zip_ref, staging, normalized_members)
+        if plugin_info.get("bundled") is True:
+            plugin_info = dict(plugin_info, bundled=False)
+            atomic_json_write(staging / _PLUGIN_INFO_FILENAME, plugin_info, mode=0o600)
+
+        post_install_requirements = staging / "requirements.post-install.lock"
+        if post_install_requirements.exists():
+            self.install_plugin_requirements(staging, requirements_file=post_install_requirements)
+        if plugin_info.get("defer_dependency_install", False):
+            self.install_plugin_requirements(staging)
+            self.install_npm_modules(staging)
+        return plugin_info
+
+    @staticmethod
+    def _promote_plugin_staging(plugin_id, staging, plugin_directory, plugins_root):
+        rollback = None
+        if plugin_directory.exists():
+            rollback = Path(tempfile.mkdtemp(prefix=f".{plugin_id}.rollback-", dir=plugins_root))
+            rollback.rmdir()
+            os.replace(plugin_directory, rollback)
+        try:
+            os.replace(staging, plugin_directory)
+        except Exception:
+            if rollback is not None and rollback.exists():
+                os.replace(rollback, plugin_directory)
+            raise
+        return rollback
+
+    def _rollback_plugin_install(self, plugin_id, plugin_directory, rollback, snapshot, executor):
+        if plugin_directory.exists():
+            shutil.rmtree(plugin_directory)
+        if rollback is not None and rollback.exists():
+            os.replace(rollback, plugin_directory)
+        try:
+            self._restore_plugin_record(plugin_id, snapshot)
+        except Exception:
+            self.logger.exception("Failed to restore database metadata for plugin '%s'", plugin_id)
+        try:
+            executor.reload_plugin_module(plugin_id)
+        except Exception:
+            self.logger.exception("Failed to restore loaded module for plugin '%s'", plugin_id)
 
     @staticmethod
     def install_plugin_requirements(plugin_path, requirements_file=None):
@@ -733,12 +751,13 @@ class PluginsHandler(metaclass=SingletonType):
         npm_binary = shutil.which("npm")
         if npm_binary is None:
             raise RuntimeError("npm is required to install plugin dependencies")
-        return_code = subprocess.call(  # noqa: S603 - resolved executable, lifecycle scripts disabled
+        # The executable is resolved through PATH and lifecycle scripts are disabled.
+        return_code = subprocess.call(  # noqa: S603
             [npm_binary, "ci", "--ignore-scripts", "--omit=dev"],
             cwd=str(plugin_path),
             timeout=300,
         )
-        if isinstance(return_code, int) and return_code != 0:
+        if return_code != 0:
             raise subprocess.CalledProcessError(return_code, "npm ci")
 
     @staticmethod
