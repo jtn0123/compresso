@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/jtn0123/compresso/compare/v1.14.0...v1.15.0) (2026-07-15)
+
+
+### Features
+
+* make persistent JSON state crash-safe ([#202](https://github.com/jtn0123/compresso/issues/202)) ([3f2d705](https://github.com/jtn0123/compresso/commit/3f2d7058bb31813a5f5d28abdc1309619ac06c52))
+
 # [1.14.0](https://github.com/jtn0123/compresso/compare/v1.13.6...v1.14.0) (2026-07-15)
 
 
