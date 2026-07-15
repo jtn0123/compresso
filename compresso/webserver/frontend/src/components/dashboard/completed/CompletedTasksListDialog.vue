@@ -143,171 +143,93 @@
         <q-separator class="q-mt-sm" />
       </div>
 
-      <!-- SELECTION BANNER -->
-      <q-slide-transition>
-        <div
-          v-show="(allPageSelected || selectAllMatching) && actionsExpanded"
-          class="row items-center q-pa-sm completed-tasks-selection-banner"
-        >
-          <div class="completed-tasks-selection-banner__center">
-            <div class="completed-tasks-selection-banner__content">
-              <template v-if="showSelectAllMatchingPrompt">
-                {{ selectionBannerPageText }}
-              </template>
-              <template v-else-if="selectAllMatching">
-                {{ selectionBannerAllSelectedText }}
-              </template>
-            </div>
-            <div
-              v-if="showSelectAllMatchingPrompt || selectAllMatching"
-              class="completed-tasks-selection-banner__actions"
-            >
-              <CompressoStandardButton
-                v-if="showSelectAllMatchingPrompt"
-                dense
-                :label="selectionBannerSelectAllLabel"
-                @click="selectAllMatchingResults"
-              />
-              <CompressoStandardButton
-                v-else
-                dense
-                :label="t('components.completedTasks.selectionBanner.clearSelection')"
-                @click="clearSelection"
-              />
-            </div>
-          </div>
-        </div>
-      </q-slide-transition>
-      <!-- END SELECTION BANNER -->
-
-      <div
-        id="completed-tasks-scroller"
-        ref="tableWrapperRef"
-        class="completed-tasks-table-wrapper"
-        @scroll.passive="handleTableScroll"
+      <TaskListTableShell
+        ref="taskListShellRef"
+        scroller-id="completed-tasks-scroller"
+        :rows="rows"
+        :columns="columns"
+        :loading="loading"
+        :all-loaded="allLoaded"
+        :error="error"
+        :show-scroll-top="showScrollTop"
+        :selection-visible="(allPageSelected || selectAllMatching) && actionsExpanded"
+        :show-select-all-prompt="showSelectAllMatchingPrompt"
+        :selection-page-text="selectionBannerPageText"
+        :selection-all-text="selectionBannerAllSelectedText"
+        :selection-select-all-label="selectionBannerSelectAllLabel"
+        :selection-clear-label="t('components.completedTasks.selectionBanner.clearSelection')"
+        :empty-label="t('headers.listEmpty')"
+        :error-label="t('components.completedTasks.errorFetchingList')"
+        :retry-label="t('buttons.retry')"
+        :load-more-label="t('components.completedTasks.loadMore')"
+        :scroll-to-top-label="t('components.completedTasks.scrollToTop')"
+        @select-all-matching="selectAllMatchingResults"
+        @clear-selection="clearSelection"
+        @retry="fetchCompletedTasks({ reset: true })"
+        @load-more="loadMore"
+        @scroll="handleTableScroll"
+        @scroll-top="scrollToTop"
       >
-        <div :class="[isMobile ? 'q-px-none' : 'q-px-sm', 'completed-tasks-body q-pa-sm']">
-          <q-infinite-scroll
-            ref="infiniteScrollRef"
-            :disable="allLoaded"
-            :offset="200"
-            scroll-target="#completed-tasks-scroller"
-            @load="loadMore"
-          >
-            <q-table
-              flat
-              bordered
-              hide-header
-              hide-pagination
-              :rows-per-page-options="[0]"
-              row-key="id"
-              :rows="rows"
-              :columns="columns"
-              class="completed-tasks-table"
-            >
-              <template #body="slotProps">
-                <q-tr :props="slotProps" class="completed-task-row">
-                  <q-td auto-width class="completed-task-select">
-                    <div class="completed-task-cell-center">
-                      <q-checkbox
-                        color="secondary"
-                        :model-value="isRowSelected(slotProps.row)"
-                        @update:model-value="(value) => toggleRowSelection(slotProps.row, value)"
-                      />
-                    </div>
-                  </q-td>
-
-                  <q-td>
-                    <div class="completed-task-name">
-                      {{ slotProps.row.name }}
-                    </div>
-                    <div class="text-caption">
-                      <span class="text-weight-medium"> {{ t('components.completedTasks.columns.completed') }}: </span>
-                      {{ slotProps.row.dateTimeCompleted }}
-                    </div>
-                    <div class="text-caption">
-                      <span class="text-weight-medium"> {{ t('components.completedTasks.columns.status') }}: </span>
-                      <q-badge :color="slotProps.row.status ? 'positive' : 'negative'">
-                        {{ slotProps.row.status ? t('status.success') : t('status.failed') }}
-                      </q-badge>
-                    </div>
-                  </q-td>
-
-                  <q-td auto-width class="completed-task-actions">
-                    <div class="completed-task-cell-center">
-                      <div class="completed-task-action-group">
-                        <CompressoStandardButton
-                          v-if="$q.screen.gt.xs"
-                          @click="openDetailsDialog(slotProps.row.id)"
-                          :label="t('components.completedTasks.details')"
-                          style="min-width: 100px"
-                        />
-                        <CompressoListActionButton
-                          v-else
-                          @click="openDetailsDialog(slotProps.row.id)"
-                          icon="info"
-                          :tooltip="t('components.completedTasks.details')"
-                        />
-
-                        <CompressoStandardButton
-                          v-if="$q.screen.gt.xs && slotProps.row.hasMetadata"
-                          @click="openMetadataDialog(slotProps.row.id)"
-                          :label="t('components.completedTasks.metadata')"
-                          style="min-width: 120px"
-                        />
-                        <CompressoListActionButton
-                          v-else-if="slotProps.row.hasMetadata"
-                          @click="openMetadataDialog(slotProps.row.id)"
-                          icon="data_object"
-                          :tooltip="t('components.completedTasks.metadata')"
-                        />
-                      </div>
-                    </div>
-                  </q-td>
-                </q-tr>
-              </template>
-
-              <template #no-data>
-                <div class="full-width row flex-center text-accent q-gutter-sm">
-                  <q-icon size="2em" name="sentiment_dissatisfied" />
-                  <q-item-label>{{ t('headers.listEmpty') }}</q-item-label>
-                  <q-icon size="2em" name="priority_high" />
-                </div>
-              </template>
-            </q-table>
-
-            <template #loading>
-              <div class="row flex-center q-my-md">
-                <q-spinner-dots size="32px" color="secondary" />
+        <template #body="slotProps">
+          <q-tr :props="slotProps" class="completed-task-row">
+            <q-td auto-width class="completed-task-select">
+              <div class="completed-task-cell-center">
+                <q-checkbox
+                  color="secondary"
+                  :model-value="isRowSelected(slotProps.row)"
+                  @update:model-value="(value) => toggleRowSelection(slotProps.row, value)"
+                />
               </div>
-            </template>
-          </q-infinite-scroll>
+            </q-td>
 
-          <div class="row justify-center q-mt-md" v-if="!allLoaded && rows.length > 0">
-            <CompressoStandardButton
-              color="secondary"
-              :label="t('components.completedTasks.loadMore')"
-              @click="manualLoadMore"
-            />
-          </div>
+            <q-td>
+              <div class="completed-task-name">{{ slotProps.row.name }}</div>
+              <div class="text-caption">
+                <span class="text-weight-medium"> {{ t('components.completedTasks.columns.completed') }}: </span>
+                {{ slotProps.row.dateTimeCompleted }}
+              </div>
+              <div class="text-caption">
+                <span class="text-weight-medium"> {{ t('components.completedTasks.columns.status') }}: </span>
+                <q-badge :color="slotProps.row.status ? 'positive' : 'negative'">
+                  {{ slotProps.row.status ? t('status.success') : t('status.failed') }}
+                </q-badge>
+              </div>
+            </q-td>
 
-          <q-inner-loading :showing="loading && rows.length === 0">
-            <q-spinner-dots size="42px" color="secondary" />
-          </q-inner-loading>
+            <q-td auto-width class="completed-task-actions">
+              <div class="completed-task-cell-center">
+                <div class="completed-task-action-group">
+                  <CompressoStandardButton
+                    v-if="$q.screen.gt.xs"
+                    :label="t('components.completedTasks.details')"
+                    style="min-width: 100px"
+                    @click="openDetailsDialog(slotProps.row.id)"
+                  />
+                  <CompressoListActionButton
+                    v-else
+                    icon="info"
+                    :tooltip="t('components.completedTasks.details')"
+                    @click="openDetailsDialog(slotProps.row.id)"
+                  />
 
-          <div v-show="showScrollTop" class="completed-tasks-scroll-top">
-            <CompressoStandardButton
-              round
-              dense
-              icon="keyboard_arrow_up"
-              :label="''"
-              :aria-label="t('components.completedTasks.scrollToTop')"
-              :title="t('components.completedTasks.scrollToTop')"
-              @click="scrollToTop"
-            />
-          </div>
-        </div>
-      </div>
+                  <CompressoStandardButton
+                    v-if="$q.screen.gt.xs && slotProps.row.hasMetadata"
+                    :label="t('components.completedTasks.metadata')"
+                    style="min-width: 120px"
+                    @click="openMetadataDialog(slotProps.row.id)"
+                  />
+                  <CompressoListActionButton
+                    v-else-if="slotProps.row.hasMetadata"
+                    icon="data_object"
+                    :tooltip="t('components.completedTasks.metadata')"
+                    @click="openMetadataDialog(slotProps.row.id)"
+                  />
+                </div>
+              </div>
+            </q-td>
+          </q-tr>
+        </template>
+      </TaskListTableShell>
     </div>
 
     <q-dialog v-model="filterDialogOpen" backdrop-filter="blur(2px)">
@@ -578,9 +500,10 @@ import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import dateTools from 'src/js/dateTools'
-import { useMobile } from 'src/composables/useMobile'
 import { useTaskDialogScroll } from 'src/composables/useTaskDialogScroll'
+import { useTaskListController } from 'src/composables/useTaskListController'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
+import TaskListTableShell from 'components/dashboard/shared/TaskListTableShell.vue'
 import CompletedTaskLogDialog from 'components/dashboard/completed/CompletedTaskLogDialog.vue'
 import FileMetadataDetailsDialog from 'components/dashboard/completed/FileMetadataDetailsDialog.vue'
 import FileMetadataListDialog from 'components/dashboard/completed/FileMetadataListDialog.vue'
@@ -599,23 +522,13 @@ const emit = defineEmits(['hide'])
 
 const { t } = useI18n()
 const $q = useQuasar()
-const { isMobile } = useMobile()
-
 const dialogRef = ref(null)
 const metadataDialogRef = ref(null)
 const metadataDialogTaskId = ref('')
 const metadataBrowserRef = ref(null)
-const infiniteScrollRef = ref(null)
-const tableWrapperRef = ref(null)
+const taskListShellRef = ref(null)
+const tableWrapperRef = computed(() => taskListShellRef.value?.tableWrapperRef ?? null)
 const showScrollTop = ref(false)
-
-const loading = ref(false)
-const loadingMore = ref(false)
-
-const rows = ref([])
-const totalCount = ref(0)
-const pageSize = 50
-const offset = ref(0)
 
 const searchValue = ref('')
 const statusFilter = ref('all')
@@ -634,10 +547,6 @@ const sortDialogOpen = ref(false)
 const deleteDialogOpen = ref(false)
 
 const actionsExpanded = ref(true)
-
-const selectedIds = ref([])
-const selectAllMatching = ref(false)
-const excludedIds = ref([])
 
 const selectLibrary = ref(false)
 const selectedLibraryId = ref(null)
@@ -770,23 +679,73 @@ const sortButtonLabel = computed(() =>
   }),
 )
 
-const selectedCount = computed(() => {
-  if (selectAllMatching.value) {
-    return Math.max(0, totalCount.value - excludedIds.value.length)
-  }
-  return selectedIds.value.length
+const buildFiltersPayload = () => ({
+  search_value: searchValue.value,
+  status: statusFilter.value,
+  after: sinceDate.value,
+  before: beforeDate.value,
 })
 
-const allPageSelected = computed(() => {
-  if (rows.value.length === 0) {
-    return false
+const fetchCompletedPage = async ({ start, length }) => {
+  const response = await axios({
+    method: 'post',
+    url: getCompressoApiUrl('v2', 'history/tasks'),
+    data: {
+      start,
+      length,
+      ...buildFiltersPayload(),
+      order_by: sortBy.value,
+      order_direction: descending.value ? 'desc' : 'asc',
+    },
+  })
+  return {
+    total: response.data.recordsFiltered,
+    rows: response.data.results.map((result) => ({
+      id: result.id,
+      name: result.task_label,
+      dateTimeCompleted: dateTools.printDateTimeString(result.finish_time),
+      status: result.task_success,
+      hasMetadata: result.has_metadata,
+    })),
   }
-  return rows.value.every((row) => isRowSelected(row))
-})
+}
 
-const showSelectAllMatchingPrompt = computed(
-  () => !selectAllMatching.value && allPageSelected.value && totalCount.value > rows.value.length,
-)
+const notifyFetchError = () =>
+  $q.notify({
+    color: 'negative',
+    position: 'top',
+    message: t('components.completedTasks.errorFetchingList'),
+    icon: 'report_problem',
+    actions: [{ icon: 'close', color: 'white' }],
+  })
+
+const {
+  loading,
+  loadingMore,
+  error,
+  rows,
+  totalCount,
+  selectedIds,
+  selectAllMatching,
+  excludedIds,
+  allLoaded,
+  allPageSelected,
+  selectedCount,
+  showSelectAllMatchingPrompt,
+  resetSelection,
+  clearSelection,
+  isRowSelected,
+  toggleRowSelection,
+  toggleSelectPage,
+  selectAllMatchingResults,
+  getSelectionPayload,
+  fetchTasks: fetchCompletedTasks,
+  loadMore,
+} = useTaskListController({
+  fetchPage: fetchCompletedPage,
+  buildFiltersPayload,
+  onFetchError: notifyFetchError,
+})
 
 const selectionBannerPageText = computed(() =>
   t('components.completedTasks.selectionBanner.pageSelected', { count: rows.value.length }),
@@ -812,13 +771,6 @@ const selectionBannerAllSelectedText = computed(() => {
   return t('components.completedTasks.selectionBanner.allSelected', { count: totalCount.value })
 })
 
-const allLoaded = computed(() => {
-  if (totalCount.value === 0) {
-    return true
-  }
-  return rows.value.length >= totalCount.value
-})
-
 let reloadInterval = null
 
 const show = () => {
@@ -837,12 +789,6 @@ const onDialogHide = () => {
 
 const toggleActionsExpanded = () => {
   actionsExpanded.value = !actionsExpanded.value
-}
-
-const resetSelection = () => {
-  selectedIds.value = []
-  selectAllMatching.value = false
-  excludedIds.value = []
 }
 
 const openFilterDialog = () => {
@@ -886,76 +832,6 @@ const toggleDraftSort = (option) => {
   } else {
     draftSortBy.value = option
     draftDescending.value = true
-  }
-}
-
-const isRowSelected = (row) => {
-  if (selectAllMatching.value) {
-    return !excludedIds.value.includes(row.id)
-  }
-  return selectedIds.value.includes(row.id)
-}
-
-const toggleRowSelection = (row, value) => {
-  if (selectAllMatching.value) {
-    if (value) {
-      excludedIds.value = excludedIds.value.filter((id) => id !== row.id)
-    } else if (!excludedIds.value.includes(row.id)) {
-      excludedIds.value.push(row.id)
-    }
-    return
-  }
-
-  if (value && !selectedIds.value.includes(row.id)) {
-    selectedIds.value.push(row.id)
-  } else if (!value) {
-    selectedIds.value = selectedIds.value.filter((id) => id !== row.id)
-  }
-}
-
-const toggleSelectPage = (value) => {
-  if (value) {
-    // Select all visible rows on the current page
-    const pageIds = rows.value.map((row) => row.id)
-    pageIds.forEach((id) => {
-      if (!selectedIds.value.includes(id)) {
-        selectedIds.value.push(id)
-      }
-    })
-  } else {
-    // Unchecking the box clears the entire selection, including 'selectAllMatching'
-    resetSelection()
-  }
-}
-
-const selectAllMatchingResults = () => {
-  selectAllMatching.value = true
-  selectedIds.value = []
-  excludedIds.value = []
-}
-
-const clearSelection = () => {
-  resetSelection()
-}
-
-const buildFiltersPayload = () => ({
-  search_value: searchValue.value,
-  status: statusFilter.value,
-  after: sinceDate.value,
-  before: beforeDate.value,
-})
-
-const getSelectionPayload = () => {
-  if (selectAllMatching.value) {
-    return {
-      selection_mode: 'all_filtered',
-      exclude_ids: excludedIds.value,
-      ...buildFiltersPayload(),
-    }
-  }
-  return {
-    selection_mode: 'explicit',
-    id_list: selectedIds.value,
   }
 }
 
@@ -1172,103 +1048,6 @@ const openMetadataBrowser = () => {
   })
 }
 
-const fetchCompletedTasks = ({ reset = false, silent = false, refreshTop = false } = {}) => {
-  if (reset) {
-    offset.value = 0
-    rows.value = []
-  }
-
-  const startRow = refreshTop ? 0 : offset.value
-
-  if (reset && !silent) {
-    loading.value = true
-  } else {
-    loadingMore.value = true
-  }
-
-  const data = {
-    start: startRow,
-    length: pageSize,
-    ...buildFiltersPayload(),
-    order_by: sortBy.value,
-    order_direction: descending.value ? 'desc' : 'asc',
-  }
-
-  return axios({
-    method: 'post',
-    url: getCompressoApiUrl('v2', 'history/tasks'),
-    data,
-  })
-    .then((response) => {
-      totalCount.value = response.data.recordsFiltered
-
-      const returnedData = response.data.results.map((results) => ({
-        id: results.id,
-        name: results.task_label,
-        dateTimeCompleted: dateTools.printDateTimeString(results.finish_time),
-        status: results.task_success,
-        hasMetadata: results.has_metadata,
-      }))
-
-      if (refreshTop) {
-        if (rows.value.length === 0) {
-          rows.value = returnedData
-          offset.value = rows.value.length
-        } else {
-          const updated = [...rows.value]
-          for (let i = 0; i < returnedData.length; i++) {
-            updated[i] = returnedData[i]
-          }
-          rows.value = updated
-        }
-      } else if (reset) {
-        rows.value = returnedData
-        offset.value = rows.value.length
-      } else {
-        rows.value = [...rows.value, ...returnedData]
-        offset.value = rows.value.length
-      }
-
-      if (totalCount.value > 0 && rows.value.length > totalCount.value) {
-        rows.value = rows.value.slice(0, totalCount.value)
-        offset.value = rows.value.length
-      }
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('components.completedTasks.errorFetchingList'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
-    .finally(() => {
-      if (!silent) {
-        loading.value = false
-      }
-      loadingMore.value = false
-    })
-}
-
-const loadMore = (index, done) => {
-  if (loading.value || loadingMore.value || allLoaded.value) {
-    done(allLoaded.value)
-    return
-  }
-  fetchCompletedTasks().finally(() => {
-    nextTick(() => {
-      done(allLoaded.value)
-    })
-  })
-}
-
-const manualLoadMore = () => {
-  if (infiniteScrollRef.value) {
-    infiniteScrollRef.value.trigger()
-  }
-}
-
 watch(statusFilter, () => {
   resetSelection()
   fetchCompletedTasks({ reset: true })
@@ -1347,34 +1126,6 @@ defineExpose({
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.completed-tasks-selection-banner {
-  border-bottom: 1px solid var(--q-separator-color);
-  background: rgba(0, 0, 0, 0.03);
-  gap: 12px;
-}
-
-.q-dark .completed-tasks-selection-banner {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.completed-tasks-selection-banner__content {
-  min-width: 0;
-}
-
-.completed-tasks-selection-banner__center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-
-.completed-tasks-selection-banner__actions {
-  display: flex;
-  align-items: center;
-}
-
 .completed-tasks-selection {
   padding-left: 17px;
 }
@@ -1407,33 +1158,6 @@ defineExpose({
 
 .completed-tasks-toolbar {
   width: 100%;
-}
-
-.completed-tasks-table-wrapper {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  overflow: auto;
-}
-
-.completed-tasks-body {
-  position: relative;
-  min-width: 0;
-}
-
-.completed-tasks-table {
-  width: 100%;
-  min-width: 0;
-}
-
-.completed-tasks-table :deep(table) {
-  width: 100%;
-  min-width: 0;
-}
-
-.completed-tasks-table :deep(.q-td) {
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 
 .completed-task-row :deep(.q-td) {
@@ -1495,19 +1219,6 @@ defineExpose({
   max-height: 60vh;
 }
 
-.completed-tasks-scroll-top {
-  position: sticky;
-  bottom: 18px;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-  padding: 0 18px 12px;
-}
-
-.completed-tasks-scroll-top .q-btn {
-  pointer-events: auto;
-}
-
 @media (max-width: 599px) {
   .select-library-card {
     max-width: 95vw;
@@ -1525,16 +1236,6 @@ defineExpose({
 
   .completed-tasks-filter-indicator__label {
     width: 100%;
-  }
-
-  .completed-tasks-selection-banner {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .completed-tasks-selection-banner__center {
-    align-items: flex-start;
-    flex-direction: column;
   }
 
   .completed-tasks-action-row {

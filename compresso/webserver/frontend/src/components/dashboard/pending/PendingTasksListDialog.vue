@@ -140,131 +140,55 @@
         <q-separator class="q-mt-sm" />
       </div>
 
-      <q-slide-transition>
-        <div
-          v-show="(allPageSelected || selectAllMatching) && actionsExpanded"
-          class="row items-center q-pa-sm pending-tasks-selection-banner"
-        >
-          <div class="pending-tasks-selection-banner__center">
-            <div class="pending-tasks-selection-banner__content">
-              <template v-if="showSelectAllMatchingPrompt">
-                {{ selectionBannerPageText }}
-              </template>
-              <template v-else-if="selectAllMatching">
-                {{ selectionBannerAllSelectedText }}
-              </template>
-            </div>
-            <div
-              v-if="showSelectAllMatchingPrompt || selectAllMatching"
-              class="pending-tasks-selection-banner__actions"
-            >
-              <CompressoStandardButton
-                v-if="showSelectAllMatchingPrompt"
-                dense
-                :label="selectionBannerSelectAllLabel"
-                @click="selectAllMatchingResults"
-              />
-              <CompressoStandardButton
-                v-else
-                dense
-                :label="t('components.pendingTasks.selectionBanner.clearSelection')"
-                @click="clearSelection"
-              />
-            </div>
-          </div>
-        </div>
-      </q-slide-transition>
-
-      <div
-        id="pending-tasks-scroller"
-        ref="tableWrapperRef"
-        class="pending-tasks-table-wrapper"
-        @scroll.passive="handleTableScroll"
+      <TaskListTableShell
+        ref="taskListShellRef"
+        scroller-id="pending-tasks-scroller"
+        :rows="rows"
+        :columns="columns"
+        :loading="loading"
+        :all-loaded="allLoaded"
+        :error="error"
+        :show-scroll-top="showScrollTop"
+        :selection-visible="(allPageSelected || selectAllMatching) && actionsExpanded"
+        :show-select-all-prompt="showSelectAllMatchingPrompt"
+        :selection-page-text="selectionBannerPageText"
+        :selection-all-text="selectionBannerAllSelectedText"
+        :selection-select-all-label="selectionBannerSelectAllLabel"
+        :selection-clear-label="t('components.pendingTasks.selectionBanner.clearSelection')"
+        :empty-label="t('headers.listEmpty')"
+        :error-label="t('components.pendingTasks.errorFetchingList')"
+        :retry-label="t('buttons.retry')"
+        :load-more-label="t('components.pendingTasks.loadMore')"
+        :scroll-to-top-label="t('components.pendingTasks.scrollToTop')"
+        @select-all-matching="selectAllMatchingResults"
+        @clear-selection="clearSelection"
+        @retry="fetchPendingTasks({ reset: true })"
+        @load-more="loadMore"
+        @scroll="handleTableScroll"
+        @scroll-top="scrollToTop"
       >
-        <div :class="[isMobile ? 'q-px-none' : 'q-px-sm', 'pending-tasks-body q-pa-sm']">
-          <q-infinite-scroll
-            ref="infiniteScrollRef"
-            :disable="allLoaded"
-            :offset="200"
-            scroll-target="#pending-tasks-scroller"
-            @load="loadMore"
-          >
-            <q-table
-              flat
-              bordered
-              hide-header
-              hide-pagination
-              :rows-per-page-options="[0]"
-              row-key="id"
-              :rows="rows"
-              :columns="columns"
-              class="pending-tasks-table"
-            >
-              <template #body="props">
-                <q-tr :props="props" class="pending-task-row">
-                  <q-td auto-width class="pending-task-select">
-                    <div class="pending-task-cell-center">
-                      <q-checkbox
-                        color="secondary"
-                        :model-value="isRowSelected(props.row)"
-                        @update:model-value="(value) => toggleRowSelection(props.row, value)"
-                      />
-                    </div>
-                  </q-td>
-
-                  <q-td>
-                    <div class="pending-task-name">
-                      {{ props.row.name }}
-                    </div>
-                    <div class="text-caption">
-                      <span class="text-weight-medium"> {{ t('components.pendingTasks.columns.library') }}: </span>
-                      {{ props.row.libraryName }}
-                    </div>
-                  </q-td>
-                </q-tr>
-              </template>
-
-              <template #no-data>
-                <div class="full-width row flex-center text-accent q-gutter-sm">
-                  <q-icon size="2em" name="sentiment_dissatisfied" />
-                  <q-item-label>{{ t('headers.listEmpty') }}</q-item-label>
-                  <q-icon size="2em" name="priority_high" />
-                </div>
-              </template>
-            </q-table>
-
-            <template #loading>
-              <div class="row flex-center q-my-md">
-                <q-spinner-dots size="32px" color="secondary" />
+        <template #body="props">
+          <q-tr :props="props" class="pending-task-row">
+            <q-td auto-width class="pending-task-select">
+              <div class="pending-task-cell-center">
+                <q-checkbox
+                  color="secondary"
+                  :model-value="isRowSelected(props.row)"
+                  @update:model-value="(value) => toggleRowSelection(props.row, value)"
+                />
               </div>
-            </template>
-          </q-infinite-scroll>
+            </q-td>
 
-          <div class="row justify-center q-mt-md" v-if="!allLoaded && rows.length > 0">
-            <CompressoStandardButton
-              color="secondary"
-              :label="t('components.pendingTasks.loadMore')"
-              @click="manualLoadMore"
-            />
-          </div>
-
-          <q-inner-loading :showing="loading && rows.length === 0">
-            <q-spinner-dots size="42px" color="secondary" />
-          </q-inner-loading>
-
-          <div v-show="showScrollTop" class="pending-tasks-scroll-top">
-            <CompressoStandardButton
-              round
-              dense
-              icon="keyboard_arrow_up"
-              :label="''"
-              :aria-label="t('components.pendingTasks.scrollToTop')"
-              :title="t('components.pendingTasks.scrollToTop')"
-              @click="scrollToTop"
-            />
-          </div>
-        </div>
-      </div>
+            <q-td>
+              <div class="pending-task-name">{{ props.row.name }}</div>
+              <div class="text-caption">
+                <span class="text-weight-medium"> {{ t('components.pendingTasks.columns.library') }}: </span>
+                {{ props.row.libraryName }}
+              </div>
+            </q-td>
+          </q-tr>
+        </template>
+      </TaskListTableShell>
     </div>
 
     <q-dialog v-model="filterDialogOpen" backdrop-filter="blur(2px)">
@@ -329,14 +253,15 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import { useMobile } from 'src/composables/useMobile'
 import { useTaskDialogScroll } from 'src/composables/useTaskDialogScroll'
+import { useTaskListController } from 'src/composables/useTaskListController'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
+import TaskListTableShell from 'components/dashboard/shared/TaskListTableShell.vue'
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
@@ -345,20 +270,10 @@ const emit = defineEmits(['hide'])
 
 const { t } = useI18n()
 const $q = useQuasar()
-const { isMobile } = useMobile()
-
 const dialogRef = ref(null)
-const infiniteScrollRef = ref(null)
-const tableWrapperRef = ref(null)
+const taskListShellRef = ref(null)
+const tableWrapperRef = computed(() => taskListShellRef.value?.tableWrapperRef ?? null)
 const showScrollTop = ref(false)
-
-const loading = ref(false)
-const loadingMore = ref(false)
-
-const rows = ref([])
-const totalCount = ref(0)
-const pageSize = 50
-const offset = ref(0)
 
 const searchValue = ref('')
 const libraryFilters = ref([])
@@ -366,10 +281,6 @@ const draftLibraryFilters = ref([])
 const libraryOptions = ref([])
 const filterDialogOpen = ref(false)
 const actionsExpanded = ref(true)
-
-const selectedIds = ref([])
-const selectAllMatching = ref(false)
-const excludedIds = ref([])
 
 let reloadInterval = null
 
@@ -441,25 +352,69 @@ const libraryFilterDisplay = computed(() => {
   return draftLibraryFilters.value.map((id) => libraryNameById.value[id] || id).join(', ')
 })
 
-const allLoaded = computed(() => {
-  if (totalCount.value === 0) {
-    return true
-  }
-  return rows.value.length >= totalCount.value
+const buildFiltersPayload = () => ({
+  search_value: searchValue.value,
+  library_ids: libraryFilters.value,
 })
 
-const allPageSelected = computed(() => rows.value.length > 0 && rows.value.every((row) => isRowSelected(row)))
-
-const selectedCount = computed(() => {
-  if (selectAllMatching.value) {
-    return Math.max(0, totalCount.value - excludedIds.value.length)
+const fetchPendingPage = async ({ start, length }) => {
+  const response = await axios({
+    method: 'post',
+    url: getCompressoApiUrl('v2', 'pending/tasks'),
+    data: {
+      start,
+      length,
+      ...buildFiltersPayload(),
+      order_by: 'priority',
+      order_direction: 'desc',
+    },
+  })
+  return {
+    total: response.data.recordsFiltered,
+    rows: response.data.results.map((result) => ({
+      id: result.id,
+      name: result.abspath,
+      libraryName: result.library_name,
+    })),
   }
-  return selectedIds.value.length
-})
+}
 
-const showSelectAllMatchingPrompt = computed(
-  () => !selectAllMatching.value && allPageSelected.value && totalCount.value > rows.value.length,
-)
+const notifyFetchError = () =>
+  $q.notify({
+    color: 'negative',
+    position: 'top',
+    message: t('components.pendingTasks.errorFetchingList'),
+    icon: 'report_problem',
+    actions: [{ icon: 'close', color: 'white' }],
+  })
+
+const {
+  loading,
+  loadingMore,
+  error,
+  rows,
+  totalCount,
+  selectedIds,
+  selectAllMatching,
+  excludedIds,
+  allLoaded,
+  allPageSelected,
+  selectedCount,
+  showSelectAllMatchingPrompt,
+  resetSelection,
+  clearSelection,
+  isRowSelected,
+  toggleRowSelection,
+  toggleSelectPage,
+  selectAllMatchingResults,
+  getSelectionPayload,
+  fetchTasks: fetchPendingTasks,
+  loadMore,
+} = useTaskListController({
+  fetchPage: fetchPendingPage,
+  buildFiltersPayload,
+  onFetchError: notifyFetchError,
+})
 
 const selectionBannerPageText = computed(() =>
   t('components.pendingTasks.selectionBanner.pageSelected', { count: rows.value.length }),
@@ -540,78 +495,6 @@ const clearFilterDrafts = () => {
 
 const applyFilterDrafts = () => {
   libraryFilters.value = [...draftLibraryFilters.value]
-}
-
-const resetSelection = () => {
-  selectedIds.value = []
-  selectAllMatching.value = false
-  excludedIds.value = []
-}
-
-const isRowSelected = (row) => {
-  if (selectAllMatching.value) {
-    return !excludedIds.value.includes(row.id)
-  }
-  return selectedIds.value.includes(row.id)
-}
-
-const toggleRowSelection = (row, value) => {
-  if (selectAllMatching.value) {
-    if (value) {
-      excludedIds.value = excludedIds.value.filter((id) => id !== row.id)
-    } else if (!excludedIds.value.includes(row.id)) {
-      excludedIds.value.push(row.id)
-    }
-    return
-  }
-
-  if (value && !selectedIds.value.includes(row.id)) {
-    selectedIds.value.push(row.id)
-  } else if (!value) {
-    selectedIds.value = selectedIds.value.filter((id) => id !== row.id)
-  }
-}
-
-const toggleSelectPage = (value) => {
-  if (value) {
-    const pageIds = rows.value.map((row) => row.id)
-    pageIds.forEach((id) => {
-      if (!selectedIds.value.includes(id)) {
-        selectedIds.value.push(id)
-      }
-    })
-  } else {
-    resetSelection()
-  }
-}
-
-const selectAllMatchingResults = () => {
-  selectAllMatching.value = true
-  selectedIds.value = []
-  excludedIds.value = []
-}
-
-const clearSelection = () => {
-  resetSelection()
-}
-
-const buildFiltersPayload = () => ({
-  search_value: searchValue.value,
-  library_ids: libraryFilters.value,
-})
-
-const getSelectionPayload = () => {
-  if (selectAllMatching.value) {
-    return {
-      selection_mode: 'all_filtered',
-      exclude_ids: excludedIds.value,
-      ...buildFiltersPayload(),
-    }
-  }
-  return {
-    selection_mode: 'explicit',
-    id_list: selectedIds.value,
-  }
 }
 
 const rescanLibrary = () => {
@@ -726,101 +609,6 @@ const deleteSelected = () => {
     })
 }
 
-const fetchPendingTasks = ({ reset = false, silent = false, refreshTop = false } = {}) => {
-  if (reset) {
-    offset.value = 0
-    rows.value = []
-  }
-
-  const startRow = refreshTop ? 0 : offset.value
-
-  if (reset && !silent) {
-    loading.value = true
-  } else {
-    loadingMore.value = true
-  }
-
-  const data = {
-    start: startRow,
-    length: pageSize,
-    ...buildFiltersPayload(),
-    order_by: 'priority',
-    order_direction: 'desc',
-  }
-
-  return axios({
-    method: 'post',
-    url: getCompressoApiUrl('v2', 'pending/tasks'),
-    data,
-  })
-    .then((response) => {
-      totalCount.value = response.data.recordsFiltered
-
-      const returnedData = response.data.results.map((results) => ({
-        id: results.id,
-        name: results.abspath,
-        libraryName: results.library_name,
-      }))
-
-      if (refreshTop) {
-        if (rows.value.length === 0) {
-          rows.value = returnedData
-          offset.value = rows.value.length
-        } else {
-          const updated = [...rows.value]
-          for (let i = 0; i < returnedData.length; i++) {
-            updated[i] = returnedData[i]
-          }
-          rows.value = updated
-        }
-      } else if (reset) {
-        rows.value = returnedData
-        offset.value = rows.value.length
-      } else {
-        rows.value = [...rows.value, ...returnedData]
-        offset.value = rows.value.length
-      }
-
-      if (totalCount.value > 0 && rows.value.length > totalCount.value) {
-        rows.value = rows.value.slice(0, totalCount.value)
-        offset.value = rows.value.length
-      }
-    })
-    .catch(() => {
-      $q.notify({
-        color: 'negative',
-        position: 'top',
-        message: t('components.pendingTasks.errorFetchingList'),
-        icon: 'report_problem',
-        actions: [{ icon: 'close', color: 'white' }],
-      })
-    })
-    .finally(() => {
-      if (!silent) {
-        loading.value = false
-      }
-      loadingMore.value = false
-    })
-}
-
-const loadMore = (index, done) => {
-  if (loading.value || loadingMore.value || allLoaded.value) {
-    done(allLoaded.value)
-    return
-  }
-  fetchPendingTasks().finally(() => {
-    nextTick(() => {
-      done(allLoaded.value)
-    })
-  })
-}
-
-const manualLoadMore = () => {
-  if (infiniteScrollRef.value) {
-    infiniteScrollRef.value.trigger()
-  }
-}
-
 watch(searchValue, () => {
   resetSelection()
   fetchPendingTasks({ reset: true })
@@ -881,34 +669,6 @@ defineExpose({
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.pending-tasks-selection-banner {
-  border-bottom: 1px solid var(--q-separator-color);
-  background: rgba(0, 0, 0, 0.03);
-  gap: 12px;
-}
-
-.q-dark .pending-tasks-selection-banner {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.pending-tasks-selection-banner__content {
-  min-width: 0;
-}
-
-.pending-tasks-selection-banner__center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-
-.pending-tasks-selection-banner__actions {
-  display: flex;
-  align-items: center;
-}
-
 .pending-tasks-selection {
   padding-left: 17px;
 }
@@ -941,33 +701,6 @@ defineExpose({
 
 .pending-tasks-toolbar {
   width: 100%;
-}
-
-.pending-tasks-table-wrapper {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  overflow: auto;
-}
-
-.pending-tasks-body {
-  position: relative;
-  min-width: 0;
-}
-
-.pending-tasks-table {
-  width: 100%;
-  min-width: 0;
-}
-
-.pending-tasks-table :deep(table) {
-  width: 100%;
-  min-width: 0;
-}
-
-.pending-tasks-table :deep(.q-td) {
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 
 .pending-task-row :deep(.q-td) {
@@ -1004,19 +737,6 @@ defineExpose({
   max-height: 60vh;
 }
 
-.pending-tasks-scroll-top {
-  position: sticky;
-  bottom: 18px;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-  padding: 0 18px 12px;
-}
-
-.pending-tasks-scroll-top .q-btn {
-  pointer-events: auto;
-}
-
 @media (max-width: 599px) {
   .pending-tasks-dialog-card {
     max-width: 95vw;
@@ -1030,16 +750,6 @@ defineExpose({
 
   .pending-tasks-filter-indicator__label {
     width: 100%;
-  }
-
-  .pending-tasks-selection-banner {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .pending-tasks-selection-banner__center {
-    align-items: flex-start;
-    flex-direction: column;
   }
 
   .pending-tasks-action-row {

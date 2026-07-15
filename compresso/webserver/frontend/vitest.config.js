@@ -17,10 +17,10 @@ export default defineConfig({
       thresholds: {
         // Honest all-source baseline (2026-07-12). Ratchet upward as tests are
         // added; never remove files from `include` to satisfy this gate.
-        lines: 19,
-        functions: 12,
-        branches: 15,
-        statements: 19,
+        lines: 24,
+        functions: 16,
+        branches: 17,
+        statements: 24,
       },
     },
   },
