@@ -86,6 +86,56 @@ def _make_task(abspath="/data/library/video.mkv", library_id=1, task_id=42, task
     return task
 
 
+@pytest.mark.unittest
+def test_remote_task_execution_uses_typed_phases_in_order():
+    from compresso.libs.remote_task_manager import (
+        CleanupPhaseResult,
+        DownloadPhaseResult,
+        FinalizationPhaseResult,
+        MonitoringPhaseResult,
+        RemoteTaskContext,
+        UploadPhaseResult,
+    )
+
+    mgr = _make_manager()
+    mgr.current_task = _make_task()
+    context = RemoteTaskContext(
+        original_abspath="/data/library/video.mkv",
+        address="http://remote:8001",
+        library_name="Media",
+        library_path="/data/library",
+    )
+    calls = []
+    mgr._prepare_remote_task_context = MagicMock(side_effect=lambda: calls.append("prepare") or context)
+    mgr._upload_phase = MagicMock(
+        side_effect=lambda phase_context: (
+            calls.append("upload") or UploadPhaseResult(succeeded=True, remote_task_id=7, remote_task_status="pending")
+        )
+    )
+    mgr._monitoring_phase = MagicMock(
+        side_effect=lambda phase_context: calls.append("monitor") or MonitoringPhaseResult(succeeded=True)
+    )
+    mgr._download_phase = MagicMock(
+        side_effect=lambda phase_context: (
+            calls.append("download")
+            or DownloadPhaseResult(succeeded=True, cache_path="/cache/result.mkv", checksum="sha256:ok")
+        )
+    )
+    mgr._finalization_phase = MagicMock(
+        side_effect=lambda phase_context, download: calls.append("finalize") or FinalizationPhaseResult(succeeded=True)
+    )
+    mgr._cleanup_phase = MagicMock(
+        side_effect=lambda phase_context: calls.append("cleanup") or CleanupPhaseResult(succeeded=True, remote_removed=True)
+    )
+
+    result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
+
+    assert result is True
+    assert calls == ["prepare", "upload", "monitor", "download", "finalize", "cleanup"]
+    assert context.remote_task_id == 7
+    assert context.remote_task_status == "pending"
+
+
 # ===========================================================================
 # TestInit
 # ===========================================================================

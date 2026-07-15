@@ -33,6 +33,8 @@ import os
 import queue
 import shutil
 import threading
+from dataclasses import dataclass
+from enum import StrEnum
 
 from peewee import OperationalError
 
@@ -41,6 +43,23 @@ from compresso.libs import common, task
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.unmodels.tasks import Tasks
+
+
+class StartupRecoveryAction(StrEnum):
+    NONE = "none"
+    DELETE = "delete"
+    REQUEUE = "requeue"
+    PROTECT = "protect"
+    RESTAGE = "restage"
+    RESTORE_CACHE = "restore_cache"
+
+
+@dataclass(frozen=True)
+class StartupRecoveryTransition:
+    action: StartupRecoveryAction
+    protect_cache: bool = False
+    protect_staged: bool = False
+    reason: str | None = None
 
 
 class TaskHandler(threading.Thread):
@@ -156,6 +175,74 @@ class TaskHandler(threading.Thread):
             return True
         return False
 
+    @staticmethod
+    def _startup_recovery_transition(
+        *, status, clear_pending, success, cache_usable, staged_usable, has_cache_path
+    ) -> StartupRecoveryTransition:
+        """Return the existing startup action without mutating task state."""
+        if clear_pending and status == "pending":
+            return StartupRecoveryTransition(StartupRecoveryAction.DELETE)
+        if status == "in_progress":
+            return StartupRecoveryTransition(StartupRecoveryAction.REQUEUE, reason="previous_status=in_progress")
+        if status == "processed":
+            if success is not False and not cache_usable:
+                return StartupRecoveryTransition(StartupRecoveryAction.REQUEUE, reason="reason=missing_processed_cache")
+            if cache_usable:
+                return StartupRecoveryTransition(StartupRecoveryAction.PROTECT, protect_cache=True)
+        if status == "awaiting_approval":
+            if staged_usable:
+                return StartupRecoveryTransition(
+                    StartupRecoveryAction.PROTECT,
+                    protect_cache=cache_usable,
+                    protect_staged=True,
+                )
+            if cache_usable:
+                return StartupRecoveryTransition(
+                    StartupRecoveryAction.RESTAGE,
+                    protect_cache=True,
+                    reason="approval_restage",
+                )
+            return StartupRecoveryTransition(StartupRecoveryAction.REQUEUE, reason="reason=missing_approval_output")
+        if status == "approved":
+            if cache_usable:
+                return StartupRecoveryTransition(StartupRecoveryAction.PROTECT, protect_cache=True)
+            if staged_usable and has_cache_path:
+                return StartupRecoveryTransition(
+                    StartupRecoveryAction.RESTORE_CACHE,
+                    protect_cache=True,
+                    protect_staged=True,
+                    reason="approved_cache_restored",
+                )
+            return StartupRecoveryTransition(StartupRecoveryAction.REQUEUE, reason="reason=missing_approved_output")
+        if status == "complete" and cache_usable:
+            return StartupRecoveryTransition(StartupRecoveryAction.PROTECT, protect_cache=True)
+        return StartupRecoveryTransition(StartupRecoveryAction.NONE)
+
+    @classmethod
+    def _apply_startup_recovery_transition(cls, transition, task_obj, cache_path, staged_path, protected_paths, logger):
+        """Apply one tested startup transition while preserving persisted states."""
+        if transition.action is StartupRecoveryAction.DELETE:
+            task.TaskDataStore.clear_task(task_obj.id)
+            Tasks.delete().where(Tasks.id == task_obj.id).execute()
+            return
+        if transition.action is StartupRecoveryAction.REQUEUE:
+            cls._reset_interrupted_task(task_obj)
+            logger.warning("STARTUP_TASK_REQUEUED id=%s %s", task_obj.id, transition.reason)
+            return
+        if transition.action is StartupRecoveryAction.RESTAGE:
+            task_obj.status = "processed"
+            task_obj.save()
+            logger.warning("STARTUP_APPROVAL_RESTAGE id=%s", task_obj.id)
+        elif transition.action is StartupRecoveryAction.RESTORE_CACHE:
+            os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
+            shutil.copy2(staged_path, cache_path)
+            logger.warning("STARTUP_APPROVED_CACHE_RESTORED id=%s", task_obj.id)
+
+        if transition.protect_cache and cache_path:
+            protected_paths.add(os.path.realpath(cache_path))
+        if transition.protect_staged and staged_path:
+            protected_paths.add(os.path.realpath(staged_path))
+
     @classmethod
     def recover_tasks_on_startup(cls, settings, committed_task_ids=None, finalization_task_ids=None):
         """Reconcile persisted tasks before worker and postprocessor startup.
@@ -189,47 +276,25 @@ class TaskHandler(threading.Thread):
                     cache_path = task_obj.cache_path
                     staged_path = cls._find_staged_output(staging_path, task_obj.id)
 
-                    if clear_pending and status == "pending":
-                        task.TaskDataStore.clear_task(task_obj.id)
-                        Tasks.delete().where(Tasks.id == task_obj.id).execute()
+                    cache_usable = cls._file_is_usable(cache_path)
+                    transition = cls._startup_recovery_transition(
+                        status=status,
+                        clear_pending=clear_pending,
+                        success=task_obj.success,
+                        cache_usable=cache_usable,
+                        staged_usable=bool(staged_path),
+                        has_cache_path=bool(cache_path),
+                    )
+                    cls._apply_startup_recovery_transition(
+                        transition,
+                        task_obj,
+                        cache_path,
+                        staged_path,
+                        protected_paths,
+                        logger,
+                    )
+                    if transition.action is StartupRecoveryAction.DELETE:
                         continue
-
-                    if status == "in_progress":
-                        cls._reset_interrupted_task(task_obj)
-                        logger.warning("STARTUP_TASK_REQUEUED id=%s previous_status=in_progress", task_obj.id)
-                    elif status == "processed":
-                        if task_obj.success is not False and not cls._file_is_usable(cache_path):
-                            cls._reset_interrupted_task(task_obj)
-                            logger.warning("STARTUP_TASK_REQUEUED id=%s reason=missing_processed_cache", task_obj.id)
-                        elif cls._file_is_usable(cache_path):
-                            protected_paths.add(os.path.realpath(cache_path))
-                    elif status == "awaiting_approval":
-                        if staged_path:
-                            protected_paths.add(os.path.realpath(staged_path))
-                            if cls._file_is_usable(cache_path):
-                                protected_paths.add(os.path.realpath(cache_path))
-                        elif cls._file_is_usable(cache_path):
-                            task_obj.status = "processed"
-                            task_obj.save()
-                            protected_paths.add(os.path.realpath(cache_path))
-                            logger.warning("STARTUP_APPROVAL_RESTAGE id=%s", task_obj.id)
-                        else:
-                            cls._reset_interrupted_task(task_obj)
-                            logger.warning("STARTUP_TASK_REQUEUED id=%s reason=missing_approval_output", task_obj.id)
-                    elif status == "approved":
-                        if cls._file_is_usable(cache_path):
-                            protected_paths.add(os.path.realpath(cache_path))
-                        elif staged_path and cache_path:
-                            os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
-                            shutil.copy2(staged_path, cache_path)
-                            protected_paths.add(os.path.realpath(cache_path))
-                            protected_paths.add(os.path.realpath(staged_path))
-                            logger.warning("STARTUP_APPROVED_CACHE_RESTORED id=%s", task_obj.id)
-                        else:
-                            cls._reset_interrupted_task(task_obj)
-                            logger.warning("STARTUP_TASK_REQUEUED id=%s reason=missing_approved_output", task_obj.id)
-                    elif status == "complete" and cls._file_is_usable(cache_path):
-                        protected_paths.add(os.path.realpath(cache_path))
 
                     # Uploaded remote sources live under the cache root and must
                     # remain available while the originating installation recovers.

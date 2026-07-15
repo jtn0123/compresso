@@ -36,6 +36,7 @@ import shutil
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
 
 import peewee
 
@@ -54,6 +55,15 @@ from compresso.libs.resumable_transfer import file_sha256
 from compresso.libs.safety_state import record_safety_event
 from compresso.libs.task import TaskDataStore
 from compresso.libs.thread_health import ThreadHealthMixin
+
+
+@dataclass(frozen=True)
+class PostprocessCompletionTransition:
+    commit_journal: bool
+    rollback_journal: bool
+    cleanup_cache: bool
+    succeeded: bool
+
 
 """
 
@@ -414,33 +424,51 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         """Finalize a local task after disk-capacity preflight succeeds."""
         if not self._postprocess_local_file_safely():
             return
+        if not self._persist_local_history():
+            return
+        self._mark_finalization_transition("history_persisted")
+        if not self._persist_local_metadata():
+            return
+        self._mark_finalization_transition("metadata_persisted")
+        if not self._remove_finalized_local_task():
+            return
+
+        self._mark_finalization_transition("task_removed")
+        self._finalize_file_operation_journal(True)
+        self._dispatch_completion_notification()
+
+    def _persist_local_history(self):
         try:
             history_written = self.write_history_log()
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in writing history log", message2=str(e), level="exception")
             self._defer_postprocess_failure(str(e))
-            return
+            return False
         except Exception as e:
             self._log(f"TaskMetadataError in history log: {e}", level="exception")
             self._defer_postprocess_failure(str(e))
-            return
+            return False
         if history_written is False:
             message = "history persistence returned false"
             self._log("Failed to write history log", message2=message, level="error")
             self._defer_postprocess_failure(message)
-            return
-        self._mark_finalization_phase("history_committed")
+            return False
+        return True
+
+    def _persist_local_metadata(self):
         try:
             self.commit_task_metadata()
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in committing task metadata", message2=str(e), level="exception")
             self._defer_postprocess_failure(str(e))
-            return
+            return False
         except Exception as e:
             self._log(f"TaskMetadataError in commit: {e}", level="exception")
             self._defer_postprocess_failure(str(e))
-            return
-        self._mark_finalization_phase("metadata_committed")
+            return False
+        return True
+
+    def _remove_finalized_local_task(self):
         try:
             # Clean up the staging directory for this task if it exists
             self._cleanup_staging_files()
@@ -449,12 +477,11 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         except (OSError, AttributeError, TypeError) as e:
             self._log("Exception in removing task from task list", message2=str(e), level="exception")
             self._defer_postprocess_failure(str(e))
-            return
+            return False
+        return True
 
-        self._mark_finalization_phase("task_deleted")
-        self._finalize_file_operation_journal(True)
-
-        # Dispatch external notification for task completion or failure
+    def _dispatch_completion_notification(self):
+        """Dispatch the best-effort external completion notification."""
         try:
             from compresso.libs.external_notifications import ExternalNotificationDispatcher
 
@@ -510,6 +537,48 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
                 dispatcher.dispatch("task_failed", context)
         except (ImportError, AttributeError, TypeError):
             pass  # notification failure is non-fatal
+
+    @staticmethod
+    def _next_finalization_phase(current_phase, event):
+        """Resolve idempotent journal transitions without changing phase names."""
+        target_phases = {
+            "history_persisted": "history_committed",
+            "metadata_persisted": "metadata_committed",
+            "task_removed": "task_deleted",
+        }
+        target = target_phases[event]
+        return current_phase if current_phase == target else target
+
+    def _mark_finalization_transition(self, event):
+        current_phase = None
+        if self._file_operation_tracker is not None:
+            current_phase = self._file_operation_tracker.finalization_phase
+        self._mark_finalization_phase(self._next_finalization_phase(current_phase, event))
+
+    @staticmethod
+    def _postprocess_completion_transition(task_success, movement_success):
+        """Describe journal/cache actions after the file-movement phase."""
+        return PostprocessCompletionTransition(
+            commit_journal=bool(task_success and movement_success),
+            rollback_journal=bool(task_success and not movement_success),
+            cleanup_cache=bool(movement_success or not task_success),
+            succeeded=bool(movement_success),
+        )
+
+    def _transition_postprocess_journal(self, tracker, task_success, movement_success, cache_path):
+        transition = self._postprocess_completion_transition(task_success, movement_success)
+        if transition.commit_journal:
+            tracker.commit()
+            tracker.mark_finalization_phase("file_committed")
+        elif transition.rollback_journal:
+            self._log("Rolling back all tracked file operations due to failures", level="warning")
+            tracker.rollback()
+            self._log(
+                f"Error while running postprocessor file movement on file '{cache_path}'."
+                " Not all postprocessor file movement functions completed.",
+                level="error",
+            )
+        return transition
 
     def _postprocess_local_file_safely(self):
         """Run the destructive file phase and defer all later finalization on failure."""
@@ -873,24 +942,15 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
                         level="warning",
                     )
 
-            # Commit or rollback tracked file operations
-            if file_move_processes_success:
-                tracker.commit()
-                tracker.mark_finalization_phase("file_committed")
-            else:
-                self._log("Rolling back all tracked file operations due to failures", level="warning")
-                tracker.rollback()
-
-            # Log a final error if not all file moments were successful
-            if not file_move_processes_success:
-                self._log(
-                    f"Error while running postprocessor file movement on file '{cache_path}'."
-                    " Not all postprocessor file movement functions completed.",
-                    level="error",
-                )
-
         else:
             self._log(f"Skipping file movement post-processor as the task was not successful '{cache_path}'", level="warning")
+
+        completion = self._transition_postprocess_journal(
+            tracker,
+            self.current_task.task.success,
+            file_move_processes_success,
+            cache_path,
+        )
 
         # Fetch all 'postprocessor.task_result' plugin modules
         plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type("postprocessor.task_result", library_id=library_id)
@@ -916,10 +976,10 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
 
         # Retain a valid encode when movement failed so the postprocessor can
         # retry without destroying the only completed output.
-        if file_move_processes_success or not self.current_task.task.success:
+        if completion.cleanup_cache:
             self.__cleanup_cache_files(cache_path)
         self._last_destination_files = destination_files
-        return file_move_processes_success
+        return completion.succeeded
 
     def post_process_remote_file(self):
         """

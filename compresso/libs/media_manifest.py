@@ -12,6 +12,7 @@ import random
 import subprocess
 import time
 from collections import Counter
+from dataclasses import dataclass
 
 from compresso.libs.json_state import atomic_json_write
 
@@ -35,10 +36,73 @@ STREAM_TYPES = ("video", "audio", "subtitle", "data", "attachment")
 HDR_FIELDS = ("color_primaries", "color_transfer", "color_space")
 
 
+@dataclass(frozen=True)
+class ManifestEntryPathTransition:
+    path: str | None
+    issues: tuple[str, ...]
+    include_expected: bool
+
+
 def _is_absolute_manifest_path(path):
     """Reject absolute paths using either supported host path syntax."""
     windows_drive, _ = ntpath.splitdrive(path)
     return bool(windows_drive) or ntpath.isabs(path) or posixpath.isabs(path)
+
+
+def _manifest_entry_path_transition(root, relative_path, seen_relative_paths):
+    """Validate and resolve one manifest path while tracking duplicates."""
+    if not isinstance(relative_path, str) or not relative_path or _is_absolute_manifest_path(relative_path):
+        return ManifestEntryPathTransition(None, ("manifest relative_path is invalid",), False)
+    if relative_path in seen_relative_paths:
+        return ManifestEntryPathTransition(None, ("manifest relative_path is duplicated",), False)
+    seen_relative_paths.add(relative_path)
+    path = os.path.realpath(os.path.join(root, relative_path))
+    if os.path.commonpath((root, path)) != root:
+        return ManifestEntryPathTransition(path, ("manifest path escapes verification root",), True)
+    return ManifestEntryPathTransition(path, (), True)
+
+
+def _manifest_before_size(expected):
+    try:
+        return int(expected.get("size_bytes", 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _verify_manifest_entry(root, expected, seen_relative_paths):
+    """Verify one manifest entry and return its stable report row and totals."""
+    if not isinstance(expected, dict):
+        expected = {}
+    relative_path = expected.get("relative_path")
+    before_size = _manifest_before_size(expected)
+    transition = _manifest_entry_path_transition(root, relative_path, seen_relative_paths)
+    issues = list(transition.issues)
+    current_size = 0
+    current_checksum = None
+    path = transition.path
+    if path is not None and not issues:
+        if not os.path.isfile(path):
+            issues.append("output file is missing")
+        else:
+            current_size = os.path.getsize(path)
+            if current_size <= 0:
+                issues.append("output file is empty")
+            try:
+                current_media = probe_media(path)
+                issues.extend(compare_media_summaries(expected.get("media", {}), current_media))
+                current_checksum = _sha256(path)
+            except (OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError) as error:
+                issues.append(f"output probe failed: {error}")
+    result = {
+        "relative_path": relative_path,
+        "passed": not issues,
+        "issues": issues,
+        "before_size_bytes": before_size,
+        "after_size_bytes": current_size,
+        "before_checksum": expected.get("checksum"),
+        "after_checksum": current_checksum,
+    }
+    return result, before_size, current_size, transition.include_expected
 
 
 def _sha256(path):
@@ -231,53 +295,16 @@ def verify_manifest(manifest_path, current_root=None, report_path=None):
     seen_relative_paths = set()
     expected_relative_paths = set()
     for expected in manifest_files:
-        if not isinstance(expected, dict):
-            expected = {}
-        relative_path = expected.get("relative_path")
-        try:
-            before_size = int(expected.get("size_bytes", 0))
-        except (TypeError, ValueError):
-            before_size = 0
-        total_before += before_size
-        issues = []
-        current_size = 0
-        current_checksum = None
-        if not isinstance(relative_path, str) or not relative_path or _is_absolute_manifest_path(relative_path):
-            path = None
-            issues.append("manifest relative_path is invalid")
-        elif relative_path in seen_relative_paths:
-            path = None
-            issues.append("manifest relative_path is duplicated")
-        else:
-            seen_relative_paths.add(relative_path)
-            expected_relative_paths.add(relative_path)
-            path = os.path.realpath(os.path.join(root, relative_path))
-        if path is not None and os.path.commonpath((root, path)) != root:
-            issues.append("manifest path escapes verification root")
-        elif path is not None and not os.path.isfile(path):
-            issues.append("output file is missing")
-        elif path is not None:
-            current_size = os.path.getsize(path)
-            total_after += current_size
-            if current_size <= 0:
-                issues.append("output file is empty")
-            try:
-                current_media = probe_media(path)
-                issues.extend(compare_media_summaries(expected.get("media", {}), current_media))
-                current_checksum = _sha256(path)
-            except (OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError) as error:
-                issues.append(f"output probe failed: {error}")
-        results.append(
-            {
-                "relative_path": relative_path,
-                "passed": not issues,
-                "issues": issues,
-                "before_size_bytes": before_size,
-                "after_size_bytes": current_size,
-                "before_checksum": expected.get("checksum"),
-                "after_checksum": current_checksum,
-            }
+        result, before_size, current_size, include_expected = _verify_manifest_entry(
+            root,
+            expected,
+            seen_relative_paths,
         )
+        total_before += before_size
+        total_after += current_size
+        if include_expected:
+            expected_relative_paths.add(result["relative_path"])
+        results.append(result)
     try:
         current_relative_paths = {os.path.relpath(path, root) for path in _media_files(root)}
     except (OSError, ValueError) as error:
