@@ -156,6 +156,19 @@ fixture. Any failed invariant stops the remaining scenarios and exits nonzero.
 
 ## Readiness interpretation
 
+Incoming worker transfers are bounded to 1 TiB per file by default through
+`maximum_transfer_file_size_gb`. The receiver reserves all bytes still owed by
+active sessions, keeps the configured cache reserve free, and rechecks real free
+space before every 8 MiB checksummed chunk. HTTP 507 means the durable
+`disk-reserve` latch has paused work; do not blindly retry until capacity is
+restored and the event is acknowledged. Interrupted sessions remain resumable
+for `transfer_partial_retention_hours` (48 hours by default). Intentionally
+discard one with `DELETE /compresso/api/v2/transfer/session/{transfer_id}`.
+
+The legacy `/upload/pending/file` ingress is gone and returns HTTP 410. A master
+must always send a stable job ID through the resumable session, chunk, and
+finalize endpoints. Never re-enable the old one-shot upload as a workaround.
+
 Compresso has restart recovery, durable final-replacement journaling, disk preflight, stable job IDs, leases and heartbeats, resumable checksummed transfers, bounded scanning, capability discovery, and operational status endpoints. Local automated tests and synthetic scale benchmarks cover those mechanisms.
 
 The remaining proof is production-shaped evidence: a separate-machine M4 canary, NAS traversal and file-probing behavior, concurrent contention, real media fidelity, and the progressive 100 GB through 1 TB gates. Until those pass, the supported next action is a copied or snapshot-backed 20-file canary—not a monolithic 20 TB destructive run.

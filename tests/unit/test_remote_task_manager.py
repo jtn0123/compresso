@@ -545,6 +545,14 @@ class TestWriteFailureToWorkerLog:
 
 @pytest.mark.unittest
 class TestSendTaskFileGuards:
+    def test_remote_identity_always_carries_stable_job_id_without_lease(self):
+        mgr = _make_manager()
+        mgr.current_task = _make_task()
+        mgr.current_task.task.job_id = "stable-job"
+        mgr.lease_token = None
+
+        assert mgr._remote_identity() == {"job_id": "stable-job"}
+
     def test_returns_false_when_file_missing(self, tmp_path):
         mgr = _make_manager()
         task = _make_task(abspath=str(tmp_path / "missing.mkv"))

@@ -759,8 +759,8 @@ class TestNewPendingTaskGenericException:
 class TestSendFileGenericException:
     def test_returns_empty_dict_on_generic_exception(self):
         links = _make_links()
-        links.remote_api_post_file = MagicMock(side_effect=ValueError("disk error"))
-        result = links.send_file_to_remote_installation(_BASE_CONFIG, "/path/to/file")
+        links._send_file_resumable = MagicMock(side_effect=ValueError("disk error"))
+        result = links.send_file_to_remote_installation(_BASE_CONFIG, "/path/to/file", job_id="job-1")
         assert result == {}
 
 

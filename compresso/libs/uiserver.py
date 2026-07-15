@@ -48,6 +48,9 @@ from compresso.libs.startup import StartupState
 from compresso.webserver.downloads import DownloadsHandler
 
 public_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "webserver", "public"))
+# Multipart framing needs a small allowance above the 64 MiB plugin archive
+# ceiling. The upload handler still enforces the exact archive-body limit.
+MAX_HTTP_REQUEST_BODY_SIZE = 65 * 1024 * 1024
 tornado_settings = {
     "template_loader": tornado.template.Loader(public_directory),
     "static_css": os.path.join(public_directory, "css"),
@@ -219,6 +222,7 @@ class UIServer(threading.Thread):
             self.server = tornado.httpserver.HTTPServer(
                 self.app,
                 ssl_options=ssl_options_config,
+                max_body_size=MAX_HTTP_REQUEST_BODY_SIZE,
             )
 
             self.server.listen(int(self.config.get_ui_port()), address=self.config.get_ui_address())

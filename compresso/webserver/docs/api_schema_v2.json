@@ -3887,6 +3887,48 @@
                 ],
                 "additionalProperties": false
             },
+            "RequestTransferSession": {
+                "type": "object",
+                "properties": {
+                    "job_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                    },
+                    "filename": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                    },
+                    "total_size": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "expected_checksum": {
+                        "type": "string",
+                        "pattern": "^sha256:[0-9a-f]{64}$"
+                    },
+                    "lease_token": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "nullable": true
+                    },
+                    "origin_installation_uuid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "expected_checksum",
+                    "filename",
+                    "job_id",
+                    "total_size"
+                ],
+                "additionalProperties": false
+            },
             "VersionReadSuccess": {
                 "type": "object",
                 "properties": {
@@ -8698,92 +8740,139 @@
                 }
             }
         },
-        "/upload/pending/file": {
+        "/transfer/session": {
             "post": {
-                "description": "Uploads a file to the pending tasks list",
+                "description": "Create or resume a media transfer using a stable job ID.",
                 "requestBody": {
-                    "description": "Uploads a file to the pending tasks list",
                     "required": true,
                     "content": {
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "fileName": {
-                                        "type": "string",
-                                        "format": "binary"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/RequestTransferSession"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "Successful request; Returns data for the generated task",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PendingTasksTableResults"
-                                }
-                            }
-                        }
+                        "description": "Transfer session created or resumed."
                     },
                     "400": {
-                        "description": "Bad request; Check `messages` for any validation errors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadRequest"
-                                }
-                            }
-                        }
+                        "description": "Invalid transfer metadata or configured file-size limit exceeded."
+                    },
+                    "507": {
+                        "description": "Cache capacity or disk reserve is exhausted."
+                    }
+                }
+            }
+        },
+        "/transfer/session/{transfer_id}": {
+            "get": {
+                "description": "Return the current offset and completion state for a transfer.",
+                "responses": {
+                    "200": {
+                        "description": "Current transfer state."
                     },
                     "404": {
-                        "description": "Bad request; Requested endpoint not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadEndpoint"
-                                }
-                            }
-                        }
+                        "description": "Unknown transfer ID."
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete an incomplete transfer manifest, partial file, and owned completed directory.",
+                "responses": {
+                    "200": {
+                        "description": "Transfer session abandoned."
                     },
-                    "405": {
-                        "description": "Bad request; Requested method is not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadMethod"
-                                }
-                            }
-                        }
+                    "400": {
+                        "description": "Completed transfers cannot be abandoned."
                     },
-                    "500": {
-                        "description": "Internal error; Check `error` for exception",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/InternalError"
-                                }
+                    "404": {
+                        "description": "Unknown transfer ID."
+                    }
+                }
+            }
+        },
+        "/transfer/chunk/{transfer_id}": {
+            "post": {
+                "description": "Append at most 8 MiB after validating offset, chunk checksum, and disk reserve.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/octet-stream": {
+                            "schema": {
+                                "type": "string",
+                                "format": "binary"
                             }
                         }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Chunk accepted and durable offset advanced."
+                    },
+                    "400": {
+                        "description": "Invalid offset, size, or checksum."
+                    },
+                    "507": {
+                        "description": "Cache disk reserve would be breached."
+                    }
+                }
+            }
+        },
+        "/transfer/finalize/{transfer_id}": {
+            "post": {
+                "description": "Verify the complete SHA-256 checksum and create the worker task exactly once.",
+                "responses": {
+                    "200": {
+                        "description": "Transfer verified and finalized."
+                    },
+                    "400": {
+                        "description": "Transfer is incomplete or failed checksum validation."
+                    },
+                    "404": {
+                        "description": "Unknown transfer ID."
+                    }
+                }
+            }
+        },
+        "/transfer/source/{task_id}/manifest": {
+            "get": {
+                "description": "Return size and SHA-256 metadata for a completed worker task.",
+                "responses": {
+                    "200": {
+                        "description": "Completed task transfer manifest."
+                    },
+                    "400": {
+                        "description": "Completed output is unavailable."
+                    }
+                }
+            }
+        },
+        "/transfer/source/{task_id}/chunk": {
+            "get": {
+                "description": "Return at most 8 MiB from a completed worker task with offset and checksum headers.",
+                "responses": {
+                    "200": {
+                        "description": "Binary result chunk."
+                    },
+                    "400": {
+                        "description": "Completed output or requested range is unavailable."
                     }
                 }
             }
         },
         "/upload/plugin/file": {
             "post": {
-                "description": "Uploads a plugin ZIP file and installs it",
+                "description": "Upload a plugin ZIP archive limited to 64 MiB compressed.",
                 "requestBody": {
-                    "description": "Uploads a plugin ZIP file and installs it",
                     "required": true,
                     "content": {
                         "multipart/form-data": {
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "fileName": {
+                                    "file": {
                                         "type": "string",
                                         "format": "binary"
                                     }
@@ -8794,54 +8883,24 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Successful request; Returns success status",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BaseSuccess"
-                                }
-                            }
-                        }
+                        "description": "Plugin installed."
                     },
                     "400": {
-                        "description": "Bad request; Check `messages` for any validation errors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadRequest"
-                                }
-                            }
-                        }
+                        "description": "Missing or invalid plugin archive."
                     },
-                    "404": {
-                        "description": "Bad request; Requested endpoint not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadEndpoint"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Bad request; Requested method is not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/BadMethod"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal error; Check `error` for exception",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/InternalError"
-                                }
-                            }
-                        }
+                    "413": {
+                        "description": "Compressed plugin archive exceeds 64 MiB."
+                    }
+                }
+            }
+        },
+        "/upload/pending/file": {
+            "post": {
+                "description": "This legacy media-ingress route is retired; use resumable transfer endpoints.",
+                "deprecated": true,
+                "responses": {
+                    "410": {
+                        "description": "Legacy media upload is gone and successor endpoint templates are returned."
                     }
                 }
             }

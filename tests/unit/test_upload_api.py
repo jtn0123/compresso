@@ -1,160 +1,144 @@
 #!/usr/bin/env python3
 
-"""
-tests.unit.test_upload_api.py
+"""Contracts for retired media ingress and bounded ordinary plugin uploads."""
 
-Tests for the upload API handler.
-Covers: prepare, data_received, get_receiver, upload_file_to_pending_tasks,
-upload_and_install_plugin, on_finish.
-"""
-
-from unittest.mock import MagicMock, mock_open, patch
+import asyncio
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from compresso.libs.singleton import SingletonType
 
+@pytest.mark.unittest
+def test_upload_routes_are_split_between_retired_media_and_plugin_handlers():
+    from compresso.webserver.api_v2.upload_api import ApiPluginUploadHandler, ApiUploadHandler
 
-@pytest.fixture(autouse=True)
-def reset_singletons():
-    SingletonType._instances = {}
-    yield
-    SingletonType._instances = {}
+    assert [route["path_pattern"] for route in ApiUploadHandler.routes] == [r"/upload/pending/file"]
+    assert [route["path_pattern"] for route in ApiPluginUploadHandler.routes] == [r"/upload/plugin/file"]
 
 
 @pytest.mark.unittest
-class TestUploadApiConstants:
-    def test_constants_defined(self):
-        from compresso.webserver.api_v2.upload_api import GB, MAX_STREAMED_SIZE, MB, SEPARATOR, TB
+def test_pending_file_upload_returns_410_with_resumable_successors():
+    from compresso.webserver.api_v2.upload_api import ApiUploadHandler
 
-        assert MB == 1024 * 1024
-        assert GB == 1024 * MB
-        assert TB == 1024 * GB
-        assert MAX_STREAMED_SIZE == 100 * TB
-        assert SEPARATOR == b"\r\n"
+    handler = ApiUploadHandler.__new__(ApiUploadHandler)
+    handler._finished = False
+    handler.set_status = MagicMock()
+    handler.finish = MagicMock()
 
+    asyncio.run(handler.retire_pending_upload())
 
-@pytest.mark.unittest
-class TestUploadApiGetReceiver:
-    @patch("compresso.webserver.api_v2.upload_api.session")
-    @patch("compresso.webserver.api_v2.upload_api.config")
-    @patch("compresso.webserver.api_v2.upload_api.FrontendPushMessages")
-    def test_get_receiver_returns_callable(self, _fpm, _config, _session):
-        from compresso.webserver.api_v2.upload_api import ApiUploadHandler
-
-        handler = ApiUploadHandler.__new__(ApiUploadHandler)
-        handler.frontend_messages = MagicMock()
-        handler.meta = {}
-        handler.cache_directory = "/tmp/test"
-        receiver = handler.get_receiver("pending")
-        assert callable(receiver)
-
-    @patch("compresso.webserver.api_v2.upload_api.session")
-    @patch("compresso.webserver.api_v2.upload_api.config")
-    @patch("compresso.webserver.api_v2.upload_api.FrontendPushMessages")
-    def test_receiver_first_chunk_parses_metadata(self, _fpm, _config, _session):
-        from compresso.webserver.api_v2.upload_api import ApiUploadHandler
-
-        handler = ApiUploadHandler.__new__(ApiUploadHandler)
-        handler.frontend_messages = MagicMock()
-        handler.meta = {}
-        handler.cache_directory = "/tmp/test"
-        receiver = handler.get_receiver("pending")
-
-        boundary = b"----WebKitFormBoundary"
-        header_line = b'Content-Disposition: form-data; name="file"; filename="test.mp4"'
-        content_type = b"Content-Type: video/mp4"
-        chunk = boundary + b"\r\n" + header_line + b"\r\n" + content_type + b"\r\n\r\nFILEDATA"
-
-        with patch("builtins.open", mock_open()):
-            receiver(chunk)
-
-        assert handler.meta["filename"] == "test.mp4"
-
-    @patch("compresso.webserver.api_v2.upload_api.session")
-    @patch("compresso.webserver.api_v2.upload_api.config")
-    @patch("compresso.webserver.api_v2.upload_api.FrontendPushMessages")
-    def test_receiver_sanitizes_path_traversal(self, _fpm, _config, _session):
-        from compresso.webserver.api_v2.upload_api import ApiUploadHandler
-
-        handler = ApiUploadHandler.__new__(ApiUploadHandler)
-        handler.frontend_messages = None
-        handler.meta = {}
-        handler.cache_directory = "/tmp/test"
-        receiver = handler.get_receiver("plugin")
-
-        boundary = b"----WebKitFormBoundary"
-        header_line = b'Content-Disposition: form-data; name="file"; filename="../../etc/passwd"'
-        content_type = b"Content-Type: application/octet-stream"
-        chunk = boundary + b"\r\n" + header_line + b"\r\n" + content_type + b"\r\n\r\nDATA"
-
-        with patch("builtins.open", mock_open()):
-            receiver(chunk)
-
-        # Should sanitize to just the basename
-        assert handler.meta["filename"] == "passwd"
-
-    @patch("compresso.webserver.api_v2.upload_api.session")
-    @patch("compresso.webserver.api_v2.upload_api.config")
-    @patch("compresso.webserver.api_v2.upload_api.FrontendPushMessages")
-    def test_receiver_subsequent_chunks(self, _fpm, _config, _session):
-        from compresso.webserver.api_v2.upload_api import ApiUploadHandler
-
-        handler = ApiUploadHandler.__new__(ApiUploadHandler)
-        handler.frontend_messages = None
-        handler.meta = {}
-        handler.cache_directory = "/tmp/test"
-        receiver = handler.get_receiver("pending")
-
-        boundary = b"----WebKitFormBoundary"
-        header_line = b'Content-Disposition: form-data; name="file"; filename="test.mp4"'
-        content_type = b"Content-Type: video/mp4"
-        chunk1 = boundary + b"\r\n" + header_line + b"\r\n" + content_type + b"\r\n\r\nPART1"
-
-        m = mock_open()
-        with patch("builtins.open", m):
-            receiver(chunk1)
-            receiver(b"PART2")
-
-        # The file handle should have been written to twice
-        handle = m()
-        assert handle.write.call_count == 2
+    handler.set_status.assert_called_once_with(410)
+    response = handler.finish.call_args.args[0]
+    assert response["successor"]["create"] == "/compresso/api/v2/transfer/session"
+    assert response["successor"]["chunk"].startswith("/compresso/api/v2/transfer/chunk/")
 
 
 @pytest.mark.unittest
-class TestUploadApiOnFinish:
-    def test_on_finish_closes_file(self):
-        from compresso.webserver.api_v2.upload_api import ApiUploadHandler
+def test_plugin_upload_requires_one_framework_parsed_file(tmp_path):
+    from compresso.webserver.api_v2.upload_api import ApiPluginUploadHandler
 
-        handler = ApiUploadHandler.__new__(ApiUploadHandler)
-        handler.fp = MagicMock()
-        handler.fp.closed = False
-        handler._status_code = 200
-        handler._reason = "OK"
-        handler._finished = False
-        handler._auto_finish = True
-        handler._headers = {}
-        handler._write_buffer = []
-        # Patch parent on_finish
-        with patch.object(ApiUploadHandler.__bases__[0], "on_finish"):
-            handler.on_finish()
-        handler.fp.close.assert_called_once()
+    handler = ApiPluginUploadHandler.__new__(ApiPluginUploadHandler)
+    handler.request = SimpleNamespace(files={}, headers={})
+    handler.config = MagicMock()
+    handler.config.get_cache_path.return_value = str(tmp_path)
+    handler.handle_base_api_error = MagicMock()
 
-    def test_on_finish_no_fp(self):
-        from compresso.webserver.api_v2.upload_api import ApiUploadHandler
+    asyncio.run(handler.upload_and_install_plugin())
 
-        handler = ApiUploadHandler.__new__(ApiUploadHandler)
-        # No fp attribute - should not error
-        with patch.object(ApiUploadHandler.__bases__[0], "on_finish"):
-            handler.on_finish()
+    assert handler.handle_base_api_error.call_args.args[0].status_code == 400
 
 
 @pytest.mark.unittest
-class TestUploadApiRoutes:
-    def test_routes_defined(self):
-        from compresso.webserver.api_v2.upload_api import ApiUploadHandler
+def test_plugin_upload_rejects_payload_above_64_mib_before_install(tmp_path):
+    from compresso.webserver.api_v2.upload_api import MAX_PLUGIN_UPLOAD_SIZE, ApiPluginUploadHandler
 
-        assert len(ApiUploadHandler.routes) == 2
-        paths = [r["path_pattern"] for r in ApiUploadHandler.routes]
-        assert r"/upload/pending/file" in paths
-        assert r"/upload/plugin/file" in paths
+    handler = ApiPluginUploadHandler.__new__(ApiPluginUploadHandler)
+    handler.request = SimpleNamespace(
+        files={"file": [SimpleNamespace(filename="plugin.zip", body=b"x", content_type="application/zip")]},
+        headers={"Content-Length": str(MAX_PLUGIN_UPLOAD_SIZE + 1)},
+    )
+    handler.config = MagicMock()
+    handler.config.get_cache_path.return_value = str(tmp_path)
+    handler.handle_base_api_error = MagicMock()
+
+    with patch("compresso.libs.plugins.PluginsHandler.install_plugin_from_path_on_disk") as install:
+        asyncio.run(handler.upload_and_install_plugin())
+
+    install.assert_not_called()
+    assert handler.handle_base_api_error.call_args.args[0].status_code == 413
+
+
+@pytest.mark.unittest
+def test_plugin_upload_uses_framework_parsed_file_and_cleans_temporary_copy(tmp_path):
+    from compresso.webserver.api_v2.upload_api import ApiPluginUploadHandler
+
+    handler = ApiPluginUploadHandler.__new__(ApiPluginUploadHandler)
+    handler.request = SimpleNamespace(
+        files={"file": [SimpleNamespace(filename="plugin.zip", body=b"zip-data", content_type="application/zip")]},
+        headers={"Content-Length": "8"},
+    )
+    handler.config = MagicMock()
+    handler.config.get_cache_path.return_value = str(tmp_path)
+    handler.write_success = MagicMock()
+    handler.handle_base_api_error = MagicMock()
+    observed_paths = []
+
+    def install(path):
+        observed_paths.append(path)
+        assert path.read_bytes() == b"zip-data"
+        return True
+
+    with patch("compresso.libs.plugins.PluginsHandler.install_plugin_from_path_on_disk", side_effect=install):
+        asyncio.run(handler.upload_and_install_plugin())
+
+    handler.write_success.assert_called_once()
+    assert observed_paths
+    assert not observed_paths[0].exists()
+
+
+@pytest.mark.unittest
+def test_plugin_upload_install_failure_is_structured_and_cleans_temporary_copy(tmp_path):
+    from compresso.webserver.api_v2.upload_api import ApiPluginUploadHandler
+
+    handler = ApiPluginUploadHandler.__new__(ApiPluginUploadHandler)
+    handler.request = SimpleNamespace(
+        files={"file": [SimpleNamespace(filename="plugin.zip", body=b"bad-zip", content_type="application/zip")]},
+        headers={"Content-Length": "7"},
+    )
+    handler.config = MagicMock()
+    handler.config.get_cache_path.return_value = str(tmp_path)
+    handler.handle_base_api_error = MagicMock()
+
+    with patch("compresso.libs.plugins.PluginsHandler.install_plugin_from_path_on_disk", return_value=False):
+        asyncio.run(handler.upload_and_install_plugin())
+
+    assert handler.handle_base_api_error.call_args.args[0].status_code == 400
+    assert list((tmp_path / "plugin_uploads").iterdir()) == []
+
+
+@pytest.mark.unittest
+def test_plugin_install_calls_are_serialized(tmp_path):
+    from compresso.webserver.api_v2.upload_api import _install_plugin_serialized
+
+    state_lock = threading.Lock()
+    state = {"active": 0, "maximum": 0}
+
+    def install(_path):
+        with state_lock:
+            state["active"] += 1
+            state["maximum"] = max(state["maximum"], state["active"])
+        time.sleep(0.02)
+        with state_lock:
+            state["active"] -= 1
+        return True
+
+    plugins = SimpleNamespace(install_plugin_from_path_on_disk=install)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: _install_plugin_serialized(plugins, tmp_path), range(2)))
+
+    assert results == [True, True]
+    assert state["maximum"] == 1

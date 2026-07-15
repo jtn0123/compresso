@@ -14,6 +14,18 @@ import time
 from pathlib import Path
 from typing import Any
 
+MANIFEST_GLOB = "*.json"
+
+
+class TransferStorageError(OSError):
+    """Raised before a transfer would consume reserved cache capacity."""
+
+    def __init__(self, message, *, free_bytes=None, required_bytes=None, reserved_bytes=None):
+        super().__init__(message)
+        self.free_bytes = free_bytes
+        self.required_bytes = required_bytes
+        self.reserved_bytes = reserved_bytes
+
 
 def file_sha256(path):
     digest = hashlib.sha256()
@@ -27,13 +39,25 @@ class ResumableTransferStore:
     _locks_guard = threading.Lock()
     _locks_by_root: dict[str, Any] = {}
 
-    def __init__(self, root_dir, now=time.time, fault_injector=None):
+    def __init__(
+        self,
+        root_dir,
+        now=time.time,
+        fault_injector=None,
+        *,
+        maximum_file_size_bytes=None,
+        minimum_free_bytes=0,
+        disk_usage=shutil.disk_usage,
+    ):
         self.root_dir = Path(root_dir).resolve()
         self.partial_dir = self.root_dir / "partial"
         self.completed_dir = self.root_dir / "completed"
         self.manifest_dir = self.root_dir / "manifests"
         self._now = now
         self._fault_injector = fault_injector
+        self.maximum_file_size_bytes = None if maximum_file_size_bytes is None else max(0, int(maximum_file_size_bytes))
+        self.minimum_free_bytes = max(0, int(minimum_free_bytes))
+        self._disk_usage = disk_usage
         with self._locks_guard:
             self._lock = self._locks_by_root.setdefault(str(self.root_dir), threading.RLock())
         for directory in (self.partial_dir, self.completed_dir, self.manifest_dir):
@@ -130,6 +154,53 @@ class ResumableTransferStore:
             raise ValueError("Transfer partial artifact exceeds its declared size")
         return size
 
+    def _active_reserved_bytes(self, *, exclude_transfer_id=None):
+        reserved = 0
+        for manifest_path in self.manifest_dir.glob(MANIFEST_GLOB):
+            transfer_id = manifest_path.stem
+            if transfer_id == exclude_transfer_id:
+                continue
+            try:
+                manifest = self._load(transfer_id)
+                if manifest.get("state") != "active":
+                    continue
+                reserved += int(manifest["total_size"]) - self._active_partial_size(manifest)
+            except (KeyError, OSError, TypeError, ValueError) as exc:
+                raise TransferStorageError(
+                    "Transfer capacity cannot be reserved while existing session state is invalid"
+                ) from exc
+        return reserved
+
+    def _ensure_new_session_capacity(self, transfer_id, total_size):
+        if self.maximum_file_size_bytes is not None and total_size > self.maximum_file_size_bytes:
+            raise ValueError("Transfer exceeds the configured maximum file size")
+        try:
+            free_bytes = int(self._disk_usage(self.root_dir).free)
+        except OSError as exc:
+            raise TransferStorageError("Transfer cache free space could not be checked") from exc
+        reserved_bytes = self._active_reserved_bytes(exclude_transfer_id=transfer_id)
+        required_bytes = self.minimum_free_bytes + reserved_bytes + total_size
+        if free_bytes < required_bytes:
+            raise TransferStorageError(
+                "Transfer cache capacity is already reserved by active sessions",
+                free_bytes=free_bytes,
+                required_bytes=required_bytes,
+                reserved_bytes=reserved_bytes,
+            )
+
+    def _ensure_chunk_capacity(self, chunk_size):
+        try:
+            free_bytes = int(self._disk_usage(self.root_dir).free)
+        except OSError as exc:
+            raise TransferStorageError("Transfer cache free space could not be checked") from exc
+        required_bytes = self.minimum_free_bytes + max(0, int(chunk_size))
+        if free_bytes < required_bytes:
+            raise TransferStorageError(
+                "Transfer chunk would breach the cache disk reserve",
+                free_bytes=free_bytes,
+                required_bytes=required_bytes,
+            )
+
     @staticmethod
     def _artifact_matches_manifest(path, manifest, *, checksum=False):
         try:
@@ -222,6 +293,7 @@ class ResumableTransferStore:
                         self._write_manifest(manifest)
                 return self._public_status(manifest)
 
+            self._ensure_new_session_capacity(transfer_id, total_size)
             final_path = self.completed_dir / transfer_id / filename
             manifest = {
                 "version": 1,
@@ -263,6 +335,7 @@ class ResumableTransferStore:
                 raise ValueError("Transfer chunk checksum mismatch")
             if current_offset + len(data) > int(manifest["total_size"]):
                 raise ValueError("Transfer chunk exceeds declared size")
+            self._ensure_chunk_capacity(len(data))
             self._inject_fault("append", partial_path)
             with open(partial_path, "ab") as output:
                 output.write(data)
@@ -301,11 +374,25 @@ class ResumableTransferStore:
             self._write_manifest(manifest)
             return final_path
 
+    def _remove_artifacts(self, transfer_id):
+        self._partial_path(transfer_id).unlink(missing_ok=True)
+        shutil.rmtree(self.completed_dir / transfer_id, ignore_errors=True)
+        self._manifest_path(transfer_id).unlink(missing_ok=True)
+
+    def abandon(self, transfer_id):
+        """Intentionally discard one incomplete transfer and all owned artifacts."""
+        with self._lock:
+            manifest = self._load(transfer_id)
+            if manifest.get("state") == "complete":
+                raise ValueError("Completed transfers cannot be abandoned")
+            self._remove_artifacts(transfer_id)
+            return {"transfer_id": transfer_id, "abandoned": True}
+
     def cleanup_stale(self, max_age_seconds):
         cutoff = self._now() - max(0, int(max_age_seconds))
         removed = []
         with self._lock:
-            for manifest_path in self.manifest_dir.glob("*.json"):
+            for manifest_path in self.manifest_dir.glob(MANIFEST_GLOB):
                 try:
                     transfer_id = manifest_path.stem
                     self._validate_transfer_id(transfer_id)
@@ -313,7 +400,7 @@ class ResumableTransferStore:
                         manifest = json.load(source)
                     self._validate_manifest(manifest, transfer_id)
                     updated_at = float(manifest.get("updated_at", 0))
-                except (KeyError, OSError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError, OverflowError):
+                except (KeyError, OSError, TypeError, ValueError, OverflowError):
                     transfer_id = manifest_path.stem
                     if re.fullmatch(r"[a-f0-9]{32}", transfer_id):
                         self._partial_path(transfer_id).unlink(missing_ok=True)
@@ -326,11 +413,7 @@ class ResumableTransferStore:
                         continue
                 elif updated_at >= cutoff:
                     continue
-                partial_path = self._partial_path(transfer_id)
-                if partial_path.exists():
-                    partial_path.unlink()
-                shutil.rmtree(self.completed_dir / transfer_id, ignore_errors=True)
-                manifest_path.unlink()
+                self._remove_artifacts(transfer_id)
                 removed.append(transfer_id)
         return removed
 
@@ -338,7 +421,7 @@ class ResumableTransferStore:
         """Return cheap transfer counters for the operations status API."""
         result = {"active": 0, "complete": 0, "corrupt": 0, "bytes_received": 0, "bytes_total": 0}
         with self._lock:
-            for manifest_path in self.manifest_dir.glob("*.json"):
+            for manifest_path in self.manifest_dir.glob(MANIFEST_GLOB):
                 try:
                     with open(manifest_path) as source:
                         manifest = json.load(source)
@@ -354,6 +437,6 @@ class ResumableTransferStore:
                         offset = self._active_partial_size(manifest)
                     result["bytes_received"] += offset
                     result["bytes_total"] += int(manifest.get("total_size", 0))
-                except (KeyError, OSError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError, OverflowError):
+                except (KeyError, OSError, TypeError, ValueError, OverflowError):
                     result["corrupt"] += 1
         return result

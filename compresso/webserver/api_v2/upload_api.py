@@ -26,327 +26,163 @@ Copyright:
        DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
        OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
        OR OTHER DEALINGS IN THE SOFTWARE.
-
 """
 
+import asyncio
 import os
-import shutil
-import time
+import tempfile
+import threading
+from pathlib import Path
 
-import tornado.log
 import tornado.web
 
 from compresso import config
-from compresso.libs import common, session
-from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
-from compresso.webserver.api_v2.schema.pending_schemas import PendingTasksTableResultsSchema
-from compresso.webserver.helpers import pending_tasks
 
-# CONST
 MB = 1024 * 1024
-GB = 1024 * MB
-TB = 1024 * GB
-MAX_STREAMED_SIZE = 100 * TB
-SEPARATOR = b"\r\n"
+MAX_PLUGIN_UPLOAD_SIZE = 64 * MB
+TRANSFER_SUCCESSORS = {
+    "create": "/compresso/api/v2/transfer/session",
+    "chunk": "/compresso/api/v2/transfer/chunk/{transfer_id}",
+    "finalize": "/compresso/api/v2/transfer/finalize/{transfer_id}",
+}
+_PLUGIN_INSTALL_LOCK = threading.Lock()
+
+
+def _persist_plugin_upload(upload_root, body):
+    """Write a framework-parsed upload outside the async request loop."""
+    upload_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    descriptor, temporary_path = tempfile.mkstemp(prefix="plugin-", suffix=".zip", dir=upload_root)
+    upload_path = Path(temporary_path)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(body)
+            output.flush()
+            os.fsync(output.fileno())
+    except Exception:
+        upload_path.unlink(missing_ok=True)
+        raise
+    return upload_path
+
+
+def _install_plugin_serialized(plugins_handler, upload_path):
+    """Prevent overlapping legacy installers until PR 5 adds per-plugin transactions."""
+    with _PLUGIN_INSTALL_LOCK:
+        return plugins_handler.install_plugin_from_path_on_disk(upload_path)
 
 
 @tornado.web.stream_request_body
 class ApiUploadHandler(BaseApiHandler):
-    session = None
-    params = None
-    config = None
-    frontend_messages = None
-
-    bytes_read = None
-    meta = None
-    receiver = None
-
-    cache_directory = None
+    """Compatibility endpoint that rejects retired media-file uploads early."""
 
     routes = [
         {
             "path_pattern": r"/upload/pending/file",
             "supported_methods": ["POST"],
-            "call_method": "upload_file_to_pending_tasks",
-        },
+            "call_method": "retire_pending_upload",
+        }
+    ]
+
+    def prepare(self):
+        super().prepare()
+        if not self._finished:
+            self._write_retirement_response()
+
+    def data_received(self, chunk):
+        """Discard bytes if a client races the early 410 response."""
+
+    def _write_retirement_response(self):
+        self.set_status(410)
+        self.finish(
+            {
+                "error": "410: Legacy media upload retired",
+                "successor": dict(TRANSFER_SUCCESSORS),
+            }
+        )
+
+    async def retire_pending_upload(self):
+        """Return the resumable-transfer successor contract.
+        ---
+        description: This legacy media-ingress route is retired; use resumable transfer endpoints.
+        deprecated: true
+        responses:
+          410:
+            description: Legacy media upload is gone and successor endpoint templates are returned.
+        """
+        if not self._finished:
+            self._write_retirement_response()
+
+
+class ApiPluginUploadHandler(BaseApiHandler):
+    """Bounded framework-parsed upload endpoint for plugin ZIP archives."""
+
+    routes = [
         {
             "path_pattern": r"/upload/plugin/file",
             "supported_methods": ["POST"],
             "call_method": "upload_and_install_plugin",
-        },
+        }
     ]
 
     def initialize(self, **kwargs):
-        self.session = session.Session()
-        self.params = kwargs.get("params")
+        super().initialize(**kwargs)
         self.config = config.Config()
-        self.frontend_messages = FrontendPushMessages()
 
-    def _handle_upload_error(self, error):
-        """Clear upload progress and route the failure through the shared API handlers."""
-        if self.frontend_messages:
-            self.frontend_messages.remove_item("receivingRemoteFile")
-        if isinstance(error, BaseApiError):
-            self.handle_base_api_error(error)
-        else:
-            self.handle_unhandled_error(error)
+    def _plugin_upload(self):
+        content_length = self.request.headers.get("Content-Length")
+        if content_length is not None:
+            try:
+                if int(content_length) > MAX_PLUGIN_UPLOAD_SIZE:
+                    raise BaseApiError("Plugin archive exceeds 64 MiB", status_code=413)
+            except ValueError as exc:
+                raise BaseApiError("Invalid plugin upload length", status_code=400) from exc
 
-    def prepare(self):
-        self.bytes_read = 0
-        self.meta = dict()
-        upload_type = "pending"
-        if "upload/plugin/file" in self.request.uri:
-            upload_type = "plugin"
-        self.receiver = self.get_receiver(upload_type)
-
-        # If max_body_size is not set, you cannot upload files > 100MB
-        self.request.connection.set_max_body_size(MAX_STREAMED_SIZE)
-
-        # Set the output path to the cache directory
-        out_folder = f"compresso_remote_pending_library-{time.time()}"
-        if not self.cache_directory:
-            self.cache_directory = os.path.join(self.config.get_cache_path(), "remote_library", out_folder)
-            if not os.path.exists(self.cache_directory):
-                os.makedirs(self.cache_directory)
-
-    def data_received(self, chunk):
-        self.receiver(chunk)
-
-    def get_receiver(self, upload_type):
-        index = 0
-        frontend_messages = self.frontend_messages
-
-        def receiver(chunk):
-            nonlocal index
-            if index == 0:
-                index += 1
-                split_chunk = chunk.split(SEPARATOR)
-
-                self.meta["boundary"] = SEPARATOR + split_chunk[0] + b"--" + SEPARATOR
-                self.meta["header"] = SEPARATOR.join(split_chunk[0:3])
-                self.meta["header"] += SEPARATOR * 2
-                self.meta["filename"] = split_chunk[1].split(b"=")[-1].replace(b'"', b"").decode("utf-8", errors="replace")
-                # Sanitize filename to prevent path traversal
-                self.meta["filename"] = os.path.basename(self.meta["filename"])
-                if not self.meta["filename"] or self.meta["filename"] in {".", ".."}:
-                    raise ValueError("Invalid filename in upload")
-
-                if frontend_messages and upload_type == "pending":
-                    frontend_messages.update(
-                        {
-                            "id": "receivingRemoteFile",
-                            "type": "status",
-                            "code": "receivingRemoteFile",
-                            "message": self.meta["filename"],
-                            "timeout": 10000,
-                        }
-                    )
-
-                chunk = chunk[len(self.meta["header"]) :]
-                self.fp = open(os.path.join(self.cache_directory, self.meta["filename"]), "wb")  # noqa: SIM115 — file closed in on_finish(); context manager incompatible with streaming chunks
-                self.fp.write(chunk)
-            else:
-                self.fp.write(chunk)
-
-        return receiver
-
-    def on_finish(self):
-        try:
-            if hasattr(self, "fp") and self.fp and not self.fp.closed:
-                self.fp.close()
-        finally:
-            super().on_finish()
-
-    async def upload_file_to_pending_tasks(self):
-        """
-        Upload - upload a new pending task
-        ---
-        description: Uploads a file to the pending tasks list
-        requestBody:
-            description: Uploads a file to the pending tasks list
-            required: True
-            content:
-                multipart/form-data:
-                    schema:
-                        type: object
-                        properties:
-                            fileName:
-                                type: string
-                                format: binary
-        responses:
-            200:
-                description: 'Successful request; Returns data for the generated task'
-                content:
-                    application/json:
-                        schema:
-                            PendingTasksTableResultsSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
-        """
-        try:
-            # TODO: Add POST endpoint to receive metadata or a recipe pertaining
-            # to this uploaded file (for future when plugins can be sent with the file).
-            self.meta["content_length"] = (
-                int(self.request.headers.get("Content-Length")) - len(self.meta["header"]) - len(self.meta["boundary"])
-            )
-
-            if self.frontend_messages:
-                self.frontend_messages.update(
-                    {"id": "receivingRemoteFile", "type": "status", "code": "receivingRemoteFile", "message": "", "timeout": 0}
-                )
-
-            self.fp.seek(self.meta["content_length"], 0)
-            self.fp.truncate()
-            self.fp.close()
-
-            # Remove frontend status message
-            if self.frontend_messages:
-                self.frontend_messages.remove_item("receivingRemoteFile")
-
-            # Create task entry for the file
-            pathname = os.path.join(self.cache_directory, self.meta["filename"])
-            job_id = self.get_query_argument("job_id", None)
-            lease_token = self.get_query_argument("lease_token", None)
-            origin_installation_uuid = self.get_query_argument("origin_installation_uuid", None)
-            task_info = pending_tasks.add_remote_tasks(pathname, job_id=job_id)
-            if not task_info:
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to create task for uploaded file")
-                self.write_error()
-                return
-
-            identity_bound = pending_tasks.bind_remote_task_identity(
-                task_info.get("id"),
-                lease_token=lease_token,
-                origin_installation_uuid=origin_installation_uuid,
-            )
-            if os.path.realpath(task_info.get("abspath")) != os.path.realpath(pathname):
-                shutil.rmtree(self.cache_directory, ignore_errors=True)
-            if not identity_bound:
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Remote task identity conflicts with the existing job")
-                self.write_error()
-                return
-
-            # Checksumming reads the whole file, which is expensive for large uploads.
-            # Allow callers to opt out via ?include_checksum=false (defaults to enabled).
-            include_checksum = self.get_query_argument("include_checksum", "true").lower() != "false"
-            checksum = common.get_file_checksum(task_info.get("abspath")) if include_checksum else None
-
-            # Return the details of the generated task
-            response_data = {
-                "id": task_info.get("id"),
-                "abspath": task_info.get("abspath"),
-                "priority": task_info.get("priority"),
-                "type": task_info.get("type"),
-                "status": task_info.get("status"),
-                "checksum": checksum,
-            }
-            if task_info.get("job_id"):
-                response_data["job_id"] = task_info["job_id"]
-            response = self.build_response(PendingTasksTableResultsSchema(), response_data)
-            self.write_success(response)
-            return
-        except BaseApiError as bae:
-            self._handle_upload_error(bae)
-            return
-        except Exception as e:
-            self._handle_upload_error(e)
+        for uploads in self.request.files.values():
+            if uploads:
+                upload = uploads[0]
+                if len(upload.body) > MAX_PLUGIN_UPLOAD_SIZE:
+                    raise BaseApiError("Plugin archive exceeds 64 MiB", status_code=413)
+                return upload
+        raise BaseApiError("A plugin ZIP file is required", status_code=400)
 
     async def upload_and_install_plugin(self):
-        """
-        Upload - upload a plugin and install it
+        """Install one ordinary multipart plugin upload and remove its temp copy.
         ---
-        description: Uploads a plugin ZIP file and installs it
+        description: Upload a plugin ZIP archive limited to 64 MiB compressed.
         requestBody:
-            description: Uploads a plugin ZIP file and installs it
-            required: True
-            content:
-                multipart/form-data:
-                    schema:
-                        type: object
-                        properties:
-                            fileName:
-                                type: string
-                                format: binary
+          required: true
+          content:
+            multipart/form-data:
+              schema:
+                type: object
+                properties:
+                  file:
+                    type: string
+                    format: binary
         responses:
-            200:
-                description: 'Successful request; Returns success status'
-                content:
-                    application/json:
-                        schema:
-                            BaseSuccessSchema
-            400:
-                description: Bad request; Check `messages` for any validation errors
-                content:
-                    application/json:
-                        schema:
-                            BadRequestSchema
-            404:
-                description: Bad request; Requested endpoint not found
-                content:
-                    application/json:
-                        schema:
-                            BadEndpointSchema
-            405:
-                description: Bad request; Requested method is not allowed
-                content:
-                    application/json:
-                        schema:
-                            BadMethodSchema
-            500:
-                description: Internal error; Check `error` for exception
-                content:
-                    application/json:
-                        schema:
-                            InternalErrorSchema
+          200:
+            description: Plugin installed.
+          400:
+            description: Missing or invalid plugin archive.
+          413:
+            description: Compressed plugin archive exceeds 64 MiB.
         """
+        upload_path = None
         try:
-            self.meta["content_length"] = (
-                int(self.request.headers.get("Content-Length")) - len(self.meta["header"]) - len(self.meta["boundary"])
-            )
+            upload = self._plugin_upload()
+            upload_root = Path(self.config.get_cache_path()).resolve() / "plugin_uploads"
+            upload_path = await asyncio.to_thread(_persist_plugin_upload, upload_root, upload.body)
 
-            self.fp.seek(self.meta["content_length"], 0)
-            self.fp.truncate()
-            self.fp.close()
-
-            # Create task entry for the file
-            upload_path = os.path.join(self.cache_directory, self.meta["filename"])
-
-            # Install plugin from zip
             from compresso.libs.plugins import PluginsHandler
 
-            plugins = PluginsHandler()
-            if not plugins.install_plugin_from_path_on_disk(upload_path):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to upload and install/update plugin")
-                self.write_error()
-                return
-
+            installed = await asyncio.to_thread(_install_plugin_serialized, PluginsHandler(), upload_path)
+            if not installed:
+                raise BaseApiError("Plugin package could not be installed", status_code=400)
             self.write_success()
-            return
-        except BaseApiError as bae:
-            self._handle_upload_error(bae)
-            return
-        except Exception as e:
-            self._handle_upload_error(e)
+        except BaseApiError as exc:
+            self.handle_base_api_error(exc)
+        except Exception as exc:
+            self.handle_unhandled_error(exc)
+        finally:
+            if upload_path is not None:
+                upload_path.unlink(missing_ok=True)

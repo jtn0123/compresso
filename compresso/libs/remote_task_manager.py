@@ -232,13 +232,15 @@ class RemoteTaskManager(threading.Thread):
         return True
 
     def _remote_identity(self):
-        if not self.lease_token:
-            return {}
-        return {
-            "job_id": self.current_task.task.job_id,
-            "lease_token": self.lease_token,
-            "origin_installation_uuid": self.origin_installation_uuid,
-        }
+        identity = {"job_id": self.current_task.task.job_id}
+        if self.lease_token:
+            identity.update(
+                {
+                    "lease_token": self.lease_token,
+                    "origin_installation_uuid": self.origin_installation_uuid,
+                }
+            )
+        return identity
 
     def _heartbeat_remote_lease(self):
         if not self.lease_token:

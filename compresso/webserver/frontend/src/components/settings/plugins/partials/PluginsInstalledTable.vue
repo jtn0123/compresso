@@ -23,6 +23,7 @@
                       :label="$t('components.plugins.uploadZipLabel')"
                       color="secondary"
                       accept=".zip, application/zip"
+                      :max-file-size="64 * 1024 * 1024"
                       auto-upload
                       @rejected="onRejectedPluginUpload"
                       @failed="onFailedPluginUploadAndInstall"

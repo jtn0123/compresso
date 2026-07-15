@@ -199,6 +199,28 @@ class TestUIServerSetLogging:
 
 
 @pytest.mark.unittest
+def test_ui_server_caps_buffered_request_bodies():
+    from compresso.libs.uiserver import MAX_HTTP_REQUEST_BODY_SIZE
+
+    server = _make_uiserver()
+    server.config.get_ssl_enabled.return_value = False
+    server.config.get_ui_port.return_value = 8888
+    server.config.get_ui_address.return_value = "127.0.0.1"
+    server.make_web_app = MagicMock(return_value=MagicMock())
+
+    with (
+        patch("compresso.libs.uiserver.asyncio.new_event_loop", return_value=MagicMock()),
+        patch("compresso.libs.uiserver.asyncio.set_event_loop"),
+        patch("compresso.libs.uiserver.tornado.httpserver.HTTPServer") as http_server,
+        patch("compresso.libs.uiserver.tornado.ioloop.IOLoop.current", return_value=MagicMock()),
+        patch.object(server, "_record_network_readiness"),
+    ):
+        server.run()
+
+    assert http_server.call_args.kwargs["max_body_size"] == MAX_HTTP_REQUEST_BODY_SIZE
+
+
+@pytest.mark.unittest
 class TestUIServerMakeWebApp:
     @patch("compresso.libs.uiserver.os.makedirs")
     @patch("swagger_ui.tornado_api_doc")

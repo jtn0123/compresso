@@ -560,25 +560,35 @@ class TestSendFileToRemoteInstallation:
             origin_installation_uuid="master-1",
         )
 
+    def test_rejects_distributed_upload_without_stable_job_id(self):
+        links = _create_links()
+        links.remote_api_post_file = MagicMock()
+        config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
+
+        result = links.send_file_to_remote_installation(config, "/path/to/file")
+
+        assert result == {}
+        links.remote_api_post_file.assert_not_called()
+
     def test_returns_results_on_success(self):
         links = _create_links()
-        links.remote_api_post_file = MagicMock(return_value={"id": 5, "checksum": "abc"})
+        links._send_file_resumable = MagicMock(return_value={"id": 5, "checksum": "abc"})
         config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
-        result = links.send_file_to_remote_installation(config, "/path/to/file")
+        result = links.send_file_to_remote_installation(config, "/path/to/file", job_id="job-1")
         assert result == {"id": 5, "checksum": "abc"}
 
-    def test_returns_empty_when_error_in_result(self):
+    def test_returns_empty_when_resumable_transfer_is_interrupted(self):
         links = _create_links()
-        links.remote_api_post_file = MagicMock(return_value={"error": "upload failed"})
+        links._send_file_resumable = MagicMock(return_value={})
         config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
-        result = links.send_file_to_remote_installation(config, "/path/to/file")
+        result = links.send_file_to_remote_installation(config, "/path/to/file", job_id="job-1")
         assert result == {}
 
     def test_returns_empty_on_request_exception(self):
         links = _create_links()
-        links.remote_api_post_file = MagicMock(side_effect=requests.exceptions.ConnectionError)
+        links._send_file_resumable = MagicMock(side_effect=requests.exceptions.ConnectionError)
         config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
-        result = links.send_file_to_remote_installation(config, "/path/to/file")
+        result = links.send_file_to_remote_installation(config, "/path/to/file", job_id="job-1")
         assert result == {}
 
 

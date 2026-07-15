@@ -92,3 +92,27 @@ services:
 ```
 
 The loopback host binding is the safe default. A master that must accept LAN workers can use `8888:8888` after enabling API authentication and restricting access with the host firewall. Configure a unique destination `api_token` on each remote link; it is masked on read and is not returned by the general settings endpoint. Basic authentication remains supported independently. API v1 is authenticated and rate-limited but deprecated for removal in the next major release.
+
+## Transfer safety
+
+Media sent between the master and a worker uses only the resumable transfer API.
+The retired `/compresso/api/v2/upload/pending/file` route returns HTTP 410.
+Every distributed media job must include a stable job ID, and every 8 MiB chunk
+plus the completed file is SHA-256 checked.
+
+| Setting | Default | Description |
+|---|---:|---|
+| `maximum_transfer_file_size_gb` | `1024` | Maximum declared size of one incoming media file (1 TiB by default). |
+| `minimum_free_space_gb` | `5` | Cache space that incoming chunks must leave unused. |
+| `transfer_partial_retention_hours` | `48` | Resume window before an interrupted session and all owned artifacts are removed. |
+
+Session creation reserves the remaining bytes for every active transfer so
+concurrent workers cannot collectively overcommit the cache. Free space is
+rechecked before every chunk. A reserve failure returns HTTP 507, persists the
+disk-reserve safety latch, pauses local workers, and leaves the partial transfer
+available to resume after operator acknowledgement and a successful capacity
+recheck. Operators can intentionally abandon an incomplete session with
+`DELETE /compresso/api/v2/transfer/session/{transfer_id}`.
+
+Plugin ZIP uploads remain separate from media ingress. They use the framework's
+ordinary multipart parser and are limited to 64 MiB compressed.

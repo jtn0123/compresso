@@ -58,6 +58,7 @@ DEFAULT_WORKER_CAP = 2
 DEFAULT_MINIMUM_FREE_SPACE_GB = 5.0
 DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER = 1.25
 DEFAULT_DISK_SPACE_RETRY_SECONDS = 60
+DEFAULT_MAXIMUM_TRANSFER_FILE_SIZE_GB = 1024.0
 DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS = 48
 DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS = 168
 DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT = 500
@@ -122,6 +123,7 @@ class Config(metaclass=SingletonType):
         self.minimum_free_space_gb = DEFAULT_MINIMUM_FREE_SPACE_GB
         self.disk_space_output_multiplier = DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER
         self.disk_space_retry_seconds = DEFAULT_DISK_SPACE_RETRY_SECONDS
+        self.maximum_transfer_file_size_gb = DEFAULT_MAXIMUM_TRANSFER_FILE_SIZE_GB
         self.transfer_partial_retention_hours = DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS
         self.remote_artifact_retention_hours = DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS
 
@@ -670,6 +672,12 @@ class Config(metaclass=SingletonType):
             return max(5, int(self.disk_space_retry_seconds))
         except (TypeError, ValueError):
             return DEFAULT_DISK_SPACE_RETRY_SECONDS
+
+    def get_maximum_transfer_file_size_gb(self):
+        try:
+            return max(0.001, float(self.maximum_transfer_file_size_gb))
+        except (TypeError, ValueError):
+            return DEFAULT_MAXIMUM_TRANSFER_FILE_SIZE_GB
 
     def get_transfer_partial_retention_hours(self):
         try:

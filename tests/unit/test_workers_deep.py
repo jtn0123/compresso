@@ -458,6 +458,7 @@ class TestWorkerProcessTaskQueueItem:
         worker.worker_log = []
 
         with (
+            patch.object(worker, "_check_task_disk_space", return_value=SimpleNamespace(ok=True)),
             patch.object(worker, "_Worker__exec_worker_runners_on_set_task", return_value=True),
             patch.object(worker, "_Worker__set_start_task_stats"),
             patch.object(worker, "_Worker__set_finish_task_stats"),
@@ -478,6 +479,7 @@ class TestWorkerProcessTaskQueueItem:
         worker.worker_log = []
 
         with (
+            patch.object(worker, "_check_task_disk_space", return_value=SimpleNamespace(ok=True)),
             patch.object(worker, "_Worker__exec_worker_runners_on_set_task", return_value=False),
             patch.object(worker, "_Worker__set_start_task_stats"),
             patch.object(worker, "_Worker__set_finish_task_stats"),
