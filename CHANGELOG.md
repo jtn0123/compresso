@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/jtn0123/compresso/compare/v1.15.0...v1.16.0) (2026-07-15)
+
+
+### Features
+
+* stream large health scans safely ([ba2e15f](https://github.com/jtn0123/compresso/commit/ba2e15fec2eb0d2cde562dd64d7eefe95dfc9578))
+
 # [1.15.0](https://github.com/jtn0123/compresso/compare/v1.14.0...v1.15.0) (2026-07-15)
 
 
