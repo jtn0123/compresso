@@ -17,6 +17,7 @@ class RequestPluginsTableDataSchema(RequestTableDataSchema):
     order_by = fields.Str(
         metadata={"example": "name"},
         load_default="name",
+        validate=validate.OneOf(["name", "author", "version", "plugin_id", "position", "update_available"]),
     )
 
 

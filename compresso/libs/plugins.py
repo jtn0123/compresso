@@ -34,12 +34,15 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
+import threading
 import zipfile
-from operator import attrgetter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 import requests
@@ -58,6 +61,15 @@ from compresso.libs.unplugins import PluginExecutor
 _PLUGIN_INFO_FILENAME = "info.json"
 _LOGGER_NAME = "Compresso.PluginsHandler"
 _SHA256_HEX_LENGTH = 64
+MAX_PLUGIN_ARCHIVE_BYTES = 64 * 1024 * 1024
+MAX_PLUGIN_ARCHIVE_ENTRIES = 1_000
+MAX_PLUGIN_EXPANDED_BYTES = 512 * 1024 * 1024
+MAX_PLUGIN_ENTRY_BYTES = 128 * 1024 * 1024
+MAX_PLUGIN_INFO_BYTES = 1 * 1024 * 1024
+MAX_PLUGIN_COMPRESSION_RATIO = 100
+_PLUGIN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+_PLUGIN_REQUIRED_TEXT_FIELDS = ("id", "name", "author", "version", "tags", "description", "icon")
+_PLUGIN_SORT_FIELDS = frozenset({"name", "author", "version", "plugin_id", "position", "update_available"})
 
 
 class PluginsHandler(metaclass=SingletonType):
@@ -67,6 +79,8 @@ class PluginsHandler(metaclass=SingletonType):
     """
 
     version: int = 2
+    _install_locks_guard = threading.Lock()
+    _install_locks: dict[str, threading.RLock] = {}
 
     def __init__(self, *args, **kwargs):
         self.settings = config.Config()
@@ -87,13 +101,25 @@ class PluginsHandler(metaclass=SingletonType):
         return os.path.join(plugins_directory, f"repo-{repo_id}.json")
 
     def get_plugin_path(self, plugin_id):
-        base_path = os.path.realpath(self.settings.get_plugins_path())
-        plugin_directory = os.path.realpath(os.path.join(base_path, plugin_id))
-        if not plugin_directory.startswith(base_path + os.sep):
-            raise ValueError(f"Invalid plugin_id: path traversal detected in '{plugin_id}'")
+        plugin_directory = self._get_plugin_path_without_create(plugin_id)
         if not os.path.exists(plugin_directory):
             os.makedirs(plugin_directory)
         return plugin_directory
+
+    def _get_plugin_path_without_create(self, plugin_id):
+        if not isinstance(plugin_id, str) or not _PLUGIN_ID_PATTERN.fullmatch(plugin_id):
+            raise ValueError(f"Invalid plugin_id: path traversal detected in '{plugin_id}'")
+        base_path = os.path.realpath(self.settings.get_plugins_path())
+        plugin_directory = os.path.realpath(os.path.join(base_path, plugin_id))
+        if os.path.commonpath((base_path, plugin_directory)) != base_path or plugin_directory == base_path:
+            raise ValueError(f"Invalid plugin_id: path traversal detected in '{plugin_id}'")
+        return plugin_directory
+
+    @classmethod
+    def _plugin_install_lock(cls, plugin_id):
+        """Return the process-local lock for one validated plugin ID."""
+        with cls._install_locks_guard:
+            return cls._install_locks.setdefault(plugin_id, threading.RLock())
 
     def get_plugin_download_cache_path(self, plugin_id, plugin_version):
         """Return a cache path contained under the configured plugin directory."""
@@ -389,23 +415,7 @@ class PluginsHandler(metaclass=SingletonType):
         plugin_list = self.get_installable_plugins_list(filter_repo_id=repo_id)
         for plugin in plugin_list:
             if plugin.get("plugin_id") == plugin_id:
-                success = self.download_and_install_plugin(plugin)
-
-                if success:
-                    try:
-                        # Write the plugin info to the DB
-                        plugin_directory = self.get_plugin_path(plugin.get("plugin_id"))
-                        result = self.write_plugin_data_to_db(plugin, plugin_directory)
-                        if result:
-                            self.logger.info("Installed plugin '%s'", plugin_id)
-
-                        # Ensure the plugin module is reloaded (if it was previously loaded)
-                        plugin_executor = PluginExecutor()
-                        plugin_executor.reload_plugin_module(plugin.get("plugin_id"))
-
-                        return result
-                    except Exception:
-                        self.logger.exception("Exception while installing plugin '%s'.", plugin)
+                return self.download_and_install_plugin(plugin)
 
         return False
 
@@ -421,30 +431,14 @@ class PluginsHandler(metaclass=SingletonType):
             return False
         try:
             plugin_info = self.install_plugin(abspath)
-
-            # Set the plugin_id variable used when writing data to DB.
-            # The returned 'plugin_info' is just a readout of the info.json file which has this set to 'id'
-            plugin_info["plugin_id"] = plugin_info.get("id")
-
-            # Cleanup zip file
-            if os.path.isfile(abspath):
-                os.remove(abspath)
-
-            # Write the plugin info to the DB
-            plugin_directory = self.get_plugin_path(plugin_info.get("plugin_id"))
-            result = self.write_plugin_data_to_db(plugin_info, plugin_directory)
-            if result:
-                self.logger.info("Installed plugin '%s'", os.path.basename(plugin_directory))
-
-            # Ensure the plugin module is reloaded (if it was previously loaded)
-            plugin_executor = PluginExecutor()
-            plugin_executor.reload_plugin_module(plugin_info.get("plugin_id"))
-
-            return result
+            self.logger.info("Installed plugin '%s'", plugin_info["plugin_id"])
+            return True
         except Exception as e:
             self.logger.exception("Exception while installing plugin from zip '%s'. %s", abspath, str(e))
-
-        return False
+            return False
+        finally:
+            if os.path.isfile(abspath):
+                os.remove(abspath)
 
     def download_and_install_plugin(self, plugin):
         """
@@ -458,16 +452,12 @@ class PluginsHandler(metaclass=SingletonType):
         try:
             # Fetch remote zip file
             destination = self.download_plugin(plugin)
-
-            # Install downloaded plugin
-            self.install_plugin(destination, plugin.get("plugin_id"))
-
-            # Cleanup zip file
-            if os.path.isfile(destination):
-                os.remove(destination)
-
-            self.notify_site_of_plugin_install(plugin)
-
+            try:
+                installed_info = self.install_plugin(destination, plugin.get("plugin_id"))
+            finally:
+                if os.path.isfile(destination):
+                    os.remove(destination)
+            self.notify_site_of_plugin_install(installed_info)
             return True
 
         except Exception as e:
@@ -495,6 +485,7 @@ class PluginsHandler(metaclass=SingletonType):
         self.logger.debug("Downloading plugin '%s' to '%s'", package_url, destination)
         session = Session()
         digest = hashlib.sha256()
+        bytes_downloaded = 0
         try:
             with session.requests_session.get(package_url, stream=True, allow_redirects=True, timeout=60) as r:
                 r.raise_for_status()
@@ -502,6 +493,9 @@ class PluginsHandler(metaclass=SingletonType):
                     for chunk in r.iter_content(chunk_size=64 * 1024):
                         if not chunk:
                             continue
+                        bytes_downloaded += len(chunk)
+                        if bytes_downloaded > MAX_PLUGIN_ARCHIVE_BYTES:
+                            raise ValueError("Plugin archive exceeds the maximum compressed size of 64 MiB")
                         digest.update(chunk)
                         f.write(chunk)
             if digest.hexdigest() != expected_digest:
@@ -513,16 +507,102 @@ class PluginsHandler(metaclass=SingletonType):
         return destination
 
     @staticmethod
-    def _safe_extract_plugin_archive(zip_ref, plugin_directory):
+    def _normalized_archive_path(member):
+        raw_name = member.filename.replace("\\", "/").rstrip("/")
+        if not raw_name or raw_name.startswith("/") or re.match(r"^[A-Za-z]:/", raw_name):
+            raise ValueError(f"Plugin archive contains an unsafe path: {member.filename}")
+        parts = PurePosixPath(raw_name).parts
+        if any(part in {"", ".", ".."} for part in parts):
+            raise ValueError(f"Plugin archive contains an unsafe path: {member.filename}")
+        return PurePosixPath(*parts)
+
+    @classmethod
+    def _validate_archive_members(cls, members):
+        if len(members) > MAX_PLUGIN_ARCHIVE_ENTRIES:
+            raise ValueError(f"Plugin archive contains too many entries (maximum {MAX_PLUGIN_ARCHIVE_ENTRIES})")
+
+        seen_paths = set()
+        expanded_size = 0
+        compressed_size = 0
+        normalized_members = []
+        for member in members:
+            member_path = cls._normalized_archive_path(member)
+            duplicate_key = member_path.as_posix().casefold()
+            if duplicate_key in seen_paths:
+                raise ValueError(f"Plugin archive contains a duplicate path: {member.filename}")
+            seen_paths.add(duplicate_key)
+
+            if member.flag_bits & 0x1:
+                raise ValueError(f"Plugin archive contains an encrypted member: {member.filename}")
+            if member.create_system == 3:
+                file_type = stat.S_IFMT(member.external_attr >> 16)
+                if file_type not in {0, stat.S_IFREG, stat.S_IFDIR}:
+                    raise ValueError(f"Plugin archive contains a forbidden file type: {member.filename}")
+            if member.file_size > MAX_PLUGIN_ENTRY_BYTES:
+                raise ValueError(f"Plugin archive entry is too large: {member.filename}")
+
+            expanded_size += member.file_size
+            compressed_size += member.compress_size
+            if expanded_size > MAX_PLUGIN_EXPANDED_BYTES:
+                raise ValueError("Plugin archive exceeds the maximum total expanded size")
+            if member.file_size and (
+                member.compress_size == 0 or member.file_size / member.compress_size > MAX_PLUGIN_COMPRESSION_RATIO
+            ):
+                raise ValueError(f"Plugin archive exceeds the maximum compression ratio: {member.filename}")
+            normalized_members.append((member, member_path))
+
+        if expanded_size and (compressed_size == 0 or expanded_size / compressed_size > MAX_PLUGIN_COMPRESSION_RATIO):
+            raise ValueError("Plugin archive exceeds the maximum total compression ratio")
+        return normalized_members
+
+    def _validate_plugin_archive(self, zip_ref, requested_plugin_id=None):
+        normalized_members = self._validate_archive_members(zip_ref.infolist())
+        info_members = [item for item in normalized_members if item[1].as_posix() == _PLUGIN_INFO_FILENAME]
+        if len(info_members) != 1:
+            raise ValueError("Plugin archive must contain exactly one root info.json")
+        info_member = info_members[0][0]
+        if info_member.file_size > MAX_PLUGIN_INFO_BYTES:
+            raise ValueError("Plugin archive info.json is too large")
+        try:
+            plugin_info = json.loads(zip_ref.read(info_member).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError, RuntimeError, zipfile.BadZipFile) as exc:
+            raise ValueError("Plugin archive contains an invalid info.json") from exc
+        if not isinstance(plugin_info, dict):
+            raise ValueError("Plugin archive info.json must be a JSON object")
+
+        for field in _PLUGIN_REQUIRED_TEXT_FIELDS:
+            value = plugin_info.get(field)
+            if not isinstance(value, str) or (field != "icon" and not value.strip()):
+                raise ValueError(f"Plugin archive info.json has an invalid or missing '{field}'")
+        plugin_id = plugin_info["id"]
+        if not _PLUGIN_ID_PATTERN.fullmatch(plugin_id):
+            raise ValueError(f"Plugin archive info.json has an invalid plugin ID: {plugin_id}")
+        if requested_plugin_id is not None and plugin_id != requested_plugin_id:
+            raise ValueError("Plugin archive info.json ID does not match the requested plugin ID")
+        compatibility = plugin_info.get("compatibility", plugin_info.get("compresso_compatibility"))
+        if not isinstance(compatibility, list) or self.version not in compatibility:
+            raise ValueError(f"Plugin archive is not compatible with plugin API version {self.version}")
+        return plugin_info, normalized_members
+
+    @staticmethod
+    def _extract_validated_plugin_archive(zip_ref, plugin_directory, normalized_members):
         destination = Path(plugin_directory).resolve()
-        for member in zip_ref.infolist():
-            member_path = (destination / member.filename).resolve()
-            if member_path != destination and destination not in member_path.parents:
-                raise ValueError(f"Plugin archive contains an unsafe path: {member.filename}")
-            # ZIP symlinks can escape the destination after extraction.
-            if (member.external_attr >> 16) & 0o170000 == 0o120000:
-                raise ValueError(f"Plugin archive contains a forbidden symlink: {member.filename}")
-        zip_ref.extractall(str(destination))
+        for member, normalized_path in normalized_members:
+            member_path = destination.joinpath(*normalized_path.parts)
+            if member.is_dir():
+                member_path.mkdir(parents=True, exist_ok=True, mode=0o700)
+                continue
+            member_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            with zip_ref.open(member, "r") as source, open(member_path, "wb") as output:
+                shutil.copyfileobj(source, output, length=1024 * 1024)
+            archive_mode = member.external_attr >> 16 if member.create_system == 3 else 0
+            os.chmod(member_path, 0o700 if archive_mode & 0o111 else 0o600)
+
+    @classmethod
+    def _safe_extract_plugin_archive(cls, zip_ref, plugin_directory):
+        """Compatibility helper for callers that only need safe extraction."""
+        normalized_members = cls._validate_archive_members(zip_ref.infolist())
+        cls._extract_validated_plugin_archive(zip_ref, plugin_directory, normalized_members)
 
     def install_plugin(self, zip_file, plugin_id=None):
         """
@@ -532,40 +612,79 @@ class PluginsHandler(metaclass=SingletonType):
         :param plugin_id:
         :return:
         """
-        # Read plugin ID from zip contents info.json if no plugin_id was provided
-        if not plugin_id:
-            with zipfile.ZipFile(zip_file, "r") as zip_ref:
-                plugin_info = json.loads(zip_ref.read(_PLUGIN_INFO_FILENAME))
-            plugin_id = plugin_info.get("id")
-        # Create plugin destination directory based on plugin ID
-        plugin_directory = self.get_plugin_path(plugin_id)
-        # Prevent installation if destination has a git repository. This plugin is probably under development
-        self.logger.info(os.path.join(str(plugin_directory), ".git"))
-        if os.path.exists(os.path.join(str(plugin_directory), ".git")):
-            raise Exception("Plugin directory contains a git repository. Uninstall this source version before installing.")
-        # Extract zip file contents
-        self.logger.debug("Extracting plugin to '%s'", plugin_directory)
-        with zipfile.ZipFile(zip_file, "r") as zip_ref:
-            self._safe_extract_plugin_archive(zip_ref, plugin_directory)
-        # Read plugin info
-        plugin_info = self.get_plugin_info(plugin_id)
-        if plugin_info.get("id") != plugin_id:
-            raise ValueError("Plugin archive info.json ID does not match the requested plugin ID")
-        # Only the built-in installer may create a bundled plugin. External
-        # archives cannot self-assert that trust level.
-        if plugin_info.get("bundled") is True:
-            plugin_info["bundled"] = False
-            info_path = os.path.join(str(plugin_directory), _PLUGIN_INFO_FILENAME)
-            atomic_json_write(info_path, plugin_info, mode=0o600)
-        # Run through any required dependency installation
-        post_install_python_requirements = os.path.join(str(plugin_directory), "requirements.post-install.lock")
-        if os.path.exists(post_install_python_requirements):
-            self.install_plugin_requirements(plugin_directory, requirements_file=post_install_python_requirements)
-        if plugin_info.get("defer_dependency_install", False):
-            self.install_plugin_requirements(plugin_directory)
-            self.install_npm_modules(plugin_directory)
-        # Return installed plugin info
-        return plugin_info
+        archive_path = Path(zip_file)
+        if archive_path.stat().st_size > MAX_PLUGIN_ARCHIVE_BYTES:
+            raise ValueError("Plugin archive exceeds the maximum compressed size of 64 MiB")
+
+        with zipfile.ZipFile(archive_path, "r") as zip_ref:
+            plugin_info, normalized_members = self._validate_plugin_archive(zip_ref, plugin_id)
+            plugin_id = plugin_info["id"]
+            with self._plugin_install_lock(plugin_id):
+                return self._install_validated_plugin(zip_ref, plugin_info, normalized_members)
+
+    def _install_validated_plugin(self, zip_ref, plugin_info, normalized_members):
+        plugin_id = plugin_info["id"]
+        plugins_root = Path(self.settings.get_plugins_path()).resolve()
+        plugins_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        plugin_directory = Path(self._get_plugin_path_without_create(plugin_id))
+        if (plugin_directory / ".git").exists():
+            raise RuntimeError("Plugin directory contains a git repository. Uninstall this source version before installing.")
+
+        staging = Path(tempfile.mkdtemp(prefix=f".{plugin_id}.staging-", dir=plugins_root))
+        rollback = None
+        live_moved = False
+        promoted = False
+        snapshot = None
+        executor = PluginExecutor()
+        try:
+            self._extract_validated_plugin_archive(zip_ref, staging, normalized_members)
+            if plugin_info.get("bundled") is True:
+                plugin_info = dict(plugin_info, bundled=False)
+                atomic_json_write(staging / _PLUGIN_INFO_FILENAME, plugin_info, mode=0o600)
+
+            post_install_requirements = staging / "requirements.post-install.lock"
+            if post_install_requirements.exists():
+                self.install_plugin_requirements(staging, requirements_file=post_install_requirements)
+            if plugin_info.get("defer_dependency_install", False):
+                self.install_plugin_requirements(staging)
+                self.install_npm_modules(staging)
+
+            snapshot = self._snapshot_plugin_record(plugin_id)
+            if plugin_directory.exists():
+                rollback = Path(tempfile.mkdtemp(prefix=f".{plugin_id}.rollback-", dir=plugins_root))
+                rollback.rmdir()
+                os.replace(plugin_directory, rollback)
+                live_moved = True
+            os.replace(staging, plugin_directory)
+            promoted = True
+
+            installed_info = dict(plugin_info, plugin_id=plugin_id)
+            if not self.write_plugin_data_to_db(installed_info, str(plugin_directory)):
+                raise RuntimeError(f"Failed to persist database metadata for plugin '{plugin_id}'")
+            executor.reload_plugin_module(plugin_id)
+            if rollback is not None:
+                shutil.rmtree(rollback, ignore_errors=True)
+            return installed_info
+        except Exception:
+            if promoted and plugin_directory.exists():
+                shutil.rmtree(plugin_directory)
+            if live_moved and rollback is not None and rollback.exists():
+                os.replace(rollback, plugin_directory)
+            if promoted or live_moved:
+                try:
+                    self._restore_plugin_record(plugin_id, snapshot)
+                except Exception:
+                    self.logger.exception("Failed to restore database metadata for plugin '%s'", plugin_id)
+                try:
+                    executor.reload_plugin_module(plugin_id)
+                except Exception:
+                    self.logger.exception("Failed to restore loaded module for plugin '%s'", plugin_id)
+            raise
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging, ignore_errors=True)
+            if rollback is not None and rollback.exists():
+                shutil.rmtree(rollback, ignore_errors=True)
 
     @staticmethod
     def install_plugin_requirements(plugin_path, requirements_file=None):
@@ -608,9 +727,33 @@ class PluginsHandler(metaclass=SingletonType):
         package_file = os.path.join(plugin_path, "package.json")
         if not os.path.exists(package_file):
             return
-        raise ValueError(
-            "Plugin packages must ship pre-built frontend assets; automatic npm install/build is disabled for security"
+        lock_file = os.path.join(plugin_path, "package-lock.json")
+        if not os.path.exists(lock_file):
+            raise ValueError("Plugin package.json requires a package-lock.json")
+        npm_binary = shutil.which("npm")
+        if npm_binary is None:
+            raise RuntimeError("npm is required to install plugin dependencies")
+        return_code = subprocess.call(  # noqa: S603 - resolved executable, lifecycle scripts disabled
+            [npm_binary, "ci", "--ignore-scripts", "--omit=dev"],
+            cwd=str(plugin_path),
+            timeout=300,
         )
+        if isinstance(return_code, int) and return_code != 0:
+            raise subprocess.CalledProcessError(return_code, "npm ci")
+
+    @staticmethod
+    def _snapshot_plugin_record(plugin_id):
+        plugin_entry = Plugins.get_or_none(plugin_id=plugin_id)
+        if plugin_entry is None:
+            return None
+        return {field.name: getattr(plugin_entry, field.name) for field in Plugins._meta.sorted_fields}
+
+    @staticmethod
+    def _restore_plugin_record(plugin_id, snapshot):
+        with Plugins._meta.database.atomic():
+            Plugins.delete().where(Plugins.plugin_id == plugin_id).execute()
+            if snapshot is not None:
+                Plugins.insert(snapshot).execute()
 
     @staticmethod
     def write_plugin_data_to_db(plugin, plugin_directory):
@@ -653,6 +796,10 @@ class PluginsHandler(metaclass=SingletonType):
         plugin_type=None,
         library_id=None,
     ):
+        if order:
+            invalid_fields = [item.get("column") for item in order if item.get("column") not in _PLUGIN_SORT_FIELDS]
+            if invalid_fields:
+                raise ValueError(f"Unsupported plugin sort field: {invalid_fields[0]}")
         try:
             query = Plugins.select()
 
@@ -695,10 +842,13 @@ class PluginsHandler(metaclass=SingletonType):
             if order:
                 for o in order:
                     model = o.get("model") if o.get("model") else Plugins
+                    unsupported_flow_sort = model is LibraryPluginFlow and o.get("column") != "position"
+                    if model not in {Plugins, LibraryPluginFlow} or unsupported_flow_sort:
+                        raise ValueError("Unsupported plugin sort model")
                     if o.get("dir") == "asc":
-                        order_by = attrgetter(o.get("column"))(model).asc()
+                        order_by = getattr(model, o.get("column")).asc()
                     else:
-                        order_by = attrgetter(o.get("column"))(model).desc()
+                        order_by = getattr(model, o.get("column")).desc()
 
                     query = query.order_by_extend(order_by)
 

@@ -53,6 +53,21 @@ def test_checked_in_schema_documents_health_discovery_and_terminal_state():
 
 
 @pytest.mark.unittest
+def test_checked_in_schema_limits_plugin_sort_fields():
+    schema_path = Path(__file__).parents[2] / "compresso" / "webserver" / "docs" / "api_schema_v2.json"
+    schemas = json.loads(schema_path.read_text(encoding="utf-8"))["components"]["schemas"]
+
+    assert schemas["RequestPluginsTableData"]["properties"]["order_by"]["enum"] == [
+        "name",
+        "author",
+        "version",
+        "plugin_id",
+        "position",
+        "update_available",
+    ]
+
+
+@pytest.mark.unittest
 class TestCompressoSpecPlugin:
     @pytest.mark.skipif(not apispec_available, reason="apispec not installed")
     def test_operations_from_urlspec_yields_operations(self):

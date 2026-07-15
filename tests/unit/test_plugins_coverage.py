@@ -47,6 +47,22 @@ def _make_handler(tmp_path):
     return handler
 
 
+def _plugin_info(plugin_id, **overrides):
+    info = {
+        "id": plugin_id,
+        "plugin_id": plugin_id,
+        "name": "Test Plugin",
+        "author": "Compresso",
+        "version": "1.0",
+        "tags": "test",
+        "description": "Test plugin",
+        "icon": "",
+        "compatibility": [2],
+    }
+    info.update(overrides)
+    return info
+
+
 # ---------------------------------------------------------------------------
 # Lines 72-73: _log method
 # ---------------------------------------------------------------------------
@@ -213,22 +229,17 @@ class TestGetSettingsOfAllInstalledPlugins:
 
 @pytest.mark.unittest
 class TestInstallPluginByIdException:
-    def test_returns_false_on_exception_during_db_write(self, tmp_path):
-        """If write_plugin_data_to_db raises, the exception is logged and False is returned."""
+    def test_returns_transactional_installer_result(self, tmp_path):
         handler = _make_handler(tmp_path)
         plugin = {"plugin_id": "test_plugin", "name": "Test", "version": "1.0"}
 
         with (
             patch.object(handler, "get_installable_plugins_list", return_value=[plugin]),
-            patch.object(handler, "download_and_install_plugin", return_value=True),
-            patch.object(handler, "get_plugin_path", return_value=str(tmp_path / "plugins" / "test_plugin")),
-            patch.object(handler, "write_plugin_data_to_db", side_effect=RuntimeError("db failure")),
-            patch("compresso.libs.plugins.PluginExecutor"),
+            patch.object(handler, "download_and_install_plugin", return_value=False),
         ):
             result = handler.install_plugin_by_id("test_plugin")
 
         assert result is False
-        handler.logger.exception.assert_called()
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +318,7 @@ class TestInstallPlugin:
         handler.settings.get_plugins_path.return_value = str(plugins_dir)
 
         plugin_id = "auto_detected_plugin"
-        info = {"id": plugin_id, "name": "Auto Plugin", "version": "1.0", "compatibility": [2]}
+        info = _plugin_info(plugin_id, name="Auto Plugin")
         zip_path = tmp_path / "auto_plugin.zip"
         with zipfile.ZipFile(str(zip_path), "w") as zf:
             zf.writestr("info.json", json.dumps(info))
@@ -316,7 +327,11 @@ class TestInstallPlugin:
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "info.json").write_text(json.dumps(info))
 
-        with patch("subprocess.call"):
+        with (
+            patch.object(handler, "_snapshot_plugin_record", return_value=None),
+            patch.object(handler, "write_plugin_data_to_db", return_value=True),
+            patch("compresso.libs.plugins.PluginExecutor"),
+        ):
             result = handler.install_plugin(str(zip_path))
 
         assert result.get("id") == plugin_id
@@ -329,7 +344,7 @@ class TestInstallPlugin:
         handler.settings.get_plugins_path.return_value = str(plugins_dir)
 
         plugin_id = "explicit_plugin"
-        info = {"id": plugin_id, "name": "Explicit Plugin", "version": "1.0", "compatibility": [2]}
+        info = _plugin_info(plugin_id, name="Explicit Plugin")
         zip_path = tmp_path / "explicit_plugin.zip"
         with zipfile.ZipFile(str(zip_path), "w") as zf:
             zf.writestr("info.json", json.dumps(info))
@@ -338,7 +353,11 @@ class TestInstallPlugin:
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "info.json").write_text(json.dumps(info))
 
-        with patch("subprocess.call"):
+        with (
+            patch.object(handler, "_snapshot_plugin_record", return_value=None),
+            patch.object(handler, "write_plugin_data_to_db", return_value=True),
+            patch("compresso.libs.plugins.PluginExecutor"),
+        ):
             result = handler.install_plugin(str(zip_path), plugin_id=plugin_id)
 
         assert result.get("id") == plugin_id
@@ -351,7 +370,7 @@ class TestInstallPlugin:
         handler.settings.get_plugins_path.return_value = str(plugins_dir)
 
         plugin_id = "dev_plugin"
-        info = {"id": plugin_id, "name": "Dev Plugin", "version": "1.0"}
+        info = _plugin_info(plugin_id, name="Dev Plugin")
         zip_path = tmp_path / "dev_plugin.zip"
         with zipfile.ZipFile(str(zip_path), "w") as zf:
             zf.writestr("info.json", json.dumps(info))
@@ -372,7 +391,7 @@ class TestInstallPlugin:
         handler.settings.get_plugins_path.return_value = str(plugins_dir)
 
         plugin_id = "deferred_plugin"
-        info = {"id": plugin_id, "name": "Deferred", "version": "1.0", "defer_dependency_install": True}
+        info = _plugin_info(plugin_id, name="Deferred", defer_dependency_install=True)
         zip_path = tmp_path / "deferred_plugin.zip"
         with zipfile.ZipFile(str(zip_path), "w") as zf:
             zf.writestr("info.json", json.dumps(info))
@@ -384,6 +403,9 @@ class TestInstallPlugin:
         with (
             patch.object(handler, "install_plugin_requirements") as mock_req,
             patch.object(handler, "install_npm_modules") as mock_npm,
+            patch.object(handler, "_snapshot_plugin_record", return_value=None),
+            patch.object(handler, "write_plugin_data_to_db", return_value=True),
+            patch("compresso.libs.plugins.PluginExecutor"),
         ):
             handler.install_plugin(str(zip_path), plugin_id=plugin_id)
 
@@ -398,7 +420,7 @@ class TestInstallPlugin:
         handler.settings.get_plugins_path.return_value = str(plugins_dir)
 
         plugin_id = "post_req_plugin"
-        info = {"id": plugin_id, "name": "PostReq", "version": "1.0"}
+        info = _plugin_info(plugin_id, name="PostReq")
         zip_path = tmp_path / "post_req_plugin.zip"
         with zipfile.ZipFile(str(zip_path), "w") as zf:
             zf.writestr("info.json", json.dumps(info))
@@ -409,7 +431,12 @@ class TestInstallPlugin:
         (plugin_dir / "info.json").write_text(json.dumps(info))
         (plugin_dir / "requirements.post-install.lock").write_text("some-package==1.0 --hash=sha256:" + "0" * 64)
 
-        with patch.object(handler, "install_plugin_requirements") as mock_req:
+        with (
+            patch.object(handler, "install_plugin_requirements") as mock_req,
+            patch.object(handler, "_snapshot_plugin_record", return_value=None),
+            patch.object(handler, "write_plugin_data_to_db", return_value=True),
+            patch("compresso.libs.plugins.PluginExecutor"),
+        ):
             handler.install_plugin(str(zip_path), plugin_id=plugin_id)
 
         # install_plugin_requirements should be called with the post-install requirements_file kwarg
@@ -449,15 +476,14 @@ class TestInstallPluginRequirementsCleanup:
 
 @pytest.mark.unittest
 class TestInstallNpmModulesBuildDisabled:
-    def test_npm_build_is_rejected_without_starting_a_process(self, tmp_path):
-        """Plugin installation must not execute package lifecycle scripts."""
+    def test_npm_without_lock_is_rejected_without_starting_a_process(self, tmp_path):
         from compresso.libs.plugins import PluginsHandler
 
         plugin_dir = tmp_path / "npm_plugin"
         plugin_dir.mkdir()
         (plugin_dir / "package.json").write_text('{"name": "test"}')
 
-        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="pre-built"):
+        with patch("subprocess.call") as mock_call, pytest.raises(ValueError, match="package-lock.json"):
             PluginsHandler.install_npm_modules(str(plugin_dir))
         mock_call.assert_not_called()
 

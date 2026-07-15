@@ -3,9 +3,6 @@
 """Contracts for retired media ingress and bounded ordinary plugin uploads."""
 
 import asyncio
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -121,24 +118,10 @@ def test_plugin_upload_install_failure_is_structured_and_cleans_temporary_copy(t
 
 
 @pytest.mark.unittest
-def test_plugin_install_calls_are_serialized(tmp_path):
+def test_plugin_upload_delegates_to_transactional_installer(tmp_path):
     from compresso.webserver.api_v2.upload_api import _install_plugin_serialized
 
-    state_lock = threading.Lock()
-    state = {"active": 0, "maximum": 0}
+    plugins = SimpleNamespace(install_plugin_from_path_on_disk=MagicMock(return_value=True))
 
-    def install(_path):
-        with state_lock:
-            state["active"] += 1
-            state["maximum"] = max(state["maximum"], state["active"])
-        time.sleep(0.02)
-        with state_lock:
-            state["active"] -= 1
-        return True
-
-    plugins = SimpleNamespace(install_plugin_from_path_on_disk=install)
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        results = list(executor.map(lambda _: _install_plugin_serialized(plugins, tmp_path), range(2)))
-
-    assert results == [True, True]
-    assert state["maximum"] == 1
+    assert _install_plugin_serialized(plugins, tmp_path) is True
+    plugins.install_plugin_from_path_on_disk.assert_called_once_with(tmp_path)

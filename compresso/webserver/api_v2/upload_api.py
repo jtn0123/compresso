@@ -31,7 +31,6 @@ Copyright:
 import asyncio
 import os
 import tempfile
-import threading
 from pathlib import Path
 
 import tornado.web
@@ -46,7 +45,6 @@ TRANSFER_SUCCESSORS = {
     "chunk": "/compresso/api/v2/transfer/chunk/{transfer_id}",
     "finalize": "/compresso/api/v2/transfer/finalize/{transfer_id}",
 }
-_PLUGIN_INSTALL_LOCK = threading.Lock()
 
 
 def _persist_plugin_upload(upload_root, body):
@@ -66,9 +64,8 @@ def _persist_plugin_upload(upload_root, body):
 
 
 def _install_plugin_serialized(plugins_handler, upload_path):
-    """Prevent overlapping legacy installers until PR 5 adds per-plugin transactions."""
-    with _PLUGIN_INSTALL_LOCK:
-        return plugins_handler.install_plugin_from_path_on_disk(upload_path)
+    """Compatibility wrapper; the installer now locks by validated plugin ID."""
+    return plugins_handler.install_plugin_from_path_on_disk(upload_path)
 
 
 @tornado.web.stream_request_body

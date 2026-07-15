@@ -72,6 +72,16 @@ class TestPluginsApiInstalled(ApiTestBase):
         assert resp.code == 400
 
     @patch(PLUGINS_HELPERS + ".prepare_filtered_plugins")
+    def test_get_installed_plugins_rejects_unknown_sort_field(self, mock_plugins):
+        resp = self.post_json(
+            "/plugins/installed",
+            {"start": 0, "length": 10, "order_by": "__dict__"},
+        )
+
+        assert resp.code == 400
+        mock_plugins.assert_not_called()
+
+    @patch(PLUGINS_HELPERS + ".prepare_filtered_plugins")
     def test_get_installed_plugins_internal_error(self, mock_plugins):
         mock_plugins.side_effect = Exception("DB error")
         resp = self.post_json("/plugins/installed", {"start": 0, "length": 10})
