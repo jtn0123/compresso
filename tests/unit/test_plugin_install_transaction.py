@@ -221,6 +221,24 @@ class TestTransactionalPluginInstall:
         executor.reload_plugin_module.assert_called_once_with("safe_plugin")
         assert not list((tmp_path / "plugins").glob(".safe_plugin.*-*"))
 
+    def test_combined_dependency_sets_share_staged_site_packages(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        archive = _archive(
+            tmp_path / "plugin.zip",
+            _info(defer_dependency_install=True),
+            [("requirements.post-install.lock", ""), ("requirements.lock", "")],
+        )
+
+        with patch.object(handler, "install_plugin_requirements") as install_requirements:
+            _install_with_fake_db(handler, archive)
+
+        staging_path = install_requirements.call_args_list[0].args[0]
+        assert install_requirements.call_args_list[0].kwargs == {
+            "requirements_file": Path(staging_path) / "requirements.post-install.lock"
+        }
+        assert install_requirements.call_args_list[1].args == (staging_path,)
+        assert install_requirements.call_args_list[1].kwargs == {"clean": False}
+
     def test_dependency_failure_leaves_live_plugin_and_database_untouched(self, tmp_path):
         handler = _make_handler(tmp_path)
         live = tmp_path / "plugins" / "safe_plugin"
@@ -297,6 +315,38 @@ class TestTransactionalPluginInstall:
         assert maximum_by_id["same"] == 1
         assert maximum_total >= 2
 
+    def test_install_guard_uses_owner_only_cross_process_lock(self, tmp_path):
+        handler = _make_handler(tmp_path)
+        archive = _archive(tmp_path / "plugin.zip")
+        file_lock = MagicMock()
+        file_lock.return_value.__enter__.return_value = file_lock.return_value
+
+        with patch("compresso.libs.plugins.FileLock", file_lock):
+            _install_with_fake_db(handler, archive)
+
+        lock_path = Path(file_lock.call_args.args[0])
+        assert lock_path == tmp_path / "plugins" / ".safe_plugin.install.lock"
+        assert file_lock.call_args.kwargs == {"mode": 0o600}
+
+    def test_restore_updates_existing_plugin_without_delete_cascade(self, tmp_path):
+        from compresso.libs.plugins import Plugins
+
+        handler = _make_handler(tmp_path)
+        snapshot = {"id": 3, "plugin_id": "safe_plugin", "name": "Old"}
+
+        with (
+            patch.object(Plugins._meta, "database", MagicMock()),
+            patch("compresso.libs.plugins.Plugins.update") as update,
+            patch("compresso.libs.plugins.Plugins.delete") as delete,
+            patch("compresso.libs.plugins.Plugins.insert") as insert,
+        ):
+            update.return_value.where.return_value.execute.return_value = 1
+            handler._restore_plugin_record("safe_plugin", snapshot)
+
+        update.assert_called_once_with(snapshot)
+        delete.assert_not_called()
+        insert.assert_not_called()
+
 
 @pytest.mark.unittest
 def test_download_rejects_oversized_stream_and_removes_partial_file(tmp_path):
@@ -331,7 +381,10 @@ def test_npm_dependencies_use_lockfile_without_lifecycle_scripts(tmp_path):
 
     (tmp_path / "package.json").write_text("{}")
     (tmp_path / "package-lock.json").write_text("{}")
-    with patch("subprocess.call", return_value=0) as call:
+    with (
+        patch("compresso.libs.plugins.shutil.which", return_value="/usr/bin/npm"),
+        patch("subprocess.call", return_value=0) as call,
+    ):
         PluginsHandler.install_npm_modules(str(tmp_path))
 
     assert Path(call.call_args.args[0][0]).stem.casefold() == "npm"

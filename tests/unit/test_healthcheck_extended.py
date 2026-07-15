@@ -515,7 +515,9 @@ class TestRunLibraryScan:
             HealthCheckManager.set_worker_count(1)
             assert wait_until(lambda: HealthCheckManager.get_scan_progress()["worker_count"] <= 1)
             assert wait_until(lambda: len(HealthCheckManager.get_scan_progress()["workers"]) <= 1)
-            scan_thread.join(timeout=8)
+            # Hosted macOS runners can be heavily contended under full coverage.
+            # Keep a finite deadlock detector without tying success to an 8s wall clock.
+            scan_thread.join(timeout=20)
 
         assert not scan_thread.is_alive()
         assert maximum_active >= 3

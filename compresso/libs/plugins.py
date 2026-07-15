@@ -42,10 +42,12 @@ import sys
 import tempfile
 import threading
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 import requests
+from filelock import FileLock
 
 from compresso import config
 from compresso.libs import common
@@ -120,6 +122,15 @@ class PluginsHandler(metaclass=SingletonType):
         """Return the process-local lock for one validated plugin ID."""
         with cls._install_locks_guard:
             return cls._install_locks.setdefault(plugin_id, threading.RLock())
+
+    @contextmanager
+    def _plugin_install_guard(self, plugin_id):
+        """Serialize one plugin ID across threads and server processes."""
+        plugins_root = Path(self.settings.get_plugins_path()).resolve()
+        plugins_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        lock_path = plugins_root / f".{plugin_id}.install.lock"
+        with self._plugin_install_lock(plugin_id), FileLock(lock_path, mode=0o600):
+            yield
 
     def get_plugin_download_cache_path(self, plugin_id, plugin_version):
         """Return a cache path contained under the configured plugin directory."""
@@ -623,7 +634,7 @@ class PluginsHandler(metaclass=SingletonType):
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
             plugin_info, normalized_members = self._validate_plugin_archive(zip_ref, plugin_id)
             plugin_id = plugin_info["id"]
-            with self._plugin_install_lock(plugin_id):
+            with self._plugin_install_guard(plugin_id):
                 return self._install_validated_plugin(zip_ref, plugin_info, normalized_members)
 
     def _install_validated_plugin(self, zip_ref, plugin_info, normalized_members):
@@ -671,7 +682,7 @@ class PluginsHandler(metaclass=SingletonType):
         if post_install_requirements.exists():
             self.install_plugin_requirements(staging, requirements_file=post_install_requirements)
         if plugin_info.get("defer_dependency_install", False):
-            self.install_plugin_requirements(staging)
+            self.install_plugin_requirements(staging, clean=not post_install_requirements.exists())
             self.install_npm_modules(staging)
         return plugin_info
 
@@ -705,7 +716,7 @@ class PluginsHandler(metaclass=SingletonType):
             self.logger.exception("Failed to restore loaded module for plugin '%s'", plugin_id)
 
     @staticmethod
-    def install_plugin_requirements(plugin_path, requirements_file=None):
+    def install_plugin_requirements(plugin_path, requirements_file=None, clean=True):
         """Install a plugin's hash-locked wheel dependencies into its private target."""
         if requirements_file is None:
             requirements_file = os.path.join(plugin_path, "requirements.lock")
@@ -714,7 +725,7 @@ class PluginsHandler(metaclass=SingletonType):
         if not os.path.exists(requirements_file):
             return
         # First, remove the existing site-packages directory if it exists to ensure a clean installation
-        if os.path.exists(install_target):
+        if clean and os.path.exists(install_target):
             shutil.rmtree(install_target)
         # Recreate the site-packages directory
         os.makedirs(install_target, exist_ok=True)
@@ -770,8 +781,11 @@ class PluginsHandler(metaclass=SingletonType):
     @staticmethod
     def _restore_plugin_record(plugin_id, snapshot):
         with Plugins._meta.database.atomic():
-            Plugins.delete().where(Plugins.plugin_id == plugin_id).execute()
-            if snapshot is not None:
+            if snapshot is None:
+                Plugins.delete().where(Plugins.plugin_id == plugin_id).execute()
+                return
+            restored = Plugins.update(snapshot).where(Plugins.plugin_id == plugin_id).execute()
+            if restored == 0:
                 Plugins.insert(snapshot).execute()
 
     @staticmethod
