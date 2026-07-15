@@ -36,6 +36,7 @@ import re
 import shutil
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from compresso.libs import common
@@ -46,6 +47,57 @@ from compresso.libs.plugins import PluginsHandler
 from compresso.libs.remote_task_lease import RemoteTaskLease
 from compresso.libs.resumable_transfer import file_sha256
 from compresso.libs.task import TaskDataStore
+
+
+@dataclass
+class RemoteTaskContext:
+    original_abspath: str
+    address: str | None
+    library_name: str
+    library_path: str
+    remote_task_id: int | str | None = None
+    remote_task_status: str | None = None
+
+
+@dataclass(frozen=True)
+class LeasePhaseResult:
+    succeeded: bool
+    deferred: bool = False
+
+
+@dataclass(frozen=True)
+class UploadPhaseResult:
+    succeeded: bool
+    remote_task_id: int | str | None = None
+    remote_task_status: str | None = None
+    cleanup_remote: bool = False
+
+
+@dataclass(frozen=True)
+class MonitoringPhaseResult:
+    succeeded: bool
+    worker_id: object | None = None
+    cleanup_remote: bool = False
+
+
+@dataclass(frozen=True)
+class DownloadPhaseResult:
+    succeeded: bool
+    cache_path: str | None = None
+    checksum: str | None = None
+    cleanup_remote: bool = False
+
+
+@dataclass(frozen=True)
+class FinalizationPhaseResult:
+    succeeded: bool
+    cleanup_remote: bool = False
+
+
+@dataclass(frozen=True)
+class CleanupPhaseResult:
+    succeeded: bool
+    remote_removed: bool
 
 
 class RemoteTaskManager(threading.Thread):
@@ -179,7 +231,8 @@ class RemoteTaskManager(threading.Thread):
         self.worker_subprocess_percent = "0"
         self.worker_subprocess_elapsed = "0"
 
-        if not self._acquire_remote_lease():
+        lease_result = self._lease_phase()
+        if not lease_result.succeeded:
             self.current_task.task.deferred_until = datetime.now() + timedelta(seconds=10)
             self.current_task.task.save()
             self.current_task.set_status("pending")
@@ -211,6 +264,10 @@ class RemoteTaskManager(threading.Thread):
 
         # Reset the current file info for the next task
         self.__unset_current_task()
+
+    def _lease_phase(self) -> LeasePhaseResult:
+        acquired = self._acquire_remote_lease()
+        return LeasePhaseResult(succeeded=acquired, deferred=not acquired)
 
     def _acquire_remote_lease(self):
         installation_uuid = self.installation_info.get("installation_uuid") or self.installation_info.get("uuid")
@@ -269,7 +326,7 @@ class RemoteTaskManager(threading.Thread):
         self.current_task.task.finish_time = self.finish_time
 
     def __write_failure_to_worker_log(self):
-        # Append long entry to say the worker was terminated
+        """Persist the standard remote-task failure explanation."""
         self.worker_log.append("\n\nREMOTE TASK FAILED!")
         self.worker_log.append("\nAn error occurred during one of these stages:")
         self.worker_log.append("\n    - while sending task to remote installation")
@@ -279,581 +336,697 @@ class RemoteTaskManager(threading.Thread):
         self.worker_log.append(f"\nRelevant logs will be prefixed with 'ERROR:Compresso.{self.name}'")
         self.current_task.save_command_log(self.worker_log)
 
-    def __send_task_to_remote_worker_and_monitor(self):  # noqa: C901 — multi-step remote task lifecycle with progress tracking
-        """
-        Sends the task file to the remote installation to process.
-        Monitors progress and then fetches the results.
+    def __send_task_to_remote_worker_and_monitor(self):
+        """Run the remote task lifecycle through explicit typed phases."""
+        context = self._prepare_remote_task_context()
+        if context is None:
+            return False
 
-        Network disconnections are handled with exponential backoff.
-        The manager will retry for up to 30 minutes before giving up
-        and returning the task to the local queue.
+        upload = self._upload_phase(context)
+        context.remote_task_id = upload.remote_task_id
+        context.remote_task_status = upload.remote_task_status
+        if not upload.succeeded:
+            return self._finish_failed_phase(context, upload.cleanup_remote)
 
-        :return:
-        """
-        # Set the absolute path to the original file
+        monitoring = self._monitoring_phase(context)
+        if not monitoring.succeeded:
+            return self._finish_failed_phase(context, monitoring.cleanup_remote)
+
+        download = self._download_phase(context)
+        if not download.succeeded:
+            return self._finish_failed_phase(context, download.cleanup_remote)
+
+        finalization = self._finalization_phase(context, download)
+        if not finalization.succeeded:
+            return self._finish_failed_phase(context, finalization.cleanup_remote)
+
+        return self._cleanup_phase(context).succeeded
+
+    def _finish_failed_phase(self, context, cleanup_remote):
+        if cleanup_remote:
+            self._cleanup_phase(context)
+        return False
+
+    def _prepare_remote_task_context(self):
         original_abspath = self.current_task.get_source_abspath()
-
-        # Ensure file exists
         if not os.path.exists(original_abspath):
             self._log(f"File no longer exists '{original_abspath}'. Was it removed?", level="warning")
             self.__write_failure_to_worker_log()
-            return False
+            return None
 
-        # Set the remote worker address
-        address = self.installation_info.get("address")
-
-        lock_key = None
-
-        # Fetch the library name and path this task is for
         library_id = self.current_task.get_task_library_id()
         try:
             library = Library(library_id)
         except Exception:
             self._log(f"Unable to fetch library config for ID {library_id}", level="exception")
             self.__write_failure_to_worker_log()
-            return False
-        library_name = library.get_name()
-        library_path = library.get_path()
+            return None
+        return RemoteTaskContext(
+            original_abspath=original_abspath,
+            address=self.installation_info.get("address"),
+            library_name=library.get_name(),
+            library_path=library.get_path(),
+        )
 
-        # Check if we can create the remote task with just a relative path
-        #   only create checksum and send file if the remote library path cannot accept relative paths, or
-        #   it is configured for only receiving remote files
-        send_file = False
-        library_config = self.links.get_the_remote_library_config_by_name(self.installation_info, library_name)
+    def _upload_phase(self, context: RemoteTaskContext) -> UploadPhaseResult:
+        library_config = self.links.get_the_remote_library_config_by_name(
+            self.installation_info,
+            context.library_name,
+        )
         if not isinstance(library_config, dict):
             library_config = {}
 
-        # Check if remote library is configured only for receiving remote files
-        if library_config.get("enable_remote_only"):
-            send_file = True
-        elif not library_config.get("id") or not library_config.get("path"):
+        send_file = bool(library_config.get("enable_remote_only"))
+        if not send_file and (not library_config.get("id") or not library_config.get("path")):
             self._log(
-                f"Remote library mapping for '{library_name}' is unavailable. Falling back to a checksummed upload.",
+                f"Remote library mapping for '{context.library_name}' is unavailable. Falling back to a checksummed upload.",
                 level="warning",
             )
             send_file = True
 
-        # First attempt to create a task with an abspath on the remote installation
-        remote_task_id = None
-        remote_task_status = None
+        result: UploadPhaseResult | None = None
         if not send_file:
-            remote_library_id = library_config.get("id")
+            result = self._create_remote_task_from_library_path(context, library_config)
+            if result is not None and not result.succeeded:
+                return result
+        if result is None:
+            result = self._upload_remote_task_source(context)
+        if not result.succeeded:
+            return result
+        if result.remote_task_id is None:
+            self._log("Failed to create remote task. Var remote_task_id is still None", level="error")
+            self.__write_failure_to_worker_log()
+            return UploadPhaseResult(False)
 
-            # Remove library path from file abspath to create a relative path
-            original_relpath = os.path.relpath(original_abspath, library_path)
-            # Join remote library path to the relative path to form a remote library abspath to the file
-            remote_original_abspath = os.path.join(library_config.get("path"), original_relpath)
-            # Post the task creation. This will error if the file does not exist
-            info = self.links.new_pending_task_create_on_remote_installation(
-                self.installation_info,
-                remote_original_abspath,
-                remote_library_id,
-                **self._remote_identity(),
+        current_task = self.current_task
+        if current_task is None:
+            raise RuntimeError("remote task disappeared during upload")
+        current_task.task.remote_task_id = int(result.remote_task_id)
+        current_task.task.save()
+        if not self._set_remote_task_library(context, result):
+            return UploadPhaseResult(
+                False,
+                result.remote_task_id,
+                result.remote_task_status,
+                cleanup_remote=True,
             )
-            if not info:
-                self._log(
-                    f"Unable to create remote pending task for path '{remote_original_abspath}'. Fallback to sending file.",
-                    level="debug",
+        if not self._start_remote_task(context, result):
+            return UploadPhaseResult(
+                False,
+                result.remote_task_id,
+                result.remote_task_status,
+                cleanup_remote=True,
+            )
+        return result
+
+    def _create_remote_task_from_library_path(
+        self,
+        context: RemoteTaskContext,
+        library_config: dict,
+    ) -> UploadPhaseResult | None:
+        remote_library_path = library_config.get("path")
+        if not isinstance(remote_library_path, str) or not remote_library_path:
+            return None
+        original_relpath = os.path.relpath(context.original_abspath, context.library_path)
+        remote_original_abspath = os.path.join(remote_library_path, original_relpath)
+        info = self.links.new_pending_task_create_on_remote_installation(
+            self.installation_info,
+            remote_original_abspath,
+            library_config.get("id"),
+            **self._remote_identity(),
+        )
+        if not info:
+            self._log(
+                f"Unable to create remote pending task for path '{remote_original_abspath}'. Fallback to sending file.",
+                level="debug",
+            )
+            return None
+        error = info.get("error", "").lower()
+        if "path does not exist" in error:
+            self._log(
+                f"Unable to find file in remote library's path '{remote_original_abspath}'. Fallback to sending file.",
+                level="debug",
+            )
+            return None
+        if "task already exists" in error:
+            self._log(
+                f"A remote task already exists with the path '{remote_original_abspath}'. Fallback to sending file.",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return UploadPhaseResult(False)
+        return UploadPhaseResult(
+            True,
+            remote_task_id=info.get("id"),
+            remote_task_status=info.get("status"),
+        )
+
+    def _upload_remote_task_source(self, context: RemoteTaskContext) -> UploadPhaseResult:
+        initial_checksum = file_sha256(context.original_abspath)
+        initial_file_size = os.path.getsize(context.original_abspath)
+        upload_deadline = time.monotonic() + 1800
+        info = {}
+        while not self.redundant_flag.is_set():
+            if time.monotonic() > upload_deadline:
+                self._log(f"Upload retry deadline exceeded for '{context.original_abspath}'", level="error")
+                self.__write_failure_to_worker_log()
+                return UploadPhaseResult(False)
+
+            lock_key = None
+            if initial_file_size > 100000000:
+                lock_key = self.links.acquire_network_transfer_lock(
+                    context.address,
+                    transfer_limit=1,
+                    lock_type="send",
                 )
-                send_file = True
-            elif "path does not exist" in info.get("error", "").lower():
-                self._log(
-                    f"Unable to find file in remote library's path '{remote_original_abspath}'. Fallback to sending file.",
-                    level="debug",
+                if not lock_key:
+                    self.event.wait(1)
+                    continue
+
+            self._log(
+                f"Uploading file to remote installation '{context.original_abspath}'",
+                level="debug",
+            )
+            upload_identity = self._remote_identity()
+
+            def upload_progress(active_lock=lock_key):
+                lock_active = not active_lock or self.links.refresh_network_transfer_lock(active_lock)
+                lease_active = self._heartbeat_remote_lease() if self.lease_token else True
+                return bool(lock_active and lease_active)
+
+            if self.lease_token or lock_key:
+                upload_identity["progress_callback"] = upload_progress
+            try:
+                info = self.links.send_file_to_remote_installation(
+                    self.installation_info,
+                    context.original_abspath,
+                    **upload_identity,
                 )
-                send_file = True
-            elif "task already exists" in info.get("error", "").lower():
+            finally:
+                self.links.release_network_transfer_lock(lock_key)
+            if info:
+                break
+            self._log(
+                f"Upload interrupted; retaining resume state for '{context.original_abspath}'",
+                level="warning",
+            )
+            if not self.lease_token:
+                self.__write_failure_to_worker_log()
+                return UploadPhaseResult(False)
+            if not self._heartbeat_remote_lease():
                 self._log(
-                    f"A remote task already exists with the path '{remote_original_abspath}'. Fallback to sending file.",
+                    f"Remote task lease was lost during upload for '{context.original_abspath}'",
+                    level="error",
+                )
+                self.__write_failure_to_worker_log()
+                return UploadPhaseResult(False)
+            self.event.wait(2)
+
+        remote_task_id = info.get("id")
+        remote_task_status = info.get("status")
+        if info.get("checksum") != initial_checksum:
+            self._record_transfer_corruption("upload", "A remote upload checksum did not match its source")
+            self._log(
+                f"The uploaded file did not return a correct checksum '{context.original_abspath}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return UploadPhaseResult(
+                False,
+                remote_task_id,
+                remote_task_status,
+                cleanup_remote=True,
+            )
+        return UploadPhaseResult(True, remote_task_id, remote_task_status)
+
+    def _record_transfer_corruption(self, phase, message):
+        if self.safety_event_recorder is not None:
+            self.safety_event_recorder(
+                "manifest-corruption",
+                message,
+                task_id=self.current_task.get_task_id(),
+                phase=phase,
+            )
+
+    def _set_remote_task_library(self, context, upload):
+        deadline = time.monotonic() + 1800
+        while not self.redundant_flag.is_set():
+            if upload.remote_task_status in {"in_progress", "processed", "complete"}:
+                break
+            if time.monotonic() > deadline:
+                self._log(
+                    f"Set-remote-library retry deadline exceeded for '{context.original_abspath}'",
                     level="error",
                 )
                 self.__write_failure_to_worker_log()
                 return False
-
-            # Set the remote task ID (only when info is valid, i.e. we did not fall back to send_file)
-            if not send_file:
-                remote_task_id = info.get("id")
-                remote_task_status = info.get("status")
-
-        if send_file:
-            # Every network transfer is integrity checked. This is deliberately
-            # not optional for remote jobs handling production media.
-            initial_checksum = file_sha256(original_abspath)
-            initial_file_size = os.path.getsize(original_abspath)
-
-            # Loop until we are able to upload the file to the remote installation
-            info = {}
-            upload_deadline = time.monotonic() + 1800  # 30 min max
-            while not self.redundant_flag.is_set():
-                if time.monotonic() > upload_deadline:
-                    self._log(f"Upload retry deadline exceeded for '{original_abspath}'", level="error")
-                    self.__write_failure_to_worker_log()
-                    return False
-                # For files smaller than 100MB, just transfer them in parallel
-                # Smaller files add a lot of time overhead with the waiting in line and it slows the whole process down
-                # Larger files benefit from being transferred one at a time.
-                if initial_file_size > 100000000:
-                    # Check for network transfer lock
-                    lock_key = self.links.acquire_network_transfer_lock(address, transfer_limit=1, lock_type="send")
-                    if not lock_key:
-                        self.event.wait(1)
-                        continue
-
-                # Send a file to a remote installation.
-                self._log(f"Uploading file to remote installation '{original_abspath}'", level="debug")
-                upload_identity = self._remote_identity()
-
-                def upload_progress(active_lock=lock_key):
-                    lock_active = not active_lock or self.links.refresh_network_transfer_lock(active_lock)
-                    lease_active = self._heartbeat_remote_lease() if self.lease_token else True
-                    return bool(lock_active and lease_active)
-
-                if self.lease_token or lock_key:
-                    upload_identity["progress_callback"] = upload_progress
-                try:
-                    info = self.links.send_file_to_remote_installation(
-                        self.installation_info,
-                        original_abspath,
-                        **upload_identity,
-                    )
-                finally:
-                    self.links.release_network_transfer_lock(lock_key)
-                if not info:
-                    self._log(f"Upload interrupted; retaining resume state for '{original_abspath}'", level="warning")
-                    if self.lease_token:
-                        if not self._heartbeat_remote_lease():
-                            self._log(f"Remote task lease was lost during upload for '{original_abspath}'", level="error")
-                            self.__write_failure_to_worker_log()
-                            return False
-                        self.event.wait(2)
-                        continue
-                    self.__write_failure_to_worker_log()
-                    return False
-                break
-
-            # Set the remote task ID
-            remote_task_id = info.get("id")
-            remote_task_status = info.get("status")
-
-            # Compare uploaded file md5checksum
-            if info.get("checksum") != initial_checksum:
-                if self.safety_event_recorder is not None:
-                    self.safety_event_recorder(
-                        "manifest-corruption",
-                        "A remote upload checksum did not match its source",
-                        task_id=self.current_task.get_task_id(),
-                        phase="upload",
-                    )
-                self._log(f"The uploaded file did not return a correct checksum '{original_abspath}'", level="error")
-                # Send request to terminate the remote worker then return
-                self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
-                self.__write_failure_to_worker_log()
-                return False
-
-        # Ensure at this point we have set the remote_task_id
-        if remote_task_id is None:
-            self._log("Failed to create remote task. Var remote_task_id is still None", level="error")
-            self.__write_failure_to_worker_log()
-            return False
-        self.current_task.task.remote_task_id = int(remote_task_id)
-        self.current_task.task.save()
-
-        # Set the library of the remote task using the library's name
-        set_lib_deadline = time.monotonic() + 1800  # 30 min max
-        while not self.redundant_flag.is_set():
-            if remote_task_status in {"in_progress", "processed", "complete"}:
-                break
-            if time.monotonic() > set_lib_deadline:
-                self._log(f"Set-remote-library retry deadline exceeded for '{original_abspath}'", level="error")
-                self.__write_failure_to_worker_log()
-                return False
-            result = self.links.set_the_remote_task_library(self.installation_info, remote_task_id, library_name)
+            result = self.links.set_the_remote_task_library(
+                self.installation_info,
+                upload.remote_task_id,
+                context.library_name,
+            )
             if result is None:
-                # Unable to reach remote installation
                 self.event.wait(2)
                 continue
             if not result.get("success"):
                 self._log(
-                    f"Failed to match a remote library named '{library_name}'."
+                    f"Failed to match a remote library named '{context.library_name}'."
                     " Remote installation will use the default library",
                     level="warning",
                 )
-                # Just log the warning for this. If no matching library name is found it will remain set as the default library
-                break
-            if result.get("success"):
-                break
+            break
+        return True
 
-        # Start the remote task
-        start_task_deadline = time.monotonic() + 1800  # 30 min max
+    def _start_remote_task(self, context, upload):
+        deadline = time.monotonic() + 1800
         while not self.redundant_flag.is_set():
-            if remote_task_status in {"in_progress", "processed", "complete"}:
+            if upload.remote_task_status in {"in_progress", "processed", "complete"}:
                 break
-            if time.monotonic() > start_task_deadline:
-                self._log(f"Start-task retry deadline exceeded for '{original_abspath}'", level="error")
+            if time.monotonic() > deadline:
+                self._log(
+                    f"Start-task retry deadline exceeded for '{context.original_abspath}'",
+                    level="error",
+                )
                 self.__write_failure_to_worker_log()
                 return False
-            result = self.links.start_the_remote_task_by_id(self.installation_info, remote_task_id)
+            result = self.links.start_the_remote_task_by_id(
+                self.installation_info,
+                upload.remote_task_id,
+            )
             if not result:
-                # Unable to reach remote installation
                 self.event.wait(2)
                 continue
             if not result.get("success"):
-                self._log(f"Failed to set initial remote pending task to status '{original_abspath}'", level="error")
-                # Send request to terminate the remote worker then return
-                self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
+                self._log(
+                    f"Failed to set initial remote pending task to status '{context.original_abspath}'",
+                    level="error",
+                )
                 self.__write_failure_to_worker_log()
                 return False
-            if result.get("success"):
-                break
+            break
+        return True
 
-        # Loop while redundant_flag not set (while true because of below)
+    def _monitoring_phase(self, context: RemoteTaskContext) -> MonitoringPhaseResult:
         worker_id = None
         task_status = ""
-        last_status_fetch = 0
+        last_status_fetch = 0.0
         polling_delay = 5
         consecutive_poll_failures = 0
-        max_retry_seconds = 1800  # 30 minutes total retry window
-        first_failure_time = None
+        first_failure_time: float | None = None
         while task_status != "complete":
             self.event.wait(1)
             if self.redundant_flag.is_set():
-                # Send request to terminate the remote worker then exit
                 if worker_id:
                     self.links.terminate_remote_worker(self.installation_info, worker_id)
                 break
 
-            # Only fetch the status every polling_delay seconds
             time_now = time.time()
             if last_status_fetch > (time_now - polling_delay):
                 continue
-
-            # Check if we have exceeded the maximum retry window
-            if first_failure_time and (time_now - first_failure_time) > max_retry_seconds:
+            if first_failure_time and (time_now - first_failure_time) > 1800:
                 self._log(
-                    f"Remote link unreachable for over {max_retry_seconds} seconds, giving up on task '{original_abspath}'",
+                    f"Remote link unreachable for over 1800 seconds, giving up on task '{context.original_abspath}'",
                     level="error",
                 )
                 self.__write_failure_to_worker_log()
-                return False
+                return MonitoringPhaseResult(False, worker_id)
 
-            # Fetch task status
-            all_task_states = self.links.get_remote_pending_task_state(self.installation_info, remote_task_id)
+            all_task_states = self.links.get_remote_pending_task_state(
+                self.installation_info,
+                context.remote_task_id,
+            )
             task_status = ""
             polling_delay = 5
             if all_task_states:
-                # Successful contact -- reset backoff state
                 if self.lease_token and not self._heartbeat_remote_lease():
-                    self._log(f"Remote task lease was lost while polling '{original_abspath}'", level="error")
+                    self._log(
+                        f"Remote task lease was lost while polling '{context.original_abspath}'",
+                        level="error",
+                    )
                     self.__write_failure_to_worker_log()
-                    return False
+                    return MonitoringPhaseResult(False, worker_id)
                 consecutive_poll_failures = 0
                 first_failure_time = None
-                remote_results = all_task_states.get("results") if isinstance(all_task_states, dict) else None
-                if not isinstance(remote_results, list) or not all(isinstance(item, dict) for item in remote_results):
-                    self._log(f"Remote task status response was malformed for '{original_abspath}'", level="error")
-                    self.__write_failure_to_worker_log()
-                    return False
-                for ts in remote_results:
-                    if str(ts.get("id")) == str(remote_task_id):
-                        # Task is complete. Exit loop but do not set redundant flag on link manager
-                        task_status = ts.get("status")
-                        break
-                if not remote_results:
-                    # Remote task list is empty
-                    task_status = "removed"
-                elif remote_results and task_status == "":
-                    # Remote task list did not contain this task
-                    task_status = "removed"
+                task_status = self._parse_remote_task_status(
+                    all_task_states,
+                    context.remote_task_id,
+                    context.original_abspath,
+                )
+                if task_status is None:
+                    return MonitoringPhaseResult(False, worker_id)
 
-            # If the task status is 'complete', break the loop here and move onto the result retrieval
-            # If all_task_states returned no results (we are unable to connect to the remote installation)
-            # If all_task_states did return results but our task_status was found, the remote installation has removed our task
-            # If the task status is not 'in_progress', loop here and wait for task to be picked up by a worker
             if task_status == "complete":
                 break
-            elif not all_task_states:
-                # Connection failed -- apply exponential backoff
+            if not all_task_states:
                 consecutive_poll_failures += 1
-                if consecutive_poll_failures == 3 and self.lease_token and self.safety_event_recorder is not None:
-                    self.safety_event_recorder(
-                        "remote-poll-loss",
-                        "Three consecutive remote status polls failed while this node held the task lease",
-                        task_id=self.current_task.get_task_id(),
-                        installation_uuid=self.installation_info.get("installation_uuid")
-                        or self.installation_info.get("uuid"),
-                    )
-                if first_failure_time is None:
-                    first_failure_time = time_now
-                polling_delay = min(60, 5 * (2 ** min(consecutive_poll_failures, 4)))
-                self._log(
-                    f"Lost contact with remote installation (attempt {consecutive_poll_failures}),"
-                    f" next poll in {polling_delay}s for '{original_abspath}'",
-                    level="warning",
+                polling_delay, first_failure_time = self._remote_poll_failure(
+                    context,
+                    consecutive_poll_failures,
+                    time_now,
+                    first_failure_time,
                 )
                 last_status_fetch = time_now
                 continue
-            elif task_status == "removed":
-                self._log(f"Task has been removed by remote installation '{original_abspath}'", level="error")
+            if task_status == "removed":
+                self._log(
+                    f"Task has been removed by remote installation '{context.original_abspath}'",
+                    level="error",
+                )
                 self.__write_failure_to_worker_log()
-                return False
-            elif task_status != "in_progress":
-                # Mark this as the last time run
+                return MonitoringPhaseResult(False, worker_id)
+            if task_status != "in_progress":
                 last_status_fetch = time_now
                 polling_delay = 10
                 continue
 
-            # Check if we know the task's worker ID already
-            if not worker_id:
-                # The task has been picked up by a worker, find out which one...
-                workers_status = self.links.get_all_worker_status(self.installation_info)
-                if not workers_status:
-                    # The request failed for some reason... Perhaps we lost contact with the remote installation
-                    # Mark this as the last time run
-                    last_status_fetch = time_now
-                    continue
-                for worker in workers_status:
-                    if str(worker.get("current_task")) == str(remote_task_id):
-                        worker_id = worker.get("id")
-
-            # Fetch worker progress
-            worker_status = self.links.get_single_worker_status(self.installation_info, worker_id)
-            if not worker_status:
-                # Mark this as the last time run
+            worker_id, progress_updated = self._update_remote_worker_progress(
+                context.remote_task_id,
+                worker_id,
+            )
+            if not progress_updated:
                 last_status_fetch = time_now
                 continue
-
-            # Update status
-            self.paused = worker_status.get("paused")
-            self.worker_log = worker_status.get("worker_log_tail")
-            self.worker_runners_info = worker_status.get("runners_info")
-            self.worker_subprocess_percent = worker_status.get("subprocess", {}).get("percent")
-            self.worker_subprocess_elapsed = worker_status.get("subprocess", {}).get("elapsed")
-
-            # Mark this as the last time run
             last_status_fetch = time_now
 
-        # If the previous loop was broken because this tread needs to terminate, return False here (did not complete)
         if self.redundant_flag.is_set():
-            self.worker_log += ["\n\nREMOTE LINK MANAGER TERMINATED!"]
-            self.current_task.save_command_log(self.worker_log)
-            return False
+            worker_log = self.worker_log
+            current_task = self.current_task
+            if worker_log is None or current_task is None:
+                raise RuntimeError("remote task state disappeared during monitoring")
+            worker_log += ["\n\nREMOTE LINK MANAGER TERMINATED!"]
+            current_task.save_command_log(worker_log)
+            return MonitoringPhaseResult(False, worker_id)
 
-        self._log(f"Remote task completed '{original_abspath}'", level="info")
+        self._log(f"Remote task completed '{context.original_abspath}'", level="info")
+        return MonitoringPhaseResult(True, worker_id)
 
-        # Create local cache path to download results
+    def _parse_remote_task_status(self, all_task_states, remote_task_id, original_abspath):
+        remote_results = all_task_states.get("results") if isinstance(all_task_states, dict) else None
+        if not isinstance(remote_results, list) or not all(isinstance(item, dict) for item in remote_results):
+            self._log(
+                f"Remote task status response was malformed for '{original_abspath}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return None
+        for task_state in remote_results:
+            if str(task_state.get("id")) == str(remote_task_id):
+                return task_state.get("status")
+        return "removed"
+
+    def _remote_poll_failure(self, context, failure_count, time_now, first_failure_time):
+        if failure_count == 3 and self.lease_token and self.safety_event_recorder is not None:
+            self.safety_event_recorder(
+                "remote-poll-loss",
+                "Three consecutive remote status polls failed while this node held the task lease",
+                task_id=self.current_task.get_task_id(),
+                installation_uuid=self.installation_info.get("installation_uuid") or self.installation_info.get("uuid"),
+            )
+        if first_failure_time is None:
+            first_failure_time = time_now
+        polling_delay = min(60, 5 * (2 ** min(failure_count, 4)))
+        self._log(
+            f"Lost contact with remote installation (attempt {failure_count}),"
+            f" next poll in {polling_delay}s for '{context.original_abspath}'",
+            level="warning",
+        )
+        return polling_delay, first_failure_time
+
+    def _update_remote_worker_progress(self, remote_task_id, worker_id):
+        if not worker_id:
+            workers_status = self.links.get_all_worker_status(self.installation_info)
+            if not workers_status:
+                return worker_id, False
+            for worker in workers_status:
+                if str(worker.get("current_task")) == str(remote_task_id):
+                    worker_id = worker.get("id")
+
+        worker_status = self.links.get_single_worker_status(self.installation_info, worker_id)
+        if not worker_status:
+            return worker_id, False
+        self.paused = worker_status.get("paused")
+        self.worker_log = worker_status.get("worker_log_tail")
+        self.worker_runners_info = worker_status.get("runners_info")
+        self.worker_subprocess_percent = worker_status.get("subprocess", {}).get("percent")
+        self.worker_subprocess_elapsed = worker_status.get("subprocess", {}).get("elapsed")
+        return worker_id, True
+
+    def _download_phase(self, context: RemoteTaskContext) -> DownloadPhaseResult:
+        data, cache_directory = self._fetch_remote_result_data(context)
+        if data is None:
+            return DownloadPhaseResult(False)
+        if not data.get("task_success"):
+            self.__write_failure_to_worker_log()
+            return DownloadPhaseResult(False)
+
+        task_label = data.get("task_label")
+        self._log(
+            f"Remote task #{context.remote_task_id} was successful, proceeding to download the completed file '{task_label}'",
+            level="debug",
+        )
+        self._log("Remote task result path will be transferred", level="debug")
+        remote_result_path = data.get("abspath")
+        if not isinstance(remote_result_path, str) or not remote_result_path:
+            self._log(
+                f"Remote task result path was malformed for '{context.original_abspath}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return DownloadPhaseResult(False)
+
+        local_result_path = self._existing_library_result(remote_result_path, context.library_path)
+        if local_result_path:
+            task_cache_path = self._copy_shared_remote_result(
+                context,
+                local_result_path,
+                cache_directory,
+            )
+            if task_cache_path is None:
+                return DownloadPhaseResult(False, cleanup_remote=True)
+        else:
+            task_cache_path = self._set_download_cache_path(remote_result_path, cache_directory)
+            downloaded, cleanup_remote = self._download_remote_result(
+                context,
+                task_label,
+                task_cache_path,
+            )
+            if not downloaded:
+                return DownloadPhaseResult(False, cleanup_remote=cleanup_remote)
+
+        if self.redundant_flag.is_set():
+            worker_log = self.worker_log
+            current_task = self.current_task
+            if worker_log is None or current_task is None:
+                raise RuntimeError("remote task state disappeared during download")
+            worker_log += ["\n\nREMOTE LINK MANAGER TERMINATED!"]
+            current_task.save_command_log(worker_log)
+            return DownloadPhaseResult(False)
+
+        expected_checksum = data.get("checksum")
+        downloaded_checksum = file_sha256(task_cache_path)
+        if not expected_checksum or expected_checksum == "UNKNOWN" or downloaded_checksum != expected_checksum:
+            self._record_transfer_corruption(
+                "download",
+                "A downloaded remote result did not match its manifest checksum",
+            )
+            self._log(
+                f"The downloaded file did not produce a correct checksum '{task_cache_path}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return DownloadPhaseResult(False, cleanup_remote=True)
+        return DownloadPhaseResult(
+            True,
+            cache_path=task_cache_path,
+            checksum=downloaded_checksum,
+        )
+
+    def _fetch_remote_result_data(self, context):
         task_cache_path = self.current_task.get_cache_path()
-        # Ensure the cache directory exists
         cache_directory = os.path.dirname(os.path.abspath(task_cache_path))
         if not os.path.exists(cache_directory):
             os.makedirs(cache_directory)
-
-        # Fetch remote task result data
         data = self.links.fetch_remote_task_data(
-            self.installation_info, remote_task_id, os.path.join(cache_directory, "remote_data.json")
+            self.installation_info,
+            context.remote_task_id,
+            os.path.join(cache_directory, "remote_data.json"),
         )
-
         if not isinstance(data, dict) or not data:
             self._log(
-                f"Failed to retrieve remote task data for '{original_abspath}'."
+                f"Failed to retrieve remote task data for '{context.original_abspath}'."
                 " NOTE: The cached files have not been removed from the remote host.",
                 level="error",
             )
             self.__write_failure_to_worker_log()
-            return False
+            return None, cache_directory
+
         self.worker_log = [data.get("log")]
-
-        # Save the completed command log
         self.current_task.save_command_log(self.worker_log)
-
-        # Update task state
         task_state = data.get("task_state")
         self.logger.warn("Importing task_state into TaskDataStore: %s", task_state)
         if task_state:
             if not isinstance(task_state, dict):
-                self._log(f"Remote task state was malformed for '{original_abspath}'", level="error")
+                self._log(
+                    f"Remote task state was malformed for '{context.original_abspath}'",
+                    level="error",
+                )
                 self.__write_failure_to_worker_log()
-                return False
+                return None, cache_directory
             TaskDataStore.import_task_state(self.current_task.get_task_id(), task_state)
+        return data, cache_directory
 
-        # Fetch remote task file
-        if data.get("task_success"):
-            task_label = data.get("task_label")
+    def _copy_shared_remote_result(self, context, task_cache_path, cache_directory):
+        self.current_task.cache_path = task_cache_path
+        self._log(f"abspath exists - task cache path: '{task_cache_path}'", level="debug")
+        tcp_base = os.path.basename(task_cache_path)
+        local_match = re.search(r"-\w{5}-\d{10}", cache_directory)
+        if not local_match:
             self._log(
-                f"Remote task #{remote_task_id} was successful, proceeding to download the completed file '{task_label}'",
+                f"Unable to detect random_string pattern in main instance cache directory named '{cache_directory}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return None
+        remote_match = re.search(r"-\w{5}-\d{10}", tcp_base)
+        if not remote_match:
+            self._log(
+                f"Unable to detect random_string pattern in remote library located directory named '{task_cache_path}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return None
+
+        incorrect_random_string = remote_match.group()
+        new_tcp_base, suffix = tcp_base.split(incorrect_random_string)
+        output_path = os.path.join(
+            cache_directory,
+            new_tcp_base + local_match.group() + suffix,
+        )
+        self._log(f"...copying {task_cache_path} to {output_path}", level="debug")
+        try:
+            output = shutil.copy(task_cache_path, output_path)
+        except (FileNotFoundError, PermissionError, shutil.SameFileError):
+            self._log(
+                f"Failed to copy file from '{task_cache_path}' to '{output_path}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return None
+        if not os.path.exists(output) or os.path.getsize(output) <= 0:
+            self._log(f"Copied file is missing or empty at '{output_path}'", level="error")
+            self.__write_failure_to_worker_log()
+            return None
+        self._log(
+            f"File successfully copied from remote library located cache to main instance cache at '{output}'",
+            level="info",
+        )
+        self.current_task.cache_path = output
+        return output
+
+    def _set_download_cache_path(self, remote_result_path, cache_directory):
+        file_extension = os.path.splitext(remote_result_path)[1].lstrip(".")
+        self.current_task.set_cache_path(cache_directory, file_extension)
+        task_cache_path = self.current_task.get_cache_path()
+        self._log(f"task cache path: '{task_cache_path}'", level="debug")
+        return task_cache_path
+
+    def _download_remote_result(self, context, task_label, task_cache_path):
+        download_deadline = time.monotonic() + 1800
+        while not self.redundant_flag.is_set():
+            if time.monotonic() > download_deadline:
+                self._log(f"Download retry deadline exceeded for '{task_label}'", level="error")
+                self.__write_failure_to_worker_log()
+                return False, False
+            lock_key = self.links.acquire_network_transfer_lock(
+                context.address,
+                transfer_limit=2,
+                lock_type="receive",
+            )
+            if not lock_key:
+                self.event.wait(1)
+                continue
+            self._log(
+                f"Downloading file from remote installation '{task_label}'",
                 level="debug",
             )
-            self._log("Remote task result path will be transferred", level="debug")
-            remote_result_path = data.get("abspath")
-            if not isinstance(remote_result_path, str) or not remote_result_path:
-                self._log(f"Remote task result path was malformed for '{original_abspath}'", level="error")
+            success = self._fetch_remote_result_file(
+                context,
+                task_cache_path,
+                lock_key,
+            )
+            if success:
+                return True, False
+            self._log(
+                "Download interrupted; retaining resumable transfer state",
+                level="warning",
+            )
+            if not self.lease_token:
                 self.__write_failure_to_worker_log()
-                return False
-            local_result_path = self._existing_library_result(remote_result_path, library_path)
-            if local_result_path:
-                # /library/tvshows/show_name/season/compresso_remote_pending_library/file.mkv
-                task_cache_path = local_result_path
-                self.current_task.cache_path = task_cache_path
-                self._log(f"abspath exists - task cache path: '{task_cache_path}'", level="debug")
-                # need to get the file into the local instance /tmp/compresso/compresso_file_conversion... location
-                # the task_cache_path file is currently sitting in the library's compresso_remote_pending_library directory
-                # with a different random string - reformulate the basename of the file with the correct random string
-                # and copy it to the local instance /tmp/compresso/compresso_file_conversion location
-                tcp_base = os.path.basename(task_cache_path)
-                match1 = re.search(r"-\w{5}-\d{10}", cache_directory)
-                if match1:
-                    correct_random_string = match1.group()
-                else:
-                    self._log(
-                        f"Unable to detect random_string pattern in main instance cache directory named '{cache_directory}'",
-                        level="error",
-                    )
-                    self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
-                    self.__write_failure_to_worker_log()
-                    return False
-                match2 = re.search(r"-\w{5}-\d{10}", tcp_base)
-                if match2:
-                    incorrect_random_string = match2.group()
-                else:
-                    self._log(
-                        f"Unable to detect random_string pattern in remote library"
-                        f" located directory named '{task_cache_path}'",
-                        level="error",
-                    )
-                    self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
-                    self.__write_failure_to_worker_log()
-                    return False
-                new_tcp_base = tcp_base.split(incorrect_random_string)[0]
-                sfx = tcp_base.split(incorrect_random_string)[1]
-                correct_cache_file_path = os.path.join(cache_directory, new_tcp_base + correct_random_string + sfx)
-                self._log(f"...copying {task_cache_path} to {correct_cache_file_path}", level="debug")
-                try:
-                    output = shutil.copy(task_cache_path, correct_cache_file_path)
-                    if os.path.exists(output) and os.path.getsize(output) > 0:
-                        self._log(
-                            f"File successfully copied from remote library located cache to main instance cache at '{output}'",
-                            level="info",
-                        )
-                        # Update task pointers to the new local cache path
-                        task_cache_path = output
-                        self.current_task.cache_path = output
-                    else:
-                        self._log(f"Copied file is missing or empty at '{correct_cache_file_path}'", level="error")
-                        self.__write_failure_to_worker_log()
-                        return False
-                except (FileNotFoundError, PermissionError, shutil.SameFileError):
-                    self._log(f"Failed to copy file from '{task_cache_path}' to '{correct_cache_file_path}'", level="error")
-                    self.__write_failure_to_worker_log()
-                    return False
-            else:
-                # Set the new file out as the extension may have changed
-                split_file_name = os.path.splitext(remote_result_path)
-                file_extension = split_file_name[1].lstrip(".")
-                self.current_task.set_cache_path(cache_directory, file_extension)
-                # Read the updated cache path
-                task_cache_path = self.current_task.get_cache_path()
-                self._log(f"task cache path: '{task_cache_path}'", level="debug")
-
-                # Loop until we are able to download the file from the remote installation
-                download_deadline = time.monotonic() + 1800  # 30 min max
-                while not self.redundant_flag.is_set():
-                    if time.monotonic() > download_deadline:
-                        self._log(f"Download retry deadline exceeded for '{task_label}'", level="error")
-                        self.__write_failure_to_worker_log()
-                        return False
-                    # Check for network transfer lock
-                    lock_key = self.links.acquire_network_transfer_lock(address, transfer_limit=2, lock_type="receive")
-                    if not lock_key:
-                        self.event.wait(1)
-                        continue
-                    # Download the file
-                    self._log(f"Downloading file from remote installation '{task_label}'", level="debug")
-                    if self.lease_token:
-
-                        def download_progress(active_lock=lock_key):
-                            lock_active = self.links.refresh_network_transfer_lock(active_lock)
-                            lease_active = self._heartbeat_remote_lease()
-                            return bool(lock_active and lease_active)
-
-                        try:
-                            success = self.links.fetch_remote_task_completed_file_resumable(
-                                self.installation_info,
-                                remote_task_id,
-                                task_cache_path,
-                                progress_callback=download_progress,
-                            )
-                        finally:
-                            self.links.release_network_transfer_lock(lock_key)
-                    else:
-                        try:
-                            success = self.links.fetch_remote_task_completed_file(
-                                self.installation_info,
-                                remote_task_id,
-                                task_cache_path,
-                            )
-                        finally:
-                            self.links.release_network_transfer_lock(lock_key)
-                    if not success:
-                        self._log(
-                            "Download interrupted; retaining resumable transfer state",
-                            level="warning",
-                        )
-                        if self.lease_token:
-                            if not self._heartbeat_remote_lease():
-                                self._log(
-                                    f"Remote task lease was lost during download for '{original_abspath}'", level="error"
-                                )
-                                self.__write_failure_to_worker_log()
-                                return False
-                            self.event.wait(2)
-                            continue
-                        self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
-                        self.__write_failure_to_worker_log()
-                        return False
-                    break
-
-            # If the previous loop was broken because this tread needs to terminate, return False here (did not complete)
-            if self.redundant_flag.is_set():
-                self.worker_log += ["\n\nREMOTE LINK MANAGER TERMINATED!"]
-                self.current_task.save_command_log(self.worker_log)
-                return False
-
-            # Match the remote manifest checksum with the received file. Missing
-            # checksums are rejected so old/partial workers cannot silently bypass
-            # integrity validation.
-            expected_checksum = data.get("checksum")
-            downloaded_checksum = file_sha256(task_cache_path)
-            if not expected_checksum or expected_checksum == "UNKNOWN" or downloaded_checksum != expected_checksum:
-                if self.safety_event_recorder is not None:
-                    self.safety_event_recorder(
-                        "manifest-corruption",
-                        "A downloaded remote result did not match its manifest checksum",
-                        task_id=self.current_task.get_task_id(),
-                        phase="download",
-                    )
-                self._log(f"The downloaded file did not produce a correct checksum '{task_cache_path}'", level="error")
-                self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
+                return False, True
+            if not self._heartbeat_remote_lease():
+                self._log(
+                    f"Remote task lease was lost during download for '{context.original_abspath}'",
+                    level="error",
+                )
                 self.__write_failure_to_worker_log()
-                return False
+                return False, False
+            self.event.wait(2)
+        return False, False
 
-            if self.lease_token and not RemoteTaskLease.complete(
-                self.current_task.task,
-                self.lease_token,
-                downloaded_checksum,
-            ):
-                if self.safety_event_recorder is not None:
-                    self.safety_event_recorder(
-                        "duplicate-lease",
-                        "A conflicting remote completion attempted to close this task lease",
-                        task_id=self.current_task.get_task_id(),
-                    )
-                self._log(f"Conflicting remote completion received for '{original_abspath}'", level="error")
-                self.__write_failure_to_worker_log()
-                return False
+    def _fetch_remote_result_file(self, context, task_cache_path, lock_key):
+        try:
+            if not self.lease_token:
+                return self.links.fetch_remote_task_completed_file(
+                    self.installation_info,
+                    context.remote_task_id,
+                    task_cache_path,
+                )
 
-            # Send request to terminate the remote worker then return
-            self.links.remove_task_from_remote_installation(self.installation_info, remote_task_id)
+            def download_progress(active_lock=lock_key):
+                lock_active = self.links.refresh_network_transfer_lock(active_lock)
+                lease_active = self._heartbeat_remote_lease()
+                return bool(lock_active and lease_active)
 
-            return True
+            return self.links.fetch_remote_task_completed_file_resumable(
+                self.installation_info,
+                context.remote_task_id,
+                task_cache_path,
+                progress_callback=download_progress,
+            )
+        finally:
+            self.links.release_network_transfer_lock(lock_key)
 
-        self.__write_failure_to_worker_log()
-        return False
+    def _finalization_phase(
+        self,
+        context: RemoteTaskContext,
+        download: DownloadPhaseResult,
+    ) -> FinalizationPhaseResult:
+        current_task = self.current_task
+        if current_task is None:
+            raise RuntimeError("remote task disappeared during finalization")
+        if self.lease_token and not RemoteTaskLease.complete(
+            current_task.task,
+            self.lease_token,
+            download.checksum,
+        ):
+            if self.safety_event_recorder is not None:
+                self.safety_event_recorder(
+                    "duplicate-lease",
+                    "A conflicting remote completion attempted to close this task lease",
+                    task_id=current_task.get_task_id(),
+                )
+            self._log(
+                f"Conflicting remote completion received for '{context.original_abspath}'",
+                level="error",
+            )
+            self.__write_failure_to_worker_log()
+            return FinalizationPhaseResult(False)
+        return FinalizationPhaseResult(True)
+
+    def _cleanup_phase(self, context) -> CleanupPhaseResult:
+        response = self.links.remove_task_from_remote_installation(
+            self.installation_info,
+            context.remote_task_id,
+        )
+        remote_removed = bool(response.get("success")) if isinstance(response, dict) else bool(response)
+        return CleanupPhaseResult(succeeded=remote_removed, remote_removed=remote_removed)

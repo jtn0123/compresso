@@ -136,6 +136,22 @@ def test_approved_task_restores_missing_cache_from_staging(recovery_db, tmp_path
 
 
 @pytest.mark.unittest
+def test_approved_cache_restore_failure_does_not_abort_other_recovery(recovery_db, tmp_path, monkeypatch):
+    approved = _task(tmp_path, "approved", cache_exists=False)
+    staged = tmp_path / "staging" / f"task_{approved.id}" / "encoded.mkv"
+    staged.parent.mkdir(parents=True)
+    staged.write_bytes(b"staged-output")
+    processed = _task(tmp_path, "processed", cache_exists=True)
+    monkeypatch.setattr("compresso.libs.taskhandler.shutil.copy2", MagicMock(side_effect=OSError("disk full")))
+
+    protected = TaskHandler.recover_tasks_on_startup(_settings(tmp_path))
+
+    assert Tasks.get_by_id(approved.id).status == "approved"
+    assert str(staged) in protected
+    assert str(processed.cache_path) in protected
+
+
+@pytest.mark.unittest
 def test_clear_pending_setting_only_removes_pending_tasks(recovery_db, tmp_path):
     pending = _task(tmp_path, "pending")
     approval = _task(tmp_path, "awaiting_approval", cache_exists=True)
