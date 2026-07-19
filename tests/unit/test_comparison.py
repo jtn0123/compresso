@@ -100,9 +100,10 @@ def test_create_batch_rejects_invalid_candidate_selection(comparison_db, tmp_pat
     source = tmp_path / "movie.mkv"
     source.write_bytes(b"source")
     manager = build_manager(tmp_path)
+    source_path = str(source)
 
     with pytest.raises(ValueError):
-        manager.create_batch(str(source), 0, 10, 1, profile_keys)
+        manager.create_batch(source_path, 0, 10, 1, profile_keys)
 
 
 @pytest.mark.unittest
@@ -415,9 +416,10 @@ def test_winner_rejects_an_incomplete_comparison(comparison_db, tmp_path):
         status="completed",
         progress=100,
     )
+    manager = build_manager(tmp_path)
 
     with pytest.raises(ValueError, match="completed comparison"):
-        build_manager(tmp_path).select_winner(batch.batch_uuid, candidate.candidate_uuid)
+        manager.select_winner(batch.batch_uuid, candidate.candidate_uuid)
 
 
 @pytest.mark.unittest

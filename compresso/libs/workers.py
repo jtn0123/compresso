@@ -49,6 +49,8 @@ from compresso.libs.safety_state import record_safety_event
 from compresso.libs.task import load_task_metadata
 from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
 
+PROCESS_PLUGIN_TYPE = "worker.process"
+
 
 class Worker(threading.Thread):
     # Instance state is initialised in __init__; annotations here avoid the
@@ -355,7 +357,7 @@ class Worker(threading.Thread):
         library_id = self.current_task.get_task_library_id()
         task_id = self.current_task.get_task_id()
         plugin_handler = PluginsHandler()
-        plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type("worker.process", library_id=library_id)
+        plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type(PROCESS_PLUGIN_TYPE, library_id=library_id)
 
         # A bake-off winner is a task-scoped use of the existing Encoding Presets
         # runner. If that runner is not enabled library-wide, append its installed
@@ -368,7 +370,7 @@ class Worker(threading.Thread):
             and comparison_profile
             and not any(module.get("plugin_id") == "encoding_presets" for module in plugin_modules)
         ):
-            installed_modules = plugin_handler.get_enabled_plugin_modules_by_type("worker.process")
+            installed_modules = plugin_handler.get_enabled_plugin_modules_by_type(PROCESS_PLUGIN_TYPE)
             comparison_runner = next(
                 (module for module in installed_modules if module.get("plugin_id") == "encoding_presets"),
                 None,
@@ -476,7 +478,7 @@ class Worker(threading.Thread):
                 result = {"success": None}
 
                 def _run_plugin(result=result, runner_id=runner_id):
-                    result["success"] = plugin_handler.exec_plugin_runner(data, runner_id, "worker.process")
+                    result["success"] = plugin_handler.exec_plugin_runner(data, runner_id, PROCESS_PLUGIN_TYPE)
 
                 runner_thread = threading.Thread(target=_run_plugin, daemon=True)
                 runner_thread.start()

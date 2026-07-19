@@ -17,6 +17,9 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.preview import PreviewManager
 from compresso.libs.unmodels import ComparisonBatches, ComparisonCandidates
 
+VIDEO_STREAM_MAP = "0:v:0"
+MOVFLAGS_FASTSTART = "+faststart"
+
 PROFILE_CATALOG = {
     "x265_crf_22": {
         "label": "x265 CRF 22",
@@ -242,7 +245,7 @@ class ComparisonManager:
                 "-i",
                 batch.source_path,
                 "-map",
-                "0:v:0",
+                VIDEO_STREAM_MAP,
                 "-map",
                 "0:a?",
                 "-c",
@@ -261,7 +264,7 @@ class ComparisonManager:
                 "-i",
                 segment_path,
                 "-map",
-                "0:v:0",
+                VIDEO_STREAM_MAP,
                 "-map",
                 "0:a?",
                 "-c:v",
@@ -275,7 +278,7 @@ class ComparisonManager:
                 "-b:a",
                 "192k",
                 "-movflags",
-                "+faststart",
+                MOVFLAGS_FASTSTART,
                 source_web_path,
             ],
             300,
@@ -352,7 +355,7 @@ class ComparisonManager:
                 "-i",
                 segment_path,
                 "-map",
-                "0:v:0",
+                VIDEO_STREAM_MAP,
                 "-map",
                 "0:a?",
                 *profile["ffmpeg_args"],
@@ -361,7 +364,7 @@ class ComparisonManager:
                 "-b:a",
                 "128k",
                 "-movflags",
-                "+faststart",
+                MOVFLAGS_FASTSTART,
                 "-progress",
                 "pipe:1",
                 "-nostats",
@@ -378,7 +381,7 @@ class ComparisonManager:
                     "-i",
                     output_path,
                     "-map",
-                    "0:v:0",
+                    VIDEO_STREAM_MAP,
                     "-map",
                     "0:a?",
                     "-c:v",
@@ -392,7 +395,7 @@ class ComparisonManager:
                     "-b:a",
                     "128k",
                     "-movflags",
-                    "+faststart",
+                    MOVFLAGS_FASTSTART,
                     preview_path,
                 ],
                 300,

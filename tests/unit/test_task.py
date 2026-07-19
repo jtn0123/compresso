@@ -249,8 +249,9 @@ class TestTaskDatabaseOps:
         from compresso.libs.unmodels.tasks import Tasks
 
         self._create_library()
+        task = Task()
         with pytest.raises(TaskError, match="metadata must be a dictionary"):
-            Task().create_task_by_absolute_path(
+            task.create_task_by_absolute_path(
                 "/media/invalid-metadata.mkv",
                 library_id=1,
                 task_metadata=["not", "a", "dictionary"],
