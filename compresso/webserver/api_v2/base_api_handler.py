@@ -55,6 +55,7 @@ READ_ONLY_POST_PATHS = (
     "/approval/detail",
     "/compression/stats",
     "/compression/library-analysis/status",
+    "/comparison/status",
     "/filebrowser/list",
     "/fileinfo/probe",
     "/fileinfo/task",

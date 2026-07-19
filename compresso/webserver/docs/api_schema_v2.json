@@ -776,6 +776,320 @@
                 ],
                 "additionalProperties": false
             },
+            "ComparisonProfile": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "encoder": {
+                        "type": "string"
+                    },
+                    "codec": {
+                        "type": "string"
+                    },
+                    "crf": {
+                        "type": "integer"
+                    },
+                    "preset": {
+                        "type": "string"
+                    },
+                    "hardware": {
+                        "type": "boolean"
+                    },
+                    "available": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "available",
+                    "codec",
+                    "crf",
+                    "description",
+                    "encoder",
+                    "hardware",
+                    "key",
+                    "label",
+                    "preset"
+                ],
+                "additionalProperties": false
+            },
+            "ComparisonProfilesResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "This is always \"True\" when a request succeeds",
+                        "example": true
+                    },
+                    "profiles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ComparisonProfile"
+                        }
+                    }
+                },
+                "required": [
+                    "profiles",
+                    "success"
+                ],
+                "additionalProperties": false
+            },
+            "RequestComparisonCreate": {
+                "type": "object",
+                "properties": {
+                    "source_path": {
+                        "type": "string"
+                    },
+                    "start_time": {
+                        "type": "number",
+                        "default": 0.0,
+                        "minimum": 0.0
+                    },
+                    "duration": {
+                        "type": "number",
+                        "default": 10.0,
+                        "minimum": 1.0,
+                        "maximum": 30.0
+                    },
+                    "library_id": {
+                        "type": "integer",
+                        "default": 1
+                    },
+                    "profile_keys": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 4,
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "profile_keys",
+                    "source_path"
+                ],
+                "additionalProperties": false
+            },
+            "ComparisonCreateResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "This is always \"True\" when a request succeeds",
+                        "example": true
+                    },
+                    "batch_uuid": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "batch_uuid",
+                    "success"
+                ],
+                "additionalProperties": false
+            },
+            "RequestComparisonStatus": {
+                "type": "object",
+                "properties": {
+                    "batch_uuid": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "batch_uuid"
+                ],
+                "additionalProperties": false
+            },
+            "ComparisonCandidate": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "candidate_uuid": {
+                        "type": "string"
+                    },
+                    "profile_key": {
+                        "type": "string"
+                    },
+                    "profile_label": {
+                        "type": "string"
+                    },
+                    "encoder": {
+                        "type": "string"
+                    },
+                    "codec": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "progress": {
+                        "type": "number"
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "output_url": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "output_size": {
+                        "type": "integer",
+                        "default": 0
+                    },
+                    "source_size": {
+                        "type": "integer",
+                        "default": 0
+                    },
+                    "size_saved_bytes": {
+                        "type": "integer",
+                        "default": 0
+                    },
+                    "size_saved_percent": {
+                        "type": "number",
+                        "default": 0.0
+                    },
+                    "vmaf_score": {
+                        "type": "number",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "ssim_score": {
+                        "type": "number",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "error": {
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "candidate_uuid",
+                    "codec",
+                    "encoder",
+                    "id",
+                    "profile_key",
+                    "profile_label",
+                    "progress",
+                    "status"
+                ],
+                "additionalProperties": false
+            },
+            "ComparisonStatusResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "This is always \"True\" when a request succeeds",
+                        "example": true
+                    },
+                    "batch_uuid": {
+                        "type": "string"
+                    },
+                    "source_path": {
+                        "type": "string"
+                    },
+                    "source_size": {
+                        "type": "integer",
+                        "default": 0
+                    },
+                    "source_url": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "library_id": {
+                        "type": "integer"
+                    },
+                    "start_time": {
+                        "type": "number"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "progress": {
+                        "type": "number"
+                    },
+                    "winner_candidate_id": {
+                        "type": "integer",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "full_encode_task_id": {
+                        "type": "integer",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "error": {
+                        "type": "string",
+                        "default": null,
+                        "nullable": true
+                    },
+                    "candidates": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ComparisonCandidate"
+                        }
+                    }
+                },
+                "required": [
+                    "batch_uuid",
+                    "candidates",
+                    "duration",
+                    "library_id",
+                    "progress",
+                    "source_path",
+                    "start_time",
+                    "status",
+                    "success"
+                ],
+                "additionalProperties": false
+            },
+            "RequestComparisonWinner": {
+                "type": "object",
+                "properties": {
+                    "batch_uuid": {
+                        "type": "string"
+                    },
+                    "candidate_uuid": {
+                        "type": "string"
+                    },
+                    "queue_full_encode": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "required": [
+                    "batch_uuid",
+                    "candidate_uuid"
+                ],
+                "additionalProperties": false
+            },
+            "RequestComparisonCleanup": {
+                "type": "object",
+                "properties": {
+                    "batch_uuid": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "batch_uuid"
+                ],
+                "additionalProperties": false
+            },
             "DocumentContentSuccess": {
                 "type": "object",
                 "properties": {
@@ -4523,6 +4837,124 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/comparison/profiles": {
+            "get": {
+                "description": "List built-in sample encode profiles and local encoder availability.",
+                "responses": {
+                    "200": {
+                        "description": "Available comparison profiles.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ComparisonProfilesResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/comparison/create": {
+            "post": {
+                "description": "Create a persistent two-to-four candidate sample encode batch.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestComparisonCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comparison batch created.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ComparisonCreateResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/comparison/status": {
+            "post": {
+                "description": "Read batch and per-candidate status, progress, paths, and metrics.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestComparisonStatus"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Current comparison status.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ComparisonStatusResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/comparison/winner": {
+            "post": {
+                "description": "Pick a completed candidate and optionally queue the full source with that profile.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestComparisonWinner"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated comparison status.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ComparisonStatusResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/comparison/cleanup": {
+            "post": {
+                "description": "Remove a terminal comparison batch and its cached samples.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestComparisonCleanup"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Comparison removed."
                     }
                 }
             }

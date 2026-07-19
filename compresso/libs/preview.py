@@ -22,6 +22,33 @@ from compresso import config
 from compresso.libs.logs import CompressoLogging
 
 
+def validate_preview_source_path(source_path, library_id=None, allow_cache=True):
+    """Return a canonical source path when it is inside an allowed media root."""
+    real_path = os.path.realpath(source_path)
+    allowed_roots = set()
+
+    try:
+        from compresso.libs.unmodels import Libraries
+
+        libraries = Libraries.select(Libraries.path)
+        if library_id is not None:
+            libraries = libraries.where(Libraries.id == library_id)
+        for library in libraries:
+            if library.path:
+                allowed_roots.add(os.path.realpath(library.path))
+    except Exception as exc:
+        raise ValueError("Unable to validate configured library paths") from exc
+
+    if allow_cache:
+        cache_path = config.Config().get_cache_path()
+        if cache_path:
+            allowed_roots.add(os.path.realpath(cache_path))
+
+    if not allowed_roots or not any(real_path == root or real_path.startswith(root + os.sep) for root in allowed_roots):
+        raise ValueError("Source path is not within an allowed directory")
+    return real_path
+
+
 class PreviewManager:
     """
     Manages preview job creation, status tracking, and cleanup.

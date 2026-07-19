@@ -70,6 +70,14 @@
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.abPreview') }}</q-tooltip>
         </q-item>
 
+        <q-item clickable to="/ui/comparison" v-ripple :class="{ 'nav-active': $route.path === '/ui/comparison' }">
+          <q-item-section avatar><q-icon name="view_quilt" size="20px" /></q-item-section>
+          <q-item-section v-if="!mini">{{ $t('navigation.sampleBakeoff') }}</q-item-section>
+          <q-tooltip v-if="mini" anchor="center right" self="center left">{{
+            $t('navigation.sampleBakeoff')
+          }}</q-tooltip>
+        </q-item>
+
         <!-- MONITORING -->
         <q-item-label v-if="!mini" class="nav-section-label">{{
           $t('navigation.monitoring') || 'Monitoring'

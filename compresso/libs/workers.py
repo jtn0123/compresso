@@ -46,6 +46,7 @@ from compresso.libs.disk_space_guard import DiskSpaceGuard
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.safety_state import record_safety_event
+from compresso.libs.task import load_task_metadata
 from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
 
 
@@ -352,8 +353,32 @@ class Worker(threading.Thread):
         """
         # Init plugins
         library_id = self.current_task.get_task_library_id()
+        task_id = self.current_task.get_task_id()
         plugin_handler = PluginsHandler()
         plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type("worker.process", library_id=library_id)
+
+        # A bake-off winner is a task-scoped use of the existing Encoding Presets
+        # runner. If that runner is not enabled library-wide, append its installed
+        # module for this task only so the selected profile cannot be silently lost.
+        task_metadata = load_task_metadata(task_id)
+        task_meta = task_metadata.get("__meta__", {}) if isinstance(task_metadata, dict) else {}
+        comparison_profile = task_meta.get("comparison_profile") if isinstance(task_meta, dict) else None
+        if (
+            isinstance(comparison_profile, dict)
+            and comparison_profile
+            and not any(module.get("plugin_id") == "encoding_presets" for module in plugin_modules)
+        ):
+            installed_modules = plugin_handler.get_enabled_plugin_modules_by_type("worker.process")
+            comparison_runner = next(
+                (module for module in installed_modules if module.get("plugin_id") == "encoding_presets"),
+                None,
+            )
+            if comparison_runner is None:
+                message = "The Encoding Presets runner required by this comparison winner is not installed"
+                self.logger.error(message)
+                self.worker_log.append(f"\n{message}\n")
+                return False
+            plugin_modules.append(comparison_runner)
 
         # Create dictionary of runners info for the frontend
         self.worker_runners_info = self.__build_worker_runners_info(plugin_modules)
@@ -392,7 +417,6 @@ class Worker(threading.Thread):
         )
 
         # Generate default data object for the runner functions
-        task_id = self.current_task.get_task_id()
         data = {
             "worker_log": self.worker_log,
             "library_id": library_id,

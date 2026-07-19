@@ -32,6 +32,7 @@ Copyright:
 import warnings
 
 from .approval_api import ApiApprovalHandler
+from .comparison_api import ApiComparisonHandler
 from .compression_api import ApiCompressionHandler
 from .docs_api import ApiDocsHandler
 from .filebrowser_api import ApiFilebrowserHandler
@@ -56,6 +57,7 @@ __author__ = "Josh.5 (jsunnex@gmail.com)"
 __all__ = (
     "ApiApprovalHandler",
     "ApiCompressionHandler",
+    "ApiComparisonHandler",
     "ApiDocsHandler",
     "ApiFileinfoHandler",
     "ApiHealthcheckHandler",

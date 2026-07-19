@@ -321,7 +321,16 @@ def check_if_task_exists_matching_path(abspath):
     return bool(TaskHandler.check_if_task_exists_matching_path(abspath))
 
 
-def create_task(abspath, library_id=1, library_name=None, task_type="local", priority_score=0, job_id=None):
+def create_task(
+    abspath,
+    library_id=1,
+    library_name=None,
+    task_type="local",
+    priority_score=0,
+    job_id=None,
+    task_metadata=None,
+    force_local=False,
+):
     """
     Create a pending task given the path to a file and a library ID or name
 
@@ -348,9 +357,12 @@ def create_task(abspath, library_id=1, library_name=None, task_type="local", pri
         "task_type": task_type,
         "library_id": library.get_id(),
         "priority_score": priority_score,
+        "force_local": force_local,
     }
     if job_id:
         create_kwargs["job_id"] = job_id
+    if task_metadata is not None:
+        create_kwargs["task_metadata"] = task_metadata
     if not new_task.create_task_by_absolute_path(abspath, **create_kwargs):
         # File was not created.
         # Do not carry on.
