@@ -813,6 +813,15 @@ class Worker(threading.Thread):
 
         return False
 
+    def __wait_while_paused(self):
+        """Block until the worker is resumed (or flagged redundant)."""
+        self.logger.debug("Pausing worker exec command subprocess loop")
+        while not self.redundant_flag.is_set():
+            self.event.wait(1)
+            if not self.paused_flag.is_set():
+                self.logger.debug("Resuming worker exec command subprocess loop")
+                return
+
     def __monitor_command_subprocess(self, sub_proc, data, exec_command, command_progress_parser):
         """Drive a spawned plugin subprocess to completion and report success.
 
@@ -842,13 +851,7 @@ class Worker(threading.Thread):
             # Stop parsing the sub process if the worker is paused
             # Then resume it when the worker is resumed
             if self.paused_flag.is_set():
-                self.logger.debug("Pausing worker exec command subprocess loop")
-                while not self.redundant_flag.is_set():
-                    self.event.wait(1)
-                    if not self.paused_flag.is_set():
-                        self.logger.debug("Resuming worker exec command subprocess loop")
-                        break
-                    continue
+                self.__wait_while_paused()
 
             # Fetch command stdout and append it to the current task object (to be saved during post process)
             line_text = sub_proc.stdout.readline()
