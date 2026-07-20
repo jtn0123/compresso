@@ -50,6 +50,13 @@ from compresso.libs.workers import Worker
 
 
 class Foreman(threading.Thread):
+    # Guards compound mutations of worker_threads/paused_worker_threads, which
+    # are touched by both the Foreman loop and Tornado API handlers. RLock
+    # because the *_all_* helpers call the per-worker helpers. Class-level so
+    # it exists even for instances constructed without __init__ (as some unit
+    # tests do); the process only ever runs one Foreman.
+    worker_registry_lock = threading.RLock()
+
     def __init__(self, data_queues, settings, task_queue, event):
         super().__init__(name="Foreman")
         self.settings = settings
@@ -83,14 +90,15 @@ class Foreman(threading.Thread):
         self.available_remote_managers = {}
 
     def stop(self):
-        self.paused_worker_threads = []
         self.abort_flag.set()
         # Stop all workers
         # To avoid having the dictionary change size during iteration,
         #   we need to first get the thread_keys, then iterate through that
-        thread_keys = [t for t in self.worker_threads]
-        for thread in thread_keys:
-            self.mark_worker_thread_as_redundant(thread)
+        with self.worker_registry_lock:
+            self.paused_worker_threads = []
+            thread_keys = [t for t in self.worker_threads]
+            for thread in thread_keys:
+                self.mark_worker_thread_as_redundant(thread)
         # Stop all remote link manager threads
         thread_keys = [t for t in self.remote_task_manager_threads]
         for thread in thread_keys:
@@ -252,46 +260,47 @@ class Foreman(threading.Thread):
                     )
 
     def init_worker_threads(self):
-        # Remove any redundant idle workers from our list
-        # To avoid having the dictionary change size during iteration,
-        #   we need to first get the thread_keys, then iterate through that
-        thread_keys = [t for t in self.worker_threads]
-        for thread in thread_keys:
-            if thread in self.worker_threads and not self.worker_threads[thread].is_alive():
-                del self.worker_threads[thread]
+        with self.worker_registry_lock:
+            # Remove any redundant idle workers from our list
+            # To avoid having the dictionary change size during iteration,
+            #   we need to first get the thread_keys, then iterate through that
+            thread_keys = [t for t in self.worker_threads]
+            for thread in thread_keys:
+                if thread in self.worker_threads and not self.worker_threads[thread].is_alive():
+                    del self.worker_threads[thread]
 
-        # Check that we have enough workers running. Spawn new ones as required.
-        worker_group_ids = []
-        worker_group_names = []
-        for worker_group in WorkerGroup.get_all_worker_groups():
-            worker_group_ids.append(worker_group.get("id"))
+            # Check that we have enough workers running. Spawn new ones as required.
+            worker_group_ids = []
+            worker_group_names = []
+            for worker_group in WorkerGroup.get_all_worker_groups():
+                worker_group_ids.append(worker_group.get("id"))
 
-            # Create threads as required
-            for i in range(worker_group.get("number_of_workers")):
-                worker_id = f"{worker_group.get('name')}-{i}"
-                worker_name = f"{worker_group.get('name')}-Worker-{i + 1}"
-                # Add this name to a list. If the name changes, we can remove old incorrectly named workers
-                worker_group_names.append(worker_name)
-                if worker_id not in self.worker_threads:
-                    # This worker does not yet exist, create it
-                    self.start_worker_thread(worker_id, worker_name, worker_group.get("id"))
+                # Create threads as required
+                for i in range(worker_group.get("number_of_workers")):
+                    worker_id = f"{worker_group.get('name')}-{i}"
+                    worker_name = f"{worker_group.get('name')}-Worker-{i + 1}"
+                    # Add this name to a list. If the name changes, we can remove old incorrectly named workers
+                    worker_group_names.append(worker_name)
+                    if worker_id not in self.worker_threads:
+                        # This worker does not yet exist, create it
+                        self.start_worker_thread(worker_id, worker_name, worker_group.get("id"))
 
-            # Remove any workers that do not belong. The max number of supported workers is 12
-            for i in range(worker_group.get("number_of_workers"), 12):
-                worker_id = f"{worker_group.get('name')}-{i}"
+                # Remove any workers that do not belong. The max number of supported workers is 12
+                for i in range(worker_group.get("number_of_workers"), 12):
+                    worker_id = f"{worker_group.get('name')}-{i}"
+                    # Only remove threads that are idle (never terminate a task just to reduce worker count)
+                    if worker_id in self.worker_threads and self.worker_threads[worker_id].idle:
+                        self.mark_worker_thread_as_redundant(worker_id)
+
+            # Remove workers for groups that no longer exist
+            for thread in list(self.worker_threads):
+                worker_group_id = self.worker_threads[thread].worker_group_id
+                worker_name = self.worker_threads[thread].name
                 # Only remove threads that are idle (never terminate a task just to reduce worker count)
-                if worker_id in self.worker_threads and self.worker_threads[worker_id].idle:
-                    self.mark_worker_thread_as_redundant(worker_id)
-
-        # Remove workers for groups that no longer exist
-        for thread in list(self.worker_threads):
-            worker_group_id = self.worker_threads[thread].worker_group_id
-            worker_name = self.worker_threads[thread].name
-            # Only remove threads that are idle (never terminate a task just to reduce worker count)
-            if (worker_group_id not in worker_group_ids or worker_name not in worker_group_names) and self.worker_threads[
-                thread
-            ].idle:
-                self.mark_worker_thread_as_redundant(thread)
+                if (
+                    worker_group_id not in worker_group_ids or worker_name not in worker_group_names
+                ) and self.worker_threads[thread].idle:
+                    self.mark_worker_thread_as_redundant(thread)
 
     def fetch_available_remote_installation(
         self,
@@ -524,7 +533,11 @@ class Foreman(threading.Thread):
 
     def get_tags_configured_for_worker(self, worker_id):
         """Fetch the tags for a given worker ID"""
-        assigned_worker_group_id = self.worker_threads[worker_id].worker_group_id
+        with self.worker_registry_lock:
+            worker_thread = self.worker_threads.get(worker_id)
+            if worker_thread is None:
+                raise ValueError(f"Worker ID '{worker_id}' is no longer registered")
+            assigned_worker_group_id = worker_thread.worker_group_id
         worker_group = WorkerGroup(group_id=assigned_worker_group_id)
         return worker_group.get_tags()
 
@@ -568,16 +581,17 @@ class Foreman(threading.Thread):
         :param record_paused:
         :return:
         """
-        if worker_id not in self.worker_threads:
-            self.logger.warning("Asked to pause Worker ID '%s', but this was not found.", worker_id)
-            return False
+        with self.worker_registry_lock:
+            if worker_id not in self.worker_threads:
+                self.logger.warning("Asked to pause Worker ID '%s', but this was not found.", worker_id)
+                return False
 
-        if not self.worker_threads[worker_id].paused_flag.is_set():
-            self.logger.debug("Asked to pause Worker ID %s", worker_id)
-            self.worker_threads[worker_id].paused_flag.set()
-            if record_paused and worker_id not in self.paused_worker_threads:
-                self.paused_worker_threads.append(worker_id)
-        return True
+            if not self.worker_threads[worker_id].paused_flag.is_set():
+                self.logger.debug("Asked to pause Worker ID %s", worker_id)
+                self.worker_threads[worker_id].paused_flag.set()
+                if record_paused and worker_id not in self.paused_worker_threads:
+                    self.paused_worker_threads.append(worker_id)
+            return True
 
     def pause_all_worker_threads(self, worker_group_id=None, record_paused=False):
         """
@@ -588,12 +602,13 @@ class Foreman(threading.Thread):
         :return:
         """
         result = True
-        for thread in self.worker_threads:
-            # Limit by worker group if requested
-            if worker_group_id and self.worker_threads[thread].worker_group_id != worker_group_id:
-                continue
-            if not self.pause_worker_thread(thread, record_paused=record_paused):
-                result = False
+        with self.worker_registry_lock:
+            for thread in list(self.worker_threads):
+                # Limit by worker group if requested
+                if worker_group_id and self.worker_threads[thread].worker_group_id != worker_group_id:
+                    continue
+                if not self.pause_worker_thread(thread, record_paused=record_paused):
+                    result = False
         return result
 
     def resume_worker_thread(self, worker_id):
@@ -609,26 +624,28 @@ class Foreman(threading.Thread):
         if getattr(self, "safety_latched", False):
             self.logger.warning("Refusing to resume Worker ID '%s' while the durable safety latch is active.", worker_id)
             return False
-        if worker_id not in self.worker_threads:
-            self.logger.warning("Asked to resume Worker ID '%s', but this was not found.", worker_id)
-            return False
+        with self.worker_registry_lock:
+            if worker_id not in self.worker_threads:
+                self.logger.warning("Asked to resume Worker ID '%s', but this was not found.", worker_id)
+                return False
 
-        self.worker_threads[worker_id].paused_flag.clear()
-        if worker_id in self.paused_worker_threads:
-            self.paused_worker_threads.remove(worker_id)
-        return True
+            self.worker_threads[worker_id].paused_flag.clear()
+            if worker_id in self.paused_worker_threads:
+                self.paused_worker_threads.remove(worker_id)
+            return True
 
     def resume_all_worker_threads(self, worker_group_id=None, recorded_paused_only=False):
         """Resume all threads"""
         result = True
-        for thread in self.worker_threads:
-            # Limit by worker group if requested
-            if worker_group_id and self.worker_threads[thread].worker_group_id != worker_group_id:
-                continue
-            if recorded_paused_only and thread not in self.paused_worker_threads:
-                continue
-            if not self.resume_worker_thread(thread):
-                result = False
+        with self.worker_registry_lock:
+            for thread in list(self.worker_threads):
+                # Limit by worker group if requested
+                if worker_group_id and self.worker_threads[thread].worker_group_id != worker_group_id:
+                    continue
+                if recorded_paused_only and thread not in self.paused_worker_threads:
+                    continue
+                if not self.resume_worker_thread(thread):
+                    result = False
         return result
 
     def terminate_worker_thread(self, worker_id):
@@ -641,23 +658,28 @@ class Foreman(threading.Thread):
         :rtype:
         """
         self.logger.debug("Asked to terminate Worker ID %s", worker_id)
-        if worker_id not in self.worker_threads:
-            self.logger.warning("Asked to terminate Worker ID '%s', but this was not found.", worker_id)
-            return False
+        with self.worker_registry_lock:
+            if worker_id not in self.worker_threads:
+                self.logger.warning("Asked to terminate Worker ID '%s', but this was not found.", worker_id)
+                return False
 
-        self.mark_worker_thread_as_redundant(worker_id)
-        return True
+            self.mark_worker_thread_as_redundant(worker_id)
+            return True
 
     def terminate_all_worker_threads(self):
         """Terminate all threads"""
         result = True
-        for thread in self.worker_threads:
-            if not self.terminate_worker_thread(thread):
-                result = False
+        with self.worker_registry_lock:
+            for thread in list(self.worker_threads):
+                if not self.terminate_worker_thread(thread):
+                    result = False
         return result
 
     def mark_worker_thread_as_redundant(self, worker_id):
-        self.worker_threads[worker_id].redundant_flag.set()
+        with self.worker_registry_lock:
+            worker_thread = self.worker_threads.get(worker_id)
+        if worker_thread:
+            worker_thread.redundant_flag.set()
 
     def mark_remote_task_manager_thread_as_redundant(self, link_manager_id):
         self.remote_task_manager_threads[link_manager_id].redundant_flag.set()
@@ -680,7 +702,11 @@ class Foreman(threading.Thread):
                     }
                     plugin_handler = PluginsHandler()
                     plugin_handler.run_event_plugins_for_plugin_type("events.task_scheduled", event_data)
-            # If the worker thread specified was not available to collect this task, it will be fetched again in the next loop
+            else:
+                # The worker thread specified was not available to collect this task.
+                # Report failure so the caller returns the claimed task to 'pending'
+                # and it can be fetched again in the next loop.
+                return False
         else:
             # Place into queue for a remote link manager thread to collect
             self.remote_workers_pending_task_queue.put(item)
@@ -750,9 +776,10 @@ class Foreman(threading.Thread):
             self.pause_all_worker_threads(record_paused=True)
             return False
 
-        if self.paused_worker_threads:
-            self.resume_all_worker_threads(recorded_paused_only=True)
-            self.paused_worker_threads = []
+        with self.worker_registry_lock:
+            if self.paused_worker_threads:
+                self.resume_all_worker_threads(recorded_paused_only=True)
+                self.paused_worker_threads = []
         return True
 
     def _record_worker_metrics(self, last_metrics_time, metrics_interval):
@@ -878,6 +905,12 @@ class Foreman(threading.Thread):
                     "Re-queueing tasks. Unable to find worker capable of processing task '%s'",
                     next_item_to_process.get_source_abspath(),
                 )
+                # The task was atomically claimed (status='in_progress') at fetch;
+                # return it to 'pending' so it can be picked up again.
+                try:
+                    next_item_to_process.set_status("pending")
+                except (AttributeError, TypeError, peewee.PeeweeException) as e:
+                    self.logger.exception("Unable to return claimed task to pending: %s", str(e))
                 self.task_queue.requeue_tasks_at_bottom(next_item_to_process.get_task_id())
 
         return allow_local_check

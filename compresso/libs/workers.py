@@ -418,6 +418,9 @@ class Worker(threading.Thread):
             # Mark the status of the worker for the frontend
             self.worker_runners_info[runner_id]["status"] = "in_progress"
             self.worker_runners_info[runner_id]["success"] = False
+            # Track failures recorded inside the pass loop so the final status
+            # cannot report a failed runner as successful.
+            runner_failed = False
 
             # Loop over runner. This way we can repeat the function with the same data if requested by the repeat flag
             runner_pass_count = 0
@@ -474,6 +477,7 @@ class Worker(threading.Thread):
                         self.logger.warning("Plugin runner '%s' did not stop within timeout after worker shutdown", runner_id)
                     self.worker_runners_info[runner_id]["status"] = "complete"
                     self.worker_runners_info[runner_id]["success"] = False
+                    runner_failed = True
                     overall_success = False
                     self.worker_log.append("\n\nWORKER TERMINATED!")
                     break
@@ -483,6 +487,7 @@ class Worker(threading.Thread):
                     # Skip this plugin module's loop
                     self.worker_runners_info[runner_id]["status"] = "complete"
                     self.worker_runners_info[runner_id]["success"] = False
+                    runner_failed = True
                     # Set overall success status to failed
                     overall_success = False
                     # Append long entry to say the worker was terminated
@@ -511,6 +516,7 @@ class Worker(threading.Thread):
                         self.logger.warning("Worker has been terminated before a command was completed")
                         # Mark runner as failed
                         self.worker_runners_info[runner_id]["success"] = False
+                        runner_failed = True
                         # Set overall success status to failed
                         overall_success = False
                         # Append long entry to say the worker was terminated
@@ -544,6 +550,7 @@ class Worker(threading.Thread):
                         self.logger.error("WORKER_RUNNER_FAILED runner=%s file=%s", runner_id, original_abspath)
                         self.logger.error("Error while running worker process '%s' on file '%s'", runner_id, original_abspath)
                         self.worker_runners_info[runner_id]["success"] = False
+                        runner_failed = True
                         overall_success = False
                 else:
                     # Ensure the new 'file_in' is set to the previous runner's 'file_in' for the next loop
@@ -570,7 +577,10 @@ class Worker(threading.Thread):
                     continue
                 break
 
-            self.worker_runners_info[runner_id]["success"] = True
+            # Do not overwrite a failure recorded inside the runner loop — the
+            # frontend uses this per-runner status for incident triage.
+            if not runner_failed:
+                self.worker_runners_info[runner_id]["success"] = True
             self.worker_runners_info[runner_id]["status"] = "complete"
 
         # Log if no command was run by any Plugins

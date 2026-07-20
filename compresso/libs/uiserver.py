@@ -58,7 +58,10 @@ tornado_settings = {
     "static_icons": os.path.join(public_directory, "icons"),
     "static_img": os.path.join(public_directory, "img"),
     "static_js": os.path.join(public_directory, "js"),
-    "debug": True,
+    # Debug mode (which also enables serve_traceback, leaking tracebacks to API
+    # clients) must never be on in production. update_tornado_settings() turns
+    # it on when the server is started in developer mode.
+    "debug": False,
     "autoreload": False,
 }
 
@@ -167,6 +170,7 @@ class UIServer(threading.Thread):
     def update_tornado_settings(self):
         # Check if this is a development environment or not
         if self.developer:
+            tornado_settings["debug"] = True
             tornado_settings["autoreload"] = True
             tornado_settings["serve_traceback"] = True
 

@@ -83,6 +83,7 @@ class Task:
         self.logger = CompressoLogging.get_logger(name=__class__.__name__)
         self.statistics = {}
         self.errors = []
+        self._destination_path_override = None
 
     def set_cache_path(self, cache_directory=None, file_extension=None):
         if not self.task:
@@ -149,6 +150,12 @@ class Task:
         if not self.task:
             raise TaskError("Unable to fetch destination data. Task has not been set!")
 
+        if self._destination_path_override:
+            return {
+                "basename": os.path.basename(self._destination_path_override),
+                "abspath": self._destination_path_override,
+            }
+
         cache_path = self.get_cache_path()
 
         # Get the current cache path's file extension
@@ -156,6 +163,23 @@ class Task:
         file_extension = split_file_name[1].lstrip(".")
 
         return prepare_file_destination_data(self.task.abspath, file_extension)
+
+    def set_destination_path(self, new_path):
+        """
+        Override the destination path returned by get_destination_data().
+
+        Used by replacement policies (eg. 'keep_both') that need the encoded
+        output written somewhere other than the default destination derived
+        from the source path.
+
+        :param new_path: Absolute path the finalized output should be written to.
+        :return:
+        """
+        if not self.task:
+            raise TaskError("Unable to set destination path. Task has not been set!")
+        if not new_path:
+            raise TaskError("Unable to set destination path. No path provided!")
+        self._destination_path_override = new_path
 
     def get_source_data(self):
         if not self.task:
@@ -718,10 +742,15 @@ class TaskDataStore:
         if tid is None:
             raise RuntimeError(_ERR_NO_TASK_ID)
         with cls._lock:
-            t = cls._task_state.get(tid, {})
+            # Copy-then-reassign so the write propagates when _task_state is a
+            # multiprocessing Manager DictProxy (in-place mutation of the value
+            # returned by .get() would be lost on a proxy).
+            t = dict(cls._task_state.get(tid, {}))
             t.pop(key, None)
             if not t:
                 cls._task_state.pop(tid, None)
+            else:
+                cls._task_state[tid] = t
 
     @classmethod
     def export_task_state(cls, task_id):
@@ -757,9 +786,12 @@ class TaskDataStore:
         :param new_state: Dict of key→value to merge in.
         """
         with cls._lock:
-            t = cls._task_state.setdefault(task_id, {})
+            # Copy-then-reassign so the merge propagates when _task_state is a
+            # multiprocessing Manager DictProxy (see delete_task_state).
+            t = dict(cls._task_state.get(task_id, {}))
             for k, v in new_state.items():
                 t[k] = v
+            cls._task_state[task_id] = t
 
     @classmethod
     def import_task_state_json(cls, task_id, json_data):

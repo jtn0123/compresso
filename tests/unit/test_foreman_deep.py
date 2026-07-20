@@ -331,7 +331,8 @@ class TestHandTaskToWorkersLocal:
 
         mock_item = MagicMock()
         result = foreman.hand_task_to_workers(mock_item, local=True, worker_id="w-0")
-        assert result is True  # Returns True but no task set
+        # Returns False so the caller reverts the claimed task to 'pending'
+        assert result is False
         mock_thread.set_task.assert_not_called()
 
     def test_does_not_run_events_for_remote_task(self):

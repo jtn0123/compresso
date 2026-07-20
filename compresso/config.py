@@ -479,7 +479,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.first_run
+        return _as_bool(self.first_run)
 
     def get_release_notes_viewed(self):
         """
@@ -511,7 +511,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.clear_pending_tasks_on_restart
+        return _as_bool(self.clear_pending_tasks_on_restart)
 
     def get_auto_manage_completed_tasks(self):
         """
@@ -519,7 +519,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.auto_manage_completed_tasks
+        return _as_bool(self.auto_manage_completed_tasks)
 
     def get_max_age_of_completed_tasks(self):
         """
@@ -535,7 +535,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.compress_completed_tasks_logs
+        return _as_bool(self.compress_completed_tasks_logs)
 
     def get_always_keep_failed_tasks(self):
         """
@@ -543,7 +543,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.always_keep_failed_tasks
+        return _as_bool(self.always_keep_failed_tasks)
 
     def get_log_path(self):
         """
@@ -559,7 +559,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.enable_library_scanner
+        return _as_bool(self.enable_library_scanner)
 
     def get_run_full_scan_on_start(self):
         """
@@ -567,7 +567,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.run_full_scan_on_start
+        return _as_bool(self.run_full_scan_on_start)
 
     def get_schedule_full_scan_minutes(self):
         """
@@ -583,7 +583,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return self.follow_symlinks
+        return _as_bool(self.follow_symlinks)
 
     def get_library_scan_queue_limit(self):
         """Maximum number of discovered files awaiting scan tests."""

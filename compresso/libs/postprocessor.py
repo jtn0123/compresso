@@ -101,6 +101,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         self.abort_flag = threading.Event()
         self.current_task = None
         self._last_destination_files = []
+        self._keep_source_file = False
         self._file_operation_tracker = None
         self._disk_space_guard = None
         self._safety_event_recorder = record_safety_event
@@ -749,7 +750,14 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
                 self.current_task.set_destination_path(new_path)
         except (OSError, AttributeError, KeyError, TypeError) as e:
             self._log("Exception in keep_both path adjustment", message2=str(e), level="warning")
-        self._finalize_local_task()
+        # The adjusted destination differs from the source, which would normally
+        # trigger source-file removal in post_process_file. The whole point of
+        # 'keep_both' is that the original survives, so suppress that removal.
+        self._keep_source_file = True
+        try:
+            self._finalize_local_task()
+        finally:
+            self._keep_source_file = False
 
     def _finalize_remote_task(self):
         """Finalize a remote task only after its file and history are durable."""
@@ -879,8 +887,9 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             )
 
             # Check if the source file needs to be removed by default (only if it does not match the destination file)
+            # Replacement policies like 'keep_both' set _keep_source_file to preserve the original.
             remove_source_file = False
-            if source_data["abspath"] != destination_data["abspath"]:
+            if source_data["abspath"] != destination_data["abspath"] and not self._keep_source_file:
                 remove_source_file = True
 
             # Set initial data (some fields will be overwritten further down)

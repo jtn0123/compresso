@@ -29,6 +29,7 @@ Copyright:
 
 """
 
+import asyncio
 import json
 import secrets
 import sys
@@ -88,6 +89,10 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
     routes: list[dict[str, Any]] = []
     route: dict[str, Any] = {}
     error_messages: dict[str, Any] = {}
+    # Route handler bodies are synchronous DB/file work; run them in a worker
+    # thread by default so they cannot stall the IOLoop. Individual routes can
+    # opt out with {"run_on_ioloop": True}; subclasses can disable per-handler.
+    offload_route_bodies = True
 
     """
     Valid API return status codes:
@@ -267,6 +272,8 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         error_id = secrets.token_hex(8)
         call_method = self.route.get("call_method") if getattr(self, "route", None) else None
         tornado.log.app_log.warning(LOG_BASE_API_ERROR, error_id, call_method, exc.private_detail)
+        if self._response_already_committed():
+            return
         self.error_messages = exc.messages
         self._api_error_id = error_id
         self.set_status(exc.status_code, reason=exc.public_message)
@@ -300,6 +307,8 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         call_method = self.route.get("call_method") if getattr(self, "route", None) else None
         error_id = secrets.token_hex(8)
         tornado.log.app_log.exception(LOG_UNHANDLED_ERROR, error_id, self.__class__.__name__, call_method)
+        if self._response_already_committed():
+            return
         self.error_messages = {}
         self._api_error_id = error_id
         self.set_status(self.STATUS_ERROR_INTERNAL, reason="Internal server error")
@@ -307,7 +316,7 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
     def write_api_error(self, status_code, public_reason, *, messages=None, error_id=None, exc_info=None) -> None:
         """Own the complete structured error response for v2 API handlers."""
-        if getattr(self, "_finished", False):
+        if self._response_already_committed():
             return
 
         self.error_messages = messages or {}
@@ -373,12 +382,61 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
     async def _invoke_route(self, route, *args, **kwargs):
         """Invoke one routed method and own any exception it lets escape."""
         self.route = route
+        method = getattr(self, route.get("call_method"))
         try:
-            await getattr(self, route.get("call_method"))(*args, **kwargs)
+            if route.get("run_on_ioloop") or not self.offload_route_bodies:
+                await method(*args, **kwargs)
+            else:
+                await self._invoke_route_offloaded(method, *args, **kwargs)
         except BaseApiError as exc:
             self.handle_base_api_error(exc)
         except Exception as exc:
             self.handle_unhandled_error(exc)
+        finally:
+            self._apply_deferred_finish()
+
+    async def _invoke_route_offloaded(self, method, *args, **kwargs):
+        """
+        Run a handler body in a worker thread so its synchronous DB and file
+        I/O cannot block the single Tornado IOLoop for every other client.
+
+        Tornado handlers are not thread-safe, so ``finish()`` is deferred while
+        the body runs off-loop: response status, headers, and body chunks are
+        only buffered on the handler (safe — the awaiting coroutine is
+        suspended until the worker completes), and the actual connection write
+        happens back on the IOLoop in ``_apply_deferred_finish``.
+        """
+        self._finish_deferred = False
+        self._defer_finish = True
+        try:
+            if asyncio.iscoroutinefunction(method):
+                # Coroutine bodies get their own short-lived event loop in the
+                # worker thread; awaits like asyncio.to_thread and
+                # run_in_executor behave identically there.
+                await asyncio.to_thread(asyncio.run, method(*args, **kwargs))
+            else:
+                await asyncio.to_thread(method, *args, **kwargs)
+        finally:
+            self._defer_finish = False
+
+    def _response_already_committed(self):
+        """True when a response has been finished or is pending deferred finish."""
+        return getattr(self, "_finished", False) or getattr(self, "_finish_deferred", False)
+
+    def _apply_deferred_finish(self):
+        """Complete a finish() that was deferred while the body ran off-loop."""
+        if getattr(self, "_finish_deferred", False):
+            self._finish_deferred = False
+            if not self._finished:
+                super().finish()
+
+    def finish(self, chunk=None):
+        if getattr(self, "_defer_finish", False):
+            if chunk is not None:
+                self.write(chunk)
+            self._finish_deferred = True
+            return None
+        return super().finish(chunk)
 
     def handle_endpoint_not_found(self):
         """
