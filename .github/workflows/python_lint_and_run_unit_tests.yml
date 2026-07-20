@@ -137,7 +137,10 @@ jobs:
     name: Coverage Summary
     needs: py_unit_test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    # Run the coverage gate on pushes AND pull requests. PRs (including fork
+    # PRs) are the primary contribution path and must not bypass the
+    # fail_under=75 enforcement in pyproject.toml.
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
 
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -158,7 +161,10 @@ jobs:
     - name: Download shard coverage
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
       with:
-        pattern: coverage-*
+        # Combine only the ubuntu shards: they exist on every event type
+        # (pushes run ubuntu-only) and keep the combined dataset consistent
+        # across OS-specific path handling.
+        pattern: coverage-ubuntu-*
         merge-multiple: true
 
     - name: Combine and report coverage

@@ -169,6 +169,117 @@ def run_benchmark(entry_count: int, batch_size: int = 1_000) -> dict[str, object
     }
 
 
+def run_real_pipeline_benchmark(entry_count: int, batch_size: int = 1_000) -> dict[str, object]:
+    """
+    Schedule entries through the real peewee task pipeline.
+
+    Unlike run_benchmark (a synthetic floor for raw SQLite scheduling), this
+    tier exercises the code a production scan actually runs per queued file:
+    the dedupe SELECT (TaskHandler.check_if_task_exists_matching_path), the
+    Tasks model insert through SqliteQueueDatabase's writer queue, cache-path
+    assignment, the library priority lookup, and the pending-status
+    transition. ffprobe and plugin execution are intentionally excluded so the
+    benchmark stays hermetic (no subprocesses or network).
+    """
+    if entry_count < 1:
+        raise ValueError("entry_count must be positive")
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+
+    # Imports are local so the synthetic benchmark stays importable without
+    # dragging in the full application stack.
+    from compresso import config
+    from compresso.libs import task as task_lib
+    from compresso.libs.taskhandler import TaskHandler
+    from compresso.libs.unmodels import Libraries, Tasks
+    from compresso.libs.unmodels.lib import Database
+
+    rss = _RssSampler()
+    tracemalloc.start()
+    rss.start()
+    started = time.perf_counter()
+    queued = 0
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="compresso-library-scale-real-") as temp_dir:
+            temp = Path(temp_dir)
+            library_dir = temp / "library"
+            cache_dir = temp / "cache"
+            library_dir.mkdir()
+            cache_dir.mkdir()
+
+            settings = config.Config(config_path=str(temp / "config"))
+            settings.set_cache_path(str(cache_dir))
+
+            database_path = temp / "tasks.db"
+            db_connection = Database.select_database(
+                {
+                    "TYPE": "SQLITE",
+                    "FILE": str(database_path),
+                    "MIGRATIONS_DIR": str(temp / "migrations"),
+                }
+            )
+            try:
+                db_connection.create_tables([Tasks, Libraries])
+                Libraries.create(id=1, name="ScaleBenchmark", path=str(library_dir))
+
+                for root, _dirs, files in synthetic_walk(entry_count, files_per_directory=batch_size):
+                    directory = library_dir / Path(root).name
+                    directory.mkdir()
+                    for filename in files:
+                        file_path = directory / filename
+                        file_path.touch()
+                        abspath = str(file_path)
+                        if TaskHandler.check_if_task_exists_matching_path(abspath):
+                            continue
+                        if task_lib.Task().create_task_by_absolute_path(abspath, library_id=1):
+                            queued += 1
+            finally:
+                # Flush the queued writer before measuring read latency
+                db_connection.obj.stop()
+                db_connection.obj.close()
+
+            read_connection = sqlite3.connect(database_path)
+            try:
+                lookup_p95_ms, page_p95_ms = _measure_query_latency(read_connection, entry_count)
+                stored_count = read_connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+            finally:
+                read_connection.close()
+            database_bytes = database_path.stat().st_size
+    finally:
+        duration_seconds = time.perf_counter() - started
+        _current, peak_python_bytes = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        rss.stop()
+
+    if queued != entry_count or stored_count != entry_count:
+        raise RuntimeError(f"queued {queued} entries but SQLite contains {stored_count} (expected {entry_count})")
+
+    return {
+        "schema_version": 1,
+        "mode": "real_pipeline",
+        "recorded_at": datetime.now(UTC).isoformat(),
+        "machine": {
+            "platform": platform.platform(),
+            "architecture": platform.machine(),
+            "python": platform.python_version(),
+            "logical_cpus": psutil.cpu_count(),
+        },
+        "entry_count": entry_count,
+        "batch_size": batch_size,
+        "duration_seconds": round(duration_seconds, 4),
+        "entries_per_second": round(entry_count / duration_seconds, 2),
+        "peak_python_mb": round(peak_python_bytes / (1024 * 1024), 2),
+        "baseline_rss_mb": round(rss.baseline / (1024 * 1024), 2),
+        "peak_rss_mb": round(rss.peak / (1024 * 1024), 2),
+        "peak_rss_delta_mb": round((rss.peak - rss.baseline) / (1024 * 1024), 2),
+        "database_mb": round(database_bytes / (1024 * 1024), 2),
+        "database_bytes_per_entry": round(database_bytes / entry_count, 2),
+        "sqlite_lookup_p95_ms": round(lookup_p95_ms, 4),
+        "sqlite_page_p95_ms": round(page_p95_ms, 4),
+    }
+
+
 def matching_threshold(entry_count: int, threshold_config: dict[str, Any]) -> dict[str, float]:
     tiers = threshold_config.get("tiers", {})
     if not isinstance(tiers, dict):

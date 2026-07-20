@@ -1,0 +1,61 @@
+name: Refresh Test Durations
+
+# Regenerates .test_durations (used by pytest-split to balance the 3-way CI
+# shards) on a monthly schedule so shard balance does not degrade as tests are
+# added. Opens a PR with the refreshed data when it changed.
+
+on:
+  schedule:
+    - cron: "17 4 1 * *"  # 04:17 UTC on the 1st of each month
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh_durations:
+    name: Regenerate .test_durations
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 1
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      with:
+        python-version: "3.13"
+        cache: 'pip'
+        cache-dependency-path: requirements-dev.lock
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --require-hashes -r requirements-dev.lock
+
+    - name: Regenerate test durations
+      run: |
+        pytest tests/unit -q --store-durations --cov-fail-under=0
+
+    - name: Open PR when durations changed
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        if git diff --quiet -- .test_durations; then
+          echo "No change to .test_durations; nothing to do."
+          exit 0
+        fi
+        branch="chore/refresh-test-durations-$(date -u +%Y%m%d)"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b "$branch"
+        git add .test_durations
+        git commit -m "chore(ci): refresh .test_durations for pytest-split shard balance"
+        git push -u origin "$branch" --force
+        if ! gh pr list --head "$branch" --state open --json number --jq '.[0].number' | grep -q .; then
+          gh pr create \
+            --title "chore(ci): refresh .test_durations" \
+            --body "Automated monthly refresh of \`.test_durations\` so pytest-split keeps the 3-way unit test shards balanced. See workflow \`refresh_test_durations.yml\`."
+        fi

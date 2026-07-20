@@ -64,6 +64,21 @@ class FileTest:
             "library_management.file_test", library_id=library_id
         )
 
+        # Hoist the library codec pre-filter configuration out of the per-file
+        # path: one DB fetch per FileTest instance instead of one per file.
+        self.target_codecs = []
+        self.skip_codecs = []
+        try:
+            from compresso.libs.library import Library
+
+            library = Library(self.library_id)
+            self.target_codecs = [c.lower() for c in (library.get_target_codecs() or [])]
+            self.skip_codecs = [c.lower() for c in (library.get_skip_codecs() or [])]
+        except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
+            self.logger.debug("Codec pre-filter config unavailable for library %s: %s", library_id, str(e))
+        except Exception as e:
+            self.logger.debug("Codec pre-filter config unexpected error for library %s: %s", library_id, str(e))
+
     def file_failed_in_history(self, path):
         """
         Check if file has already failed in history
@@ -105,45 +120,9 @@ class FileTest:
         decision_plugin = None
         file_issues = []
 
-        # Codec pre-filter (before plugins, for speed)
-        from compresso.libs.library import Library
-
-        try:
-            library = Library(self.library_id)
-            target_codecs = library.get_target_codecs()
-            skip_codecs = library.get_skip_codecs()
-            if target_codecs or skip_codecs:
-                from compresso.libs.ffprobe_utils import extract_media_metadata
-
-                try:
-                    meta = extract_media_metadata(path)
-                    file_codec = meta.get("codec", "").lower()
-                    # Strip "(estimated)" suffix from codec hint
-                    if " (estimated)" in file_codec:
-                        file_codec = file_codec.replace(" (estimated)", "")
-                    if file_codec:
-                        if skip_codecs and file_codec in [c.lower() for c in skip_codecs]:
-                            return (
-                                False,
-                                [{"id": "codec_skip", "message": f"Codec '{file_codec}' in skip list — '{path}'"}],
-                                0,
-                                None,
-                            )
-                        if target_codecs and file_codec not in [c.lower() for c in target_codecs]:
-                            return (
-                                False,
-                                [{"id": "codec_target", "message": f"Codec '{file_codec}' not in target list — '{path}'"}],
-                                0,
-                                None,
-                            )
-                except (subprocess.SubprocessError, OSError, json.JSONDecodeError, ValueError) as e:
-                    self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, str(e))
-                except Exception as e:
-                    self.logger.debug("Codec pre-filter probe unexpected error for '%s': %s", path, str(e))
-        except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-            self.logger.debug("Codec pre-filter skipped for '%s': %s", path, str(e))
-        except Exception as e:
-            self.logger.debug("Codec pre-filter unexpected error for '%s': %s", path, str(e))
+        # Cheap checks run first: the .compressoignore lockfile read and the
+        # indexed failed-history lookup are near-free, while the codec
+        # pre-filter below can fork an ffprobe process per file.
 
         # Per-directory .compressoignore lockfile — users can opt files out
         # of processing without modifying server config.
@@ -156,7 +135,7 @@ class FileTest:
             )
             return_value = False
 
-        # Check if file has failed in history.
+        # Check if file has failed in history (indexed lookup — still cheap).
         if self.file_failed_in_history(path):
             file_issues.append(
                 {
@@ -165,6 +144,37 @@ class FileTest:
                 }
             )
             return_value = False
+
+        # Codec pre-filter (before plugins, for speed); uses the library codec
+        # configuration hoisted into __init__.
+        if return_value is None and (self.target_codecs or self.skip_codecs):
+            from compresso.libs.ffprobe_utils import extract_media_metadata
+
+            try:
+                meta = extract_media_metadata(path)
+                file_codec = meta.get("codec", "").lower()
+                # Strip "(estimated)" suffix from codec hint
+                if " (estimated)" in file_codec:
+                    file_codec = file_codec.replace(" (estimated)", "")
+                if file_codec:
+                    if self.skip_codecs and file_codec in self.skip_codecs:
+                        return (
+                            False,
+                            [{"id": "codec_skip", "message": f"Codec '{file_codec}' in skip list — '{path}'"}],
+                            0,
+                            None,
+                        )
+                    if self.target_codecs and file_codec not in self.target_codecs:
+                        return (
+                            False,
+                            [{"id": "codec_target", "message": f"Codec '{file_codec}' not in target list — '{path}'"}],
+                            0,
+                            None,
+                        )
+            except (subprocess.SubprocessError, OSError, json.JSONDecodeError, ValueError) as e:
+                self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, str(e))
+            except Exception as e:
+                self.logger.debug("Codec pre-filter probe unexpected error for '%s': %s", path, str(e))
 
         # Only run checks with plugins if other tests were not conclusive
         priority_score_modification = 0
