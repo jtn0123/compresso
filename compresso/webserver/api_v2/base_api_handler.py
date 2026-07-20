@@ -176,9 +176,9 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         from compresso import config
 
         settings = config.Config()
-        csrf_enabled = self._explicit_bool(settings.get_csrf_protection_enabled())
+        csrf_enabled = self._explicit_bool(settings.get_csrf_protection_enforced())
         csrf_cookie = self._ensure_csrf_cookie() if csrf_enabled else ""
-        api_auth_enabled = self._explicit_bool(settings.get_api_auth_enabled())
+        api_auth_enabled = self._explicit_bool(settings.get_api_auth_enforced())
         service_authenticated = api_auth_enabled and request_has_valid_api_token(
             self.request,
             settings.get_api_auth_token(),

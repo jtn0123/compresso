@@ -63,7 +63,7 @@ def request_has_valid_api_token(request, expected_token, *, allow_websocket_prot
 def authorize_request(handler, *, allow_websocket_protocol=False, allow_options=True):
     """Enforce optional API auth on any Tornado request handler."""
     settings = config.Config()
-    if not _explicit_bool(settings.get_api_auth_enabled()):
+    if not _explicit_bool(settings.get_api_auth_enforced()):
         return True
     if allow_options and handler.request.method == "OPTIONS":
         return True

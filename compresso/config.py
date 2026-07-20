@@ -156,7 +156,14 @@ class Config(metaclass=SingletonType):
         self.api_auth_enabled = False
         self.api_auth_token = ""
         self.csrf_protection_enabled = False
+        # When the UI listens on a non-loopback address, API auth and CSRF
+        # protection are force-enabled unless the operator explicitly opts out
+        # of authentication for network deployments with this flag.
+        self.allow_unauthenticated_network_access = False
         self.allow_lan_proxy_targets = True
+        # Optional containment roots for the UI file browser. When set, the
+        # /filebrowser API can only list paths under these directories.
+        self.browse_root_paths = []
 
         # Import env variables and override all previous settings.
         self.__import_settings_from_env()
@@ -191,15 +198,18 @@ class Config(metaclass=SingletonType):
         self.__ensure_api_auth_token()
 
     def __ensure_api_auth_token(self):
-        """Generate and persist a token when an operator enables auth without one."""
-        if not self.get_api_auth_enabled() or self.get_api_auth_token():
+        """Generate and persist a token when auth is enforced without one configured."""
+        if not self.get_api_auth_enforced() or self.get_api_auth_token():
             return
         self.api_auth_token = secrets.token_urlsafe(32)
         try:
             self.__write_settings_to_file()
         except Exception:
             logger.exception("Failed to persist generated API auth token to settings.json")
-        logger.warning("API authentication was enabled without a token; generated one in settings.json")
+        logger.warning(
+            "API authentication is enforced without a configured token; generated one in settings.json "
+            "(setting 'api_auth_token'). Use it to sign in when the UI prompts for an API token."
+        )
 
     def __apply_large_library_safe_defaults(self):
         if not self.get_large_library_safe_defaults():
@@ -706,6 +716,47 @@ class Config(metaclass=SingletonType):
 
     def get_csrf_protection_enabled(self):
         return _as_bool(self.csrf_protection_enabled)
+
+    def get_allow_unauthenticated_network_access(self):
+        return _as_bool(self.allow_unauthenticated_network_access)
+
+    def get_browse_root_paths(self):
+        """
+        Get setting - browse_root_paths
+
+        Accepts a list (settings.json) or a path-separator/comma separated
+        string (environment variable). An empty value means unrestricted.
+
+        :return: List of browse root path strings.
+        """
+        value = self.browse_root_paths
+        if not value:
+            return []
+        if isinstance(value, str):
+            separator = "," if "," in value else os.pathsep
+            value = value.split(separator)
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    def ui_listens_on_loopback(self):
+        """Whether the UI server binds only to a loopback interface."""
+        return str(self.ui_address).strip() in ("127.0.0.1", "::1", "localhost")
+
+    def _network_exposure_requires_auth(self):
+        return not self.ui_listens_on_loopback() and not self.get_allow_unauthenticated_network_access()
+
+    def get_api_auth_enforced(self):
+        """
+        Whether API authentication must be enforced for requests.
+
+        Secure-by-default posture: auth is enforced when the operator enabled
+        it explicitly, or whenever the UI is exposed beyond loopback without
+        an explicit unauthenticated-network opt-in.
+        """
+        return self.get_api_auth_enabled() or self._network_exposure_requires_auth()
+
+    def get_csrf_protection_enforced(self):
+        """Whether CSRF protection must be enforced for requests (see get_api_auth_enforced)."""
+        return self.get_csrf_protection_enabled() or self._network_exposure_requires_auth()
 
     def get_allow_lan_proxy_targets(self):
         return _as_bool(self.allow_lan_proxy_targets)

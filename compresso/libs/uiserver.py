@@ -178,7 +178,7 @@ class UIServer(threading.Thread):
         address = self.config.get_ui_address()
         loopback = address in ("127.0.0.1", "::1", "localhost")
         exposure = "loopback" if loopback else "network"
-        auth_enabled = self.config.get_api_auth_enabled()
+        auth_enabled = self.config.get_api_auth_enforced()
         auth_mode = "enabled" if auth_enabled else "disabled"
         StartupState().mark_ready(
             "ui_server_ready",

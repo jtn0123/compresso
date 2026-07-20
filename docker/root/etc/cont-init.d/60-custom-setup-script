@@ -50,13 +50,22 @@ run_plugin_init_script() {
     return "${status}"
 }
 
+# SECURITY: /config is owned by the (non-root) application user, but this init
+# stage runs as root. Sourcing /config/startup.sh unconditionally would let
+# anything able to write /config escalate to container root on the next start.
+# The operator must explicitly opt in via the container environment (which the
+# application cannot modify) by setting RUN_CUSTOM_STARTUP_SCRIPT=true.
 if [[ -f /config/startup.sh ]]; then
-    echo "**** (custom-setup-script) Calling custom user setup script ****"
-    sed -i 's/\r$//' /config/startup.sh
-    if [[ "${EUID}" -ne 0 ]]; then
-        warn_if_risky_nonroot "/config/startup.sh"
+    if [[ "${RUN_CUSTOM_STARTUP_SCRIPT,,}" == "true" ]]; then
+        echo "**** (custom-setup-script) Calling custom user setup script ****"
+        sed -i 's/\r$//' /config/startup.sh
+        if [[ "${EUID}" -ne 0 ]]; then
+            warn_if_risky_nonroot "/config/startup.sh"
+        fi
+        source /config/startup.sh
+    else
+        echo "**** (custom-setup-script) Ignoring /config/startup.sh (set RUN_CUSTOM_STARTUP_SCRIPT=true to enable) ****"
     fi
-    source /config/startup.sh
 fi
 
 for plugin_script in /config/.compresso/plugins/*/init.d/*.sh; do

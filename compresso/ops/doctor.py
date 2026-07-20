@@ -409,8 +409,8 @@ class DeploymentDoctor:
             )
 
     def _security_checks(self) -> list[CheckResult]:
-        auth_enabled = bool(self.settings.get_api_auth_enabled() and self.settings.get_api_auth_token())
-        csrf_enabled = bool(self.settings.get_csrf_protection_enabled())
+        auth_enabled = bool(self.settings.get_api_auth_enforced() and self.settings.get_api_auth_token())
+        csrf_enabled = bool(self.settings.get_csrf_protection_enforced())
         address = str(self.settings.get_ui_address() or "")
         exposed = address in {".".join(("0", "0", "0", "0")), "::", "*"}
         tls = bool(self.settings.get_ssl_enabled())

@@ -18,6 +18,9 @@ class _AuthSettings:
     def get_api_auth_enabled(self):
         return True
 
+    def get_api_auth_enforced(self):
+        return True
+
     def get_api_auth_token(self):
         return "secret"
 
@@ -139,6 +142,7 @@ class TestWebsocketRouteAuth(tornado.testing.AsyncHTTPTestCase):
     def setUp(self):
         settings = MagicMock()
         settings.get_api_auth_enabled.return_value = True
+        settings.get_api_auth_enforced.return_value = True
         settings.get_api_auth_token.return_value = "secret"
         self.config_patch = patch("compresso.config.Config", return_value=settings)
         self.config_patch.start()
