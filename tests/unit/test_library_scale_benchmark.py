@@ -82,6 +82,10 @@ def test_threshold_failures_enforces_throughput_floor():
     result["entries_per_second"] = 25
     assert threshold_failures(result, thresholds) == []
 
+    result["entries_per_second"] = "fast"
+    with pytest.raises(ValueError, match="entries_per_second is not numeric"):
+        threshold_failures(result, thresholds)
+
 
 @pytest.mark.unittest
 def test_empty_threshold_configuration_has_clear_error():
