@@ -18,9 +18,9 @@ from contextlib import contextmanager
 
 from compresso.config import Config
 from compresso.libs.ffprobe_utils import probe_file
+from compresso.libs.library_analysis import iter_media_files
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.healthstatus import HealthStatus
-from compresso.webserver.helpers.library_analysis import iter_media_files
 
 
 def _initial_scan_progress(library_id=None, max_workers=1):

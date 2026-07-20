@@ -246,8 +246,12 @@ class TaskQueue:
 
     def get_next_pending_tasks(self, local_only=False, library_names=None, library_tags=None):
         """
-        Fetch the next pending task.
-        Set that task status as 'in_progress' and then return it.
+        Fetch the next pending task and atomically claim it.
+
+        The claim flips the row to 'in_progress' with a conditional UPDATE so
+        two consumers polling concurrently can never both receive the same
+        still-'pending' task. A consumer that fails to hand the task off must
+        return it to 'pending' (see Foreman._find_and_assign_pending_task).
 
         :param local_only:
         :param library_names:
@@ -263,6 +267,20 @@ class TaskQueue:
             library_names=library_names,
             library_tags=library_tags,
         )
+        if not task_item:
+            return task_item
+        # Atomically claim the task. If another consumer claimed it between
+        # the fetch and this update, zero rows change and we report no task.
+        claimed = (
+            Tasks.update(status="in_progress")
+            .where((Tasks.id == task_item.get_task_id()) & (Tasks.status == "pending"))
+            .execute()
+        )
+        if not claimed:
+            self._log(f"Task {task_item.get_task_id()} was claimed by another consumer; skipping", level="debug")
+            return False
+        # Keep the in-memory model consistent with the claimed row
+        task_item.task.status = "in_progress"
         return task_item
 
     def get_next_processed_tasks(self):

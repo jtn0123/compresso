@@ -405,7 +405,7 @@ class ApiCompressionHandler(BaseApiHandler):
 
             validate_library_exists(library_id)
 
-            from compresso.webserver.helpers import library_analysis
+            from compresso.libs import library_analysis
 
             result = library_analysis.start_analysis(library_id)
 
@@ -455,7 +455,7 @@ class ApiCompressionHandler(BaseApiHandler):
             if not library_id:
                 raise ValueError("library_id is required")
 
-            from compresso.webserver.helpers import library_analysis
+            from compresso.libs import library_analysis
 
             result = library_analysis.get_analysis_status(library_id)
 

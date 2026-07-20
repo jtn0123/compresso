@@ -309,14 +309,14 @@ class TestStartLibraryAnalysisErrors(ApiTestBase):
         assert resp.code == 400
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch("compresso.webserver.helpers.library_analysis.start_analysis", side_effect=Exception("Thread crash"))
+    @patch("compresso.libs.library_analysis.start_analysis", side_effect=Exception("Thread crash"))
     def test_start_analysis_generic_exception_returns_500(self, _mock_start, _mock_validate):
         """Unhandled exception → 500 (lines 469-472)."""
         resp = self.post_json("/compression/library-analysis", {"library_id": 1})
         assert resp.code == 500
 
     @patch(VALIDATE_LIB, return_value=True)
-    @patch("compresso.webserver.helpers.library_analysis.start_analysis")
+    @patch("compresso.libs.library_analysis.start_analysis")
     def test_start_analysis_success(self, mock_start, _mock_validate):
         """Happy path returns 200 with status field."""
         mock_start.return_value = {"status": "running", "progress": {"checked": 0, "total": 100}}
@@ -342,25 +342,25 @@ class TestLibraryAnalysisStatusErrors(ApiTestBase):
         resp = self.post_json("/compression/library-analysis/status", {"library_id": 0})
         assert resp.code == 400
 
-    @patch("compresso.webserver.helpers.library_analysis.get_analysis_status", side_effect=ValueError("Bad id"))
+    @patch("compresso.libs.library_analysis.get_analysis_status", side_effect=ValueError("Bad id"))
     def test_get_analysis_status_value_error_returns_400(self, _mock_status):
         """ValueError from helper → 400 (lines 515-518)."""
         resp = self.post_json("/compression/library-analysis/status", {"library_id": 1})
         assert resp.code == 400
 
-    @patch("compresso.webserver.helpers.library_analysis.get_analysis_status", side_effect=BaseApiError("Access denied"))
+    @patch("compresso.libs.library_analysis.get_analysis_status", side_effect=BaseApiError("Access denied"))
     def test_get_analysis_status_base_api_error_returns_400(self, _mock_status):
         """BaseApiError → 400 (lines 519-523)."""
         resp = self.post_json("/compression/library-analysis/status", {"library_id": 1})
         assert resp.code == 400
 
-    @patch("compresso.webserver.helpers.library_analysis.get_analysis_status", side_effect=Exception("DB crash"))
+    @patch("compresso.libs.library_analysis.get_analysis_status", side_effect=Exception("DB crash"))
     def test_get_analysis_status_generic_exception_returns_500(self, _mock_status):
         """Unhandled exception → 500 (lines 524-527)."""
         resp = self.post_json("/compression/library-analysis/status", {"library_id": 1})
         assert resp.code == 500
 
-    @patch("compresso.webserver.helpers.library_analysis.get_analysis_status")
+    @patch("compresso.libs.library_analysis.get_analysis_status")
     def test_get_analysis_status_success(self, mock_status):
         """Happy path returns 200 with status/progress/version/results."""
         mock_status.return_value = {

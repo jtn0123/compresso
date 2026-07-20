@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from compresso.config import Config
+from compresso.libs import library_analysis
 from compresso.libs.json_state import atomic_json_write
-from compresso.webserver.helpers import library_analysis
 
 SCHEMA_VERSION = 1
 GIB = 1024**3

@@ -54,10 +54,8 @@ class TestFileTestCodecPreFilter:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         ft.file_failed_in_history = MagicMock(return_value=False)
 
-        mock_library = MagicMock()
-        mock_library.get_target_codecs.return_value = []
-        mock_library.get_skip_codecs.return_value = ["hevc"]
-        mock_lib_cls.return_value = mock_library
+        ft.target_codecs = []
+        ft.skip_codecs = ["hevc"]
 
         mock_meta.return_value = {"codec": "hevc"}
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/media/video.mp4")
@@ -71,10 +69,8 @@ class TestFileTestCodecPreFilter:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         ft.file_failed_in_history = MagicMock(return_value=False)
 
-        mock_library = MagicMock()
-        mock_library.get_target_codecs.return_value = ["h264"]
-        mock_library.get_skip_codecs.return_value = []
-        mock_lib_cls.return_value = mock_library
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
 
         mock_meta.return_value = {"codec": "hevc"}
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/media/video.mp4")
@@ -88,10 +84,8 @@ class TestFileTestCodecPreFilter:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         ft.file_failed_in_history = MagicMock(return_value=False)
 
-        mock_library = MagicMock()
-        mock_library.get_target_codecs.return_value = ["hevc"]
-        mock_library.get_skip_codecs.return_value = []
-        mock_lib_cls.return_value = mock_library
+        ft.target_codecs = ["hevc"]
+        ft.skip_codecs = []
 
         mock_meta.return_value = {"codec": "hevc"}
         # No plugins, so result should be None (no decision)
@@ -105,10 +99,8 @@ class TestFileTestCodecPreFilter:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         ft.file_failed_in_history = MagicMock(return_value=False)
 
-        mock_library = MagicMock()
-        mock_library.get_target_codecs.return_value = []
-        mock_library.get_skip_codecs.return_value = ["hevc"]
-        mock_lib_cls.return_value = mock_library
+        ft.target_codecs = []
+        ft.skip_codecs = ["hevc"]
 
         mock_meta.return_value = {"codec": "hevc (estimated)"}
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/media/video.mp4")
@@ -121,10 +113,8 @@ class TestFileTestCodecPreFilter:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         ft.file_failed_in_history = MagicMock(return_value=False)
 
-        mock_library = MagicMock()
-        mock_library.get_target_codecs.return_value = ["hevc"]
-        mock_library.get_skip_codecs.return_value = []
-        mock_lib_cls.return_value = mock_library
+        ft.target_codecs = ["hevc"]
+        ft.skip_codecs = []
 
         mock_meta.side_effect = Exception("probe failed")
         # Should continue without error
@@ -137,10 +127,8 @@ class TestFileTestCodecPreFilter:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         ft.file_failed_in_history = MagicMock(return_value=False)
 
-        mock_library = MagicMock()
-        mock_library.get_target_codecs.return_value = []
-        mock_library.get_skip_codecs.return_value = []
-        mock_lib_cls.return_value = mock_library
+        ft.target_codecs = []
+        ft.skip_codecs = []
 
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/media/video.mp4")
         assert result is None
@@ -159,10 +147,8 @@ class TestFileTestPluginExecFailure:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         ft.file_failed_in_history = MagicMock(return_value=False)
 
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = []
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_cls.return_value = mock_lib
+        ft.target_codecs = []
+        ft.skip_codecs = []
 
         mock_module = {"plugin_id": "test_plugin", "name": "Test Plugin"}
         ft.plugin_modules = [mock_module]
@@ -187,10 +173,8 @@ class TestFileTestBothFlags:
         ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=True)
         ft.file_failed_in_history = MagicMock(return_value=True)
 
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = []
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_cls.return_value = mock_lib
+        ft.target_codecs = []
+        ft.skip_codecs = []
 
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/media/video.mp4")
         assert result is False
@@ -278,3 +262,26 @@ class TestFileTesterThread:
 
         assert files_to_test.unfinished_tasks == 0
         assert not thread.is_alive()
+
+
+@pytest.mark.unittest
+class TestCodecProbeFailureArms:
+    @patch("compresso.libs.ffprobe_utils.extract_media_metadata", side_effect=OSError("probe io error"))
+    def test_known_probe_error_falls_through_to_plugins(self, mock_meta):
+        ft = _make_filetest()
+        ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
+        ft.file_failed_in_history = MagicMock(return_value=False)
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
+        result, _, _, _ = ft.should_file_be_added_to_task_list("/media/video.mkv")
+        assert result is None
+
+    @patch("compresso.libs.ffprobe_utils.extract_media_metadata", side_effect=RuntimeError("unexpected"))
+    def test_unexpected_probe_error_falls_through_to_plugins(self, mock_meta):
+        ft = _make_filetest()
+        ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
+        ft.file_failed_in_history = MagicMock(return_value=False)
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
+        result, _, _, _ = ft.should_file_be_added_to_task_list("/media/video.mkv")
+        assert result is None

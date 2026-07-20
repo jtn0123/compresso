@@ -265,6 +265,51 @@ class TestTaskQueue:
         assert result is not None
         assert result.library_id == second_library.id
 
+    @pytest.mark.unittest
+    def test_get_next_pending_tasks_atomically_claims_task(self):
+        self._create_task("/media/library/claim_me.mkv")
+        with patch("compresso.libs.taskqueue.CompressoLogging.get_logger"):
+            from compresso.libs.taskqueue import TaskQueue
+
+            queue = TaskQueue({})
+            claimed = queue.get_next_pending_tasks()
+
+        assert claimed is not False
+        assert claimed.task.status == "in_progress"
+        # The claim must be visible in the database, not just in memory
+        row = Tasks.get(Tasks.abspath == "/media/library/claim_me.mkv")
+        assert row.status == "in_progress"
+
+    @pytest.mark.unittest
+    def test_get_next_pending_tasks_reports_no_task_when_claim_lost(self):
+        row = self._create_task("/media/library/raced.mkv")
+        with patch("compresso.libs.taskqueue.CompressoLogging.get_logger"):
+            from compresso.libs import taskqueue as taskqueue_module
+            from compresso.libs.taskqueue import TaskQueue
+
+            queue = TaskQueue({})
+
+            real_fetch = taskqueue_module.fetch_next_task_filtered
+
+            def fetch_then_lose_race(*args, **kwargs):
+                task_item = real_fetch(*args, **kwargs)
+                # Another consumer claims the row between fetch and claim
+                Tasks.update(status="in_progress").where(Tasks.id == row.id).execute()
+                return task_item
+
+            with patch.object(taskqueue_module, "fetch_next_task_filtered", side_effect=fetch_then_lose_race):
+                claimed = queue.get_next_pending_tasks()
+
+        assert claimed is False
+
+    @pytest.mark.unittest
+    def test_get_next_pending_tasks_returns_false_when_queue_empty(self):
+        with patch("compresso.libs.taskqueue.CompressoLogging.get_logger"):
+            from compresso.libs.taskqueue import TaskQueue
+
+            queue = TaskQueue({})
+            assert queue.get_next_pending_tasks() is False
+
 
 if __name__ == "__main__":
     pytest.main(["-s", "--log-cli-level=INFO", __file__])

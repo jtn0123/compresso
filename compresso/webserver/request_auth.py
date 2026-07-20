@@ -4,9 +4,15 @@ import base64
 import hmac
 
 from compresso import config
+from compresso.libs.constants import API_AUTH_HEADER_NAME, WEBSOCKET_AUTH_PROTOCOL_PREFIX
 
-API_AUTH_HEADER_NAME = "X-Compresso-Api-Token"
-WEBSOCKET_AUTH_PROTOCOL_PREFIX = "compresso-auth."
+__all__ = [
+    "API_AUTH_HEADER_NAME",
+    "WEBSOCKET_AUTH_PROTOCOL_PREFIX",
+    "authorize_request",
+    "encode_websocket_token",
+    "request_has_valid_api_token",
+]
 
 
 def _explicit_bool(value):
@@ -63,7 +69,7 @@ def request_has_valid_api_token(request, expected_token, *, allow_websocket_prot
 def authorize_request(handler, *, allow_websocket_protocol=False, allow_options=True):
     """Enforce optional API auth on any Tornado request handler."""
     settings = config.Config()
-    if not _explicit_bool(settings.get_api_auth_enabled()):
+    if not _explicit_bool(settings.get_api_auth_enforced()):
         return True
     if allow_options and handler.request.method == "OPTIONS":
         return True

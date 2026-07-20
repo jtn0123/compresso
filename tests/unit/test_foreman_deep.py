@@ -331,7 +331,8 @@ class TestHandTaskToWorkersLocal:
 
         mock_item = MagicMock()
         result = foreman.hand_task_to_workers(mock_item, local=True, worker_id="w-0")
-        assert result is True  # Returns True but no task set
+        # Returns False so the caller reverts the claimed task to 'pending'
+        assert result is False
         mock_thread.set_task.assert_not_called()
 
     def test_does_not_run_events_for_remote_task(self):
@@ -633,3 +634,66 @@ class TestGetTagsConfiguredForWorker:
 
 if __name__ == "__main__":
     pytest.main(["-s", "--log-cli-level=INFO", __file__])
+
+
+# ==================================================================
+# Worker registry edge cases (registry lock paths)
+# ==================================================================
+
+
+@pytest.mark.unittest
+class TestWorkerRegistryEdgeCases:
+    def test_get_tags_raises_for_unregistered_worker(self):
+        foreman = _make_foreman()
+        foreman.worker_threads = {}
+        with pytest.raises(ValueError, match="no longer registered"):
+            foreman.get_tags_configured_for_worker("gone-0")
+
+    def test_pause_all_reports_failure_when_one_pause_fails(self):
+        foreman = _make_foreman()
+        mock_thread = MagicMock()
+        foreman.worker_threads = {"w-0": mock_thread}
+        foreman.pause_worker_thread = MagicMock(return_value=False)
+        assert foreman.pause_all_worker_threads() is False
+
+    def test_resume_worker_thread_missing_worker_returns_false(self):
+        foreman = _make_foreman()
+        foreman.safety_latched = False
+        foreman.worker_threads = {}
+        assert foreman.resume_worker_thread("gone-0") is False
+
+    def test_resume_all_reports_failure_when_one_resume_fails(self):
+        foreman = _make_foreman()
+        mock_thread = MagicMock()
+        foreman.worker_threads = {"w-0": mock_thread}
+        foreman.resume_worker_thread = MagicMock(return_value=False)
+        assert foreman.resume_all_worker_threads() is False
+
+    def test_terminate_all_reports_failure_when_one_terminate_fails(self):
+        foreman = _make_foreman()
+        mock_thread = MagicMock()
+        foreman.worker_threads = {"w-0": mock_thread}
+        foreman.terminate_worker_thread = MagicMock(return_value=False)
+        assert foreman.terminate_all_worker_threads() is False
+
+    def test_failed_hand_off_returns_claimed_task_to_pending(self):
+        foreman = _make_foreman()
+        foreman.task_queue.task_list_pending_is_empty.return_value = False
+        foreman.link_manager_tread_heartbeat = MagicMock()
+        foreman.postprocessor_queue_full = MagicMock(return_value=False)
+        foreman.check_for_idle_workers = MagicMock(return_value=True)
+        foreman.fetch_available_worker_ids = MagicMock(return_value=["w-0"])
+        foreman.get_tags_configured_for_worker = MagicMock(return_value=[])
+        foreman.hand_task_to_workers = MagicMock(return_value=False)
+
+        mock_item = MagicMock()
+        mock_item.get_source_abspath.return_value = "/media/file.mkv"
+        mock_item.get_task_library_name.return_value = "default"
+        mock_item.get_task_id.return_value = 7
+        foreman.task_queue.get_next_pending_tasks.return_value = mock_item
+
+        foreman._find_and_assign_pending_task(True)
+
+        # The atomically-claimed task must be reverted to 'pending' and requeued
+        mock_item.set_status.assert_called_once_with("pending")
+        foreman.task_queue.requeue_tasks_at_bottom.assert_called_once_with(7)

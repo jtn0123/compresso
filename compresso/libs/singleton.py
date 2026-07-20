@@ -44,4 +44,15 @@ class SingletonType(type):
             with lock:
                 if cls not in cls._instances:
                     cls._instances[cls] = super().__call__(*args, **kwargs)
+                    return cls._instances[cls]
+        if args or kwargs:
+            # Constructor arguments after the first instantiation would be
+            # silently dropped (e.g. Config(port=...) after an earlier bare
+            # Config()), making initialization order an invisible, load-bearing
+            # dependency. Fail loudly instead.
+            raise RuntimeError(
+                f"{cls.__name__} is a singleton and is already instantiated; "
+                "constructor arguments passed now would be ignored. "
+                "Construct it with arguments once, before any other use."
+            )
         return cls._instances[cls]

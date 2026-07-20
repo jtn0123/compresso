@@ -3,7 +3,7 @@
 """
 tests.unit.test_library_analysis_helpers.py
 
-Comprehensive unit tests for compresso/webserver/helpers/library_analysis.py.
+Comprehensive unit tests for compresso/libs/library_analysis.py.
 Targets uncovered lines 105-286 and 294-329 (the _run_analysis background
 worker and the _get_historical_savings DB query).
 """
@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-ANALYSIS_MODULE = "compresso.webserver.helpers.library_analysis"
+ANALYSIS_MODULE = "compresso.libs.library_analysis"
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ class TestRunAnalysisFileWalking:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """A single .mkv file is probed and ends up in one result group."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["movie.mkv"])]
         mock_getsize.return_value = 1_000_000_000
@@ -75,7 +75,7 @@ class TestRunAnalysisFileWalking:
     @patch("os.walk")
     def test_non_media_files_are_skipped(self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model):
         """Files with non-media extensions must not be probed."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["notes.txt", "cover.jpg", "movie.mkv"])]
         mock_getsize.return_value = 500_000_000
@@ -101,7 +101,7 @@ class TestRunAnalysisFileWalking:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """All 14 recognised media extensions must be picked up."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         media_files = [
             "a.mp4",
@@ -143,7 +143,7 @@ class TestRunAnalysisFileWalking:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """An empty library dir results in total=0 and complete status."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], [])]
         mock_hist.return_value = {}
@@ -167,7 +167,7 @@ class TestRunAnalysisFileWalking:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """'(estimated)' suffix should be stripped from codec names."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["file.mkv"])]
         mock_getsize.return_value = 100_000
@@ -201,7 +201,7 @@ class TestRunAnalysisFileWalking:
     ):
         """A file that raises during metadata extraction is skipped but
         progress.checked still advances."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["bad.mkv", "good.mkv"])]
         mock_getsize.return_value = 500_000
@@ -227,7 +227,7 @@ class TestRunAnalysisFileWalking:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """Three files with the same (codec, resolution) share one group."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["a.mkv", "b.mkv", "c.mkv"])]
         mock_getsize.return_value = 1_000_000
@@ -270,7 +270,7 @@ class TestRunAnalysisBitrate:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """When probe_data provides bit_rate, avg_bitrate_mbps should be set."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["movie.mp4"])]
         mock_getsize.return_value = 1_000_000_000
@@ -301,7 +301,7 @@ class TestRunAnalysisBitrate:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """When probe_data has duration but no bit_rate, derive from size."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         file_size = 500_000_000  # bytes
         duration = 100.0  # seconds
@@ -336,7 +336,7 @@ class TestRunAnalysisBitrate:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """A probe exception must not crash the analysis; bitrate stays 0."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["movie.mp4"])]
         mock_getsize.return_value = 200_000_000
@@ -368,7 +368,7 @@ class TestRunAnalysisBitrate:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """When probe returns duration=0, bitrate should remain 0."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["movie.mp4"])]
         mock_getsize.return_value = 100_000_000
@@ -413,7 +413,7 @@ class TestRunAnalysisSkipCodecs:
     ):
         """Files whose codec is in skip_codecs must have confidence='optimal'
         and zero estimated savings."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["movie.mkv"])]
         mock_getsize.return_value = 2_000_000_000
@@ -449,7 +449,7 @@ class TestRunAnalysisSkipCodecs:
     ):
         """If Library.get_skip_codecs() raises, the list should default to []
         and analysis should still complete successfully."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["movie.mkv"])]
         mock_getsize.return_value = 1_000_000
@@ -483,7 +483,7 @@ class TestRunAnalysisAggregation:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """total_files and total_size_bytes must aggregate across all groups."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         files = ["a.mkv", "b.mkv", "c.mp4"]
         mock_walk.return_value = [("/media", [], files)]
@@ -521,7 +521,7 @@ class TestRunAnalysisAggregation:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """Result groups should be sorted with highest estimated savings first."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["a.mkv", "b.mp4"])]
         mock_getsize.return_value = 1_000_000_000
@@ -559,7 +559,7 @@ class TestRunAnalysisAggregation:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """results['last_run'] must be a parseable ISO-8601 datetime string."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], [])]
         mock_hist.return_value = {}
@@ -589,7 +589,7 @@ class TestRunAnalysisAggregation:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """estimated_savings_bytes should reflect historical savings percentage."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         file_size = 1_000_000_000  # 1 GB
         savings_pct = 40.0
@@ -635,7 +635,7 @@ class TestRunAnalysisCachePersistence:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """get_or_create is called exactly once with library_id and defaults."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], [])]
         mock_hist.return_value = {}
@@ -661,7 +661,7 @@ class TestRunAnalysisCachePersistence:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """When created=False the existing record's fields are updated and saved."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], [])]
         mock_hist.return_value = {}
@@ -687,7 +687,7 @@ class TestRunAnalysisCachePersistence:
         self, mock_walk, mock_getsize, mock_meta, mock_hist, mock_lib_cls, mock_cache_model
     ):
         """file_count on the existing cache record is set to total_files."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.return_value = [("/media", [], ["a.mkv", "b.mkv"])]
         mock_getsize.return_value = 100_000
@@ -721,7 +721,7 @@ class TestIncrementalAnalysisMetadata:
         return_value=({"codec": "h264", "resolution": "1080p", "file_size": 100, "bitrate_mbps": 1.5}, ("fp", "algo")),
     )
     def test_unchanged_file_uses_cached_metadata(self, _mock_cached, mock_persist, mock_probe):
-        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+        from compresso.libs.library_analysis import _analyse_file_incremental
 
         result = _analyse_file_incremental("/media/unchanged.mkv")
 
@@ -734,7 +734,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + ".os.stat")
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_unchanged_file_renews_generation_marker(self, mock_paths, mock_stat, mock_persist, mock_probe):
-        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+        from compresso.libs.library_analysis import _analyse_file_incremental
 
         mock_stat.return_value = MagicMock(st_size=100, st_mtime_ns=200, st_dev=3, st_ino=4)
         cached_entry = {
@@ -766,7 +766,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + "._persist_analysis_file")
     @patch(ANALYSIS_MODULE + "._cached_analysis_file", return_value=(None, ("fp-new", "algo")))
     def test_changed_file_probes_and_persists_metadata(self, _mock_cached, mock_persist, mock_probe):
-        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+        from compresso.libs.library_analysis import _analyse_file_incremental
 
         entry = {"codec": "hevc", "resolution": "4k", "file_size": 200, "bitrate_mbps": 2.5}
         mock_probe.return_value = entry
@@ -783,7 +783,7 @@ class TestIncrementalAnalysisMetadata:
         return_value={"codec": "h264", "resolution": "1080p", "duration": 120, "bitrate_mbps": 8},
     )
     def test_probe_analysis_reuses_metadata_probe_for_bitrate(self, mock_extract, _mock_size):
-        from compresso.webserver.helpers.library_analysis import _probe_analysis_file
+        from compresso.libs.library_analysis import _probe_analysis_file
 
         result = _probe_analysis_file("/media/movie.mkv")
 
@@ -797,7 +797,7 @@ class TestIncrementalAnalysisMetadata:
         return_value={"codec": "h264", "resolution": "1080p", "duration": 120, "bitrate_mbps": 8},
     )
     def test_probe_analysis_tolerates_stat_failure(self, _mock_extract, _mock_size, _mock_stat):
-        from compresso.webserver.helpers.library_analysis import _probe_analysis_file
+        from compresso.libs.library_analysis import _probe_analysis_file
 
         result = _probe_analysis_file("/media/unstatable.mkv")
 
@@ -808,7 +808,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + "._persist_analysis_file")
     @patch(ANALYSIS_MODULE + "._cached_analysis_file", return_value=(None, ("fp-new", "algo")))
     def test_changed_file_marks_current_analysis_generation(self, _mock_cached, mock_persist, mock_probe):
-        from compresso.webserver.helpers.library_analysis import _analyse_file_incremental
+        from compresso.libs.library_analysis import _analyse_file_incremental
 
         entry = {"codec": "hevc", "resolution": "4k", "file_size": 200, "bitrate_mbps": 2.5}
         mock_probe.return_value = entry
@@ -821,7 +821,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_missing_cache_path_falls_back_to_fingerprint(self, mock_paths, mock_fingerprint):
-        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+        from compresso.libs.library_analysis import _cached_analysis_file
 
         mock_paths.get_or_none.return_value = None
 
@@ -834,7 +834,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_incomplete_cached_entry_falls_back_to_fingerprint(self, mock_paths, mock_fingerprint):
-        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+        from compresso.libs.library_analysis import _cached_analysis_file
 
         row = MagicMock()
         row.file_metadata.metadata_json = json.dumps({"_compresso_library_analysis": {"codec": "h264", "resolution": "1080p"}})
@@ -849,7 +849,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + ".common.get_file_fingerprint", return_value=("fp", "algo"))
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_corrupt_metadata_json_falls_back_to_reprobe(self, mock_paths, _mock_fingerprint):
-        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+        from compresso.libs.library_analysis import _cached_analysis_file
 
         row = MagicMock()
         row.file_metadata.fingerprint = "fp"
@@ -865,7 +865,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + ".os.stat")
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_matching_file_identity_skips_content_hash(self, mock_paths, mock_stat, mock_fingerprint):
-        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+        from compresso.libs.library_analysis import _cached_analysis_file
 
         mock_stat.return_value = MagicMock(st_size=100, st_mtime_ns=200, st_dev=3, st_ino=4)
         row = MagicMock()
@@ -897,7 +897,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + ".os.stat")
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_changed_file_identity_defers_to_content_hash(self, mock_paths, mock_stat, mock_fingerprint):
-        from compresso.webserver.helpers.library_analysis import _cached_analysis_file
+        from compresso.libs.library_analysis import _cached_analysis_file
 
         mock_stat.return_value = MagicMock(st_size=101, st_mtime_ns=201, st_dev=3, st_ino=4)
         row = MagicMock()
@@ -926,7 +926,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + "._path_is_within", side_effect=lambda path, _root: path.startswith("/media/"))
     @patch(ANALYSIS_MODULE + ".FileMetadataPaths")
     def test_generation_cleanup_removes_only_stale_paths_in_library(self, mock_paths, _mock_within):
-        from compresso.webserver.helpers.library_analysis import _cleanup_stale_analysis_paths
+        from compresso.libs.library_analysis import _cleanup_stale_analysis_paths
 
         stale = MagicMock(id=1, path="/media/stale.mkv")
         outside = MagicMock(id=2, path="/other/keep.mkv")
@@ -940,7 +940,7 @@ class TestIncrementalAnalysisMetadata:
     @patch(ANALYSIS_MODULE + ".os.path.realpath", return_value="/media/a.mkv")
     @patch(ANALYSIS_MODULE + ".os.path.commonpath", side_effect=ValueError("different drives"))
     def test_path_scope_check_rejects_incomparable_paths(self, _mock_commonpath, _mock_realpath):
-        from compresso.webserver.helpers.library_analysis import _path_is_within
+        from compresso.libs.library_analysis import _path_is_within
 
         assert _path_is_within("/media/a.mkv", "/media") is False
 
@@ -960,7 +960,7 @@ class TestRunAnalysisErrorHandling:
     @patch("os.walk")
     def test_unexpected_exception_sets_error_status(self, mock_walk, mock_hist, mock_lib_cls, mock_cache_model):
         """An unhandled exception during analysis must set status='error'."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.side_effect = PermissionError("no access")
 
@@ -976,7 +976,7 @@ class TestRunAnalysisErrorHandling:
     @patch("os.walk")
     def test_error_info_contains_exception_message(self, mock_walk, mock_hist, mock_lib_cls, mock_cache_model):
         """info['error'] must contain the exception message string."""
-        from compresso.webserver.helpers.library_analysis import _run_analysis
+        from compresso.libs.library_analysis import _run_analysis
 
         mock_walk.side_effect = ValueError("something broke badly")
 
@@ -992,7 +992,7 @@ class TestRunAnalysisErrorHandling:
     @patch("os.walk")
     def test_cleanup_thread_is_started_after_completion(self, mock_walk, mock_hist, mock_lib_cls, mock_cache_model):
         """The finally block must spawn a cleanup daemon thread."""
-        from compresso.webserver.helpers import library_analysis
+        from compresso.libs import library_analysis
 
         mock_walk.return_value = [("/media", [], [])]
         mock_hist.return_value = {}
@@ -1060,7 +1060,7 @@ class TestGetHistoricalSavings:
     @patch(ANALYSIS_MODULE + ".CompressionStats")
     def test_returns_empty_dict_on_db_exception(self, mock_stats_model):
         """A DB error must be swallowed and return {}."""
-        from compresso.webserver.helpers.library_analysis import _get_historical_savings
+        from compresso.libs.library_analysis import _get_historical_savings
 
         mock_stats_model.select.side_effect = Exception("connection lost")
         result = _get_historical_savings()
@@ -1068,7 +1068,7 @@ class TestGetHistoricalSavings:
 
     def test_savings_pct_calculated_correctly(self):
         """savings_pct = ((avg_source - avg_dest) / avg_source) * 100."""
-        from compresso.webserver.helpers.library_analysis import _get_historical_savings
+        from compresso.libs.library_analysis import _get_historical_savings
 
         rows = [
             {
@@ -1091,7 +1091,7 @@ class TestGetHistoricalSavings:
 
     def test_codec_lowercased_in_result_key(self):
         """Codec names from the DB should be normalised to lowercase."""
-        from compresso.webserver.helpers.library_analysis import _get_historical_savings
+        from compresso.libs.library_analysis import _get_historical_savings
 
         rows = [
             {
@@ -1111,7 +1111,7 @@ class TestGetHistoricalSavings:
 
     def test_row_with_zero_avg_source_is_excluded(self):
         """Rows where avg_source=0 must be silently skipped."""
-        from compresso.webserver.helpers.library_analysis import _get_historical_savings
+        from compresso.libs.library_analysis import _get_historical_savings
 
         rows = [
             {
@@ -1131,7 +1131,7 @@ class TestGetHistoricalSavings:
 
     def test_row_with_zero_count_is_excluded(self):
         """Rows where cnt=0 must be silently skipped."""
-        from compresso.webserver.helpers.library_analysis import _get_historical_savings
+        from compresso.libs.library_analysis import _get_historical_savings
 
         rows = [
             {
@@ -1151,7 +1151,7 @@ class TestGetHistoricalSavings:
 
     def test_multiple_rows_produce_multiple_entries(self):
         """Two rows with different (codec, resolution) produce two entries."""
-        from compresso.webserver.helpers.library_analysis import _get_historical_savings
+        from compresso.libs.library_analysis import _get_historical_savings
 
         rows = [
             {
@@ -1180,7 +1180,7 @@ class TestGetHistoricalSavings:
 
     def test_none_codec_resolved_to_empty_string(self):
         """A NULL source_codec (None) in the DB should become an empty string key."""
-        from compresso.webserver.helpers.library_analysis import _get_historical_savings
+        from compresso.libs.library_analysis import _get_historical_savings
 
         rows = [
             {
@@ -1210,7 +1210,7 @@ class TestLookupSavingsEdgeCases:
 
     def test_fallback_codec_low_confidence_when_total_count_lt_5(self):
         """Codec-only fallback with <5 total samples is 'low' confidence."""
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {
             ("vp9", "1280x720"): {"avg_savings_pct": 30.0, "count": 2},
@@ -1223,7 +1223,7 @@ class TestLookupSavingsEdgeCases:
 
     def test_exact_match_boundary_at_count_5_is_medium(self):
         """Exactly 5 samples → medium confidence."""
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {("av1", "1920x1080"): {"avg_savings_pct": 55.0, "count": 5}}
         _, _, confidence = _lookup_savings(historical, "av1", "1920x1080")
@@ -1231,7 +1231,7 @@ class TestLookupSavingsEdgeCases:
 
     def test_exact_match_boundary_at_count_20_is_high(self):
         """Exactly 20 samples → high confidence."""
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {("av1", "1920x1080"): {"avg_savings_pct": 55.0, "count": 20}}
         _, _, confidence = _lookup_savings(historical, "av1", "1920x1080")
@@ -1239,7 +1239,7 @@ class TestLookupSavingsEdgeCases:
 
     def test_fallback_weighted_average_correctness(self):
         """Codec-only fallback must weight by sample count."""
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {
             ("h264", "480p"): {"avg_savings_pct": 10.0, "count": 10},  # 100 total
@@ -1252,7 +1252,7 @@ class TestLookupSavingsEdgeCases:
 
     def test_empty_historical_returns_none_confidence(self):
         """_lookup_savings on an empty dict must return (0, 0, 'none')."""
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         pct, count, confidence = _lookup_savings({}, "h264", "1920x1080")
         assert (pct, count, confidence) == (0, 0, "none")
@@ -1269,7 +1269,7 @@ class TestGetAnalysisStatusEdgeCases:
     @patch(ANALYSIS_MODULE + ".LibraryAnalysisCache")
     def test_invalid_json_in_cache_returns_empty_results(self, mock_cache_model):
         """Corrupt analysis_json should be silently replaced with {}."""
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         mock_cache = MagicMock()
         mock_cache.analysis_json = "NOT-VALID-JSON{{{"
@@ -1285,7 +1285,7 @@ class TestGetAnalysisStatusEdgeCases:
     @patch(ANALYSIS_MODULE + ".LibraryAnalysisCache")
     def test_none_analysis_json_returns_empty_results(self, mock_cache_model):
         """None analysis_json (e.g. NULL in DB) must not raise."""
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         mock_cache = MagicMock()
         mock_cache.analysis_json = None

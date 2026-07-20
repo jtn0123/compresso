@@ -146,3 +146,87 @@ class TestStructuredApiErrors:
         assert response["error"] == "500: Internal server error"
         assert response["error_id"] == "legacy500"
         assert "password" not in str(response)
+
+
+@pytest.mark.unittest
+class TestRouteBodyOffload:
+    """Tests for the _invoke_route offload / deferred-finish mechanism."""
+
+    def _make_offload_handler(self):
+        handler = BaseApiHandler.__new__(BaseApiHandler)
+        handler.error_messages = {}
+        handler.route = {}
+        handler._finished = False
+        handler.application = MagicMock(settings={})
+        handler.calls = []
+        return handler
+
+    def test_sync_route_body_is_offloaded_and_finish_deferred(self):
+        handler = self._make_offload_handler()
+        finished_chunks = []
+
+        def fake_super_finish(chunk=None):
+            finished_chunks.append(chunk)
+            handler._finished = True
+
+        def sync_body():
+            # finish() during the offloaded body must only be recorded
+            handler.calls.append("body")
+            handler.finish({"success": True})
+            assert handler._finish_deferred is True
+            assert handler._finished is False
+
+        handler.sync_body = sync_body
+        with patch.object(BaseApiHandler.__bases__[1], "finish", side_effect=fake_super_finish, autospec=False):
+            asyncio.run(handler._invoke_route({"call_method": "sync_body"}))
+
+        assert handler.calls == ["body"]
+        # The real finish happened exactly once, back on the caller, with the chunk
+        assert finished_chunks == [{"success": True}]
+        assert handler._finish_deferred is False
+
+    def test_run_on_ioloop_route_is_not_offloaded(self):
+        handler = self._make_offload_handler()
+
+        async def loop_body():
+            handler.calls.append("loop-body")
+            # Not deferred: finish() should go straight through
+            assert getattr(handler, "_defer_finish", False) is False
+
+        handler.loop_body = loop_body
+        asyncio.run(handler._invoke_route({"call_method": "loop_body", "run_on_ioloop": True}))
+        assert handler.calls == ["loop-body"]
+
+    def test_offload_disabled_per_handler_runs_on_loop(self):
+        handler = self._make_offload_handler()
+        handler.offload_route_bodies = False
+
+        async def loop_body():
+            handler.calls.append("no-offload")
+            assert getattr(handler, "_defer_finish", False) is False
+
+        handler.loop_body = loop_body
+        asyncio.run(handler._invoke_route({"call_method": "loop_body"}))
+        assert handler.calls == ["no-offload"]
+
+    def test_error_after_deferred_finish_does_not_double_respond(self):
+        handler = self._make_offload_handler()
+        finished_chunks = []
+
+        def fake_super_finish(chunk=None):
+            finished_chunks.append(chunk)
+            handler._finished = True
+
+        def sync_body():
+            handler.finish({"success": True})
+            raise RuntimeError("late failure after response was produced")
+
+        handler.sync_body = sync_body
+        with (
+            patch.object(BaseApiHandler.__bases__[1], "finish", side_effect=fake_super_finish, autospec=False),
+            patch(f"{BASE_API}.tornado.log.app_log.exception"),
+        ):
+            asyncio.run(handler._invoke_route({"call_method": "sync_body"}))
+
+        # The deferred success response is delivered once; the late error is logged only
+        assert finished_chunks == [{"success": True}]

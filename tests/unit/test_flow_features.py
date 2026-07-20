@@ -305,6 +305,8 @@ class TestCodecPreFilter:
             ft.plugin_handler = MagicMock()
             ft.plugin_modules = []
             ft.failed_paths = []
+            ft.target_codecs = []
+            ft.skip_codecs = []
             ft.file_failed_in_history = MagicMock(return_value=False)
             ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
         return ft
@@ -313,14 +315,11 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_skip_codec_returns_false(self, mock_lib_class, mock_extract):
         """File with codec in skip list should be rejected."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = []
-        mock_lib.get_skip_codecs.return_value = ["hevc", "av1"]
-        mock_lib_class.return_value = mock_lib
-
         mock_extract.return_value = {"codec": "hevc", "resolution": "1080p", "container": "mkv"}
 
         ft = self._make_filetest()
+        ft.target_codecs = []
+        ft.skip_codecs = ["hevc", "av1"]
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         assert result is False
         assert any(i["id"] == "codec_skip" for i in issues)
@@ -329,14 +328,11 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_target_codec_not_matched_returns_false(self, mock_lib_class, mock_extract):
         """File with codec NOT in target list should be rejected."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = ["h264", "mpeg4"]
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_class.return_value = mock_lib
-
         mock_extract.return_value = {"codec": "hevc", "resolution": "1080p", "container": "mkv"}
 
         ft = self._make_filetest()
+        ft.target_codecs = ["h264", "mpeg4"]
+        ft.skip_codecs = []
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         assert result is False
         assert any(i["id"] == "codec_target" for i in issues)
@@ -345,14 +341,11 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_target_codec_matched_continues(self, mock_lib_class, mock_extract):
         """File with codec in target list should NOT be rejected by the filter."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = ["h264"]
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_class.return_value = mock_lib
-
         mock_extract.return_value = {"codec": "h264", "resolution": "1080p", "container": "mkv"}
 
         ft = self._make_filetest()
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
         # With no plugins configured, the result should be None (no decision)
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         # Not rejected by codec filter — result depends on plugins (None = no decision)
@@ -362,12 +355,9 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_no_codecs_configured_passes_through(self, mock_lib_class, mock_extract):
         """When no target/skip codecs configured, filter is skipped entirely."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = []
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_class.return_value = mock_lib
-
         ft = self._make_filetest()
+        ft.target_codecs = []
+        ft.skip_codecs = []
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         # extract_media_metadata should not even be called
         mock_extract.assert_not_called()
@@ -377,14 +367,11 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_codec_filter_case_insensitive(self, mock_lib_class, mock_extract):
         """Codec comparison should be case-insensitive."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = ["H264"]
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_class.return_value = mock_lib
-
         mock_extract.return_value = {"codec": "h264", "resolution": "1080p", "container": "mkv"}
 
         ft = self._make_filetest()
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
         result, _, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         # Should pass — h264 matches H264 case-insensitively
         assert result is None
@@ -393,14 +380,11 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_estimated_codec_stripped(self, mock_lib_class, mock_extract):
         """Estimated codec hint (e.g. 'h264 (estimated)') should have suffix stripped."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = []
-        mock_lib.get_skip_codecs.return_value = ["h264"]
-        mock_lib_class.return_value = mock_lib
-
         mock_extract.return_value = {"codec": "h264 (estimated)", "resolution": "", "container": "mp4"}
 
         ft = self._make_filetest()
+        ft.target_codecs = []
+        ft.skip_codecs = ["h264"]
         result, issues, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mp4")
         assert result is False
         assert any(i["id"] == "codec_skip" for i in issues)
@@ -409,19 +393,30 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_probe_failure_falls_through(self, mock_lib_class, mock_extract):
         """If ffprobe fails, the file should fall through to plugins."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = ["h264"]
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_class.return_value = mock_lib
-
         ft = self._make_filetest()
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
         result, _, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         assert result is None  # Falls through to plugin loop
 
     @patch("compresso.libs.library.Library", side_effect=Exception("no library"))
     def test_library_lookup_failure_falls_through(self, mock_lib_class):
-        """If Library() raises, the file should fall through to normal flow."""
-        ft = self._make_filetest()
+        """If Library() raises during construction, codec filters stay empty and
+        the file falls through to the normal flow."""
+        with (
+            patch("compresso.libs.filetest.config.Config"),
+            patch("compresso.libs.filetest.CompressoLogging") as mock_logging,
+            patch("compresso.libs.filetest.PluginsHandler") as mock_ph,
+        ):
+            mock_logging.get_logger.return_value = MagicMock()
+            mock_ph.return_value.get_enabled_plugin_modules_by_type.return_value = []
+            from compresso.libs.filetest import FileTest
+
+            ft = FileTest(library_id=1)
+        ft.file_failed_in_history = MagicMock(return_value=False)
+        ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
+        assert ft.target_codecs == []
+        assert ft.skip_codecs == []
         result, _, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         assert result is None
 
@@ -429,14 +424,11 @@ class TestCodecPreFilter:
     @patch("compresso.libs.library.Library")
     def test_empty_codec_in_metadata_falls_through(self, mock_lib_class, mock_extract):
         """If extracted codec is empty, codec filter should not reject."""
-        mock_lib = MagicMock()
-        mock_lib.get_target_codecs.return_value = ["h264"]
-        mock_lib.get_skip_codecs.return_value = []
-        mock_lib_class.return_value = mock_lib
-
         mock_extract.return_value = {"codec": "", "resolution": "", "container": "mkv"}
 
         ft = self._make_filetest()
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
         result, _, _, _ = ft.should_file_be_added_to_task_list("/test/movie.mkv")
         # Empty codec should not match target filter — falls through
         assert result is None
@@ -769,7 +761,7 @@ class TestLibraryAnalysisLookupSavings:
     """Tests for library_analysis._lookup_savings()."""
 
     def _call(self, historical, codec, resolution):
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         return _lookup_savings(historical, codec, resolution)
 
@@ -838,34 +830,34 @@ class TestLibraryAnalysisLookupSavings:
 class TestLibraryAnalysisGetStatus:
     """Tests for library_analysis.get_analysis_status()."""
 
-    @patch("compresso.webserver.helpers.library_analysis.LibraryAnalysisCache")
-    @patch("compresso.webserver.helpers.library_analysis._active_analyses", {})
+    @patch("compresso.libs.library_analysis.LibraryAnalysisCache")
+    @patch("compresso.libs.library_analysis._active_analyses", {})
     def test_no_cache_returns_none_status(self, mock_cache_class):
         mock_cache_class.get_or_none.return_value = None
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         result = get_analysis_status(99)
         assert result["status"] == "none"
         assert result["results"] is None
 
-    @patch("compresso.webserver.helpers.library_analysis.LibraryAnalysisCache")
-    @patch("compresso.webserver.helpers.library_analysis._active_analyses", {})
+    @patch("compresso.libs.library_analysis.LibraryAnalysisCache")
+    @patch("compresso.libs.library_analysis._active_analyses", {})
     def test_cached_result_returned(self, mock_cache_class):
         mock_cache = MagicMock()
         mock_cache.analysis_json = json.dumps({"groups": [], "total_files": 10})
         mock_cache.file_count = 10
         mock_cache.version = 3
         mock_cache_class.get_or_none.return_value = mock_cache
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         result = get_analysis_status(1)
         assert result["status"] == "complete"
         assert result["version"] == 3
         assert result["results"]["total_files"] == 10
 
-    @patch("compresso.webserver.helpers.library_analysis.LibraryAnalysisCache")
+    @patch("compresso.libs.library_analysis.LibraryAnalysisCache")
     def test_running_analysis_returns_progress(self, mock_cache_class):
-        from compresso.webserver.helpers import library_analysis
+        from compresso.libs import library_analysis
 
         # Manually inject a running analysis
         old = dict(library_analysis._active_analyses)
@@ -881,15 +873,15 @@ class TestLibraryAnalysisGetStatus:
             library_analysis._active_analyses.clear()
             library_analysis._active_analyses.update(old)
 
-    @patch("compresso.webserver.helpers.library_analysis.LibraryAnalysisCache")
-    @patch("compresso.webserver.helpers.library_analysis._active_analyses", {})
+    @patch("compresso.libs.library_analysis.LibraryAnalysisCache")
+    @patch("compresso.libs.library_analysis._active_analyses", {})
     def test_malformed_cache_json_returns_empty(self, mock_cache_class):
         mock_cache = MagicMock()
         mock_cache.analysis_json = "not valid json"
         mock_cache.file_count = 0
         mock_cache.version = 1
         mock_cache_class.get_or_none.return_value = mock_cache
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         result = get_analysis_status(1)
         assert result["status"] == "complete"
@@ -930,7 +922,7 @@ class TestAnalysisApiEndpoints:
             test.tearDown()
 
     @patch("compresso.webserver.api_v2.compression_api.validate_library_exists", return_value=True)
-    @patch("compresso.webserver.helpers.library_analysis.start_analysis")
+    @patch("compresso.libs.library_analysis.start_analysis")
     def test_start_analysis_success(self, mock_start, _mock_validate):
         mock_start.return_value = {"status": "running", "progress": {"checked": 0, "total": 100}}
         test = self._AnalysisApiTest("runTest")
@@ -944,7 +936,7 @@ class TestAnalysisApiEndpoints:
             test.tearDown()
 
     @patch("compresso.webserver.api_v2.compression_api.validate_library_exists", return_value=True)
-    @patch("compresso.webserver.helpers.library_analysis.get_analysis_status")
+    @patch("compresso.libs.library_analysis.get_analysis_status")
     def test_get_analysis_status_success(self, mock_status, _mock_validate):
         mock_status.return_value = {
             "status": "complete",

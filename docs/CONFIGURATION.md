@@ -15,6 +15,11 @@
 | `PORT` | `8888` | Override the web UI / API port (forwarded to `--port` CLI arg) |
 | `HOME_DIR` | `~` (source), `/config` (Docker) | Override the home directory used to resolve `~/.compresso/` paths |
 | `ui_address` | `127.0.0.1` | Listen address. Container deployments must set `0.0.0.0`; source installs default to loopback for safety. |
+| `api_auth_enabled` | `false` | Explicitly enable API token authentication. Auth is force-enabled whenever `ui_address` is non-loopback unless `allow_unauthenticated_network_access=true`. A token is generated into `settings.json` (`api_auth_token`) on first enforced start. |
+| `csrf_protection_enabled` | `false` | Explicitly enable CSRF double-submit protection. Force-enabled on non-loopback deployments unless `allow_unauthenticated_network_access=true`. |
+| `allow_unauthenticated_network_access` | `false` | Opt out of the automatic auth/CSRF enforcement on non-loopback deployments. Not recommended. |
+| `browse_root_paths` | unset | Optional comma-separated list of directories the UI file browser is contained to. Unset means unrestricted browsing (behind API auth). |
+| `RUN_CUSTOM_STARTUP_SCRIPT` | unset | Set to `true` to allow the container init to source `/config/startup.sh` as root at startup. Disabled by default to prevent privilege escalation from the `/config` volume. |
 
 ## Volume Mounts
 

@@ -33,7 +33,6 @@ export default defineConfig({
       pages: path.resolve(__dirname, 'src/pages'),
       assets: path.resolve(__dirname, 'src/assets'),
       boot: path.resolve(__dirname, 'src/boot'),
-      stores: path.resolve(__dirname, 'src/stores'),
     },
   },
 })

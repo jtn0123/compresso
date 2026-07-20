@@ -40,21 +40,52 @@ def fetch_windows_drives():
     return [f"{d}:" for d in string.ascii_uppercase if os.path.exists(f"{d}:")]
 
 
+def _configured_browse_roots():
+    """Return the canonical, existing browse containment roots (may be empty)."""
+    from compresso import config
+
+    roots = []
+    for root in config.Config().get_browse_root_paths():
+        resolved = os.path.realpath(root)
+        if os.path.isdir(resolved):
+            roots.append(resolved)
+    return roots
+
+
+def _clamp_to_browse_roots(resolved):
+    """Contain a resolved path within the configured browse roots.
+
+    When browse roots are configured, any path outside of them (including
+    symlink escapes, which realpath already resolved) is redirected to the
+    first configured root. Without configured roots, browsing is unrestricted
+    (the API route itself still sits behind the standard request auth).
+    """
+    roots = _configured_browse_roots()
+    if not roots:
+        return resolved
+    for root in roots:
+        # Component-wise containment: exact root or a child path of it
+        if resolved == root or resolved.startswith(root.rstrip(os.sep) + os.sep):
+            return resolved
+    return roots[0]
+
+
 def _validate_browsable_path(user_path):
     """Resolve and validate a user-provided filesystem path for browsing.
 
     Returns a canonical absolute path with traversal sequences resolved.
-    Rejects null bytes and paths outside a valid filesystem root.
+    Rejects null bytes and paths outside a valid filesystem root, and
+    contains the result within the configured browse roots (if any).
     """
     if not user_path or "\x00" in str(user_path):
-        return os.sep
+        return _clamp_to_browse_roots(os.sep)
     resolved = os.path.realpath(user_path)
     # Build the filesystem root for this path (handles drive letters on Windows)
     drive, _ = os.path.splitdrive(resolved)
     fs_root = drive + os.sep if drive else os.sep
     if not resolved.startswith(fs_root):
-        return os.sep
-    return resolved
+        return _clamp_to_browse_roots(os.sep)
+    return _clamp_to_browse_roots(resolved)
 
 
 class DirectoryListing:
