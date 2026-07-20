@@ -467,34 +467,43 @@ class Task:
         # set-based chunks instead of one recursive DELETE per record.
         chunk_size = 500
         try:
-            query = Tasks.select(Tasks.id, Tasks.type, Tasks.abspath).where(Tasks.id.in_(list(id_list)))
-
-            found_ids = []
             had_failure = False
-            for task_record in query:
-                try:
-                    # Remote tasks need to be cleaned up from the cache partition also
-                    if task_record.type == "remote":
-                        remote_task_dirname = task_record.abspath
-                        if os.path.exists(task_record.abspath) and "compresso_remote_pending_library" in remote_task_dirname:
-                            self.logger.info("Removing remote pending library task '%s'.", remote_task_dirname)
-                            shutil.rmtree(os.path.dirname(remote_task_dirname))
+            id_list = list(id_list)
 
-                    TaskDataStore.clear_task(task_record.id)
-                    found_ids.append(task_record.id)
-                except Exception as e:
-                    # A cleanup failure must not abort the batch: tasks whose
-                    # irreversible cleanup (remote dir removal, datastore
-                    # clearing) already succeeded still need their rows deleted
-                    # below, or they would be orphaned with their backing state
-                    # gone. The failed task keeps its row for a later retry.
-                    had_failure = True
-                    self.logger.exception("An error occurred while deleting task ID: %s. %s", task_record.id, e)
+            # Process everything in bounded chunks, including the SELECT: a
+            # single IN clause over an unbounded id list can exceed SQLite's
+            # bound-variable limit on large purges.
+            for start_idx in range(0, len(id_list), chunk_size):
+                chunk_ids = id_list[start_idx : start_idx + chunk_size]
+                query = Tasks.select(Tasks.id, Tasks.type, Tasks.abspath).where(Tasks.id.in_(chunk_ids))
 
-            for start in range(0, len(found_ids), chunk_size):
-                chunk = found_ids[start : start + chunk_size]
-                TaskMetadata.delete().where(TaskMetadata.task.in_(chunk)).execute()
-                Tasks.delete().where(Tasks.id.in_(chunk)).execute()
+                chunk_found_ids = []
+                for task_record in query:
+                    try:
+                        # Remote tasks need to be cleaned up from the cache partition also
+                        if task_record.type == "remote":
+                            remote_task_dirname = task_record.abspath
+                            if (
+                                os.path.exists(task_record.abspath)
+                                and "compresso_remote_pending_library" in remote_task_dirname
+                            ):
+                                self.logger.info("Removing remote pending library task '%s'.", remote_task_dirname)
+                                shutil.rmtree(os.path.dirname(remote_task_dirname))
+
+                        TaskDataStore.clear_task(task_record.id)
+                        chunk_found_ids.append(task_record.id)
+                    except Exception as e:
+                        # A cleanup failure must not abort the batch: tasks whose
+                        # irreversible cleanup (remote dir removal, datastore
+                        # clearing) already succeeded still need their rows deleted
+                        # below, or they would be orphaned with their backing state
+                        # gone. The failed task keeps its row for a later retry.
+                        had_failure = True
+                        self.logger.exception("An error occurred while deleting task ID: %s. %s", task_record.id, e)
+
+                if chunk_found_ids:
+                    TaskMetadata.delete().where(TaskMetadata.task.in_(chunk_found_ids)).execute()
+                    Tasks.delete().where(Tasks.id.in_(chunk_found_ids)).execute()
 
             return not had_failure
         except Exception:

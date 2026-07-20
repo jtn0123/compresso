@@ -281,6 +281,23 @@ class TestDeleteTasksRecursively:
         remaining_metadata = [row.task_id for row in TaskMetadata.select(TaskMetadata.task)]
         assert remaining_metadata == [t2.id]
 
+    def test_deletes_large_batches_beyond_sql_variable_limits(self, in_memory_db):
+        # Regression: the SELECT must be chunked too - a single IN clause over
+        # 1000+ ids can exceed SQLite's bound-variable limit.
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        self._setup_metadata_table(in_memory_db)
+        Tasks.delete().execute()
+        rows = [{"abspath": f"/bulk_{i:05d}.mkv", "status": "pending", "library_id": 1, "priority": i} for i in range(1200)]
+        Tasks.insert_many(rows).execute()
+        all_ids = [row.id for row in Tasks.select(Tasks.id)]
+        assert len(all_ids) == 1200
+
+        t = Task()
+        assert t.delete_tasks_recursively(all_ids) is True
+        assert Tasks.select().count() == 0
+
     def test_returns_false_on_query_error(self):
         from compresso.libs.task import Task
         from compresso.libs.unmodels.tasks import Tasks
