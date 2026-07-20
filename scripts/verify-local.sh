@@ -79,6 +79,7 @@ npm ci
 rm -rf coverage
 npm run lint
 npx vitest run --coverage
+node scripts/check-coverage-ratchet.mjs
 npm run build:publish
 
 if [[ "${MODE}" == "full" ]]; then

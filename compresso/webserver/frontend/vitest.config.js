@@ -1,6 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
+import coverageThresholds from './coverage-thresholds.json'
 
 export default defineConfig({
   plugins: [vue()],
@@ -12,15 +13,19 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.{js,vue}'],
       exclude: ['src/**/__tests__/**', 'src/test-utils/**'],
-      reporter: ['text-summary', 'lcov'],
+      // json-summary feeds scripts/check-coverage-ratchet.mjs
+      reporter: ['text-summary', 'lcov', 'json-summary'],
       reportsDirectory: './coverage',
       thresholds: {
-        // Honest all-source baseline (2026-07-12). Ratchet upward as tests are
-        // added; never remove files from `include` to satisfy this gate.
-        lines: 24,
-        functions: 16,
-        branches: 17,
-        statements: 24,
+        // Floors live in coverage-thresholds.json, shared with the auto-
+        // ratchet check (scripts/check-coverage-ratchet.mjs) which fails CI
+        // when achieved coverage outgrows a floor - so the floors must be
+        // raised as tests are added. Never remove files from `include` to
+        // satisfy this gate.
+        lines: coverageThresholds.lines,
+        functions: coverageThresholds.functions,
+        branches: coverageThresholds.branches,
+        statements: coverageThresholds.statements,
       },
     },
   },

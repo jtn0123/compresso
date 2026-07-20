@@ -1,0 +1,8 @@
+{
+  "comment": "Honest all-source coverage baseline (2026-07-12). Consumed by vitest.config.js (enforced floor) and scripts/check-coverage-ratchet.mjs (auto-ratchet: fails CI when achieved coverage exceeds a floor by more than `ratchetSlackPoints`, forcing the floor to be raised). Never remove files from coverage `include` to satisfy this gate.",
+  "ratchetSlackPoints": 2,
+  "lines": 24,
+  "functions": 16,
+  "branches": 17,
+  "statements": 24
+}
