@@ -256,6 +256,31 @@ class TestDeleteTasksRecursively:
         # The task must survive when its cleanup failed
         assert Tasks.select().count() == 1
 
+    def test_partial_cleanup_failure_still_deletes_cleaned_tasks(self, in_memory_db):
+        # Regression: a cleanup failure mid-batch must not orphan tasks whose
+        # irreversible cleanup already succeeded - their rows must still be
+        # deleted, while the failed task keeps its row and the call reports
+        # failure.
+        from compresso.libs.task import Task, TaskDataStore
+        from compresso.libs.unmodels.tasks import Tasks
+
+        TaskMetadata = self._setup_metadata_table(in_memory_db)
+        Tasks.delete().execute()
+        t1 = Tasks.create(abspath="/part_a.mkv", status="pending", library_id=1, priority=1)
+        t2 = Tasks.create(abspath="/part_b.mkv", status="pending", library_id=1, priority=2)
+        t3 = Tasks.create(abspath="/part_c.mkv", status="pending", library_id=1, priority=3)
+        TaskMetadata.create(task=t1.id, json_blob="{}")
+        TaskMetadata.create(task=t2.id, json_blob="{}")
+
+        t = Task()
+        with patch.object(TaskDataStore, "clear_task", side_effect=[None, RuntimeError("datastore down"), None]):
+            assert t.delete_tasks_recursively([t1.id, t2.id, t3.id]) is False
+
+        remaining = [row.id for row in Tasks.select(Tasks.id)]
+        assert remaining == [t2.id]
+        remaining_metadata = [row.task_id for row in TaskMetadata.select(TaskMetadata.task)]
+        assert remaining_metadata == [t2.id]
+
     def test_returns_false_on_query_error(self):
         from compresso.libs.task import Task
         from compresso.libs.unmodels.tasks import Tasks

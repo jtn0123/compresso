@@ -470,6 +470,7 @@ class Task:
             query = Tasks.select(Tasks.id, Tasks.type, Tasks.abspath).where(Tasks.id.in_(list(id_list)))
 
             found_ids = []
+            had_failure = False
             for task_record in query:
                 try:
                     # Remote tasks need to be cleaned up from the cache partition also
@@ -482,16 +483,20 @@ class Task:
                     TaskDataStore.clear_task(task_record.id)
                     found_ids.append(task_record.id)
                 except Exception as e:
-                    # Catch cleanup exceptions
+                    # A cleanup failure must not abort the batch: tasks whose
+                    # irreversible cleanup (remote dir removal, datastore
+                    # clearing) already succeeded still need their rows deleted
+                    # below, or they would be orphaned with their backing state
+                    # gone. The failed task keeps its row for a later retry.
+                    had_failure = True
                     self.logger.exception("An error occurred while deleting task ID: %s. %s", task_record.id, e)
-                    return False
 
             for start in range(0, len(found_ids), chunk_size):
                 chunk = found_ids[start : start + chunk_size]
                 TaskMetadata.delete().where(TaskMetadata.task.in_(chunk)).execute()
                 Tasks.delete().where(Tasks.id.in_(chunk)).execute()
 
-            return True
+            return not had_failure
         except Exception:
             self.logger.exception("An error occurred while deleting task IDs: %s.", id_list)
             return False
