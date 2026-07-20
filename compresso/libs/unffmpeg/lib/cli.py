@@ -53,7 +53,10 @@ def ffmpeg_cmd(params):
         raw_output = out.decode("utf-8")
     except Exception as e:
         raise FFMpegError(command, str(e)) from e
-    if pipe.returncode == 1 or "error" in raw_output:
+    # Any non-zero exit code is a failure (ffmpeg uses many codes beyond 1,
+    # and negative codes indicate signal death). Never inspect the output
+    # text for the word "error" - legitimate paths/metadata may contain it.
+    if pipe.returncode != 0:
         raise FFMpegError(command, raw_output)
     if not raw_output:
         raise FFMpegError(command, "No command output returned")
@@ -78,7 +81,9 @@ def ffprobe_cmd(params):
         raw_output = out.decode("utf-8")
     except Exception as e:
         raise FFProbeError(command, str(e)) from e
-    if pipe.returncode == 1 or "error" in raw_output:
+    # Any non-zero exit code is a failure (see ffmpeg_cmd). ffprobe errors are
+    # requested explicitly via -show_error JSON, not by scanning output text.
+    if pipe.returncode != 0:
         raise FFProbeError(command, raw_output)
     if not raw_output:
         raise FFProbeError(command, "No info found")

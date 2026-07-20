@@ -11,6 +11,7 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import tornado.web
 
 from compresso.libs.singleton import SingletonType
 
@@ -116,7 +117,10 @@ class TestWebsocketAuthentication:
     def test_prepare_rejects_unauthorized_handshake(self, mock_authorize):
         handler = _make_handler()
 
-        handler.prepare()
+        # The refusal must be enforced by this handler (raising Finish stops
+        # the upgrade), not left to authorize_request's finish() side effect.
+        with pytest.raises(tornado.web.Finish):
+            handler.prepare()
 
         mock_authorize.assert_called_once_with(handler, allow_websocket_protocol=True)
 
@@ -500,6 +504,35 @@ class TestAsyncLoops:
             call_data = handler.send.call_args[0][0]
             assert call_data["type"] == "system_logs"
             assert call_data["data"]["system_logs"] == ["log line 1"]
+
+    @pytest.mark.asyncio
+    async def test_async_system_logs_skips_read_when_file_unchanged(self, tmp_path):
+        # Regression: the per-second poll must not re-read the log file when
+        # its mtime/size have not changed since the previous iteration.
+        log_file = tmp_path / "compresso.log"
+        log_file.write_text("line1\n")
+
+        handler = _make_handler()
+        handler.sending_system_logs = True
+        handler.send = AsyncMock()
+        handler.config.read_system_logs.return_value = ["line1"]
+        handler.config.get_log_path.return_value = str(tmp_path)
+
+        with patch(f"{WS_MOD}.gen.sleep", new_callable=AsyncMock) as mock_sleep:
+            iterations = 0
+
+            async def stop_after_three(*args):
+                nonlocal iterations
+                iterations += 1
+                if iterations >= 3:
+                    handler.sending_system_logs = False
+
+            mock_sleep.side_effect = stop_after_three
+
+            await handler.async_system_logs()
+
+        # Three poll iterations, but the file never changed: one read only.
+        handler.config.read_system_logs.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_async_workers_info_sends_data(self):

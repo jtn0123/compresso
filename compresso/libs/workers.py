@@ -793,93 +793,102 @@ class Worker(threading.Thread):
                 shell=False,
                 start_new_session=True,
             )
-
-            # Fetch process using psutil for control (sending SIGSTOP on windows will not work)
-            proc = psutil.Process(pid=sub_proc.pid)
-
-            # Create proc monitor
-            self.worker_subprocess_monitor.set_proc(sub_proc.pid)
-
-            # Set process priority (cross-platform via psutil)
             try:
-                if os.name == "nt":
-                    proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
-                else:
-                    parent_proc = psutil.Process(os.getpid())
-                    proc.nice(parent_proc.nice() + 1)
-            except (psutil.AccessDenied, psutil.NoSuchProcess, OSError) as e:
-                self.logger.warning(
-                    "Unable to lower priority of subprocess. Subprocess should continue to run at normal priority: %s",
-                    e,
-                )
-
-            # Poll process for new output until finished
-            while not self.redundant_flag.is_set():
-                # Stop parsing the sub process if the worker is paused
-                # Then resume it when the worker is resumed
-                if self.paused_flag.is_set():
-                    self.logger.debug("Pausing worker exec command subprocess loop")
-                    while not self.redundant_flag.is_set():
-                        self.event.wait(1)
-                        if not self.paused_flag.is_set():
-                            self.logger.debug("Resuming worker exec command subprocess loop")
-                            break
-                        continue
-
-                # Fetch command stdout and append it to the current task object (to be saved during post process)
-                line_text = sub_proc.stdout.readline()
-                self.worker_log.append(line_text)
-
-                # Check if the command has completed. If it has, exit the loop
-                if line_text == "" and sub_proc.poll() is not None:
-                    self.logger.debug("Subprocess task completed!")
-                    break
-
-                # Parse encoding speed from FFmpeg output
-                self.worker_subprocess_monitor.parse_ffmpeg_speed(line_text)
-
-                # Parse the progress
-                try:
-                    progress_dict = command_progress_parser(line_text)
-                    progress_percent = progress_dict.get("percent", 0)
-                    self.worker_subprocess_monitor.set_subprocess_percent(progress_percent)
-                except (ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
-                    # Only need to show any sort of exception if we have debugging enabled.
-                    # So we should log it as a debug rather than an exception.
-                    self.logger.debug("Exception while parsing command progress: %s", e)
-
-            # Get the final output and the exit status
-            if not self.redundant_flag.is_set():
-                try:
-                    sub_proc.communicate(timeout=30)
-                except subprocess.TimeoutExpired:
-                    self.logger.warning("Subprocess communicate() timed out after 30s, terminating")
-                    self.worker_subprocess_monitor.terminate_proc()
-
-            # If the process is still running, kill it
-            self.worker_subprocess_monitor.terminate_proc()
-
-            # Stop proc monitor
-            self.worker_subprocess_monitor.unset_proc()
-            if isinstance(current_command_ref, list):
-                current_command_ref.clear()
-
-            if sub_proc.returncode == 0:
-                return True
-            else:
-                self.logger.error("WORKER_COMMAND_FAILED file=%s command=%s", data.get("file_in"), exec_command)
-                self.logger.error(
-                    "Command run against '%s' exited with non-zero status. "
-                    "Download command dump from history for more information. %s",
-                    data.get("file_in"),
-                    exec_command,
-                )
-                return False
+                return self.__monitor_command_subprocess(sub_proc, data, exec_command, command_progress_parser)
+            finally:
+                # Always reap the subprocess and release monitor state - even
+                # when readline()/psutil raise mid-loop. Without this, an OSError
+                # during output parsing leaves the encoder running orphaned and
+                # the stdout pipe open while the worker moves on.
+                self.worker_subprocess_monitor.terminate_proc()
+                self.worker_subprocess_monitor.unset_proc()
+                if sub_proc.stdout is not None:
+                    sub_proc.stdout.close()
+                if isinstance(current_command_ref, list):
+                    current_command_ref.clear()
 
         except (subprocess.SubprocessError, OSError, FileNotFoundError, TypeError) as e:
             self.logger.error("WORKER_COMMAND_EXCEPTION file=%s", data.get("file_in"))
             self.logger.error("Error while executing the command against file %s. %s", data.get("file_in"), e)
 
+        return False
+
+    def __monitor_command_subprocess(self, sub_proc, data, exec_command, command_progress_parser):
+        """Drive a spawned plugin subprocess to completion and report success.
+
+        The caller owns subprocess/monitor cleanup via try/finally.
+        """
+        # Fetch process using psutil for control (sending SIGSTOP on windows will not work)
+        proc = psutil.Process(pid=sub_proc.pid)
+
+        # Create proc monitor
+        self.worker_subprocess_monitor.set_proc(sub_proc.pid)
+
+        # Set process priority (cross-platform via psutil)
+        try:
+            if os.name == "nt":
+                proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+            else:
+                parent_proc = psutil.Process(os.getpid())
+                proc.nice(parent_proc.nice() + 1)
+        except (psutil.AccessDenied, psutil.NoSuchProcess, OSError) as e:
+            self.logger.warning(
+                "Unable to lower priority of subprocess. Subprocess should continue to run at normal priority: %s",
+                e,
+            )
+
+        # Poll process for new output until finished
+        while not self.redundant_flag.is_set():
+            # Stop parsing the sub process if the worker is paused
+            # Then resume it when the worker is resumed
+            if self.paused_flag.is_set():
+                self.logger.debug("Pausing worker exec command subprocess loop")
+                while not self.redundant_flag.is_set():
+                    self.event.wait(1)
+                    if not self.paused_flag.is_set():
+                        self.logger.debug("Resuming worker exec command subprocess loop")
+                        break
+                    continue
+
+            # Fetch command stdout and append it to the current task object (to be saved during post process)
+            line_text = sub_proc.stdout.readline()
+            self.worker_log.append(line_text)
+
+            # Check if the command has completed. If it has, exit the loop
+            if line_text == "" and sub_proc.poll() is not None:
+                self.logger.debug("Subprocess task completed!")
+                break
+
+            # Parse encoding speed from FFmpeg output
+            self.worker_subprocess_monitor.parse_ffmpeg_speed(line_text)
+
+            # Parse the progress
+            try:
+                progress_dict = command_progress_parser(line_text)
+                progress_percent = progress_dict.get("percent", 0)
+                self.worker_subprocess_monitor.set_subprocess_percent(progress_percent)
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
+                # Only need to show any sort of exception if we have debugging enabled.
+                # So we should log it as a debug rather than an exception.
+                self.logger.debug("Exception while parsing command progress: %s", e)
+
+        # Get the final output and the exit status
+        if not self.redundant_flag.is_set():
+            try:
+                sub_proc.communicate(timeout=30)
+            except subprocess.TimeoutExpired:
+                self.logger.warning("Subprocess communicate() timed out after 30s, terminating")
+                self.worker_subprocess_monitor.terminate_proc()
+
+        if sub_proc.returncode == 0:
+            return True
+        self.logger.error("WORKER_COMMAND_FAILED file=%s command=%s", data.get("file_in"), exec_command)
+        self.logger.error(
+            "Command run against '%s' exited with non-zero status. "
+            "Download command dump from history for more information. %s",
+            data.get("file_in"),
+            exec_command,
+        )
         return False
 
 
