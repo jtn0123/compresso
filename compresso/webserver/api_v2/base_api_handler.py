@@ -427,13 +427,16 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         """Complete a finish() that was deferred while the body ran off-loop."""
         if getattr(self, "_finish_deferred", False):
             self._finish_deferred = False
+            chunk = getattr(self, "_deferred_finish_chunk", None)
+            self._deferred_finish_chunk = None
             if not self._finished:
-                super().finish()
+                super().finish(chunk)
 
     def finish(self, chunk=None):
         if getattr(self, "_defer_finish", False):
-            if chunk is not None:
-                self.write(chunk)
+            # Record the final chunk; it is handed to the real finish() on the
+            # IOLoop thread once the offloaded body returns.
+            self._deferred_finish_chunk = chunk
             self._finish_deferred = True
             return None
         return super().finish(chunk)
