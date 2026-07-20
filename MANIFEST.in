@@ -31,7 +31,7 @@ include compresso/webserver/frontend/package-lock.json
 include compresso/webserver/frontend/package.json
 include compresso/webserver/frontend/playwright.config.js
 include compresso/webserver/frontend/postcss.config.cjs
-include compresso/webserver/frontend/quasar.config.cjs
+include compresso/webserver/frontend/quasar.config.js
 include compresso/webserver/frontend/vitest.config.js
 
 # Prune local-only frontend install artifacts from source distributions

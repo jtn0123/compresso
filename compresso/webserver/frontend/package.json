@@ -14,7 +14,7 @@
     "serve": "quasar dev --debug",
     "dev": "quasar dev",
     "build": "quasar build",
-    "build:publish": "quasar build --publish",
+    "build:publish": "quasar build",
     "test:e2e": "npm run build:publish && playwright test",
     "test:e2e:run": "playwright test",
     "test:e2e:live": "npm run build:publish && playwright test --config=playwright.live.config.js",

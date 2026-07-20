@@ -12,9 +12,9 @@ import routes from './routes'
  */
 
 export default route(function (/* { store, ssrContext } */) {
-  const createHistory = process.env.SERVER
+  const createHistory = import.meta.env.QUASAR_SERVER
     ? createMemoryHistory
-    : process.env.VUE_ROUTER_MODE === 'history'
+    : import.meta.env.QUASAR_VUE_ROUTER_MODE === 'history'
       ? createWebHistory
       : createWebHashHistory
 
@@ -22,10 +22,10 @@ export default route(function (/* { store, ssrContext } */) {
     scrollBehavior: () => ({ left: 0, top: 0 }),
     routes,
 
-    // Leave this as is and make changes in quasar.conf.js instead!
-    // quasar.conf.js -> build -> vueRouterMode
-    // quasar.conf.js -> build -> publicPath
-    history: createHistory(process.env.VUE_ROUTER_BASE),
+    // Leave this as is and make changes in quasar.config.js instead!
+    // quasar.config.js -> build -> vueRouterMode
+    // quasar.config.js -> build -> publicPath
+    history: createHistory(import.meta.env.QUASAR_VUE_ROUTER_BASE),
   })
 
   return Router

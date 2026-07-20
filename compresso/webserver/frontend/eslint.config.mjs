@@ -76,6 +76,14 @@ export default [
     },
   },
 
+  // Node-context config files (not transpiled by Babel).
+  {
+    files: ['quasar.config.js', 'vitest.config.js', 'playwright.config.js', 'playwright.live.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+
   // Vue SFCs keep vue-eslint-parser as the file parser; <script> blocks are
   // parsed by @babel/eslint-parser.
   {
