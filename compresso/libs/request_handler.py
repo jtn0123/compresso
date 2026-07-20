@@ -32,7 +32,7 @@ Copyright:
 import requests
 from requests.auth import HTTPBasicAuth
 
-from compresso.webserver.request_auth import API_AUTH_HEADER_NAME
+from compresso.libs.constants import API_AUTH_HEADER_NAME
 
 DEFAULT_TIMEOUT = 30
 

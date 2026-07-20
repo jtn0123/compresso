@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from compresso.ops import planner
-from compresso.webserver.helpers import library_analysis
+from compresso.libs import library_analysis
 
 
 class FakeSettings:

@@ -11,7 +11,7 @@ This document is designed to help AI agents understand the structure, technology
 - **Framework**: [Vue.js 3](https://v3.vuejs.org/)
 - **UI Component Library**: [Quasar Framework v2](https://quasar.dev/)
 - **Build System**: Quasar CLI (Vite)
-- **State Management**: [Vuex](https://vuex.vuejs.org/)
+- **State Management**: No store library. Shared state lives in plain modules under `src/js/` — the mutable `$compresso` global (`src/js/compressoGlobals.js`), the WebSocket listener registry (`src/js/compressoWebsocket.js`), and small module-level stores such as `src/js/sharedLinksStore.js`.
 - **Routing**: [Vue Router](https://router.vuejs.org/)
 - **HTTP Client**: [Axios](https://axios-http.com/)
 - **Internationalization**: [Vue-i18n](https://vue-i18n.intlify.dev/)
@@ -47,7 +47,6 @@ The project follows the standard Quasar directory structure:
   - **`layouts/`**: Main layout templates (e.g., `MainLayout.vue`).
   - **`pages/`**: View components corresponding to routes.
   - **`router/`**: Vue Router configuration.
-  - **`store/`**: Vuex store modules (if present/used).
   - **`App.vue`**: Root Vue component.
   - **`index.template.html`**: HTML template for the app.
 

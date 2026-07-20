@@ -28,9 +28,9 @@ import requests
 
 from compresso import metadata
 from compresso.config import Config
+from compresso.libs.constants import API_AUTH_HEADER_NAME
 from compresso.libs.json_state import atomic_json_write
 from compresso.libs.worker_capabilities import WorkerCapabilities
-from compresso.webserver.request_auth import API_AUTH_HEADER_NAME
 
 SCHEMA_VERSION = 1
 REPORT_TTL_HOURS = 24

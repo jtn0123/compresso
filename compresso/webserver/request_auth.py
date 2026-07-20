@@ -4,9 +4,15 @@ import base64
 import hmac
 
 from compresso import config
+from compresso.libs.constants import API_AUTH_HEADER_NAME, WEBSOCKET_AUTH_PROTOCOL_PREFIX
 
-API_AUTH_HEADER_NAME = "X-Compresso-Api-Token"
-WEBSOCKET_AUTH_PROTOCOL_PREFIX = "compresso-auth."
+__all__ = [
+    "API_AUTH_HEADER_NAME",
+    "WEBSOCKET_AUTH_PROTOCOL_PREFIX",
+    "authorize_request",
+    "encode_websocket_token",
+    "request_has_valid_api_token",
+]
 
 
 def _explicit_bool(value):

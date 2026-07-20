@@ -622,6 +622,7 @@ import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useApprovalQueueData } from 'src/composables/useApprovalQueueData'
+import { usePreviewJob } from 'src/composables/usePreviewJob'
 import VideoCompare from 'components/preview/VideoCompare.vue'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
@@ -667,13 +668,16 @@ export default {
       fetchTasks: fetchApprovalTasks,
     } = useApprovalQueueData({ notify: $q.notify, t: $t })
 
-    // Preview state
-    const previewActive = ref(false)
-    const previewLoading = ref(false)
-    const previewStatus = ref('')
-    const previewData = ref(null)
-    let previewJobId = null
-    let previewPollInterval = null
+    // Preview job state + actions (shared composable)
+    const {
+      previewActive,
+      previewLoading,
+      previewStatus,
+      previewData,
+      startPreview: startPreviewJob,
+      cleanupPreview,
+      resetPreviewState,
+    } = usePreviewJob({ notify: $q.notify, t: $t })
 
     const columns = computed(() => [
       {
@@ -930,9 +934,7 @@ export default {
 
     async function showDetail(id) {
       detailData.value = null
-      previewActive.value = false
-      previewLoading.value = false
-      previewData.value = null
+      resetPreviewState()
       showDetailDialog.value = true
       try {
         const res = await axios.post(getCompressoApiUrl('v2', 'approval/detail'), { id: id })
@@ -973,76 +975,10 @@ export default {
     // Preview functions
     async function startPreview() {
       if (!detailData.value) return
-      previewLoading.value = true
-      previewStatus.value = $t('pages.approvalQueue.previewStarting')
-      try {
-        const res = await axios.post(getCompressoApiUrl('v2', 'preview/create'), {
-          source_path: detailData.value.abspath,
-          start_time: 0,
-          duration: 10,
-          library_id: detailData.value.library_id || 1,
-        })
-        previewJobId = res.data.job_id
-        previewStatus.value = $t('pages.approvalQueue.previewProcessing')
-        pollPreviewStatus()
-      } catch (e) {
-        previewLoading.value = false
-        $q.notify({
-          type: 'negative',
-          message: $t('pages.approvalQueue.failedToCreatePreview'),
-          timeout: 3000,
-          position: 'top',
-        })
-      }
-    }
-
-    function pollPreviewStatus() {
-      previewPollInterval = setInterval(async () => {
-        try {
-          const res = await axios.post(getCompressoApiUrl('v2', 'preview/status'), { job_id: previewJobId })
-          const status = res.data.status
-          previewStatus.value = status
-          if (status === 'complete') {
-            clearInterval(previewPollInterval)
-            previewPollInterval = null
-            previewData.value = res.data
-            previewLoading.value = false
-            previewActive.value = true
-          } else if (status === 'error' || status === 'failed') {
-            clearInterval(previewPollInterval)
-            previewPollInterval = null
-            previewLoading.value = false
-            $q.notify({
-              type: 'negative',
-              message: $t('pages.approvalQueue.previewFailed', { error: res.data.error || '' }),
-              timeout: 3000,
-              position: 'top',
-            })
-          }
-        } catch {
-          clearInterval(previewPollInterval)
-          previewPollInterval = null
-          previewLoading.value = false
-        }
-      }, 2000)
-    }
-
-    async function cleanupPreview() {
-      if (previewPollInterval) {
-        clearInterval(previewPollInterval)
-        previewPollInterval = null
-      }
-      if (previewJobId) {
-        try {
-          await axios.post(getCompressoApiUrl('v2', 'preview/cleanup'), { job_id: previewJobId })
-        } catch {
-          // ignore cleanup errors
-        }
-        previewJobId = null
-      }
-      previewActive.value = false
-      previewLoading.value = false
-      previewData.value = null
+      await startPreviewJob({
+        sourcePath: detailData.value.abspath,
+        libraryId: detailData.value.library_id || 1,
+      })
     }
 
     function handleKeydown(e) {

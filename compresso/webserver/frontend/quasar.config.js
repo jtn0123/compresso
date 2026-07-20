@@ -74,7 +74,6 @@ export default defineConfig(function (ctx) {
         pages: fileURLToPath(new URL('./src/pages', import.meta.url)),
         assets: fileURLToPath(new URL('./src/assets', import.meta.url)),
         boot: fileURLToPath(new URL('./src/boot', import.meta.url)),
-        stores: fileURLToPath(new URL('./src/stores', import.meta.url)),
       },
 
       vueOptionsAPI: true,
