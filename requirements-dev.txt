@@ -1,6 +1,6 @@
 -r requirements.txt
 
-ruff==0.15.21
+ruff==0.15.22
 pytest==9.1.1
 pytest-cov==7.1.0
 pytest-benchmark==5.2.3
@@ -13,7 +13,7 @@ build==1.5.1
 # so locks compiled on another OS retain its hash.
 colorama==0.4.6
 yappi==1.7.6            # Thread-aware profiler for dev profiling
-mypy==2.2.0             # Gradual type checking
+mypy==2.3.0             # Gradual type checking
 pip-audit==2.10.1       # Dependency vulnerability auditing
 pip-tools==7.5.3       # Reproducible hash-locked dependency compilation
 

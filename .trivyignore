@@ -105,6 +105,7 @@ CVE-2026-46119
 CVE-2026-46185
 CVE-2026-46195
 CVE-2026-46259
+CVE-2026-43185
 
 # openssl / libssl3t64: Heap use-after-free in PKCS7_verify(). Shipped
 # by the ubuntu:24.04 base image; fix is in 3.0.13-0ubuntu3.11, which
