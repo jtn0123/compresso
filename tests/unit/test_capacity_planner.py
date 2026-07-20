@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from compresso.ops import planner
 from compresso.libs import library_analysis
+from compresso.ops import planner
 
 
 class FakeSettings:

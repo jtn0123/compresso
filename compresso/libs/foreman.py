@@ -297,9 +297,9 @@ class Foreman(threading.Thread):
                 worker_group_id = self.worker_threads[thread].worker_group_id
                 worker_name = self.worker_threads[thread].name
                 # Only remove threads that are idle (never terminate a task just to reduce worker count)
-                if (
-                    worker_group_id not in worker_group_ids or worker_name not in worker_group_names
-                ) and self.worker_threads[thread].idle:
+                if (worker_group_id not in worker_group_ids or worker_name not in worker_group_names) and self.worker_threads[
+                    thread
+                ].idle:
                     self.mark_worker_thread_as_redundant(thread)
 
     def fetch_available_remote_installation(

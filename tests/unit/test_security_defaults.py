@@ -29,12 +29,12 @@ class TestAuthEnforcementDefaults:
         assert settings.get_csrf_protection_enforced() is False
 
     def test_network_exposure_enforces_auth_and_csrf(self, settings):
-        settings.ui_address = "0.0.0.0"
+        settings.ui_address = "0.0.0.0"  # noqa: S104
         assert settings.get_api_auth_enforced() is True
         assert settings.get_csrf_protection_enforced() is True
 
     def test_explicit_opt_out_disables_network_enforcement(self, settings):
-        settings.ui_address = "0.0.0.0"
+        settings.ui_address = "0.0.0.0"  # noqa: S104
         settings.allow_unauthenticated_network_access = True
         assert settings.get_api_auth_enforced() is False
         assert settings.get_csrf_protection_enforced() is False
@@ -47,14 +47,14 @@ class TestAuthEnforcementDefaults:
         assert settings.get_csrf_protection_enforced() is True
 
     def test_token_generated_when_network_enforced(self, tmp_path):
-        os.environ["ui_address"] = "0.0.0.0"
+        os.environ["ui_address"] = "0.0.0.0"  # noqa: S104, SIM112 — Compresso env keys are lowercase
         try:
             SingletonType._instances = {}
             enforced_settings = config.Config(config_path=str(tmp_path / "config-net"))
             assert enforced_settings.get_api_auth_enforced() is True
             assert enforced_settings.get_api_auth_token() != ""
         finally:
-            del os.environ["ui_address"]
+            del os.environ["ui_address"]  # noqa: SIM112
 
     def test_browse_root_paths_parses_string_and_list(self, settings):
         settings.browse_root_paths = "/media/a, /media/b"
