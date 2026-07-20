@@ -99,3 +99,26 @@ class TestFileBrowserContainment:
         sibling.mkdir()
         settings.browse_root_paths = [str(root)]
         assert filebrowser._validate_browsable_path(str(sibling)) == os.path.realpath(str(root))
+
+
+@pytest.mark.unittest
+class TestBooleanGetterCoercion:
+    """Env-style string values must coerce through _as_bool in every boolean getter."""
+
+    def test_false_strings_disable_features(self, settings):
+        for attr, getter in [
+            ("first_run", settings.get_first_run),
+            ("clear_pending_tasks_on_restart", settings.get_clear_pending_tasks_on_restart),
+            ("auto_manage_completed_tasks", settings.get_auto_manage_completed_tasks),
+            ("compress_completed_tasks_logs", settings.get_compress_completed_tasks_logs),
+            ("always_keep_failed_tasks", settings.get_always_keep_failed_tasks),
+            ("enable_library_scanner", settings.get_enable_library_scanner),
+            ("run_full_scan_on_start", settings.get_run_full_scan_on_start),
+            ("follow_symlinks", settings.get_follow_symlinks),
+        ]:
+            setattr(settings, attr, "false")
+            assert getter() is False, f"{attr}='false' must coerce to False"
+            setattr(settings, attr, "true")
+            assert getter() is True, f"{attr}='true' must coerce to True"
+            setattr(settings, attr, "0")
+            assert getter() is False, f"{attr}='0' must coerce to False"

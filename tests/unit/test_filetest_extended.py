@@ -262,3 +262,26 @@ class TestFileTesterThread:
 
         assert files_to_test.unfinished_tasks == 0
         assert not thread.is_alive()
+
+
+@pytest.mark.unittest
+class TestCodecProbeFailureArms:
+    @patch("compresso.libs.ffprobe_utils.extract_media_metadata", side_effect=OSError("probe io error"))
+    def test_known_probe_error_falls_through_to_plugins(self, mock_meta):
+        ft = _make_filetest()
+        ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
+        ft.file_failed_in_history = MagicMock(return_value=False)
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
+        result, _, _, _ = ft.should_file_be_added_to_task_list("/media/video.mkv")
+        assert result is None
+
+    @patch("compresso.libs.ffprobe_utils.extract_media_metadata", side_effect=RuntimeError("unexpected"))
+    def test_unexpected_probe_error_falls_through_to_plugins(self, mock_meta):
+        ft = _make_filetest()
+        ft.file_in_compresso_ignore_lockfile = MagicMock(return_value=False)
+        ft.file_failed_in_history = MagicMock(return_value=False)
+        ft.target_codecs = ["h264"]
+        ft.skip_codecs = []
+        result, _, _, _ = ft.should_file_be_added_to_task_list("/media/video.mkv")
+        assert result is None
