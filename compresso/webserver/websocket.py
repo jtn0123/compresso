@@ -30,6 +30,7 @@ Copyright:
 """
 
 import json
+import os
 import time
 import uuid
 from typing import Any
@@ -120,7 +121,12 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         return check_websocket_origin(self, origin)
 
     def prepare(self):
-        authorize_request(self, allow_websocket_protocol=True)
+        if not authorize_request(self, allow_websocket_protocol=True):
+            # authorize_request has already written the 401 response. Raising
+            # Finish makes the refusal explicit so the upgrade can never
+            # proceed, rather than relying on the finished-response side
+            # effect to abort the handshake.
+            raise tornado.web.Finish()
 
     def select_subprotocol(self, subprotocols):
         # Echo only the non-secret protocol. The credential is carried in a
@@ -482,18 +488,33 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             await gen.sleep(self.STREAM_POLL_INTERVALS["frontend_message"])
 
     async def async_system_logs(self):
+        last_log_stat = None
         while self._stream_is_active(self.sending_system_logs):
-            system_logs = self.config.read_system_logs(lines=1000)
+            # Only re-read the log when it actually changed - this loop runs
+            # every second per connected client.
+            log_stat = self._system_log_file_stat()
+            if log_stat is None or log_stat != last_log_stat:
+                last_log_stat = log_stat
+                system_logs = self.config.read_system_logs(lines=1000)
 
-            await self._send_stream_message(
-                "system_logs",
-                {
-                    "logs_path": self.config.get_log_path(),
-                    "system_logs": system_logs,
-                },
-            )
+                await self._send_stream_message(
+                    "system_logs",
+                    {
+                        "logs_path": self.config.get_log_path(),
+                        "system_logs": system_logs,
+                    },
+                )
 
             await gen.sleep(self.STREAM_POLL_INTERVALS["system_logs"])
+
+    def _system_log_file_stat(self):
+        """Return a change token for the log file, or None when unreadable."""
+        log_file = os.path.join(self.config.get_log_path(), "compresso.log")
+        try:
+            stat_result = os.stat(log_file)
+        except OSError:
+            return None
+        return (stat_result.st_mtime_ns, stat_result.st_size)
 
     async def async_workers_info(self):
         while self._stream_is_active(self.sending_worker_info):

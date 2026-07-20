@@ -406,6 +406,18 @@ class TestHistory:
         assert result is False
 
     @pytest.mark.unittest
+    def test_delete_historic_tasks_recursively_returns_false_on_delete_error(self):
+        task = self._create_task(label="err.mkv")
+        self.db_connection.execute_sql("SELECT 1")
+
+        from compresso.libs.unmodels import CompletedTasksCommandLogs
+
+        history = self._make_history()
+        with patch.object(CompletedTasksCommandLogs, "delete", side_effect=RuntimeError("db down")):
+            result = history.delete_historic_tasks_recursively(id_list=[task.id])
+        assert result is False
+
+    @pytest.mark.unittest
     def test_delete_historic_tasks_recursively_cascades_command_logs(self):
         task = self._create_task(label="cascade.mkv")
         self._create_command_log(task, dump="log data here")

@@ -45,7 +45,14 @@ The following folders are generated in the Docker environment:
 
 You can also just install the module natively in your home directory in "develop" mode.
 
-Start by creating a venv.
+To run the whole flow below in one step (venv + hash-locked install + frontend
+build + editable install), use:
+
+```bash
+bash devops/local_dev_venv.sh
+```
+
+Or do it manually. Start by creating a venv.
 
 ```bash
 python3.13 -m venv venv
@@ -172,7 +179,7 @@ bash scripts/check-requirements-locks.sh
 
 ### Frontend coverage ratchet
 
-Vitest coverage thresholds start conservatively so the current suite passes. Raise the thresholds only when new tests make the higher number stable, and never lower them without documenting the reason in the PR.
+Vitest coverage floors live in `compresso/webserver/frontend/coverage-thresholds.json` and start conservatively so the current suite passes. The ratchet is enforced automatically: `scripts/check-coverage-ratchet.mjs` (run in CI and by `verify-local.sh` after the coverage run) fails when achieved coverage exceeds a floor by more than the configured slack, which forces the floor to be raised as tests are added. Never lower a floor without documenting the reason in the PR.
 
 ### Docker preflight and scan grouping
 

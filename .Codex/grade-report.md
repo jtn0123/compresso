@@ -2,462 +2,553 @@
 
 **Project:** Compresso
 
-**Audited:** 2026-07-12
+**Audited:** 2026-07-20
 
-**Baseline:** released `master` at `668ba24b8085f8d060fe0f861acfd88ebd307ccf` (`v1.13.2`)
+**Baseline:** `master` at `f3f566a` (`v1.17.0`), audited on branch `claude/codebase-audit-grading-15a5em`
 
-**Stack:** Python 3.13, Tornado, Peewee/SQLite, Vue 3, Quasar/Vite, pytest, Vitest, Playwright, GitHub Actions
+**Stack:** Python 3.13, Tornado, Peewee/SQLite, Vue 3.5, Quasar 2.21/Vite 7, pytest, Vitest, Playwright, GitHub Actions
+
+**Method:** Nine parallel category audits, followed by manual verification of the highest-impact claims — each Major *code* finding was re-read at the cited lines before inclusion. Code findings cite file:line evidence; module-level findings (e.g. A4) cite the files/packages concerned, and repo-wide metrics (B3's type-hint coverage, H4's docstring coverage) are AST-computed aggregates reproducible from the stated scope rather than single line ranges. Security was reviewed directly against `request_auth.py`, `security_headers.py`, `downloads.py`, `proxy.py`, `websocket.py`, the plugin install/execution chain, rate limiting, and `.trivyignore`. No source code was modified. Grades are calibrated (A = exemplary, C = average working code) with Security and Testing weighted double in the overall grade.
+
+**Prior audit:** 2026-07-12 against `v1.13.2` graded the repo **B-** overall; 33 of its 37 items were completed. This audit confirms the improvement is real: Testing rose B → A-, Security C+ → B+, Performance C+ → B+, Dependencies B → A-, Docs C+ → B+, Tooling B → A. Of the prior audit's four open items, **A3** (split large orchestration modules) and **E4** (plugin isolation) remain partially open and are folded into A6/C1 and the Security strengths below; the prior report's **I2/I3** (release-convention enforcement, duplicate master-push validation) were not re-examined in depth; they remain open but are excluded from section I's grading. Note that all finding IDs in this report are issued fresh for the 2026-07-20 baseline — the I2/I3 findings in section I below are new items, unrelated to the prior report's I2/I3.
 
 ## Summary
 
-| ID | Category | Grade | Items |
-|----|----------|-------|-------|
-| A | Architecture & Design | B- | 3 |
-| B | Backend Quality | B | 5 |
-| C | Frontend Quality | C | 5 |
-| D | Testing & Reliability | B | 4 |
-| E | Security | C+ | 6 |
-| F | Dependencies & Tech Currency | B | 3 |
-| G | Performance & Scalability | C+ | 5 |
-| H | Documentation & Onboarding | C+ | 3 |
-| I | Developer Experience & Tooling | B | 3 |
-| **Overall** | | **B-** | **37** |
+| ID | Category | Grade | Prior (07-12) | Items |
+|----|----------|-------|----------------|-------|
+| A | Architecture & Design | **B-** | B- | 7 |
+| B | Backend Quality | **B+** | B | 7 |
+| C | Frontend Quality | **B-** | C | 8 |
+| D | Testing & Reliability | **A-** | B | 6 |
+| E | Security | **B+** | C+ | 5 |
+| F | Dependencies & Tech Currency | **A-** | B | 5 |
+| G | Performance & Scalability | **B+** | C+ | 7 |
+| H | Documentation & Onboarding | **B+** | C+ | 6 |
+| I | Developer Experience & Tooling | **A** | B | 3 |
+| **Overall** (D & E double-weighted) | | **B+** | B- | **54** |
 
-**Top 5 highest-leverage fixes:** E1, A1, B1, C1, G1
-
-## Validation Snapshot
-
-- PR `#184` merged cleanly, release `v1.13.2` published successfully, and no open PRs remained.
-- Ruff and formatting passed across the Python source/tests; Mypy passed across 232 source files.
-- Integration suite passed 21 tests; the full unit suite and post-merge cross-platform GitHub matrix were run against the merged revision.
-- Frontend passed 416 unit tests, ESLint, isolated coverage, and a production build.
-- Frontend coverage was 35.6% lines, 25.1% branches, and 24.9% functions, with 59 of 110 application files absent from the report.
-- Python and npm security audits reported no known vulnerabilities.
-- Focused repros confirmed stale-lease revival, duplicate analysis starts, unlimited negative pagination, invalid task types, scheduler exception propagation, and a download-link concurrency crash.
-- This remains a NAS-free audit: real-media quality, NAS behavior, and physical M4 interruption/thermal evidence are still outside the evidence boundary.
-
-### Implementation validation — `codex/audit-fix-batch`
-
-- **33 of 37** addressable grade items are marked complete below.
-- Python unit suite: **3,609 passed, 8 skipped**; focused changed-area suite: **342 passed, 2 skipped**; integration suite: **21 passed**.
-- Ruff and format checks passed across 409 files; Mypy passed across 232 source files.
-- Frontend: **427 passed**, coverage gate passed, ESLint passed, production build passed on Quasar 2.21.2, and all 3 strict mocked Playwright journeys passed.
-- Frontend production dependency audit reported **0 vulnerabilities** after the compatible update batch.
-- Security hardening: **129 focused backend tests** and **17 focused frontend tests** passed; the broader backend suite passed **3,623 tests with 8 skips** before the final seven focused security cases were added, and the full frontend suite passed **431 tests** plus production build.
-- Finalization durability: **169 focused recovery/history/postprocessor/service tests** passed with crash-resumable file, history, metadata, and deletion phases.
-- Library analysis: **56 focused helper tests** passed with single-flight starts, streamed traversal, generation cleanup, and stat-first cache hits.
-- Frontend coverage now inventories **all 113 application JS/Vue files**: 19.54% statements, 15.11% branches, 12.42% functions, and 19.39% lines, with honest ratchet floors at 19/15/12/19.
-- Packaged live E2E: **3 Playwright journeys passed** against an isolated wheel install, including reject, approve/file replacement, history persistence, and backend restart.
-- Locked CI/local parity: canonical `--require-hashes` installs dry-ran successfully for runtime and development graphs; lock regeneration, actionlint, 10 release contract tests, 3 release-tool tests, and clean-wheel inspection passed. The fast lane passed **3,647 backend tests with 8 skips**, **431 frontend tests**, honest coverage, lint, type, audit, and production-build gates while listing every intentionally skipped full gate.
-- Structured API errors: **675 broad API/settings/plugin tests passed with 2 skips**, plus 70 focused boundary/transfer/notification/pending/preview tests. Malformed bodies are no longer echoed or double-written; unexpected details stay in correlated logs and client 500s use a stable public message.
-- Responsive/browser coverage: **433 frontend unit tests**, ESLint, production build, 4 desktop Chromium journeys, a Pixel 7 accessibility journey, and a focused WebKit smoke passed. The onboarding flow has a zero critical/serious axe result and keyboard-driven setup/plugin assertions; Firefox is enabled in CI because the local macOS launcher fails before browser context creation in this environment.
-- Security boundary follow-up: **938 plugin/worker/security tests passed with 3 skips**. External plugins now require an explicit ID allowlist at execution, remote archives require HTTPS plus a repository SHA-256, archive traversal/symlinks and shell commands are rejected, dependency installation is hash-locked wheel-only, and npm lifecycle execution is disabled. CSP forbids eval and inline scripts, all third-party Actions are immutable-SHA pinned, actionlint passes, and a local/CI pin-policy guard prevents drift.
-- Demand-aware scheduling: **315 focused scheduler, task, capability, Foreman, pending-API, and installation-link tests passed**. Distributed totals now use runnable non-deferred demand, bounded deterministic largest-remainder allocation, persisted recent throughput by codec, current CPU/memory/disk/thermal pressure, encoder compatibility, and remote queue depth.
-- License consistency: package history confirmed GPL-3.0-only metadata was chosen by the original copyright holder while earlier MIT file grants remain present. The combined distribution, Python/npm metadata, contributor policy, retained MIT notice, third-party/SBOM index, wheel contents, and a local/CI consistency gate are now aligned without deleting prior grants. **10 release contract tests passed**, all three npm lockfiles report zero vulnerabilities, and the clean wheel contains GPL, MIT, and third-party notices.
+**Top 5 highest-leverage improvements:** B1, G2, G1, E1, C1 (details at the end).
 
 ---
 
 ## A — Architecture & Design — B-
 
-Compresso now has strong durability primitives—leases, resumable transfers, scan checkpoints, a replacement journal, and explicit disk guards. The overall design is held back by unsupervised critical threads, separate filesystem/database durability protocols, and very large orchestration modules that combine several state machines.
+A mature, deliberately-hardened Unmanic fork with genuinely good bones — a startup readiness state machine, crash-recovery journal, schema-validated v2 API, and cleanly deprecated v1 — but it still carries the ancestor's structural debt: a service-locator built on ~14 singletons, a libs↔webserver layering inversion held together by deferred imports, a reflection-based API router, an 883-line god-object `Config`, and a ~2,900-line dead abstraction (`unffmpeg`). Above "average working code" on engineering rigor; held back from B+ by coupling and global state.
 
-### Architecture improvements
+### A1 — Service-locator singletons hand live `threading.Thread` objects to HTTP handlers
 
-#### ~~A1~~ ✓ done 2026-07-12 — Add fault containment and health supervision for critical service threads
-
-- **Where:** `compresso/libs/postprocessor.py:95-118`, `compresso/libs/scheduler.py:69-99`, `compresso/service.py:100-138`
-- **What's wrong:** The postprocessor and scheduled-task loops have no per-iteration exception boundary. One unexpected database, filesystem, plugin, or cleanup exception can permanently end finalization or all recurring maintenance.
-- **Impact:** Major — the installation can remain superficially alive while essential work has stopped.
-- **Fix:** Contain each work item, record last-success/error and consecutive failures, expose thread health through readiness, and make the root service restart or fail visibly when a critical thread exits.
+- **Where:** `compresso/libs/uiserver.py:69-92` (`CompressoDataQueues` / `CompressoRunningThreads` singletons, populated at `uiserver.py:116-119`); consumers at `compresso/webserver/api_v2/workers_api.py:84-86`, `compresso/webserver/websocket.py:111-113`, `compresso/webserver/helpers/workers.py:42-43` (pattern repeated six times); 14 classes use `SingletonType` (`config.py:73`, `libs/plugins.py:77`, `libs/session.py:40`, `libs/installation_link.py:53`, `libs/startup.py:23`, `webserver/downloads.py:45`, …)
+- **What's wrong:** API handlers call methods directly on the live `Foreman` thread fetched from an untyped global dict (`foreman.pause_worker_thread(...)`). There is no interface between HTTP and the orchestrator; handlers are coupled to Foreman's internal registry/locking discipline, and tests must construct half-initialized `Foreman` objects (acknowledged at `foreman.py:55-57`). This is the central coupling mechanism of the whole app.
+- **Impact:** Major
+- **Fix:** Define a narrow `WorkerControl`/`SystemStatus` facade owned by `service.py`, inject it via Tornado `Application` settings, and have handlers use `self.application.settings` instead of `CompressoRunningThreads()`. Retire the two registry singletons.
 - **Effort:** M
-- **Grade lift:** B- → B (prevents single exceptions from disabling whole subsystems)
+- **Grade lift:** B- → B+ (largest single architecture lever)
 
-#### ~~A2~~ ✓ done 2026-07-12 — Unify file replacement, history, and task state into one replayable protocol
+### A2 — Layering inversion: `libs/uiserver.py` is a webserver component living in `libs`
 
-- **Where:** `compresso/libs/postprocessor.py:386-412,801-846`, `compresso/libs/file_operation_tracker.py:106-125`, `compresso/libs/taskhandler.py:166-172`
-- **What's wrong:** Files, history/metadata, and task deletion commit in separate durability domains. Recovery can treat the file as committed and delete the task without replaying missing audit/statistics state.
-- **Impact:** Major — a crash can preserve media while silently losing authoritative history and operational evidence.
-- **Fix:** Persist explicit finalization phases on the task, make each phase idempotent, and replay or roll back every phase before deleting task/journal state. Add crash injection at each boundary.
+- **Where:** `compresso/libs/uiserver.py:48` (top-level `from compresso.webserver.downloads import DownloadsHandler`); deferred imports of five webserver modules inside `make_web_app()` (`uiserver.py:252,264,274,302,319`); reverse imports at `compresso/webserver/helpers/workers.py:32`, `webserver/websocket.py:49`, `webserver/api_v2/workers_api.py:32`, `webserver/api_v2/system_api.py:24`
+- **What's wrong:** `libs` imports the presentation layer at module import time while five webserver modules import back into `libs.uiserver`. The cycle only avoids `ImportError` because most webserver imports are deferred — import order is load-bearing and invisible.
+- **Impact:** Moderate
+- **Fix:** Move `UIServer` and the registry classes into `compresso/webserver/` (`service.py` already owns construction, so only import paths change). Enforce direction with an import-linter contract (`libs` must not import `webserver`).
+- **Effort:** S
+- **Grade lift:** B- → B
+
+### A3 — `Config` is an 883-line god-object that persists its own live `__dict__`
+
+- **Where:** `compresso/config.py:223-229` (`get_config_as_dict()` returns the *live* `self.__dict__`), `config.py:300-302` (every instance attribute serialized to `settings.json`), `config.py:396-883` (~490 lines of hand-written getter/setter boilerplate); duplicated bool parsing at `config.py:799-801` and `config.py:848-850` despite `_as_bool` existing at `config.py:67`
+- **What's wrong:** No settings schema. Any transient attribute assigned to the singleton leaks into `settings.json`; callers of `get_config_as_dict()` can mutate config state without persistence; every new setting requires editing four places.
+- **Impact:** Moderate
+- **Fix:** Introduce a declarative settings table (dataclass fields or a registry of `Setting(default, type, persist)`); serialize only registered keys; return a copy from `get_config_as_dict()`; route all bool getters through `_as_bool`.
+- **Effort:** M
+- **Grade lift:** B- → B
+
+### A4 — `unffmpeg` is a ~2,900-line abstraction with exactly one live consumer
+
+- **Where:** `compresso/libs/unffmpeg/` (2,944 lines across 12 container classes, 4 video-codec classes, audio/subtitle codecs, handles); sole product import verified at `compresso/libs/worker_capabilities.py:15` (uses only `Info.get_ffmpeg_video_encoders()` / hw-accel detection, `worker_capabilities.py:42-48`)
+- **What's wrong:** Transcode command construction moved to the plugin system (`bundled_plugins/encoding_presets`), but the whole codec/container hierarchy remains, inflating the maintenance surface and misleading readers about where encoding decisions live. It also harbors the B1 correctness bug.
+- **Impact:** Moderate
+- **Fix:** Extract `Info`/`probe.py`/`lib/cli.py` into a small `libs/ffmpeg_info.py`; delete the container/codec class hierarchy (or move it into the encoding-presets plugin).
+- **Effort:** S
+- **Grade lift:** B- → B (cleanliness, not behavior)
+
+### A5 — Reflection-based API routing recompiles regexes and dispatches stringly-typed per request
+
+- **Where:** `compresso/webserver/api_request_router.py:74-83` (URL segments select modules via `importlib.import_module` + `getattr`); `compresso/webserver/api_v1/base_api_handler.py:59-97` (`action_route()` compiles `tornado.routing.PathMatches(...)` on every request at line 79, dispatches via `getattr(self, route.get("call_method"))()`); per-handler route dicts, e.g. `compresso/webserver/api_v2/pending_api.py:61-117`
+- **What's wrong:** Tornado's native routing is bypassed twice; a `call_method` typo becomes a runtime `AttributeError`; regexes are recompiled per request; `ModuleNotFoundError` is used as control flow.
+- **Impact:** Moderate
+- **Fix:** At app build time, walk each handler's `routes` list once and register real Tornado URLSpecs with precompiled matchers; keep the dict format as the declaration source so Swagger tooling is untouched.
+- **Effort:** M
+- **Grade lift:** B- → B
+
+### A6 — `Foreman` remains a 961-line multi-responsibility orchestrator
+
+- **Where:** `compresso/libs/foreman.py:52-90` (constructor wires safety latch, dual pending queues, remote link managers, schedule state, config-hash tracking); `foreman.py:211-224` (minute-resolution string-compare scheduler: `if time_now == self.last_schedule_run: return` silently skips events if an iteration stalls past the minute); `foreman.py:728-751` (remote heartbeat), `foreman.py:826-916` (assignment algorithm)
+- **What's wrong:** Local worker lifecycle, distributed dispatch, event scheduling, metrics, and queue-idle notifications all live in one class with one lock — which is why the API layer needs the raw object (A1). Successor to prior-audit item A3, still open.
+- **Impact:** Moderate
+- **Fix:** Extract `RemoteDispatcher` (heartbeat + link managers + remote queues) and `WorkerScheduler` (event schedules) as owned sub-objects; Foreman keeps local worker registry + assignment. Shrinks the facade needed for A1.
 - **Effort:** L
-- **Grade lift:** B- → B+ (creates one auditable recovery state machine)
+- **Grade lift:** B → B+ (after A1)
 
-#### A3 — Split the largest orchestration modules by state-machine responsibility
+### A7 — Pure polling threading model; the global shutdown `Event` doubles as a sleep timer
 
-- **Where:** `compresso/libs/installation_link.py:1-1470`, `compresso/libs/postprocessor.py:1-1221`, `compresso/webserver/api_v2/pending_api.py:1-987`, `compresso/webserver/frontend/src/pages/ApprovalQueue.vue:1-1100`
-- **What's wrong:** Networking, retry policy, persistence, lifecycle transitions, serialization, and UI actions coexist in modules near or above 1,000 lines.
-- **Impact:** Moderate — small changes require understanding unrelated state machines and increase regression risk.
-- **Fix:** Extract transport/reconciliation, finalization/history, pending-query, and approval-data/action services behind narrow interfaces; move tests with each seam before behavior changes.
+- **Where:** `compresso/libs/foreman.py:926-927` (`self.event.wait(2)` main tick), `compresso/libs/workers.py:104-120` (`event.wait(1)`/`wait(5)`/`wait(0.5)` pacing), `foreman.py:753-756` (0.5s wait per drained completed task), `compresso/service.py:486-489` (`time.sleep(1)` main loop)
+- **What's wrong:** The process-wide shutdown event is reused everywhere as "sleep unless shutting down" — a *set* event turns every loop into a busy-spin until each thread notices its own flag — and task hand-off latency stacks poll intervals (2s + 1s) despite `queue.Queue` objects already existing (`foreman.py:72-74`).
+- **Impact:** Minor–Moderate
+- **Fix:** Blocking hand-off (`Queue.get(timeout=...)` or per-worker `Event`), per-concern events for pacing, drop the per-item drain wait.
+- **Effort:** M
+- **Grade lift:** B- → B-/B
+
+**Strengths:** Startup lifecycle and crash recovery are well above hobby-fork grade — `service.py:103-113` verifies threads stay alive, `service.py:378-396` turns a dead critical thread into visible shutdown, `service.py:247-272` replays the file-operation journal before any worker claims work. The v2 API layer is genuinely well-structured (Marshmallow schemas per endpoint, auth/CSRF/rate-limit guards and offloaded route bodies in `api_v2/base_api_handler.py:53-135`, v1 as a clean deprecation shim stamping `Deprecation` headers). Plugin execution is process-isolated with real cleanup discipline (`libs/unplugins/child_process.py:44-80` locked PID registry; `service.py:409-420` atexit/autoreload wiring).
+
+---
+
+## B — Backend Quality — B+
+
+A disciplined, defensively engineered backend: **zero** bare `except:` clauses in 245 files, narrow typed exception tuples, journaled crash-safe file operations, ruff with security/bugbear/complexity rules, and 64.7k lines of tests for 51.8k lines of code. Kept out of the A range by near-absent type hints (12.3% of functions), god functions behind `noqa: C901` waivers, an inherited correctness bug in `unffmpeg`, and the `Config` singleton (graded under A3).
+
+**Metrics:** bare `except:`: 0; `except Exception`: 320 (top: `installation_link.py` 18, `postprocessor.py` 15); functions with any annotation: 210/1,707 (12.3%), files with any: 28/245; functions >100 lines: 22; largest files: `installation_link.py` 1,459, `postprocessor.py` 1,403, `plugins.py` 1,208; logger style: 200 lazy `%s` calls, 0 f-string calls; TODO/FIXME: 4.
+
+### B1 — Wrong subprocess success check in unffmpeg CLI wrappers (false failures *and* missed failures)
+
+- **Where:** `compresso/libs/unffmpeg/lib/cli.py:56` and `cli.py:81` — `if pipe.returncode == 1 or "error" in raw_output:` (verified; duplicated in both `ffmpeg_cmd` and `ffprobe_cmd`, with stdout+stderr merged at `cli.py:48`)
+- **What's wrong:** Two bugs in one line: (a) only exit code `1` is treated as failure — ffmpeg/ffprobe exit codes 8, 69, 234, and negative signal-death codes are silently treated as success; (b) the substring test raises a false failure whenever "error" appears anywhere in legitimate output (e.g. a file path or encoder description containing the word). Probe results feed the whole pipeline.
+- **Impact:** Major
+- **Fix:** `if pipe.returncode != 0:` and drop the substring heuristic (or restrict it to ffprobe's `-show_error` JSON field). Add regression tests for non-1 exit codes and "error"-containing paths.
+- **Effort:** S
+- **Grade lift:** B+ → A- (with B2)
+
+### B2 — Subprocess/pipe leak on exception path in worker command execution
+
+- **Where:** `compresso/libs/workers.py:777-883` (`__exec_command_subprocess`): `Popen` at line 787; `terminate_proc()`/`unset_proc()` reached only on the normal path (lines 860-863); the handler at 879-883 logs and returns `False` with **no `finally`**
+- **What's wrong:** If `sub_proc.stdout.readline()` (line 830) or `psutil.Process(...)` raises `OSError` mid-loop, the running ffmpeg is never terminated and the stdout pipe never closed; the orphaned encoder keeps consuming CPU/disk while the worker moves on. (The *outer* crash path `_fail_current_task_after_unexpected_error`, lines 217-236, does terminate — but exceptions here are caught locally and never reach it.)
+- **Impact:** Moderate
+- **Fix:** Wrap the post-Popen body in `try/finally` calling `terminate_proc()` + `unset_proc()` and closing `sub_proc.stdout`.
+- **Effort:** S
+- **Grade lift:** B+ → A- (with B1)
+
+### B3 — Type hints essentially absent
+
+- **Where:** AST-measured: 210 of 1,707 functions annotated (12.3%); 28 of 245 files contain any annotation. Zero annotations in `compresso/libs/postprocessor.py` (47 defs), `libs/task.py` (46 defs), `libs/metadata.py`, `libs/history.py`. mypy is configured (`pyproject.toml:53-67`) but has almost nothing to check.
+- **What's wrong:** Dict-shaped payloads (`data`, `manager_info`, `task_data`) flow through dozens of functions with no contracts; several defensive `except (AttributeError, TypeError)` blocks exist precisely to paper over this.
+- **Impact:** Moderate
+- **Fix:** Annotate public interfaces of the ~15 central modules first (task, taskqueue, foreman, workers, postprocessor); introduce TypedDicts/dataclasses for the payload shapes.
 - **Effort:** L
-- **Grade lift:** B- → B (reduces coupling in the highest-risk maintenance surfaces)
+- **Grade lift:** B+ → A- over time
+
+### B4 — God functions waived with `noqa: C901`
+
+- **Where:** `compresso/libs/workers.py:347` (`__exec_worker_runners_on_set_task`, **281 lines**, nested closure thread launcher at line 457); `compresso/libs/libraryscanner.py:269` (`scan_library_path`, 200 lines, incl. the `double_check` polling hack at 369-389); `compresso/libs/postprocessor.py:851` (`post_process_file`, 173 lines); `compresso/libs/installation_link.py:505` (197 lines); 22 functions exceed 100 lines
+- **What's wrong:** The most failure-prone paths in the system are the hardest to test in isolation.
+- **Impact:** Moderate
+- **Fix:** Extract the runner-pass loop into `_run_single_runner_pass()` (the file already demonstrates this style); replace the scan `double_check` poll with condition-based completion.
+- **Effort:** M
+- **Grade lift:** +⅓ grade
+
+### B5 — Dead `DoesNotExist` handlers on lazy peewee selects, and a lost return value
+
+- **Where:** `compresso/libs/history.py:76-79`, `compresso/libs/task.py:445-448` and `task.py:487-489` — `except Tasks.DoesNotExist:` around `.select()` chains that are lazy and never raise it (only `.get()` does); `delete_tasks_recursively` (task.py:452-489) falls through with an implicit `None` where the contract returns `True`/`False`
+- **Impact:** Minor
+- **Fix:** Delete the unreachable handlers; make the return explicit.
+- **Effort:** S
+- **Grade lift:** marginal
+
+### B6 — Unlocked reads of `worker_threads` despite a documented lock protocol
+
+- **Where:** `compresso/libs/foreman.py:53-58` documents `worker_registry_lock`; mutation sites honor it, but read paths iterate without it: `get_all_worker_status` (948-952), `get_worker_status` (954-961), `fetch_available_worker_ids` (508-514), `check_for_idle_workers` (516-521), `_check_queue_idle_transition` (812-814). Concurrent `del` at `foreman.py:270` can raise `RuntimeError: dictionary changed size during iteration` in an API thread.
+- **Impact:** Minor
+- **Fix:** Snapshot under the lock: `with self.worker_registry_lock: threads = list(self.worker_threads.values())`.
+- **Effort:** S
+- **Grade lift:** marginal
+
+### B7 — Copy-paste duplication in `unffmpeg`
+
+- **Where:** `compresso/libs/unffmpeg/info.py:66-106` vs `108-148` (~40 lines duplicated except "encoder"/"decoder"); `info.py:244-263` duplicates `get_all_supported_codecs_of_type("video")` (216-242); `lib/cli.py:39-61` vs `64-86` twins (unused `err` at 49/74)
+- **What's wrong:** Bug-fix divergence risk — B1's bug already exists in two places.
+- **Impact:** Minor
+- **Fix:** One `_parse_codec_table(raw, kind)` helper; one `_media_tool_cmd(binary, params, exc_class)`. (Or resolve via A4 deletion.)
+- **Effort:** S
+- **Grade lift:** marginal
+
+**Strengths:** Crash-safe journaled finalization (`postprocessor.py:60-74` explicit `FINALIZATION_PHASE_ORDER` state machine; `_postprocess_local_file_safely` at 616-643 resumes from a persisted journal; `service.py:246-272` replays on startup). Exception and subprocess hygiene enforced by tooling (ruff `S`, `B`, `SIM`, `T20`, `C90` enabled in `pyproject.toml:36`; the 54 swallow sites are nearly all narrow with justified `noqa` waivers, e.g. `gpu_monitor.py:51`). Thoughtful async web layer (`api_v2/base_api_handler.py:382-442` offloads sync bodies from the IOLoop; `handle_unhandled_error` at 295-315 gives clients opaque correlated error IDs).
 
 ---
 
-## B — Backend Quality — B
+## C — Frontend Quality — B-
 
-The backend has strong schema coverage, checksummed transfers, retry/defer handling, and broad unit tests. Confirmed lifecycle defects remain around exceptional worker cleanup, lease expiry, task-domain validation, history transactions, and API error ownership.
+A genuinely disciplined codebase for its class — modern pinned stack (Vue 3.5, Quasar 2.21, Vite 7, vitest 4, Playwright 1.61), real unit + e2e + accessibility testing, complete i18n coverage (~1,730 `t()` call sites, no hardcoded strings in the sampled 1,000-line components), and a proper composables layer. Held back by several 750–1,250-line monolith components, a plain-JS codebase with no TypeScript, a self-admitted ~24% coverage baseline, mixed Options/`<script setup>` styles, and ad-hoc global-singleton state.
 
-### Backend improvements
+**Metrics:** 88 Vue SFCs (25,245 lines); largest: `CompletedTasksListDialog.vue` 1,251 / `ApprovalQueue.vue` 1,095 / `VideoCompare.vue` 1,001 / `LibraryConfigDialog.vue` 855; 36 vitest unit files (6,160 lines) + 2 Playwright specs; 49 files `<script setup>` vs 34 Options-wrapper; no Pinia/Vuex — module-level `reactive()` singletons.
 
-#### ~~B1~~ ✓ done 2026-07-12 — Always release or defer a worker task after unexpected exceptions
+### C1 — Monolithic components (1,000+ lines, dialogs-within-dialogs)
 
-- **Where:** `compresso/libs/workers.py:102-128,209-282`
-- **What's wrong:** The loop logs unexpected exceptions but clears `current_task` only after a successful happy path. A failure can leave one worker retrying the same in-progress task forever.
-- **Impact:** Major — one malformed file, plugin failure, or database error can permanently consume a worker and strand work.
-- **Fix:** Wrap the task lifecycle in `try/finally`, persist a retry/defer or failed state, terminate residual subprocess state, and always detach the task. Add injected failures at each persistence boundary.
+- **Where:** `compresso/webserver/frontend/src/components/dashboard/completed/CompletedTasksListDialog.vue` (1,251 lines; nests four additional `q-dialog`s at lines 356, 419, 459); `src/pages/ApprovalQueue.vue` (1,095); `src/components/preview/VideoCompare.vue` (1,001); `LibraryConfigDialog.vue` (855)
+- **What's wrong:** Single files own toolbar UI, sub-dialogs, selection logic, and API calls; these giants are exactly the files without component tests.
+- **Impact:** Major
+- **Fix:** Extract each nested `q-dialog` into `ui/dialogs/` components; move approve/reject flows into a composable like the existing `useApprovalQueueData.js`; add component tests as pieces are carved out (pairs with D1).
 - **Effort:** M
-- **Grade lift:** B → B+ (closes the clearest backend liveness defect)
+- **Grade lift:** B- → B
 
-#### ~~B2~~ ✓ done 2026-07-12 — Enforce lease expiry during heartbeat and first completion
+### C2 — No TypeScript; typing is runtime-props only
 
-- **Where:** `compresso/libs/remote_task_lease.py:61-93`
-- **What's wrong:** Heartbeat and completion check token ownership but not whether the lease is still live. A stale worker can revive an expired lease or complete after its ownership window.
-- **Impact:** Major — distributed exactly-once ownership can break during disconnect/reconnect races.
-- **Fix:** Add `lease_expires_at > now` to heartbeat and first-completion predicates, and create a separate explicit reconciliation path for late identical results.
-- **Effort:** S
-- **Grade lift:** B → B+ (makes the lease contract match its expiry semantics)
-
-#### ~~B3~~ ✓ done 2026-07-12 — Validate pagination and task types at both schema and domain boundaries
-
-- **Where:** `compresso/webserver/api_v2/schema/schemas.py:118-160`, `approval_schemas.py:28-60`, `pending_schemas.py:151-180`, `compresso/libs/task.py:243-280,366-406`
-- **What's wrong:** Negative/unlimited pagination is accepted, and task `type` accepts arbitrary strings even though lifecycle code handles only `local` and `remote`.
-- **Impact:** Major — one request can load an entire large table or create a permanently stuck unique-path task.
-- **Fix:** Require `start >= 0`, cap page sizes, restrict type to `local|remote`, and clamp/revalidate inside query and task-creation methods.
-- **Effort:** S
-- **Grade lift:** B → B+ (turns two reproduced API failures into rejected input)
-
-#### ~~B4~~ ✓ done 2026-07-12 — Make history persistence transactional and idempotent
-
-- **Where:** `compresso/libs/history.py:279-313`, `compresso/libs/postprocessor.py:386-412,1081-1103`
-- **What's wrong:** Completed-task, command-log, and statistics rows are independent writes. A false late result is ignored and finalization can delete the task after partial history.
-- **Impact:** Moderate — failures can lose statistics/logs or produce duplicate completed records on retry.
-- **Fix:** Use an idempotency key and one database transaction for all history rows; treat any false result as a deferred finalization failure.
-- **Effort:** M
-- **Grade lift:** B → B+ (makes task history an all-or-nothing boundary)
-
-#### ~~B5~~ ✓ done 2026-07-12 — Give the v2 API one structured error writer
-
-- **Where:** `compresso/webserver/api_v2/base_api_handler.py:210-233,267-340`, `compresso/webserver/api_v2/pending_api.py:529-535`
-- **What's wrong:** Request parsing writes an error and then raises, while many handlers catch and write again. Raw request bodies and exception strings can also become client-visible reasons.
-- **Impact:** Moderate — malformed requests can cause double-finish behavior and leak unstable or sensitive implementation details.
-- **Fix:** Make parsing raise a structured public error without writing, route expected/unexpected errors through one response owner, and log private diagnostics with correlation IDs.
-- **Effort:** M
-- **Grade lift:** B → B+ (standardizes the remaining weak API boundary)
-
----
-
-## C — Frontend Quality — C
-
-The Vue/Quasar interface is useful and has a coherent visual system, localization, and substantial unit coverage. Confirmed user-intent bugs, autosave races, disabled-control bypasses, platform-specific path handling, and accessibility/responsive failures prevent a professional B grade.
-
-### Frontend improvements
-
-#### ~~C1~~ ✓ done 2026-07-12 — Scope approval keyboard shortcuts to safe focus contexts
-
-- **Where:** `compresso/webserver/frontend/src/pages/ApprovalQueue.vue:1047-1055`
-- **What's wrong:** A window-level Enter handler approves whenever the detail dialog is open, regardless of whether Reject, Close, preview, or another interactive control has focus.
-- **Impact:** Major — a normal keyboard action can replace the wrong media file.
-- **Fix:** Ignore editable/interactive targets, require an explicit modifier or focused Approve action, guard re-entry, and add keyboard tests for every dialog control.
-- **Effort:** S
-- **Grade lift:** C → C+ (removes the highest-risk frontend action bug)
-
-#### ~~C2~~ ✓ done 2026-07-12 — Serialize plugin autosaves without dropping edits
-
-- **Where:** `compresso/webserver/frontend/src/components/settings/plugins/PluginInfoDialog.vue:470-505,564-575`
-- **What's wrong:** Watcher events are discarded while a save is active; the first completion then refetches server state. A second edit can be overwritten without ever being sent.
-- **Impact:** Major — operators can lose configuration changes with no warning.
-- **Fix:** Queue one trailing save using immutable snapshots/version numbers, refetch only after the latest version is acknowledged, and test two edits around a delayed request.
-- **Effort:** M
-- **Grade lift:** C → C+ (makes autosave preserve user intent)
-
-#### ~~C3~~ ✓ done 2026-07-12 — Prevent disabled plugin settings from changing through wrapper events
-
-- **Where:** `compresso/webserver/frontend/src/components/settings/plugins/PluginInfoDialog.vue:148-160,470-489`
-- **What's wrong:** The checkbox is disabled, but the parent click handler still toggles the bound value and the save request persists it.
-- **Impact:** Moderate — settings presented as immutable can still be modified.
-- **Fix:** Remove the wrapper handler or guard it on enabled state; use the checkbox event as the single owner and add a disabled-click regression.
-- **Effort:** S
-- **Grade lift:** C → C+ (restores the control contract)
-
-#### ~~C4~~ ✓ done 2026-07-12 — Centralize cross-platform path presentation
-
-- **Where:** `src/composables/useApprovalQueueData.js:17-20`, `src/boot/compressoWebsocket.js:358`, `src/components/dashboard/WorkersPanel.vue:273`, `src/pages/HealthCheck.vue:479`
-- **What's wrong:** Filename extraction splits only on `/`; Windows paths display as the entire absolute path.
-- **Impact:** Moderate — Windows deployments show broken labels in several core views.
-- **Fix:** Add one tested path-display utility supporting `/` and `\\`, then replace all ad hoc splits.
-- **Effort:** S
-- **Grade lift:** C → C+ (fixes a repeated platform defect)
-
-#### ~~C5~~ ✓ done 2026-07-12 — Enforce responsive and accessible interaction standards
-
-- **Where:** `frontend/index.html:10`, `SettingsLibrary.vue:10,92`, `SettingsLink.vue:8,99`, `FirstRunWizard.vue:2-4`, `PluginInstallerManageRepos.vue:62-99`
-- **What's wrong:** Browser zoom is disabled, platform detection replaces viewport breakpoints, several dialogs impose 400-560px minimum widths, and important actions use clickable spans.
-- **Impact:** Moderate — narrow windows, phones, keyboard users, and low-vision users can be blocked from core setup/actions.
-- **Fix:** Restore zoom, use `lt-md`/`useMobile`, maximize dialogs on small viewports, replace spans with semantic links/buttons, and add keyboard/mobile assertions.
-- **Effort:** M
-- **Grade lift:** C → B- (addresses the broadest UX/accessibility debt cluster)
-
----
-
-## D — Testing & Reliability — B
-
-Python reliability evidence is broad: thousands of unit tests, integration tests, cross-platform shards, fault/fuzz coverage, and a 75% floor. Frontend testing passes but measures only imported files, and browser lanes do not yet prove packaged destructive workflows or diverse clients.
-
-### Testing improvements
-
-#### ~~D1~~ ✓ done 2026-07-12 — Measure every frontend source file and ratchet meaningful thresholds
-
-- **Where:** `compresso/webserver/frontend/vitest.config.js:11-20`, `compresso/webserver/frontend/src/`
-- **What's wrong:** No source include pattern means unimported files count as nonexistent; 59 of 110 application files were absent while 30/20/20/30 thresholds passed.
-- **Impact:** Major — core pages can have zero coverage without lowering the reported gate.
-- **Fix:** Include all JS/Vue source with intentional generated/vendor exclusions, add tests for uncovered core flows, and ratchet thresholds from the resulting honest baseline.
-- **Effort:** M
-- **Grade lift:** B → B+ (makes frontend coverage representative rather than selective)
-
-#### ~~D2~~ ✓ done 2026-07-12 — Exercise a packaged, state-changing release workflow end to end
-
-- **Where:** `frontend/tests/e2e-live/compresso-live-smoke.spec.js:3-52`, `frontend/scripts/start-live-backend.mjs:20-29`
-- **What's wrong:** Live E2E starts source through `PYTHONPATH` and checks mostly read-oriented startup contracts. It does not prove the wheel, migration, encode handoff, approval/reject, or restart workflow.
-- **Impact:** Major — a release can pass while the installed product's core media lifecycle is broken.
-- **Fix:** Install the built wheel in a disposable environment, seed a tiny media fixture, run queue→process→approve/reject→restart journeys, and assert disk/database outcomes.
+- **Where:** `jsconfig.json` (not tsconfig); `eslint.config.mjs:64-77,89-101` (`@babel/eslint-parser`, `requireConfigFile: false`); coercion smells TS would catch, e.g. `ApprovalQueue.vue:833-834` (`=== true || === 'true'`); lint tier is only `vue/strongly-recommended` + prettier
+- **Impact:** Moderate
+- **Fix:** Incremental adoption — `allowJs` tsconfig + `vue-tsc` in CI, convert `src/js/` and `src/composables/` first; bump ESLint to `flat/recommended`.
 - **Effort:** L
-- **Grade lift:** B → B+ (adds genuine product-release proof)
+- **Grade lift:** B → B+/A- long-term
 
-#### ~~D3~~ ✓ done 2026-07-12 — Make mock E2E fail on unknown requests and runtime transport errors
+### C3 — Split personality: `<script setup>` vs Options-wrapper `setup()`
 
-- **Where:** `frontend/tests/e2e/compresso-smoke.spec.js:60-175,219-221`, `frontend/tests/e2e-live/compresso-live-smoke.spec.js:23-40`
-- **What's wrong:** Unknown mock endpoints receive a generic HTTP 200 success, and suites inconsistently ignore console errors, request failures, and unexpected non-2xx responses.
-- **Impact:** Moderate — renamed/misspelled endpoints and browser transport failures can leave smoke tests green.
-- **Fix:** Reject unknown routes, fail on unexpected console/request/HTTP errors, and add deliberate 4xx/5xx recovery scenarios.
-- **Effort:** S
-- **Grade lift:** B → B+ (raises the signal of the existing browser lanes)
-
-#### ~~D4~~ ✓ done 2026-07-12 — Add browser, mobile, and accessibility coverage
-
-- **Where:** `frontend/playwright.config.js:24-29`, `frontend/playwright.live.config.js:51-56`, `.github/workflows/frontend_lint_and_build.yml:85-92`
-- **What's wrong:** E2E runs only desktop Chromium and has no automated keyboard/axe gate despite responsive and accessibility requirements.
-- **Impact:** Moderate — Safari/WebKit, Firefox, mobile layouts, and semantic failures are detected only manually.
-- **Fix:** Add one mobile Chromium project, focused WebKit/Firefox smoke, axe checks, and keyboard traversal for approval/setup/plugin workflows.
+- **Where:** 49 vs 34 files; e.g. `ApprovalQueue.vue:630-633` (Options wrapper) beside `CompletedTasksListDialog.vue:496` (`<script setup>`) in the same feature area
+- **Impact:** Moderate
+- **Fix:** Migrate the 34 Options-wrapper files (mechanical — they already use Composition API inside `setup()`), then enable `vue/component-api-style: ['error', ['script-setup']]`.
 - **Effort:** M
-- **Grade lift:** B → B+ (covers declared client diversity and key accessibility contracts)
+- **Grade lift:** B- → B (with C1)
+
+### C4 — Ad-hoc global state; installation switch does `location.reload()`
+
+- **Where:** `src/js/sharedLinksStore.js:24-29` (`setTarget()` → `localStorage.setItem` → `location.reload()`); `src/js/compressoGlobals.js:79` (`let $compresso = {}` mutable module singleton, stuffed with websocket listener registries by `compressoWebsocket.js`)
+- **What's wrong:** Full-page reload as a state transition defeats SPA routing/state; the untyped `$compresso` bag is shared mutable state with no devtools visibility, while Quasar bundles Pinia support unused.
+- **Impact:** Moderate
+- **Fix:** Pinia stores for installation target, toast settings, and websocket connection state; make target switching re-fetch instead of reloading.
+- **Effort:** M
+- **Grade lift:** +⅓ grade in maintainability
+
+### C5 — Auth retry via `window.prompt()` on the mutated global axios instance
+
+- **Where:** `src/js/apiAuth.js:33-36` (`globalThis.prompt(promptText)`); wired at `src/boot/axios.js:64-78` (401 → prompt → retry); interceptors installed on the **global** axios default instance (lines 40, 64) which every page imports directly
+- **What's wrong:** A blocking native prompt is poor UX/accessibility (no i18n, blocks the event loop) — especially since a proper `LoginDialog.vue` already exists (`src/components/drawers/partials/LoginDialog.vue`); mutating global axios leaks interceptors to any code sharing the module.
+- **Impact:** Moderate
+- **Fix:** Promise-based auth gate using the existing LoginDialog; one dedicated `axios.create()` app instance imported everywhere.
+- **Effort:** M
+- **Grade lift:** +⅓ grade (with C3)
+
+### C6 — Coverage gate honest but very low
+
+- **Where:** `compresso/webserver/frontend/vitest.config.js:17-24` — `thresholds: { lines: 24, functions: 16, branches: 17, statements: 24 }` ("Honest all-source baseline (2026-07-12). Ratchet upward…")
+- **What's wrong:** Tests concentrate on `src/js/` and `src/composables/`; the five largest, riskiest components (C1) have no component tests. Cross-referenced as D1 — the ratchet is a comment, not a mechanism.
+- **Impact:** Moderate
+- **Fix:** See D1.
+- **Effort:** M–L
+- **Grade lift:** B- → B
+
+### C7 — 11 unscoped `<style>` blocks leaking global CSS
+
+- **Where:** 44/55 style blocks scoped; unscoped include `src/components/settings/plugins/partials/PluginsInstalledTable.vue:627`, `src/components/dashboard/completed/CompletedTaskLogDialog.vue:81`, `src/components/docs/HelpSupportDialog.vue:382`, `src/pages/SettingsPlugins.vue:68`, `src/components/FooterData.vue:65`, +6 more; plus a 604-line global `app.scss`
+- **Impact:** Minor
+- **Fix:** Add `scoped` + `:deep()` where global reach isn't required; enable `vue/enforce-style-attribute`.
+- **Effort:** S
+- **Grade lift:** hygiene
+
+### C8 — Dead boilerplate axios instance with placeholder production URL
+
+- **Where:** `src/boot/axios.js:86` — `const api = axios.create({ baseURL: 'https://api.example.com' })` (verified), injected as `$api` (line 95) and exported (line 101); zero consumers found in `src/`
+- **Impact:** Minor
+- **Fix:** Delete the scaffold instance, export, and comments (lines 80-97).
+- **Effort:** S
+- **Grade lift:** hygiene
+
+**Strengths:** Layered test setup with accessibility scanning (36 colocated unit test files; axe-core audit at `tests/e2e/compresso-smoke.spec.js:405`; a live-backend Playwright config). Security-conscious API layer (`src/boot/axios.js:24-56` origin-checks every request before attaching auth/CSRF headers; `src/js/sanitize.js` wraps DOMPurify with an explicit allowlist; the auth token travels in WebSocket subprotocols, not query strings — `src/js/apiAuth.js:18-31`). Complete i18n discipline and 12 purpose-built composables, each with a matching test.
 
 ---
 
-## E — Security — C+
+## D — Testing & Reliability — A-
 
-The project has schema validation, rate limiting, security headers, SSRF guards, CodeQL, Sonar, Trivy, signed images, SBOMs, and clean advisory scans. The effective trust boundary is still incomplete: first launch is unauthenticated on all interfaces, protected mode exempts sensitive reads and whole handler families, secrets are stored weakly, plugins have full process privileges, CSP is permissive, and most Actions use mutable tags.
+An unusually mature test and reliability posture: ~4,000 backend tests with genuinely behavioral assertions, an enforced 75% combined-coverage gate, cross-OS PR shards, fail-closed fuzz tests for every persistence primitive, and real-filesystem integration tests of the data-loss-critical file-move path. Kept from A/A+ by the very low frontend coverage gate, a thin marked integration suite whose coverage is invisible in Sonar, and a stale test-durations file.
 
-### Security improvements
+**Metrics:** ~4,036 Python tests on 3.13 (3,947 collected on the audit box's 3.11 with one env-only collection error); ~4,012 unit (175 files) vs **24 integration** (7 files); backend gate `fail_under = 75` (`pyproject.toml:25`) enforced in CI (`python_lint_and_run_unit_tests.yml:176`); frontend thresholds 24/16/17/24; 36 vitest files (~432 cases) + 2 Playwright specs.
 
-#### ~~E1~~ ✓ done 2026-07-12 — Make authentication cover sensitive reads, WebSockets, proxying, and plugin APIs
+### D1 — Frontend coverage gate is very low relative to backend rigor
 
-- **Where:** `base_api_handler.py:53-73,141-193`, `settings_api.py:182-191`, `settings_link_mixin.py:147-169`, `websocket.py:56-171`, `proxy.py:116-189`, `plugins.py:121-205`
-- **What's wrong:** API auth protects only selected mutation routes. Sensitive settings can return remote passwords, while WebSockets, proxy, and plugin APIs bypass the guarded base handler.
-- **Impact:** Major — enabling auth does not actually create the boundary operators expect.
-- **Fix:** Add shared authentication middleware for every dynamic route, protect all sensitive reads, return password-present placeholders instead of secrets, and add unauthorized integration tests for each handler family.
+- **Where:** `compresso/webserver/frontend/vitest.config.js:17-24` (24% lines / 16% functions vs backend 75%); only 6 of 15 pages in `src/pages/*.vue` have tests
+- **What's wrong:** The "ratchet upward" is a comment, not a mechanism — nothing prevents it staying at 24% forever.
+- **Impact:** Moderate
+- **Fix:** CI step that fails if achieved coverage exceeds thresholds by >2 points without a threshold bump (auto-ratchet); component tests for the 9 untested pages, starting with the C1 extraction targets.
 - **Effort:** M
-- **Grade lift:** C+ → B (closes the largest confidentiality and boundary gap)
+- **Grade lift:** A- → A
 
-#### ~~E2~~ ✓ done 2026-07-12 — Use a safe first-launch network posture
+### D2 — Marked integration suite is thin; its coverage is unenforced and invisible
 
-- **Where:** `compresso/config.py:77-80,149-156`, `compresso/libs/uiserver.py:205-215`, `README.md:19-30`
-- **What's wrong:** The default binds all interfaces with auth and CSRF disabled, while Quick Start publishes the port without an adjacent warning.
-- **Impact:** Major — a mistaken router/container exposure permits unauthenticated media-changing requests.
-- **Fix:** Bind loopback by default or require explicit trusted-LAN opt-in, generate a first-run token, and surface exposure mode in onboarding/readiness.
-- **Effort:** M
-- **Grade lift:** C+ → B- (reduces the most likely operator-driven exposure)
+- **Where:** `.github/workflows/integration_test_and_build_all_packages_ci.yml:112` (`--cov-fail-under=0`); `sonar-project.properties:27-30` (documented but unimplemented cross-workflow consolidation); 24 tests across 7 files (`test_service_startup.py` has 3, `test_distributed_process_drill.py` has 1)
+- **Impact:** Moderate
+- **Fix:** Compose the unit/integration workflows via `workflow_call` under one parent (the pattern already exists — `release.yml` calls both), merge coverage artifacts, and add integration tests for remote-worker lease/handoff and websocket push paths.
+- **Effort:** M–L
+- **Grade lift:** A- → A
 
-#### ~~E3~~ ✓ done 2026-07-12 — Store configuration secrets atomically with mode 0600 and redact failures
+### D3 — `.test_durations` is 2 months stale and covers ~62% of unit tests
 
-- **Where:** `compresso/config.py:263-273,323-327`, `compresso/libs/common.py:225-260`
-- **What's wrong:** Settings inherit the process umask and write failures log the complete configuration, including credentials.
-- **Impact:** Major — local users, backups, or logs can expose tokens, passwords, and webhooks.
-- **Fix:** Write/replace with explicit `0600`, secure backups, preserve ownership, and recursively redact secret fields from every log/response path.
+- **Where:** `.test_durations` (2,483 entries spanning 105 files vs ~4,012 tests in 174 files; last touched `2026-05-20`); `refresh_test_durations.yml:9` (monthly cron whose output hasn't landed since May — the workflow exits silently on failure/unmerged PR)
+- **Impact:** Minor
+- **Fix:** `workflow_dispatch` the refresh now; add failure notification or auto-merge label so refresh PRs don't rot.
 - **Effort:** S
-- **Grade lift:** C+ → B- (protects stored credentials with a narrow change)
+- **Grade lift:** marginal
 
-#### E4 — Isolate plugin installation and execution
+### D4 — E2E depth is one smoke spec per mode, with silent retry masking
 
-**Phase-one hardening complete 2026-07-12:** untrusted external plugin execution is now off by default, remote packages are digest-authenticated, installation scripts are constrained, and shell command strings are rejected. Full least-privilege process/container isolation remains open for explicitly trusted third-party Python runners.
-
-- **Where:** `compresso/libs/plugins.py:486-564`, `compresso/libs/workers.py:736-751`
-- **What's wrong:** Plugin ZIPs can trigger pip/npm install/build and runtime commands—including shell execution—with the full privileges of the Compresso process.
-- **Impact:** Major — a compromised plugin can read configuration, alter media, or execute arbitrary host commands.
-- **Fix:** Require trusted/signed sources, execute in a restricted container/process profile, default media to read-only, and grant network/filesystem capabilities explicitly.
-- **Effort:** L
-- **Grade lift:** C+ → B+ (turns a documented trust assumption into technical isolation)
-
-#### ~~E5~~ ✓ done 2026-07-12 — Restore meaningful production CSP protection
-
-- **Where:** `compresso/webserver/security_headers.py:46-59`, `compresso/webserver/frontend/quasar.config.cjs`
-- **What's wrong:** Production permits both `unsafe-eval` and inline scripts/styles, sharply reducing CSP's value against future injection bugs.
-- **Impact:** Moderate — a later XSS defect faces fewer browser-enforced barriers.
-- **Fix:** Audit the bundle, choose a CSP-compatible Vue build, externalize or hash/nonce inline content, and add browser assertions that eval/inline execution is rejected.
+- **Where:** `tests/e2e-live/compresso-live-smoke.spec.js` (94 lines — the only test of the real frontend↔backend contract); `playwright.config.js:11` (`retries: process.env.CI ? 2 : 0`, no flake reporting)
+- **Impact:** Minor–Moderate
+- **Fix:** Add 2-3 live journeys (settings save round-trip, approval action, history pagination); enable the JSON reporter and annotate when `retry > 0` occurred.
 - **Effort:** M
-- **Grade lift:** C+ → B- (restores defense in depth)
+- **Grade lift:** A- → A (with D1)
 
-#### ~~E6~~ ✓ done 2026-07-12 — Pin every third-party GitHub Action to an immutable commit
+### D5 — Coverage-campaign test-file sprawl
 
-- **Where:** `.github/workflows/` (54 mutable-tag uses; examples in `python_lint_and_run_unit_tests.yml`, `integration_test_and_build_all_packages_ci.yml`, `release.yml`)
-- **What's wrong:** Most Actions use mutable major tags even though selected release steps are already SHA-pinned.
-- **Impact:** Moderate — an altered tag can change trusted CI or release behavior without a repository diff.
-- **Fix:** Pin all external actions to reviewed SHAs with version comments and let Dependabot update those pins through review.
+- **Where:** five foreman files (`test_foreman.py`, `_deep`, `_extended`, `_queue_empty`, `_run_refactor`), plus `test_additional_api_coverage.py`, `test_api_deferred_coverage.py`, `test_config_round2.py`, a broad `*_extended.py` family. Sampled tests are real (drive Tornado handlers over HTTP, assert payloads) — organizational debt, not shallow testing.
+- **Impact:** Minor
+- **Fix:** Consolidate per-module; ban `*_coverage`/`*_round2` naming in a CONTRIBUTING note.
 - **Effort:** M
-- **Grade lift:** C+ → B- (closes broad CI supply-chain drift)
+- **Grade lift:** marginal
+
+### D6 — `ThreadHealthMixin` has no dedicated unit test
+
+- **Where:** `compresso/libs/thread_health.py:1-43` (the watchdog telemetry primitive); coverage only indirect via consumers (`tests/unit/test_scheduler.py:44,451-485`, `test_postprocessor.py:674-706`)
+- **Impact:** Minor
+- **Fix:** Direct suite including a concurrent hammer test.
+- **Effort:** S
+- **Grade lift:** marginal
+
+**Strengths:** Data-loss invariants tested against the real filesystem with injected failure — `tests/integration/test_file_pipeline.py:153-187` injects `OSError` on the final rename and asserts byte-for-byte restoration of the destination, source survival, and cache retention. Fail-closed primitives each have adversarial suites (`test_safety_state.py:77-121` corrupt-state forcing pause; `test_20tb_state_fuzz.py` 200 seeded malformed-JSON iterations; `test_retry.py` 520 lines against a real SQLite DB). CI rigor: hash-locked deps, pip-audit, ruff+mypy blocking, 3-way shards × {ubuntu, macos, windows}, combined 75% gate, Docker runtime smoke test, and autouse fixtures that reap leaked threads/singletons (`tests/conftest.py:110-202`).
 
 ---
 
-## F — Dependencies & Tech Currency — B
+## E — Security — B+
 
-Runtime/dev Python locks and npm locks exist, and live audits found no known vulnerabilities. Reproducibility is weakened because tested/installed graphs differ, npm update automation is missing, and safe frontend updates plus an unused parser remain.
+Genuinely strong, deliberate security engineering for a self-hosted tool: auth and CSRF are force-enabled whenever the UI listens beyond loopback (with an auto-generated token persisted at mode 0600), token comparison is constant-time, the plugin supply chain is HTTPS-only with mandatory SHA-256 and one of the most thorough zip validators you'll see in this class of app, the remote-installation proxy is SSRF-guarded with header allowlists, and the backend contains zero `eval`/`exec`/`pickle`/`shell=True`. Remaining findings are defense-in-depth and secrets-at-rest hardening, not exposed defaults. (Prior audit: C+ — the E1/E2/E3/E5/E6 hardening from that round is verifiably in place.)
 
-### Dependency improvements
+### E1 — WebSocket `prepare()` ignores `authorize_request`'s return value
 
-#### ~~F1~~ ✓ done 2026-07-12 — Install the same hash-locked Python graph that CI audits
-
-- **Where:** `requirements.lock`, `requirements-dev.lock`, `python_lint_and_run_unit_tests.yml:45-57,99-104`, `integration_test_and_build_all_packages_ci.yml:105-111`, `verify-local.yml:34-37`, `docker/Dockerfile.base:169-202`
-- **What's wrong:** Audits inspect lockfiles, but CI, integration, local parity, and Docker install unlocked `.txt` inputs whose transitives can drift.
-- **Impact:** Major — the code can run and ship with versions different from those that passed the security audit.
-- **Fix:** Make hash-locked installs canonical, derive cache keys from locks, and add a check that source requirement inputs regenerate without diff.
-- **Effort:** M
-- **Grade lift:** B → B+ (aligns audit, test, package, and runtime graphs)
-
-#### ~~F2~~ ✓ done 2026-07-12 — Add Dependabot coverage for all npm lockfiles
-
-- **Where:** `.github/dependabot.yml:1-35`, `compresso/webserver/frontend/package-lock.json`, `compresso/webserver/package-lock.json`, `.github/release/package-lock.json`
-- **What's wrong:** Dependabot covers pip, Actions, and Docker but none of the three npm directories.
-- **Impact:** Moderate — JavaScript security and compatibility updates rely on manual discovery.
-- **Fix:** Add weekly npm entries per directory with grouped patch/minor updates and conservative PR limits.
+- **Where:** `compresso/webserver/websocket.py:122-123` — `def prepare(self): authorize_request(self, allow_websocket_protocol=True)` (verified: return value unchecked); contrast HTTP handlers, e.g. `proxy.py:182-184` (`if not authorize_request(self): return`)
+- **What's wrong:** Rejection relies on the side effect that `authorize_request` calls `handler.finish()` (`request_auth.py:83-85`), which aborts the handshake today because Tornado skips the upgrade after a finished response. Nothing in *this* handler enforces the auth decision; a refactor of `authorize_request` (e.g. returning without finishing) or of Tornado's prepare/upgrade sequencing silently opens every stream — workers, logs, task data — to unauthenticated clients. The socket also never re-checks auth after open despite long-lived connections.
+- **Impact:** Moderate (defense-in-depth on the heaviest data-exposure surface)
+- **Fix:** Check the return and raise `tornado.web.HTTPError(401)` when false; add a regression test asserting an unauthenticated websocket handshake is refused when `api_auth_enforced` is on.
 - **Effort:** S
-- **Grade lift:** B → B+ (completes automated dependency coverage)
+- **Grade lift:** B+ → A-
 
-#### ~~F3~~ ✓ done 2026-07-12 — Remove dead dependencies and batch compatible frontend updates
+### E2 — Single static bearer token; remote-installation credentials plaintext at rest
 
-- **Where:** `compresso/webserver/frontend/package.json:20-63`, `src/js/markupParser.js:2`
-- **What's wrong:** `js-bbcode-parser` is declared but unused, and compatible updates are available for Axios, Quasar, Vue, Vitest, DOMPurify, and related tooling.
-- **Impact:** Moderate — unused/stale packages add supply-chain surface and future migration cost.
-- **Fix:** Remove the unused parser, batch patch/minor updates under full frontend gates, and isolate Quasar-app/router/ESLint majors into separate migration lanes.
+- **Where:** `compresso/config.py:201-210` (auto-generated token persisted to `settings.json`); `config.py:302` (file written 0600 — good); `compresso/webserver/proxy.py:162-171` (remote basic-auth `username`/`password` and `api_token` read as plaintext from settings); `config.py:229` (`get_config_as_dict()` returns the live dict including `api_auth_token`, so any settings-dump surface must remember to redact)
+- **What's wrong:** One long-lived shared token with no rotation or expiry; compromise means silent full API access until manually changed. Remote-worker credentials sit unencrypted in the same file, and the live-dict export makes accidental token disclosure a one-line mistake in any future settings endpoint.
+- **Impact:** Moderate
+- **Fix:** Add a token-rotation endpoint/CLI and creation timestamp; return a redacted copy from `get_config_as_dict()` by default (allowlist callers that need secrets); document credential scoping for remote links.
 - **Effort:** M
-- **Grade lift:** B → B+ (keeps the supported stack current without upgrade bundling)
+- **Grade lift:** B+ → A- (with E1)
+
+### E3 — CSRF cookie never sets the `Secure` flag
+
+- **Where:** `compresso/webserver/api_v2/base_api_handler.py:162` — `self.set_cookie(CSRF_COOKIE_NAME, csrf_token, httponly=False, samesite="Strict")` (httponly=False is required by the double-submit pattern; `Secure` is simply absent even when serving HTTPS)
+- **Impact:** Minor
+- **Fix:** `secure=self.request.protocol == "https"` (or always-on when `get_ssl_enabled()`).
+- **Effort:** S
+- **Grade lift:** marginal
+
+### E4 — Proxy SSRF check has a DNS-rebinding TOCTOU window
+
+- **Where:** `compresso/webserver/proxy.py:87-104` (`_is_blocked_address` resolves and validates), then `proxy.py:212` (`client.fetch(url, ...)` re-resolves independently). Practical risk is low — targets come only from operator-configured remote installations (`proxy.py:112-147`), not request input — but a malicious DNS answer could pass validation then rebind to loopback/metadata.
+- **Impact:** Minor
+- **Fix:** Resolve once, validate the IP, and connect to that IP with the Host header pinned (or re-validate in a custom resolver hook).
+- **Effort:** M
+- **Grade lift:** marginal
+
+### E5 — `DownloadsHandler` skips the security-header mixin and auth
+
+- **Where:** `compresso/webserver/downloads.py:77` — `class DownloadsHandler(web.RequestHandler)` (no `SecurityHeadersMixin`, no `authorize_request`). Mitigated: links are unguessable UUID4 capabilities expiring in 60s (`downloads.py:63-69`) and paths are realpath-confined to library/cache roots (`downloads.py:102-123`), so this is header hygiene plus a note that a leaked link is exercisable without a token for its 60-second life.
+- **Impact:** Minor
+- **Fix:** Add the mixin; optionally require the auth header when `api_auth_enforced` is on (links are already minted by authenticated callers).
+- **Effort:** S
+- **Grade lift:** marginal
+
+**Strengths (verified):** Secure-by-default network posture — auth+CSRF force-enabled off-loopback unless explicitly opted out (`config.py:159-161, 740-758`), auto-generated token (`config.py:201-210`), constant-time comparisons via `hmac.compare_digest` (`request_auth.py:56-65`), per-IP/path rate limiting with headers (`base_api_handler.py:115-133`). Plugin supply chain: HTTPS-only + mandatory SHA-256 with hex validation (`plugins.py:486-513`), 64 MiB download cap, and archive validation rejecting absolute/traversal paths, symlinks/special files, encrypted members, entry-count/size/compression-ratio bombs (`plugins.py:520-569`); external plugin execution requires an explicit `COMPRESSO_TRUSTED_PLUGIN_IDS` allowlist (`libs/unplugins/executor.py:155-211`). Proxy hardening: request/response header allowlists, credential injection only for the resolved target, redirect blocking, fail-closed DNS, loopback/link-local/metadata blocklist (`proxy.py:16-104`). Strict CSP with no `unsafe-inline`/`unsafe-eval` script sources (`security_headers.py:50-64`), websocket origin validation (`security_headers.py:67-81`), token carried in websocket subprotocol rather than query string. `.trivyignore` entries all carry written justifications (kernel-header CVEs unreachable in-container; npm-internal tooling), and the container drops privileges via `gosu "${PUID}:${PGID}"` (`docker/root/entrypoint.sh:167-168`). Suppression-hygiene gaps in `.trivyignore` are tracked as F2.
 
 ---
 
-## G — Performance & Scalability — C+
+## F — Dependencies & Tech Currency — A-
 
-The production library-analysis path now uses a single-flight streamed scan, stat-first cache reuse, and one metadata probe per changed file. The main remaining performance caveat is synchronous transfer hashing and durable writes on Tornado's event loop.
+Runtime and dev Python dependencies are fully pinned and compiled into hash-locked files enforced with `--require-hashes`, backed by CI lock-consistency checks, `pip-audit` on both locks, `npm audit`, digest-pinned Docker base images, and six-ecosystem weekly Dependabot. Versions are current for mid-2026 (Python 3.13, Node 24 LTS, Tornado 6.5.x, urllib3 2.7.0, Vue 3.5, Vite 7, Quasar 2.21). Deductions for pre-commit tool drift, `.trivyignore` hygiene, and stale metadata.
 
-### Performance improvements
+### F1 — Pre-commit hook versions drifted from CI-pinned tools (mypy a major version behind)
 
-#### ~~G1~~ ✓ done 2026-07-12 — Rebuild real library analysis as one bounded, single-flight pipeline
-
-- **Where:** `compresso/webserver/helpers/library_analysis.py:49-76,226-270`, `libraryanalysiscache.py:16-27`
-- **Historical issue:** Concurrent starts could launch duplicate scans, and each scan stored every path in a list then a set before probing.
-- **Historical impact:** Major — two requests could duplicate a 20 TB scan while each consumed memory proportional to file count.
-- **Fix:** Make start atomic, enforce one row/job per library, stream files in bounded batches, mark rows by analysis generation, and remove stale rows after the pass.
-- **Effort:** M
-- **Grade lift:** C+ → B (fixes the biggest gap between the benchmark and production path)
-
-#### ~~G2~~ ✓ done 2026-07-12 — Move remote transfer hashing and durable writes off Tornado's event loop
-
-- **Where:** `compresso/webserver/api_v2/transfer_api.py:97-169`, `compresso/libs/resumable_transfer.py:181-227`
-- **What's wrong:** Async handlers perform synchronous chunk/file hashing plus data and manifest `fsync` operations.
-- **Impact:** Major — large or slow transfers can freeze every web/API/readiness request on the process.
-- **Fix:** Use bounded worker threads for store operations/hashing, stream progress, and batch durability checkpoints while preserving crash recovery.
-- **Effort:** M
-- **Grade lift:** C+ → B- (keeps the control plane responsive during large transfers)
-
-#### ~~G3~~ ✓ done 2026-07-12 — Avoid content hashing unchanged files during cached analysis
-
-- **Where:** `compresso/webserver/helpers/library_analysis.py:160-177`, `compresso/libs/common.py:315-399`
-- **Historical issue:** Cache lookup computed a fingerprint first; large files reread ten 8 MiB samples even when unchanged.
-- **Historical impact:** Major — repeated cached analysis created heavy random NAS I/O across a huge library.
-- **Fix:** Gate content hashes behind persisted size/mtime/file-ID checks and hash only new or changed candidates.
-- **Effort:** M
-- **Grade lift:** C+ → B- (makes cache hits cheap enough for production use)
-
-#### ~~G4~~ ✓ done 2026-07-12 — Reuse one ffprobe result per analysis file
-
-- **Where:** `compresso/webserver/helpers/library_analysis.py:135-149`, `compresso/libs/ffprobe_utils.py:66-118`
-- **What's wrong:** Metadata extraction probes the file, then bitrate extraction launches ffprobe again for data already available in the first result.
-- **Impact:** Moderate — a 100,000-file analysis launches roughly 200,000 probe processes.
-- **Fix:** Return/reuse the original probe payload and derive codec, resolution, duration, and bitrate in one pass.
+- **Where:** `.pre-commit-config.yaml:12` (ruff `v0.15.7`) and `:19` (mirrors-mypy `v1.19.1`) vs `requirements-dev.txt:3` (`ruff==0.15.22`) and `:16` (`mypy==2.3.0`); `dependabot.yml` has no `pre-commit` ecosystem
+- **What's wrong:** Local hooks run mypy 1.19 while CI runs 2.3 — pass locally, fail CI (or vice versa), and nothing keeps the revs fresh.
+- **Impact:** Moderate
+- **Fix:** Bump the two `rev:` values; add pre-commit autoupdate automation or a CI assertion that revs match the dev pins.
 - **Effort:** S
-- **Grade lift:** C+ → B- (halves a dominant external-process cost)
+- **Grade lift:** A- → A
 
-#### ~~G5~~ ✓ done 2026-07-12 — Allocate distributed workers from runnable demand and measured throughput
+### F2 — `.trivyignore` suppressions never expire, contain a duplicate, and suppress an already-patched CVE
 
-- **Where:** `compresso/libs/scheduler.py:149-210`, `compresso/libs/task.py:362-364`, `compresso/libs/foreman.py:723-790`
-- **What's wrong:** Allocation counts every task status and does not rank compatible workers by queue depth, throughput, transfer cost, or thermal/capability state.
-- **Impact:** Moderate — approval/deferred backlogs can attract workers despite no runnable work, starving the M4 or another installation.
-- **Fix:** Count only runnable non-deferred work, persist rolling per-capability throughput, and apply one deterministic allocation score with bounded rounded totals.
-- **Effort:** L
-- **Grade lift:** C+ → B (turns existing telemetry into useful distributed scheduling)
+- **Where:** `.trivyignore:84` and `:108` (CVE-2026-43185 listed twice) while `docker/Dockerfile:11` patches that same CVE; ~100 suppressions with no `exp:` dates
+- **What's wrong:** A fix regression would never resurface in scans; the suppression would hide the Dockerfile patch silently breaking.
+- **Impact:** Moderate
+- **Fix:** Use `CVE-XXXX exp:YYYY-MM-DD` tied to the next base-image rebuild; dedupe; remove entries patched in the Dockerfile so the scan verifies the patch.
+- **Effort:** S
+- **Grade lift:** A- → A
+
+### F3 — Stale/EOL Node engine floor in webserver package.json
+
+- **Where:** `compresso/webserver/package.json:17-18` (`"node": ">=14.17.2"`, `"npm": ">=6.14.13"`) vs `.nvmrc` (`24`) and `frontend/package.json:71` (`"node": "^24 || ^22"`)
+- **Impact:** Minor. **Fix:** Align to `^24 || ^22` / `npm >=10`. **Effort:** S. **Lift:** hygiene.
+
+### F4 — License metadata inconsistency uncovered by the consistency check
+
+- **Where:** `setup.cfg:3` (`license = GPLv3`, non-SPDX) vs setup.py (`GPL-3.0-only`); `scripts/check-license-consistency.sh:19` checks setup.py but never setup.cfg
+- **Impact:** Minor. **Fix:** Set `GPL-3.0-only` in setup.cfg (or delete the duplicate field) and add it to the check script. **Effort:** S. **Lift:** marginal.
+
+### F5 — Dependabot pip updates can't regenerate the hash-locked `.lock` files
+
+- **Where:** `.github/dependabot.yml:3-13` (pip, weekly, grouped) + locks named `requirements.lock`/`requirements-dev.lock` (pip-compile output, `requirements.lock:1-6`) + the drift gate at `python_lint_and_run_unit_tests.yml:58`
+- **What's wrong:** Dependabot bumps `requirements.txt` but leaves the hash locks stale, so every grouped Dependabot PR fails the lock gate until a human recompiles — freshness automation and the reproducibility gate work against each other. (CI correctly blocks the stale state, so this is friction, not a gap.)
+- **Impact:** Minor
+- **Fix:** Rename to the `requirements.in`/`.txt` convention Dependabot regenerates, or add a workflow step that runs pip-compile on Dependabot branches.
+- **Effort:** M
+- **Grade lift:** A- → A (with F1)
+
+**Strengths:** True hash-locked reproducible chain end-to-end (588 sha256 hashes in `requirements.lock`; `--require-hashes` install at `docker/Dockerfile.base:201`; drift blocked by `scripts/check-requirements-locks.sh:40-41` in CI; digest-pinned base images at `docker/Dockerfile:5` / `Dockerfile.base:4`). Active vulnerability management with documented reasoning (CVE-driven pins with inline rationale at `requirements.txt:10-13,24-25`; `pip-audit` on both locks; `npm audit --omit=dev`; targeted in-image patches at `docker/Dockerfile:26-44`). Six-ecosystem grouped Dependabot plus CI-enforced license hygiene (`LICENSES/`, `THIRD_PARTY_NOTICES.md`, wheel ships license files at `setup.py:229`).
 
 ---
 
-## H — Documentation & Onboarding — C+
+## G — Performance & Scalability — B+
 
-Architecture, deployment, development, release recovery, and supply-chain controls are documented. The primary Docker command currently fails, the critical 20 TB runbook is hidden under `.Codex`, and licensing guidance contradicts the declared GPL license.
+Deliberate, above-average performance engineering: correct composite indexes on the two hot queries, durable scan checkpointing with backpressure, an atomic task-claim UPDATE, and a versioned scale-benchmark harness wired into CI. Held back by real hot-path costs that all bite at the 100k+ scale the tooling advertises, and a CI scale gate loose enough to let order-of-magnitude regressions through on PRs.
 
-### Documentation improvements
+### G1 — Task ingestion does 3-4 serialized writes + a dedupe SELECT + an N+1 library lookup per file
 
-#### ~~H1~~ ✓ done 2026-07-12 — Fix every Docker quick-start image reference
-
-- **Where:** `README.md:19-30`, `docker/docker-compose.yml:11-15`, `docs/CONFIGURATION.md:69-78`
-- **What's wrong:** Documentation uses `jtn0123/compresso:latest`, which denied public manifest access, while the published GHCR image resolved successfully.
-- **Impact:** Major — the shortest supported onboarding path cannot start the product.
-- **Fix:** Point all examples to GHCR or restore verified public Docker Hub publishing; add a CI smoke check for every documented image reference.
-- **Effort:** S
-- **Grade lift:** C+ → B (restores the primary install path)
-
-#### ~~H2~~ ✓ done 2026-07-12 — Publish the 20 TB safety plan as supported operator documentation
-
-- **Where:** `.Codex/20tb-media-compression-plan.md:1-191`, `docs/FORK_DEPLOYMENT.md:66-131`, `README.md`
-- **What's wrong:** Master/worker separation, staged 20-file→100 GB→500 GB→1 TB gates, and snapshot-backed batches live in an internal audit directory with no public-doc link.
-- **Impact:** Major — operators can deploy a large library without seeing the rules that define safe use.
-- **Fix:** Move the plan to `docs/LARGE_LIBRARY_RUNBOOK.md` and link it from README, deployment, and roadmap docs.
-- **Effort:** S
-- **Grade lift:** C+ → B (puts the safety contract on the supported path)
-
-#### ~~H3~~ ✓ done 2026-07-12 — Resolve the repository's license contradiction
-
-- **Where:** `LICENSE`, `setup.py:227-231`, `README.md:150-164`, copyright headers across `compresso/`
-- **What's wrong:** Metadata/LICENSE say GPL-3.0-only, while README and hundreds of source headers mix MIT permission text with “All Rights Reserved.”
-- **Impact:** Moderate — contributors and redistributors cannot confidently determine obligations.
-- **Fix:** Obtain the copyright-holder decision, then align LICENSE, metadata, README, headers, frontend license, and third-party notices in one reviewed change.
+- **Where:** `compresso/libs/task.py:271-307` (`Tasks.create(...)` then redundant `self.save()`, `set_cache_path()`, per-file `Library(...)` lookup at line 290 → `Libraries.get_or_none` per file via `library.py:277`, then `set_status("pending")` = another save); `compresso/libs/taskhandler.py:337-338` (pre-SELECT dedupe despite `abspath` being `unique=True` at `unmodels/tasks.py:52` with the `IntegrityError` path already handled at `task.py:309`)
+- **What's wrong:** Queuing one file = 1 SELECT + 1 INSERT + redundant save + 1 SELECT + 1-2 UPDATEs, all serialized through the single-writer `SqliteQueueDatabase`. The project's own real-pipeline threshold tolerates ~11 files/s; at that floor a 100k-file first scan spends hours in scheduling alone.
+- **Impact:** Major
+- **Fix:** Drop the pre-SELECT (rely on the UNIQUE constraint), remove the redundant save, cache library priority scores per scan, add a chunked `insert_many` path with a single bulk UPDATE per chunk.
 - **Effort:** M
-- **Grade lift:** C+ → B- (removes the largest onboarding/legal ambiguity)
+- **Grade lift:** B+ → A-
+
+### G2 — Every WebSocket client re-reads the entire log file into memory every second
+
+- **Where:** `compresso/config.py:389-394` — `with open(log_file) as f: all_lines = f.readlines()` then slices the last N (verified); called from `compresso/webserver/websocket.py:484-496` (`read_system_logs(lines=1000)`) on a 1-second interval (`websocket.py:81`, `STREAM_POLL_INTERVALS["system_logs"] = 1` — verified)
+- **What's wrong:** `readlines()` loads the whole unbounded `compresso.log` (hundreds of MB on a busy server) into a list once per second per connected client, on the Tornado IO thread. The stream dedupe only skips the *send*, not the read.
+- **Impact:** Major
+- **Fix:** Tail by seeking from the end (bounded byte window, e.g. last 256 KB), and short-circuit on unchanged `st_mtime`/`st_size` between polls.
+- **Effort:** S
+- **Grade lift:** B+ → A- (with G3)
+
+### G3 — Per-client WS polling loops re-run full-table COUNTs; no shared broadcast
+
+- **Where:** `compresso/webserver/websocket.py:504-586` (per-client 3s loops); `webserver/helpers/completed_tasks.py:87-113` (**four** COUNT queries per tick against unbounded `completedtasks`); `compresso/libs/task.py:390-392` (unfiltered COUNT with a pointless `ORDER BY`)
+- **What's wrong:** Cost is O(clients × tables scanned) every 3 seconds; 10 open dashboard tabs ≈ 27 duplicated queries/s against the same SQLite file at 100k+ rows.
+- **Impact:** Moderate
+- **Fix:** Compute each stream payload once in a single periodic broadcaster and fan out to registered handlers; cache counts for the poll interval; drop the ORDER BY.
+- **Effort:** M
+- **Grade lift:** B+ → A- (with G2)
+
+### G4 — Scan pipeline stalls at every directory boundary
+
+- **Where:** `compresso/libs/libraryscanner.py:358-366` (walk blocks until all queued files in the current directory are tested — a hard drain barrier per directory); `compresso/libs/filetest.py:249-257` (testers use `get_nowait()` then `event.wait(2)` on empty queue)
+- **What's wrong:** Directory walking and file testing never overlap across boundaries, and drained testers sleep up to 2s while the next directory's files wait. Media libraries are one-directory-per-title — tens of thousands of stall points.
+- **Impact:** Moderate
+- **Fix:** Blocking `queue.get(timeout=0.25)`; checkpoint on a trailing frontier instead of a per-directory drain barrier.
+- **Effort:** M
+- **Grade lift:** B+ → A-
+
+### G5 — Row-at-a-time recursive deletes for history purges and task deletions
+
+- **Where:** `compresso/libs/history.py:249-251` (`delete_instance(recursive=True)` per row, driven by the retention job at `scheduler.py:290` which selects **all** expired rows); same pattern with a per-row `os.path.exists` stat at `task.py:469-479`
+- **What's wrong:** The first retention run on a long-lived install (200k expired tasks + logs) is hundreds of thousands of serialized statements blocking all other writers.
+- **Impact:** Moderate
+- **Fix:** Chunk IDs (~500) and issue set-based deletes on the dependent tables, then the parents.
+- **Effort:** S
+- **Grade lift:** B+ → A- (small)
+
+### G6 — CI scale gate asserts little on PRs
+
+- **Where:** `.github/workflows/large_library_scale.yml:63-70,79-85` (PRs: 10k synthetic tier + real tier pinned to `--entries 2000`); `docs/performance/large-library-thresholds.json` (`real_tiers.2000.max_duration_seconds: 180` ≈ 11 entries/s pass bar; an unused `real_tiers.10000` exists); `compresso/libs/library_scale_benchmark.py:61-77,126-129` (synthetic tiers use hand-rolled raw sqlite3 `executemany` — code production never runs; production goes row-by-row through peewee, see G1)
+- **What's wrong:** A 5-10x regression in real scheduling throughput passes PR CI; the impressive 100k/500k numbers validate a synthetic floor sharing almost nothing with production; nothing asserts `entries_per_second`.
+- **Impact:** Moderate
+- **Fix:** Run the real-pipeline tier at 10,000 entries on PRs, tighten `max_duration_seconds` to ~2x recorded baseline, add a `min_entries_per_second` check to `threshold_failures` (`library_scale_benchmark.py:297-313`).
+- **Effort:** S
+- **Grade lift:** B+ → A-
+
+### G7 — Debug mode JSON-serializes every directory's file list during scans
+
+- **Where:** `compresso/libs/libraryscanner.py:335-336` — `self.logger.debug(json.dumps(files, indent=2))`
+- **What's wrong:** O(total files) extra serialization and log volume exactly when users enable debugging to report slow scans — which then feeds G2's whole-file log reads.
+- **Impact:** Minor. **Fix:** Log `len(files)` + root only. **Effort:** S. **Lift:** hygiene.
+
+**Strengths:** Indexes match the hot queries — composite `(status, priority)` on Tasks (`unmodels/tasks.py:82-83`, migration `007_add_task_queue_index.py`) matches the scheduler's claim query, `(abspath, task_success)` on history (migration 009) backs the per-file failed-path check via an indexed `.exists()` (`history.py:205-212`), and the pending-claim is an atomic conditional UPDATE (`taskqueue.py:274-281`). Scans are checkpointed, bounded, resumable (atomic-JSON journal with per-root locks; backpressure at `libraryscanner.py:342-344` caps queue depth; startup recovery pages the tasks table in 500-row keyset batches at `taskhandler.py:279-284`). Genuine versioned scale tooling with tracemalloc/RSS/p95 latency budgets and a real-pipeline mode that honestly documents its exclusions — well beyond what comparable projects ship (G6 critiques its assertion tightness, not its existence).
 
 ---
 
-## I — Developer Experience & Tooling — B
+## H — Documentation & Onboarding — B+
 
-CI is broad and unusually capable: cross-platform shards, integration, frontend, package reproducibility, Docker, CodeQL, Sonar, signing, SBOMs, and recovery workflows. Local parity does not actually mirror those gates, release semantics are not enforced, and master/release workflows duplicate substantial validation.
+The core onboarding path is genuinely good — `docs/DEVELOPING.md` is accurate and matches the real tooling, `README.md` is complete, and there are 17 topical docs including a 1,000-line plugin guide, an architecture doc, and an operator runbook. Pulled down by a ring of stale legacy documentation that actively misleads, and ~46% backend docstring coverage.
 
-### Developer-experience improvements
+### H1 — `tests/README.md` is almost entirely stale and misleading
 
-#### ~~I1~~ ✓ done 2026-07-12 — Make local verification explicitly match fast and full CI modes
+- **Where:** `tests/README.md:9` (`tests/scripts/setup_tests.sh` — path doesn't exist; actual is `tests/scripts_/`), `:20` (`pycodestyle ./` — repo uses ruff/mypy per `pyproject.toml:27-51`), `:41` (`pytest ... lib/common.py` — no `lib/` dir), `:84` (legacy `docker-compose` v1 syntax)
+- **What's wrong:** Every command fails or points at an abandoned tool; a contributor hits four dead ends before finding `scripts/verify-local.sh`.
+- **Impact:** Moderate. **Fix:** Rewrite to ~30 lines pointing at `pytest tests/unit`, `verify-local.sh fast|full`, and the marker scheme. **Effort:** S. **Lift:** B+ → A- (with H2).
 
-- **Where:** `scripts/verify-local.sh:18-79`, `.github/workflows/python_lint_and_run_unit_tests.yml`, `.github/workflows/integration_test_and_build_all_packages_ci.yml`
-- **What's wrong:** The script claims parity but omits Ruff/format/Mypy, dev-lock audit, integration, release-tool tests, actionlint/contracts, and clean package/artifact validation.
-- **Impact:** Moderate — a developer can receive “Local verification complete” while required CI gates would still fail.
-- **Fix:** Add documented fast/full modes, run the canonical commands, and print an explicit skipped-gates summary.
-- **Effort:** M
-- **Grade lift:** B → B+ (makes the local result truthful and actionable)
+### H2 — Frontend README contradicts the repo and has broken links/typos
 
-#### I2 — Enforce release-driving commit or PR-title conventions
+- **Where:** `compresso/webserver/frontend/README.md:16` ("Node.js 22" vs `.nvmrc` = 24), `:5` (link to nonexistent `github.com/Compresso/compresso`), `:39` ("This projected is licensed under th GPL" + MIT notice under a GPL heading), `:56` (broken `docs/CONTRIBUTING.md` relative link)
+- **Impact:** Moderate. **Fix:** One-pass rewrite. **Effort:** S. **Lift:** with H1.
 
-- **Where:** `docs/GENERATING_MASTER_RELEASE.md:3-17`, `.github/release/prepare-candidate.mjs:54-74`, `commitlint.config.js:1-3`, `.github/pull_request_template.md:1-18`
-- **What's wrong:** Conventional Commit syntax drives release selection, but commitlint is not installable from the root and no workflow validates merge titles.
-- **Impact:** Moderate — valid changes can silently produce no release or the wrong release level.
-- **Fix:** Add PR-title validation, wire a real local commitlint dependency/script, and document squash/merge-title expectations in the template.
-- **Effort:** S
-- **Grade lift:** B → B+ (protects the release trigger contract)
+### H3 — `devops/local_dev_venv.sh` and `frontend_install.sh` are undocumented and stale
 
-#### I3 — Remove duplicate validation from publication-bound master pushes
+- **Where:** zero doc references to either script; `devops/local_dev_venv.sh:25` runs `git submodule update --init --recursive` against a repo with no submodules (README.md:14 says none required), installs un-hash-pinned (lines 36-37) contra `DEVELOPING.md:60`; same stale submodule call at `devops/run_docker.sh:258`
+- **Impact:** Moderate. **Fix:** Update to the lock-based flow or delete in favor of DEVELOPING.md. **Effort:** S. **Lift:** part of the stale-docs cleanup.
 
-- **Where:** `.github/workflows/release.yml:3-16`, `python_lint_and_run_unit_tests.yml:3-10`, `frontend_lint_and_build.yml:3-10`, `integration_test_and_build_all_packages_ci.yml:3-9`
-- **What's wrong:** A master merge starts direct Python/frontend/package workflows while release validation repeats many gates against the candidate SHA.
-- **Impact:** Moderate — duplicated runners slow feedback and create noisy duplicate coverage/Sonar/status results.
-- **Fix:** Keep broad PR validation, make release-bound master validation owned by one workflow, and retain a clearly named scheduled/manual non-publishing package lane.
-- **Effort:** M
-- **Grade lift:** B → B+ (simplifies the release signal and critical path)
+### H4 — Backend docstring coverage ~46%
+
+- **Where:** AST-measured across `compresso/libs/` (145 modules): functions 484/1,044 (46%), classes 73/166 (44%); worst core files: `library.py` 10/44, `taskhandler.py` 7/17, `foreman.py` 21/42
+- **Impact:** Minor–Moderate. **Fix:** Document the task-lifecycle files first (ARCHITECTURE.md points readers there). **Effort:** M. **Lift:** minor.
+
+### H5 — Duplicate, divergent legacy issue/PR templates
+
+- **Where:** `docs/ISSUE_TEMPLATE.md` and `docs/PULL_REQUEST_TEMPLATE.md` coexist with (and differ from) the live `.github/` forms; `docs/CONTRIBUTING.md:18` still points at the legacy one
+- **Impact:** Minor. **Fix:** Delete the legacy pair; point CONTRIBUTING at the .github forms. **Effort:** S.
+
+### H6 — `AGENTS.md` names a nonexistent config file
+
+- **Where:** `frontend/AGENTS.md:57` (`quasar.config.cjs` — actual file is `quasar.config.js`); line 7 carries the stale org link
+- **Impact:** Minor. **Fix:** Two-line edit. **Effort:** S.
+
+**Strengths:** `docs/DEVELOPING.md:144-186` is accurate and complete — documented verify-local lanes, `SKIP_E2E=1`, and lock-regeneration commands all match the real scripts. Substantive references: `docs/ARCHITECTURE.md` (queue states, approval lifecycle, API-security model at `:37-55`), `docs/CONFIGURATION.md:5-24` env-var table. Depth beyond basics: `docs/PLUGIN_DEVELOPMENT.md` (1,000 lines), `docs/20TB_MEDIA_COMPRESSION_RUNBOOK.md`, `docs/SECURITY_SUPPLY_CHAIN.md`, and a semantic-release-maintained CHANGELOG.
+
+---
+
+## I — Developer Experience & Tooling — A
+
+Top-tier tooling for a project this size: pre-commit with ruff/ruff-format/mypy, a CI-parity `verify-local.sh` that CI itself validates, SHA-pinned actions enforced by a checker script, hash-pinned locks with drift checks and pip-audit, six-ecosystem Dependabot, Sonar, and duration-based pytest sharding with automated monthly refresh. Remaining issues are genuinely small.
+
+### I1 — `.editorconfig` contradicts the pre-commit end-of-file-fixer
+
+- **Where:** `.editorconfig:8` (`insert_final_newline = false`) vs `.pre-commit-config.yaml:7` (`end-of-file-fixer`)
+- **What's wrong:** Editor and hook fight over the last byte on every save/commit cycle.
+- **Impact:** Minor. **Fix:** `insert_final_newline = true`. **Effort:** S. **Lift:** polish.
+
+### I2 — User-local IDE state committed to VCS
+
+- **Where:** `.idea/dataSources.local.xml` (machine-specific DataGrip state) and `.idea/dictionaries/josh5.xml` tracked; `.gitignore:4` excludes only `workspace.xml`. (The committed `runConfigurations/` are a legitimate DX asset and should stay.)
+- **Impact:** Minor. **Fix:** `git rm --cached` the two files; extend `.gitignore`. **Effort:** S.
+
+### I3 — Pre-commit runs full-repo mypy on every commit and covers no frontend files
+
+- **Where:** `.pre-commit-config.yaml:18-24` (mypy with `pass_filenames: false` / `always_run: true` — the slowest configuration) and lines 6/8 (`exclude: ^compresso/webserver/frontend/` with no eslint/prettier hook anywhere)
+- **What's wrong:** Slow commits on the backend side; frontend lint errors surface only in CI.
+- **Impact:** Minor. **Fix:** Add a scoped eslint/prettier hook; scope or deliberately accept the mypy cost with a comment. **Effort:** S/M. **Lift:** polish.
+
+**Strengths:** CI-parity verification with a self-testing gate — `scripts/verify-local.sh` (154 lines) mirrors CI exactly, and `verify-local.yml:9-22` runs the script in CI whenever it or its inputs change, so the local lane cannot silently drift. Supply-chain discipline enforced by tooling, not convention (40-char SHA pins with `check-action-pins.sh` failing the build; lock drift detected by recompiling in a temp dir). Duration-balanced sharding with automated upkeep (`.test_durations` feeds 3-way pytest-split; `refresh_test_durations.yml` regenerates monthly and opens a PR only on change — see D3 for the current staleness). Well-commented configs (`pyproject.toml:37-48` documents every ruff ignore; `sonar-project.properties:12-26` explains each exclusion).
+
+---
+
+## Top 5 Highest-Leverage Improvements
+
+Ranked by impact × grade lift ÷ effort, with Security and Testing weighted:
+
+1. **B1 — Fix the ffmpeg/ffprobe success check** (`compresso/libs/unffmpeg/lib/cli.py:56,81`). Major correctness bug, Small effort: non-1 exit codes pass as success and any output containing "error" fails spuriously — and probe results feed the entire pipeline. One-line fix per site plus regression tests. Lift: B+ → A- for Backend.
+
+2. **G2 — Stop re-reading the whole log file per client per second** (`compresso/config.py:389-394`, `websocket.py:81,484-496`). Major hot-path cost, Small effort: seek-from-end tailing plus an mtime/size short-circuit removes an O(log-size × clients) load from the Tornado IO thread. Lift: toward A- for Performance.
+
+3. **G1 — Batch task ingestion** (`task.py:271-307`, `taskhandler.py:337-338`). Major at the 100k-file scale the project explicitly targets: drop the redundant dedupe SELECT and save, cache library scores per scan, add chunked `insert_many`. Turns hours of first-scan scheduling into minutes. Lift: B+ → A- for Performance (pair with G6 so CI would catch regressions).
+
+4. **E1 — Enforce websocket auth explicitly** (`websocket.py:122-123`). Small effort on the heaviest data-exposure surface: check `authorize_request`'s return and raise 401 instead of relying on a `finish()` side effect, plus a regression test that an unauthenticated handshake is refused. Security-weighted. Lift: B+ → A- for Security (with E2's token rotation as the follow-up).
+
+5. **C1 — Break up the monolith components and test the pieces** (`CompletedTasksListDialog.vue` 1,251 lines, `ApprovalQueue.vue` 1,095, `VideoCompare.vue` 1,001). Major maintainability drag and the direct cause of the frontend's 24% coverage floor: extract the nested dialogs and flows into components/composables and add tests as pieces land (satisfies D1's ratchet at the same time). Lift: B- → B for Frontend and A- → A for Testing.
+
+**Strategic runner-up:** A1 (replace the `CompressoRunningThreads` service locator with an injected facade) — the largest architecture lever, prerequisite to safely splitting `Foreman` (A6).

@@ -240,25 +240,22 @@ class History:
         if not id_list:
             return False
 
+        # Delete in bounded, set-based chunks. Per-row recursive deletes issue
+        # dependent-row queries and a DELETE per record through the single-
+        # writer queue - a first retention run on a long-lived install would
+        # serialize hundreds of thousands of statements.
+        chunk_size = 500
+        id_list = list(id_list)
         try:
-            query = CompletedTasks.select()
-
-            if id_list:
-                query = query.where(CompletedTasks.id.in_(id_list))
-
-            for historic_task_id in query:
-                try:
-                    historic_task_id.delete_instance(recursive=True)
-                except Exception:
-                    # Catch delete exceptions
-                    self.logger.exception("An error occurred while deleting historic task ID: %s.", historic_task_id)
-                    return False
-
+            for start in range(0, len(id_list), chunk_size):
+                chunk = id_list[start : start + chunk_size]
+                CompletedTasksCommandLogs.delete().where(CompletedTasksCommandLogs.completedtask_id.in_(chunk)).execute()
+                CompressionStats.delete().where(CompressionStats.completedtask.in_(chunk)).execute()
+                CompletedTasks.delete().where(CompletedTasks.id.in_(chunk)).execute()
             return True
-
-        except CompletedTasks.DoesNotExist:
-            # No historic entries exist yet
-            self.logger.warning(_MSG_NO_HISTORIC_TASKS)
+        except Exception:
+            self.logger.exception("An error occurred while deleting historic task IDs: %s.", id_list)
+            return False
 
     def delete_historic_task_command_logs(self, id_list=None):
         """

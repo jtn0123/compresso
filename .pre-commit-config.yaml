@@ -8,15 +8,17 @@ repos:
         exclude: ^compresso/webserver/frontend/
       - id: check-yaml
       - id: check-json
+  # Keep these revs in sync with the pins in requirements-dev.txt so local
+  # hooks and CI run identical tool versions.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.7
+    rev: v0.15.22
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
         args: [--check]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+    rev: v2.3.0
     hooks:
       - id: mypy
         args: [--ignore-missing-imports, --no-error-summary]

@@ -175,9 +175,9 @@ def run_real_pipeline_benchmark(entry_count: int, batch_size: int = 1_000) -> di
 
     Unlike run_benchmark (a synthetic floor for raw SQLite scheduling), this
     tier exercises the code a production scan actually runs per queued file:
-    the dedupe SELECT (TaskHandler.check_if_task_exists_matching_path), the
-    Tasks model insert through SqliteQueueDatabase's writer queue, cache-path
-    assignment, the library priority lookup, and the pending-status
+    the Tasks model insert through SqliteQueueDatabase's writer queue (with
+    duplicates rejected by the UNIQUE abspath constraint, as in production),
+    cache-path assignment, the library priority lookup, and the pending-status
     transition. ffprobe and plugin execution are intentionally excluded so the
     benchmark stays hermetic (no subprocesses or network).
     """
@@ -190,7 +190,6 @@ def run_real_pipeline_benchmark(entry_count: int, batch_size: int = 1_000) -> di
     # dragging in the full application stack.
     from compresso import config
     from compresso.libs import task as task_lib
-    from compresso.libs.taskhandler import TaskHandler
     from compresso.libs.unmodels import Libraries, Tasks
     from compresso.libs.unmodels.lib import Database
 
@@ -230,8 +229,6 @@ def run_real_pipeline_benchmark(entry_count: int, batch_size: int = 1_000) -> di
                         file_path = directory / filename
                         file_path.touch()
                         abspath = str(file_path)
-                        if TaskHandler.check_if_task_exists_matching_path(abspath):
-                            continue
                         if task_lib.Task().create_task_by_absolute_path(abspath, library_id=1):
                             queued += 1
             finally:
@@ -310,6 +307,17 @@ def threshold_failures(result: dict[str, object], thresholds: dict[str, float]) 
         allowed = float(thresholds[threshold_name])
         if actual > allowed:
             failures.append(f"{result_name}={actual} exceeded {threshold_name}={allowed}")
+
+    # Optional throughput floor: guards against per-entry regressions that a
+    # generous wall-clock ceiling would let through.
+    if "min_entries_per_second" in thresholds:
+        eps_value = result["entries_per_second"]
+        if not isinstance(eps_value, int | float):
+            raise ValueError("benchmark result entries_per_second is not numeric")
+        eps = float(eps_value)
+        floor = float(thresholds["min_entries_per_second"])
+        if eps < floor:
+            failures.append(f"entries_per_second={eps} fell below min_entries_per_second={floor}")
     return failures
 
 

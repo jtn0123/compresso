@@ -248,13 +248,15 @@ class FileTesterThread(threading.Thread):
         plugin_handler = PluginsHandler()
         while not self.abort_flag.is_set():
             try:
-                # Pending task queue has an item available. Fetch it.
-                next_file = self.files_to_test.get_nowait()
+                # Block briefly for the next queued file. A short timeout (not
+                # a long idle sleep) keeps testers responsive the moment the
+                # scanner enqueues the next directory's files, while still
+                # re-checking the abort flag regularly.
+                next_file = self.files_to_test.get(timeout=0.25)
                 self._set_testing_state(True)
                 self.status_updates.put(next_file)
             except queue.Empty:
                 self._set_testing_state(False)
-                self.event.wait(2)
                 continue
             except (AttributeError, TypeError, OSError):
                 self.logger.exception("Exception in fetching library scan result for path %s:", self.name)

@@ -224,9 +224,17 @@ class Config(metaclass=SingletonType):
         """
         Return a dictionary of configuration fields and their current values
 
+        Returns a shallow copy: callers must not be able to mutate live config
+        state (or have secrets such as api_auth_token silently rewritten)
+        through the returned mapping. Persist changes via set_config_item().
+
+        Note: the returned dict still contains secrets - anything exposed to
+        clients must go through a redacting serializer
+        (see webserver.api_v2.settings_api.serialize_public_settings).
+
         :return:
         """
-        return self.__dict__
+        return dict(self.__dict__)
 
     def get_config_keys(self):
         """
@@ -379,19 +387,40 @@ class Config(metaclass=SingletonType):
         """
         return metadata.read_version_string("long")
 
+    # Byte window read from the end of the log when tailing a bounded number
+    # of lines. Large enough for >1000 typical log lines while keeping the
+    # per-poll cost flat regardless of total log size.
+    SYSTEM_LOG_TAIL_BYTES = 256 * 1024
+
     def read_system_logs(self, lines=None):
         """
         Return an array of system log lines
+
+        When ``lines`` is given, only a bounded window at the end of the file
+        is read (the log grows without bound, and this is polled per websocket
+        client - reading the whole file each time does not scale).
 
         :param lines:
         :return:
         """
         log_file = os.path.join(self.log_path, "compresso.log")
-        with open(log_file) as f:
-            all_lines = f.readlines()
-        if lines is not None:
-            all_lines = all_lines[-lines:]
-        return [line.rstrip() for line in all_lines]
+        if lines is None:
+            with open(log_file) as f:
+                all_lines = f.readlines()
+            return [line.rstrip() for line in all_lines]
+
+        with open(log_file, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            file_size = f.tell()
+            window = min(file_size, self.SYSTEM_LOG_TAIL_BYTES)
+            f.seek(file_size - window)
+            data = f.read(window)
+        text = data.decode("utf-8", errors="replace")
+        all_lines = text.splitlines()
+        if window < file_size and all_lines:
+            # The window almost certainly started mid-line; drop the partial.
+            all_lines = all_lines[1:]
+        return [line.rstrip() for line in all_lines[-lines:]]
 
     def get_ui_port(self):
         """
