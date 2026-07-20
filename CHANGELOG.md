@@ -1,3 +1,12 @@
+## [1.16.2](https://github.com/jtn0123/compresso/compare/v1.16.1...v1.16.2) (2026-07-20)
+
+
+### Bug Fixes
+
+* **frontend:** migrate breaking changes for frontend-dependencies group bump ([6e3220a](https://github.com/jtn0123/compresso/commit/6e3220ad79afe3b30ad7c9ea788e1d9845742307)), closes [#q-app](https://github.com/jtn0123/compresso/issues/q-app)
+* list software encoders first and repair encoder availability filter ([ed021fd](https://github.com/jtn0123/compresso/commit/ed021fd83259942e384dd15d4b901d1448acc72c))
+* patch linux-libc-dev CVE-2026-43185 in app image ([c391269](https://github.com/jtn0123/compresso/commit/c391269e3ccba68723c2ecaa269d2b4c5ce49c87))
+
 ## [1.16.1](https://github.com/jtn0123/compresso/compare/v1.16.0...v1.16.1) (2026-07-15)
 
 
