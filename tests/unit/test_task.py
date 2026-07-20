@@ -385,7 +385,8 @@ class TestTaskDestinationOverride:
     def test_default_destination_derived_from_source_and_cache_extension(self):
         t = self._make_task()
         dest = t.get_destination_data()
-        assert dest["abspath"] == os.path.join("/media", "movie.mp4")
+        # dirname may differ by drive letter on Windows, so compare just the tail
+        assert dest["abspath"].endswith(os.path.join("media", "movie.mp4"))
         assert dest["basename"] == "movie.mp4"
 
     def test_override_changes_destination_data(self):
