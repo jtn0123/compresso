@@ -5,6 +5,16 @@
 ARG BASE_IMAGE=ghcr.io/jtn0123/compresso-base@sha256:342429cf3cae1a6955db4b84856b48ae08ec468e7235eb26b3ef7479083bd03c
 FROM ${BASE_IMAGE}
 
+# Patch OS packages that have security fixes newer than the pinned base image.
+# Drop entries here once the base image is rebuilt with the fix included.
+RUN \
+    echo "**** Patch linux-libc-dev CVE-2026-43185 (fixed in 6.8.0-134.134) ****" \
+        && apt-get update \
+        && apt-get install -y --only-upgrade linux-libc-dev \
+        && apt-get clean autoclean -y \
+        && apt-get autoremove -y \
+        && rm -rf /var/lib/apt/lists/*
+
 # Install pre-built Compresso wheel
 COPY /dist/ /src/
 RUN \

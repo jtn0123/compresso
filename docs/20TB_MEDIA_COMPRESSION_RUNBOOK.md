@@ -10,6 +10,7 @@ This runbook is the release gate for compressing a 20 TB media library with one 
 - Keep traffic on a trusted LAN or VPN. Put TLS and authentication at a reverse proxy before crossing an untrusted network.
 - Give every node its own API token. In the master's M4 link, store the M4 worker's token; in the M4's master link, store the master's token. Never reuse the master token as a shared cluster secret.
 - Start the M4 worker with one concurrent encode. Increase concurrency only from measured thermal, memory, and throughput evidence.
+- Run software encoders (`libx265` / `libsvtav1`) on every node, including the M4. The M4's value is its fast CPU, not VideoToolbox: hardware encoders (VideoToolbox, NVENC, QSV, VAAPI) produce larger files at the same quality and defeat the purpose of the rollout. Treat them as a last resort for speed-only situations — see [ENCODING_GUIDE.md](ENCODING_GUIDE.md).
 
 ## Non-negotiable safeguards
 

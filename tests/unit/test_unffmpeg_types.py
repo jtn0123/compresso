@@ -154,10 +154,10 @@ VIDEO_CODECS = [
         H264,
         "h264",
         "libx264",
-        ["h264_nvenc", "h264_vaapi", "libx264", "libx264rgb"],
+        ["libx264", "libx264rgb", "h264_nvenc", "h264_vaapi"],
         "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
     ),
-    (Hevc, "hevc", "libx265", ["hevc_nvenc", "hevc_vaapi", "libx265"], "HEVC (High Efficiency Video Coding)"),
+    (Hevc, "hevc", "libx265", ["libx265", "hevc_nvenc", "hevc_vaapi"], "HEVC (High Efficiency Video Coding)"),
 ]
 
 

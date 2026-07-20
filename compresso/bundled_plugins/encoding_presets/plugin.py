@@ -56,9 +56,14 @@ class Settings(PluginSettings):
         },
         "video_encoder": {
             "label": "Video Encoder",
-            "description": "Specific encoder to use. Leave empty for auto-detection based on codec.",
+            "description": (
+                "Specific encoder to use. Leave empty for auto-detection (a software encoder for the chosen codec). "
+                "Software encoders (libx264, libx265, libsvtav1) give the best compression per byte and run on any "
+                "CPU — Intel, AMD, or Apple Silicon. Hardware encoders (nvenc, qsv, vaapi, videotoolbox) are a LAST "
+                "RESORT: faster, but produce larger files at the same quality, defeating the purpose of compression."
+            ),
             "input_type": "text",
-            "placeholder": "e.g., libx265, libsvtav1, hevc_nvenc",
+            "placeholder": "e.g., libx265, libsvtav1",
         },
         "crf": {
             "label": "Quality (CRF)",

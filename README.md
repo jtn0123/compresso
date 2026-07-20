@@ -36,6 +36,7 @@ The default publishes only to the Docker host. For a trusted-LAN master/worker s
 
 - **Docker (recommended)** — see [`docker/docker-compose.yml`](docker/docker-compose.yml) and [`docs/FORK_DEPLOYMENT.md`](docs/FORK_DEPLOYMENT.md)
 - **20 TB rollout** — follow [`docs/20TB_MEDIA_COMPRESSION_RUNBOOK.md`](docs/20TB_MEDIA_COMPRESSION_RUNBOOK.md) before using a production library
+- **Encoder choice** — see [`docs/ENCODING_GUIDE.md`](docs/ENCODING_GUIDE.md): software encoders (`libx265`/`libsvtav1`) are the default and give the smallest files on any CPU; hardware encoding is a last resort
 - **Source** — see [Install and Run](#install-and-run) below
 
 ---

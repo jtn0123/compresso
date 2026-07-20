@@ -45,6 +45,8 @@ GET http://127.0.0.1:8888/compresso/api/v2/healthcheck/readiness
 
 ## Hardware Acceleration
 
+> **Hardware encoding is a last resort.** If your goal is smaller files, use the default software encoders (`libx265` / `libsvtav1`) — they produce meaningfully smaller files at the same visual quality and run on any CPU (Intel, AMD, Apple Silicon). Hardware acceleration below is worthwhile for quality-neutral *decoding*, or when encode speed genuinely matters more than storage savings. See the [Encoding Guide](ENCODING_GUIDE.md).
+
 ### VAAPI (Intel / AMD)
 
 Pass the render device into the container:
