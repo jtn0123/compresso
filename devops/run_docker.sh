@@ -255,7 +255,6 @@ ensure_dist_artifacts() {
 
     rm -rf "$PROJECT_BASE/build"
     rm -f "$PROJECT_BASE"/dist/compresso-*
-    git submodule update --init --recursive
     "$venv_python" -m build --no-isolation --skip-dependency-check --wheel
     "$venv_python" -m build --no-isolation --skip-dependency-check --sdist
 }

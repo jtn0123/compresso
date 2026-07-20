@@ -1,42 +1,57 @@
 # Compresso Web frontend
 
-A simple tool for optimising your file library to a single, uniform format.
+The frontend user interface for [Compresso](https://github.com/jtn0123/compresso),
+vendored directly into the main repository (no submodules).
 
-This project contains the frontend user interface for [Compresso](https://github.com/Compresso/compresso).
-
+Built with Vue 3 + Quasar (Vite).
 
 ---
 
+## Requirements
+
+Node.js 24 is the supported build baseline (see the repository root `.nvmrc`);
+Node 22 also works per the `engines` field in `package.json`.
 
 ## Install the dependencies
+
 ```bash
 npm ci
 ```
 
-This frontend is vendored directly into the main Compresso repository. The supported build baseline for this fork is Node.js 22.
-
-
 ## Development
 
 ### Start the app in development mode (hot-code reloading, error reporting, etc.)
+
 ```bash
 npm run serve
 ```
 
 ### Lint the files
+
 ```bash
 npm run lint
 ```
 
+### Run tests
+
+```bash
+npm run test            # vitest unit tests
+npm run test:e2e        # mocked Playwright journeys (builds first)
+npm run test:e2e:live   # Playwright against a live backend
+```
+
 ### Build the app for production
+
 ```bash
 npm run build:publish
 ```
 
-
 ## License and Contribution
 
-This projected is licensed under th GPL version 3.
+This project is licensed under GPL-3.0-only (see the `LICENSE` file in this
+directory and at the repository root). Portions of this directory retain the
+original author's earlier MIT permission notice, reproduced below; see the
+root `THIRD_PARTY_NOTICES.md` and `LICENSES/` for details.
 
 Copyright (C) Josh Sunnex - All Rights Reserved
 
@@ -51,6 +66,8 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
 This project contains libraries imported from external authors.
-Please refer to the source of these libraries for more information on their respective licenses.
+Please refer to the source of these libraries for more information on their
+respective licenses.
 
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md) to learn how to contribute to Compresso.
+See [CONTRIBUTING.md](../../../docs/CONTRIBUTING.md) to learn how to contribute
+to Compresso.

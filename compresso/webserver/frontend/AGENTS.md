@@ -4,7 +4,7 @@ This document is designed to help AI agents understand the structure, technology
 
 ## Project Overview
 
-**Compresso Frontend** is the web-based user interface for [Compresso](https://github.com/Compresso/compresso), a tool for optimizing video libraries to a uniform format. It interacts with the Compresso backend API to manage tasks, plugins, settings, and monitor progress.
+**Compresso Frontend** is the web-based user interface for [Compresso](https://github.com/jtn0123/compresso), a tool for optimizing video libraries to a uniform format. It interacts with the Compresso backend API to manage tasks, plugins, settings, and monitor progress.
 
 ## Technology Stack
 
@@ -54,7 +54,7 @@ The project follows the standard Quasar directory structure:
 
 - **`src/js/compressoGlobals.js`**: Contains the `$compresso` global object. This is the primary interface for communicating with the backend API. It handles URL resolution, authentication state, and theme management.
 - **`src/boot/global-event-bus.js`**: Initializes the global event bus available as `$global`. This is used for decoupled communication between components (e.g., triggering a refresh).
-- **`quasar.config.cjs`**: The main configuration file for the Quasar framework. It defines boot files, plugins, build settings, and the Vite development server proxy.
+- **`quasar.config.js`**: The main configuration file for the Quasar framework. It defines boot files, plugins, build settings, and the Vite development server proxy.
 - **`package.json`**: Dependency definitions and script commands.
 
 ## Validation Commands
