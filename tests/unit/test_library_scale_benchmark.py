@@ -62,6 +62,28 @@ def test_threshold_selection_and_failures():
 
 
 @pytest.mark.unittest
+def test_threshold_failures_enforces_throughput_floor():
+    result = {
+        "duration_seconds": 1,
+        "peak_rss_delta_mb": 1,
+        "sqlite_lookup_p95_ms": 1,
+        "sqlite_page_p95_ms": 1,
+        "entries_per_second": 10,
+    }
+    thresholds = {
+        "max_duration_seconds": 2,
+        "max_peak_rss_delta_mb": 2,
+        "max_sqlite_lookup_p95_ms": 2,
+        "max_sqlite_page_p95_ms": 2,
+        "min_entries_per_second": 20,
+    }
+    assert threshold_failures(result, thresholds) == ["entries_per_second=10.0 fell below min_entries_per_second=20.0"]
+
+    result["entries_per_second"] = 25
+    assert threshold_failures(result, thresholds) == []
+
+
+@pytest.mark.unittest
 def test_empty_threshold_configuration_has_clear_error():
     with pytest.raises(ValueError, match="no tier entries"):
         matching_threshold(10_000, {"tiers": {}})

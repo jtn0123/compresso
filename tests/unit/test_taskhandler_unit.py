@@ -145,7 +145,10 @@ def test_check_if_task_exists_matching_path_true_and_false():
 
 @pytest.mark.unittest
 def test_add_path_to_task_queue_returns_false_when_task_exists(task_handler):
-    task_handler.check_if_task_exists_matching_path = MagicMock(return_value=True)
+    # Duplicate paths are rejected by the UNIQUE constraint during creation
+    # (create_task_from_path returns False on IntegrityError) - there is no
+    # dedupe pre-SELECT.
+    task_handler.create_task_from_path = MagicMock(return_value=False)
 
     assert task_handler.add_path_to_task_queue("/tmp/video.mkv", 1) is False
 
@@ -157,7 +160,6 @@ def test_add_path_to_task_queue_runs_event_plugins(task_handler):
     created_task.get_task_type.return_value = "local"
     created_task.get_source_data.return_value = {"file": "/tmp/video.mkv"}
 
-    task_handler.check_if_task_exists_matching_path = MagicMock(return_value=False)
     task_handler.create_task_from_path = MagicMock(return_value=created_task)
 
     with patch("compresso.libs.taskhandler.PluginsHandler") as mock_plugins:

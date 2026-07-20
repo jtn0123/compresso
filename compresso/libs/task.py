@@ -46,6 +46,7 @@ from compresso.libs import common
 from compresso.libs.exceptions import TaskError
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.unmodels.taskmetadata import TaskMetadata
 from compresso.libs.unmodels.tasks import IntegrityError, Tasks  # type: ignore[attr-defined]
 
 _ERR_NO_TASK_LIBRARY = "Unable to fetch task library ID. Task has not been set!"
@@ -268,6 +269,8 @@ class Task:
             except OSError:
                 self.logger.warning("Could not get file size for '%s'", os.path.basename(abspath))
 
+            # Tasks.create() already persists the row - no extra save() needed
+            # before the follow-up field updates below.
             self.task = Tasks.create(
                 abspath=abspath,
                 status="creating",
@@ -275,7 +278,6 @@ class Task:
                 source_size=source_size,
                 job_id=job_id or str(uuid.uuid4()),
             )
-            self.save()
             self.logger.debug(
                 "Created new task with ID: %s for %s (source_size=%d)",
                 self.task,
@@ -388,8 +390,8 @@ class Task:
         self.task.delete_instance()
 
     def get_total_task_list_count(self):
-        task_query = Tasks.select().order_by(Tasks.id.desc())
-        return task_query.count()
+        # A COUNT does not need an ORDER BY - this runs per websocket poll.
+        return Tasks.select().count()
 
     def get_runnable_task_count(self):
         """Count work a worker could claim now, excluding approval and retry delays."""
@@ -460,33 +462,39 @@ class Task:
         if not id_list:
             return False
 
+        # Per-row work (remote cache cleanup, datastore clearing) only needs a
+        # narrow column set; the row deletions themselves are issued as bounded
+        # set-based chunks instead of one recursive DELETE per record.
+        chunk_size = 500
         try:
-            query = Tasks.select()
+            query = Tasks.select(Tasks.id, Tasks.type, Tasks.abspath).where(Tasks.id.in_(list(id_list)))
 
-            if id_list:
-                query = query.where(Tasks.id.in_(id_list))
-
-            for task_id in query:
+            found_ids = []
+            for task_record in query:
                 try:
                     # Remote tasks need to be cleaned up from the cache partition also
-                    if task_id.type == "remote":
-                        remote_task_dirname = task_id.abspath
-                        if os.path.exists(task_id.abspath) and "compresso_remote_pending_library" in remote_task_dirname:
+                    if task_record.type == "remote":
+                        remote_task_dirname = task_record.abspath
+                        if os.path.exists(task_record.abspath) and "compresso_remote_pending_library" in remote_task_dirname:
                             self.logger.info("Removing remote pending library task '%s'.", remote_task_dirname)
                             shutil.rmtree(os.path.dirname(remote_task_dirname))
 
-                    TaskDataStore.clear_task(task_id.id)
-                    task_id.delete_instance(recursive=True)
+                    TaskDataStore.clear_task(task_record.id)
+                    found_ids.append(task_record.id)
                 except Exception as e:
-                    # Catch delete exceptions
-                    self.logger.exception("An error occurred while deleting task ID: %s. %s", task_id, e)
+                    # Catch cleanup exceptions
+                    self.logger.exception("An error occurred while deleting task ID: %s. %s", task_record.id, e)
                     return False
 
-            return True
+            for start in range(0, len(found_ids), chunk_size):
+                chunk = found_ids[start : start + chunk_size]
+                TaskMetadata.delete().where(TaskMetadata.task.in_(chunk)).execute()
+                Tasks.delete().where(Tasks.id.in_(chunk)).execute()
 
-        except Tasks.DoesNotExist:
-            # No task entries exist yet
-            self.logger.warning("No tasks currently exist.")
+            return True
+        except Exception:
+            self.logger.exception("An error occurred while deleting task IDs: %s.", id_list)
+            return False
 
     def reorder_tasks(self, id_list, direction):
         # Get the task with the highest ID

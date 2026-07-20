@@ -346,11 +346,9 @@ class TaskHandler(threading.Thread):
         :param priority_score:
         :return:
         """
-        # Check if file exists in task queue based on it's absolute path
-        abspath = os.path.abspath(pathname)
-        if self.check_if_task_exists_matching_path(abspath):
-            return False
-        # Create the new task from the provide path
+        # Duplicate paths are rejected by the UNIQUE constraint on
+        # Tasks.abspath (create_task_by_absolute_path handles IntegrityError
+        # and returns False) - no dedupe pre-SELECT is needed per file.
         new_task = self.create_task_from_path(pathname, library_id, priority_score=priority_score)
         if not new_task:
             return False
