@@ -65,3 +65,28 @@ def test_threshold_selection_and_failures():
 def test_empty_threshold_configuration_has_clear_error():
     with pytest.raises(ValueError, match="no tier entries"):
         matching_threshold(10_000, {"tiers": {}})
+
+
+@pytest.mark.unittest
+def test_real_pipeline_benchmark_schedules_every_entry():
+    """The real-pipeline tier drives the actual peewee task pipeline end to end."""
+    from compresso.libs.library_scale_benchmark import run_real_pipeline_benchmark
+
+    result = run_real_pipeline_benchmark(30, batch_size=10)
+
+    assert result["mode"] == "real_pipeline"
+    assert result["entry_count"] == 30
+    assert result["entries_per_second"] > 0
+    assert result["database_bytes_per_entry"] > 0
+    assert result["sqlite_lookup_p95_ms"] >= 0
+    assert result["sqlite_page_p95_ms"] >= 0
+
+
+@pytest.mark.unittest
+def test_real_pipeline_benchmark_rejects_invalid_inputs():
+    from compresso.libs.library_scale_benchmark import run_real_pipeline_benchmark
+
+    with pytest.raises(ValueError):
+        run_real_pipeline_benchmark(0)
+    with pytest.raises(ValueError):
+        run_real_pipeline_benchmark(10, batch_size=0)

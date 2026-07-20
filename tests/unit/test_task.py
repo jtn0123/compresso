@@ -366,3 +366,43 @@ class TestTaskDatabaseOps:
         t.save()
         refreshed = Tasks.get_by_id(row.id)
         assert refreshed.status == "pending"
+
+
+@pytest.mark.unittest
+class TestTaskDestinationOverride:
+    """Tests for set_destination_path() and its effect on get_destination_data()."""
+
+    def _make_task(self):
+        from compresso.libs.task import Task
+
+        t = Task()
+        mock_task = MagicMock()
+        mock_task.abspath = "/media/movie.mp4"
+        mock_task.cache_path = "/tmp/cache/movie-abc12.mp4"
+        t.task = mock_task
+        return t
+
+    def test_default_destination_derived_from_source_and_cache_extension(self):
+        t = self._make_task()
+        dest = t.get_destination_data()
+        assert dest["abspath"] == os.path.join("/media", "movie.mp4")
+        assert dest["basename"] == "movie.mp4"
+
+    def test_override_changes_destination_data(self):
+        t = self._make_task()
+        t.set_destination_path("/media/movie.hevc.mp4")
+        dest = t.get_destination_data()
+        assert dest["abspath"] == "/media/movie.hevc.mp4"
+        assert dest["basename"] == "movie.hevc.mp4"
+
+    def test_set_destination_path_requires_task(self):
+        from compresso.libs.task import Task
+
+        t = Task()
+        with pytest.raises(Exception, match="Task has not been set"):
+            t.set_destination_path("/media/other.mp4")
+
+    def test_set_destination_path_rejects_empty_path(self):
+        t = self._make_task()
+        with pytest.raises(Exception, match="No path provided"):
+            t.set_destination_path("")
