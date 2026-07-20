@@ -451,6 +451,22 @@ class Task:
 
         return query.dicts()
 
+    def __cleanup_task_before_delete(self, task_record):
+        """Run a task's irreversible pre-delete cleanup; return success."""
+        try:
+            # Remote tasks need to be cleaned up from the cache partition also
+            if task_record.type == "remote":
+                remote_task_dirname = task_record.abspath
+                if os.path.exists(task_record.abspath) and "compresso_remote_pending_library" in remote_task_dirname:
+                    self.logger.info("Removing remote pending library task '%s'.", remote_task_dirname)
+                    shutil.rmtree(os.path.dirname(remote_task_dirname))
+
+            TaskDataStore.clear_task(task_record.id)
+            return True
+        except Exception as e:
+            self.logger.exception("An error occurred while deleting task ID: %s. %s", task_record.id, e)
+            return False
+
     def delete_tasks_recursively(self, id_list):
         """
         Deletes a given list of tasks based on their IDs
@@ -479,27 +495,14 @@ class Task:
 
                 chunk_found_ids = []
                 for task_record in query:
-                    try:
-                        # Remote tasks need to be cleaned up from the cache partition also
-                        if task_record.type == "remote":
-                            remote_task_dirname = task_record.abspath
-                            if (
-                                os.path.exists(task_record.abspath)
-                                and "compresso_remote_pending_library" in remote_task_dirname
-                            ):
-                                self.logger.info("Removing remote pending library task '%s'.", remote_task_dirname)
-                                shutil.rmtree(os.path.dirname(remote_task_dirname))
-
-                        TaskDataStore.clear_task(task_record.id)
+                    # A cleanup failure must not abort the batch: tasks whose
+                    # irreversible cleanup already succeeded still need their
+                    # rows deleted below, or they would be orphaned with their
+                    # backing state gone. A failed task keeps its row for retry.
+                    if self.__cleanup_task_before_delete(task_record):
                         chunk_found_ids.append(task_record.id)
-                    except Exception as e:
-                        # A cleanup failure must not abort the batch: tasks whose
-                        # irreversible cleanup (remote dir removal, datastore
-                        # clearing) already succeeded still need their rows deleted
-                        # below, or they would be orphaned with their backing state
-                        # gone. The failed task keeps its row for a later retry.
+                    else:
                         had_failure = True
-                        self.logger.exception("An error occurred while deleting task ID: %s. %s", task_record.id, e)
 
                 if chunk_found_ids:
                     TaskMetadata.delete().where(TaskMetadata.task.in_(chunk_found_ids)).execute()
