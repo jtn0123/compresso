@@ -291,17 +291,17 @@ class TestFilterAvailableEncoders:
         assert "srt" in result
 
     @patch("compresso.libs.unffmpeg.info.cli.ffmpeg_available_encoders")
-    def test_all_unavailable_filters_what_it_can(self, mock_enc):
+    def test_all_unavailable_encoders_are_removed(self, mock_enc):
         """
-        Note: the source code modifies the list while iterating, so not all
-        unavailable entries are removed in a single pass.  We test the actual
-        behaviour here (single unavailable encoder is fully removed).
+        Every unavailable encoder is removed, including adjacent ones, and the
+        input list is not mutated (it may be a codec class attribute).
         """
         mock_enc.return_value = ENCODER_OUTPUT
         info = Info()
-        codec_encoders = ["fake_only"]
+        codec_encoders = ["fake_only", "also_fake", "libx264", "fake_again"]
         result = info.filter_available_encoders_for_codec(codec_encoders, "video")
-        assert result == []
+        assert result == ["libx264"]
+        assert codec_encoders == ["fake_only", "also_fake", "libx264", "fake_again"]
 
 
 # ---------------------------------------------------------------------------

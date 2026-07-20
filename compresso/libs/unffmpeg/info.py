@@ -208,13 +208,10 @@ class Info:
             available_encoders = self.get_ffmpeg_subtitle_encoders()
         elif codec_type == "video":
             available_encoders = self.get_ffmpeg_video_encoders()
-        # Iterate through the list of encoders.
-        for encoder in codec_encoders:
-            # Check if ffmpeg has that encoder
-            if encoder not in available_encoders:
-                # Encoder is not available, remove it from the list
-                codec_encoders.remove(encoder)
-        return codec_encoders
+        # Build a new list rather than mutating in place: removing while iterating
+        # skips the element after each removal, and the input list is the codec
+        # class attribute shared across calls.
+        return [encoder for encoder in codec_encoders if encoder in available_encoders]
 
     def get_all_supported_codecs_of_type(self, codec_type):
         """

@@ -34,6 +34,7 @@ from ..base_codecs import Codecs
 
 class Av1(Codecs):
     name = "av1"
-    encoders = ["av1_nvenc", "av1_vaapi", "av1_qsv", "libsvtav1", "libaom-av1"]
+    # Software encoders first — best compression per byte; hardware encoders are a speed-only fallback
+    encoders = ["libsvtav1", "libaom-av1", "av1_nvenc", "av1_vaapi", "av1_qsv"]
     default_encoder = "libsvtav1"
     codec_long_name = "AV1 (AOMedia Video 1)"
