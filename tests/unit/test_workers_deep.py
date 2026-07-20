@@ -719,6 +719,53 @@ class TestWorkerExecRunners:
 
         assert result is True
 
+    @patch(
+        "compresso.libs.workers.load_task_metadata",
+        return_value={"__meta__": {"comparison_profile": {"video_encoder": "libx265"}}},
+    )
+    @patch("compresso.libs.workers.os.path.exists", return_value=False)
+    @patch("compresso.libs.workers.PluginsHandler")
+    def test_comparison_profile_injects_encoding_runner_for_one_task(
+        self,
+        mock_ph_cls,
+        _mock_exists,
+        _mock_metadata,
+    ):
+        worker = _make_worker()
+        mock_task = MagicMock()
+        mock_task.get_task_library_id.return_value = 1
+        mock_task.get_task_id.return_value = 42
+        mock_task.get_task_type.return_value = "local"
+        mock_task.get_source_abspath.return_value = "/path/to/file.mp4"
+        mock_task.get_cache_path.return_value = "/tmp/cache/file.mp4"
+        worker.current_task = mock_task
+        worker.worker_log = []
+        worker.worker_subprocess_monitor = _make_monitor()
+
+        comparison_runner = {
+            "plugin_id": "encoding_presets",
+            "name": "Encoding Presets",
+            "author": "Compresso",
+            "version": "1.0",
+            "icon": "",
+            "description": "Encode a selected comparison profile",
+        }
+        mock_ph = MagicMock()
+        mock_ph.get_enabled_plugin_modules_by_type.side_effect = [[], [comparison_runner]]
+        mock_ph.exec_plugin_runner.return_value = True
+        mock_ph_cls.return_value = mock_ph
+
+        with (
+            patch("compresso.libs.workers.shutil"),
+            patch("compresso.libs.workers.os.path.abspath", side_effect=lambda path: path),
+            patch("compresso.libs.workers.os.makedirs"),
+        ):
+            result = worker._Worker__exec_worker_runners_on_set_task()
+
+        assert result is True
+        mock_ph.exec_plugin_runner.assert_called_once()
+        assert mock_ph.exec_plugin_runner.call_args.args[1:] == ("encoding_presets", "worker.process")
+
     @patch("compresso.libs.workers.PluginsHandler")
     def test_plugin_failure_returns_false(self, mock_ph_cls):
         worker = _make_worker()

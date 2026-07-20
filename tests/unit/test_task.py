@@ -243,6 +243,22 @@ class TestTaskDatabaseOps:
 
         assert Tasks.select().where(Tasks.abspath == "/media/invalid.mkv").count() == 0
 
+    def test_create_task_rejects_invalid_metadata_before_writing(self, in_memory_db):
+        from compresso.libs.exceptions import TaskError
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        self._create_library()
+        task = Task()
+        with pytest.raises(TaskError, match="metadata must be a dictionary"):
+            task.create_task_by_absolute_path(
+                "/media/invalid-metadata.mkv",
+                library_id=1,
+                task_metadata=["not", "a", "dictionary"],
+            )
+
+        assert Tasks.select().where(Tasks.abspath == "/media/invalid-metadata.mkv").count() == 0
+
     def test_create_task_duplicate_returns_false(self, in_memory_db):
         from compresso.libs.task import Task
 

@@ -12,6 +12,7 @@ import logging
 import os
 import re
 
+from compresso.libs.task import load_task_metadata
 from compresso.libs.unplugins.settings import PluginSettings
 
 logger = logging.getLogger(__name__)
@@ -186,6 +187,7 @@ CPU_USED_PRESET_MAP = {
 }
 
 VIDEOTOOLBOX_ENCODERS = {"h264_videotoolbox", "hevc_videotoolbox"}
+AMF_ENCODERS = {"h264_amf", "hevc_amf", "av1_amf"}
 
 # CRF parameter name varies by encoder
 CRF_PARAM_MAP = {
@@ -201,6 +203,33 @@ def _videotoolbox_quality_from_crf(crf):
     """Map the UI's lower-is-better CRF scale to VideoToolbox 1-100 quality."""
     bounded_crf = max(0, min(63, int(crf)))
     return round(100 - (bounded_crf / 63) * 99)
+
+
+def _load_task_profile_override(task_id):
+    """Load a one-job comparison winner without changing library settings."""
+    if task_id is None:
+        return {}
+    try:
+        payload = load_task_metadata(task_id)
+        metadata = payload.get("__meta__", {}) if isinstance(payload, dict) else {}
+        profile = metadata.get("comparison_profile", {}) if isinstance(metadata, dict) else {}
+        if not isinstance(profile, dict):
+            return {}
+        allowed = {
+            "video_codec",
+            "video_encoder",
+            "crf",
+            "encoder_preset",
+            "max_bitrate",
+            "scale_height",
+            "audio_codec",
+            "audio_bitrate",
+            "output_format",
+        }
+        return {key: value for key, value in profile.items() if key in allowed}
+    except (TypeError, ValueError):
+        logger.warning("Ignoring invalid task comparison profile metadata for task %s", task_id)
+        return {}
 
 
 def _get_source_extension(file_path):
@@ -261,7 +290,8 @@ def on_worker_process(data, **kwargs):
     settings = Settings(library_id=data.get("library_id"))
     settings.get_setting()
 
-    s = settings.settings_configured
+    s = dict(settings.settings_configured)
+    s.update(_load_task_profile_override(data.get("task_id")))
 
     file_in = data.get("file_in")
     if not file_in:
@@ -308,17 +338,21 @@ def on_worker_process(data, **kwargs):
         crf = s.get("crf", 23)
         if video_encoder in VIDEOTOOLBOX_ENCODERS:
             cmd.extend(["-q:v", str(_videotoolbox_quality_from_crf(crf))])
+        elif video_encoder in AMF_ENCODERS:
+            cmd.extend(["-rc", "cqp", "-qp_i", str(int(crf)), "-qp_p", str(int(crf))])
         else:
             crf_param = CRF_PARAM_MAP.get(video_encoder, "-crf")
             cmd.extend([crf_param, str(int(crf))])
 
         # Encoder preset
         preset = s.get("encoder_preset", "medium").strip()
-        if preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
+        if preset and video_encoder in AMF_ENCODERS:
+            cmd.extend(["-quality", preset])
+        elif preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
             preset_param = PRESET_PARAM_MAP.get(video_encoder, "-preset")
             # Map named presets to numbers for SVT-AV1 and VP9/libaom
             if video_encoder == "libsvtav1":
-                preset_value = SVTAV1_PRESET_MAP.get(preset, "5")
+                preset_value = preset if preset.isdigit() else SVTAV1_PRESET_MAP.get(preset, "5")
             elif video_encoder in ("libvpx-vp9", "libaom-av1"):
                 preset_value = CPU_USED_PRESET_MAP.get(preset, "3")
             else:
