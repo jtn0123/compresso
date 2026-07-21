@@ -15,6 +15,7 @@ from compresso.webserver.api_v2.base_api_handler import (
     BaseApiHandler,
     float_value,
     integer_value,
+    optional_integer_value,
     string_value,
 )
 from compresso.webserver.api_v2.schema.preview_schemas import (
@@ -70,8 +71,9 @@ class ApiPreviewHandler(BaseApiHandler):
 
             from compresso.webserver.helpers.healthcheck import validate_library_exists
 
+            # Only validate an explicitly provided library id (absent means default)
+            validate_library_exists(optional_integer_value(json_request.get("library_id")))
             library_id = integer_value(json_request.get("library_id"), 1)
-            validate_library_exists(library_id)
 
             # Validate source_path is within an allowed directory
             source_path = string_value(json_request.get("source_path"))

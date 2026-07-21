@@ -208,6 +208,10 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     return
                 handler = cast("Callable[..., object]", handler_value)
                 handler(params=message_data.get("params", {}))
+            elif command:
+                # Non-string truthy commands get the same rejection as unknown ones
+                tornado.log.app_log.warning("Rejected unknown WS command: %r", command)
+                self.write_message({"success": False, "error": "Unknown command"})
         except (json.decoder.JSONDecodeError, ValueError):
             tornado.log.app_log.error("Received incorrectly formatted message - %r", message, exc_info=False)
 
@@ -548,8 +552,8 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         while self._stream_is_active(self.sending_pending_tasks_info):
             results: list[dict[str, object]] = []
             params = {
-                "start": "0",
-                "length": "10",
+                "start": 0,
+                "length": 10,
                 "search_value": "",
                 "order": {
                     "column": "priority",
@@ -598,8 +602,8 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         while self._stream_is_active(self.sending_completed_tasks_info):
             results: list[dict[str, object]] = []
             params = {
-                "start": "0",
-                "length": "10",
+                "start": 0,
+                "length": 10,
                 "search_value": "",
                 "order": {
                     "column": "finish_time",

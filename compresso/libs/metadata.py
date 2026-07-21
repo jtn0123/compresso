@@ -501,7 +501,8 @@ class CompressoFileMetadata:
                 if not source_fingerprint:
                     source_fingerprint, source_algo = common.get_file_fingerprint(source_path_at_set)
                 if source_algo is None:
-                    source_algo = "sampled_sha256_v1"
+                    # Match common.get_file_fingerprint's default family
+                    source_algo = "sampled_xxhash_v1"
                 group = fingerprint_groups.setdefault(
                     source_fingerprint,
                     {"algo": source_algo, "paths": [], "scope": "source"},

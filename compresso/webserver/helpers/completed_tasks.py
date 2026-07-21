@@ -34,7 +34,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Protocol, cast
 
-from compresso.libs import history, task
+from compresso.libs import history, narrowing, task
 from compresso.libs.history import HistoryOrder
 from compresso.libs.unmodels import FileMetadataPaths
 
@@ -59,14 +59,20 @@ def _parse_datetime_to_timestamp(value: object) -> float | None:
     return None
 
 
+def parse_timestamp_value(value: object) -> float | None:
+    """Best-effort conversion of a stored start/finish time to a POSIX timestamp."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return _parse_datetime_to_timestamp(value)
+
+
 def _text_param(params: Mapping[str, object], key: str, default: str) -> str:
     value = params.get(key, default)
     return value if isinstance(value, str) else default
 
 
 def _int_param(params: Mapping[str, object], key: str, default: int) -> int:
-    value = params.get(key, default)
-    return value if isinstance(value, int) and not isinstance(value, bool) else default
+    return narrowing.coerce_int(params.get(key, default), default)
 
 
 def _history_order(params: Mapping[str, object]) -> HistoryOrder:

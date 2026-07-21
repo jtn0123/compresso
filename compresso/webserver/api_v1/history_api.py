@@ -32,13 +32,19 @@ Copyright:
 import json
 import time
 from collections.abc import Mapping, Sequence
+from typing import Protocol, cast
 
 import tornado.escape
 
 from compresso import config
-from compresso.libs import history
+from compresso.libs import history, narrowing
 from compresso.libs.history import HistoryOrder
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
+from compresso.webserver.helpers import completed_tasks
+
+
+class _CountableRows(Protocol):
+    def count(self) -> int: ...
 
 
 class ApiHistoryHandler(BaseApiHandler):
@@ -109,9 +115,7 @@ class ApiHistoryHandler(BaseApiHandler):
 
     @staticmethod
     def _integer_list(value: object) -> list[int]:
-        if not isinstance(value, list):
-            return []
-        return [item for item in value if isinstance(item, int) and not isinstance(item, bool)]
+        return narrowing.int_list(value, coerce=True)
 
     def delete_historic_tasks(self, historic_task_ids: Sequence[int]) -> bool:
         """
@@ -136,10 +140,8 @@ class ApiHistoryHandler(BaseApiHandler):
 
         # Generate filters for query
         draw = request_dict.get("draw")
-        start_value = request_dict.get("start")
-        length_value = request_dict.get("length")
-        start = start_value if isinstance(start_value, int) and not isinstance(start_value, bool) else 0
-        length = length_value if isinstance(length_value, int) and not isinstance(length_value, bool) else 0
+        start = narrowing.coerce_int(request_dict.get("start"), 0)
+        length = narrowing.coerce_int(request_dict.get("length"), 0)
 
         search_value_raw = request_dict.get("search")
         search = search_value_raw if isinstance(search_value_raw, Mapping) else {}
@@ -152,8 +154,7 @@ class ApiHistoryHandler(BaseApiHandler):
         filter_order = filter_order_value if isinstance(filter_order_value, Mapping) else {}
         order_direction_value = filter_order.get("dir")
         order_direction = order_direction_value if isinstance(order_direction_value, str) else "desc"
-        column_index_value = filter_order.get("column")
-        column_index = column_index_value if isinstance(column_index_value, int) else 0
+        column_index = narrowing.coerce_int(filter_order.get("column"), 0)
         columns_value = request_dict.get("columns")
         columns = columns_value if isinstance(columns_value, list) else []
         column_value = columns[column_index] if 0 <= column_index < len(columns) else {}
@@ -170,13 +171,12 @@ class ApiHistoryHandler(BaseApiHandler):
         # Get total count
         records_total_count = history_logging.get_total_historic_task_list_count()
         # Get quantity after filters (without pagination)
-        records_filtered_count = len(
-            list(
-                history_logging.get_historic_task_list_filtered_and_sorted(
-                    order=order, start=0, length=0, search_value=search_value
-                )
-            )
-        )
+        records_filtered_count = cast(
+            "_CountableRows",
+            history_logging.get_historic_task_list_filtered_and_sorted(
+                order=order, start=0, length=0, search_value=search_value
+            ),
+        ).count()
         # Get filtered/sorted results
         task_results = history_logging.get_historic_task_list_filtered_and_sorted(
             order=order, start=start, length=length, search_value=search_value
@@ -191,11 +191,16 @@ class ApiHistoryHandler(BaseApiHandler):
         for task in task_results:
             # Set params as required in template
             finish_time = task.get("finish_time")
-            timestamp = float(finish_time) if isinstance(finish_time, (int, float)) else 0.0
+            timestamp = completed_tasks.parse_timestamp_value(finish_time)
+            if timestamp is None:
+                # Surface unparseable stored values instead of rendering epoch 0
+                display_time = str(finish_time) if finish_time else ""
+            else:
+                display_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
             item: dict[str, object] = {
                 "id": task["id"],
                 "selected": False,
-                "finish_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)),
+                "finish_time": display_time,
                 "task_label": task["task_label"],
                 "task_success": task["task_success"],
             }

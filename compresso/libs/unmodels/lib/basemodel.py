@@ -220,7 +220,8 @@ class BaseModel(Model):
                 return True
             elif isinstance(value, str) and value.lower() in ["f", "false", "0"]:
                 return False
-            return False
+            # Unrecognised values must fail loudly, not coerce to False
+            raise TypeError(f"Cannot interpret {value!r} as a boolean for field '{field_id}'")
         elif isinstance(field, IntegerField):
             return int(cast("str | bytes | bytearray | float | int", value))
         elif isinstance(field, (FloatField, DecimalField)):

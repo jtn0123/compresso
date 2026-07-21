@@ -33,7 +33,7 @@ import os
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, cast
 
-from compresso.libs import filetest, task
+from compresso.libs import filetest, narrowing, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.peewee_types import execute_count
@@ -55,15 +55,11 @@ def _text_param(params: Mapping[str, object], key: str, default: str) -> str:
 
 
 def _int_param(params: Mapping[str, object], key: str, default: int) -> int:
-    value = params.get(key, default)
-    return value if isinstance(value, int) and not isinstance(value, bool) else default
+    return narrowing.coerce_int(params.get(key, default), default)
 
 
 def _id_list_param(params: Mapping[str, object], key: str) -> list[int]:
-    value = params.get(key)
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, int) and not isinstance(item, bool)]
+    return narrowing.int_list(params.get(key), coerce=True)
 
 
 def _task_order(params: Mapping[str, object]) -> TaskOrder:

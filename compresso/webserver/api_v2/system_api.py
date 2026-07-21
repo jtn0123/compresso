@@ -361,7 +361,7 @@ class ApiSystemHandler(BaseApiHandler):
         """
         try:
             request = self.read_json_request(SafetyAcknowledgeRequestSchema())
-            actor = string_value(request.get("actor"), "operator")
+            actor = string_value(request.get("actor"), "operator") or "operator"
             store = self._safety_store()
             event = store.acknowledge(string_value(request["event_id"]), actor=actor)
             if event.get("active"):

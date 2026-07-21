@@ -161,7 +161,9 @@ def save_library_config(  # noqa: C901 — complex validation logic; refactor tr
         plugin_executor = PluginExecutor()
         for ep in enabled_plugins:
             if ep.get("has_config"):
-                plugin_executor.save_plugin_settings(plugin_id, _mapping(ep.get("settings")), library_id=library_id)
+                plugin_executor.save_plugin_settings(
+                    _string(ep.get("plugin_id")), _mapping(ep.get("settings")), library_id=library_id
+                )
 
     # Update plugin flow (if the data was given)
     plugin_flow_value = plugin_config.get("plugin_flow")

@@ -835,6 +835,11 @@ class Worker(threading.Thread):
             )
             return False, task_cache_path
 
+    def __apply_parsed_progress(self, progress_value: object) -> None:
+        # A parser returning a non-mapping must not reset progress to 0
+        if isinstance(progress_value, Mapping):
+            self.monitor.set_subprocess_percent(progress_value.get("percent", 0))
+
     def __exec_command_subprocess(self, data: dict[str, object]) -> bool:
         """
         Executes a command as a shell subprocess.
@@ -952,9 +957,7 @@ class Worker(threading.Thread):
 
                 # Parse the progress
                 try:
-                    progress_value = command_progress_parser(line_text)
-                    progress_percent = progress_value.get("percent", 0) if isinstance(progress_value, Mapping) else 0
-                    self.monitor.set_subprocess_percent(progress_percent)
+                    self.__apply_parsed_progress(command_progress_parser(line_text))
                 except (ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
                     # Only need to show any sort of exception if we have debugging enabled.
                     # So we should log it as a debug rather than an exception.

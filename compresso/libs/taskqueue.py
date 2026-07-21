@@ -204,7 +204,11 @@ class TaskQueue:
 
     def _log(self, message: object, message2: object = "", level: str = "info") -> None:
         message = common.format_message(message, message2)
-        self.logger.log(getattr(logging, level.upper(), logging.INFO), message)
+        if level == "exception":
+            # logging has no EXCEPTION level; keep the traceback semantics
+            self.logger.exception(message)
+        else:
+            self.logger.log(getattr(logging, level.upper(), logging.ERROR), message)
 
     """
     Last task based on status pending, in_progress or processed

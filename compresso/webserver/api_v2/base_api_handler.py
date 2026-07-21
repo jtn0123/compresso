@@ -47,6 +47,7 @@ from tornado.log import app_log
 from tornado.routing import PathMatches
 from tornado.web import RequestHandler
 
+from compresso.libs import narrowing
 from compresso.webserver.request_auth import authorize_request, request_has_valid_api_token
 from compresso.webserver.security_headers import SecurityHeadersMixin
 
@@ -101,25 +102,25 @@ def string_value(value: object, default: str = "") -> str:
 
 
 def integer_value(value: object, default: int = 0) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) else default
+    # Coerces numeric strings: v1 DataTables clients send "start"/"length"/ids
+    # as strings, and dropping them to the default silently breaks pagination.
+    return narrowing.coerce_int(value, default)
 
 
 def optional_integer_value(value: object) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
+    return narrowing.coerce_int_or_none(value)
 
 
 def float_value(value: object, default: float = 0.0) -> float:
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+    return narrowing.strict_float(value, default)
 
 
 def boolean_value(value: object, default: bool = False) -> bool:
-    return value if isinstance(value, bool) else default
+    return narrowing.strict_bool(value, default)
 
 
 def integer_list_value(value: object) -> list[int]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, int) and not isinstance(item, bool)]
+    return narrowing.int_list(value, coerce=True)
 
 
 class BaseApiError(Exception):

@@ -83,15 +83,18 @@ class LoggingSettings(Protocol):
 
 
 def _parse_forward_log_entry(value: object) -> ForwardLogEntry | None:
+    """Parse a buffered entry, coercing scalar values so older buffers still forward."""
     if not isinstance(value, dict):
         return None
     labels = value.get("labels")
     entry = value.get("entry")
-    if not isinstance(labels, dict) or not all(isinstance(key, str) and isinstance(item, str) for key, item in labels.items()):
+    if not isinstance(labels, dict) or not all(isinstance(key, str) for key in labels):
         return None
-    if not isinstance(entry, list) or len(entry) != 2 or not all(isinstance(item, str) for item in entry):
+    if not isinstance(entry, list) or len(entry) != 2:
         return None
-    return ForwardLogEntry(labels=cast("dict[str, str]", labels), entry=cast("list[str]", entry))
+    coerced_labels = {key: item if isinstance(item, str) else str(item) for key, item in labels.items()}
+    coerced_entry = [item if isinstance(item, str) else str(item) for item in entry]
+    return ForwardLogEntry(labels=cast("dict[str, str]", coerced_labels), entry=coerced_entry)
 
 
 class ForwardJSONFormatter(JSONFormatter):

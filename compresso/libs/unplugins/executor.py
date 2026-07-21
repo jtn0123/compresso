@@ -64,9 +64,10 @@ class _PluginSettingsFactory(Protocol):
 
 
 def _object_dict(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+    # Accept any Mapping: plugin Settings implementations may return custom types
+    if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
         return {}
-    return cast("dict[str, object]", value)
+    return dict(cast("Mapping[str, object]", value))
 
 
 class PluginExecutor:

@@ -15,6 +15,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import cast
 
+from compresso.libs import narrowing
 from compresso.libs.json_state import atomic_json_write
 
 MEDIA_EXTENSIONS = {
@@ -44,24 +45,6 @@ def _object_dict(value: object) -> JsonObject:
     if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
         return {}
     return cast("JsonObject", value)
-
-
-def _int_value(value: object, default: int = 0) -> int:
-    if not isinstance(value, (bool, int, float, str, bytes, bytearray)):
-        return default
-    try:
-        return int(value)
-    except (OverflowError, TypeError, ValueError):
-        return default
-
-
-def _float_value(value: object, default: float = 0.0) -> float:
-    if not isinstance(value, (bool, int, float, str, bytes, bytearray)):
-        return default
-    try:
-        return float(value)
-    except (OverflowError, TypeError, ValueError):
-        return default
 
 
 @dataclass(frozen=True)
@@ -100,7 +83,7 @@ def _manifest_entry_path_transition(
 
 
 def _manifest_before_size(expected: JsonObject) -> int:
-    return _int_value(expected.get("size_bytes"))
+    return narrowing.coerce_int(expected.get("size_bytes"))
 
 
 def _verify_manifest_entry(
@@ -182,7 +165,7 @@ def probe_media(path: str | os.PathLike[str]) -> JsonObject:
         {},
     )
     format_info = _object_dict(probe.get("format"))
-    duration = _float_value(format_info.get("duration"))
+    duration = narrowing.coerce_float(format_info.get("duration"))
     chapters = probe.get("chapters")
     return {
         "streams": {stream_type: int(counts.get(stream_type, 0)) for stream_type in STREAM_TYPES},
@@ -207,17 +190,18 @@ def compare_media_summaries(before: object, after: object) -> list[str]:
     if not isinstance(after_streams, dict):
         return ["output stream summary is invalid"]
     for stream_type in STREAM_TYPES:
-        try:
-            expected = _int_value(before_streams.get(stream_type))
-            actual = _int_value(after_streams.get(stream_type))
-        except OverflowError:
+        expected = narrowing.coerce_int_or_none(before_streams.get(stream_type, 0))
+        actual = narrowing.coerce_int_or_none(after_streams.get(stream_type, 0))
+        if expected is None or actual is None:
             issues.append(f"{stream_type} stream count is invalid")
             continue
         if actual < expected:
             issues.append(f"{stream_type} streams decreased from {expected} to {actual}")
-    expected_chapters = _int_value(before.get("chapters"))
-    actual_chapters = _int_value(after.get("chapters"))
-    if actual_chapters < expected_chapters:
+    expected_chapters = narrowing.coerce_int_or_none(before.get("chapters", 0))
+    actual_chapters = narrowing.coerce_int_or_none(after.get("chapters", 0))
+    if expected_chapters is None or actual_chapters is None:
+        issues.append("chapter count is invalid")
+    elif actual_chapters < expected_chapters:
         issues.append(f"chapters decreased from {expected_chapters} to {actual_chapters}")
     before_video = before.get("video", {})
     after_video = after.get("video", {})
@@ -228,9 +212,11 @@ def compare_media_summaries(before: object, after: object) -> list[str]:
         expected_metadata = before_video.get(field)
         if expected_metadata and after_video.get(field) != expected_metadata:
             issues.append(f"{field} changed from {expected_metadata} to {after_video.get(field)}")
-    before_duration = _float_value(before.get("duration_seconds"))
-    after_duration = _float_value(after.get("duration_seconds"))
-    if not math.isfinite(before_duration) or not math.isfinite(after_duration):
+    before_duration = narrowing.coerce_float_or_none(before.get("duration_seconds", 0) or 0)
+    after_duration = narrowing.coerce_float_or_none(after.get("duration_seconds", 0) or 0)
+    if before_duration is None or after_duration is None:
+        issues.append("duration is invalid")
+    elif not math.isfinite(before_duration) or not math.isfinite(after_duration):
         issues.append("duration is not finite")
     else:
         tolerance = max(1.0, before_duration * 0.01)

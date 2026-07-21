@@ -70,7 +70,10 @@ def _remote_task_id(value: object) -> int | str | None:
 def _remote_task_id_as_int(value: int | str | None) -> int:
     if isinstance(value, bool) or value is None:
         raise RuntimeError("Remote task response did not include a task ID")
-    return int(value)
+    try:
+        return int(value)
+    except ValueError as error:
+        raise RuntimeError(f"Remote task response contained an invalid task ID: {value!r}") from error
 
 
 def _json_value(value: object) -> bool:
@@ -1157,9 +1160,15 @@ class RemoteTaskManager(threading.Thread):
         return FinalizationPhaseResult(True)
 
     def _cleanup_phase(self, context: RemoteTaskContext) -> CleanupPhaseResult:
+        try:
+            remote_task_id = _remote_task_id_as_int(context.remote_task_id)
+        except RuntimeError as error:
+            # A bad remote id must not abort cleanup; the remote delete is best-effort
+            self._log(f"Skipping remote task removal: {error}", level="warning")
+            return CleanupPhaseResult(succeeded=False, remote_removed=False)
         response = self.links.remove_task_from_remote_installation(
             self.installation_info,
-            _remote_task_id_as_int(context.remote_task_id),
+            remote_task_id,
         )
         remote_removed = bool(response.get("success")) if isinstance(response, dict) else bool(response)
         return CleanupPhaseResult(succeeded=remote_removed, remote_removed=remote_removed)
