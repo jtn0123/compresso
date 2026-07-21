@@ -6,8 +6,10 @@ Two families with deliberately different semantics:
   accepted as an int/float) and return the default for anything else. Use
   these where a mismatched type indicates a programming error and silent
   coercion would hide it.
-- ``coerce_*`` helpers additionally convert compatible scalars (numeric
-  strings, floats, bytes) and return the default only when conversion fails.
+- ``coerce_*`` helpers additionally convert compatible wire scalars and return
+  the default only when conversion fails. Integer coercion deliberately accepts
+  only integers and integer strings; booleans, bytes, and fractional numbers
+  are rejected so IDs and byte offsets cannot be silently changed.
   Use these at wire, config, and database boundaries where stringly-typed
   values are legal inputs.
 
@@ -59,11 +61,15 @@ def coerce_int(value: object, default: int = 0) -> int:
 
 
 def coerce_int_or_none(value: object) -> int | None:
-    if not isinstance(value, _COERCIBLE_SCALARS):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if not isinstance(value, str):
         return None
     try:
-        return int(value)
-    except (TypeError, ValueError, OverflowError):
+        return int(value, 10)
+    except ValueError:
         return None
 
 

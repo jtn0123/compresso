@@ -38,7 +38,7 @@ from peewee import DoesNotExist, fn
 
 from compresso import config
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import execute_write
+from compresso.libs.peewee_types import CountedRows, execute_write
 from compresso.libs.unmodels.completedtasks import CompletedTasks
 from compresso.libs.unmodels.completedtaskscommandlogs import CompletedTasksCommandLogs
 from compresso.libs.unmodels.compressionstats import CompressionStats
@@ -124,7 +124,7 @@ class History:
         task_success: bool | None = None,
         after_time: float | None = None,
         before_time: float | None = None,
-    ) -> Iterable[dict[str, object]]:
+    ) -> CountedRows:
         query = CompletedTasks.select()
 
         if id_list:
@@ -164,7 +164,7 @@ class History:
         if length:
             query = query.limit(length).offset(start)
 
-        return cast("Iterable[dict[str, object]]", query.dicts())
+        return cast("CountedRows", query.dicts())
 
     def get_current_path_of_historic_tasks_by_id(self, id_list: Sequence[int] | None = None) -> Iterable[dict[str, object]]:
         """

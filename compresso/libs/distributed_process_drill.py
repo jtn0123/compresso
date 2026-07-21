@@ -14,13 +14,16 @@ import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
-from typing import IO, cast
+from typing import IO
+
+from compresso.libs import narrowing
 
 
 def _json_object(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+    result = narrowing.string_keyed_dict_or_none(value)
+    if result is None:
         raise RuntimeError("localhost drill returned a non-object JSON response")
-    return cast("dict[str, object]", value)
+    return result
 
 
 def _checksum(data: bytes) -> str:

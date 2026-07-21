@@ -1,7 +1,9 @@
 """Typed contracts and runtime narrowing for ffprobe-derived data."""
 
 from collections.abc import Mapping
-from typing import TypedDict, cast
+from typing import TypedDict
+
+from compresso.libs import narrowing
 
 
 class EncodingArguments(TypedDict):
@@ -10,9 +12,7 @@ class EncodingArguments(TypedDict):
 
 
 def string_keyed_dict(value: object) -> dict[str, object] | None:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return None
-    return cast("dict[str, object]", value)
+    return narrowing.string_keyed_dict_or_none(value)
 
 
 def probe_streams(file_probe: Mapping[str, object]) -> list[dict[str, object]]:
@@ -23,15 +23,8 @@ def probe_streams(file_probe: Mapping[str, object]) -> list[dict[str, object]]:
 
 
 def stream_text(stream: Mapping[str, object], key: str) -> str:
-    value = stream.get(key)
-    return value if isinstance(value, str) else ""
+    return narrowing.strict_str(stream.get(key))
 
 
 def stream_int(stream: Mapping[str, object], key: str) -> int:
-    value = stream.get(key)
-    if isinstance(value, (int, float, str)):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            pass
-    return 0
+    return narrowing.coerce_int(stream.get(key))

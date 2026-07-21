@@ -31,14 +31,14 @@ Copyright:
 
 import os
 from collections.abc import Mapping, Sequence
-from typing import cast
 
-from compresso.libs import filetest, narrowing, task
+from compresso.libs import filetest, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import CountedRows, execute_count
+from compresso.libs.peewee_types import execute_count
 from compresso.libs.task import TaskOrder
 from compresso.libs.unmodels.tasks import Tasks
+from compresso.webserver.helpers.pagination import parse_page_params
 
 logger = CompressoLogging.get_logger(name=__name__)
 
@@ -63,14 +63,7 @@ def prepare_filtered_pending_tasks_for_table(request_dict: Mapping[str, object])
     """
 
     # Generate filters for query
-    draw = narrowing.coerce_int(request_dict.get("draw"), 0)
-    start = narrowing.coerce_int(request_dict.get("start"), 0)
-    length = narrowing.coerce_int(request_dict.get("length"), 0)
-
-    search_value = ""
-    search = request_dict.get("search")
-    if isinstance(search, Mapping) and isinstance(search.get("value"), str):
-        search_value = cast(str, search["value"])
+    page = parse_page_params(request_dict, data_tables=True)
 
     # Force sort order always by ID desc
     order: TaskOrder = {
@@ -83,22 +76,19 @@ def prepare_filtered_pending_tasks_for_table(request_dict: Mapping[str, object])
     # Get total count
     records_total_count = task_handler.get_total_task_list_count()
     # Get quantity after filters (without pagination)
-    filtered_rows = cast(
-        CountedRows,
-        task_handler.get_task_list_filtered_and_sorted(
-            order=order, start=0, length=0, search_value=search_value, status="pending"
-        ),
+    filtered_rows = task_handler.get_task_list_filtered_and_sorted(
+        order=order, start=0, length=0, search_value=page.search_value, status="pending"
     )
     records_filtered_count = filtered_rows.count()
     # Get filtered/sorted results
     pending_task_results = task_handler.get_task_list_filtered_and_sorted(
-        order=order, start=start, length=length, search_value=search_value, status="pending"
+        order=order, start=page.start, length=page.length, search_value=page.search_value, status="pending"
     )
 
     # Build return data
     data: list[dict[str, object]] = []
     return_data: dict[str, object] = {
-        "draw": draw,
+        "draw": page.draw,
         "recordsTotal": records_total_count,
         "recordsFiltered": records_filtered_count,
         "successCount": 0,
@@ -130,11 +120,7 @@ def prepare_filtered_pending_tasks(params: Mapping[str, object], include_library
     :param include_library:
     :return:
     """
-    start = narrowing.coerce_int(params.get("start"), 0)
-    length = narrowing.coerce_int(params.get("length"), 0)
-
-    search_value = narrowing.strict_str(params.get("search_value"))
-    library_ids = narrowing.int_list(params.get("library_ids"), coerce=True)
+    page = parse_page_params(params)
 
     order = _task_order(params)
 
@@ -143,16 +129,23 @@ def prepare_filtered_pending_tasks(params: Mapping[str, object], include_library
     # Get total count
     records_total_count = task_handler.get_total_task_list_count()
     # Get quantity after filters (without pagination)
-    filtered_rows = cast(
-        CountedRows,
-        task_handler.get_task_list_filtered_and_sorted(
-            order=order, start=0, length=0, search_value=search_value, status="pending", library_ids=library_ids
-        ),
+    filtered_rows = task_handler.get_task_list_filtered_and_sorted(
+        order=order,
+        start=0,
+        length=0,
+        search_value=page.search_value,
+        status="pending",
+        library_ids=page.library_ids,
     )
     records_filtered_count = filtered_rows.count()
     # Get filtered/sorted results
     pending_task_results = task_handler.get_task_list_filtered_and_sorted(
-        order=order, start=start, length=length, search_value=search_value, status="pending", library_ids=library_ids
+        order=order,
+        start=page.start,
+        length=page.length,
+        search_value=page.search_value,
+        status="pending",
+        library_ids=page.library_ids,
     )
 
     # Build return data
@@ -201,14 +194,18 @@ def get_filtered_pending_task_ids(params: Mapping[str, object], exclude_ids: Seq
     :param exclude_ids:
     :return:
     """
-    search_value = narrowing.strict_str(params.get("search_value"))
-    library_ids = narrowing.int_list(params.get("library_ids"), coerce=True)
+    page = parse_page_params(params)
 
     exclude_set = set(exclude_ids or [])
 
     task_handler = task.Task()
     query = task_handler.get_task_list_filtered_and_sorted(
-        order=None, start=0, length=0, search_value=search_value, status="pending", library_ids=library_ids
+        order=None,
+        start=0,
+        length=0,
+        search_value=page.search_value,
+        status="pending",
+        library_ids=page.library_ids,
     )
 
     id_list: list[int] = []

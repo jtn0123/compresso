@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the read-only type-safety metrics reporter."""
+"""Tests for the type-safety metrics reporter and ledger drift guard."""
 
 import json
 
@@ -77,3 +77,30 @@ def test_collect_metrics_recognizes_case_insensitive_vue_script_tags(tmp_path):
 
     assert metrics.frontend.typed_vue_files == 1
     assert metrics.frontend.vue_script_loc == 3
+
+
+@pytest.mark.unittest
+def test_replace_document_metrics_updates_only_generated_section(tmp_path):
+    from scripts.type_safety_metrics import GENERATED_END, GENERATED_START, collect_metrics, replace_document_metrics
+
+    (tmp_path / "compresso").mkdir()
+    (tmp_path / "tests").mkdir()
+    document = f"Before\n\n{GENERATED_START}\nstale\n{GENERATED_END}\n\nAfter\n"
+
+    updated = replace_document_metrics(document, collect_metrics(tmp_path))
+
+    assert updated.startswith("Before\n\n")
+    assert updated.endswith("\n\nAfter\n")
+    assert "stale" not in updated
+    assert "| Production Python files | 245 | 0 | All checked |" in updated
+
+
+@pytest.mark.unittest
+def test_replace_document_metrics_requires_one_marker_pair(tmp_path):
+    from scripts.type_safety_metrics import collect_metrics, replace_document_metrics
+
+    (tmp_path / "compresso").mkdir()
+    (tmp_path / "tests").mkdir()
+
+    with pytest.raises(ValueError, match="generated metrics markers"):
+        replace_document_metrics("No generated section", collect_metrics(tmp_path))

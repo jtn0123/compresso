@@ -6,7 +6,7 @@ checklists or metrics.
 
 | Field | Value |
 |---|---|
-| Status | Complete |
+| Status | Complete; PR #218 awaiting review |
 | Baseline | `f3f566a8` (`v1.17.0`) |
 | Started | 2026-07-20 |
 | Last verified | 2026-07-21 |
@@ -25,24 +25,23 @@ checklists or metrics.
 
 ## Current Metrics
 
-Run `python3.13 scripts/type_safety_metrics.py --format markdown` to reproduce the structural metrics.
-The reporter is read-only; update this table in the same PR that changes a work item.
+Run `python3.13 scripts/type_safety_metrics.py --write-document docs/TYPE_SAFETY.md` after structural
+changes. CI runs the corresponding `--check-document` command and rejects stale values.
 
+<!-- BEGIN GENERATED TYPE SAFETY METRICS -->
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
-| Production Python files | 245 | 249 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,683 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 1,869 / 1,869 | 100% |
+| Production Python files | 245 | 250 | All checked |
+| Production Python nonblank LOC | 44,273 | 47,702 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 1,860 / 1,860 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
-| Normal mypy errors | 0 | 0 | 0 |
-| `--check-untyped-defs` errors | 593 in 68 files | 0 in 0 files | 0 |
-| Strict mypy errors | 4,944 in 145 files | 0 in 0 files | 0 |
 | Production frontend JavaScript files | 33 | 0 | 0 |
 | Production frontend JavaScript LOC | 2,451 | 0 | 0 |
-| Production frontend TypeScript files | 0 | 45 | All production modules |
+| Production frontend TypeScript files | 0 | 47 | All production modules |
 | Typed Vue components | 0 / 88 | 88 / 88 | 100% |
-| Vue script LOC | 12,182 | 12,805 | All checked |
+| Vue script LOC | 12,182 | 12,766 | All checked |
+<!-- END GENERATED TYPE SAFETY METRICS -->
 
 ## Work Ledger
 
@@ -59,6 +58,21 @@ required gates and evidence are recorded here.
 | PY-30 | Strict service/web boundaries: helpers, APIs, WebSocket, proxy/auth, plugins, migrations | Complete | Strict mypy, API suites, packaged live backend, and clean wheel | — |
 | TS-90 | Global strict ratchet, exception cleanup, and final verification | Complete | All completion-contract gates | — |
 
+### Simplification Follow-up
+
+This batch keeps the completion contract intact: runtime validation, strict-versus-coercing
+boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit remain required.
+
+| ID | Deliverable | Status | Required evidence | PR / commit |
+|---|---|---|---|---|
+| SIM-01 | Reject booleans and fractional values at integer boundaries | Complete | Narrowing and destructive-history regression tests | PR #218 |
+| SIM-02 | Generate and verify this document's current metrics; remove duplicated PR test totals | Complete | Metrics document tests and CI drift check | PR #218 |
+| SIM-03 | Share pagination parsing and give Peewee dictionary rows their real counted type | Complete | Helper tests, strict mypy, API regression suites | PR #218 |
+| SIM-04 | Split library save responsibilities and share typed write/import request parsing | Complete | Settings helper and API regression suites | PR #218 |
+| SIM-05 | Finish safe boundary-helper consolidation | Complete | Focused tests, Ruff, strict mypy | PR #218 |
+| SIM-06 | Parse each browser WebSocket event once and use one typed Library Settings state object | Complete | Vitest, Vue typecheck, Chrome and WebKit E2E | PR #218 |
+| SIM-07 | Preserve unknown notification-channel fields and collapse generated artifacts in review | Complete | Vitest plus generated-artifact attributes | PR #218 |
+
 ## Verification Evidence
 
 | ID | Evidence recorded 2026-07-20 |
@@ -70,6 +84,7 @@ required gates and evidence are recorded here.
 | PY-20 | Models, metadata, queues, workers, scanner/checkpoint, manifests, analysis, scheduler, links, post-processing, monitoring, and lifecycle services strict; focused suites passed, including 127 foreman, 134 file/scanner, 56 manifest, 81 analysis, 85 health, and 257 support assertions; fixed remote-upload cleanup, nullable cache paths, malformed worker slots, FFprobe boundary validation, and scheduled history cleanup treating dictionary rows as model objects |
 | PY-30 | All 246 mypy source files pass `mypy --strict`; the complete unit suite passes (4,031 tests), integration passes (24), release contracts pass (11), and the packaged live backend passes (3). Fixed inherited v1 dispatch awaiting its synchronous router, typed write-result handling, malformed WebSocket payloads, optional-watchdog wheel imports, service registration argument misuse, duplicate queue initialization, and stoppable resource logging |
 | TS-90 | `verify-local.sh full` passed under an isolated Node 24.11.1 runtime with only Playwright skipped: action pins, licenses, locks, both pip audits, Ruff/format, strict mypy, OpenAPI, 4,031 unit tests, 481 frontend tests plus coverage, build, actionlint, 24 integration tests, 11 release tests, 3 release-tool tests, and clean-wheel inspection. Separate Playwright verification uses installed Google Chrome as the primary desktop, mobile, and packaged live-backend browser plus WebKit for Safari coverage: mocked browser tests 9 passed and packaged live-backend tests 3 passed. `npm audit --omit=dev` reports zero production vulnerabilities |
+| SIM-01–07 | Integer, pagination, settings, helper, WebSocket, Library Settings, notification-preservation, and metrics regressions pass. Strict mypy, Ruff, frontend contract/type/lint/test/build gates, the complete isolated unit suite, installed Chrome/mobile Chrome, WebKit, and packaged live-backend Chrome all pass. |
 
 ## Defects Prevented or Fixed
 

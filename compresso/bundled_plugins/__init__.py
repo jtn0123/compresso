@@ -13,6 +13,7 @@ import re
 import shutil
 from collections.abc import Mapping
 
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.peewee_types import execute_write
 
@@ -21,10 +22,6 @@ logger = CompressoLogging.get_logger("bundled_plugins")
 BUNDLED_PLUGINS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PLUGIN_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
 _SETTINGS_FILENAME_PATTERN = re.compile(r"settings[A-Za-z0-9_.-]*\.json\Z")
-
-
-def _mapping(value: object) -> Mapping[str, object]:
-    return value if isinstance(value, Mapping) else {}
 
 
 def _validated_plugin_name(value: object, fallback: str | None = None) -> str:
@@ -69,7 +66,7 @@ def install_bundled_plugins(plugins_path: str | os.PathLike[str]) -> None:
             continue
 
         with open(info_file) as f:
-            bundled_info = _mapping(json.load(f))
+            bundled_info = narrowing.mapping_value(json.load(f))
 
         try:
             plugin_id = _validated_plugin_name(bundled_info.get("id"), entry)
@@ -87,7 +84,7 @@ def install_bundled_plugins(plugins_path: str | os.PathLike[str]) -> None:
             target_info_file = os.path.join(target_dir, "info.json")
             if os.path.exists(target_info_file):
                 with open(target_info_file) as f:
-                    existing_info = _mapping(json.load(f))
+                    existing_info = narrowing.mapping_value(json.load(f))
                 existing_version = existing_info.get("version", "0.0.0")
                 bundled_version = bundled_info.get("version", "0.0.0")
                 if _version_newer(bundled_version, existing_version):

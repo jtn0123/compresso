@@ -1,6 +1,6 @@
 import type { LiveGpuMetrics, LiveSystemMetricsMessage } from './contracts'
 import { parseFiniteNumber } from 'src/js/formatUtils'
-import { isRecord, KNOWN_STREAM_TYPES, parseRawEnvelope } from './envelope'
+import { isRecord, KNOWN_STREAM_TYPES, type RawEnvelope } from './envelope'
 import type { WorkerInfoMessage, WorkerRunnerInfo, WorkerSubprocessInfo } from './workers'
 
 export interface PendingTaskMessage {
@@ -207,9 +207,7 @@ function parseSystemMetrics(value: unknown): LiveSystemMetricsMessage | null {
   return result
 }
 
-export function parseDashboardEnvelope(raw: string): DashboardEnvelope | null {
-  const envelope = parseRawEnvelope(raw)
-  if (!envelope) return null
+export function parseDashboardEnvelope(envelope: RawEnvelope): DashboardEnvelope | null {
   if (!envelope.success) return envelope
   const serverId = envelope.server_id
   switch (envelope.type) {

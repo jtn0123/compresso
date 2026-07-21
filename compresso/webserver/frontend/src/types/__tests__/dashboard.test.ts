@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { parseDashboardEnvelope } from '../dashboard'
+import { parseRawEnvelope } from '../envelope'
+
+const parse = (raw: string) => parseDashboardEnvelope(parseRawEnvelope(raw)!)
 
 describe('parseDashboardEnvelope', () => {
   it('accepts the completed task results envelope used by the dashboard', () => {
-    const parsed = parseDashboardEnvelope(
+    const parsed = parse(
       JSON.stringify({
         success: true,
         server_id: 'server-1',
@@ -21,7 +24,7 @@ describe('parseDashboardEnvelope', () => {
   })
 
   it('normalizes optional worker telemetry at the browser boundary', () => {
-    const parsed = parseDashboardEnvelope(
+    const parsed = parse(
       JSON.stringify({
         success: true,
         server_id: 'server-1',
@@ -39,7 +42,7 @@ describe('parseDashboardEnvelope', () => {
 
   it('rejects malformed task payloads', () => {
     expect(
-      parseDashboardEnvelope(
+      parse(
         JSON.stringify({
           success: true,
           server_id: 'server-1',
@@ -53,7 +56,7 @@ describe('parseDashboardEnvelope', () => {
 
 describe('parseDashboardEnvelope regressions', () => {
   it('coerces the stringified worker start_time the backend sends', () => {
-    const parsed = parseDashboardEnvelope(
+    const parsed = parse(
       JSON.stringify({
         success: true,
         server_id: 'server-1',
@@ -70,14 +73,14 @@ describe('parseDashboardEnvelope regressions', () => {
 
   it('passes through known stream types the dashboard does not model', () => {
     for (const type of ['frontend_message', 'system_logs']) {
-      const parsed = parseDashboardEnvelope(JSON.stringify({ success: true, server_id: 'server-1', type, data: [] }))
+      const parsed = parse(JSON.stringify({ success: true, server_id: 'server-1', type, data: [] }))
       expect(parsed).toEqual({ success: true, server_id: 'server-1', type: 'unhandled' })
     }
   })
 
   it('still rejects envelopes with unknown stream types', () => {
     expect(
-      parseDashboardEnvelope(JSON.stringify({ success: true, server_id: 'server-1', type: 'not_a_stream', data: [] })),
+      parse(JSON.stringify({ success: true, server_id: 'server-1', type: 'not_a_stream', data: [] })),
     ).toBeNull()
   })
 })

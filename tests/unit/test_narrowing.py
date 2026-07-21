@@ -9,11 +9,14 @@ from compresso.libs import narrowing
 
 @pytest.mark.unittest
 class TestCoercingFamily:
-    def test_coerce_int_accepts_numeric_scalars(self):
+    def test_coerce_int_accepts_only_integers_and_integer_strings(self):
         # Regression origin: preloading enabled without a count compared int >= None
         assert narrowing.coerce_int(None) == 0
         assert narrowing.coerce_int("3") == 3
-        assert narrowing.coerce_int(2.9) == 2
+        assert narrowing.coerce_int("-3") == -3
+        assert narrowing.coerce_int(True, 7) == 7
+        assert narrowing.coerce_int(2.9, 7) == 7
+        assert narrowing.coerce_int(b"3", 7) == 7
         assert narrowing.coerce_int("abc", 7) == 7
         assert narrowing.coerce_int(object(), 1) == 1
 
@@ -58,7 +61,7 @@ class TestContainers:
 
     def test_int_list_modes(self):
         assert narrowing.int_list([1, "2", True]) == [1]
-        assert narrowing.int_list([1, "2", True], coerce=True) == [1, 2, 1]
+        assert narrowing.int_list([1, "2", True, 2.5, b"3"], coerce=True) == [1, 2]
 
     def test_string_list_filters_and_defaults(self):
         assert narrowing.string_list(["a", 1, "b"]) == ["a", "b"]

@@ -67,6 +67,7 @@ vi.mock('quasar', () => ({
 }))
 
 import { shallowMountWithQuasar } from 'src/test-utils'
+import { serializeNotificationChannel } from 'src/types/notifications'
 import SettingsNotifications from '../SettingsNotifications.vue'
 
 // ---------------------------------------------------------------------------
@@ -325,7 +326,7 @@ describe('SettingsNotifications.vue', () => {
         ([config]) => config.url && config.url.includes('notifications/channels/test'),
       )
       expect(testCalls.length).toBe(1)
-      expect(testCalls[0][0].data.channel).toEqual(channel)
+      expect(testCalls[0][0].data.channel).toEqual(serializeNotificationChannel(channel))
       expect(val(wrapper.vm.testingId)).toBeNull()
     })
   })

@@ -8,6 +8,25 @@ from compresso.webserver.helpers import settings
 
 
 @pytest.mark.unittest
+def test_parse_library_save_request_normalizes_validated_objects() -> None:
+    request = settings.parse_library_save_request(
+        "7",
+        {"name": "Movies", "enable_scanner": True},
+        {"enabled_plugins": []},
+    )
+
+    assert request.library_id == 7
+    assert request.library_config == {"name": "Movies", "enable_scanner": True}
+    assert request.plugin_config == {"enabled_plugins": []}
+
+
+@pytest.mark.unittest
+def test_parse_library_save_request_rejects_non_object_sections() -> None:
+    with pytest.raises(ValueError, match="contain objects"):
+        settings.parse_library_save_request(1, [], {})
+
+
+@pytest.mark.unittest
 @patch("compresso.webserver.helpers.settings.PluginExecutor")
 @patch("compresso.webserver.helpers.settings.plugins")
 @patch("compresso.webserver.helpers.settings.Library")

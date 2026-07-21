@@ -32,12 +32,11 @@ Copyright:
 import os
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import cast
 
 from compresso.libs import history, narrowing, task
 from compresso.libs.history import HistoryOrder
-from compresso.libs.peewee_types import CountedRows
 from compresso.libs.unmodels import FileMetadataPaths
+from compresso.webserver.helpers.pagination import parse_page_params
 
 
 def _parse_datetime_to_timestamp(value: object) -> float | None:
@@ -78,10 +77,7 @@ def prepare_filtered_completed_tasks(params: Mapping[str, object]) -> dict[str, 
     :param params:
     :return:
     """
-    start = narrowing.coerce_int(params.get("start"), 0)
-    length = narrowing.coerce_int(params.get("length"), 0)
-
-    search_value = narrowing.strict_str(params.get("search_value"))
+    page = parse_page_params(params)
     status = narrowing.strict_str(params.get("status"), "all")
 
     order = _history_order(params)
@@ -101,31 +97,28 @@ def prepare_filtered_completed_tasks(params: Mapping[str, object]) -> dict[str, 
     # Get total count
     records_total_count = history_logging.get_total_historic_task_list_count()
     # Get total success count
-    success_rows = cast(CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=True))
+    success_rows = history_logging.get_historic_task_list_filtered_and_sorted(task_success=True)
     records_total_success_count = success_rows.count()
     # Get total failed count
-    failed_rows = cast(CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=False))
+    failed_rows = history_logging.get_historic_task_list_filtered_and_sorted(task_success=False)
     records_total_failed_count = failed_rows.count()
     # Get quantity after filters (without pagination)
-    filtered_rows = cast(
-        CountedRows,
-        history_logging.get_historic_task_list_filtered_and_sorted(
-            order=order,
-            start=0,
-            length=0,
-            search_value=search_value,
-            task_success=task_success,
-            after_time=after_time,
-            before_time=before_time,
-        ),
+    filtered_rows = history_logging.get_historic_task_list_filtered_and_sorted(
+        order=order,
+        start=0,
+        length=0,
+        search_value=page.search_value,
+        task_success=task_success,
+        after_time=after_time,
+        before_time=before_time,
     )
     records_filtered_count = filtered_rows.count()
     # Get filtered/sorted results
     task_results = history_logging.get_historic_task_list_filtered_and_sorted(
         order=order,
-        start=start,
-        length=length,
-        search_value=search_value,
+        start=page.start,
+        length=page.length,
+        search_value=page.search_value,
         task_success=task_success,
         after_time=after_time,
         before_time=before_time,
@@ -173,7 +166,7 @@ def get_filtered_completed_task_ids(params: Mapping[str, object], exclude_ids: S
     :param exclude_ids:
     :return:
     """
-    search_value = narrowing.strict_str(params.get("search_value"))
+    page = parse_page_params(params)
     status = narrowing.strict_str(params.get("status"), "all")
 
     task_success = None
@@ -192,7 +185,7 @@ def get_filtered_completed_task_ids(params: Mapping[str, object], exclude_ids: S
         order=None,
         start=0,
         length=0,
-        search_value=search_value,
+        search_value=page.search_value,
         task_success=task_success,
         after_time=after_time,
         before_time=before_time,

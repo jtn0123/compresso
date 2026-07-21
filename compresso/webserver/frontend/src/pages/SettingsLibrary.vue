@@ -154,20 +154,20 @@
               <!--START LIBRARY SCANNER-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.libraryScanner') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="enableLibraryScanner === null" type="QToggle" />
+                <q-skeleton v-if="settingsLoading" type="QToggle" />
                 <q-toggle
                   v-else
-                  v-model="enableLibraryScanner"
+                  v-model="librarySettings.enableLibraryScanner"
                   :label="$t('components.settings.library.enableLibraryScanner')"
                 />
-                <div v-if="enableLibraryScanner" class="sub-setting">
+                <div v-if="librarySettings.enableLibraryScanner" class="sub-setting">
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="libraryScanSchedule === null" type="QInput" />
+                    <q-skeleton v-if="settingsLoading" type="QInput" />
                     <q-input
-                      v-if="enableLibraryScanner && libraryScanSchedule !== null"
+                      v-if="librarySettings.enableLibraryScanner && !settingsLoading"
                       outlined
                       type="number"
-                      v-model.number="libraryScanSchedule"
+                      v-model.number="librarySettings.libraryScanSchedule"
                       :label="$t('components.settings.library.libraryScannerSchedule')"
                       lazy-rules
                       :rules="[
@@ -181,18 +181,18 @@
                 </div>
               </div>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="runLibraryScanOnStart === null" type="QToggle" />
+                <q-skeleton v-if="settingsLoading" type="QToggle" />
                 <q-toggle
-                  v-if="runLibraryScanOnStart !== null"
-                  v-model="runLibraryScanOnStart"
+                  v-if="!settingsLoading"
+                  v-model="librarySettings.runLibraryScanOnStart"
                   :label="$t('components.settings.library.runLibraryScanOnStart')"
                 />
               </div>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="libraryScanFollowSymlinks === null" type="QToggle" />
+                <q-skeleton v-if="settingsLoading" type="QToggle" />
                 <q-toggle
-                  v-if="libraryScanFollowSymlinks !== null"
-                  v-model="libraryScanFollowSymlinks"
+                  v-if="!settingsLoading"
+                  v-model="librarySettings.libraryScanFollowSymlinks"
                   :label="$t('components.settings.library.followSymlinks')"
                 />
               </div>
@@ -203,21 +203,21 @@
               <!--START FILE TESTING-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.fileTesting') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="concurrentFileTesters === null" type="QInput" />
+                <q-skeleton v-if="settingsLoading" type="QInput" />
                 <q-input
-                  v-if="concurrentFileTesters !== null"
+                  v-if="!settingsLoading"
                   readonly
                   outlined
                   color="primary"
-                  v-model="concurrentFileTesters"
+                  v-model="librarySettings.concurrentFileTesters"
                   :label="$t('components.settings.library.concurrentFileTesters')"
-                  :placeholder="concurrentFileTesters"
+                  :placeholder="String(librarySettings.concurrentFileTesters)"
                 >
                 </q-input>
-                <q-skeleton v-if="concurrentFileTesters === null" type="QSlider" />
+                <q-skeleton v-if="settingsLoading" type="QSlider" />
                 <q-slider
-                  v-if="concurrentFileTesters !== null"
-                  v-model="concurrentFileTesters"
+                  v-if="!settingsLoading"
+                  v-model="librarySettings.concurrentFileTesters"
                   :min="1"
                   :max="10"
                   :step="1"
@@ -231,10 +231,10 @@
               <!--START PENDING TASKS CONFIG-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.pendingTasks') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="clearPendingTasksOnStart === null" type="QToggle" />
+                <q-skeleton v-if="settingsLoading" type="QToggle" />
                 <q-toggle
                   v-else
-                  v-model="clearPendingTasksOnStart"
+                  v-model="librarySettings.clearPendingTasksOnStart"
                   :label="$t('components.settings.library.clearPendingTasksOnStart')"
                 />
               </div>
@@ -245,30 +245,30 @@
               <!--START COMPLETED TASKS CONFIG-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.completedTasks') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="autoManageCompletedTasks === null" type="QToggle" />
+                <q-skeleton v-if="settingsLoading" type="QToggle" />
                 <q-toggle
                   v-else
-                  v-model="autoManageCompletedTasks"
+                  v-model="librarySettings.autoManageCompletedTasks"
                   :label="$t('components.settings.library.autoManageCompletedTasks')"
                 />
-                <div v-if="autoManageCompletedTasks" class="sub-setting q-gutter-sm">
+                <div v-if="librarySettings.autoManageCompletedTasks" class="sub-setting q-gutter-sm">
                   <div class="q-gutter-sm q-mb-lg">
-                    <q-skeleton v-if="compressCompletedTasksLogs === null" type="QInput" />
+                    <q-skeleton v-if="settingsLoading" type="QInput" />
                     <q-toggle
                       v-else
-                      v-model="compressCompletedTasksLogs"
+                      v-model="librarySettings.compressCompletedTasksLogs"
                       :label="$t('components.settings.library.compressCompletedTasksLogs')"
                     />
                   </div>
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="maxAgeOfCompletedTasks === null" type="QInput" />
+                    <q-skeleton v-if="settingsLoading" type="QInput" />
                     <q-input
-                      v-if="autoManageCompletedTasks && maxAgeOfCompletedTasks !== null"
+                      v-if="librarySettings.autoManageCompletedTasks && !settingsLoading"
                       outlined
                       type="number"
-                      v-model.number="maxAgeOfCompletedTasks"
+                      v-model.number="librarySettings.maxAgeOfCompletedTasks"
                       :label="
-                        compressCompletedTasksLogs
+                        librarySettings.compressCompletedTasksLogs
                           ? $t('components.settings.library.maxAgeOfCompletedTasksCompress')
                           : $t('components.settings.library.maxAgeOfCompletedTasks')
                       "
@@ -280,12 +280,12 @@
                     />
                   </div>
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="alwaysKeepFailedTasks === null" type="QInput" />
+                    <q-skeleton v-if="settingsLoading" type="QInput" />
                     <q-toggle
                       v-else
-                      v-model="alwaysKeepFailedTasks"
+                      v-model="librarySettings.alwaysKeepFailedTasks"
                       :label="
-                        compressCompletedTasksLogs
+                        librarySettings.compressCompletedTasksLogs
                           ? $t('components.settings.library.dontCompressFailedTasks')
                           : $t('components.settings.library.alwaysKeepFailedTasks')
                       "
@@ -300,22 +300,22 @@
               <!--START APPROVAL WORKFLOW-->
               <h5 class="q-mb-none">{{ $t('components.settings.library.approvalWorkflow') }}</h5>
               <div class="q-gutter-sm">
-                <q-skeleton v-if="approvalRequired === null" type="QToggle" />
+                <q-skeleton v-if="settingsLoading" type="QToggle" />
                 <q-toggle
                   v-else
-                  v-model="approvalRequired"
+                  v-model="librarySettings.approvalRequired"
                   :label="$t('components.settings.library.requireApproval')"
                 />
                 <div class="text-caption text-grey q-ml-md">
                   {{ $t('components.settings.library.approvalWorkflowHelp') }}
                 </div>
-                <div v-if="approvalRequired" class="sub-setting">
+                <div v-if="librarySettings.approvalRequired" class="sub-setting">
                   <div class="q-gutter-sm">
-                    <q-skeleton v-if="stagingPath === null" type="QInput" />
+                    <q-skeleton v-if="settingsLoading" type="QInput" />
                     <q-input
                       v-else
                       outlined
-                      v-model="stagingPath"
+                      v-model="librarySettings.stagingPath"
                       :label="$t('components.settings.library.stagingDirectory')"
                       :hint="$t('components.settings.library.stagingDirectoryHint')"
                     />
@@ -422,26 +422,13 @@ export default defineComponent({
   data() {
     return {
       filter: '',
-      libraryPath: null as string | null,
       libraryPaths: null as LibraryListItem[] | null,
-      newLibraryPath: false,
       libraryConfigLibraryId: 0,
       selectDirectoryInitialPath: '',
       selectDirectoryListType: 'directories',
       selectDirectoryMode: '',
-      enableLibraryScanner: null as boolean | null,
-      libraryScanSchedule: null as number | null,
-      libraryScanFollowSymlinks: null as boolean | null,
-      concurrentFileTesters: null as number | null,
-      runLibraryScanOnStart: null as boolean | null,
-      enableLibraryFileMonitor: null as boolean | null,
-      clearPendingTasksOnStart: null as boolean | null,
-      autoManageCompletedTasks: null as boolean | null,
-      compressCompletedTasksLogs: null as boolean | null,
-      maxAgeOfCompletedTasks: null as number | null,
-      alwaysKeepFailedTasks: null as boolean | null,
-      approvalRequired: null as boolean | null,
-      stagingPath: null as string | null,
+      settingsLoading: true,
+      librarySettings: parseLibraryPageSettings({}),
     }
   },
   computed: {
@@ -460,7 +447,7 @@ export default defineComponent({
   methods: {
     addNewLibraryWithDirectoryBrowser: function () {
       this.selectDirectoryMode = 'newLibrary'
-      this.selectDirectoryInitialPath = this.libraryPath ?? ''
+      this.selectDirectoryInitialPath = this.librarySettings.libraryPath
       this.selectDirectoryListType = 'directories'
       this.$nextTick(() => {
         if (this.$refs.selectDirectoryDialogRef) {
@@ -589,9 +576,11 @@ export default defineComponent({
         url: getCompressoApiUrl('v2', 'settings/read'),
       })
         .then((response) => {
-          Object.assign(this, parseLibraryPageSettings(response.data.settings))
+          this.librarySettings = parseLibraryPageSettings(response.data.settings)
+          this.settingsLoading = false
         })
         .catch(() => {
+          this.settingsLoading = false
           this.$q.notify({
             color: 'negative',
             position: 'top',
@@ -603,22 +592,23 @@ export default defineComponent({
     },
     save: function () {
       // Save settings
-      let data = {
+      const settings = this.librarySettings
+      const data = {
         settings: {
-          library_path: this.libraryPath,
-          enable_library_scanner: this.enableLibraryScanner,
-          schedule_full_scan_minutes: this.libraryScanSchedule,
-          follow_symlinks: this.libraryScanFollowSymlinks,
-          concurrent_file_testers: this.concurrentFileTesters,
-          run_full_scan_on_start: this.runLibraryScanOnStart,
-          enable_inotify: this.enableLibraryFileMonitor,
-          clear_pending_tasks_on_restart: this.clearPendingTasksOnStart,
-          auto_manage_completed_tasks: this.autoManageCompletedTasks,
-          compress_completed_tasks_logs: this.compressCompletedTasksLogs,
-          max_age_of_completed_tasks: this.maxAgeOfCompletedTasks,
-          always_keep_failed_tasks: this.alwaysKeepFailedTasks,
-          approval_required: this.approvalRequired,
-          staging_path: this.stagingPath,
+          library_path: settings.libraryPath,
+          enable_library_scanner: settings.enableLibraryScanner,
+          schedule_full_scan_minutes: settings.libraryScanSchedule,
+          follow_symlinks: settings.libraryScanFollowSymlinks,
+          concurrent_file_testers: settings.concurrentFileTesters,
+          run_full_scan_on_start: settings.runLibraryScanOnStart,
+          enable_inotify: settings.enableLibraryFileMonitor,
+          clear_pending_tasks_on_restart: settings.clearPendingTasksOnStart,
+          auto_manage_completed_tasks: settings.autoManageCompletedTasks,
+          compress_completed_tasks_logs: settings.compressCompletedTasksLogs,
+          max_age_of_completed_tasks: settings.maxAgeOfCompletedTasks,
+          always_keep_failed_tasks: settings.alwaysKeepFailedTasks,
+          approval_required: settings.approvalRequired,
+          staging_path: settings.stagingPath,
         },
       }
       axios<ApiSchema<'SettingsLibrariesList'>>({

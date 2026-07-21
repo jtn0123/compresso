@@ -32,16 +32,15 @@ Copyright:
 import json
 import time
 from collections.abc import Mapping, Sequence
-from typing import cast
 
 import tornado.escape
 
 from compresso import config
 from compresso.libs import history, narrowing
 from compresso.libs.history import HistoryOrder
-from compresso.libs.peewee_types import CountedRows
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 from compresso.webserver.helpers import completed_tasks
+from compresso.webserver.helpers.pagination import parse_page_params
 
 
 class ApiHistoryHandler(BaseApiHandler):
@@ -136,14 +135,7 @@ class ApiHistoryHandler(BaseApiHandler):
         """
 
         # Generate filters for query
-        draw = request_dict.get("draw")
-        start = narrowing.coerce_int(request_dict.get("start"), 0)
-        length = narrowing.coerce_int(request_dict.get("length"), 0)
-
-        search_value_raw = request_dict.get("search")
-        search = search_value_raw if isinstance(search_value_raw, Mapping) else {}
-        search_value_entry = search.get("value")
-        search_value = search_value_entry if isinstance(search_value_entry, str) else ""
+        page = parse_page_params(request_dict, data_tables=True)
 
         # Get sort order
         order_entries = request_dict.get("order")
@@ -168,15 +160,12 @@ class ApiHistoryHandler(BaseApiHandler):
         # Get total count
         records_total_count = history_logging.get_total_historic_task_list_count()
         # Get quantity after filters (without pagination)
-        records_filtered_count = cast(
-            "CountedRows",
-            history_logging.get_historic_task_list_filtered_and_sorted(
-                order=order, start=0, length=0, search_value=search_value
-            ),
+        records_filtered_count = history_logging.get_historic_task_list_filtered_and_sorted(
+            order=order, start=0, length=0, search_value=page.search_value
         ).count()
         # Get filtered/sorted results
         task_results = history_logging.get_historic_task_list_filtered_and_sorted(
-            order=order, start=start, length=length, search_value=search_value
+            order=order, start=page.start, length=page.length, search_value=page.search_value
         )
 
         # Build return data
@@ -210,7 +199,7 @@ class ApiHistoryHandler(BaseApiHandler):
 
         # Return results
         return {
-            "draw": draw,
+            "draw": page.draw,
             "recordsTotal": records_total_count,
             "recordsFiltered": records_filtered_count,
             "successCount": success_count,

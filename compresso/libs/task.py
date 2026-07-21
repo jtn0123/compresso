@@ -49,7 +49,7 @@ from compresso.libs import common
 from compresso.libs.exceptions import TaskError
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import execute_count, model_as_dict
+from compresso.libs.peewee_types import CountedRows, execute_count, model_as_dict
 from compresso.libs.unmodels.tasks import Tasks
 
 _ERR_NO_TASK_LIBRARY = "Unable to fetch task library ID. Task has not been set!"
@@ -453,7 +453,7 @@ class Task:
         status: str | None = None,
         task_type: str | None = None,
         library_ids: Sequence[int] | None = None,
-    ) -> Iterable[dict[str, object]]:
+    ) -> CountedRows:
         if start is None or int(start) < 0:
             raise TaskError("Task list start must be zero or greater.")
         if length is not None and not 0 <= int(length) <= 1000:
@@ -492,7 +492,7 @@ class Task:
         if length:
             query = query.limit(length).offset(start)
 
-        return cast("Iterable[dict[str, object]]", query.dicts())
+        return cast("CountedRows", query.dicts())
 
     def delete_tasks_recursively(self, id_list: Sequence[int] | None) -> bool:
         """

@@ -187,7 +187,12 @@
 
 <script lang="ts">
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { isRecord } from 'src/types/envelope'
+import {
+  normalizeNotificationChannel,
+  serializeNotificationChannel,
+  type ChannelType,
+  type NotificationChannel,
+} from 'src/types/notifications'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -195,54 +200,12 @@ import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
 
-type ChannelType = 'discord' | 'slack' | 'webhook'
-interface NotificationChannel {
-  id: string
-  name: string
-  type: ChannelType
-  url: string
-  headers: Record<string, string> | null
-  triggers: string[]
-  enabled: boolean
-}
 interface ChannelForm {
   name: string
   type: ChannelType | ''
   url: string
   headersRaw: string
   triggers: string[]
-}
-
-// Lenient normalization: channels are stored raw in the backend config, so
-// older or hand-edited entries may miss fields. Defaults mirror the backend
-// dispatcher (external_notifications.py: missing "enabled" means enabled).
-// Entries that can't even be normalized must be preserved verbatim, never
-// silently dropped — saveChannels() posts the full list back.
-const normalizeNotificationChannel = (value: unknown): NotificationChannel | null => {
-  if (!isRecord(value)) return null
-  const channel = value
-  if (
-    typeof channel.id !== 'string' ||
-    (channel.type !== 'discord' && channel.type !== 'slack' && channel.type !== 'webhook') ||
-    typeof channel.url !== 'string'
-  ) {
-    return null
-  }
-  return {
-    id: channel.id,
-    name: typeof channel.name === 'string' ? channel.name : '',
-    type: channel.type,
-    url: channel.url,
-    headers: isRecord(channel.headers)
-      ? Object.fromEntries(
-          Object.entries(channel.headers).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
-        )
-      : null,
-    triggers: Array.isArray(channel.triggers)
-      ? channel.triggers.filter((trigger): trigger is string => typeof trigger === 'string')
-      : [],
-    enabled: typeof channel.enabled === 'boolean' ? channel.enabled : true,
-  }
 }
 
 export default {
@@ -373,6 +336,7 @@ export default {
         })
         .catch(() => {
           this.channels = []
+          this.unmanagedChannels = []
           this.loading = false
           this.$q.notify({
             color: 'negative',
@@ -387,7 +351,9 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'notifications/channels/save'),
-        data: { channels: [...this.channels, ...this.unmanagedChannels] },
+        data: {
+          channels: [...this.channels.map(serializeNotificationChannel), ...this.unmanagedChannels],
+        },
       })
         .then(() => {
           this.$q.notify({
@@ -413,7 +379,7 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'notifications/channels/test'),
-        data: { channel: channel },
+        data: { channel: serializeNotificationChannel(channel) },
       })
         .then(() => {
           this.testingId = null
@@ -511,6 +477,7 @@ export default {
           headers: headers,
           triggers: [...this.dialogForm.triggers],
           enabled: true,
+          source: {},
         })
       }
 

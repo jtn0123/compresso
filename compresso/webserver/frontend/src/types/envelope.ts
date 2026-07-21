@@ -25,6 +25,8 @@ export const KNOWN_STREAM_TYPES: ReadonlySet<string> = new Set([
 
 export type RawEnvelope = { success: false } | { success: true; server_id: string; type: string; data: unknown }
 
+const parsedMessages = new WeakMap<MessageEvent, RawEnvelope | null>()
+
 /** Parse the envelope shell; payload validation stays with the consumer. */
 export function parseRawEnvelope(raw: string): RawEnvelope | null {
   let value: unknown
@@ -37,4 +39,12 @@ export function parseRawEnvelope(raw: string): RawEnvelope | null {
   if (value.success === false) return { success: false }
   if (value.success !== true || typeof value.server_id !== 'string' || typeof value.type !== 'string') return null
   return { success: true, server_id: value.server_id, type: value.type, data: value.data }
+}
+
+/** Parse and cache a browser message so every socket listener shares one result. */
+export function parseMessageEnvelope(event: MessageEvent): RawEnvelope | null {
+  if (parsedMessages.has(event)) return parsedMessages.get(event) ?? null
+  const envelope = typeof event.data === 'string' ? parseRawEnvelope(event.data) : null
+  parsedMessages.set(event, envelope)
+  return envelope
 }

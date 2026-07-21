@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import $compresso, { showEventToast, type CompressoSocket, type RegisteredWebSocketListener } from './compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 import { getWebsocketProtocols } from 'src/js/apiAuth'
-import { isRecord, KNOWN_STREAM_TYPES, parseRawEnvelope } from 'src/types/envelope'
+import { isRecord, KNOWN_STREAM_TYPES, parseMessageEnvelope, type RawEnvelope } from 'src/types/envelope'
 import type { QNotifyUpdateOptions } from 'quasar'
 import type { Translate } from 'src/types/ui'
 
@@ -57,9 +57,7 @@ function isCompletedTaskMessage(value: unknown): value is CompletedTaskMessage {
   )
 }
 
-export function parseIncomingEnvelope(raw: string): IncomingEnvelope | null {
-  const envelope = parseRawEnvelope(raw)
-  if (!envelope) return null
+export function parseIncomingEnvelope(envelope: RawEnvelope): IncomingEnvelope | null {
   if (!envelope.success) return envelope
   const serverId = envelope.server_id
   switch (envelope.type) {
@@ -406,8 +404,9 @@ export const CompressoWebsocketHandler = function ($t: Translate) {
 
       // Add event listener to handle frontend messages from server
       addWebsocketEventListener('message', 'handle_frontend_messages', function (evt) {
-        if (typeof evt.data === 'string') {
-          const jsonData = parseIncomingEnvelope(evt.data)
+        const envelope = parseMessageEnvelope(evt)
+        if (envelope) {
+          const jsonData = parseIncomingEnvelope(envelope)
           if (jsonData?.success) {
             // Ensure the server is still running the same instance...
             if (serverId === null) {

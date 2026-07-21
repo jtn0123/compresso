@@ -39,6 +39,9 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+GENERATED_START = "<!-- BEGIN GENERATED TYPE SAFETY METRICS -->"
+GENERATED_END = "<!-- END GENERATED TYPE SAFETY METRICS -->"
+
 
 @dataclass(frozen=True)
 class PythonMetrics:
@@ -275,12 +278,62 @@ def render_markdown(metrics: TypeSafetyMetrics) -> str:
     )
 
 
+def render_program_metrics(metrics: TypeSafetyMetrics) -> str:
+    """Render the reproducible structural rows used by the program ledger."""
+    python = metrics.python_production
+    frontend = metrics.frontend
+    return "\n".join(
+        [
+            "| Metric | Baseline | Current | Target |",
+            "|---|---:|---:|---:|",
+            f"| Production Python files | 245 | {python.files:,} | All checked |",
+            f"| Production Python nonblank LOC | 44,273 | {python.nonblank_loc:,} | All checked |",
+            "| Fully annotated Python functions | 137 / 1,707 | "
+            f"{python.complete_functions:,} / {python.functions:,} | 100% |",
+            f"| Incomplete Python function LOC | 29,894 | {python.incomplete_function_loc:,} | 0 |",
+            f"| Unchecked Python function LOC | 28,370 | {python.unchecked_function_loc:,} | 0 |",
+            f"| Production frontend JavaScript files | 33 | {frontend.production_js_files:,} | 0 |",
+            f"| Production frontend JavaScript LOC | 2,451 | {frontend.production_js_loc:,} | 0 |",
+            f"| Production frontend TypeScript files | 0 | {frontend.production_ts_files:,} | All production modules |",
+            f"| Typed Vue components | 0 / 88 | {frontend.typed_vue_files:,} / {frontend.vue_files:,} | 100% |",
+            f"| Vue script LOC | 12,182 | {frontend.vue_script_loc:,} | All checked |",
+        ]
+    )
+
+
+def replace_document_metrics(document: str, metrics: TypeSafetyMetrics) -> str:
+    """Replace exactly one generated metrics section without touching prose."""
+    if document.count(GENERATED_START) != 1 or document.count(GENERATED_END) != 1:
+        raise ValueError("Document must contain exactly one pair of generated metrics markers")
+    before, marked, remainder = document.partition(GENERATED_START)
+    generated, ended, after = remainder.partition(GENERATED_END)
+    if not marked or not ended or GENERATED_END in generated:
+        raise ValueError("Document has invalid generated metrics markers")
+    return f"{before}{GENERATED_START}\n{render_program_metrics(metrics)}\n{GENERATED_END}{after}"
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Report Compresso type-safety migration metrics without changing files.")
+    parser = argparse.ArgumentParser(description="Report or verify Compresso type-safety migration metrics.")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    document_mode = parser.add_mutually_exclusive_group()
+    document_mode.add_argument("--check-document", type=Path)
+    document_mode.add_argument("--write-document", type=Path)
     args = parser.parse_args()
     metrics = collect_metrics(args.root)
+    document_path: Path | None = args.check_document or args.write_document
+    if document_path is not None:
+        current = document_path.read_text(encoding="utf-8")
+        expected = replace_document_metrics(current, metrics)
+        if args.check_document:
+            if current != expected:
+                print(f"Generated metrics are stale in {document_path}")  # noqa: T201
+                return 1
+            print(f"Generated metrics are current in {document_path}")  # noqa: T201
+            return 0
+        document_path.write_text(expected, encoding="utf-8")
+        print(f"Updated generated metrics in {document_path}")  # noqa: T201
+        return 0
     print(render_json(metrics) if args.format == "json" else render_markdown(metrics))  # noqa: T201
     return 0
 

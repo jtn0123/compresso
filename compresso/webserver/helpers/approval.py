@@ -12,17 +12,18 @@ import datetime
 import os
 import shutil
 from collections.abc import Mapping, Sequence
-from typing import TypedDict, cast
+from typing import TypedDict
 
 from compresso import config
 from compresso.libs import narrowing, task
 from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import CountedRows, execute_write
+from compresso.libs.peewee_types import execute_write
 from compresso.libs.task import TaskOrder
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.webserver.api_v2.schema.approval_schemas import APPROVAL_TASK_ORDER_COLUMNS
+from compresso.webserver.helpers.pagination import parse_page_params
 
 logger = CompressoLogging.get_logger(name=__name__)
 
@@ -213,10 +214,7 @@ def _matches_approval_filters(item: Mapping[str, object], codec_filter: object =
 def _get_approval_items(
     params: Mapping[str, object], include_library: bool = False, force_all: bool = False
 ) -> tuple[int, int, list[dict[str, object]]]:
-    start = narrowing.strict_int(params.get("start"))
-    length = narrowing.strict_int(params.get("length"))
-    search_value = narrowing.strict_str(params.get("search_value"))
-    library_ids = narrowing.int_list(params.get("library_ids"))
+    page = parse_page_params(params)
     codec_filter = narrowing.strict_str(params.get("codec"))
     quality_min = _normalise_quality_min(params.get("quality_min", 0))
     has_derived_filters = bool(_normalise_codec_filter(codec_filter)) or quality_min > 0
@@ -229,20 +227,20 @@ def _get_approval_items(
         order=order,
         start=0,
         length=0,
-        search_value=search_value,
+        search_value=page.search_value,
         status="awaiting_approval",
-        library_ids=library_ids,
+        library_ids=page.library_ids,
     )
 
-    data_start = 0 if has_derived_filters or force_all else start
-    data_length = 0 if has_derived_filters or force_all else length
+    data_start = 0 if has_derived_filters or force_all else page.start
+    data_length = 0 if has_derived_filters or force_all else page.length
     approval_task_results = task_handler.get_task_list_filtered_and_sorted(
         order=order,
         start=data_start,
         length=data_length,
-        search_value=search_value,
+        search_value=page.search_value,
         status="awaiting_approval",
-        library_ids=library_ids,
+        library_ids=page.library_ids,
     )
 
     settings = config.Config()
@@ -255,10 +253,9 @@ def _get_approval_items(
     if has_derived_filters:
         items = [item for item in items if _matches_approval_filters(item, codec_filter=codec_filter, quality_min=quality_min)]
 
-    counted_rows = cast(CountedRows, count_query)
-    records_filtered_count = len(items) if has_derived_filters or force_all else counted_rows.count()
-    if (has_derived_filters or force_all) and length:
-        items = items[start : start + length]
+    records_filtered_count = len(items) if has_derived_filters or force_all else count_query.count()
+    if (has_derived_filters or force_all) and page.length:
+        items = items[page.start : page.start + page.length]
 
     return records_total_count, records_filtered_count, items
 
@@ -292,8 +289,7 @@ def prepare_approval_summary(params: Mapping[str, object]) -> dict[str, object]:
     :param params: dict with search/filter parameters
     :return: dict with counts, aggregate sizes, VMAF average, and codec options
     """
-    search_value = narrowing.strict_str(params.get("search_value"))
-    library_ids = narrowing.int_list(params.get("library_ids"))
+    page = parse_page_params(params)
     codec_filter = narrowing.strict_str(params.get("codec"))
     quality_min = _normalise_quality_min(params.get("quality_min", 0))
     order = _build_order(params)
@@ -303,9 +299,9 @@ def prepare_approval_summary(params: Mapping[str, object]) -> dict[str, object]:
         order=order,
         start=0,
         length=0,
-        search_value=search_value,
+        search_value=page.search_value,
         status="awaiting_approval",
-        library_ids=library_ids,
+        library_ids=page.library_ids,
     )
 
     settings = config.Config()
@@ -489,7 +485,7 @@ def get_all_matching_task_ids(
     """
     if not _normalise_codec_filter(codec) and _normalise_quality_min(quality_min) == 0:
         task_handler = task.Task()
-        results = task_handler.get_task_list_filtered_and_sorted(
+        query_results = task_handler.get_task_list_filtered_and_sorted(
             order={"column": "finish_time", "dir": "desc"},
             start=0,
             length=0,
@@ -497,9 +493,9 @@ def get_all_matching_task_ids(
             status="awaiting_approval",
             library_ids=list(library_ids or []),
         )
-        return [task_id for row in results if isinstance((task_id := row.get("id")), int)]
+        return [task_id for row in query_results if isinstance((task_id := row.get("id")), int)]
 
-    _records_total, _records_filtered, results = _get_approval_items(
+    _records_total, _records_filtered, filtered_results = _get_approval_items(
         params={
             "start": 0,
             "length": 0,
@@ -512,7 +508,7 @@ def get_all_matching_task_ids(
         },
         force_all=True,
     )
-    return [task_id for row in results if isinstance((task_id := row.get("id")), int)]
+    return [task_id for row in filtered_results if isinstance((task_id := row.get("id")), int)]
 
 
 def get_approval_count() -> int:

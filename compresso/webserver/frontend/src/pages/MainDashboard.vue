@@ -144,6 +144,7 @@ import {
   type QueueEta,
 } from 'src/types/dashboard'
 import type { WorkerInfoMessage, WorkerProgressEntry } from 'src/types/workers'
+import { parseMessageEnvelope } from 'src/types/envelope'
 
 export default defineComponent({
   name: 'MainDashboard',
@@ -408,8 +409,9 @@ export default defineComponent({
       })
 
       compressoWSHandler.addEventListener('message', 'handle_dashboard_messages', function (evt) {
-        if (typeof evt.data === 'string') {
-          const jsonData = parseDashboardEnvelope(evt.data)
+        const envelope = parseMessageEnvelope(evt)
+        if (envelope) {
+          const jsonData = parseDashboardEnvelope(envelope)
           if (jsonData?.success) {
             if (activeServerId === null) {
               activeServerId = jsonData.server_id

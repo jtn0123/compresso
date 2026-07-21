@@ -188,7 +188,7 @@ class TestSettingsApiLibraryConfig(ApiTestBase):
         data = self.parse_response(resp)
         assert data["library_config"]["id"] == 0
 
-    @patch("compresso.webserver.helpers.settings.save_library_config", return_value=True)
+    @patch("compresso.webserver.helpers.settings.save_library_request", return_value=True)
     def test_write_library_config_success(self, mock_save):
         """POST /settings/library/write returns 200."""
         resp = self.post_json(
@@ -207,8 +207,20 @@ class TestSettingsApiLibraryConfig(ApiTestBase):
             },
         )
         assert resp.code == 200
+        request = mock_save.call_args.args[0]
+        assert request.library_id == 1
+        assert request.library_config == {
+            "id": 1,
+            "name": "Movies",
+            "path": "/movies",
+            "enable_remote_only": False,
+            "enable_scanner": True,
+            "enable_inotify": False,
+            "priority_score": 0,
+        }
+        assert request.plugin_config == {"enabled_plugins": []}
 
-    @patch("compresso.webserver.helpers.settings.save_library_config", return_value=True)
+    @patch("compresso.webserver.helpers.settings.save_library_request", return_value=True)
     def test_write_library_config_accepts_partial_update(self, mock_save):
         """Regression: partial payloads (supported by save_library_config's
         fall-back-to-current-value logic) must not be rejected with a 400."""
@@ -217,10 +229,10 @@ class TestSettingsApiLibraryConfig(ApiTestBase):
             {"library_config": {"id": 3, "enable_scanner": True}},
         )
         assert resp.code == 200
-        saved_config = mock_save.call_args.kwargs["library_config"]
+        saved_config = mock_save.call_args.args[0].library_config
         assert saved_config["enable_scanner"] is True
 
-    @patch("compresso.webserver.helpers.settings.save_library_config", return_value=True)
+    @patch("compresso.webserver.helpers.settings.save_library_request", return_value=True)
     def test_write_library_config_accepts_plugin_settings_blob(self, mock_save):
         """Regression: plugin entries carrying settings/library_id (as produced
         by config exports) must not be rejected with a 400."""
@@ -241,7 +253,7 @@ class TestSettingsApiLibraryConfig(ApiTestBase):
         )
         assert resp.code == 200
 
-    @patch("compresso.webserver.helpers.settings.save_library_config", return_value=False)
+    @patch("compresso.webserver.helpers.settings.save_library_request", return_value=False)
     def test_write_library_config_failure(self, mock_save):
         """POST /settings/library/write returns 500 on save failure."""
         resp = self.post_json(
@@ -327,7 +339,7 @@ class TestSettingsApiLibraryExportImport(ApiTestBase):
         data = self.parse_response(resp)
         assert "plugins" in data
 
-    @patch("compresso.webserver.helpers.settings.save_library_config", return_value=True)
+    @patch("compresso.webserver.helpers.settings.save_library_request", return_value=True)
     def test_import_library_plugin_config_success(self, mock_save):
         """POST /settings/library/import returns 200."""
         resp = self.post_json(
@@ -339,6 +351,10 @@ class TestSettingsApiLibraryExportImport(ApiTestBase):
             },
         )
         assert resp.code == 200
+        request = mock_save.call_args.args[0]
+        assert request.library_id == 1
+        assert request.library_config == {"name": "Movies", "path": "/movies"}
+        assert request.plugin_config == {"enabled_plugins": [], "plugin_flow": {}}
 
 
 # ------------------------------------------------------------------

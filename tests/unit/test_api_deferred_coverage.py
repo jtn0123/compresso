@@ -130,16 +130,16 @@ class TestSettingsLibraryImportInvalidPayload(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch(SETTINGS_HELPERS + ".save_library_config")
+    @patch(SETTINGS_HELPERS + ".save_library_request")
     def test_empty_body_returns_400(self, mock_save):
         """An empty JSON object is missing required fields
         (library_id, library_config); the schema layer must reject
-        before save_library_config is touched."""
+        before the library save helper is touched."""
         resp = self.post_json("/settings/library/import", {})
         assert resp.code == 400
         mock_save.assert_not_called()
 
-    @patch(SETTINGS_HELPERS + ".save_library_config")
+    @patch(SETTINGS_HELPERS + ".save_library_request")
     def test_malformed_json_returns_400(self, mock_save):
         """A POST body that isn't valid JSON at all must be rejected
         before reaching the schema or save layer."""

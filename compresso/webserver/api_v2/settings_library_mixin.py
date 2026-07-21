@@ -22,6 +22,31 @@ from compresso.webserver.api_v2.schema.settings_schemas import (
 class LibrarySettingsMixin(BaseApiHandler):
     """Mixin for library configuration CRUD endpoints."""
 
+    def _save_library_payload(
+        self,
+        json_request: Mapping[str, object],
+        *,
+        library_id: object,
+        invalid_reason: str,
+        failure_reason: str,
+    ) -> bool:
+        """Parse and save the shared library write/import payload shape."""
+        from compresso.webserver.helpers import settings
+
+        try:
+            request = settings.parse_library_save_request(
+                library_id,
+                json_request.get("library_config"),
+                json_request.get("plugins", {}),
+            )
+        except ValueError as error:
+            raise BaseApiError(invalid_reason) from error
+        if settings.save_library_request(request):
+            return True
+        self.set_status(self.STATUS_ERROR_INTERNAL, reason=failure_reason)
+        self.write_error()
+        return False
+
     async def get_all_libraries(self) -> None:
         """
         Settings - get list of all libraries
@@ -219,19 +244,14 @@ class LibrarySettingsMixin(BaseApiHandler):
         try:
             json_request = self.read_json_request(SettingsLibraryConfigReadAndWriteSchema())
 
-            # Save settings
-            from compresso.webserver.helpers import settings
-
-            library_config_value = json_request["library_config"]
-            plugin_config_value = json_request.get("plugins", {})
-            if not isinstance(library_config_value, Mapping) or not isinstance(plugin_config_value, Mapping):
-                raise BaseApiError("Library configuration must contain objects")
-            library_config = {str(key): value for key, value in library_config_value.items()}
-            plugin_config = {str(key): value for key, value in plugin_config_value.items()}
-            library_id = integer_value(library_config.get("id"))
-            if not settings.save_library_config(library_id, library_config=library_config, plugin_config=plugin_config):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to write library config")
-                self.write_error()
+            library_config = json_request.get("library_config")
+            library_id = library_config.get("id") if isinstance(library_config, Mapping) else None
+            if not self._save_library_payload(
+                json_request,
+                library_id=library_id,
+                invalid_reason="Library configuration must contain objects",
+                failure_reason="Failed to write library config",
+            ):
                 return
 
             self.write_success()
@@ -413,19 +433,12 @@ class LibrarySettingsMixin(BaseApiHandler):
         try:
             json_request = self.read_json_request(SettingsLibraryPluginConfigImportSchema())
 
-            # Save settings
-            from compresso.webserver.helpers import settings
-
-            library_config_value = json_request.get("library_config")
-            plugin_config_value = json_request.get("plugins", {})
-            if not isinstance(library_config_value, Mapping) or not isinstance(plugin_config_value, Mapping):
-                raise BaseApiError("Imported library configuration must contain objects")
-            library_config = {str(key): value for key, value in library_config_value.items()}
-            plugin_config = {str(key): value for key, value in plugin_config_value.items()}
-            library_id = integer_value(json_request.get("library_id"))
-            if not settings.save_library_config(library_id, library_config=library_config, plugin_config=plugin_config):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to import library config")
-                self.write_error()
+            if not self._save_library_payload(
+                json_request,
+                library_id=json_request.get("library_id"),
+                invalid_reason="Imported library configuration must contain objects",
+                failure_reason="Failed to import library config",
+            ):
                 return
 
             self.write_success()
