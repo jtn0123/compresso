@@ -903,8 +903,8 @@ class Foreman(threading.Thread):
                 self.paused_worker_threads = []
         return True
 
-    def _record_worker_metrics(self, last_metrics_time: float, metrics_interval: int) -> tuple[float, int]:
-        """Emit worker metrics, adjusting interval based on activity. Returns (last_time, interval)."""
+    def _record_worker_metrics(self, last_metrics_time: float) -> float:
+        """Emit worker metrics, adjusting the interval based on worker activity."""
         workers_info = self.get_all_worker_status()
         any_busy = any(not worker_info.get("idle") for worker_info in workers_info)
         metrics_interval = 2 if any_busy else 10
@@ -925,7 +925,7 @@ class Foreman(threading.Thread):
                     subprocess=worker_info.get("subprocess"),
                 )
             last_metrics_time = now
-        return last_metrics_time, metrics_interval
+        return last_metrics_time
 
     def _check_queue_idle_transition(self, was_active: bool) -> bool:
         """Detect queue transition from active→idle and dispatch notification. Returns current active state."""
@@ -1044,7 +1044,6 @@ class Foreman(threading.Thread):
 
         allow_local_idle_worker_check = True
         last_metrics_time = 0.0
-        metrics_interval = 2
         was_queue_active = False
 
         while not self.abort_flag.is_set():
@@ -1056,7 +1055,7 @@ class Foreman(threading.Thread):
                 if not self._sync_and_validate_workers():
                     continue
 
-                last_metrics_time, metrics_interval = self._record_worker_metrics(last_metrics_time, metrics_interval)
+                last_metrics_time = self._record_worker_metrics(last_metrics_time)
 
                 was_queue_active = self._check_queue_idle_transition(was_queue_active)
 

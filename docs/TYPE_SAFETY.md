@@ -31,8 +31,8 @@ The reporter is read-only; update this table in the same PR that changes a work 
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
 | Production Python files | 245 | 248 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,655 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 1,888 / 1,888 | 100% |
+| Production Python nonblank LOC | 44,273 | 47,681 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 1,889 / 1,889 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
 | Normal mypy errors | 0 | 0 | 0 |
@@ -42,7 +42,7 @@ The reporter is read-only; update this table in the same PR that changes a work 
 | Production frontend JavaScript LOC | 2,451 | 0 | 0 |
 | Production frontend TypeScript files | 0 | 45 | All production modules |
 | Typed Vue components | 0 / 88 | 88 / 88 | 100% |
-| Vue script LOC | 12,182 | 12,603 | All checked |
+| Vue script LOC | 12,182 | 12,783 | All checked |
 
 ## Work Ledger
 
@@ -81,6 +81,8 @@ The migration was kept behavior-preserving except where stricter boundary checks
 - Peewee writes distinguish required integer row counts from intentionally ignored results, preventing mocks or driver changes from silently becoming truthy control-flow values.
 - Resource logging uses a real stoppable thread, and optional watchdog types no longer crash an installed wheel when watchdog is absent.
 - The OpenAPI schema now expands nested response shapes and generated frontend declarations are checked for drift.
+- Bundled plugin identifiers and settings filenames are allowlisted and confined to their configured roots, preventing malformed metadata or symlinks from escaping the plugin directory or forging log lines.
+- Worker metric timing no longer accepts and immediately overwrites a caller-supplied interval; the interval now has one clear owner based on current worker activity.
 
 ## Decisions
 
