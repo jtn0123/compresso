@@ -139,9 +139,9 @@ def validate_source_path(path: str | Path, settings: Config) -> Path:
     return source
 
 
-def _select_inventory(
+def _collect_inventory(
     source: Path, sample_size: int, full_inventory: bool, seed: int
-) -> tuple[Inventory, list[dict[str, object]]]:
+) -> tuple[list[tuple[int, str, int]], int, int, int, tuple[int, str], list[dict[str, object]], list[OSError]]:
     sample_heap: list[tuple[int, str, int]] = []
     total_bytes = 0
     media_files = 0
@@ -169,6 +169,15 @@ def _select_inventory(
             heapq.heappush(sample_heap, item)
         elif item > sample_heap[0]:
             heapq.heapreplace(sample_heap, item)
+    return sample_heap, total_bytes, media_files, unreadable_files, largest, all_entries, traversal_errors
+
+
+def _select_inventory(
+    source: Path, sample_size: int, full_inventory: bool, seed: int
+) -> tuple[Inventory, list[dict[str, object]]]:
+    sample_heap, total_bytes, media_files, unreadable_files, largest, all_entries, traversal_errors = _collect_inventory(
+        source, sample_size, full_inventory, seed
+    )
     if traversal_errors:
         suffix = "y" if len(traversal_errors) == 1 else "ies"
         raise ValueError(f"planning source contains {len(traversal_errors)} unreadable director{suffix}")

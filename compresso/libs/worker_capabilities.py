@@ -18,6 +18,18 @@ from compresso.libs.unffmpeg.info import Info
 from compresso.libs.unmodels.completedtasks import CompletedTasks
 from compresso.libs.unmodels.compressionstats import CompressionStats
 
+ObjectDict = dict[str, object]
+
+
+def _finite_number(value: object, default: float) -> float:
+    if not isinstance(value, (int, float, str)):
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
 
 class CacheSettings(Protocol):
     def get_cache_path(self) -> str: ...
@@ -196,29 +208,20 @@ class WorkerCapabilities:
         cache_disk_value = capabilities.get("cache_disk")
         thermal_value = capabilities.get("thermal")
         performance_value = capabilities.get("performance")
-        cpu = cast("dict[str, object]", cpu_value) if isinstance(cpu_value, dict) else {}
-        memory = cast("dict[str, object]", memory_value) if isinstance(memory_value, dict) else {}
-        cache_disk = cast("dict[str, object]", cache_disk_value) if isinstance(cache_disk_value, dict) else {}
-        thermal = cast("dict[str, object]", thermal_value) if isinstance(thermal_value, dict) else {}
-        performance = cast("dict[str, object]", performance_value) if isinstance(performance_value, dict) else {}
+        cpu = cast(ObjectDict, cpu_value) if isinstance(cpu_value, dict) else {}
+        memory = cast(ObjectDict, memory_value) if isinstance(memory_value, dict) else {}
+        cache_disk = cast(ObjectDict, cache_disk_value) if isinstance(cache_disk_value, dict) else {}
+        thermal = cast(ObjectDict, thermal_value) if isinstance(thermal_value, dict) else {}
+        performance = cast(ObjectDict, performance_value) if isinstance(performance_value, dict) else {}
 
-        def finite_number(value: object, default: float) -> float:
-            if not isinstance(value, (int, float, str)):
-                return default
-            try:
-                number = float(value)
-            except (TypeError, ValueError):
-                return default
-            return number if math.isfinite(number) else default
-
-        cpu_percent = min(100.0, max(0.0, finite_number(cpu.get("percent"), 100.0)))
-        memory_percent = min(100.0, max(0.0, finite_number(memory.get("percent"), 100.0)))
-        free_disk_bytes = max(0.0, finite_number(cache_disk.get("free_bytes"), 0.0))
+        cpu_percent = min(100.0, max(0.0, _finite_number(cpu.get("percent"), 100.0)))
+        memory_percent = min(100.0, max(0.0, _finite_number(memory.get("percent"), 100.0)))
+        free_disk_bytes = max(0.0, _finite_number(cache_disk.get("free_bytes"), 0.0))
         cpu_headroom = 100 - cpu_percent
         memory_headroom = 100 - memory_percent
         free_disk_gb = free_disk_bytes / (1024**3)
         base_score = (cpu_headroom * 0.5) + (memory_headroom * 0.3) + (min(free_disk_gb, 500) * 0.04)
-        tasks_per_hour = max(0.0, finite_number(performance.get("tasks_per_hour"), 0.0))
+        tasks_per_hour = max(0.0, _finite_number(performance.get("tasks_per_hour"), 0.0))
         throughput_bonus = min(30.0, math.log1p(tasks_per_hour) * 6)
         thermal_state = thermal.get("state")
         thermal_factor = {"critical": 0.05, "hot": 0.35, "warm": 0.75}.get(

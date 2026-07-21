@@ -11,6 +11,7 @@ and audio bitrate.
 import logging
 import os
 import re
+from collections.abc import Mapping
 from typing import Protocol, cast
 
 from compresso.libs import narrowing
@@ -316,46 +317,7 @@ def on_worker_process(data: dict[str, object], **kwargs: object) -> None:
         "0",
     ]
 
-    # Video settings
-    video_codec = narrowing.strict_str(s.get("video_codec")).strip()
-    video_encoder = narrowing.strict_str(s.get("video_encoder")).strip()
-
-    if video_codec and not video_encoder:
-        video_encoder = CODEC_ENCODER_MAP.get(video_codec, video_codec)
-
-    if video_encoder:
-        cmd.extend(["-c:v", video_encoder])
-
-        # CRF / quality
-        crf = narrowing.strict_int(s.get("crf"), 23)
-        if video_encoder in VIDEOTOOLBOX_ENCODERS:
-            cmd.extend(["-q:v", str(_videotoolbox_quality_from_crf(crf))])
-        else:
-            crf_param = CRF_PARAM_MAP.get(video_encoder, "-crf")
-            cmd.extend([crf_param, str(crf)])
-
-        # Encoder preset
-        preset = narrowing.strict_str(s.get("encoder_preset"), "medium").strip()
-        if preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
-            preset_param = PRESET_PARAM_MAP.get(video_encoder, "-preset")
-            # Map named presets to numbers for SVT-AV1 and VP9/libaom
-            if video_encoder == "libsvtav1":
-                preset_value = SVTAV1_PRESET_MAP.get(preset, "5")
-            elif video_encoder in ("libvpx-vp9", "libaom-av1"):
-                preset_value = CPU_USED_PRESET_MAP.get(preset, "3")
-            else:
-                preset_value = preset
-            cmd.extend([preset_param, preset_value])
-
-        # Max bitrate
-        max_bitrate = narrowing.strict_str(s.get("max_bitrate")).strip()
-        if max_bitrate:
-            if video_encoder in VIDEOTOOLBOX_ENCODERS:
-                cmd.extend(["-b:v", max_bitrate])
-            cmd.extend(["-maxrate", max_bitrate, "-bufsize", max_bitrate])
-    else:
-        # No video codec specified — copy video
-        cmd.extend(["-c:v", "copy"])
+    video_encoder = _append_video_settings(cmd, s)
 
     # Resolution scaling
     scale_height = narrowing.strict_int(s.get("scale_height"))
@@ -363,15 +325,7 @@ def on_worker_process(data: dict[str, object], **kwargs: object) -> None:
         # Scale to target height, auto-calculate width (divisible by 2)
         cmd.extend(["-vf", f"scale=-2:{scale_height}"])
 
-    # Audio settings
-    audio_codec = narrowing.strict_str(s.get("audio_codec")).strip()
-    if audio_codec:
-        cmd.extend(["-c:a", audio_codec])
-        audio_bitrate = narrowing.strict_str(s.get("audio_bitrate")).strip()
-        if audio_bitrate:
-            cmd.extend(["-b:a", audio_bitrate])
-    else:
-        cmd.extend(["-c:a", "copy"])
+    _append_audio_settings(cmd, s)
 
     # Keep every subtitle, data, and attachment stream. If the selected output
     # container cannot represent one of them, FFmpeg fails visibly instead of
@@ -397,3 +351,45 @@ def on_worker_process(data: dict[str, object], **kwargs: object) -> None:
         current_command.append(" ".join(cmd))
 
     worker_log.append(f"[Encoding Presets] Command: {' '.join(cmd)}\n")
+
+
+def _append_video_settings(cmd: list[str], settings: Mapping[str, object]) -> str:
+    video_codec = narrowing.strict_str(settings.get("video_codec")).strip()
+    video_encoder = narrowing.strict_str(settings.get("video_encoder")).strip()
+    if video_codec and not video_encoder:
+        video_encoder = CODEC_ENCODER_MAP.get(video_codec, video_codec)
+    if not video_encoder:
+        cmd.extend(["-c:v", "copy"])
+        return ""
+    cmd.extend(["-c:v", video_encoder])
+    crf = narrowing.strict_int(settings.get("crf"), 23)
+    crf_args = (
+        ["-q:v", str(_videotoolbox_quality_from_crf(crf))]
+        if video_encoder in VIDEOTOOLBOX_ENCODERS
+        else [CRF_PARAM_MAP.get(video_encoder, "-crf"), str(crf)]
+    )
+    cmd.extend(crf_args)
+    preset = narrowing.strict_str(settings.get("encoder_preset"), "medium").strip()
+    if preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
+        preset_value = (
+            SVTAV1_PRESET_MAP.get(preset, "5")
+            if video_encoder == "libsvtav1"
+            else (CPU_USED_PRESET_MAP.get(preset, "3") if video_encoder in ("libvpx-vp9", "libaom-av1") else preset)
+        )
+        cmd.extend([PRESET_PARAM_MAP.get(video_encoder, "-preset"), preset_value])
+    max_bitrate = narrowing.strict_str(settings.get("max_bitrate")).strip()
+    if max_bitrate:
+        if video_encoder in VIDEOTOOLBOX_ENCODERS:
+            cmd.extend(["-b:v", max_bitrate])
+        cmd.extend(["-maxrate", max_bitrate, "-bufsize", max_bitrate])
+    return video_encoder
+
+
+def _append_audio_settings(cmd: list[str], settings: Mapping[str, object]) -> None:
+    audio_codec = narrowing.strict_str(settings.get("audio_codec")).strip()
+    if not audio_codec:
+        cmd.extend(["-c:a", "copy"])
+        return
+    cmd.extend(["-c:a", audio_codec])
+    if audio_bitrate := narrowing.strict_str(settings.get("audio_bitrate")).strip():
+        cmd.extend(["-b:a", audio_bitrate])

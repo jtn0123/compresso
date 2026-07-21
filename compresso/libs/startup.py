@@ -43,7 +43,7 @@ class StartupState(metaclass=SingletonType):
 
     def reset(self) -> None:
         with self._lock:
-            self._stages: dict[str, bool] = {stage: False for stage in self.REQUIRED_STAGES}
+            self._stages: dict[str, bool] = dict.fromkeys(self.REQUIRED_STAGES, False)
             self._details: dict[str, object] = {}
             self._errors: list[dict[str, str]] = []
 

@@ -145,16 +145,9 @@ class FileOperationTracker:
     ) -> ValidatedJournal:
         if not isinstance(data, dict) or data.get("version") != 1:
             raise ValueError("file-operation journal schema is invalid")
-        operation_id = data.get("operation_id")
-        if not isinstance(operation_id, str) or not operation_id or f"{operation_id}.json" != journal_name:
-            raise ValueError("file-operation journal identity is invalid")
-        task_id = data.get("task_id")
-        if task_id is not None and (not isinstance(task_id, int) or isinstance(task_id, bool)):
-            raise ValueError("file-operation journal task identity is invalid")
-        if expected_operation_id is not None and operation_id != expected_operation_id:
-            raise ValueError("file-operation journal identity does not match the requested operation")
-        if expected_task_id is not None and task_id != expected_task_id:
-            raise ValueError("file-operation journal identity does not match the requested task")
+        operation_id, task_id = FileOperationTracker._validated_journal_identity(
+            data, journal_name, expected_operation_id, expected_task_id
+        )
         state = data.get("state")
         if state not in JOURNAL_STATES:
             raise ValueError("file-operation journal state is invalid")
@@ -167,14 +160,7 @@ class FileOperationTracker:
         created_paths = data.get("created_paths")
         if not isinstance(backups, list) or not isinstance(created_paths, list):
             raise ValueError("file-operation journal paths are invalid")
-        normalized_backups: list[tuple[str, str]] = []
-        for pair in backups:
-            if not isinstance(pair, list) or len(pair) != 2 or not all(isinstance(item, str) and item for item in pair):
-                raise ValueError("file-operation journal backup pair is invalid")
-            backup_path, original_path = pair
-            if os.path.abspath(backup_path) != f"{os.path.abspath(original_path)}.compresso.bak":
-                raise ValueError("file-operation journal backup is not owned by its original path")
-            normalized_backups.append((backup_path, original_path))
+        normalized_backups = FileOperationTracker._validated_journal_backups(backups)
         if not all(isinstance(path, str) and path for path in created_paths):
             raise ValueError("file-operation journal created paths are invalid")
         return {
@@ -185,6 +171,37 @@ class FileOperationTracker:
             "backups": normalized_backups,
             "created_paths": cast("list[str]", created_paths),
         }
+
+    @staticmethod
+    def _validated_journal_identity(
+        data: dict[object, object],
+        journal_name: str,
+        expected_operation_id: str | None,
+        expected_task_id: int | None,
+    ) -> tuple[str, int | None]:
+        operation_id = data.get("operation_id")
+        if not isinstance(operation_id, str) or not operation_id or f"{operation_id}.json" != journal_name:
+            raise ValueError("file-operation journal identity is invalid")
+        task_id = data.get("task_id")
+        if task_id is not None and (not isinstance(task_id, int) or isinstance(task_id, bool)):
+            raise ValueError("file-operation journal task identity is invalid")
+        if expected_operation_id is not None and operation_id != expected_operation_id:
+            raise ValueError("file-operation journal identity does not match the requested operation")
+        if expected_task_id is not None and task_id != expected_task_id:
+            raise ValueError("file-operation journal identity does not match the requested task")
+        return operation_id, task_id
+
+    @staticmethod
+    def _validated_journal_backups(backups: list[object]) -> list[tuple[str, str]]:
+        normalized: list[tuple[str, str]] = []
+        for pair in backups:
+            if not isinstance(pair, list) or len(pair) != 2 or not all(isinstance(item, str) and item for item in pair):
+                raise ValueError("file-operation journal backup pair is invalid")
+            backup_path, original_path = pair
+            if os.path.abspath(backup_path) != f"{os.path.abspath(original_path)}.compresso.bak":
+                raise ValueError("file-operation journal backup is not owned by its original path")
+            normalized.append((backup_path, original_path))
+        return normalized
 
     def _persist(self) -> None:
         if not self._journal_path:
@@ -367,41 +384,7 @@ class FileOperationTracker:
                 continue
             journal_path = os.path.join(journal_dir, journal_name)
             try:
-                with open(journal_path) as journal_file:
-                    data: object = json.load(journal_file)
-                data = cls._validate_journal(data, journal_name)
-                task_id = data.get("task_id")
-                state = data.get("state", "active")
-                finalization_phase = data.get("finalization_phase")
-                backups = data["backups"]
-                created_paths = [os.path.realpath(path) for path in data.get("created_paths", [])]
-
-                if state in COMMITTED_STATES:
-                    for backup_path, _original_path in backups:
-                        if os.path.exists(backup_path):
-                            os.remove(backup_path)
-                    if task_id is not None:
-                        if finalization_phase == "task_deleted":
-                            result["committed_task_ids"].append(task_id)
-                        else:
-                            result["finalization_task_ids"].append(task_id)
-                else:
-                    missing_backups = [
-                        backup_path for backup_path, _original_path in backups if not os.path.exists(backup_path)
-                    ]
-                    if missing_backups:
-                        raise FileNotFoundError(f"required backup is missing: {missing_backups[0]}")
-                    for created_path in reversed(created_paths):
-                        if os.path.exists(created_path):
-                            os.remove(created_path)
-                    for backup_path, original_path in reversed(backups):
-                        if os.path.exists(backup_path):
-                            os.makedirs(os.path.dirname(os.path.abspath(original_path)), exist_ok=True)
-                            os.replace(backup_path, original_path)
-                    if task_id is not None:
-                        result["rolled_back_task_ids"].append(task_id)
-
-                    os.remove(journal_path)
+                cls._recover_journal(journal_path, journal_name, result)
             except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
                 logger.error("FILE_OPERATION_RECOVERY_FAILED journal=%s error=%s", journal_path, error)
                 recovery_errors.append(journal_path)
@@ -410,6 +393,44 @@ class FileOperationTracker:
             raise RuntimeError(f"Unable to recover {len(recovery_errors)} file-operation journal(s)")
 
         return result
+
+    @classmethod
+    def _recover_journal(cls, journal_path: str, journal_name: str, result: RecoveryResult) -> None:
+        with open(journal_path) as journal_file:
+            raw_data: object = json.load(journal_file)
+        data = cls._validate_journal(raw_data, journal_name)
+        task_id = data.get("task_id")
+        backups = data["backups"]
+        if data.get("state", "active") in COMMITTED_STATES:
+            cls._recover_committed_journal(backups)
+            if task_id is not None:
+                if data.get("finalization_phase") == "task_deleted":
+                    result["committed_task_ids"].append(task_id)
+                else:
+                    result["finalization_task_ids"].append(task_id)
+            return
+        cls._rollback_journal_paths(backups, data.get("created_paths", []))
+        if task_id is not None:
+            result["rolled_back_task_ids"].append(task_id)
+        os.remove(journal_path)
+
+    @staticmethod
+    def _recover_committed_journal(backups: list[tuple[str, str]]) -> None:
+        for backup_path, _original_path in backups:
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+
+    @staticmethod
+    def _rollback_journal_paths(backups: list[tuple[str, str]], created_paths: list[str]) -> None:
+        missing = [backup for backup, _original in backups if not os.path.exists(backup)]
+        if missing:
+            raise FileNotFoundError(f"required backup is missing: {missing[0]}")
+        for created_path in reversed(created_paths):
+            if os.path.exists(created_path):
+                os.remove(created_path)
+        for backup_path, original_path in reversed(backups):
+            os.makedirs(os.path.dirname(os.path.abspath(original_path)), exist_ok=True)
+            os.replace(backup_path, original_path)
 
     @staticmethod
     def finalize_committed(journal_dir: str | None) -> None:

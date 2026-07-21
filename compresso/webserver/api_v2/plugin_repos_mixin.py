@@ -228,27 +228,8 @@ class PluginReposMixin(BaseApiHandler):
             os.makedirs(cache_root, exist_ok=True)
             cache_path = os.path.join(cache_root, "community-repos-cache.json")
 
-            if not self.settings.get("serve_traceback") and os.path.exists(cache_path):
-                try:
-                    cached = await IOLoop.current().run_in_executor(None, _read_json_file, cache_path)
-                    cached_at_value = cached.get("cached_at", 0)
-                    cached_at = float(cached_at_value) if isinstance(cached_at_value, (int, float)) else 0.0
-                    cached_response_value = cached.get("response")
-                    cached_response = (
-                        {str(key): value for key, value in cached_response_value.items()}
-                        if isinstance(cached_response_value, Mapping)
-                        else None
-                    )
-                    repos = cached_response.get("repos") if cached_response is not None else None
-                    # Validate cached schema (repo_* keys) to avoid serving stale/old-format data.
-                    first_repo = repos[0] if isinstance(repos, list) and repos else None
-                    if not isinstance(first_repo, Mapping) or not first_repo.get("repo_id"):
-                        repos = None
-                    if cached_response and repos and (time.time() - cached_at) < cache_ttl_seconds:
-                        self.write_success(cached_response)
-                        return
-                except Exception:
-                    tornado.log.app_log.warning("Failed to read community repos cache", exc_info=True)
+            if await self._serve_community_repos_cache(cache_path, cache_ttl_seconds):
+                return
 
             active_session = self.session
             if active_session is None:
@@ -275,3 +256,22 @@ class PluginReposMixin(BaseApiHandler):
             return
         except Exception as e:
             self.handle_unhandled_error(e)
+
+    async def _serve_community_repos_cache(self, cache_path: str, cache_ttl_seconds: int) -> bool:
+        if self.settings.get("serve_traceback") or not os.path.exists(cache_path):
+            return False
+        try:
+            cached = await IOLoop.current().run_in_executor(None, _read_json_file, cache_path)
+            cached_at_value = cached.get("cached_at", 0)
+            cached_at = float(cached_at_value) if isinstance(cached_at_value, (int, float)) else 0.0
+            raw_response = cached.get("response")
+            response = {str(key): value for key, value in raw_response.items()} if isinstance(raw_response, Mapping) else None
+            repos = response.get("repos") if response is not None else None
+            first_repo = repos[0] if isinstance(repos, list) and repos else None
+            valid = isinstance(first_repo, Mapping) and bool(first_repo.get("repo_id"))
+            if response and valid and (time.time() - cached_at) < cache_ttl_seconds:
+                self.write_success(response)
+                return True
+        except Exception:
+            tornado.log.app_log.warning("Failed to read community repos cache", exc_info=True)
+        return False

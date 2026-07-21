@@ -29,10 +29,8 @@ Copyright:
 
 """
 
-import json
 import os
 import queue
-import subprocess
 import threading
 from copy import deepcopy
 from typing import cast
@@ -168,75 +166,65 @@ class FileTest:
 
         # Codec pre-filter (before plugins, for speed); uses the library codec
         # configuration hoisted into __init__.
-        if return_value is None and (self.target_codecs or self.skip_codecs):
-            from compresso.libs.ffprobe_utils import extract_media_metadata
-
-            try:
-                meta = extract_media_metadata(path)
-                file_codec = meta.get("codec", "").lower()
-                # Strip "(estimated)" suffix from codec hint
-                if " (estimated)" in file_codec:
-                    file_codec = file_codec.replace(" (estimated)", "")
-                if file_codec:
-                    if self.skip_codecs and file_codec in self.skip_codecs:
-                        return (
-                            False,
-                            [{"id": "codec_skip", "message": f"Codec '{file_codec}' in skip list — '{path}'"}],
-                            0,
-                            None,
-                        )
-                    if self.target_codecs and file_codec not in self.target_codecs:
-                        return (
-                            False,
-                            [{"id": "codec_target", "message": f"Codec '{file_codec}' not in target list — '{path}'"}],
-                            0,
-                            None,
-                        )
-            except (subprocess.SubprocessError, OSError, json.JSONDecodeError, ValueError) as e:
-                self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, str(e))
-            except Exception as e:
-                self.logger.debug("Codec pre-filter probe unexpected error for '%s': %s", path, str(e))
+        if return_value is None and (codec_result := self._codec_prefilter(path)) is not None:
+            return codec_result
 
         # Only run checks with plugins if other tests were not conclusive
         priority_score_modification = 0
         if return_value is None:
-            # Set the initial data with just the priority score.
-            data: dict[str, object] = {
-                "priority_score": 0,
-                "shared_info": {},
-            }
-            # Run tests against plugins
-            for plugin_module in self.plugin_modules:
-                plugin_id = plugin_module.get("plugin_id")
-                if not isinstance(plugin_id, str):
-                    self.logger.warning("Skipping file-test plugin with an invalid plugin ID")
-                    continue
-                data["library_id"] = self.library_id
-                data["path"] = path
-                data["issues"] = deepcopy(file_issues)
-                data["add_file_to_pending_tasks"] = None
-
-                # Run plugin to update data
-                if not self.plugin_handler.exec_plugin_runner(data, plugin_id, "library_management.file_test"):
-                    continue
-
-                # Append any file issues found during previous tests
-                file_issues = _issues(data.get("issues"))
-
-                # Set the return_value based on the plugin results
-                # If the add_file_to_pending_tasks returned an answer (True/False) then break the loop.
-                # No need to continue.
-                if data.get("add_file_to_pending_tasks") is not None:
-                    return_value = _optional_bool(data.get("add_file_to_pending_tasks"))
-                    decision_plugin = {
-                        "plugin_id": plugin_id,
-                        "plugin_name": plugin_module.get("name"),
-                    }
-                    break
-            # Set the priority score modification
-            priority_score_modification = narrowing.coerce_int(data.get("priority_score"))
+            return_value, file_issues, priority_score_modification, decision_plugin = self._run_file_test_plugins(
+                path, file_issues
+            )
 
         return return_value, file_issues, priority_score_modification, decision_plugin
+
+    def _codec_prefilter(self, path: str) -> FileTestResult | None:
+        if not (self.target_codecs or self.skip_codecs):
+            return None
+        from compresso.libs.ffprobe_utils import extract_media_metadata
+
+        try:
+            file_codec = extract_media_metadata(path).get("codec", "").lower().replace(" (estimated)", "")
+            if self.skip_codecs and file_codec in self.skip_codecs:
+                return False, [{"id": "codec_skip", "message": f"Codec '{file_codec}' in skip list — '{path}'"}], 0, None
+            if file_codec and self.target_codecs and file_codec not in self.target_codecs:
+                return (
+                    False,
+                    [{"id": "codec_target", "message": f"Codec '{file_codec}' not in target list — '{path}'"}],
+                    0,
+                    None,
+                )
+        except Exception as error:
+            self.logger.debug("Codec pre-filter probe failed for '%s': %s", path, error)
+        return None
+
+    def _run_file_test_plugins(
+        self, path: str, file_issues: list[FileIssue]
+    ) -> tuple[bool | None, list[FileIssue], int, dict[str, object] | None]:
+        data: dict[str, object] = {"priority_score": 0, "shared_info": {}}
+        decision: dict[str, object] | None = None
+        result: bool | None = None
+        for plugin_module in self.plugin_modules:
+            plugin_id = plugin_module.get("plugin_id")
+            if not isinstance(plugin_id, str):
+                self.logger.warning("Skipping file-test plugin with an invalid plugin ID")
+                continue
+            data.update(
+                {
+                    "library_id": self.library_id,
+                    "path": path,
+                    "issues": deepcopy(file_issues),
+                    "add_file_to_pending_tasks": None,
+                }
+            )
+            if not self.plugin_handler.exec_plugin_runner(data, plugin_id, "library_management.file_test"):
+                continue
+            file_issues = _issues(data.get("issues"))
+            if data.get("add_file_to_pending_tasks") is not None:
+                result = _optional_bool(data.get("add_file_to_pending_tasks"))
+                decision = {"plugin_id": plugin_id, "plugin_name": plugin_module.get("name")}
+                break
+        return result, file_issues, narrowing.coerce_int(data.get("priority_score")), decision
 
 
 class FileTesterThread(threading.Thread):
@@ -292,33 +280,8 @@ class FileTesterThread(threading.Thread):
                 self._set_testing_state(False)
                 continue
 
-            # Test file to be added to task list. Add it if required
             try:
-                result, issues, priority_score, _ = file_test.should_file_be_added_to_task_list(next_file)
-                # Log any error messages
-                for issue in issues:
-                    if isinstance(issue, dict):
-                        self.logger.info(issue.get("message"))
-                    else:
-                        self.logger.info(issue)
-                # If file needs to be added, then add it
-                if result:
-                    self.add_path_to_queue(
-                        {
-                            "path": next_file,
-                            "priority_score": priority_score,
-                        }
-                    )
-                    # Execute event plugin runners (only when added to queue)
-                    plugin_handler.run_event_plugins_for_plugin_type(
-                        "events.file_queued",
-                        {
-                            "library_id": self.library_id,
-                            "file_path": next_file,
-                            "priority_score": priority_score,
-                            "issues": issues,
-                        },
-                    )
+                self._test_next_file(file_test, plugin_handler, next_file)
 
             except UnicodeEncodeError:
                 self.logger.warning("File contains Unicode characters that cannot be processed. Ignoring.")
@@ -331,6 +294,23 @@ class FileTesterThread(threading.Thread):
                 self.files_to_test.task_done()
 
         self.logger.info("Exiting %s", self.name)
+
+    def _test_next_file(self, file_test: FileTest, plugin_handler: PluginsHandler, next_file: str) -> None:
+        result, issues, priority_score, _ = file_test.should_file_be_added_to_task_list(next_file)
+        for issue in issues:
+            self.logger.info(issue.get("message") if isinstance(issue, dict) else issue)
+        if not result:
+            return
+        self.add_path_to_queue({"path": next_file, "priority_score": priority_score})
+        plugin_handler.run_event_plugins_for_plugin_type(
+            "events.file_queued",
+            {
+                "library_id": self.library_id,
+                "file_path": next_file,
+                "priority_score": priority_score,
+                "issues": issues,
+            },
+        )
 
     def add_path_to_queue(self, item: dict[str, object]) -> None:
         self.files_to_process.put(item)

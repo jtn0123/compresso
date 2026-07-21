@@ -548,7 +548,7 @@ class Links(metaclass=SingletonType):
             "capabilities": capabilities,
         }
 
-    def update_all_remote_installation_links(  # noqa: C901 — multi-step remote link sync with error recovery
+    def update_all_remote_installation_links(
         self,
     ) -> list[dict[str, object]]:
         """
@@ -561,21 +561,7 @@ class Links(metaclass=SingletonType):
         remote_installations: list[dict[str, object]] = []
         distributed_worker_count_target = self.settings.get_distributed_worker_count_target()
         for local_config in self.settings.get_remote_installations():
-            # Ensure address is not added twice by comparing installation IDs
-            # Items matching these checks will be skipped over and will not be added to the installation list
-            #   that will be re-saved
-            if local_config.get("uuid") in installation_id_list and local_config.get("uuid", "???") != "???":
-                # Do not update this installation. By doing this it will be removed from the list
-                save_settings = True
-                continue
-
-            # Ensure the address is something valid
-            if not local_config.get("address"):
-                save_settings = True
-                continue
-
-            # Remove any entries that have an unknown address and uuid
-            if local_config.get("address") == "???" and local_config.get("uuid") == "???":
+            if self._link_should_be_removed(local_config, installation_id_list):
                 save_settings = True
                 continue
 
@@ -592,160 +578,20 @@ class Links(metaclass=SingletonType):
                 installation_id_list.append(updated_config.get("uuid", "???"))
                 continue
 
-            # Fetch updated data
-            installation_data = None
-            try:
-                installation_data = self.validate_remote_installation(
-                    _config_string(local_config, "address") or "",
-                    auth=local_config.get("auth"),
-                    username=local_config.get("username"),
-                    password=local_config.get("password"),
-                    api_token=local_config.get("api_token"),
-                )
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, OSError) as e:
-                self._record_link_failure(link_uuid)
-                self.logger.warning(
-                    "Link %s unreachable: %s (retry in %ds)",
-                    link_uuid,
-                    e,
-                    int((self._link_status[link_uuid]["next_retry"] if link_uuid in self._link_status else 0) - time.time()),
-                )
-            except Exception as e:
-                self._record_link_failure(link_uuid)
-                self.logger.warning("Failed to validate remote installation at %s: %s", local_config.get("address"), e)
+            installation_data = self._validate_link(local_config, link_uuid)
 
             # Generate updated configured values
             updated_config = self.__generate_default_config(local_config)
             updated_config["available"] = False
             if installation_data:
-                # If we used a temp address-based key, migrate status to the real UUID
-                installation_session = narrowing.string_keyed_dict(installation_data.get("session"))
-                real_uuid_value = installation_session.get("uuid")
-                real_uuid = real_uuid_value if isinstance(real_uuid_value, str) else None
-                if real_uuid is not None and link_uuid != real_uuid:
-                    if link_uuid in self._link_status:
-                        self._link_status[real_uuid] = self._link_status.pop(link_uuid)
-                    link_uuid = real_uuid
-                # Record successful contact
-                self._record_link_success(link_uuid)
-                # Mark the installation as available
-                updated_config["available"] = True
-
-                # Append current runnable demand and measured worker capacity.
-                runnable_task_count = installation_data.get("runnable_task_count", installation_data.get("task_count", 0))
-                updated_config["task_count"] = runnable_task_count
-                updated_config["runnable_task_count"] = runnable_task_count
-                updated_config["capabilities"] = installation_data.get("capabilities", {})
-
-                installation_settings = narrowing.string_keyed_dict(installation_data.get("settings"))
-                merge_dict: dict[str, object] = {
-                    "name": installation_settings.get("installation_name"),
-                    "version": installation_data.get("version"),
-                    "uuid": installation_session.get("uuid"),
-                }
-                self.__merge_config_dicts(updated_config, merge_dict)
-
-                # Fetch the corresponding remote configuration for this local installation
-                remote_config = {}
-                try:
-                    remote_config = self.fetch_remote_installation_link_config_for_this(local_config)
-                except requests.exceptions.Timeout:
-                    self._log("Request to fetch remote installation config timed out", level="warning")
-                    updated_config["available"] = False
-                except requests.exceptions.RequestException as e:
-                    self._log("Request to fetch remote installation config failed", message2=str(e), level="warning")
-                    updated_config["available"] = False
-                except Exception as e:
-                    self._log("Failed to fetch remote installation config", message2=str(e), level="error")
-                    updated_config["available"] = False
-
-                # If the remote configuration is newer than this one, use those values
-                # The remote installation will do the same and this will synchronise
-                remote_link_config = narrowing.string_keyed_dict(remote_config.get("link_config"))
-                local_updated = local_config.get("last_updated", 1)
-                remote_updated = remote_link_config.get("last_updated", 1)
-                if (
-                    isinstance(local_updated, (int, float))
-                    and isinstance(remote_updated, (int, float))
-                    and local_updated < remote_updated
-                ):
-                    # Note that the configuration options are reversed when reading from the remote installation config
-                    # These items are not synced here:
-                    #   - enable_task_preloading
-                    #   - enable_checksum_validation
-                    #   - enable_config_missing_libraries
-                    if updated_config["enable_receiving_tasks"] != remote_link_config.get("enable_sending_tasks"):
-                        updated_config["enable_receiving_tasks"] = remote_link_config.get("enable_sending_tasks")
-                        save_settings = True
-                    if updated_config["enable_sending_tasks"] != remote_link_config.get("enable_receiving_tasks"):
-                        updated_config["enable_sending_tasks"] = remote_link_config.get("enable_receiving_tasks")
-                        save_settings = True
-                    # Update the distributed_worker_count_target
-                    distributed_worker_count_target = narrowing.coerce_int(
-                        remote_config.get("distributed_worker_count_target")
-                    )
-                    # Also sync the last_updated flag
-                    updated_config["last_updated"] = remote_link_config.get("last_updated")
-
-                # If the remote config is unable to contact this installation (or it does not have a corresponding config yet)
-                #   then also push the configuration
-                if not remote_link_config.get("available"):
-                    try:
-                        self.push_remote_installation_link_config(updated_config)
-                    except requests.exceptions.Timeout:
-                        self._log("Request to push link config to remote installation timed out", level="warning")
-                        updated_config["available"] = False
-                    except requests.exceptions.RequestException as e:
-                        self._log(
-                            "Request to push link config to remote installation failed", message2=str(e), level="warning"
-                        )
-                        updated_config["available"] = False
-                    except Exception as e:
-                        self._log("Failed to push link config to remote installation", message2=str(e), level="error")
-                        updated_config["available"] = False
-
-                # Push library configurations for missing remote libraries (if configured to do so)
-                if local_config.get("enable_sending_tasks") and local_config.get("enable_config_missing_libraries"):
-                    # Fetch remote installation library name list
-                    results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
-                    existing_library_names = []
-                    for library in narrowing.string_keyed_dicts(results.get("libraries")):
-                        existing_library_names.append(library.get("name"))
-                    # Loop over local libraries and create an import object for each one that is missing
-                    for library_config in Library.get_all_libraries():
-                        # Ignore local libraries that are configured for remote only
-                        if library_config["enable_remote_only"]:
-                            continue
-                        # For each of the missing libraries, create a new remote library with that config.
-                        if library_config["name"] not in existing_library_names:
-                            # Export library config
-                            import_data = Library.export(library_config["id"])
-                            # Set library ID to 0 to generate new library from this import
-                            import_data["library_id"] = 0
-                            # Configure remote library to be fore remote files only
-                            imported_library_config = narrowing.string_keyed_dict(import_data.get("library_config"))
-                            imported_library_config["enable_remote_only"] = True
-                            imported_library_config["enable_scanner"] = False
-                            imported_library_config["enable_inotify"] = False
-                            import_data["library_config"] = imported_library_config
-                            # Import library on remote installation
-                            self._log(
-                                f"Importing remote library config '{library_config['name']}'",
-                                message2=import_data,
-                                level="debug",
-                            )
-                            result = self.import_remote_library_config(local_config, import_data)
-                            if result is None:
-                                # There was a connection issue of some kind. This was already logged.
-                                continue
-                            if result.get("success"):
-                                self._log(f"Successfully imported library '{library_config['name']}'", level="debug")
-                                continue
-                            self._log(
-                                f"Failed to import library config '{library_config['name']}'",
-                                message2=result.get("error"),
-                                level="error",
-                            )
+                link_changed, distributed_worker_count_target = self._update_validated_link(
+                    local_config,
+                    updated_config,
+                    installation_data,
+                    link_uuid,
+                    distributed_worker_count_target,
+                )
+                save_settings = save_settings or link_changed
 
             # Only save to file if the settings have been updated
             remote_installations.append(updated_config)
@@ -761,6 +607,172 @@ class Links(metaclass=SingletonType):
         self.settings.set_bulk_config_items(settings_dict, save_settings=save_settings)
 
         return remote_installations
+
+    @staticmethod
+    def _link_should_be_removed(local_config: Mapping[str, object], installation_ids: list[object]) -> bool:
+        duplicate = local_config.get("uuid") in installation_ids and local_config.get("uuid", "???") != "???"
+        missing_address = not local_config.get("address")
+        unknown = local_config.get("address") == "???" and local_config.get("uuid") == "???"
+        return duplicate or missing_address or unknown
+
+    def _validate_link(self, local_config: Mapping[str, object], link_uuid: str) -> dict[str, object] | None:
+        try:
+            return self.validate_remote_installation(
+                _config_string(local_config, "address") or "",
+                auth=local_config.get("auth"),
+                username=local_config.get("username"),
+                password=local_config.get("password"),
+                api_token=local_config.get("api_token"),
+            )
+        except Exception as error:
+            self._record_link_failure(link_uuid)
+            self.logger.warning("Failed to validate remote installation at %s: %s", local_config.get("address"), error)
+            return None
+
+    def _update_validated_link(
+        self,
+        local_config: Mapping[str, object],
+        updated_config: dict[str, object],
+        installation_data: Mapping[str, object],
+        link_uuid: str,
+        distributed_worker_count_target: int,
+    ) -> tuple[bool, int]:
+        self._merge_validated_link_status(updated_config, installation_data, link_uuid)
+        remote_config = self._fetch_remote_link_config(local_config, updated_config)
+        remote_link_config = narrowing.string_keyed_dict(remote_config.get("link_config"))
+        link_changed, distributed_worker_count_target = self._sync_newer_remote_link_config(
+            local_config,
+            updated_config,
+            remote_config,
+            remote_link_config,
+            distributed_worker_count_target,
+        )
+        self._push_link_config_if_needed(updated_config, remote_link_config)
+        self._sync_missing_remote_libraries(local_config)
+        return link_changed, distributed_worker_count_target
+
+    def _merge_validated_link_status(
+        self,
+        updated_config: dict[str, object],
+        installation_data: Mapping[str, object],
+        link_uuid: str,
+    ) -> None:
+        installation_session = narrowing.string_keyed_dict(installation_data.get("session"))
+        real_uuid_value = installation_session.get("uuid")
+        real_uuid = real_uuid_value if isinstance(real_uuid_value, str) else None
+        if real_uuid is not None and link_uuid != real_uuid:
+            if link_uuid in self._link_status:
+                self._link_status[real_uuid] = self._link_status.pop(link_uuid)
+            link_uuid = real_uuid
+        self._record_link_success(link_uuid)
+        updated_config["available"] = True
+        runnable_count = installation_data.get("runnable_task_count", installation_data.get("task_count", 0))
+        updated_config["task_count"] = runnable_count
+        updated_config["runnable_task_count"] = runnable_count
+        updated_config["capabilities"] = installation_data.get("capabilities", {})
+        installation_settings = narrowing.string_keyed_dict(installation_data.get("settings"))
+        self.__merge_config_dicts(
+            updated_config,
+            {
+                "name": installation_settings.get("installation_name"),
+                "version": installation_data.get("version"),
+                "uuid": installation_session.get("uuid"),
+            },
+        )
+
+    def _fetch_remote_link_config(
+        self, local_config: Mapping[str, object], updated_config: dict[str, object]
+    ) -> dict[str, object]:
+        try:
+            return self.fetch_remote_installation_link_config_for_this(local_config)
+        except requests.exceptions.Timeout:
+            self._log("Request to fetch remote installation config timed out", level="warning")
+        except requests.exceptions.RequestException as error:
+            self._log("Request to fetch remote installation config failed", message2=str(error), level="warning")
+        except Exception as error:
+            self._log("Failed to fetch remote installation config", message2=str(error), level="error")
+        updated_config["available"] = False
+        return {}
+
+    @staticmethod
+    def _remote_link_is_newer(local_config: Mapping[str, object], remote_link_config: Mapping[str, object]) -> bool:
+        local_updated = local_config.get("last_updated", 1)
+        remote_updated = remote_link_config.get("last_updated", 1)
+        return (
+            isinstance(local_updated, (int, float))
+            and isinstance(remote_updated, (int, float))
+            and local_updated < remote_updated
+        )
+
+    def _sync_newer_remote_link_config(
+        self,
+        local_config: Mapping[str, object],
+        updated_config: dict[str, object],
+        remote_config: Mapping[str, object],
+        remote_link_config: Mapping[str, object],
+        distributed_worker_count_target: int,
+    ) -> tuple[bool, int]:
+        if not self._remote_link_is_newer(local_config, remote_link_config):
+            return False, distributed_worker_count_target
+        link_changed = self._copy_remote_link_flags(updated_config, remote_link_config)
+        target = narrowing.coerce_int(remote_config.get("distributed_worker_count_target"))
+        updated_config["last_updated"] = remote_link_config.get("last_updated")
+        return link_changed, target
+
+    @staticmethod
+    def _copy_remote_link_flags(updated_config: dict[str, object], remote_link_config: Mapping[str, object]) -> bool:
+        changed = False
+        flag_pairs = (
+            ("enable_receiving_tasks", "enable_sending_tasks"),
+            ("enable_sending_tasks", "enable_receiving_tasks"),
+        )
+        for local_key, remote_key in flag_pairs:
+            remote_value = remote_link_config.get(remote_key)
+            if updated_config[local_key] != remote_value:
+                updated_config[local_key] = remote_value
+                changed = True
+        return changed
+
+    def _push_link_config_if_needed(self, updated_config: dict[str, object], remote_link_config: Mapping[str, object]) -> None:
+        if remote_link_config.get("available"):
+            return
+        try:
+            self.push_remote_installation_link_config(updated_config)
+        except requests.exceptions.Timeout:
+            self._log("Request to push link config to remote installation timed out", level="warning")
+            updated_config["available"] = False
+        except requests.exceptions.RequestException as error:
+            self._log("Request to push link config to remote installation failed", message2=str(error), level="warning")
+            updated_config["available"] = False
+        except Exception as error:
+            self._log("Failed to push link config to remote installation", message2=str(error), level="error")
+            updated_config["available"] = False
+
+    def _sync_missing_remote_libraries(self, local_config: Mapping[str, object]) -> None:
+        if not local_config.get("enable_sending_tasks") or not local_config.get("enable_config_missing_libraries"):
+            return
+        results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
+        existing_names = {library.get("name") for library in narrowing.string_keyed_dicts(results.get("libraries"))}
+        for library_config in Library.get_all_libraries():
+            if library_config["enable_remote_only"] or library_config["name"] in existing_names:
+                continue
+            self._import_remote_library(local_config, library_config)
+
+    def _import_remote_library(self, local_config: Mapping[str, object], library_config: Mapping[str, object]) -> None:
+        import_data = Library.export(narrowing.coerce_int(library_config.get("id")))
+        import_data["library_id"] = 0
+        imported_config = narrowing.string_keyed_dict(import_data.get("library_config"))
+        imported_config.update({"enable_remote_only": True, "enable_scanner": False, "enable_inotify": False})
+        import_data["library_config"] = imported_config
+        library_name = library_config.get("name")
+        self._log(f"Importing remote library config '{library_name}'", message2=import_data, level="debug")
+        result = self.import_remote_library_config(local_config, import_data)
+        if result is None:
+            return
+        if result.get("success"):
+            self._log(f"Successfully imported library '{library_name}'", level="debug")
+            return
+        self._log(f"Failed to import library config '{library_name}'", message2=result.get("error"), level="error")
 
     def read_remote_installation_link_config(self, uuid: str) -> dict[str, object]:
         """
@@ -940,85 +952,17 @@ class Links(metaclass=SingletonType):
         installations_with_info: dict[str, dict[str, object]] = {}
         for lc in self.settings.get_remote_installations():
             local_config = self.__generate_default_config(lc)
-
-            # Only installations that are available
-            if not local_config.get("available"):
-                continue
-
-            # Only installations that are configured for sending tasks to
-            if not local_config.get("enable_sending_tasks"):
-                continue
-
-            # No valid UUID, no valid connection. This link may still be syncing
             local_uuid = _config_string(local_config, "uuid") or ""
-            if len(local_uuid) < 20:
+            if (
+                not local_config.get("available")
+                or not local_config.get("enable_sending_tasks")
+                or len(local_uuid) < 20
+                or self._should_skip_link(local_uuid)
+            ):
                 continue
-
-            # Skip links in backoff period
-            if self._should_skip_link(local_uuid):
-                continue
-
             try:
-                # Define auth
-                # Only installations that have at least one idle worker that is not paused
-                results = self.remote_api_get(local_config, "/compresso/api/v2/workers/status")
-                worker_list = narrowing.string_keyed_dicts(results.get("workers_status"))
-
-                # Only add installations that have not got pending tasks. This is unless we are configured to preload the queue
-                max_pending_tasks = 0
-                if local_config.get("enable_task_preloading"):
-                    # Preload with the number of workers (regardless of the worker status) plus an additional one to account
-                    # for delays in the downloads
-                    max_pending_tasks = narrowing.coerce_int(local_config.get("preloading_count"))
-                results = self.remote_api_post(local_config, "/compresso/api/v2/pending/tasks", {"start": 0, "length": 1})
-                if results.get("error"):
-                    continue
-                current_pending_tasks = narrowing.coerce_int(results.get("recordsFiltered"))
-                if local_config.get("enable_task_preloading") and current_pending_tasks >= max_pending_tasks:
-                    self._log(
-                        f"Remote installation has exceeded the max remote pending task count ({current_pending_tasks})",
-                        level="debug",
-                    )
-                    continue
-
-                # Fetch remote installation library name list
-                results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
-                library_names = []
-                for library in narrowing.string_keyed_dicts(results.get("libraries")):
-                    library_name = library.get("name")
-                    if isinstance(library_name, str):
-                        library_names.append(library_name)
-
-                try:
-                    capabilities = self.remote_api_get(local_config, "/compresso/api/v2/system/capabilities")
-                    if capabilities.get("error"):
-                        capabilities = {}
-                except Exception:
-                    capabilities = {}
-
-                idle_slots = sum(bool(worker.get("idle")) and not bool(worker.get("paused")) for worker in worker_list)
-                active_nonpaused_workers = sum(not bool(worker.get("paused")) for worker in worker_list)
-                preload_slots = 0
-                if local_config.get("enable_task_preloading") and active_nonpaused_workers:
-                    preload_slots = max(0, int(max_pending_tasks) - current_pending_tasks)
-                available_slots = idle_slots + preload_slots
-
-                if available_slots:
-                    installations_with_info[local_uuid] = {
-                        "address": local_config.get("address"),
-                        "auth": local_config.get("auth"),
-                        "username": local_config.get("username"),
-                        "password": local_config.get("password"),
-                        "api_token": local_config.get("api_token"),
-                        "enable_task_preloading": local_config.get("enable_task_preloading"),
-                        "preloading_count": local_config.get("preloading_count"),
-                        "library_names": library_names,
-                        "available_slots": available_slots,
-                        "queue_depth": current_pending_tasks,
-                        "capabilities": capabilities,
-                        "scheduling_score": WorkerCapabilities.scheduling_score(capabilities) or 0,
-                        "available_workers": bool(idle_slots),
-                    }
+                if info := self._remote_worker_availability(local_config):
+                    installations_with_info[local_uuid] = info
 
             except Exception as e:
                 self._log(
@@ -1029,6 +973,56 @@ class Links(metaclass=SingletonType):
                 continue
 
         return installations_with_info
+
+    def _remote_worker_availability(self, config: dict[str, object]) -> dict[str, object] | None:
+        worker_results = self.remote_api_get(config, "/compresso/api/v2/workers/status")
+        workers = narrowing.string_keyed_dicts(worker_results.get("workers_status"))
+        preloading = bool(config.get("enable_task_preloading"))
+        max_pending = narrowing.coerce_int(config.get("preloading_count")) if preloading else 0
+        pending = self.remote_api_post(config, "/compresso/api/v2/pending/tasks", {"start": 0, "length": 1})
+        if pending.get("error"):
+            return None
+        pending_count = narrowing.coerce_int(pending.get("recordsFiltered"))
+        if preloading and pending_count >= max_pending:
+            self._log(f"Remote installation has exceeded max pending count ({pending_count})", level="debug")
+            return None
+        libraries = self.remote_api_get(config, _REMOTE_LIBRARIES_API)
+        library_names = [
+            name
+            for library in narrowing.string_keyed_dicts(libraries.get("libraries"))
+            if isinstance((name := library.get("name")), str)
+        ]
+        try:
+            capabilities = self.remote_api_get(config, "/compresso/api/v2/system/capabilities")
+            capabilities = {} if capabilities.get("error") else capabilities
+        except Exception:
+            capabilities = {}
+        idle_slots = sum(bool(worker.get("idle")) and not bool(worker.get("paused")) for worker in workers)
+        active_workers = sum(not bool(worker.get("paused")) for worker in workers)
+        preload_slots = max(0, max_pending - pending_count) if preloading and active_workers else 0
+        available_slots = idle_slots + preload_slots
+        if not available_slots:
+            return None
+        return {
+            **{
+                key: config.get(key)
+                for key in (
+                    "address",
+                    "auth",
+                    "username",
+                    "password",
+                    "api_token",
+                    "enable_task_preloading",
+                    "preloading_count",
+                )
+            },
+            "library_names": library_names,
+            "available_slots": available_slots,
+            "queue_depth": pending_count,
+            "capabilities": capabilities,
+            "scheduling_score": WorkerCapabilities.scheduling_score(capabilities) or 0,
+            "available_workers": bool(idle_slots),
+        }
 
     def within_enabled_link_limits(self) -> bool:
         """

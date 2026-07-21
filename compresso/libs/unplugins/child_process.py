@@ -44,6 +44,8 @@ from compresso.libs.logs import CompressoLogging
 
 logger = CompressoLogging.get_logger(__name__)
 
+ParserCallback = Callable[..., object]
+
 
 class _SharedQueue(Protocol):
     def put(self, value: object) -> None: ...
@@ -179,7 +181,7 @@ class PluginChildProcess:
         parser = self.data.get("command_progress_parser")
         if callable(parser):
             try:
-                cast("Callable[..., object]", parser)(None, pid=child_pid, proc_start_time=time.time())
+                cast(ParserCallback, parser)(None, pid=child_pid, proc_start_time=time.time())
             except Exception:
                 self.logger.exception("Failed to register progress parser")
 
@@ -217,34 +219,37 @@ class PluginChildProcess:
             raise RuntimeError("Plugin child process has not been started")
 
         while True:
-            # 1) drain logs
-            try:
-                while True:
-                    msg = self._log_q.get_nowait()
-                    worker_log = self.data.get("worker_log")
-                    if isinstance(worker_log, list):
-                        cast("list[object]", worker_log).append(f"{msg}\n")
-            except queue.Empty:
-                pass
-
-            # 2) drain progress updates
-            try:
-                while True:
-                    pct = self._prog_q.get_nowait()
-                    if callable(parser):
-                        cast("Callable[..., object]", parser)(str(pct))
-            except queue.Empty:
-                pass
+            self._drain_child_logs()
+            self._drain_progress(parser)
 
             # 3) if the child exited, we’re done. Unset parser PID
             if not process.is_alive():
                 exit_ok = process.exitcode == 0
                 if callable(parser):
                     # tell parser to unset its internal proc state
-                    cast("Callable[..., object]", parser)(None, unset=True)
+                    cast(ParserCallback, parser)(None, unset=True)
                 break
 
             # Add a short wait here to prevent CPU pinning
             time.sleep(0.1)
 
         return exit_ok
+
+    def _drain_child_logs(self) -> None:
+        try:
+            while True:
+                message = self._log_q.get_nowait()
+                worker_log = self.data.get("worker_log")
+                if isinstance(worker_log, list):
+                    cast("list[object]", worker_log).append(f"{message}\n")
+        except queue.Empty:
+            pass
+
+    def _drain_progress(self, parser: object) -> None:
+        try:
+            while True:
+                progress = self._prog_q.get_nowait()
+                if callable(parser):
+                    cast(ParserCallback, parser)(str(progress))
+        except queue.Empty:
+            pass

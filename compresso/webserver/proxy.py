@@ -85,6 +85,18 @@ _BLOCKED_NETWORKS = [
 ]
 
 
+def _ip_address_is_blocked(ip_string: str) -> bool:
+    try:
+        address = ipaddress.ip_address(ip_string)
+    except ValueError:
+        return False
+    if address.is_loopback or address.is_link_local or address.is_reserved:
+        return True
+    if address.is_private and not config.Config().get_allow_lan_proxy_targets():
+        return True
+    return any(address in network for network in _BLOCKED_NETWORKS)
+
+
 def _is_blocked_address(hostname: str) -> bool:
     """
     Check if a hostname resolves to a loopback, link-local, or cloud metadata IP.
@@ -101,17 +113,8 @@ def _is_blocked_address(hostname: str) -> bool:
         ip_str = sockaddr[0]
         if not isinstance(ip_str, str):
             return True
-        try:
-            addr = ipaddress.ip_address(ip_str)
-        except ValueError:
-            continue
-        if addr.is_loopback or addr.is_link_local or addr.is_reserved:
+        if _ip_address_is_blocked(ip_str):
             return True
-        if addr.is_private and not config.Config().get_allow_lan_proxy_targets():
-            return True
-        for net in _BLOCKED_NETWORKS:
-            if addr in net:
-                return True
     return False
 
 
@@ -122,37 +125,13 @@ def resolve_proxy_target(target_id: str | None) -> ProxyTarget | None:
     """
     links = Links()
     remotes = links.settings.get_remote_installations()
-    target_config: dict[str, object] | None = None
-
-    # Helper to search remotes
-    def search_remotes(search_list: Sequence[dict[str, object]]) -> dict[str, object] | None:
-        if not target_id:
-            return None
-        t_id = str(target_id).strip().lower()
-        # Priority 1: Address (normalized)
-        for r in search_list:
-            addr = str(r.get("address", "")).strip().lower().rstrip("/")
-            addr_bare = addr.replace(_HTTP_SCHEME, "").replace("https://", "")
-            t_id_bare = t_id.replace(_HTTP_SCHEME, "").replace("https://", "")
-            if addr == t_id or addr == t_id.rstrip("/") or addr_bare == t_id_bare:
-                return r
-        # Priority 2: UUID
-        for r in search_list:
-            if str(r.get("uuid", "")).strip().lower() == t_id:
-                return r
-        # Priority 3: Name
-        for r in search_list:
-            if str(r.get("name", "")).strip().lower() == t_id:
-                return r
-        return None
-
-    target_config = search_remotes(remotes)
+    target_config = _search_remotes(remotes, target_id)
 
     if not target_config:
         # Try reloading settings in case another process updated them
         links.settings.reload()
         remotes = links.settings.get_remote_installations()
-        target_config = search_remotes(remotes)
+        target_config = _search_remotes(remotes, target_id)
 
     if not target_config:
         return None
@@ -169,6 +148,28 @@ def resolve_proxy_target(target_id: str | None) -> ProxyTarget | None:
         return None
 
     # Auth
+    auth_headers = _proxy_auth_headers(target_config)
+    return {"url_base": url_base, "headers": auth_headers, "config": target_config}
+
+
+def _search_remotes(remotes: Sequence[dict[str, object]], target_id: str | None) -> dict[str, object] | None:
+    if not target_id:
+        return None
+    normalized = str(target_id).strip().lower()
+    bare_target = normalized.replace(_HTTP_SCHEME, "").replace("https://", "")
+    for remote in remotes:
+        address = str(remote.get("address", "")).strip().lower().rstrip("/")
+        bare_address = address.replace(_HTTP_SCHEME, "").replace("https://", "")
+        if address in {normalized, normalized.rstrip("/")} or bare_address == bare_target:
+            return remote
+    for key in ("uuid", "name"):
+        for remote in remotes:
+            if str(remote.get(key, "")).strip().lower() == normalized:
+                return remote
+    return None
+
+
+def _proxy_auth_headers(target_config: Mapping[str, object]) -> dict[str, str]:
     auth_headers: dict[str, str] = {}
     auth_type = narrowing.strict_str(target_config.get("auth"))
     if auth_type.lower() == "basic":
@@ -182,7 +183,7 @@ def resolve_proxy_target(target_id: str | None) -> ProxyTarget | None:
     if api_token:
         auth_headers[API_AUTH_HEADER_NAME] = api_token
 
-    return {"url_base": url_base, "headers": auth_headers, "config": target_config}
+    return auth_headers
 
 
 class ProxyHandler(SecurityHeadersMixin, tornado.web.RequestHandler):

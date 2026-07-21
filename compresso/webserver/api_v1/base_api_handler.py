@@ -63,46 +63,43 @@ class BaseApiHandler(V2BaseApiHandler):
         self.set_status(404)
         self.write("404 Not Found")
 
+    def _route_request(self, route: ApiRoute, request_api_endpoint: str) -> bool:
+        supported_methods = route.get("supported_methods")
+        if supported_methods and self.request.method not in supported_methods:
+            return False
+
+        route_parts = list(filter(None, route.get("path_pattern").split("/")))
+        if list(filter(None, request_api_endpoint.split("/"))) == route_parts:
+            app_log.debug(f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True)
+            self._route_method(self, route)()
+            return True
+
+        params = PathMatches(route["path_pattern"]).match(self.request)
+        if not params:
+            return False
+        app_log.debug(
+            "Routing API to {}.{}(*args={}, **kwargs={})".format(
+                self.__class__.__name__, route.get("call_method"), params["path_args"], params["path_kwargs"]
+            ),
+            exc_info=True,
+        )
+        raw_path_args: object = params["path_args"]
+        raw_path_kwargs: object = params["path_kwargs"]
+        path_args = tuple(raw_path_args) if isinstance(raw_path_args, (list, tuple)) else ()
+        path_kwargs = (
+            {str(key): value for key, value in raw_path_kwargs.items() if isinstance(key, str)}
+            if isinstance(raw_path_kwargs, Mapping)
+            else {}
+        )
+        self._route_method(self, route)(*path_args, **path_kwargs)
+        return True
+
     def action_route(self) -> None:
         request_api_endpoint = (self.request.uri or "").split("?", 1)[0]
         if request_api_endpoint.startswith("/compresso"):
             request_api_endpoint = request_api_endpoint[len("/compresso") :]
         for route in self.routes:
-            # Check if the rout supports the supported http methods
-            supported_methods = route.get("supported_methods")
-            if supported_methods and self.request.method not in supported_methods:
-                # The request's method is not supported by this route.
-                continue
-
-            # If the route does not have any params an it matches the current request URI, then route to that method.
-            if list(filter(None, request_api_endpoint.split("/"))) == list(filter(None, route.get("path_pattern").split("/"))):
-                app_log.debug(f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True)
-                self._route_method(self, route)()
-                return
-
-            # Fetch the path match from this route's path pattern
-            path_match = PathMatches(route["path_pattern"])
-
-            # Check if the path matches, and get any params from a match
-            params = path_match.match(self.request)
-
-            # If we have a match and were returned some params, load that method
-            if params:
-                app_log.debug(
-                    "Routing API to {}.{}(*args={}, **kwargs={})".format(
-                        self.__class__.__name__, route.get("call_method"), params["path_args"], params["path_kwargs"]
-                    ),
-                    exc_info=True,
-                )
-                raw_path_args: object = params["path_args"]
-                raw_path_kwargs: object = params["path_kwargs"]
-                path_args = tuple(raw_path_args) if isinstance(raw_path_args, (list, tuple)) else ()
-                path_kwargs = (
-                    {str(key): value for key, value in raw_path_kwargs.items() if isinstance(key, str)}
-                    if isinstance(raw_path_kwargs, Mapping)
-                    else {}
-                )
-                self._route_method(self, route)(*path_args, **path_kwargs)
+            if self._route_request(route, request_api_endpoint):
                 return
 
         # If we got this far, then the URI does not match any of our configured routes.

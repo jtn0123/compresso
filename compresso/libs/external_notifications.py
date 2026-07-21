@@ -126,10 +126,8 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
                 self._send_webhook(channel, event_type, context)
             else:
                 logger.warning("Unknown channel type '%s' for channel '%s'", channel_type, channel.get("name", "unnamed"))
-        except Exception as e:
-            logger.error(
-                "Failed to send %s notification to channel '%s': %s", channel_type, channel.get("name", "unnamed"), str(e)
-            )
+        except Exception:
+            logger.exception("Failed to send %s notification to channel '%s'", channel_type, channel.get("name", "unnamed"))
 
     def _send_discord(
         self,
@@ -305,6 +303,6 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
                 return {"success": False, "error": f"Unknown channel type '{channel_type}'"}
             sender(channel_config, "task_completed", test_context)
             return {"success": True}
-        except Exception as e:
-            logger.error("Test notification failed for channel '%s': %s", channel_config.get("name", "unnamed"), str(e))
-            return {"success": False, "error": str(e)}
+        except Exception as error:
+            logger.exception("Test notification failed for channel '%s'", channel_config.get("name", "unnamed"))
+            return {"success": False, "error": str(error)}

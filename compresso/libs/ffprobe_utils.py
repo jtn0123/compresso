@@ -120,32 +120,29 @@ def extract_media_metadata(filepath: str | os.PathLike[str]) -> MediaMetadata:
     with contextlib.suppress(TypeError, ValueError):
         result["bitrate_mbps"] = _to_float(format_info.get("bit_rate")) / 1000000
 
-    # Find the first video stream
     raw_streams = probe_data.get("streams")
     streams = raw_streams if isinstance(raw_streams, list) else []
-    for raw_stream in streams:
-        stream = narrowing.string_keyed_dict_or_none(raw_stream)
-        if stream is None:
-            continue
-        if stream.get("codec_type") == "video":
-            codec_name = stream.get("codec_name")
-            result["codec"] = codec_name if isinstance(codec_name, str) else ""
-            height = _to_int(stream.get("height"))
-            if height >= 2160:
-                result["resolution"] = "4K"
-            elif height >= 1440:
-                result["resolution"] = "1440p"
-            elif height >= 1080:
-                result["resolution"] = "1080p"
-            elif height >= 720:
-                result["resolution"] = "720p"
-            elif height >= 480:
-                result["resolution"] = "480p"
-            elif height > 0:
-                result["resolution"] = f"{height}p"
-            break
+    video_stream = next(
+        (
+            stream
+            for raw_stream in streams
+            if (stream := narrowing.string_keyed_dict_or_none(raw_stream)) is not None and stream.get("codec_type") == "video"
+        ),
+        None,
+    )
+    if video_stream is not None:
+        codec_name = video_stream.get("codec_name")
+        result["codec"] = codec_name if isinstance(codec_name, str) else ""
+        result["resolution"] = _resolution_from_height(_to_int(video_stream.get("height")))
 
     return result
+
+
+def _resolution_from_height(height: int) -> str:
+    for threshold, label in ((2160, "4K"), (1440, "1440p"), (1080, "1080p"), (720, "720p"), (480, "480p")):
+        if height >= threshold:
+            return label
+    return f"{height}p" if height > 0 else ""
 
 
 def compute_quality_scores(

@@ -82,52 +82,52 @@ class _CompressoProcess:
     def base_url(self) -> str:
         return f"http://127.0.0.1:{self.port}/compresso/api/v2"
 
+    def _start_once(self) -> Exception | None:
+        self.home.mkdir(parents=True, exist_ok=True)
+        for directory in (self.home / "cache", self.home / "staging", self.home / "library"):
+            directory.mkdir(parents=True, exist_ok=True)
+        self.log_handle = (self.home / f"{self.name}.stdout.log").open("ab")
+        environment = {
+            **os.environ,
+            "HOME_DIR": str(self.home),
+            "PYTHONPATH": str(self.repository_root),
+            "config_path": str(self.home / "config"),
+            "cache_path": str(self.home / "cache"),
+            "log_path": str(self.home / "logs"),
+            "plugins_path": str(self.home / "plugins"),
+            "staging_path": str(self.home / "staging"),
+            "library_path": str(self.home / "library"),
+            "userdata_path": str(self.home / "userdata"),
+            "minimum_free_space_gb": "0",
+        }
+        self.process = subprocess.Popen(  # noqa: S603 - fixed interpreter/module invocation
+            [sys.executable, "-m", "compresso", "--address", "127.0.0.1", "--port", str(self.port)],
+            cwd=self.repository_root,
+            env=environment,
+            stdout=self.log_handle,
+            stderr=subprocess.STDOUT,
+        )
+        deadline = time.monotonic() + 60
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None:
+                return RuntimeError(f"{self.name} exited during startup on port {self.port}")
+            try:
+                _status, readiness = _request_json(f"{self.base_url}/healthcheck/readiness")
+                if readiness.get("ready") is True:
+                    return None
+            except (OSError, ValueError, urllib.error.URLError) as error:
+                last_error = error
+            time.sleep(0.1)
+        self.stop()
+        raise TimeoutError(f"{self.name} was not ready after 60 seconds: {last_error}")
+
     def start(self, bind_attempts: int = 3) -> None:
         last_error: Exception | None = None
         for attempt in range(bind_attempts):
-            self.home.mkdir(parents=True, exist_ok=True)
-            for directory in (self.home / "cache", self.home / "staging", self.home / "library"):
-                directory.mkdir(parents=True, exist_ok=True)
-            self.log_handle = (self.home / f"{self.name}.stdout.log").open("ab")
-            environment = {
-                **os.environ,
-                "HOME_DIR": str(self.home),
-                "PYTHONPATH": str(self.repository_root),
-                "config_path": str(self.home / "config"),
-                "cache_path": str(self.home / "cache"),
-                "log_path": str(self.home / "logs"),
-                "plugins_path": str(self.home / "plugins"),
-                "staging_path": str(self.home / "staging"),
-                "library_path": str(self.home / "library"),
-                "userdata_path": str(self.home / "userdata"),
-                # The drill's isolated 1-3 MiB fixture must not inherit the
-                # host's production reserve. Real deployments keep the 5 GiB
-                # default; this process can only write below its temporary home.
-                "minimum_free_space_gb": "0",
-            }
-            self.process = subprocess.Popen(  # noqa: S603 - fixed interpreter/module invocation
-                [sys.executable, "-m", "compresso", "--address", "127.0.0.1", "--port", str(self.port)],
-                cwd=self.repository_root,
-                env=environment,
-                stdout=self.log_handle,
-                stderr=subprocess.STDOUT,
-            )
-            deadline = time.monotonic() + 60
-            while time.monotonic() < deadline:
-                if self.process.poll() is not None:
-                    last_error = RuntimeError(f"{self.name} exited during startup on port {self.port}")
-                    break
-                try:
-                    _status, readiness = _request_json(f"{self.base_url}/healthcheck/readiness")
-                    if readiness.get("ready") is True:
-                        return
-                except (OSError, ValueError, urllib.error.URLError) as error:
-                    last_error = error
-                time.sleep(0.1)
-            else:
-                self.stop()
-                raise TimeoutError(f"{self.name} was not ready after 60 seconds: {last_error}")
-
+            last_error = self._start_once()
+            if last_error is None:
+                return
             self.stop()
             if attempt + 1 < bind_attempts:
                 self.port = _free_port()

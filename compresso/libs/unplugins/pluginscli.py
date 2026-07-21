@@ -137,6 +137,10 @@ def print_table(
         col_size.append(col)
     format_str = " | ".join([f"{{:<{i}}}" for i in col_size])
     line = format_str.replace(" | ", "-+-").format(*["-" * i for i in col_size])
+    _print_table_rows(my_list, format_str, line, sep, max_col_width)
+
+
+def _print_table_rows(my_list: list[list[str]], format_str: str, line: str, sep: str, max_col_width: int) -> None:
     row_values = my_list.pop(0)
     line_done = False
     while my_list:
@@ -331,8 +335,7 @@ class PluginsCLI:
         if not plugin_id:
             raise ValueError("Plugin details require plugin_id")
         new_plugin_path = os.path.join(self.plugins_directory, plugin_id)
-        if not os.path.exists(new_plugin_path):
-            os.makedirs(new_plugin_path)
+        os.makedirs(new_plugin_path, exist_ok=True)
 
         # Create main python file template
         main_plugin_template = [
@@ -583,48 +586,40 @@ class PluginsCLI:
 
         plugin_results = self.__get_installed_plugins(plugin_id=plugin_id)
         for plugin_result in plugin_results:
-            print(f"{BColours.HEADER}Testing plugin: '{plugin_result.get('name')}'{BColours.ENDC}")
-            tested_plugin_id = narrowing.strict_str_or_none(plugin_result.get("plugin_id"))
-            if tested_plugin_id is None:
-                continue
+            self._test_installed_plugin(plugin_executor, plugin_result)
 
-            # Reload the plugin
-            plugin_executor.reload_plugin_module(tested_plugin_id)
-
-            # Test Plugin settings
-            print(f"  {BColours.SUBHEADER}Testing settings{BColours.ENDC}")
-            errors, plugin_settings = plugin_executor.test_plugin_settings(tested_plugin_id)
-            print(f"    {BColours.SECTION}Plugin settings schema{BColours.ENDC}")
-            if errors:
-                for error in errors:
-                    print(f"        -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
-            else:
-                formatted_plugin_settings = json.dumps(plugin_settings, indent=1)
-                formatted_plugin_settings = formatted_plugin_settings.replace("\n", "\n" + "                    ")
-                print(f"        - {BColours.RESULTS}Settings: {formatted_plugin_settings}{BColours.ENDC}")
+    def _test_installed_plugin(self, plugin_executor: PluginExecutor, plugin_result: PluginRecord) -> None:
+        print(f"{BColours.HEADER}Testing plugin: '{plugin_result.get('name')}'{BColours.ENDC}")
+        plugin_id = narrowing.strict_str_or_none(plugin_result.get("plugin_id"))
+        if plugin_id is None:
+            return
+        plugin_executor.reload_plugin_module(plugin_id)
+        self._print_settings_test(plugin_executor, plugin_id)
+        print(f"  {BColours.SUBHEADER}Testing runners{BColours.ENDC}")
+        plugin_types = plugin_executor.get_all_plugin_types_in_plugin(plugin_id)
+        if not plugin_types:
+            print(f"  -- {BColours.FAIL}FAILED: No runners found in plugin{BColours.ENDC}")
+        for plugin_type in plugin_types:
+            print(f"    {BColours.SECTION}{plugin_type}{BColours.ENDC}")
+            errors = plugin_executor.test_plugin_runner(plugin_id, plugin_type, test_data_modifiers=self.test_data_modifiers)
+            for error in errors:
+                print(f"        -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
+            if not errors:
                 print(f"        -- {BColours.OKGREEN}PASSED{BColours.ENDC} --")
+            print()
+        print("\n")
 
-            # Test Plugin runners
-            print(f"  {BColours.SUBHEADER}Testing runners{BColours.ENDC}")
-            plugin_types_in_plugin = plugin_executor.get_all_plugin_types_in_plugin(tested_plugin_id)
-            if not plugin_types_in_plugin:
-                error = "No runners found in plugin"
-                print(f"  -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
-                print()
-            else:
-                for plugin_type_in_plugin in plugin_types_in_plugin:
-                    print(f"    {BColours.SECTION}{plugin_type_in_plugin}{BColours.ENDC}")
-                    errors = plugin_executor.test_plugin_runner(
-                        tested_plugin_id, plugin_type_in_plugin, test_data_modifiers=self.test_data_modifiers
-                    )
-                    if errors:
-                        for error in errors:
-                            print(f"        -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
-                    else:
-                        print(f"        -- {BColours.OKGREEN}PASSED{BColours.ENDC} --")
-                    print()
-            print()
-            print()
+    @staticmethod
+    def _print_settings_test(plugin_executor: PluginExecutor, plugin_id: str) -> None:
+        print(f"  {BColours.SUBHEADER}Testing settings{BColours.ENDC}")
+        errors, plugin_settings = plugin_executor.test_plugin_settings(plugin_id)
+        print(f"    {BColours.SECTION}Plugin settings schema{BColours.ENDC}")
+        for error in errors:
+            print(f"        -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
+        if not errors:
+            settings = json.dumps(plugin_settings, indent=1).replace("\n", "\n" + "                    ")
+            print(f"        - {BColours.RESULTS}Settings: {settings}{BColours.ENDC}")
+            print(f"        -- {BColours.OKGREEN}PASSED{BColours.ENDC} --")
 
     def test_plugins(self) -> None:
         plugin_results = self.__get_installed_plugins()

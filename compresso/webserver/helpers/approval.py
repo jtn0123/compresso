@@ -82,31 +82,9 @@ def _build_approval_item(
     item["size_delta"] = staged_size - source_size if staged_size else 0
 
     metadata_updates: dict[str, object] = {}
-    stored_source_codec = narrowing.strict_str(approval_task.get("source_codec"))
-    source_meta = extract_media_metadata(source_path) if source_path else None
-    if stored_source_codec:
-        source_codec = stored_source_codec
-    else:
-        source_codec = source_meta["codec"] if source_meta else ""
-        if source_codec:
-            metadata_updates["source_codec"] = source_codec
-    item["source_codec"] = source_codec
-    item["source_resolution"] = source_meta["resolution"] if source_meta else ""
-
-    staged_path = staged_info["path"]
-    stored_staged_codec = narrowing.strict_str(approval_task.get("staged_codec"))
-    if staged_path:
-        staged_meta = extract_media_metadata(staged_path)
-        item["staged_codec"] = stored_staged_codec or staged_meta.get("codec", "")
-        item["staged_resolution"] = staged_meta.get("resolution", "")
-        if item["staged_codec"] and not stored_staged_codec:
-            metadata_updates["staged_codec"] = item["staged_codec"]
-    elif stored_staged_codec:
-        item["staged_codec"] = stored_staged_codec
-        item["staged_resolution"] = ""
-    else:
-        item["staged_codec"] = ""
-        item["staged_resolution"] = ""
+    _add_source_media_info(item, approval_task, source_path, metadata_updates)
+    staged_path = narrowing.strict_str(staged_info["path"])
+    _add_staged_media_info(item, approval_task, staged_path, metadata_updates)
     if staged_path and staged_info["size"]:
         metadata_updates["staged_size"] = staged_info["size"]
 
@@ -121,6 +99,39 @@ def _build_approval_item(
         item["library_name"] = library.get_name()
 
     return item
+
+
+def _add_source_media_info(
+    item: dict[str, object],
+    approval_task: Mapping[str, object],
+    source_path: str,
+    metadata_updates: dict[str, object],
+) -> None:
+    stored_codec = narrowing.strict_str(approval_task.get("source_codec"))
+    source_meta = extract_media_metadata(source_path) if source_path else None
+    source_codec = stored_codec or (source_meta["codec"] if source_meta else "")
+    if source_codec and not stored_codec:
+        metadata_updates["source_codec"] = source_codec
+    item["source_codec"] = source_codec
+    item["source_resolution"] = source_meta["resolution"] if source_meta else ""
+
+
+def _add_staged_media_info(
+    item: dict[str, object],
+    approval_task: Mapping[str, object],
+    staged_path: str,
+    metadata_updates: dict[str, object],
+) -> None:
+    stored_codec = narrowing.strict_str(approval_task.get("staged_codec"))
+    if not staged_path:
+        item["staged_codec"] = stored_codec
+        item["staged_resolution"] = ""
+        return
+    staged_meta = extract_media_metadata(staged_path)
+    item["staged_codec"] = stored_codec or staged_meta.get("codec", "")
+    item["staged_resolution"] = staged_meta.get("resolution", "")
+    if item["staged_codec"] and not stored_codec:
+        metadata_updates["staged_codec"] = item["staged_codec"]
 
 
 def _backfill_approval_metadata(
@@ -146,6 +157,34 @@ def _backfill_approval_metadata(
         logger.debug("Failed to backfill approval metadata for task %s: %s", task_id, e)
 
 
+def _fill_source_codec(item: dict[str, object], metadata_updates: dict[str, object]) -> None:
+    source_codec = narrowing.strict_str(item["source_codec"])
+    source_path = narrowing.strict_str(item["abspath"])
+    if source_codec or not source_path:
+        return
+    source_meta = extract_media_metadata(source_path)
+    item["source_codec"] = source_meta.get("codec", "")
+    if item["source_codec"]:
+        metadata_updates["source_codec"] = item["source_codec"]
+
+
+def _fill_staged_metadata(
+    item: dict[str, object], task_id: int, staging_path: str, metadata_updates: dict[str, object]
+) -> None:
+    if narrowing.strict_str(item["staged_codec"]) and narrowing.strict_int(item["staged_size"]):
+        return
+    staged_info = _get_staged_file_info(task_id, staging_path)
+    staged_path = staged_info.get("path", "")
+    if staged_info.get("size"):
+        item["staged_size"] = staged_info.get("size", 0)
+        metadata_updates["staged_size"] = item["staged_size"]
+    if staged_path and not item["staged_codec"]:
+        staged_meta = extract_media_metadata(staged_path)
+        item["staged_codec"] = staged_meta.get("codec", "")
+        if item["staged_codec"]:
+            metadata_updates["staged_codec"] = item["staged_codec"]
+
+
 def _approval_summary_item_from_task(approval_task: Mapping[str, object], staging_path: str) -> dict[str, object]:
     task_id = narrowing.strict_int(approval_task["id"])
     item: dict[str, object] = {
@@ -159,25 +198,8 @@ def _approval_summary_item_from_task(approval_task: Mapping[str, object], stagin
     }
 
     metadata_updates: dict[str, object] = {}
-    source_codec = narrowing.strict_str(item["source_codec"])
-    source_path = narrowing.strict_str(item["abspath"])
-    if not source_codec and source_path:
-        source_meta = extract_media_metadata(source_path)
-        item["source_codec"] = source_meta.get("codec", "")
-        if item["source_codec"]:
-            metadata_updates["source_codec"] = item["source_codec"]
-
-    if not narrowing.strict_str(item["staged_codec"]) or not narrowing.strict_int(item["staged_size"]):
-        staged_info = _get_staged_file_info(task_id, staging_path)
-        staged_path = staged_info.get("path", "")
-        if staged_info.get("size"):
-            item["staged_size"] = staged_info.get("size", 0)
-            metadata_updates["staged_size"] = item["staged_size"]
-        if staged_path and not item["staged_codec"]:
-            staged_meta = extract_media_metadata(staged_path)
-            item["staged_codec"] = staged_meta.get("codec", "")
-            if item["staged_codec"]:
-                metadata_updates["staged_codec"] = item["staged_codec"]
+    _fill_source_codec(item, metadata_updates)
+    _fill_staged_metadata(item, task_id, staging_path, metadata_updates)
 
     staged_size = narrowing.strict_int(item["staged_size"])
     source_size = narrowing.strict_int(item["source_size"])
@@ -429,6 +451,26 @@ def approve_tasks(task_ids: Sequence[int]) -> int:
     return task.Task.set_tasks_status(task_ids, "approved")
 
 
+def _cleanup_rejected_task(task_id: int, staging_path: str) -> None:
+    task_staging_dir = os.path.join(staging_path, f"task_{task_id}")
+    if os.path.exists(task_staging_dir):
+        try:
+            shutil.rmtree(task_staging_dir)
+            logger.info("Removed staging directory for rejected task %s", task_id)
+        except Exception:
+            logger.exception("Failed to remove staging directory for task %s", task_id)
+
+    try:
+        task_record = Tasks.get_by_id(task_id)
+        if task_record.cache_path:
+            cache_dir = os.path.dirname(task_record.cache_path)
+            if os.path.exists(cache_dir) and "compresso_file_conversion" in cache_dir:
+                shutil.rmtree(cache_dir)
+                logger.info("Removed cache directory for rejected task %s", task_id)
+    except Exception as error:
+        logger.warning("Could not clean cache for task %s: %s", task_id, error)
+
+
 def reject_tasks(task_ids: Sequence[int], requeue: bool = False) -> int | bool:
     """
     Reject tasks — removes staged files and either deletes the task
@@ -442,31 +484,12 @@ def reject_tasks(task_ids: Sequence[int], requeue: bool = False) -> int | bool:
     staging_path = settings.get_staging_path()
 
     for task_id in task_ids:
-        # Clean up staged files
-        task_staging_dir = os.path.join(staging_path, f"task_{task_id}")
-        if os.path.exists(task_staging_dir):
-            try:
-                shutil.rmtree(task_staging_dir)
-                logger.info("Removed staging directory for rejected task %s", task_id)
-            except Exception as e:
-                logger.error("Failed to remove staging directory for task %s: %s", task_id, e)
-
-        # Also clean up cache files for the task
-        try:
-            task_record = Tasks.get_by_id(task_id)
-            if task_record.cache_path:
-                cache_dir = os.path.dirname(task_record.cache_path)
-                if os.path.exists(cache_dir) and "compresso_file_conversion" in cache_dir:
-                    shutil.rmtree(cache_dir)
-                    logger.info("Removed cache directory for rejected task %s", task_id)
-        except Exception as e:
-            logger.warning("Could not clean cache for task %s: %s", task_id, e)
+        _cleanup_rejected_task(task_id, staging_path)
 
     if requeue:
         return task.Task.set_tasks_status(task_ids, "pending")
-    else:
-        task_handler = task.Task()
-        return task_handler.delete_tasks_recursively(task_ids)
+    task_handler = task.Task()
+    return task_handler.delete_tasks_recursively(task_ids)
 
 
 def get_all_matching_task_ids(

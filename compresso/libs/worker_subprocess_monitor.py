@@ -413,51 +413,12 @@ class WorkerSubprocessMonitor(threading.Thread):
                     self.event.wait(1)
                     continue
 
-                if self.subprocess is None:
+                if self.subprocess is None or not self.subprocess.is_running():
                     self.event.wait(1)
                     continue
 
-                if not self.subprocess.is_running():
-                    self.event.wait(1)
-                    continue
-
-                # Fetch CPU info
-                cpu_percent = self.subprocess.cpu_percent(interval=None)
-                normalised_cpu_percent = cpu_percent / cpu_count
-
-                # Fetch Memory info
-                mem_info = self.subprocess.memory_info()
-                total_rss = mem_info.rss
-                total_vms = mem_info.vms
-                for child in self.subprocess.children(recursive=True):
-                    try:
-                        mem = child.memory_info()
-                        total_rss += mem.rss
-                        total_vms += mem.vms
-                    except psutil.NoSuchProcess:
-                        continue
-
-                # Calculate percentage of memory used relative to total system RAM
-                total_system_ram = psutil.virtual_memory().total
-                mem_percent = (total_rss / total_system_ram) * 100
-
-                # Set values in parent worker thread
-                self.set_proc_resources_in_parent_worker(normalised_cpu_percent, total_rss, total_vms, mem_percent)
-
-                # Pause/resume subprocesses while keeping the monitor loop alive
-                if self.paused_flag.is_set():
-                    if not self.paused:
-                        self.suspend_proc()
-                        self._pause_time_counter = time.time()
-                    elif self._pause_time_counter is not None:
-                        self.subprocess_pause_time += int(time.time() - self._pause_time_counter)
-                        self._pause_time_counter = time.time()
-                    self.event.wait(1)
-                elif self.paused:
-                    if self._pause_time_counter is not None:
-                        self.subprocess_pause_time += int(time.time() - self._pause_time_counter)
-                    self.resume_proc()
-                    self._pause_time_counter = None
+                self._record_process_resources(cpu_count)
+                self._update_pause_state()
 
             except psutil.NoSuchProcess:
                 self.logger.debug("No such process: %s", self.subprocess_pid)
@@ -473,6 +434,37 @@ class WorkerSubprocessMonitor(threading.Thread):
                 time.sleep(1)
 
         self.logger.info("Exiting WorkerMonitor loop")
+
+    def _record_process_resources(self, cpu_count: int) -> None:
+        if self.subprocess is None:
+            return
+        normalised_cpu_percent = self.subprocess.cpu_percent(interval=None) / cpu_count
+        mem_info = self.subprocess.memory_info()
+        total_rss, total_vms = mem_info.rss, mem_info.vms
+        for child in self.subprocess.children(recursive=True):
+            try:
+                child_memory = child.memory_info()
+                total_rss += child_memory.rss
+                total_vms += child_memory.vms
+            except psutil.NoSuchProcess:
+                continue
+        mem_percent = (total_rss / psutil.virtual_memory().total) * 100
+        self.set_proc_resources_in_parent_worker(normalised_cpu_percent, total_rss, total_vms, mem_percent)
+
+    def _update_pause_state(self) -> None:
+        if self.paused_flag.is_set():
+            if not self.paused:
+                self.suspend_proc()
+                self._pause_time_counter = time.time()
+            elif self._pause_time_counter is not None:
+                self.subprocess_pause_time += int(time.time() - self._pause_time_counter)
+                self._pause_time_counter = time.time()
+            self.event.wait(1)
+        elif self.paused:
+            if self._pause_time_counter is not None:
+                self.subprocess_pause_time += int(time.time() - self._pause_time_counter)
+            self.resume_proc()
+            self._pause_time_counter = None
 
     def stop(self) -> None:
         self.terminate_proc()

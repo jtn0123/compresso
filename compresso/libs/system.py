@@ -80,16 +80,8 @@ class System(metaclass=SingletonType):
             self.python_version = "{}.{}.{}.{}.{}".format(*sys.version_info)
         return self.python_version
 
-    def __detect_gpus(self) -> list[GpuInfo]:
-        """
-        Detect available GPUs on the system.
-        Returns a list of GPU info dicts.
-
-        :return:
-        """
+    def _detect_nvidia_gpus(self) -> list[GpuInfo]:
         gpus: list[GpuInfo] = []
-
-        # NVIDIA detection via nvidia-smi
         try:
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=index,name,memory.total,driver_version", "--format=csv,noheader,nounits"],  # noqa: S607 - nvidia-smi resolved from PATH intentionally
@@ -115,24 +107,30 @@ class System(metaclass=SingletonType):
                         )
         except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
             self.logger.debug("NVIDIA GPU detection skipped: %s", str(e))
+        return gpus
 
-        # VAAPI detection via /dev/dri/render* devices (Linux only)
+    def _detect_vaapi_gpus(self) -> list[GpuInfo]:
+        try:
+            return [
+                {
+                    "type": "vaapi",
+                    "hwaccel": "vaapi",
+                    "index": index,
+                    "name": device_path,
+                    "memory_total_mb": 0,
+                    "driver_version": "",
+                }
+                for index, device_path in enumerate(sorted(glob.glob("/dev/dri/render*")))
+            ]
+        except Exception as e:
+            self.logger.debug("VAAPI GPU detection skipped: %s", str(e))
+            return []
+
+    def __detect_gpus(self) -> list[GpuInfo]:
+        """Detect the GPUs and platform hardware accelerators available on this host."""
+        gpus = self._detect_nvidia_gpus()
         if sys.platform == "linux":
-            try:
-                render_devices = sorted(glob.glob("/dev/dri/render*"))
-                for i, device_path in enumerate(render_devices):
-                    gpus.append(
-                        {
-                            "type": "vaapi",
-                            "hwaccel": "vaapi",
-                            "index": i,
-                            "name": device_path,
-                            "memory_total_mb": 0,
-                            "driver_version": "",
-                        }
-                    )
-            except Exception as e:
-                self.logger.debug("VAAPI GPU detection skipped: %s", str(e))
+            gpus.extend(self._detect_vaapi_gpus())
 
         # VideoToolbox is always available on macOS
         if sys.platform == "darwin":

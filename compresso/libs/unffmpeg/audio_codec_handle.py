@@ -125,28 +125,23 @@ class AudioCodecHandle:
         self.encoding_args["streams_to_map"] = []
         self.encoding_args["streams_to_encode"] = []
         for stream in probe_streams(self.file_probe):
-            # If this is a audio stream, then process the args
             if stream_text(stream, "codec_type") == "audio":
-                if self.disable_audio_encoding:
-                    # Audio re-encoding is disabled. Just copy the stream
-                    self.copy_stream(stream)
-                else:
-                    # Transcode stream if configured to do so
-                    if self.enable_audio_stream_transcoding:
-                        # If the current audio codec of this stream is the same as the configured
-                        # destination codec, then do not re-encode this audio stream
-                        if stream_text(stream, "codec_name") == self.audio_codec_transcoding:
-                            self.copy_stream(stream)
-                        else:
-                            self.transcode_stream(stream)
-                    else:
-                        self.copy_stream(stream)
-
-                    # If we have enabled stream cloning and this stream has more than 2 channels
-                    if self.enable_audio_stream_stereo_cloning and stream_int(stream, "channels") > 2:
-                        self.clone_stereo_stream(stream)
+                self._encode_audio_stream(stream)
 
         return self.encoding_args
+
+    def _encode_audio_stream(self, stream: Mapping[str, object]) -> None:
+        should_transcode = (
+            not self.disable_audio_encoding
+            and self.enable_audio_stream_transcoding
+            and stream_text(stream, "codec_name") != self.audio_codec_transcoding
+        )
+        if should_transcode:
+            self.transcode_stream(stream)
+        else:
+            self.copy_stream(stream)
+        if not self.disable_audio_encoding and self.enable_audio_stream_stereo_cloning and stream_int(stream, "channels") > 2:
+            self.clone_stereo_stream(stream)
 
     def set_audio_codec_with_default_encoder_cloning(self, codec_name: str) -> None:
         """

@@ -17,7 +17,8 @@ import subprocess
 import threading
 import time
 import uuid
-from typing import TypedDict
+from collections.abc import Mapping, Sequence
+from typing import Protocol, TypedDict
 
 from compresso import config
 from compresso.libs import narrowing
@@ -44,6 +45,10 @@ class PreviewJob(TypedDict):
     vmaf_score: float | None
     ssim_score: float | None
     encoded_by_pipeline: bool
+
+
+class PreviewPluginHandler(Protocol):
+    def exec_plugin_runner(self, data: dict[str, object], plugin_id: str, plugin_type: str) -> bool: ...
 
 
 def _command(value: object) -> list[str]:
@@ -97,6 +102,17 @@ class PreviewManager:
         if not plugin_modules:
             return False
 
+        return self._execute_preview_pipeline(plugin_handler, plugin_modules, segment_path, encoded_path, library_id)
+
+    def _execute_preview_pipeline(
+        self,
+        plugin_handler: PreviewPluginHandler,
+        plugin_modules: Sequence[Mapping[str, object]],
+        segment_path: str,
+        encoded_path: str,
+        library_id: int,
+    ) -> bool:
+
         data: dict[str, object] = {
             "worker_log": [],
             "library_id": library_id,
@@ -115,95 +131,26 @@ class PreviewManager:
 
         try:
             for i, plugin_module in enumerate(plugin_modules):
-                plugin_id = plugin_module.get("plugin_id")
-                if not isinstance(plugin_id, str):
-                    self.logger.warning("Skipping preview plugin with an invalid plugin ID")
-                    return False
                 _, ext = os.path.splitext(current_input)
                 plugin_out = os.path.join(job_dir, f"plugin_{i}{ext}")
-                data["file_in"] = current_input
-                data["file_out"] = plugin_out
-                data["exec_command"] = []
-                data["repeat"] = False
-
-                try:
-                    plugin_handler.exec_plugin_runner(data, plugin_id, "worker.process")
-                except Exception as e:
-                    self.logger.warning("Plugin %s runner failed: %s", plugin_module.get("plugin_id"), str(e))
+                if not self._run_preview_plugin(plugin_handler, plugin_module, data, current_input, plugin_out):
                     return False
 
-                exec_command = _command(data.get("exec_command"))
-                if exec_command:
-                    try:
-                        result = subprocess.run(  # noqa: S603 - trusted plugin exec_command from internal pipeline
-                            exec_command, capture_output=True, text=True, timeout=300
-                        )
-                        if result.returncode != 0:
-                            self.logger.warning(
-                                "Plugin %s command failed: %s",
-                                plugin_module.get("plugin_id"),
-                                result.stderr[-500:] if result.stderr else "",
-                            )
-                            return False
-                    except subprocess.TimeoutExpired:
-                        self.logger.warning("Plugin %s command timed out", plugin_module.get("plugin_id"))
-                        return False
-
-                    # Chain: set next input to this output if it exists
-                    plugin_output = narrowing.strict_str_or_none(data.get("file_out")) or plugin_out
-                    if os.path.exists(plugin_output):
-                        # Track old file_in for cleanup (but not the original segment)
-                        if current_input != segment_path:
-                            intermediate_files.append(current_input)
-                        current_input = plugin_output
+                plugin_output = narrowing.strict_str_or_none(data.get("file_out")) or plugin_out
+                if os.path.exists(plugin_output):
+                    if current_input != segment_path:
+                        intermediate_files.append(current_input)
+                    current_input = plugin_output
 
             # Determine the final pipeline output
             pipeline_output = current_input
 
-            # If not already mp4, remux to mp4 for browser playability
-            _, final_ext = os.path.splitext(pipeline_output)
-            if final_ext.lower() != ".mp4":
-                remux_path = os.path.join(job_dir, "remuxed.mp4")
-                # Try remux (copy codecs)
-                remux_cmd = [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    pipeline_output,
-                    "-c:v",
-                    "copy",
-                    "-c:a",
-                    "aac",
-                    remux_path,
-                ]
-                result = subprocess.run(remux_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg remux command
-                if result.returncode != 0:
-                    # Remux failed (non-mp4-compatible codec), re-encode at CRF 18
-                    reencode_cmd = [
-                        "ffmpeg",
-                        "-y",
-                        "-i",
-                        pipeline_output,
-                        "-c:v",
-                        "libx264",
-                        "-crf",
-                        "18",
-                        "-preset",
-                        "medium",
-                        "-c:a",
-                        "aac",
-                        "-b:a",
-                        "128k",
-                        remux_path,
-                    ]
-                    result = subprocess.run(reencode_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg re-encode command
-                    if result.returncode != 0:
-                        self.logger.warning("Remux/re-encode to MP4 failed: %s", result.stderr[-500:] if result.stderr else "")
-                        return False
-                pipeline_output = remux_path
+            ensured_output = self._ensure_preview_mp4(pipeline_output, job_dir)
+            if ensured_output is None:
+                return False
 
             # Copy final output to encoded_path
-            shutil.copy2(pipeline_output, encoded_path)
+            shutil.copy2(ensured_output, encoded_path)
             return True
 
         finally:
@@ -214,6 +161,74 @@ class PreviewManager:
                         os.remove(f)
                 except OSError:
                     pass
+
+    def _run_preview_plugin(
+        self,
+        plugin_handler: PreviewPluginHandler,
+        plugin_module: Mapping[str, object],
+        data: dict[str, object],
+        current_input: str,
+        plugin_out: str,
+    ) -> bool:
+        plugin_id = plugin_module.get("plugin_id")
+        if not isinstance(plugin_id, str):
+            self.logger.warning("Skipping preview plugin with an invalid plugin ID")
+            return False
+        data.update({"file_in": current_input, "file_out": plugin_out, "exec_command": [], "repeat": False})
+        try:
+            plugin_handler.exec_plugin_runner(data, plugin_id, "worker.process")
+        except Exception as error:
+            self.logger.warning("Plugin %s runner failed: %s", plugin_id, error)
+            return False
+        command = _command(data.get("exec_command"))
+        if not command:
+            return True
+        try:
+            result = subprocess.run(  # noqa: S603 - trusted plugin exec_command from internal pipeline
+                command, capture_output=True, text=True, timeout=300
+            )
+        except subprocess.TimeoutExpired:
+            self.logger.warning("Plugin %s command timed out", plugin_id)
+            return False
+        if result.returncode != 0:
+            self.logger.warning("Plugin %s command failed: %s", plugin_id, result.stderr[-500:] if result.stderr else "")
+            return False
+        return True
+
+    def _ensure_preview_mp4(self, pipeline_output: str, job_dir: str) -> str | None:
+        if os.path.splitext(pipeline_output)[1].lower() == ".mp4":
+            return pipeline_output
+        remux_path = os.path.join(job_dir, "remuxed.mp4")
+        remux = ["ffmpeg", "-y", "-i", pipeline_output, "-c:v", "copy", "-c:a", "aac", remux_path]
+        result = subprocess.run(  # noqa: S603 - trusted ffmpeg remux command
+            remux, capture_output=True, text=True, timeout=300
+        )
+        if result.returncode == 0:
+            return remux_path
+        reencode = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            pipeline_output,
+            "-c:v",
+            "libx264",
+            "-crf",
+            "18",
+            "-preset",
+            "medium",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            remux_path,
+        ]
+        result = subprocess.run(  # noqa: S603 - trusted ffmpeg re-encode command
+            reencode, capture_output=True, text=True, timeout=300
+        )
+        if result.returncode == 0:
+            return remux_path
+        self.logger.warning("Remux/re-encode to MP4 failed: %s", result.stderr[-500:] if result.stderr else "")
+        return None
 
     def get_preview_cache_dir(self) -> str:
         """Get the base directory for preview cache files."""
@@ -309,108 +324,8 @@ class PreviewManager:
             return
 
         try:
-            source_path = job["source_path"]
-            start_time = job["start_time"]
-            duration = job["duration"]
-            segment_path = job["segment_path"]
-            source_web_path = job["source_web_path"]
-            encoded_path = job["encoded_path"]
-
-            # Step 1: Extract segment from original (stream copy — fast)
-            self._check_timeout(job_id)
-            self.logger.info("Preview [%s]: Extracting segment from %s", job_id, source_path)
-            extract_cmd = [
-                "ffmpeg",
-                "-y",
-                "-ss",
-                str(start_time),
-                "-t",
-                str(duration),
-                "-i",
-                source_path,
-                "-c",
-                "copy",
-                segment_path,
-            ]
-            result = subprocess.run(extract_cmd, capture_output=True, text=True, timeout=120)  # noqa: S603 - trusted ffmpeg segment extraction command
-            if result.returncode != 0:
-                raise RuntimeError(f"Segment extraction failed: {result.stderr[-500:] if result.stderr else ''}")
-
-            # Step 2: Re-encode source to browser-playable MP4 (high quality reference)
-            self._check_timeout(job_id)
-            self.logger.info("Preview [%s]: Creating browser-playable source reference", job_id)
-            source_web_cmd = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                segment_path,
-                "-c:v",
-                "libx264",
-                "-crf",
-                "1",
-                "-preset",
-                "ultrafast",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "192k",
-                source_web_path,
-            ]
-            result = subprocess.run(source_web_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg encode command
-            if result.returncode != 0:
-                raise RuntimeError(f"Source web encode failed: {result.stderr[-500:] if result.stderr else ''}")
-
-            # Step 3: Encode using library's plugin pipeline
-            self._check_timeout(job_id)
-            pipeline_success = False
-            try:
-                pipeline_success = self._run_plugin_pipeline(segment_path, encoded_path, job["library_id"])
-            except Exception as e:
-                self.logger.warning("Preview [%s]: Plugin pipeline failed: %s", job_id, str(e))
-
-            if not pipeline_success:
-                # Fallback: standard CRF 23
-                self.logger.info("Preview [%s]: Falling back to default encode", job_id)
-                encoded_cmd = [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    segment_path,
-                    "-c:v",
-                    "libx264",
-                    "-crf",
-                    "23",
-                    "-preset",
-                    "medium",
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    "128k",
-                    encoded_path,
-                ]
-                result = subprocess.run(encoded_cmd, capture_output=True, text=True, timeout=300)  # noqa: S603 - trusted ffmpeg fallback encode command
-                if result.returncode != 0:
-                    raise RuntimeError(f"Encoded preview failed: {result.stderr[-500:] if result.stderr else ''}")
-
-            job["encoded_by_pipeline"] = pipeline_success
-
-            # Get file sizes
-            if os.path.exists(source_web_path):
-                job["source_size"] = os.path.getsize(source_web_path)
-            if os.path.exists(encoded_path):
-                job["encoded_size"] = os.path.getsize(encoded_path)
-
-            # Get codec info via ffprobe
-            job["source_codec"] = self._get_video_codec(source_path)
-            job["encoded_codec"] = self._get_video_codec(encoded_path)
-
-            # Step 4: Compute quality metrics (VMAF/SSIM) if possible
-            self._check_timeout(job_id)
-            self.logger.info("Preview [%s]: Computing quality metrics", job_id)
-            vmaf_score, ssim_score = self.compute_quality_metrics(source_web_path, encoded_path)
-            job["vmaf_score"] = vmaf_score
-            job["ssim_score"] = ssim_score
-
+            self._generate_preview_files(job_id, job)
+            self._update_preview_metrics(job_id, job)
             job["status"] = "ready"
             self.logger.info("Preview [%s]: Complete", job_id)
 
@@ -422,6 +337,99 @@ class PreviewManager:
             with self._lock:
                 if self._current_job == job_id:
                     self._current_job = None
+
+    def _generate_preview_files(self, job_id: str, job: PreviewJob) -> None:
+        self._check_timeout(job_id)
+        self.logger.info("Preview [%s]: Extracting segment from %s", job_id, job["source_path"])
+        self._run_preview_command(
+            [
+                "ffmpeg",
+                "-y",
+                "-ss",
+                str(job["start_time"]),
+                "-t",
+                str(job["duration"]),
+                "-i",
+                job["source_path"],
+                "-c",
+                "copy",
+                job["segment_path"],
+            ],
+            120,
+            "Segment extraction failed",
+        )
+        self._check_timeout(job_id)
+        self.logger.info("Preview [%s]: Creating browser-playable source reference", job_id)
+        self._run_preview_command(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                job["segment_path"],
+                "-c:v",
+                "libx264",
+                "-crf",
+                "1",
+                "-preset",
+                "ultrafast",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                job["source_web_path"],
+            ],
+            300,
+            "Source web encode failed",
+        )
+        job["encoded_by_pipeline"] = self._encode_preview_comparison(job_id, job)
+
+    def _encode_preview_comparison(self, job_id: str, job: PreviewJob) -> bool:
+        self._check_timeout(job_id)
+        try:
+            if self._run_plugin_pipeline(job["segment_path"], job["encoded_path"], job["library_id"]):
+                return True
+        except Exception as error:
+            self.logger.warning("Preview [%s]: Plugin pipeline failed: %s", job_id, error)
+        self.logger.info("Preview [%s]: Falling back to default encode", job_id)
+        self._run_preview_command(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                job["segment_path"],
+                "-c:v",
+                "libx264",
+                "-crf",
+                "23",
+                "-preset",
+                "medium",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                job["encoded_path"],
+            ],
+            300,
+            "Encoded preview failed",
+        )
+        return False
+
+    @staticmethod
+    def _run_preview_command(command: list[str], timeout: int, failure_message: str) -> None:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)  # noqa: S603
+        if result.returncode != 0:
+            raise RuntimeError(f"{failure_message}: {result.stderr[-500:] if result.stderr else ''}")
+
+    def _update_preview_metrics(self, job_id: str, job: PreviewJob) -> None:
+        if os.path.exists(job["source_web_path"]):
+            job["source_size"] = os.path.getsize(job["source_web_path"])
+        if os.path.exists(job["encoded_path"]):
+            job["encoded_size"] = os.path.getsize(job["encoded_path"])
+        job["source_codec"] = self._get_video_codec(job["source_path"])
+        job["encoded_codec"] = self._get_video_codec(job["encoded_path"])
+        self._check_timeout(job_id)
+        self.logger.info("Preview [%s]: Computing quality metrics", job_id)
+        job["vmaf_score"], job["ssim_score"] = self.compute_quality_metrics(job["source_web_path"], job["encoded_path"])
 
     def _get_video_codec(self, filepath: str) -> str:
         """Get the video codec of a file using ffprobe."""
@@ -569,15 +577,18 @@ class PreviewManager:
         preview_dir = self.get_preview_cache_dir()
         if os.path.exists(preview_dir):
             for entry in os.listdir(preview_dir):
-                entry_path = os.path.join(preview_dir, entry)
-                if os.path.isdir(entry_path) and entry not in self._jobs:
-                    try:
-                        mtime = os.path.getmtime(entry_path)
-                        if (now - mtime) > self.CLEANUP_AGE:
-                            shutil.rmtree(entry_path, ignore_errors=True)
-                            self.logger.info("Preview: Cleaned up orphaned directory %s", entry)
-                    except OSError as e:
-                        self.logger.debug("Failed to clean up preview directory %s: %s", entry, e)
+                self._cleanup_orphaned_preview(preview_dir, entry, now)
 
         if expired_ids:
             self.logger.info("Preview: Cleaned up %d expired preview jobs", len(expired_ids))
+
+    def _cleanup_orphaned_preview(self, preview_dir: str, entry: str, now: float) -> None:
+        entry_path = os.path.join(preview_dir, entry)
+        if not os.path.isdir(entry_path) or entry in self._jobs:
+            return
+        try:
+            if (now - os.path.getmtime(entry_path)) > self.CLEANUP_AGE:
+                shutil.rmtree(entry_path, ignore_errors=True)
+                self.logger.info("Preview: Cleaned up orphaned directory %s", entry)
+        except OSError as e:
+            self.logger.debug("Failed to clean up preview directory %s: %s", entry, e)

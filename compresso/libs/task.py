@@ -40,7 +40,7 @@ from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequenc
 from copy import deepcopy
 from json import JSONEncoder
 from operator import attrgetter
-from typing import NotRequired, TypedDict, Unpack, cast
+from typing import NotRequired, TypedDict, cast
 
 from peewee import DoesNotExist, IntegrityError
 
@@ -106,13 +106,22 @@ class Task:
 
     def __init__(self) -> None:
         self.name = "Task"
-        self.task: Tasks | None = None
+        self._task: Tasks | None = None
         self.task_dict: dict[str, object] | None = None
         self.settings = config.Config()
         self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.statistics: dict[str, object] = {}
         self.errors: list[str] = []
         self._destination_path_override: str | None = None
+
+    @property
+    def task(self) -> Tasks | None:
+        """Return the bound database record while preserving the public API."""
+        return self._task
+
+    @task.setter
+    def task(self, value: Tasks | None) -> None:
+        self._task = value
 
     def set_cache_path(self, cache_directory: str | None = None, file_extension: str | None = None) -> None:
         if not self.task:
@@ -818,7 +827,7 @@ class TaskDataStore:
             return deepcopy(cls._task_state.get(task_id, {}))
 
     @classmethod
-    def export_task_state_json(class_: "type[TaskDataStore]", task_id: int, **json_kwargs: Unpack[JSONDumpOptions]) -> str:
+    def export_task_state_json(cls, task_id: int, **json_kwargs: object) -> str:
         """
         Export the mutable state for a specific task as JSON.
 
@@ -826,8 +835,8 @@ class TaskDataStore:
         :param json_kwargs: Passed to json.dumps (e.g. indent=2).
         :return: JSON string.
         """
-        state = class_.export_task_state(task_id)
-        return json.dumps(state, **json_kwargs)
+        state = cls.export_task_state(task_id)
+        return json.dumps(state, **cast(JSONDumpOptions, json_kwargs))
 
     @classmethod
     def import_task_state(cls, task_id: int, new_state: Mapping[str, JsonValue]) -> None:

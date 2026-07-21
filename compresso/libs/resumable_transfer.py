@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import TracebackType
-from typing import Protocol, TypedDict, cast
+from typing import NamedTuple, Protocol, TypedDict, cast
 
 from compresso.libs.json_state import atomic_json_write
 
@@ -52,9 +52,10 @@ class TransferSummary(TypedDict):
     bytes_total: int
 
 
-class DiskUsageResult(Protocol):
-    @property
-    def free(self) -> int: ...
+class DiskUsageResult(NamedTuple):
+    total: int
+    used: int
+    free: int
 
 
 class LockContext(Protocol):
@@ -69,7 +70,7 @@ class LockContext(Protocol):
 
 
 def _default_disk_usage(path: Path) -> DiskUsageResult:
-    return shutil.disk_usage(path)
+    return DiskUsageResult(*shutil.disk_usage(path))
 
 
 class TransferStorageError(OSError):
@@ -166,6 +167,27 @@ class ResumableTransferStore:
             raise ValueError("Transfer path escapes completed directory")
         return final_path
 
+    @staticmethod
+    def _manifest_sizes(manifest: Mapping[str, object]) -> tuple[int, int]:
+        try:
+            total_size = manifest["total_size"]
+            offset = manifest["offset"]
+        except KeyError as error:
+            raise ValueError("Transfer manifest sizes are invalid") from error
+        if not isinstance(total_size, int) or isinstance(total_size, bool):
+            raise ValueError("Transfer manifest sizes are invalid")
+        if not isinstance(offset, int) or isinstance(offset, bool) or not 0 <= offset <= total_size:
+            raise ValueError("Transfer manifest sizes are invalid")
+        return total_size, offset
+
+    @staticmethod
+    def _validate_manifest_timestamp(manifest: Mapping[str, object]) -> None:
+        updated_at = manifest.get("updated_at")
+        if not isinstance(updated_at, (int, float)) or isinstance(updated_at, bool):
+            raise ValueError("Transfer manifest timestamp is invalid")
+        if not math.isfinite(updated_at) or updated_at < 0:
+            raise ValueError("Transfer manifest timestamp is invalid")
+
     def _validate_manifest(self, manifest: object, transfer_id: str) -> TransferManifest:
         if not isinstance(manifest, dict):
             raise ValueError("Transfer manifest must be an object")
@@ -174,21 +196,7 @@ class ResumableTransferStore:
         state = manifest.get("state")
         if state not in {"active", "finalizing", "complete"}:
             raise ValueError("Transfer manifest state is invalid")
-        try:
-            total_size = manifest["total_size"]
-            offset = manifest["offset"]
-        except KeyError as error:
-            raise ValueError("Transfer manifest sizes are invalid") from error
-        if (
-            not isinstance(total_size, int)
-            or isinstance(total_size, bool)
-            or not isinstance(offset, int)
-            or isinstance(offset, bool)
-            or total_size < 0
-            or offset < 0
-            or offset > total_size
-        ):
-            raise ValueError("Transfer manifest sizes are invalid")
+        total_size, offset = self._manifest_sizes(manifest)
         if state in {"finalizing", "complete"} and offset != total_size:
             raise ValueError("Transfer manifest terminal offset is invalid")
         checksum = manifest.get("expected_checksum")
@@ -198,14 +206,7 @@ class ResumableTransferStore:
             raise ValueError("Transfer manifest job identity is invalid")
         if not isinstance(manifest.get("metadata"), dict):
             raise ValueError("Transfer manifest metadata is invalid")
-        updated_at = manifest.get("updated_at")
-        if (
-            not isinstance(updated_at, (int, float))
-            or isinstance(updated_at, bool)
-            or not math.isfinite(updated_at)
-            or updated_at < 0
-        ):
-            raise ValueError("Transfer manifest timestamp is invalid")
+        self._validate_manifest_timestamp(manifest)
         filename = manifest.get("filename")
         if not isinstance(filename, str):
             raise ValueError("Transfer manifest filename is invalid")
@@ -327,33 +328,12 @@ class ResumableTransferStore:
         expected_checksum: str,
         metadata: Mapping[str, object] | None = None,
     ) -> TransferStatus:
-        if not isinstance(job_id, str) or not job_id:
-            raise ValueError("Invalid transfer job identity")
-        filename = os.path.basename(filename)
-        if not filename or filename in {".", ".."}:
-            raise ValueError("Invalid transfer filename")
-        if not isinstance(total_size, int) or isinstance(total_size, bool):
-            raise ValueError("Transfer size must be an integer")
-        if total_size < 0:
-            raise ValueError("Transfer size cannot be negative")
-        if not isinstance(expected_checksum, str) or re.fullmatch(r"sha256:[a-f0-9]{64}", expected_checksum) is None:
-            raise ValueError("Invalid transfer checksum")
+        filename = self._validate_new_transfer(job_id, filename, total_size, expected_checksum)
         transfer_id = self._transfer_id(job_id, filename, total_size)
         with self._lock:
             manifest_path = self._manifest_path(transfer_id)
             if manifest_path.exists():
-                manifest = self._load(transfer_id)
-                if manifest["expected_checksum"] != expected_checksum:
-                    raise ValueError("Transfer checksum does not match existing session")
-                partial_path = self._partial_path(transfer_id)
-                if manifest.get("state") == "active":
-                    actual_size = partial_path.stat().st_size if partial_path.exists() else 0
-                    if actual_size > int(manifest["total_size"]):
-                        self._reset_partial(manifest)
-                    else:
-                        manifest["offset"] = actual_size
-                        self._write_manifest(manifest)
-                return self._public_status(manifest)
+                return self._resume_existing_transfer(transfer_id, expected_checksum)
 
             self._ensure_new_session_capacity(transfer_id, total_size)
             final_path = self.completed_dir / transfer_id / filename
@@ -372,6 +352,35 @@ class ResumableTransferStore:
             )
             self._write_manifest(manifest)
             return self._public_status(manifest)
+
+    @staticmethod
+    def _validate_new_transfer(job_id: str, filename: str, total_size: int, expected_checksum: str) -> str:
+        if not isinstance(job_id, str) or not job_id:
+            raise ValueError("Invalid transfer job identity")
+        filename = os.path.basename(filename)
+        if not filename or filename in {".", ".."}:
+            raise ValueError("Invalid transfer filename")
+        if not isinstance(total_size, int) or isinstance(total_size, bool):
+            raise ValueError("Transfer size must be an integer")
+        if total_size < 0:
+            raise ValueError("Transfer size cannot be negative")
+        if not isinstance(expected_checksum, str) or re.fullmatch(r"sha256:[a-f0-9]{64}", expected_checksum) is None:
+            raise ValueError("Invalid transfer checksum")
+        return filename
+
+    def _resume_existing_transfer(self, transfer_id: str, expected_checksum: str) -> TransferStatus:
+        manifest = self._load(transfer_id)
+        if manifest["expected_checksum"] != expected_checksum:
+            raise ValueError("Transfer checksum does not match existing session")
+        partial_path = self._partial_path(transfer_id)
+        if manifest.get("state") == "active":
+            actual_size = partial_path.stat().st_size if partial_path.exists() else 0
+            if actual_size > int(manifest["total_size"]):
+                self._reset_partial(manifest)
+            else:
+                manifest["offset"] = actual_size
+                self._write_manifest(manifest)
+        return self._public_status(manifest)
 
     def get_manifest(self, transfer_id: str) -> dict[str, object]:
         with self._lock:

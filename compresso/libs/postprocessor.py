@@ -237,58 +237,56 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             self._log("Exception in fetching task absolute path", message2=str(e), level="exception")
 
         if self.task.get_task_type() == "local":
-            # Size guardrail check (before staging or finalization)
-            if self.model.success:
-                try:
-                    library = Library(self.task.get_task_library_id())
-                    if library.get_size_guardrail_enabled():
-                        source_size = self.model.source_size or 0
-                        cache_path = self.task.get_cache_path()
-                        if source_size > 0 and cache_path and os.path.exists(cache_path):
-                            output_size = os.path.getsize(cache_path)
-                            ratio_pct = (output_size / source_size) * 100
-                            min_pct = library.get_size_guardrail_min_pct()
-                            max_pct = library.get_size_guardrail_max_pct()
-                            if ratio_pct < min_pct or ratio_pct > max_pct:
-                                rejection_msg = f"Size guardrail REJECTED: {ratio_pct:.1f}% (allowed {min_pct}-{max_pct}%)"
-                                self._log(rejection_msg)
-                                self.model.success = False
-                                # Write rejection reason into task log so retry logic can detect it
-                                existing_log = self.model.log or ""
-                                self.model.log = (existing_log + "\n" + rejection_msg).strip()
-                                self.model.save()
-                except (OSError, ZeroDivisionError, peewee.PeeweeException) as e:
-                    self._log("Exception in size guardrail check", message2=str(e), level="warning")
-                except Exception as e:
-                    self._log(f"GuardrailRejectionError: {e}", level="warning")
-
-            # Determine replacement policy (per-library with global fallback)
-            try:
-                library = Library(self.task.get_task_library_id())
-                policy = library.get_replacement_policy()
-            except (peewee.PeeweeException, AttributeError, KeyError, TypeError) as e:
-                self._log("Could not determine replacement policy for library", message2=str(e), level="warning")
-                policy = ""
-            except Exception as e:
-                self._log(f"PolicyResolutionError: {e}", level="warning")
-                policy = ""
-            if not policy:
-                policy = "approval_required" if self.settings.get_approval_required() else "replace"
-
-            if self.model.success:
-                if policy == "approval_required":
-                    self._stage_for_approval()
-                elif policy == "keep_both":
-                    self._finalize_local_task_keep_both()
-                else:
-                    self._finalize_local_task()
-            else:
-                # Check if this failure is eligible for retry (not a guardrail rejection)
-                if self._attempt_retry():
-                    return  # Task re-queued as pending with backoff; skip finalization
-                self._finalize_local_task()
+            self._handle_processed_local_task()
         else:
             self._finalize_remote_task()
+
+    def _handle_processed_local_task(self) -> None:
+        if self.model.success:
+            self._apply_size_guardrail()
+        policy = self._replacement_policy()
+        if not self.model.success:
+            if not self._attempt_retry():
+                self._finalize_local_task()
+            return
+        if policy == "approval_required":
+            self._stage_for_approval()
+        elif policy == "keep_both":
+            self._finalize_local_task_keep_both()
+        else:
+            self._finalize_local_task()
+
+    def _apply_size_guardrail(self) -> None:
+        try:
+            library = Library(self.task.get_task_library_id())
+            source_size = self.model.source_size or 0
+            cache_path = self.task.get_cache_path()
+            if (
+                not library.get_size_guardrail_enabled()
+                or source_size <= 0
+                or not cache_path
+                or not os.path.exists(cache_path)
+            ):
+                return
+            ratio = os.path.getsize(cache_path) / source_size * 100
+            minimum, maximum = library.get_size_guardrail_min_pct(), library.get_size_guardrail_max_pct()
+            if minimum <= ratio <= maximum:
+                return
+            message = f"Size guardrail REJECTED: {ratio:.1f}% (allowed {minimum}-{maximum}%)"
+            self._log(message)
+            self.model.success = False
+            self.model.log = ((self.model.log or "") + "\n" + message).strip()
+            self.model.save()
+        except Exception as error:
+            self._log("Exception in size guardrail check", message2=str(error), level="warning")
+
+    def _replacement_policy(self) -> str:
+        try:
+            policy = Library(self.task.get_task_library_id()).get_replacement_policy()
+        except Exception as error:
+            self._log("Could not determine replacement policy", message2=str(error), level="warning")
+            policy = ""
+        return policy or ("approval_required" if self.settings.get_approval_required() else "replace")
 
     def _handle_approved_task(self) -> None:
         """Handle a task that was approved by the user — finalize file replacement from staging."""
@@ -552,57 +550,49 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             from compresso.libs.external_notifications import ExternalNotificationDispatcher
 
             dispatcher = ExternalNotificationDispatcher()
-            source_data = self.task.get_source_data()
-            cache_path = self.task.get_cache_path()
-
-            # Source size comes from the task record (the source_data/dest_data dicts
-            # only carry abspath/basename, never a "size" key).
-            source_size = self.model.source_size or 0
-            # Destination size is the size of the encoded output in the cache path.
-            destination_size = None
-            try:
-                if cache_path and os.path.exists(cache_path):
-                    destination_size = os.path.getsize(cache_path)
-            except OSError:
-                destination_size = None
-
-            context: dict[str, object] = {
-                "file_name": os.path.basename(source_data.get("abspath", "")),
-                "source_size": source_size or None,
-                "destination_size": destination_size,
-            }
-            # Include codec from destination metadata if available
-            try:
-                if cache_path and os.path.exists(cache_path):
-                    meta = extract_media_metadata(cache_path)
-                    context["codec"] = meta.get("codec", "")
-            except (subprocess.SubprocessError, OSError, ValueError):
-                pass
-            # Include size savings
-            try:
-                if source_size > 0 and destination_size:
-                    saved = source_size - destination_size
-                    pct = (saved / source_size) * 100
-                    context["size_saved"] = f"{saved / (1024 * 1024):.1f} MB ({pct:.0f}%)"
-            except (AttributeError, TypeError, ZeroDivisionError):
-                pass
-            # Include quality scores if available
-            try:
-                scores: dict[str, float | None] = {}
-                if getattr(self.model, "vmaf_score", None) is not None:
-                    scores["vmaf"] = self.model.vmaf_score
-                if getattr(self.model, "ssim_score", None) is not None:
-                    scores["ssim"] = self.model.ssim_score
-                if scores:
-                    context["quality_scores"] = scores
-            except (AttributeError, TypeError):
-                pass
+            context = self._completion_notification_context()
             if self.model.success:
                 dispatcher.dispatch("task_completed", context)
             else:
                 dispatcher.dispatch("task_failed", context)
         except (ImportError, AttributeError, TypeError):
             pass  # notification failure is non-fatal
+
+    def _completion_notification_context(self) -> dict[str, object]:
+        source_data = self.task.get_source_data()
+        cache_path = self.task.get_cache_path()
+        source_size = self.model.source_size or 0
+        destination_size = self._completion_destination_size(cache_path)
+        context: dict[str, object] = {
+            "file_name": os.path.basename(source_data.get("abspath", "")),
+            "source_size": source_size or None,
+            "destination_size": destination_size,
+        }
+        self._add_completion_codec(context, cache_path)
+        if source_size > 0 and destination_size:
+            saved = source_size - destination_size
+            context["size_saved"] = f"{saved / (1024 * 1024):.1f} MB ({saved / source_size * 100:.0f}%)"
+        scores = {
+            name: value for name in ("vmaf", "ssim") if (value := getattr(self.model, f"{name}_score", None)) is not None
+        }
+        if scores:
+            context["quality_scores"] = scores
+        return context
+
+    @staticmethod
+    def _completion_destination_size(cache_path: str | None) -> int | None:
+        try:
+            return os.path.getsize(cache_path) if cache_path and os.path.exists(cache_path) else None
+        except OSError:
+            return None
+
+    @staticmethod
+    def _add_completion_codec(context: dict[str, object], cache_path: str | None) -> None:
+        try:
+            if cache_path and os.path.exists(cache_path):
+                context["codec"] = extract_media_metadata(cache_path).get("codec", "")
+        except (subprocess.SubprocessError, OSError, ValueError):
+            pass
 
     @staticmethod
     def _next_finalization_phase(
@@ -915,7 +905,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         plugin_handler = PluginsHandler()
         return not plugin_handler.get_incompatible_enabled_plugins()
 
-    def post_process_file(self) -> bool:  # noqa: C901 — coordinates the ordered plugin and default file moves
+    def post_process_file(self) -> bool:
         # Init plugins handler
         plugin_handler = PluginsHandler()
 
@@ -926,7 +916,6 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         source_data = self.task.get_source_data()
         destination_data = self.task.get_destination_data()
         # Move file back to original folder and remove source
-        file_move_processes_success = True
         # Create a list for filling with destination paths
         destination_files: list[str] = []
         # Create a tracker for safe file operations with rollback support
@@ -945,118 +934,11 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             ),
         )
         self._file_operation_tracker = tracker
+        file_move_processes_success = True
         if self.model.success:
-            # Run a postprocess file movement on the cache file for each plugin that configures it
-
-            # Fetch all 'postprocessor.file_move' plugin modules
-            plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type(
-                "postprocessor.file_move", library_id=library_id
+            file_move_processes_success = self._run_file_movements(
+                plugin_handler, library_id, cache_path, source_data, destination_data, destination_files, tracker
             )
-
-            # Check if the source file needs to be removed by default (only if it does not match the destination file)
-            # Replacement policies like 'keep_both' set _keep_source_file to preserve the original.
-            remove_source_file = False
-            if source_data["abspath"] != destination_data["abspath"] and not self._keep_source_file:
-                remove_source_file = True
-
-            # Set initial data (some fields will be overwritten further down)
-            # - 'library_id'                - The library ID for this task
-            # - 'source_data'               - Dictionary of data pertaining to the source file
-            # - 'remove_source_file'    - True to remove the original file
-            #                             (default is True if file name has changed)
-            # - 'copy_file'             - True to run a plugin initiated file copy
-            #                             (default is False unless the plugin says otherwise)
-            # - 'file_in'               - Source path to copy from (if 'copy_file' is True)
-            # - 'file_out'              - Destination path to copy to (if 'copy_file' is True)
-            # - 'run_default_file_copy' - Prevent the final Compresso post-process
-            #                             file movement (if different from the original file name)
-            data: dict[str, object] = {
-                "library_id": library_id,
-                "task_id": self.task.get_task_id(),
-                "source_data": None,
-                "remove_source_file": remove_source_file,
-                "copy_file": None,
-                "file_in": None,
-                "file_out": None,
-                "run_default_file_copy": True,
-            }
-
-            for plugin_module in plugin_modules:
-                plugin_id = plugin_module.get("plugin_id")
-                if not isinstance(plugin_id, str):
-                    self._log("Skipping file-move plugin without a valid plugin ID", level="warning")
-                    continue
-                # Always set source_data to the original file's source_data
-                data["source_data"] = source_data
-                # Always set copy_file to False
-                data["copy_file"] = False
-                # Always set file in to cache path
-                data["file_in"] = cache_path
-                # Always set file out to destination data absolute path
-                data["file_out"] = destination_data["abspath"]
-
-                # Run plugin to update data
-                if not plugin_handler.exec_plugin_runner(data, plugin_id, "postprocessor.file_move"):
-                    # Do not continue with this plugin module's loop
-                    continue
-
-                if data.get("copy_file"):
-                    # Copy the file
-                    file_in_value = data.get("file_in")
-                    file_out_value = data.get("file_out")
-                    if not isinstance(file_in_value, str) or not isinstance(file_out_value, str):
-                        self._log(f"Plugin returned invalid copy paths ({plugin_id})", level="error")
-                        file_move_processes_success = False
-                        continue
-                    file_in = os.path.abspath(file_in_value)
-                    file_out = os.path.abspath(file_out_value)
-                    if not self.__copy_file(file_in, file_out, destination_files, plugin_id, tracker=tracker):
-                        file_move_processes_success = False
-                else:
-                    self._log(f"Plugin did not request a file copy ({plugin_module.get('plugin_id')})", level="debug")
-
-            # Compresso's default file movement process
-            # Only carry out final post-processor file moments if all others were successful
-            if file_move_processes_success and data.get("run_default_file_copy"):
-                # Run the default post-process file movement.
-                # This will always move the file back to the original location.
-                # If that original location is the same file name, it will overwrite the original file.
-                if destination_data.get("abspath") == source_data.get("abspath"):
-                    # Only run the final file copy to overwrite the source file if the remove_source_file flag was never set
-                    # The remove_source_file flag will remove the source file in later lines after this copy operation,
-                    #   so if we did copy the file here, it would be a waste of time
-                    if not data.get("remove_source_file") and not self.__copy_file(
-                        cache_path,
-                        destination_data["abspath"],
-                        destination_files,
-                        "DEFAULT",
-                        move=True,
-                        tracker=tracker,
-                    ):
-                        file_move_processes_success = False
-                elif not self.__copy_file(
-                    cache_path, destination_data["abspath"], destination_files, "DEFAULT", move=True, tracker=tracker
-                ):
-                    file_move_processes_success = False
-
-            # Source file removal process
-            # Only run if all final post-processor file moments were successful
-            if file_move_processes_success and data.get("remove_source_file"):
-                # Only carry out a source removal if the file exists and the final copy was also successful
-                if file_move_processes_success and os.path.exists(source_data["abspath"]):
-                    self._log(f"Removing source: {source_data['abspath']}")
-                    try:
-                        tracker.safe_remove(source_data["abspath"])
-                    except (OSError, PermissionError, shutil.Error) as e:
-                        self._log("Failed to safely remove source file", message2=str(e), level="error")
-                        file_move_processes_success = False
-                else:
-                    self._log(
-                        "Keeping source file '{}'. Not all postprocessor file movement functions completed.".format(
-                            source_data.get("abspath")
-                        ),
-                        level="warning",
-                    )
 
         else:
             self._log(f"Skipping file movement post-processor as the task was not successful '{cache_path}'", level="warning")
@@ -1068,31 +950,9 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             cache_path,
         )
 
-        # Fetch all 'postprocessor.task_result' plugin modules
-        plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type("postprocessor.task_result", library_id=library_id)
-
-        for plugin_module in plugin_modules:
-            result_data: dict[str, object] = {
-                "library_id": library_id,
-                "task_id": self.task.get_task_id(),
-                "task_type": self.task.get_task_type(),
-                "final_cache_path": cache_path,
-                "task_processing_success": self.task.get_task_success(),
-                "file_move_processes_success": file_move_processes_success,
-                "destination_files": list(destination_files),
-                "source_data": source_data,
-                "start_time": self.task.get_start_time(),
-                "finish_time": self.task.get_finish_time(),
-            }
-
-            # Run plugin to update data
-            plugin_id = plugin_module.get("plugin_id")
-            if not isinstance(plugin_id, str):
-                self._log("Skipping task-result plugin without a valid plugin ID", level="warning")
-                continue
-            if not plugin_handler.exec_plugin_runner(result_data, plugin_id, "postprocessor.task_result"):
-                # Do not continue with this plugin module's loop
-                continue
+        self._run_task_result_plugins(
+            plugin_handler, library_id, cache_path, source_data, destination_files, file_move_processes_success
+        )
 
         # Retain a valid encode when movement failed so the postprocessor can
         # retry without destroying the only completed output.
@@ -1100,6 +960,95 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             self.__cleanup_cache_files(cache_path)
         self._last_destination_files = destination_files
         return completion.succeeded
+
+    def _run_file_movements(
+        self,
+        plugin_handler: PluginsHandler,
+        library_id: int,
+        cache_path: str,
+        source_data: TaskPathData,
+        destination_data: TaskPathData,
+        destination_files: list[str],
+        tracker: FileOperationTracker,
+    ) -> bool:
+        remove_source = source_data["abspath"] != destination_data["abspath"] and not self._keep_source_file
+        data: dict[str, object] = {
+            "library_id": library_id,
+            "task_id": self.task.get_task_id(),
+            "source_data": source_data,
+            "remove_source_file": remove_source,
+            "copy_file": False,
+            "file_in": cache_path,
+            "file_out": destination_data["abspath"],
+            "run_default_file_copy": True,
+        }
+        success = self._run_file_move_plugins(plugin_handler, library_id, data, destination_files, tracker)
+        if success and data.get("run_default_file_copy"):
+            same_path = destination_data["abspath"] == source_data["abspath"]
+            if not same_path or not data.get("remove_source_file"):
+                success = self.__copy_file(
+                    cache_path, destination_data["abspath"], destination_files, "DEFAULT", move=True, tracker=tracker
+                )
+        if success and data.get("remove_source_file") and os.path.exists(source_data["abspath"]):
+            try:
+                tracker.safe_remove(source_data["abspath"])
+            except (OSError, PermissionError, shutil.Error) as error:
+                self._log("Failed to safely remove source file", message2=str(error), level="error")
+                success = False
+        return success
+
+    def _run_file_move_plugins(
+        self,
+        plugin_handler: PluginsHandler,
+        library_id: int,
+        data: dict[str, object],
+        destination_files: list[str],
+        tracker: FileOperationTracker,
+    ) -> bool:
+        success = True
+        modules = plugin_handler.get_enabled_plugin_modules_by_type("postprocessor.file_move", library_id=library_id)
+        for module in modules:
+            plugin_id = module.get("plugin_id")
+            if not isinstance(plugin_id, str):
+                continue
+            data.update({"copy_file": False})
+            if not plugin_handler.exec_plugin_runner(data, plugin_id, "postprocessor.file_move") or not data.get("copy_file"):
+                continue
+            file_in, file_out = data.get("file_in"), data.get("file_out")
+            if not isinstance(file_in, str) or not isinstance(file_out, str):
+                success = False
+                continue
+            if not self.__copy_file(
+                os.path.abspath(file_in), os.path.abspath(file_out), destination_files, plugin_id, tracker=tracker
+            ):
+                success = False
+        return success
+
+    def _run_task_result_plugins(
+        self,
+        plugin_handler: PluginsHandler,
+        library_id: int,
+        cache_path: str,
+        source_data: TaskPathData,
+        destination_files: list[str],
+        move_success: bool,
+    ) -> None:
+        result_data: dict[str, object] = {
+            "library_id": library_id,
+            "task_id": self.task.get_task_id(),
+            "task_type": self.task.get_task_type(),
+            "final_cache_path": cache_path,
+            "task_processing_success": self.task.get_task_success(),
+            "file_move_processes_success": move_success,
+            "destination_files": list(destination_files),
+            "source_data": source_data,
+            "start_time": self.task.get_start_time(),
+            "finish_time": self.task.get_finish_time(),
+        }
+        for module in plugin_handler.get_enabled_plugin_modules_by_type("postprocessor.task_result", library_id=library_id):
+            plugin_id = module.get("plugin_id")
+            if isinstance(plugin_id, str):
+                plugin_handler.exec_plugin_runner(result_data, plugin_id, "postprocessor.task_result")
 
     def post_process_remote_file(self) -> str | Literal[False]:
         """
@@ -1209,52 +1158,12 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         else:
             self._log(f"Copy file triggered by ({plugin_id}) {file_in} --> {file_out}")
 
-        file_move_processes_success = True
         # Use a '.part' suffix for the file movement, then rename it after. Defined
         # up-front so a partial failure can clean it up rather than orphaning it next
         # to the destination file.
         part_file_out = os.path.join(f"{file_out}.compresso.part")
         try:
-            # Ensure the src and dst are not the same file
-            if os.path.exists(file_out) and os.path.samefile(file_in, file_out):
-                self._log(
-                    f"The file_in and file_out path are the same file. Nothing will be done! '{file_in}'", level="warning"
-                )
-                return False
-
-            # Get a checksum prior to copy
-            if not os.path.exists(file_in):
-                self._log(f"The file_in path does not exist! '{file_in}'", level="warning")
-                self.event.wait(1)
-            self._log(f"Fetching checksum of source file '{file_in}'.", level="debug")
-
-            # Carry out the file movement
-            if move:
-                self._log(f"Moving file '{file_in}' --> '{part_file_out}'.", level="debug")
-                if os.path.exists(part_file_out):
-                    os.remove(part_file_out)
-                shutil.move(file_in, part_file_out, copy_function=shutil.copyfile)
-            else:
-                self._log(f"Copying file '{file_in}' --> '{part_file_out}'.", level="debug")
-                shutil.copyfile(file_in, part_file_out)
-
-            # Remove dest file if it already exists (required only for moves)
-            if os.path.exists(file_out):
-                self._log(f"The file_out path already exists. Removing file '{file_out}'", level="debug")
-                if tracker:
-                    tracker.safe_remove(file_out)
-                else:
-                    os.remove(file_out)
-
-            # Move file from part to final destination
-            self._log(f"Renaming file '{part_file_out}' --> '{file_out}'.", level="debug")
-            if tracker:
-                tracker.record_created(file_out)
-            shutil.move(part_file_out, file_out, copy_function=shutil.copyfile)
-            # Write final path to destination_files list
-            destination_files.append(file_out)
-            # Mark move process a success
-            return True
+            return self._perform_file_copy(file_in, file_out, part_file_out, destination_files, move, tracker)
         except (OSError, PermissionError, shutil.SameFileError, shutil.Error) as e:
             self.logger.error("POSTPROCESS_FILE_COPY_FAILED source=%s dest=%s", file_in, file_out)
             self._log(f"Exception while copying file {file_in} to {file_out}:", message2=str(e), level="exception")
@@ -1263,16 +1172,51 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
                 tracker.rollback()
             # Remove the staging '.part' file if it was left behind by a failed
             # move/rename so it is not orphaned next to the destination file.
-            if os.path.exists(part_file_out):
-                try:
-                    if move and not os.path.exists(file_in):
-                        shutil.copyfile(part_file_out, file_in)
-                    os.remove(part_file_out)
-                except OSError as cleanup_error:
-                    self._log(f"Failed to remove staging file '{part_file_out}'", message2=str(cleanup_error), level="warning")
-            file_move_processes_success = False
+            self._cleanup_failed_file_copy(file_in, part_file_out, move)
+            return False
 
-        return file_move_processes_success
+    def _perform_file_copy(
+        self,
+        file_in: str,
+        file_out: str,
+        part_file_out: str,
+        destination_files: list[str],
+        move: bool,
+        tracker: FileOperationTracker | None,
+    ) -> bool:
+        if os.path.exists(file_out) and os.path.samefile(file_in, file_out):
+            self._log(f"The file_in and file_out path are the same file. Nothing will be done! '{file_in}'", level="warning")
+            return False
+        if not os.path.exists(file_in):
+            self._log(f"The file_in path does not exist! '{file_in}'", level="warning")
+            self.event.wait(1)
+        if move:
+            self._log(f"Moving file '{file_in}' --> '{part_file_out}'.", level="debug")
+            if os.path.exists(part_file_out):
+                os.remove(part_file_out)
+            shutil.move(file_in, part_file_out, copy_function=shutil.copyfile)
+        else:
+            self._log(f"Copying file '{file_in}' --> '{part_file_out}'.", level="debug")
+            shutil.copyfile(file_in, part_file_out)
+        if os.path.exists(file_out):
+            self._log(f"The file_out path already exists. Removing file '{file_out}'", level="debug")
+            tracker.safe_remove(file_out) if tracker else os.remove(file_out)
+        self._log(f"Renaming file '{part_file_out}' --> '{file_out}'.", level="debug")
+        if tracker:
+            tracker.record_created(file_out)
+        shutil.move(part_file_out, file_out, copy_function=shutil.copyfile)
+        destination_files.append(file_out)
+        return True
+
+    def _cleanup_failed_file_copy(self, file_in: str, part_file_out: str, move: bool) -> None:
+        if not os.path.exists(part_file_out):
+            return
+        try:
+            if move and not os.path.exists(file_in):
+                shutil.copyfile(part_file_out, file_in)
+            os.remove(part_file_out)
+        except OSError as cleanup_error:
+            self._log(f"Failed to remove staging file '{part_file_out}'", message2=str(cleanup_error), level="warning")
 
     def write_history_log(self) -> bool:
         """
@@ -1286,61 +1230,14 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         destination_data = self.task.get_destination_data()
         source_data = self.task.get_source_data()
 
-        # If task fails, the add a notification that a task has failed
         if not self.model.success:
-            notifications = Notifications()
-            notifications.add(
-                {
-                    "uuid": "newFailedTask",
-                    "type": "error",
-                    "icon": "report",
-                    "label": "failedTaskLabel",
-                    "message": "You have a new failed task in your completed tasks list",
-                    "navigation": {
-                        "push": "/ui/dashboard",
-                        "events": [
-                            "completedTasksShowFailed",
-                        ],
-                    },
-                }
-            )
+            self._notify_failed_history_task()
 
         self._log_completed_task_data(task_dump, source_data, destination_data)
 
-        # Capture destination file size for compression stats
-        destination_size = 0
-        dest_path = ""
-        if task_dump.get("task_success", False) and destination_data:
-            dest_path = destination_data.get("abspath", "")
-            if dest_path and os.path.exists(dest_path):
-                try:
-                    destination_size = os.path.getsize(dest_path)
-                except OSError:
-                    self.logger.warning("POSTPROCESS_DESTINATION_SIZE_UNAVAILABLE path=%s", dest_path)
-                    self._log(f"Could not get destination file size for '{dest_path}'", level="warning")
-
-        # Extract media metadata for compression stats (codec, resolution, container)
-        # Always extract source metadata (even on failure, for stats tracking)
-        source_meta = _empty_media_metadata()
-        dest_meta = _empty_media_metadata()
-        source_abspath = source_data.get("abspath", "") if source_data else ""
-        if source_abspath and os.path.exists(source_abspath):
-            try:
-                source_meta = extract_media_metadata(source_abspath)
-            except (subprocess.SubprocessError, OSError, ValueError) as e:
-                self.logger.warning("POSTPROCESS_SOURCE_METADATA_UNAVAILABLE path=%s", source_abspath)
-                self._log(f"Could not extract source metadata: {e}", level="warning")
-        # Destination metadata only on success
-        if task_dump.get("task_success", False) and dest_path and os.path.exists(dest_path):
-            try:
-                dest_meta = extract_media_metadata(dest_path)
-            except (subprocess.SubprocessError, OSError, ValueError) as e:
-                self._log(f"Could not extract destination metadata: {e}", level="debug")
-
-        # Extract source duration for encoding speed context
-        source_duration_seconds = 0.0
-        with contextlib.suppress(TypeError, ValueError):
-            source_duration_seconds = float(source_meta.get("duration", 0))
+        destination_size, source_meta, dest_meta, source_duration_seconds = self._history_media_details(
+            task_dump, source_data, destination_data
+        )
 
         history_saved = history_logging.save_task_history(
             {
@@ -1369,17 +1266,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         if not history_saved:
             return False
 
-        # Bump analysis cache version so frontend knows estimates may have changed
-        try:
-            from compresso.libs.unmodels import LibraryAnalysisCache
-
-            lib_id = task_dump.get("library_id", 1)
-            cache_entry = LibraryAnalysisCache.get_or_none(LibraryAnalysisCache.library_id == lib_id)
-            if cache_entry:
-                cache_entry.version += 1
-                cache_entry.save()
-        except (ImportError, AttributeError, TypeError, peewee.PeeweeException) as e:
-            self.logger.debug("Failed to bump analysis cache version: %s", e)
+        self._bump_analysis_cache(task_dump.get("library_id", 1))
 
         # Execute event plugin runners
         plugin_handler = PluginsHandler()
@@ -1399,6 +1286,60 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
             },
         )
         return True
+
+    @staticmethod
+    def _notify_failed_history_task() -> None:
+        Notifications().add(
+            {
+                "uuid": "newFailedTask",
+                "type": "error",
+                "icon": "report",
+                "label": "failedTaskLabel",
+                "message": "You have a new failed task in your completed tasks list",
+                "navigation": {"push": "/ui/dashboard", "events": ["completedTasksShowFailed"]},
+            }
+        )
+
+    def _history_media_details(
+        self,
+        task_dump: Mapping[str, object],
+        source_data: TaskPathData,
+        destination_data: TaskPathData,
+    ) -> tuple[int, MediaMetadata, MediaMetadata, float]:
+        success = bool(task_dump.get("task_success", False))
+        source_path = source_data.get("abspath", "")
+        dest_path = destination_data.get("abspath", "") if success else ""
+        destination_size = 0
+        try:
+            destination_size = os.path.getsize(dest_path) if dest_path and os.path.exists(dest_path) else 0
+        except OSError:
+            self.logger.warning("POSTPROCESS_DESTINATION_SIZE_UNAVAILABLE path=%s", dest_path)
+        source_meta = self._extract_history_metadata(source_path, "source")
+        dest_meta = self._extract_history_metadata(dest_path, "destination")
+        with contextlib.suppress(TypeError, ValueError):
+            return destination_size, source_meta, dest_meta, float(source_meta.get("duration", 0))
+        return destination_size, source_meta, dest_meta, 0.0
+
+    def _extract_history_metadata(self, path: str, label: str) -> MediaMetadata:
+        if not path or not os.path.exists(path):
+            return _empty_media_metadata()
+        try:
+            return extract_media_metadata(path)
+        except (subprocess.SubprocessError, OSError, ValueError) as error:
+            self.logger.warning("POSTPROCESS_%s_METADATA_UNAVAILABLE path=%s", label.upper(), path)
+            self._log(f"Could not extract {label} metadata: {error}", level="warning")
+            return _empty_media_metadata()
+
+    def _bump_analysis_cache(self, library_id: object) -> None:
+        try:
+            from compresso.libs.unmodels import LibraryAnalysisCache
+
+            cache_entry = LibraryAnalysisCache.get_or_none(LibraryAnalysisCache.library_id == library_id)
+            if cache_entry:
+                cache_entry.version += 1
+                cache_entry.save()
+        except (ImportError, AttributeError, TypeError, peewee.PeeweeException) as error:
+            self.logger.debug("Failed to bump analysis cache version: %s", error)
 
     def commit_task_metadata(self) -> int:
         """

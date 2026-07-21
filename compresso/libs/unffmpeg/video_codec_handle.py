@@ -62,42 +62,24 @@ class VideoCodecHandle:
         self.encoding_args["streams_to_map"] = []
         self.encoding_args["streams_to_encode"] = []
         for stream in probe_streams(self.file_probe):
-            # If this is a video stream, then process the args
-            if stream_text(stream, "codec_type") == "video":
-                # By default the video stream will be re-encoded
-                just_copy_video_stream = False
-
-                # Ignore certain codec types (images)
-                if stream_text(stream, "codec_name") in ["mjpeg"]:
-                    just_copy_video_stream = True
-
-                # If this video stream is really an embedded jpeg file (image/jpeg), simply copy the stream
-                tags = string_keyed_dict(stream.get("tags"))
-                if tags is not None and stream_text(tags, "mimetype") == "image/jpeg":
-                    just_copy_video_stream = True
-
-                # If this video encoding is disabled. Then copy the stream
-                if self.disable_video_encoding:
-                    just_copy_video_stream = True
-
-                # If the current video codec is the same as the configured destination
-                # codec, then do not re-encode the video
-                if stream_text(stream, "codec_name") == self.video_codec:
-                    just_copy_video_stream = True
-
-                if just_copy_video_stream:
-                    # Video stream just needs to be copied
-                    self.encoding_args["streams_to_encode"].extend([f"-c:v:{self.video_tracks_count}", "copy"])
-                else:
-                    # Video stream to be re-encoded
-                    self.encoding_args["streams_to_encode"].extend([f"-c:v:{self.video_tracks_count}", self.video_encoder])
-
-                self.video_tracks_count += 1
-
-                # Map this video stream to be processed
-                self.encoding_args["streams_to_map"].extend(["-map", f"0:{stream_int(stream, 'index')}"])
+            if stream_text(stream, "codec_type") != "video":
+                continue
+            encoder = "copy" if self._should_copy_stream(stream) else self.video_encoder
+            self.encoding_args["streams_to_encode"].extend([f"-c:v:{self.video_tracks_count}", encoder])
+            self.video_tracks_count += 1
+            self.encoding_args["streams_to_map"].extend(["-map", f"0:{stream_int(stream, 'index')}"])
 
         return self.encoding_args
+
+    def _should_copy_stream(self, stream: Mapping[str, object]) -> bool:
+        codec_name = stream_text(stream, "codec_name")
+        tags = string_keyed_dict(stream.get("tags"))
+        return (
+            codec_name == "mjpeg"
+            or (tags is not None and stream_text(tags, "mimetype") == "image/jpeg")
+            or self.disable_video_encoding
+            or codec_name == self.video_codec
+        )
 
     def set_video_codec_with_default_encoder(self, codec_name: str) -> None:
         """

@@ -399,39 +399,34 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         cutoff = datetime.now() - timedelta(days=int(expiry_days))
 
         for entry in os.scandir(staging_path):
-            if not entry.is_dir() or not entry.name.startswith("task_"):
-                continue
-            try:
-                task_id = int(entry.name.split("_")[1])
-            except (ValueError, IndexError):
-                continue
+            self._cleanup_staging_entry(entry, cutoff)
 
-            # Check if the associated task still exists and is still awaiting approval
-            from compresso.libs.unmodels.tasks import Tasks
+    def _cleanup_staging_entry(self, entry: os.DirEntry[str], cutoff: datetime) -> None:
+        if not entry.is_dir() or not entry.name.startswith("task_"):
+            return
+        try:
+            task_id = int(entry.name.split("_")[1])
+        except (ValueError, IndexError):
+            return
+        from compresso.libs.unmodels.tasks import Tasks
 
-            try:
-                task_obj = Tasks.get_by_id(task_id)
-                if task_obj.status == "awaiting_approval":
-                    # Check age by finish_time
-                    if task_obj.finish_time and task_obj.finish_time < cutoff:
-                        self.logger.info("Auto-rejecting expired staging task %s (finished %s)", task_id, task_obj.finish_time)
-                        task_obj.delete_instance()
-                        try:
-                            shutil.rmtree(entry.path)
-                        except OSError as e:
-                            self.logger.warning("Failed to remove staging dir for task %s: %s", task_id, e)
-                    # Still within expiry — leave it
-                else:
-                    # Task exists but isn't awaiting approval — staging is orphaned
-                    self.logger.info("Cleaning orphaned staging dir for task %s (status=%s)", task_id, task_obj.status)
-                    try:
-                        shutil.rmtree(entry.path)
-                    except OSError as e:
-                        self.logger.warning("Failed to remove orphaned staging dir for task %s: %s", task_id, e)
-            except DoesNotExist:
-                # Task was already deleted — clean up orphaned staging
-                self.logger.info("Cleaning orphaned staging dir for deleted task %s", task_id)
-                try:
-                    shutil.rmtree(entry.path)
-                except OSError as e:
-                    self.logger.warning("Failed to remove orphaned staging dir for deleted task %s: %s", task_id, e)
+        try:
+            task_obj = Tasks.get_by_id(task_id)
+        except DoesNotExist:
+            self.logger.info("Cleaning orphaned staging dir for deleted task %s", task_id)
+            self._remove_staging_directory(entry.path, task_id)
+            return
+        if task_obj.status == "awaiting_approval" and not (task_obj.finish_time and task_obj.finish_time < cutoff):
+            return
+        if task_obj.status == "awaiting_approval":
+            self.logger.info("Auto-rejecting expired staging task %s (finished %s)", task_id, task_obj.finish_time)
+            task_obj.delete_instance()
+        else:
+            self.logger.info("Cleaning orphaned staging dir for task %s (status=%s)", task_id, task_obj.status)
+        self._remove_staging_directory(entry.path, task_id)
+
+    def _remove_staging_directory(self, path: str, task_id: int) -> None:
+        try:
+            shutil.rmtree(path)
+        except OSError as error:
+            self.logger.warning("Failed to remove staging dir for task %s: %s", task_id, error)

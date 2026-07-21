@@ -76,6 +76,7 @@ MAX_PLUGIN_COMPRESSION_RATIO = 100
 _PLUGIN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _PLUGIN_REQUIRED_TEXT_FIELDS = ("id", "name", "author", "version", "tags", "description", "icon")
 _PLUGIN_SORT_FIELDS = frozenset({"name", "author", "version", "plugin_id", "position", "update_available"})
+_INVALID_PLUGIN_ID_MESSAGE = "Plugin archive info.json has an invalid plugin ID"
 
 type PluginRecord = dict[str, object]
 type NormalizedArchiveMember = tuple[zipfile.ZipInfo, PurePosixPath]
@@ -261,7 +262,7 @@ class PluginsHandler(metaclass=SingletonType):
             plugin_id = narrowing.strict_str_or_none(plugin.get("plugin_id"))
             if plugin_id is None:
                 continue
-            plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_id)
+            plugin_settings, _ = plugin_executor.get_plugin_settings(plugin_id)
             all_settings[plugin_id] = plugin_settings
 
         # Return modules
@@ -293,72 +294,46 @@ class PluginsHandler(metaclass=SingletonType):
             repo_data_directory = repo_meta.get("repo_data_directory")
             repo_name = repo_meta.get("name") or repo_meta.get("repo_name")
 
-            # Loop over
             for plugin in narrowing.string_keyed_dicts(repo_data.get("plugins")):
-                # Only show plugins that are compatible with this version
-                # Plugins will require a 'compatibility' entry in their info.json file.
-                #   This must list the plugin handler versions that it is compatible with
-                compatibility = plugin.get("compatibility", plugin.get("compresso_compatibility", []))
-                if not isinstance(compatibility, list) or self.version not in compatibility:
-                    continue
-
-                if isinstance(repo_data_directory, str) and repo_data_directory:
-                    repo_data_directory = repo_data_directory.rstrip("/")
-                    plugin_package_url = "{0}/{1}/{1}-{2}.zip".format(
-                        repo_data_directory,
-                        plugin.get("id"),
-                        plugin.get("version"),
-                    )
-                    plugin_changelog_url = "{}/{}/changelog.md".format(
-                        repo_data_directory,
-                        plugin.get("id"),
-                    )
-                else:
-                    plugin_package_url = narrowing.strict_str(plugin.get("plugin_download_url"))
-                    plugin_changelog_url = ""
-
-                # Check if plugin is already installed:
-                plugin_status = {
-                    "installed": False,
-                }
-                plugin_id = narrowing.strict_str_or_none(plugin.get("id", plugin.get("plugin_id")))
-                if plugin_id is None:
-                    continue
-                plugin_info = self.get_plugin_info(plugin_id)
-                if plugin_info:
-                    local_version = plugin_info.get("version")
-                    # Parse the currently installed version number and check if it matches
-                    remote_version = plugin.get("version", plugin.get("plugin_version"))
-                    if local_version == remote_version:
-                        plugin_status = {
-                            "installed": True,
-                            "update_available": False,
-                        }
-                    else:
-                        # There is an update available
-                        self.flag_plugin_for_update_by_id(plugin_id)
-                        plugin_status = {
-                            "installed": True,
-                            "update_available": True,
-                        }
-
-                return_list.append(
-                    {
-                        "plugin_id": plugin_id,
-                        "name": plugin.get("name", plugin.get("plugin_name")),
-                        "author": plugin.get("author", plugin.get("plugin_author")),
-                        "description": plugin.get("description", plugin.get("plugin_description")),
-                        "version": plugin.get("version", plugin.get("plugin_version")),
-                        "icon": plugin.get("icon", plugin.get("plugin_icon_url", "")),
-                        "tags": plugin.get("tags"),
-                        "status": plugin_status,
-                        "package_url": plugin_package_url,
-                        "package_sha256": plugin.get("package_sha256", plugin.get("sha256")),
-                        "changelog_url": plugin_changelog_url,
-                        "repo_name": repo_name,
-                    }
-                )
+                if record := self._repo_plugin_record(plugin, repo_data_directory, repo_name):
+                    return_list.append(record)
         return return_list
+
+    def _repo_plugin_record(
+        self, plugin: Mapping[str, object], repo_data_directory: object, repo_name: object
+    ) -> PluginRecord | None:
+        compatibility = plugin.get("compatibility", plugin.get("compresso_compatibility", []))
+        plugin_id = narrowing.strict_str_or_none(plugin.get("id", plugin.get("plugin_id")))
+        if not isinstance(compatibility, list) or self.version not in compatibility or plugin_id is None:
+            return None
+        if isinstance(repo_data_directory, str) and repo_data_directory:
+            repo_root = repo_data_directory.rstrip("/")
+            package_url = f"{repo_root}/{plugin_id}/{plugin_id}-{plugin.get('version')}.zip"
+            changelog_url = f"{repo_root}/{plugin_id}/changelog.md"
+        else:
+            package_url = narrowing.strict_str(plugin.get("plugin_download_url"))
+            changelog_url = ""
+        status: dict[str, object] = {"installed": False}
+        plugin_info = self.get_plugin_info(plugin_id)
+        if plugin_info:
+            update_available = plugin_info.get("version") != plugin.get("version", plugin.get("plugin_version"))
+            status = {"installed": True, "update_available": update_available}
+            if update_available:
+                self.flag_plugin_for_update_by_id(plugin_id)
+        return {
+            "plugin_id": plugin_id,
+            "name": plugin.get("name", plugin.get("plugin_name")),
+            "author": plugin.get("author", plugin.get("plugin_author")),
+            "description": plugin.get("description", plugin.get("plugin_description")),
+            "version": plugin.get("version", plugin.get("plugin_version")),
+            "icon": plugin.get("icon", plugin.get("plugin_icon_url", "")),
+            "tags": plugin.get("tags"),
+            "status": status,
+            "package_url": package_url,
+            "package_sha256": plugin.get("package_sha256", plugin.get("sha256")),
+            "changelog_url": changelog_url,
+            "repo_name": repo_name,
+        }
 
     def get_installable_plugins_list(self, filter_repo_id: int | str | None = None) -> list[PluginRecord]:
         """
@@ -614,9 +589,9 @@ class PluginsHandler(metaclass=SingletonType):
                 raise ValueError(f"Plugin archive info.json has an invalid or missing '{field}'")
         plugin_id = narrowing.strict_str_or_none(plugin_info["id"])
         if plugin_id is None:
-            raise ValueError("Plugin archive info.json has an invalid plugin ID")
+            raise ValueError(_INVALID_PLUGIN_ID_MESSAGE)
         if not _PLUGIN_ID_PATTERN.fullmatch(plugin_id):
-            raise ValueError(f"Plugin archive info.json has an invalid plugin ID: {plugin_id}")
+            raise ValueError(f"{_INVALID_PLUGIN_ID_MESSAGE}: {plugin_id}")
         if requested_plugin_id is not None and plugin_id != requested_plugin_id:
             raise ValueError("Plugin archive info.json ID does not match the requested plugin ID")
         compatibility = plugin_info.get("compatibility", plugin_info.get("compresso_compatibility"))
@@ -664,7 +639,7 @@ class PluginsHandler(metaclass=SingletonType):
             plugin_info, normalized_members = self._validate_plugin_archive(zip_ref, plugin_id)
             validated_plugin_id = narrowing.strict_str_or_none(plugin_info.get("id"))
             if validated_plugin_id is None:
-                raise ValueError("Plugin archive info.json has an invalid plugin ID")
+                raise ValueError(_INVALID_PLUGIN_ID_MESSAGE)
             plugin_id = validated_plugin_id
             with self._plugin_install_guard(plugin_id):
                 return self._install_validated_plugin(zip_ref, plugin_info, normalized_members)
@@ -677,7 +652,7 @@ class PluginsHandler(metaclass=SingletonType):
     ) -> PluginRecord:
         plugin_id = narrowing.strict_str_or_none(plugin_info.get("id"))
         if plugin_id is None:
-            raise ValueError("Plugin archive info.json has an invalid plugin ID")
+            raise ValueError(_INVALID_PLUGIN_ID_MESSAGE)
         plugins_root = Path(self.settings.get_plugins_path()).resolve()
         plugins_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         plugin_directory = Path(self._get_plugin_path_without_create(plugin_id))
@@ -1175,19 +1150,6 @@ class PluginsHandler(metaclass=SingletonType):
         # Fetch all libraries
         all_libraries = Library.get_all_libraries()
 
-        def add_frontend_message(plugin_id: str, name: str) -> None:
-            # If the frontend messages queue was included in request, append a message
-            if frontend_messages:
-                frontend_messages.add(
-                    {
-                        "id": f"incompatiblePlugin_{plugin_id}",
-                        "type": "error",
-                        "code": "incompatiblePlugin",
-                        "message": name,
-                        "timeout": 0,
-                    }
-                )
-
         # Fetch all enabled plugins
         incompatible_list: list[PluginRecord] = []
         for library in all_libraries:
@@ -1199,40 +1161,38 @@ class PluginsHandler(metaclass=SingletonType):
             # Ensure only compatible plugins are enabled
             # If all enabled plugins are compatible, then return true
             for record in enabled_plugins:
-                try:
-                    # Ensure plugin is compatible
-                    plugin_id = narrowing.strict_str_or_none(record.get("plugin_id"))
-                    if plugin_id is None:
-                        continue
-                    plugin_info = self.get_plugin_info(plugin_id)
-                except Exception as e:
-                    plugin_info = None
-                    self._log(
-                        f"Exception while fetching plugin info for {record.get('plugin_id')}:",
-                        message2=str(e),
-                        level="exception",
-                    )
-                # Plugins will require a 'compatibility' entry in their info.json file.
-                #   This must list the plugin handler versions that it is compatible with
-                compatibility = plugin_info.get("compatibility", []) if plugin_info else []
-                if isinstance(compatibility, list) and self.version in compatibility:
-                    continue
-
-                self._log(
-                    f"Incompatible plugin detected: {record.get('name')} ({record.get('plugin_id')})",
-                    level="warning",
-                )
-                incompatible_list.append(
-                    {
-                        "plugin_id": record.get("plugin_id"),
-                        "name": record.get("name"),
-                    }
-                )
-                plugin_id = narrowing.strict_str_or_none(record.get("plugin_id")) or "unknown"
-                plugin_name = narrowing.strict_str_or_none(record.get("name")) or "Unknown plugin"
-                add_frontend_message(plugin_id, plugin_name)
+                if incompatible := self._incompatible_plugin(record, frontend_messages):
+                    incompatible_list.append(incompatible)
 
         return incompatible_list
+
+    def _incompatible_plugin(self, record: PluginRecord, frontend_messages: FrontendPushMessages) -> PluginRecord | None:
+        plugin_id = narrowing.strict_str_or_none(record.get("plugin_id"))
+        try:
+            plugin_info = self.get_plugin_info(plugin_id) if plugin_id is not None else None
+        except Exception as error:
+            plugin_info = None
+            self._log(
+                f"Exception while fetching plugin info for {record.get('plugin_id')}:",
+                message2=str(error),
+                level="exception",
+            )
+        compatibility = plugin_info.get("compatibility", []) if plugin_info else []
+        if isinstance(compatibility, list) and self.version in compatibility:
+            return None
+        plugin_id = plugin_id or "unknown"
+        plugin_name = narrowing.strict_str_or_none(record.get("name")) or "Unknown plugin"
+        self._log(f"Incompatible plugin detected: {plugin_name} ({plugin_id})", level="warning")
+        frontend_messages.add(
+            {
+                "id": f"incompatiblePlugin_{plugin_id}",
+                "type": "error",
+                "code": "incompatiblePlugin",
+                "message": plugin_name,
+                "timeout": 0,
+            }
+        )
+        return {"plugin_id": record.get("plugin_id"), "name": record.get("name")}
 
     @staticmethod
     def get_plugin_types_with_flows() -> list[str]:

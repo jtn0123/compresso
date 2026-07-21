@@ -215,37 +215,36 @@ def clean_files_in_cache_dir(cache_directory: PathLike, protected_paths: Sequenc
     """Remove abandoned task cache directories while retaining active files."""
     protected_paths = [os.path.realpath(path) for path in (protected_paths or []) if path]
 
-    def contains_protected_path(directory: PathLike) -> bool:
-        directory = os.path.realpath(directory)
-        for path in protected_paths:
-            try:
-                if os.path.commonpath([directory, path]) == directory:
-                    return True
-            except ValueError:
-                continue
-        return False
+    if not os.path.exists(cache_directory):
+        return
+    for root, _subfolders, _files in os.walk(cache_directory):
+        root_name = os.path.basename(root)
+        if root_name.startswith("compresso_file_conversion-"):
+            _clean_cache_path(root, protected_paths, "active cache", "cache")
+        elif root_name.startswith("compresso_remote_pending_library-"):
+            _clean_cache_path(root, protected_paths, "active remote cache", "remote library cache")
 
-    if os.path.exists(cache_directory):
-        for root, _subFolders, _files in os.walk(cache_directory):
-            root_bn = os.path.basename(root)
-            if root_bn.startswith("compresso_file_conversion-"):
-                if contains_protected_path(root):
-                    logger.info("Preserving active cache path - %s", root)
-                    continue
-                try:
-                    logger.info("Clearing cache path - %s", root)
-                    shutil.rmtree(root)
-                except Exception as e:
-                    logger.error("Exception while clearing cache path - %s", str(e))
-            elif root_bn.startswith("compresso_remote_pending_library-"):
-                if contains_protected_path(root):
-                    logger.info("Preserving active remote cache path - %s", root)
-                    continue
-                try:
-                    logger.info("Clearing remote library cache path - %s", root)
-                    shutil.rmtree(root)
-                except Exception as e:
-                    logger.error("Exception while clearing remote library cache path - %s", str(e))
+
+def _clean_cache_path(root: str, protected_paths: Sequence[PathLike], preserve_label: str, clear_label: str) -> None:
+    if _contains_protected_path(root, protected_paths):
+        logger.info("Preserving %s path - %s", preserve_label, root)
+        return
+    try:
+        logger.info("Clearing %s path - %s", clear_label, root)
+        shutil.rmtree(root)
+    except Exception:
+        logger.exception("Exception while clearing %s path - %s", clear_label, root)
+
+
+def _contains_protected_path(directory: PathLike, protected_paths: Sequence[PathLike]) -> bool:
+    directory = os.path.realpath(directory)
+    for path in protected_paths:
+        try:
+            if os.path.commonpath([directory, path]) == directory:
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def random_string(string_length: int = 5) -> str:
@@ -258,14 +257,11 @@ def json_dump_to_file(
     json_data: object,
     out_file: PathLike,
     check: bool = True,
-    rollback_on_fail: bool = True,
     file_mode: int | None = None,
 ) -> JsonWriteResult:
     """Compatibility wrapper for atomically writing a JSON document.
 
-    ``rollback_on_fail`` remains only for existing callers. Atomic replacement
-    makes partial-file rollback unnecessary, so the flag no longer changes the
-    write behavior.
+    Atomic replacement ensures a failed write cannot leave a partial document.
     """
     import json
 

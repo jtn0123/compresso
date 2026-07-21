@@ -102,5 +102,6 @@ def test_replace_document_metrics_requires_one_marker_pair(tmp_path):
     (tmp_path / "compresso").mkdir()
     (tmp_path / "tests").mkdir()
 
+    metrics = collect_metrics(tmp_path)
     with pytest.raises(ValueError, match="generated metrics markers"):
-        replace_document_metrics("No generated section", collect_metrics(tmp_path))
+        replace_document_metrics("No generated section", metrics)

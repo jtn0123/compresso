@@ -295,14 +295,14 @@ class TestStartInotifyWatchManager:
         mock_emm = MagicMock()
         mock_emm.is_alive.return_value = True
         mock_emm_cls.return_value = mock_emm
-        service.start_inotify_watch_manager({}, MagicMock())
+        service.start_inotify_watch_manager({})
         mock_emm.start.assert_called_once()
         assert service.threads[0]["name"] == "EventMonitorManager"
 
     @patch("compresso.service.eventmonitor.event_monitor_module", None)
     def test_without_watchdog(self):
         service = self._make_service()
-        result = service.start_inotify_watch_manager({}, MagicMock())
+        result = service.start_inotify_watch_manager({})
         assert result is None
         assert len(service.threads) == 0
 

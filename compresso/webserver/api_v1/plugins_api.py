@@ -36,7 +36,6 @@ import tornado.log
 
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.uiserver import CompressoDataQueues, DataQueues
-from compresso.libs.unplugins import PluginExecutor
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
 
@@ -234,25 +233,3 @@ class ApiPluginsHandler(BaseApiHandler):
         else:
             # Return failure
             self.write(json.dumps({"success": False}))
-
-    def __get_plugin_changelog(self, plugin_id: str) -> list[str]:
-        """
-        Given a plugin ID , return a list of lines read from the plugin's changelog
-
-        :param plugin_id:
-        :return:
-        """
-        # Fetch plugin changelog
-        plugin_executor = PluginExecutor()
-        return plugin_executor.get_plugin_changelog(plugin_id)
-
-    def __get_plugin_long_description(self, plugin_id: str) -> list[str]:
-        """
-        Given a plugin ID , return a list of lines read from the plugin's changelog
-
-        :param plugin_id:
-        :return:
-        """
-        # Fetch plugin changelog
-        plugin_executor = PluginExecutor()
-        return plugin_executor.get_plugin_long_description(plugin_id)

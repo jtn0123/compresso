@@ -207,7 +207,7 @@ class Migrations:
 
         raise AttributeError("Migrator does not support adding columns (expected add_fields or add_columns).")
 
-    def update_schema(self) -> None:  # noqa: C901 — migration logic with many conditional branches
+    def update_schema(self) -> None:
         """
         Bring the database schema up-to-date at application startup.
 
@@ -253,16 +253,7 @@ class Migrations:
         discovered_models = inspect.getmembers(sys.modules["compresso.libs.unmodels"], inspect.isclass)
         all_models = [cast("type[Model]", candidate) for _name, candidate in discovered_models]
 
-        # Start by creating all models
-        self.logger.info("Initialising database tables")
-        try:
-            with database.transaction():
-                for model in all_models:
-                    migrator.create_model(model)
-                migrator()
-        except Exception:
-            self.logger.exception("Initialising tables failed")
-            raise
+        self._create_discovered_models(all_models, database, migrator)
 
         # Migrations will only be used for removing obsolete columns
         self.__run_all_migrations()
@@ -270,40 +261,12 @@ class Migrations:
         # Newly added fields can be auto added with this function... no need for a migration script
         # Ensure all files are also present for each of the model classes
         self.logger.info("Updating database fields")
-        missing_required_columns: list[tuple[str, str, str]] = []
-        for model in all_models:
-            if issubclass(model, BaseModel):
-                # Fetch all peewee fields for the model class
-                # https://stackoverflow.com/questions/22573558/peewee-determining-meta-data-about-model-at-run-time
-                fields = model._meta.fields
-                table_name = str(model._meta.table_name)
-                # loop over the fields and ensure each on exists in the table
-                field_keys = [f for f in fields]
-                for fk in field_keys:
-                    field = fields.get(fk)
-                    if isinstance(field, Field):
-                        column_name = str(getattr(field, "column_name", field.name))
-                        if getattr(field, "primary_key", False):
-                            # SQLite cannot safely add primary key columns via ALTER TABLE.
-                            # These must be handled explicitly in migrations if ever required.
-                            if not any(f for f in database.get_columns(table_name) if f.name == column_name):
-                                missing_required_columns.append((table_name, column_name, "primary key"))
-                            continue
-                        if not field.null and field.default is None:
-                            # Non-null columns without a default cannot be added safely.
-                            if not any(f for f in database.get_columns(table_name) if f.name == column_name):
-                                missing_required_columns.append((table_name, column_name, "non-null without default"))
-                            continue
-                        if not any(f for f in database.get_columns(table_name) if f.name == column_name):
-                            # Field does not exist in DB table
-                            self.logger.info("Adding missing column")
-                            try:
-                                with database.transaction():
-                                    self.__add_column_to_model(model, field.name, field)
-                                    migrator()
-                            except Exception:
-                                self.logger.exception("Update failed")
-                                raise
+        missing_required_columns = [
+            missing
+            for model in all_models
+            if issubclass(model, BaseModel)
+            for missing in self._sync_model_fields(model, database, migrator)
+        ]
 
         if missing_required_columns:
             details = "; ".join(f"{table}.{column} ({reason})" for table, column, reason in missing_required_columns)
@@ -312,49 +275,78 @@ class Migrations:
                 "Create a migration to add these columns safely."
             )
 
-        # Add missing non-unique indexes declared on models
         self.logger.info("Updating database indexes")
         for model in all_models:
-            if not issubclass(model, BaseModel):
-                continue
+            if issubclass(model, BaseModel):
+                self._sync_model_indexes(model, database, migrator)
 
-            table_name = str(model._meta.table_name)
+    def _create_discovered_models(self, models: list[type[Model]], database: Database, migrator: Migrator) -> None:
+        self.logger.info("Initialising database tables")
+        try:
+            with database.transaction():
+                for model in models:
+                    migrator.create_model(model)
+                migrator()
+        except Exception:
+            self.logger.exception("Initialising tables failed")
+            raise
+
+    def _sync_model_fields(self, model: type[Model], database: Database, migrator: Migrator) -> list[tuple[str, str, str]]:
+        missing_required: list[tuple[str, str, str]] = []
+        table_name = str(model._meta.table_name)
+        existing_columns = {column.name for column in database.get_columns(table_name)}
+        # The migrator may replace Peewee field metadata while adding a column,
+        # so iterate over a stable snapshot rather than the live dictionary.
+        for field in list(model._meta.fields.values()):
+            if not isinstance(field, Field):
+                continue
+            column_name = str(getattr(field, "column_name", field.name))
+            if column_name in existing_columns:
+                continue
+            if getattr(field, "primary_key", False):
+                missing_required.append((table_name, column_name, "primary key"))
+            elif not field.null and field.default is None:
+                missing_required.append((table_name, column_name, "non-null without default"))
+            else:
+                with database.transaction():
+                    self.__add_column_to_model(model, field.name, field)
+                    migrator()
+        return missing_required
+
+    @staticmethod
+    def _declared_model_indexes(model: type[Model]) -> list[tuple[tuple[str, ...], tuple[str, ...]]]:
+        declared: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+        for columns, unique in model._meta.indexes:
+            if not unique and all(isinstance(column, str) for column in columns):
+                normalized = tuple(
+                    str(field.column_name) if (field := model._meta.fields.get(column)) else column for column in columns
+                )
+                declared.append((tuple(columns), normalized))
+        declared.extend(
+            ((field_name,), (str(field.column_name),))
+            for field_name, field in model._meta.fields.items()
+            if getattr(field, "index", False) and not getattr(field, "unique", False)
+        )
+        return declared
+
+    def _sync_model_indexes(self, model: type[Model], database: Database, migrator: Migrator) -> None:
+        table_name = str(model._meta.table_name)
+        try:
+            existing = database.get_indexes(table_name)
+        except Exception:
+            self.logger.exception("Failed to fetch indexes for table %s", table_name)
+            return
+        existing_columns = {tuple(getattr(index, "columns", [])) for index in existing}
+        existing_names = {getattr(index, "name", None) for index in existing}
+        for add_columns, compare_columns in self._declared_model_indexes(model):
+            index_name = f"{table_name}_{'_'.join(compare_columns)}"
+            if compare_columns in existing_columns or index_name in existing_names:
+                continue
             try:
-                existing_indexes = database.get_indexes(table_name)
+                with database.transaction():
+                    migrator.add_index(model, *add_columns, unique=False)
+                    migrator()
             except Exception:
-                self.logger.exception("Failed to fetch indexes for table %s", table_name)
-                continue
-
-            existing_index_columns = set(tuple(getattr(idx, "columns", [])) for idx in existing_indexes)
-            existing_index_names = set(getattr(idx, "name", None) for idx in existing_indexes if getattr(idx, "name", None))
-
-            declared_indexes: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
-            for columns, unique in model._meta.indexes:
-                if unique:
-                    continue
-                if all(isinstance(col, str) for col in columns):
-                    normalized_columns: list[str] = []
-                    for col in columns:
-                        field = model._meta.fields.get(col)
-                        normalized_columns.append(str(field.column_name) if field else col)
-                    declared_indexes.append((tuple(columns), tuple(normalized_columns)))
-
-            for field_name, field in model._meta.fields.items():
-                if getattr(field, "index", False) and not getattr(field, "unique", False):
-                    declared_indexes.append(((field_name,), (str(field.column_name),)))
-
-            for add_columns, compare_columns in declared_indexes:
-                if compare_columns in existing_index_columns:
-                    continue
-                index_name = f"{table_name}_{'_'.join(compare_columns)}"
-                if index_name in existing_index_names:
-                    continue
-                try:
-                    self.logger.info("Adding missing index on %s (%s)", table_name, ", ".join(add_columns))
-                    with database.transaction():
-                        migrator.add_index(model, *add_columns, unique=False)
-                        migrator()
-                except Exception:
-                    database.rollback()
-                    self.logger.exception("Failed to add index %s on table %s", add_columns, table_name)
-                    raise
+                database.rollback()
+                self.logger.exception("Failed to add index %s on table %s", add_columns, table_name)
+                raise

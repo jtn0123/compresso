@@ -271,33 +271,39 @@ class TaskHandler(threading.Thread):
             task_obj.save()
             logger.warning("STARTUP_APPROVAL_RESTAGE id=%s", task_obj.id)
         elif transition.action is StartupRecoveryAction.RESTORE_CACHE:
-            if not cache_path or not staged_path:
-                raise RuntimeError("Startup cache restoration requires staged and cache paths")
-            os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
-            try:
-                shutil.copy2(staged_path, cache_path)
-            except (OSError, shutil.Error) as error:
-                logger.error("STARTUP_APPROVED_CACHE_RESTORE_FAILED id=%s error=%s", task_obj.id, error)
-                if cache_path:
-                    try:
-                        os.remove(cache_path)
-                    except FileNotFoundError:
-                        pass
-                    except OSError as cleanup_error:
-                        logger.error(
-                            "STARTUP_APPROVED_PARTIAL_CACHE_CLEANUP_FAILED id=%s error=%s",
-                            task_obj.id,
-                            cleanup_error,
-                        )
-                if staged_path:
-                    protected_paths.add(os.path.realpath(staged_path))
+            if not cls._restore_startup_cache(task_obj.id, cache_path, staged_path, protected_paths, logger):
                 return
-            logger.warning("STARTUP_APPROVED_CACHE_RESTORED id=%s", task_obj.id)
 
         if transition.protect_cache and cache_path:
             protected_paths.add(os.path.realpath(cache_path))
         if transition.protect_staged and staged_path:
             protected_paths.add(os.path.realpath(staged_path))
+
+    @staticmethod
+    def _restore_startup_cache(
+        task_id: int,
+        cache_path: str | None,
+        staged_path: str | None,
+        protected_paths: set[str],
+        logger: logging.Logger,
+    ) -> bool:
+        if not cache_path or not staged_path:
+            raise RuntimeError("Startup cache restoration requires staged and cache paths")
+        os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
+        try:
+            shutil.copy2(staged_path, cache_path)
+        except (OSError, shutil.Error):
+            logger.exception("STARTUP_APPROVED_CACHE_RESTORE_FAILED id=%s", task_id)
+            try:
+                os.remove(cache_path)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logger.exception("STARTUP_APPROVED_PARTIAL_CACHE_CLEANUP_FAILED id=%s", task_id)
+            protected_paths.add(os.path.realpath(staged_path))
+            return False
+        logger.warning("STARTUP_APPROVED_CACHE_RESTORED id=%s", task_id)
+        return True
 
     @classmethod
     def recover_tasks_on_startup(
@@ -320,51 +326,74 @@ class TaskHandler(threading.Thread):
         finalization_task_ids = set(finalization_task_ids or [])
 
         try:
-            last_task_id = 0
-            while True:
-                task_batch = list(Tasks.select().where(Tasks.id > last_task_id).order_by(Tasks.id).limit(500))
-                if not task_batch:
-                    break
-
-                for task_obj in task_batch:
-                    last_task_id = task_obj.id
-                    if cls._reconcile_finalization_override(
-                        task_obj, committed_task_ids, finalization_task_ids, protected_paths, logger
-                    ):
-                        continue
-                    status = task_obj.status
-                    source_path = task_obj.abspath
-                    cache_path = task_obj.cache_path
-                    staged_path = cls._find_staged_output(staging_path, task_obj.id)
-
-                    cache_usable = cls._file_is_usable(cache_path)
-                    transition = cls._startup_recovery_transition(
-                        status=status,
-                        clear_pending=clear_pending,
-                        success=task_obj.success,
-                        cache_usable=cache_usable,
-                        staged_usable=bool(staged_path),
-                        has_cache_path=bool(cache_path),
-                    )
-                    cls._apply_startup_recovery_transition(
-                        transition,
-                        task_obj,
-                        cache_path,
-                        staged_path,
-                        protected_paths,
-                        logger,
-                    )
-                    if transition.action is StartupRecoveryAction.DELETE:
-                        continue
-
-                    # Uploaded remote sources live under the cache root and must
-                    # remain available while the originating installation recovers.
-                    if task_obj.type == "remote" and cls._file_is_usable(source_path):
-                        protected_paths.add(os.path.realpath(source_path))
+            cls._recover_task_batches(
+                staging_path,
+                clear_pending,
+                committed_task_ids,
+                finalization_task_ids,
+                protected_paths,
+                logger,
+            )
         except OperationalError as error:
             logger.debug("Skipping task recovery at startup; tasks table missing - %s", error)
 
         return sorted(protected_paths)
+
+    @classmethod
+    def _recover_task_batches(
+        cls,
+        staging_path: str,
+        clear_pending: bool,
+        committed_task_ids: set[int],
+        finalization_task_ids: set[int],
+        protected_paths: set[str],
+        logger: logging.Logger,
+    ) -> None:
+        last_task_id = 0
+        while task_batch := list(Tasks.select().where(Tasks.id > last_task_id).order_by(Tasks.id).limit(500)):
+            for task_obj in task_batch:
+                last_task_id = task_obj.id
+                cls._recover_task(
+                    task_obj,
+                    staging_path,
+                    clear_pending,
+                    committed_task_ids,
+                    finalization_task_ids,
+                    protected_paths,
+                    logger,
+                )
+
+    @classmethod
+    def _recover_task(
+        cls,
+        task_obj: Tasks,
+        staging_path: str,
+        clear_pending: bool,
+        committed_task_ids: set[int],
+        finalization_task_ids: set[int],
+        protected_paths: set[str],
+        logger: logging.Logger,
+    ) -> None:
+        if cls._reconcile_finalization_override(task_obj, committed_task_ids, finalization_task_ids, protected_paths, logger):
+            return
+        source_path = task_obj.abspath
+        cache_path = task_obj.cache_path
+        staged_path = cls._find_staged_output(staging_path, task_obj.id)
+        transition = cls._startup_recovery_transition(
+            status=task_obj.status,
+            clear_pending=clear_pending,
+            success=task_obj.success,
+            cache_usable=cls._file_is_usable(cache_path),
+            staged_usable=bool(staged_path),
+            has_cache_path=bool(cache_path),
+        )
+        cls._apply_startup_recovery_transition(transition, task_obj, cache_path, staged_path, protected_paths, logger)
+        if (
+            transition.action is not StartupRecoveryAction.DELETE
+            and task_obj.type == "remote"
+            and cls._file_is_usable(source_path)
+        ):
+            protected_paths.add(os.path.realpath(source_path))
 
     def clear_tasks_on_startup(self) -> list[str]:
         """Compatibility wrapper for callers that still invoke the old hook."""

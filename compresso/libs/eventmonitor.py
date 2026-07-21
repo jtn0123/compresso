@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, TypedDict, cast
 import peewee
 
 from compresso import config
+from compresso.libs import narrowing
 from compresso.libs.filetest import FileTest
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
@@ -172,21 +173,7 @@ class EventMonitorManager(threading.Thread):
                 self.manage_event_queue(pathname, library_id)
                 continue
 
-            # Check if monitor is enabled for at least one library
-            enable_inotify = False
-            for lib_info in Library.get_all_libraries():
-                try:
-                    library = Library(lib_info["id"])
-                except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info["id"], e)
-                    continue
-                # Check if the library is configured for remote files only
-                if library.get_enable_remote_only():
-                    # This library is configured to receive remote files only... Never enable the file monitor
-                    continue
-                # Check if file monitor is enabled on any library
-                if library.get_enable_inotify():
-                    enable_inotify = True
+            enable_inotify = self._inotify_enabled()
 
             # If at least library has the monitor enabled, then start it. Otherwise stop the monitor process
             if enable_inotify:
@@ -203,6 +190,18 @@ class EventMonitorManager(threading.Thread):
         self.stop_event_processor()
         self.logger.info("Leaving EventMonitorManager loop...")
 
+    def _inotify_enabled(self) -> bool:
+        enabled = False
+        for lib_info in Library.get_all_libraries():
+            try:
+                library = Library(lib_info["id"])
+            except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
+                self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info["id"], e)
+                continue
+            if not library.get_enable_remote_only() and library.get_enable_inotify():
+                enabled = True
+        return enabled
+
     def system_configuration_is_valid(self) -> bool:
         """
         Check and ensure the system configuration is correct for running
@@ -218,35 +217,37 @@ class EventMonitorManager(threading.Thread):
 
         :return:
         """
-        if not self.event_observer_thread:
-            monitoring_path = False
-            self.event_observer_thread = Observer()
-            for lib_info in Library.get_all_libraries():
-                self.event.wait(0.2)
-                try:
-                    library = Library(lib_info["id"])
-                except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-                    self.logger.exception("Unable to fetch library config for ID %s: %s", lib_info["id"], e)
-                    continue
-                # Check if the library is configured for remote files only
-                if library.get_enable_remote_only():
-                    # This library is configured to receive remote files only... Never enable the file monitor
-                    continue
-                # Check if library scanner is enabled on any library
-                if library.get_enable_inotify():
-                    library_path = library.get_path()
-                    if not os.path.exists(library_path):
-                        continue
-                    self.logger.info("Adding library path to monitor '%s'", library_path)
-                    event_handler = EventHandler(self.files_to_test, library.get_id())
-                    self.event_observer_thread.schedule(event_handler, library_path, recursive=True)
-                    monitoring_path = True
-            # Only start observer if a path was added to be monitored
-            if monitoring_path:
-                self.logger.info("EventMonitorManager spawning EventProcessor thread...")
-                self.event_observer_thread.start()
-        else:
+        if self.event_observer_thread:
             self.logger.info("Given signal to start the EventProcessor thread, but it is already running....")
+            return
+        self.event_observer_thread = Observer()
+        monitoring_path = any(self._schedule_library(lib_info) for lib_info in Library.get_all_libraries())
+        if monitoring_path:
+            self.logger.info("EventMonitorManager spawning EventProcessor thread...")
+            self.event_observer_thread.start()
+
+    def _schedule_library(self, lib_info: Mapping[str, object]) -> bool:
+        self.event.wait(0.2)
+        library_id = narrowing.coerce_int_or_none(lib_info.get("id"))
+        if library_id is None:
+            self.logger.error("Unable to monitor library without a valid ID: %s", lib_info.get("id"))
+            return False
+        try:
+            library = Library(library_id)
+        except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
+            self.logger.exception("Unable to fetch library config for ID %s: %s", library_id, e)
+            return False
+        if library.get_enable_remote_only() or not library.get_enable_inotify():
+            return False
+        library_path = library.get_path()
+        if not os.path.exists(library_path):
+            return False
+        self.logger.info("Adding library path to monitor '%s'", library_path)
+        event_handler = EventHandler(self.files_to_test, library.get_id())
+        if self.event_observer_thread is None:
+            return False
+        self.event_observer_thread.schedule(event_handler, library_path, recursive=True)
+        return True
 
     def stop_event_processor(self) -> None:
         """

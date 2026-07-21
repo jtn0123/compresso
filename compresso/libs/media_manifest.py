@@ -183,60 +183,120 @@ def compare_media_summaries(before: object, after: object) -> list[str]:
         return ["manifest stream summary is invalid"]
     if not isinstance(after_streams, dict):
         return ["output stream summary is invalid"]
-    for stream_type in STREAM_TYPES:
-        expected = narrowing.coerce_int_or_none(before_streams.get(stream_type, 0))
-        actual = narrowing.coerce_int_or_none(after_streams.get(stream_type, 0))
-        if expected is None or actual is None:
-            issues.append(f"{stream_type} stream count is invalid")
-            continue
-        if actual < expected:
-            issues.append(f"{stream_type} streams decreased from {expected} to {actual}")
+    issues.extend(_compare_stream_counts(before_streams, after_streams))
     expected_chapters = narrowing.coerce_int_or_none(before.get("chapters", 0))
     actual_chapters = narrowing.coerce_int_or_none(after.get("chapters", 0))
     if expected_chapters is None or actual_chapters is None:
         issues.append("chapter count is invalid")
     elif actual_chapters < expected_chapters:
         issues.append(f"chapters decreased from {expected_chapters} to {actual_chapters}")
-    before_video = before.get("video", {})
-    after_video = after.get("video", {})
-    if not isinstance(before_video, dict) or not isinstance(after_video, dict):
-        issues.append("video metadata summary is invalid")
-        before_video = after_video = {}
-    for field in HDR_FIELDS:
-        expected_metadata = before_video.get(field)
-        if expected_metadata and after_video.get(field) != expected_metadata:
-            issues.append(f"{field} changed from {expected_metadata} to {after_video.get(field)}")
-    before_duration = narrowing.coerce_float_or_none(before.get("duration_seconds", 0) or 0)
-    after_duration = narrowing.coerce_float_or_none(after.get("duration_seconds", 0) or 0)
-    if before_duration is None or after_duration is None:
-        issues.append("duration is invalid")
-    elif not math.isfinite(before_duration) or not math.isfinite(after_duration):
-        issues.append("duration is not finite")
-    else:
-        tolerance = max(1.0, before_duration * 0.01)
-        if before_duration and abs(before_duration - after_duration) > tolerance:
-            issues.append(f"duration changed from {before_duration:.3f}s to {after_duration:.3f}s")
+    issues.extend(_compare_video_metadata(before.get("video", {}), after.get("video", {})))
+    issues.extend(_compare_durations(before.get("duration_seconds", 0), after.get("duration_seconds", 0)))
     return issues
+
+
+def _compare_stream_counts(before: dict[object, object], after: dict[object, object]) -> list[str]:
+    issues: list[str] = []
+    for stream_type in STREAM_TYPES:
+        expected = narrowing.coerce_int_or_none(before.get(stream_type, 0))
+        actual = narrowing.coerce_int_or_none(after.get(stream_type, 0))
+        if expected is None or actual is None:
+            issues.append(f"{stream_type} stream count is invalid")
+        elif actual < expected:
+            issues.append(f"{stream_type} streams decreased from {expected} to {actual}")
+    return issues
+
+
+def _compare_video_metadata(before: object, after: object) -> list[str]:
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return ["video metadata summary is invalid"]
+    return [
+        f"{field} changed from {before.get(field)} to {after.get(field)}"
+        for field in HDR_FIELDS
+        if before.get(field) and after.get(field) != before.get(field)
+    ]
+
+
+def _compare_durations(before: object, after: object) -> list[str]:
+    before_duration = narrowing.coerce_float_or_none(before or 0)
+    after_duration = narrowing.coerce_float_or_none(after or 0)
+    if before_duration is None or after_duration is None:
+        return ["duration is invalid"]
+    if not math.isfinite(before_duration) or not math.isfinite(after_duration):
+        return ["duration is not finite"]
+    tolerance = max(1.0, before_duration * 0.01)
+    if before_duration and abs(before_duration - after_duration) > tolerance:
+        return [f"duration changed from {before_duration:.3f}s to {after_duration:.3f}s"]
+    return []
 
 
 def _media_files(root: str | os.PathLike[str]) -> list[str]:
     paths: list[str] = []
     walk_errors: list[OSError] = []
     for directory, subdirectories, filenames in os.walk(root, onerror=walk_errors.append):
-        for subdirectory in subdirectories:
-            path = os.path.join(directory, subdirectory)
-            if os.path.islink(path):
-                raise ValueError(f"media manifest refuses symbolic-link directory: {path}")
+        _reject_symlink_directories(directory, subdirectories)
         subdirectories.sort()
-        for filename in sorted(filenames):
-            if os.path.splitext(filename)[1].lower() in MEDIA_EXTENSIONS:
-                path = os.path.join(directory, filename)
-                if os.path.islink(path):
-                    raise ValueError(f"media manifest refuses symbolic-link input: {path}")
-                paths.append(path)
+        paths.extend(_supported_media_files(directory, filenames))
     if walk_errors:
         raise OSError(f"media manifest could not read {len(walk_errors)} director{'y' if len(walk_errors) == 1 else 'ies'}")
     return paths
+
+
+def _reject_symlink_directories(directory: str, subdirectories: list[str]) -> None:
+    for subdirectory in subdirectories:
+        path = os.path.join(directory, subdirectory)
+        if os.path.islink(path):
+            raise ValueError(f"media manifest refuses symbolic-link directory: {path}")
+
+
+def _supported_media_files(directory: str, filenames: list[str]) -> list[str]:
+    paths = []
+    for filename in sorted(filenames):
+        if os.path.splitext(filename)[1].lower() not in MEDIA_EXTENSIONS:
+            continue
+        path = os.path.join(directory, filename)
+        if os.path.islink(path):
+            raise ValueError(f"media manifest refuses symbolic-link input: {path}")
+        paths.append(path)
+    return paths
+
+
+def _manifest_structure_issues(manifest: JsonObject) -> tuple[list[ManifestRow], list[object]]:
+    results: list[ManifestRow] = []
+    if manifest.get("version") != 1:
+        results.append(_manifest_issue("manifest version is unsupported"))
+    manifest_files = manifest.get("files")
+    if not isinstance(manifest_files, list) or not manifest_files:
+        results.append(_manifest_issue("manifest contains no files"))
+        return results, []
+    return results, manifest_files
+
+
+def _manifest_issue(message: str, relative_path: str | None = None, after_size: int = 0) -> ManifestRow:
+    return {
+        "relative_path": relative_path,
+        "passed": False,
+        "issues": [message],
+        "before_size_bytes": 0,
+        "after_size_bytes": after_size,
+        "before_checksum": None,
+        "after_checksum": None,
+    }
+
+
+def _unexpected_manifest_results(root: str, expected_paths: set[str]) -> list[ManifestRow]:
+    try:
+        current_paths = {os.path.relpath(path, root) for path in _media_files(root)}
+    except (OSError, ValueError) as error:
+        return [_manifest_issue(f"output inventory failed: {error}")]
+    return [
+        _manifest_issue(
+            "unexpected output file is not present in the manifest",
+            unexpected,
+            os.path.getsize(os.path.join(root, unexpected)),
+        )
+        for unexpected in sorted(current_paths - expected_paths)
+    ]
 
 
 def create_manifest(
@@ -290,35 +350,9 @@ def verify_manifest(
     root = os.path.realpath(root_value)
     if not os.path.isdir(root):
         raise ValueError("verification root must be an existing directory")
-    results: list[ManifestRow] = []
+    results, manifest_files = _manifest_structure_issues(manifest)
     total_before = 0
     total_after = 0
-    manifest_files = manifest.get("files")
-    if manifest.get("version") != 1:
-        results.append(
-            {
-                "relative_path": None,
-                "passed": False,
-                "issues": ["manifest version is unsupported"],
-                "before_size_bytes": 0,
-                "after_size_bytes": 0,
-                "before_checksum": None,
-                "after_checksum": None,
-            }
-        )
-    if not isinstance(manifest_files, list) or not manifest_files:
-        manifest_files = []
-        results.append(
-            {
-                "relative_path": None,
-                "passed": False,
-                "issues": ["manifest contains no files"],
-                "before_size_bytes": 0,
-                "after_size_bytes": 0,
-                "before_checksum": None,
-                "after_checksum": None,
-            }
-        )
     seen_relative_paths: set[str] = set()
     expected_relative_paths: set[str] = set()
     for expected in manifest_files:
@@ -334,33 +368,7 @@ def verify_manifest(
             if isinstance(result_path, str):
                 expected_relative_paths.add(os.path.normpath(result_path))
         results.append(result)
-    try:
-        current_relative_paths = {os.path.relpath(path, root) for path in _media_files(root)}
-    except (OSError, ValueError) as error:
-        results.append(
-            {
-                "relative_path": None,
-                "passed": False,
-                "issues": [f"output inventory failed: {error}"],
-                "before_size_bytes": 0,
-                "after_size_bytes": 0,
-                "before_checksum": None,
-                "after_checksum": None,
-            }
-        )
-    else:
-        for unexpected in sorted(current_relative_paths - expected_relative_paths):
-            results.append(
-                {
-                    "relative_path": unexpected,
-                    "passed": False,
-                    "issues": ["unexpected output file is not present in the manifest"],
-                    "before_size_bytes": 0,
-                    "after_size_bytes": os.path.getsize(os.path.join(root, unexpected)),
-                    "before_checksum": None,
-                    "after_checksum": None,
-                }
-            )
+    results.extend(_unexpected_manifest_results(root, expected_relative_paths))
     failed = sum(result.get("passed") is not True for result in results)
     report: JsonObject = {
         "version": 1,

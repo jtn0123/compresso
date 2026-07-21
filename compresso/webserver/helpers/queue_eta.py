@@ -7,7 +7,7 @@ Helper functions for estimating encoding queue ETA.
 
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
 from compresso.libs.logs import CompressoLogging
@@ -17,6 +17,33 @@ if TYPE_CHECKING:
     from compresso.libs.unmodels import CompletedTasks
 
 logger = CompressoLogging.get_logger(name=__name__)
+
+
+def _worker_eta_summary(workers_status: Sequence[Mapping[str, object]]) -> tuple[int, int, int, float]:
+    active_etas: list[float] = []
+    busy = 0
+    paused = 0
+    for worker in workers_status:
+        if worker.get("paused"):
+            paused += 1
+            continue
+        if worker.get("idle"):
+            continue
+        busy += 1
+        subprocess_value = worker.get("subprocess")
+        subprocess_stats = subprocess_value if isinstance(subprocess_value, Mapping) else {}
+        eta = subprocess_stats.get("eta_seconds")
+        if isinstance(eta, (int, float)):
+            active_etas.append(float(eta))
+    return len(workers_status), busy, paused, max(active_etas) if active_etas else 0
+
+
+def _eta_confidence(history_count: int) -> str:
+    if history_count >= 10:
+        return "high"
+    if history_count >= 3:
+        return "medium"
+    return "low"
 
 
 def estimate_queue_eta(
@@ -43,26 +70,7 @@ def estimate_queue_eta(
         logger.exception("Failed to get worker status for queue ETA")
         workers_status = []
 
-    # Count total workers and collect ETAs from active (non-idle) workers
-    total_workers = len(workers_status)
-    active_etas: list[float] = []
-    num_busy_workers = 0
-    num_paused_workers = 0
-
-    for worker in workers_status:
-        if worker.get("paused"):
-            num_paused_workers += 1
-            continue
-        if not worker.get("idle"):
-            num_busy_workers += 1
-            subprocess_value = worker.get("subprocess")
-            subprocess_stats = subprocess_value if isinstance(subprocess_value, Mapping) else {}
-            eta = subprocess_stats.get("eta_seconds")
-            if isinstance(eta, (int, float)):
-                active_etas.append(float(eta))
-
-    # The active workers run in parallel, so the bottleneck is the max ETA
-    active_workers_eta_seconds = max(active_etas) if active_etas else 0
+    total_workers, num_busy_workers, num_paused_workers, active_workers_eta_seconds = _worker_eta_summary(workers_status)
 
     # Query recent completed tasks for average processing time
     estimated_per_task_seconds, history_count = _get_avg_task_duration(completed_tasks_model)
@@ -86,13 +94,7 @@ def estimate_queue_eta(
 
     total_queue_eta_seconds = active_workers_eta_seconds + pending_eta
 
-    # Confidence level based on historical data
-    if history_count >= 10:
-        eta_confidence = "high"
-    elif history_count >= 3:
-        eta_confidence = "medium"
-    else:
-        eta_confidence = "low"
+    eta_confidence = _eta_confidence(history_count)
 
     return {
         "active_workers_eta_seconds": active_workers_eta_seconds,

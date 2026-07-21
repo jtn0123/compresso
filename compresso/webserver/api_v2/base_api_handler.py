@@ -538,29 +538,30 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
 
     def _apply_deferred_finish(self) -> None:
         """Complete a finish() that was deferred while the body ran off-loop."""
-        if getattr(self, "_finish_deferred", False):
-            self._finish_deferred = False
-            chunk = self._deferred_finish_chunk
-            self._deferred_finish_chunk = None
-            if not self._finished:
-                concrete_chunk = dict(chunk) if isinstance(chunk, Mapping) else chunk
-                finish_future = super().finish(concrete_chunk)
-                deferred_future = self._deferred_finish_future
+        if not getattr(self, "_finish_deferred", False):
+            return
+        self._finish_deferred = False
+        chunk = self._deferred_finish_chunk
+        self._deferred_finish_chunk = None
+        if self._finished:
+            return
+        concrete_chunk = dict(chunk) if isinstance(chunk, Mapping) else chunk
+        finish_future = super().finish(concrete_chunk)
+        deferred_future = self._deferred_finish_future
+        if isinstance(finish_future, asyncio.Future):
+            finish_future.add_done_callback(lambda completed: self._complete_deferred(completed, deferred_future))
+        else:
+            # Preserve compatibility with simple RequestHandler test doubles.
+            deferred_future.set_result(None)
 
-                def complete_deferred(completed: asyncio.Future[None]) -> None:
-                    if completed.cancelled():
-                        deferred_future.cancel()
-                    elif (exc := completed.exception()) is not None:
-                        deferred_future.set_exception(exc)
-                    else:
-                        deferred_future.set_result(None)
-
-                if isinstance(finish_future, asyncio.Future):
-                    finish_future.add_done_callback(complete_deferred)
-                else:
-                    # Preserve compatibility with simple RequestHandler test
-                    # doubles that complete synchronously and return None.
-                    deferred_future.set_result(None)
+    @staticmethod
+    def _complete_deferred(completed: asyncio.Future[None], deferred: asyncio.Future[None]) -> None:
+        if completed.cancelled():
+            deferred.cancel()
+        elif (exc := completed.exception()) is not None:
+            deferred.set_exception(exc)
+        else:
+            deferred.set_result(None)
 
     def finish(self, chunk: ResponseChunk = None) -> asyncio.Future[None]:
         if getattr(self, "_defer_finish", False):
@@ -608,47 +609,9 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         # request_api_endpoint = re.sub('^/(compresso/)*api/v\d', '', self.request.uri)
         matched_route_with_unsupported_method = False
         for route in self.routes:
-            # Get supported methods
-            supported_methods = route["supported_methods"]
-
-            # Fetch the path match from this route's path pattern
-            path_pattern = request_api_base + route["path_pattern"]
-            path_match = PathMatches(path_pattern)
-            if path_match.regex.match(self.request.path):
-                # Check if this endpoint supports the request HTTP method
-                if self.request.method not in supported_methods:
-                    # The request's method is not supported by this route.
-                    # Mark as having found a matching route, but with an un-supported HTTP method
-                    matched_route_with_unsupported_method = True
-                    continue
-
-                # Check if the path matches, and get any params from a match
-                params = path_match.match(self.request)
-
-                # If we have a match and were returned some params, load that method
-                if params:
-                    app_log.debug(
-                        "Routing API to {}.{}(*args={}, **kwargs={})".format(
-                            self.__class__.__name__, route.get("call_method"), params["path_args"], params["path_kwargs"]
-                        ),
-                        exc_info=True,
-                    )
-
-                    raw_path_args: object = params["path_args"]
-                    raw_path_kwargs: object = params["path_kwargs"]
-                    path_args = tuple(raw_path_args) if isinstance(raw_path_args, (list, tuple)) else ()
-                    path_kwargs = (
-                        {str(key): value for key, value in raw_path_kwargs.items() if isinstance(key, str)}
-                        if isinstance(raw_path_kwargs, Mapping)
-                        else {}
-                    )
-                    await self._invoke_route(route, *path_args, **path_kwargs)
-                    return
-
-                # This route matches the current request URI and does not have any params.
-                # Set this route and call the configured method.
-                app_log.debug(f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True)
-                await self._invoke_route(route)
+            matched, handled = await self._try_route(route, request_api_base)
+            matched_route_with_unsupported_method |= matched and not handled
+            if handled:
                 return
 
         if matched_route_with_unsupported_method:
@@ -657,6 +620,34 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         else:
             app_log.warning(f"No match found for API route: {self.request.uri}", exc_info=True)
             self.handle_endpoint_not_found()
+
+    async def _try_route(self, route: ApiRoute, request_api_base: str) -> tuple[bool, bool]:
+        path_match = PathMatches(request_api_base + route["path_pattern"])
+        if not path_match.regex.match(self.request.path):
+            return False, False
+        if self.request.method not in route["supported_methods"]:
+            return True, False
+        params = path_match.match(self.request)
+        if not params:
+            app_log.debug(f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True)
+            await self._invoke_route(route)
+            return True, True
+        app_log.debug(
+            "Routing API to {}.{}(*args={}, **kwargs={})".format(
+                self.__class__.__name__, route.get("call_method"), params["path_args"], params["path_kwargs"]
+            ),
+            exc_info=True,
+        )
+        raw_path_args: object = params["path_args"]
+        raw_path_kwargs: object = params["path_kwargs"]
+        path_args = tuple(raw_path_args) if isinstance(raw_path_args, (list, tuple)) else ()
+        path_kwargs = (
+            {str(key): value for key, value in raw_path_kwargs.items() if isinstance(key, str)}
+            if isinstance(raw_path_kwargs, Mapping)
+            else {}
+        )
+        await self._invoke_route(route, *path_args, **path_kwargs)
+        return True, True
 
     def action_route(self) -> Awaitable[None] | None:
         """Return v2 routing work; v1 overrides this with its legacy sync router."""

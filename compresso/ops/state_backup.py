@@ -425,10 +425,7 @@ def _validate_journal_payload(logical_name: str, payload: object) -> list[str]:
     operation_id = payload.get("operation_id")
     if not isinstance(operation_id, str) or f"{operation_id}.json" != PurePosixPath(logical_name).name:
         raise BackupError(f"file-operation journal identity is invalid: {logical_name}")
-    if payload.get("state") not in JOURNAL_STATES:
-        raise BackupError(f"file-operation journal state is invalid: {logical_name}")
-    if payload.get("finalization_phase") not in JOURNAL_FINALIZATION_PHASES:
-        raise BackupError(f"file-operation journal finalization phase is invalid: {logical_name}")
+    _validate_journal_state(logical_name, payload)
     task_id = payload.get("task_id")
     if task_id is not None and (not isinstance(task_id, int) or isinstance(task_id, bool)):
         raise BackupError(f"file-operation journal task ID is invalid: {logical_name}")
@@ -436,25 +433,48 @@ def _validate_journal_payload(logical_name: str, payload: object) -> list[str]:
     created_paths = payload.get("created_paths")
     if not isinstance(backups, list) or not isinstance(created_paths, list):
         raise BackupError(f"file-operation journal paths are invalid: {logical_name}")
-    paths = []
-    for pair in backups:
-        if not isinstance(pair, list) or len(pair) != 2 or not all(isinstance(item, str) and item for item in pair):
-            raise BackupError(f"file-operation journal backup is invalid: {logical_name}")
-        paths.extend(pair)
+    paths = _validated_backup_paths(logical_name, backups)
     if not all(isinstance(item, str) and item for item in created_paths):
         raise BackupError(f"file-operation journal created paths are invalid: {logical_name}")
     paths.extend(created_paths)
     return paths
 
 
+def _validate_journal_state(logical_name: str, payload: dict[object, object]) -> None:
+    if payload.get("state") not in JOURNAL_STATES:
+        raise BackupError(f"file-operation journal state is invalid: {logical_name}")
+    if payload.get("finalization_phase") not in JOURNAL_FINALIZATION_PHASES:
+        raise BackupError(f"file-operation journal finalization phase is invalid: {logical_name}")
+
+
+def _validated_backup_paths(logical_name: str, backups: list[object]) -> list[str]:
+    paths: list[str] = []
+    for pair in backups:
+        if not isinstance(pair, list) or len(pair) != 2 or not all(isinstance(item, str) and item for item in pair):
+            raise BackupError(f"file-operation journal backup is invalid: {logical_name}")
+        paths.extend(pair)
+    return paths
+
+
 def _validate_recovery_semantics(rehearsal_root: Path, settings: Config) -> None:
     _read_json_object(rehearsal_root / SETTINGS_ARCHIVE_PATH, "archived settings.json")
-    allowed_roots = []
+    allowed_roots = _configured_recovery_roots(settings)
+    allowed_roots.extend(_archived_library_roots(rehearsal_root))
+    for journal in sorted((rehearsal_root / "config" / "recovery" / "file_operations").glob("*.json")):
+        _validate_recovery_journal(rehearsal_root, journal, allowed_roots)
+
+
+def _configured_recovery_roots(settings: Config) -> list[Path]:
+    allowed_roots: list[Path] = []
     for getter_name in ("get_config_path", "get_cache_path", "get_library_path", "get_userdata_path"):
         getter = getattr(settings, getter_name, None)
         value = getter() if callable(getter) else None
         if isinstance(value, (str, os.PathLike)) and os.fspath(value):
             allowed_roots.append(Path(value).expanduser().resolve())
+    return allowed_roots
+
+
+def _archived_library_roots(rehearsal_root: Path) -> list[Path]:
     database = rehearsal_root / DATABASE_ARCHIVE_PATH
     uri = f"file:{quote(database.as_posix(), safe='/')}?mode=ro"
     try:
@@ -462,18 +482,23 @@ def _validate_recovery_semantics(rehearsal_root: Path, settings: Config) -> None
             library_paths = connection.execute("SELECT path FROM libraries WHERE path IS NOT NULL").fetchall()
     except sqlite3.Error as error:
         raise BackupError("Archived library paths could not be read") from error
-    for (value,) in library_paths:
-        if isinstance(value, str) and value and Path(value).expanduser().is_absolute():
-            allowed_roots.append(Path(value).expanduser().resolve())
-    for journal in sorted((rehearsal_root / "config" / "recovery" / "file_operations").glob("*.json")):
-        payload = json.loads(journal.read_text(encoding="utf-8"))
-        logical_name = journal.relative_to(rehearsal_root).as_posix()
-        for raw_path in _validate_journal_payload(logical_name, payload):
-            if not Path(raw_path).expanduser().is_absolute():
-                raise BackupError(f"file-operation journal path is not absolute: {logical_name}")
-            candidate = Path(raw_path).expanduser().resolve()
-            if not any(candidate == root or candidate.is_relative_to(root) for root in allowed_roots):
-                raise BackupError(f"file-operation journal path is outside configured roots: {logical_name}")
+    return [
+        Path(value).expanduser().resolve()
+        for (value,) in library_paths
+        if isinstance(value, str) and value and Path(value).expanduser().is_absolute()
+    ]
+
+
+def _validate_recovery_journal(rehearsal_root: Path, journal: Path, allowed_roots: list[Path]) -> None:
+    payload = json.loads(journal.read_text(encoding="utf-8"))
+    logical_name = journal.relative_to(rehearsal_root).as_posix()
+    for raw_path in _validate_journal_payload(logical_name, payload):
+        candidate = Path(raw_path).expanduser()
+        if not candidate.is_absolute():
+            raise BackupError(f"file-operation journal path is not absolute: {logical_name}")
+        candidate = candidate.resolve()
+        if not any(candidate == root or candidate.is_relative_to(root) for root in allowed_roots):
+            raise BackupError(f"file-operation journal path is outside configured roots: {logical_name}")
 
 
 def _extract_and_verify_database(

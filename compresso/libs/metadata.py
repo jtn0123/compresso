@@ -46,6 +46,8 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.peewee_types import execute_write
 from compresso.libs.unmodels import FileMetadata, FileMetadataPaths, TaskMetadata, Tasks
 
+ObjectDict = dict[str, object]
+
 
 class ScopedMetadata(TypedDict):
     source: dict[str, object]
@@ -149,7 +151,7 @@ class CompressoFileMetadata:
             return {}
         if not all(isinstance(key, str) for key in data):
             return {}
-        return cast("dict[str, object]", data)
+        return cast(ObjectDict, data)
 
     @classmethod
     def _dump_json_dict(cls, data: object) -> str:
@@ -234,13 +236,13 @@ class CompressoFileMetadata:
             if not isinstance(meta, dict):
                 meta = {}
             return ScopedMetadata(
-                source=cast("dict[str, object]", source),
-                destination=cast("dict[str, object]", destination),
-                __meta__=cast("dict[str, object]", meta),
+                source=cast(ObjectDict, source),
+                destination=cast(ObjectDict, destination),
+                __meta__=cast(ObjectDict, meta),
             )
 
         # Legacy format: plugin_id -> dict. Treat as source scope.
-        return ScopedMetadata(source=cast("dict[str, object]", staged), destination={}, __meta__={})
+        return ScopedMetadata(source=cast(ObjectDict, staged), destination={}, __meta__={})
 
     @classmethod
     def _load_task_source_path(cls, task_id: int) -> str | None:
@@ -321,7 +323,7 @@ class CompressoFileMetadata:
     def _plugin_metadata(value: object) -> dict[str, object]:
         if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
             return {}
-        return cast("dict[str, object]", value)
+        return cast(ObjectDict, value)
 
     @classmethod
     def get(cls, plugin_id_override: str | None = None) -> dict[str, object]:
@@ -376,52 +378,58 @@ class CompressoFileMetadata:
             raise ValueError("Metadata set() requires a dict")
         if not all(isinstance(key, str) for key in data):
             raise ValueError("Metadata keys must be strings")
-        updates = cast("dict[str, object]", data)
+        updates = cast(ObjectDict, data)
 
         with cls._lock:
-            entry = cls._ensure_task_cache_entry(task_id)
-            staged = cls._load_task_metadata(task_id)
-            staged_scoped = cls._normalize_scoped_staged(staged)
-            scope_blob = staged_scoped["source"] if use_source_scope else staged_scoped["destination"]
-            plugin_data = scope_blob.get(plugin_id, {})
-            if not isinstance(plugin_data, dict):
-                plugin_data = {}
-            for key, value in updates.items():
-                if value is None:
-                    plugin_data.pop(key, None)
-                else:
-                    plugin_data[key] = deepcopy(value)
-            cls._enforce_plugin_size_limit(plugin_data)
-            scope_blob[plugin_id] = plugin_data
+            cls._set_locked(task_id, plugin_id, updates, use_source_scope)
 
-            if use_source_scope:
-                meta = staged_scoped.get("__meta__", {})
-                if not meta.get("source_fingerprint"):
-                    source_path = cls._load_task_source_path(task_id)
-                    meta["source_path_at_set"] = source_path
-                    if source_path and os.path.exists(source_path):
-                        fingerprint, algo = common.get_file_fingerprint(source_path)
-                        meta["source_fingerprint"] = fingerprint
-                        meta["source_fingerprint_algo"] = algo
-                    else:
-                        cls._logger.info("Unable to fingerprint source path for metadata set: %s", source_path)
-                staged_scoped["__meta__"] = meta
+    @classmethod
+    def _set_locked(cls, task_id: int, plugin_id: str, updates: ObjectDict, use_source_scope: bool) -> None:
+        entry = cls._ensure_task_cache_entry(task_id)
+        staged_scoped = cls._normalize_scoped_staged(cls._load_task_metadata(task_id))
+        scope_blob = staged_scoped["source"] if use_source_scope else staged_scoped["destination"]
+        plugin_data = scope_blob.get(plugin_id, {})
+        if not isinstance(plugin_data, dict):
+            plugin_data = {}
+        for key, value in updates.items():
+            if value is None:
+                plugin_data.pop(key, None)
+            else:
+                plugin_data[key] = deepcopy(value)
+        cls._enforce_plugin_size_limit(plugin_data)
+        scope_blob[plugin_id] = plugin_data
+        if use_source_scope:
+            cls._record_source_fingerprint(task_id, staged_scoped)
+        entry["staged"] = staged_scoped
+        entry["staged_loaded"] = True
+        cls._persist_staged_metadata(task_id, staged_scoped)
 
-            entry["staged"] = staged_scoped
-            entry["staged_loaded"] = True
+    @classmethod
+    def _record_source_fingerprint(cls, task_id: int, staged_scoped: ScopedMetadata) -> None:
+        meta = staged_scoped.get("__meta__", {})
+        if meta.get("source_fingerprint"):
+            return
+        source_path = cls._load_task_source_path(task_id)
+        meta["source_path_at_set"] = source_path
+        if source_path and os.path.exists(source_path):
+            fingerprint, algo = common.get_file_fingerprint(source_path)
+            meta["source_fingerprint"] = fingerprint
+            meta["source_fingerprint_algo"] = algo
+        else:
+            cls._logger.info("Unable to fingerprint source path for metadata set: %s", source_path)
+        staged_scoped["__meta__"] = meta
 
-            get_or_create = cast("Callable[..., tuple[TaskMetadata, bool]]", TaskMetadata.get_or_create)
-            row, created = get_or_create(
-                task=task_id,
-                defaults={
-                    "json_blob": cls._dump_json_dict(staged_scoped),
-                    "updated_at": datetime.now(),
-                },
-            )
-            if not created:
-                row.json_blob = cls._dump_json_dict(staged_scoped)
-                row.updated_at = datetime.now()
-                row.save()
+    @classmethod
+    def _persist_staged_metadata(cls, task_id: int, staged_scoped: ScopedMetadata) -> None:
+        get_or_create = cast("Callable[..., tuple[TaskMetadata, bool]]", TaskMetadata.get_or_create)
+        row, created = get_or_create(
+            task=task_id,
+            defaults={"json_blob": cls._dump_json_dict(staged_scoped), "updated_at": datetime.now()},
+        )
+        if not created:
+            row.json_blob = cls._dump_json_dict(staged_scoped)
+            row.updated_at = datetime.now()
+            row.save()
 
     @classmethod
     def _upsert_path(cls, file_metadata_id: int, path: str | None, path_type: str) -> None:
@@ -448,7 +456,7 @@ class CompressoFileMetadata:
             )
 
     @classmethod
-    def commit_task(  # noqa: C901 — commit sequence intentionally keeps cache and database state together
+    def commit_task(
         cls,
         task_id: int,
         task_success: bool,
@@ -476,85 +484,107 @@ class CompressoFileMetadata:
         destination_paths = destination_paths or []
         destination_paths = [p for p in destination_paths if p]
 
-        fingerprint_groups: dict[str, FingerprintGroup] = {}
-        if task_success and destination_paths and destination_staged:
-            for path in destination_paths:
-                if not os.path.exists(path):
-                    continue
-                fingerprint, algo = common.get_file_fingerprint(path)
-                group = fingerprint_groups.setdefault(fingerprint, {"algo": algo, "paths": [], "scope": "destination"})
-                if path not in group["paths"]:
-                    group["paths"].append(path)
-        if source_staged:
-            source_path_value = meta.get("source_path_at_set")
-            source_path_at_set = source_path_value if isinstance(source_path_value, str) else source_path
-            if not source_path_at_set or not os.path.exists(source_path_at_set):
-                cls._logger.info(
-                    "Source file missing at metadata commit; dropping source-scoped metadata for task %s",
-                    task_id,
-                )
-            else:
-                source_fingerprint_value = meta.get("source_fingerprint")
-                source_algo_value = meta.get("source_fingerprint_algo")
-                source_fingerprint = source_fingerprint_value if isinstance(source_fingerprint_value, str) else None
-                source_algo = source_algo_value if isinstance(source_algo_value, str) else None
-                if not source_fingerprint:
-                    source_fingerprint, source_algo = common.get_file_fingerprint(source_path_at_set)
-                if source_algo is None:
-                    # Match common.get_file_fingerprint's default family
-                    source_algo = "sampled_xxhash_v1"
-                group = fingerprint_groups.setdefault(
-                    source_fingerprint,
-                    {"algo": source_algo, "paths": [], "scope": "source"},
-                )
-                if source_path_at_set not in group["paths"]:
-                    group["paths"].append(source_path_at_set)
+        fingerprint_groups = cls._metadata_fingerprint_groups(
+            task_id, task_success, destination_paths, destination_staged, source_staged, source_path, meta
+        )
 
         # NOTE: SqliteQueueDatabase does not support atomic() transactions.
         # Write serialization is provided by the queue database's single writer thread.
         # The cls._lock protects in-memory cache consistency across app threads.
         with cls._lock:
             for fingerprint, data in fingerprint_groups.items():
-                algo = data["algo"]
-                paths = data["paths"]
                 staged_payload = source_staged if data.get("scope") == "source" else destination_staged
-
-                if not staged_payload:
-                    continue
-                try:
-                    row = FileMetadata.get(FileMetadata.fingerprint == fingerprint)
-                    existing = cls._load_json_dict(row.metadata_json)
-                    existing.update(deepcopy(staged_payload))
-                    row.metadata_json = cls._dump_json_dict(existing)
-                    row.fingerprint_algo = algo
-                    row.updated_at = datetime.now()
-                    row.last_task_id = task_id
-                    row.save()
-                except DoesNotExist:
-                    row = FileMetadata.create(
-                        fingerprint=fingerprint,
-                        fingerprint_algo=algo,
-                        metadata_json=cls._dump_json_dict(staged_payload),
-                        created_at=datetime.now(),
-                        updated_at=datetime.now(),
-                        last_task_id=task_id,
-                    )
-
-                if data.get("scope") == "source":
-                    source_path_value = meta.get("source_path_at_set")
-                    source_path_at_set = source_path_value if isinstance(source_path_value, str) else source_path
-                    if source_path_at_set:
-                        cls._upsert_path(row.id, source_path_at_set, "source")
-                else:
-                    for path in paths:
-                        cls._upsert_path(row.id, path, "destination")
-                    if paths:
-                        cls._upsert_path(row.id, paths[-1], "last_seen")
+                cls._persist_metadata_group(fingerprint, data, staged_payload, task_id, source_path, meta)
 
             execute_write(TaskMetadata.delete().where(TaskMetadata.task == task_id))
             cls._task_cache.pop(task_id, None)
             cls._task_cache_timestamps.pop(task_id, None)
         return len(fingerprint_groups)
+
+    @classmethod
+    def _persist_metadata_group(
+        cls,
+        fingerprint: str,
+        data: FingerprintGroup,
+        staged_payload: ObjectDict,
+        task_id: int,
+        source_path: str,
+        meta: ObjectDict,
+    ) -> None:
+        if not staged_payload:
+            return
+        try:
+            row = FileMetadata.get(FileMetadata.fingerprint == fingerprint)
+            existing = cls._load_json_dict(row.metadata_json)
+            existing.update(deepcopy(staged_payload))
+            row.metadata_json = cls._dump_json_dict(existing)
+            row.fingerprint_algo = data["algo"]
+            row.updated_at = datetime.now()
+            row.last_task_id = task_id
+            row.save()
+        except DoesNotExist:
+            row = FileMetadata.create(
+                fingerprint=fingerprint,
+                fingerprint_algo=data["algo"],
+                metadata_json=cls._dump_json_dict(staged_payload),
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                last_task_id=task_id,
+            )
+        paths = data["paths"]
+        if data.get("scope") == "source":
+            configured_path = meta.get("source_path_at_set")
+            cls._upsert_path(row.id, configured_path if isinstance(configured_path, str) else source_path, "source")
+            return
+        for path in paths:
+            cls._upsert_path(row.id, path, "destination")
+        if paths:
+            cls._upsert_path(row.id, paths[-1], "last_seen")
+
+    @classmethod
+    def _metadata_fingerprint_groups(
+        cls,
+        task_id: int,
+        task_success: bool,
+        destination_paths: Sequence[str],
+        destination_staged: ObjectDict,
+        source_staged: ObjectDict,
+        source_path: str,
+        meta: ObjectDict,
+    ) -> dict[str, FingerprintGroup]:
+        groups = cls._destination_fingerprint_groups(task_success, destination_paths, destination_staged)
+        if not source_staged:
+            return groups
+        configured_path = meta.get("source_path_at_set")
+        source_path_at_set = configured_path if isinstance(configured_path, str) else source_path
+        if not source_path_at_set or not os.path.exists(source_path_at_set):
+            cls._logger.info("Source file missing at metadata commit for task %s", task_id)
+            return groups
+        fingerprint = meta.get("source_fingerprint")
+        algorithm = meta.get("source_fingerprint_algo")
+        if not isinstance(fingerprint, str):
+            fingerprint, algorithm = common.get_file_fingerprint(source_path_at_set)
+        algorithm = algorithm if isinstance(algorithm, str) else "sampled_xxhash_v1"
+        group = groups.setdefault(fingerprint, {"algo": algorithm, "paths": [], "scope": "source"})
+        if source_path_at_set not in group["paths"]:
+            group["paths"].append(source_path_at_set)
+        return groups
+
+    @staticmethod
+    def _destination_fingerprint_groups(
+        task_success: bool, destination_paths: Sequence[str], destination_staged: ObjectDict
+    ) -> dict[str, FingerprintGroup]:
+        groups: dict[str, FingerprintGroup] = {}
+        if not task_success or not destination_staged:
+            return groups
+        for path in destination_paths:
+            if not os.path.exists(path):
+                continue
+            fingerprint, algorithm = common.get_file_fingerprint(path)
+            group = groups.setdefault(fingerprint, {"algo": algorithm, "paths": [], "scope": "destination"})
+            if path not in group["paths"]:
+                group["paths"].append(path)
+        return groups
 
     @classmethod
     def find_by_path(cls, path: str | None) -> list[dict[str, object]]:

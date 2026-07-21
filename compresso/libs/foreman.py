@@ -36,7 +36,7 @@ import json
 import queue
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, TypedDict, cast
 
@@ -266,63 +266,51 @@ class Foreman(threading.Thread):
             except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
                 self.logger.debug("While iterating through the worker groups, the worker group disappeared: %s", str(e))
                 continue
+            self._run_due_schedules(event_schedules, worker_group, time_now, days[day_of_week])
 
-            for event_schedule in event_schedules:
-                schedule_time = event_schedule.get("schedule_time")
-                # Ensure we have a schedule time
-                if not schedule_time:
+    def _run_due_schedules(
+        self,
+        event_schedules: Sequence[Mapping[str, object]],
+        worker_group: WorkerGroup,
+        time_now: str,
+        day: str,
+    ) -> None:
+        for event_schedule in event_schedules:
+            if time_now != event_schedule.get("schedule_time"):
+                continue
+            repetition = event_schedule.get("repetition")
+            if repetition and self._schedule_repeats_today(repetition, day):
+                scheduled_task = narrowing.strict_str_or_none(event_schedule.get("schedule_task"))
+                if scheduled_task is None:
                     continue
-                # Ensure the schedule time is now
-                if time_now != schedule_time:
-                    continue
+                self.run_task(
+                    time_now,
+                    scheduled_task,
+                    narrowing.coerce_int_or_none(event_schedule.get("schedule_worker_count")),
+                    worker_group,
+                )
 
-                repetition = event_schedule.get("repetition")
-                # Ensure we have a repetition
-                if not repetition:
-                    continue
-
-                # Check if it should run
-                if (
-                    (repetition == "daily")
-                    or (repetition == "weekday" and days[day_of_week] not in ["saturday", "sunday"])
-                    or (repetition == "weekend" and days[day_of_week] in ["saturday", "sunday"])
-                    or (repetition == days[day_of_week])
-                ):
-                    self.run_task(
-                        time_now,
-                        event_schedule.get("schedule_task"),
-                        event_schedule.get("schedule_worker_count"),
-                        worker_group,
-                    )
+    @staticmethod
+    def _schedule_repeats_today(repetition: object, day: str) -> bool:
+        is_weekend = day in {"saturday", "sunday"}
+        return (
+            repetition == "daily"
+            or (repetition == "weekday" and not is_weekend)
+            or (repetition == "weekend" and is_weekend)
+            or repetition == day
+        )
 
     def init_worker_threads(self) -> None:
         with self.worker_registry_lock:
-            # Remove any redundant idle workers from our list
-            # To avoid having the dictionary change size during iteration,
-            #   we need to first get the thread_keys, then iterate through that
-            thread_keys = [t for t in self.worker_threads]
-            for thread in thread_keys:
-                if thread in self.worker_threads and not self.worker_threads[thread].is_alive():
-                    del self.worker_threads[thread]
+            self._remove_dead_worker_threads()
 
             # Check that we have enough workers running. Spawn new ones as required.
             worker_group_ids: list[int] = []
             worker_group_names: list[str] = []
             for worker_group in WorkerGroup.get_all_worker_groups():
-                worker_group_id = worker_group["id"]
-                worker_group_name = worker_group["name"]
-                worker_count = worker_group["number_of_workers"]
+                worker_group_id, worker_group_name, worker_count, names = self._init_worker_group(worker_group)
                 worker_group_ids.append(worker_group_id)
-
-                # Create threads as required
-                for i in range(worker_count):
-                    worker_id = f"{worker_group_name}-{i}"
-                    worker_name = f"{worker_group_name}-Worker-{i + 1}"
-                    # Add this name to a list. If the name changes, we can remove old incorrectly named workers
-                    worker_group_names.append(worker_name)
-                    if worker_id not in self.worker_threads:
-                        # This worker does not yet exist, create it
-                        self.start_worker_thread(worker_id, worker_name, worker_group_id)
+                worker_group_names.extend(names)
 
                 # Remove any workers that do not belong. The max number of supported workers is 12
                 for i in range(worker_count, 12):
@@ -331,15 +319,32 @@ class Foreman(threading.Thread):
                     if worker_id in self.worker_threads and self.worker_threads[worker_id].idle:
                         self.mark_worker_thread_as_redundant(worker_id)
 
-            # Remove workers for groups that no longer exist
-            for thread in list(self.worker_threads):
-                registered_group_id = self.worker_threads[thread].worker_group_id
-                worker_name = self.worker_threads[thread].name
-                # Only remove threads that are idle (never terminate a task just to reduce worker count)
-                if (
-                    registered_group_id not in worker_group_ids or worker_name not in worker_group_names
-                ) and self.worker_threads[thread].idle:
-                    self.mark_worker_thread_as_redundant(thread)
+            self._remove_obsolete_worker_threads(worker_group_ids, worker_group_names)
+
+    def _remove_dead_worker_threads(self) -> None:
+        for worker_id in list(self.worker_threads):
+            if not self.worker_threads[worker_id].is_alive():
+                del self.worker_threads[worker_id]
+
+    def _remove_obsolete_worker_threads(self, worker_group_ids: list[int], worker_group_names: list[str]) -> None:
+        for worker_id, worker in list(self.worker_threads.items()):
+            group_removed = worker.worker_group_id not in worker_group_ids
+            name_removed = worker.name not in worker_group_names
+            if (group_removed or name_removed) and worker.idle:
+                self.mark_worker_thread_as_redundant(worker_id)
+
+    def _init_worker_group(self, worker_group: Mapping[str, object]) -> tuple[int, str, int, list[str]]:
+        worker_group_id = narrowing.strict_int(worker_group["id"])
+        worker_group_name = narrowing.strict_str(worker_group["name"])
+        worker_count = narrowing.strict_int(worker_group["number_of_workers"])
+        worker_names: list[str] = []
+        for index in range(worker_count):
+            worker_id = f"{worker_group_name}-{index}"
+            worker_name = f"{worker_group_name}-Worker-{index + 1}"
+            worker_names.append(worker_name)
+            if worker_id not in self.worker_threads:
+                self.start_worker_thread(worker_id, worker_name, worker_group_id)
+        return worker_group_id, worker_group_name, worker_count, worker_names
 
     def fetch_available_remote_installation(
         self,
@@ -758,63 +763,37 @@ class Foreman(threading.Thread):
         library_name: str | None = None,
         worker_id: str | None = None,
     ) -> bool:
-        if local:
-            # Assign the task to the worker id provided
-            if worker_id in self.worker_threads and self.worker_threads[worker_id].is_alive():
-                self.worker_threads[worker_id].set_task(item)
-                if item.get_task_type() == "local":
-                    # Execute event plugin runners (only for locally added tasks.
-                    # Remote tasks are scheduled on the installation they were considered "local")
-                    event_data = {
-                        "library_id": item.get_task_library_id(),
-                        "task_id": item.get_task_id(),
-                        "task_type": item.get_task_type(),
-                        "task_schedule_type": "local",
-                        "remote_installation_info": {},
-                        "source_data": item.get_source_data(),
-                    }
-                    plugin_handler = PluginsHandler()
-                    plugin_handler.run_event_plugins_for_plugin_type("events.task_scheduled", event_data)
-            else:
-                # The worker thread specified was not available to collect this task.
-                # Report failure so the caller returns the claimed task to 'pending'
-                # and it can be fetched again in the next loop.
-                return False
-        else:
-            # Place into queue for a remote link manager thread to collect
-            self.remote_workers_pending_task_queue.put(item)
-            # Spawn link manager thread to pickup task
-            preferred_installation_uuid = getattr(getattr(item, "task", None), "remote_installation_uuid", None)
-            required_encoder = self.get_required_video_encoder(item.get_task_library_id())
-            preferred_uuid = (
-                preferred_installation_uuid
-                if isinstance(preferred_installation_uuid, str) and preferred_installation_uuid
-                else None
-            )
-            if required_encoder and preferred_uuid:
-                manager_started = self.init_remote_task_manager_thread(
-                    library_name=library_name,
-                    preferred_installation_uuid=preferred_uuid,
-                    required_encoder=required_encoder,
-                )
-            elif required_encoder:
-                manager_started = self.init_remote_task_manager_thread(
-                    library_name=library_name,
-                    required_encoder=required_encoder,
-                )
-            elif preferred_uuid:
-                manager_started = self.init_remote_task_manager_thread(
-                    library_name=library_name,
-                    preferred_installation_uuid=preferred_uuid,
-                )
-            else:
-                manager_started = self.init_remote_task_manager_thread(library_name=library_name)
-            if not manager_started:
-                # Remove item from queue
-                self.remote_workers_pending_task_queue.get_nowait()
-                # Return failure. This will cause the item to be re-queued at the bottom of the list
-                return False
+        return self._hand_local_task(item, worker_id) if local else self._hand_remote_task(item, library_name)
+
+    def _hand_local_task(self, item: Task, worker_id: str | None) -> bool:
+        if worker_id not in self.worker_threads or not self.worker_threads[worker_id].is_alive():
+            return False
+        self.worker_threads[worker_id].set_task(item)
+        if item.get_task_type() == "local":
+            event_data = {
+                "library_id": item.get_task_library_id(),
+                "task_id": item.get_task_id(),
+                "task_type": item.get_task_type(),
+                "task_schedule_type": "local",
+                "remote_installation_info": {},
+                "source_data": item.get_source_data(),
+            }
+            PluginsHandler().run_event_plugins_for_plugin_type("events.task_scheduled", event_data)
         return True
+
+    def _hand_remote_task(self, item: Task, library_name: str | None) -> bool:
+        self.remote_workers_pending_task_queue.put(item)
+        preferred = getattr(getattr(item, "task", None), "remote_installation_uuid", None)
+        preferred_uuid = preferred if isinstance(preferred, str) and preferred else None
+        manager_started = self.init_remote_task_manager_thread(
+            library_name=library_name,
+            preferred_installation_uuid=preferred_uuid,
+            required_encoder=self.get_required_video_encoder(item.get_task_library_id()),
+        )
+        if manager_started:
+            return True
+        self.remote_workers_pending_task_queue.get_nowait()
+        return False
 
     def link_manager_tread_heartbeat(self) -> None:
         """
@@ -925,89 +904,73 @@ class Foreman(threading.Thread):
         if self.workers_pending_task_queue.full() or self.remote_workers_pending_task_queue.full():
             return allow_local_check
 
-        # Determine which worker type to use
-        worker_ids: list[str] = []
-        process_local = False
-        get_local_pending_tasks_only = False
-
-        if allow_local_check and self.check_for_idle_workers():
-            process_local = True
-            get_local_pending_tasks_only = False
-            worker_ids = self.fetch_available_worker_ids()
-            if not worker_ids:
-                return allow_local_check
-        elif self.check_for_idle_remote_workers():
-            allow_local_check = True
-            process_local = False
-            get_local_pending_tasks_only = True
-        else:
-            allow_local_check = True
+        choice = self._pending_worker_choice(allow_local_check)
+        if choice is None:
             self.event.wait(1)
-            return allow_local_check
+            return True
+        allow_local_check, process_local, get_local_pending_tasks_only, worker_ids = choice
 
         # Check if postprocessor task queue is full
         if self.postprocessor_queue_full():
             self.event.wait(5)
             return allow_local_check
 
-        # Fetch the next task matching available worker
-        available_worker_id: str | None = None
-        next_item_to_process: Task | None = None
-        if process_local:
-            for worker_id in worker_ids:
-                try:
-                    library_tags = self.get_tags_configured_for_worker(worker_id)
-                except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as e:
-                    self.logger.debug("Error while fetching the tags for the configured worker: %s", str(e))
-                    break
-                candidate = self.task_queue.get_next_pending_tasks(
-                    local_only=get_local_pending_tasks_only, library_tags=library_tags
-                )
-                if candidate:
-                    next_item_to_process = candidate
-                    available_worker_id = worker_id
-                    break
-            if not available_worker_id:
-                self.event.wait(1)
-                return False  # Force remote worker check on next iteration
-        else:
-            remote_library_names = self.get_available_remote_library_names()
-            candidate = self.task_queue.get_next_pending_tasks(
-                local_only=get_local_pending_tasks_only, library_names=remote_library_names
-            )
-            if candidate:
-                next_item_to_process = candidate
+        next_item_to_process, available_worker_id = self._claim_pending_task(
+            process_local, get_local_pending_tasks_only, worker_ids
+        )
+        if process_local and available_worker_id is None:
+            self.event.wait(1)
+            return False
 
         if next_item_to_process:
-            try:
-                source_abspath = next_item_to_process.get_source_abspath()
-                task_library_name = next_item_to_process.get_task_library_name()
-            except (AttributeError, KeyError, TypeError) as e:
-                self.logger.exception("Exception in fetching task details: %s", str(e))
-                self.event.wait(3)
-                return allow_local_check
-
-            self.logger.info("Processing item - %s", str(source_abspath))
-            success = self.hand_task_to_workers(
-                next_item_to_process,
-                local=process_local,
-                library_name=task_library_name,
-                worker_id=available_worker_id,
-            )
-            if not success:
-                self.logger.warning(
-                    "Re-queueing tasks. Unable to find worker capable of processing task '%s'",
-                    next_item_to_process.get_source_abspath(),
-                )
-                # The task was atomically claimed (status='in_progress') at fetch;
-                # return it to 'pending' so it can be picked up again.
-                try:
-                    next_item_to_process.set_status("pending")
-                except (AttributeError, TypeError, peewee.PeeweeException) as e:
-                    self.logger.exception("Unable to return claimed task to pending: %s", str(e))
-                self.task_queue.requeue_tasks_at_bottom(next_item_to_process.get_task_id())
+            self._assign_claimed_task(next_item_to_process, process_local, available_worker_id)
 
         return allow_local_check
+
+    def _assign_claimed_task(self, item: Task, process_local: bool, worker_id: str | None) -> None:
+        try:
+            source_abspath = item.get_source_abspath()
+            library_name = item.get_task_library_name()
+        except (AttributeError, KeyError, TypeError) as error:
+            self.logger.exception("Exception in fetching task details: %s", error)
+            self.event.wait(3)
+            return
+        self.logger.info("Processing item - %s", source_abspath)
+        if self.hand_task_to_workers(item, local=process_local, library_name=library_name, worker_id=worker_id):
+            return
+        self.logger.warning("Re-queueing task; no capable worker for '%s'", source_abspath)
+        try:
+            item.set_status("pending")
+        except (AttributeError, TypeError, peewee.PeeweeException) as error:
+            self.logger.exception("Unable to return claimed task to pending: %s", error)
+        self.task_queue.requeue_tasks_at_bottom(item.get_task_id())
+
+    def _pending_worker_choice(self, allow_local_check: bool) -> tuple[bool, bool, bool, list[str]] | None:
+        if allow_local_check and self.check_for_idle_workers():
+            worker_ids = self.fetch_available_worker_ids()
+            return (allow_local_check, True, False, worker_ids) if worker_ids else None
+        if self.check_for_idle_remote_workers():
+            return True, False, True, []
+        return None
+
+    def _claim_pending_task(
+        self, process_local: bool, local_only: bool, worker_ids: list[str]
+    ) -> tuple[Task | None, str | None]:
+        if not process_local:
+            candidate = self.task_queue.get_next_pending_tasks(
+                local_only=local_only, library_names=self.get_available_remote_library_names()
+            )
+            return candidate if candidate else None, None
+        for worker_id in worker_ids:
+            try:
+                library_tags = self.get_tags_configured_for_worker(worker_id)
+            except (ValueError, AttributeError, TypeError, peewee.PeeweeException) as error:
+                self.logger.debug("Error while fetching the tags for the configured worker: %s", error)
+                break
+            candidate = self.task_queue.get_next_pending_tasks(local_only=local_only, library_tags=library_tags)
+            if candidate:
+                return candidate, worker_id
+        return None, None
 
     def run(self) -> None:
         self.logger.info("Starting Foreman Monitor loop")

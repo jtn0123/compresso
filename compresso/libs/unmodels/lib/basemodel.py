@@ -214,30 +214,38 @@ class BaseModel(Model):
             return value
 
         if isinstance(field, BooleanField):
-            if isinstance(value, (bool, int)):
-                return bool(value)
-            elif isinstance(value, str) and value.lower() in ["t", "true", "1"]:
-                return True
-            elif isinstance(value, str) and value.lower() in ["f", "false", "0"]:
-                return False
-            # Unrecognised values must fail loudly, not coerce to False
-            raise TypeError(f"Cannot interpret {value!r} as a boolean for field '{field_id}'")
-        elif isinstance(field, IntegerField):
+            return self._parse_boolean_field(field_id, value)
+        return self._parse_non_boolean_field(field, value)
+
+    @staticmethod
+    def _parse_non_boolean_field(field: object, value: object) -> object:
+        if isinstance(field, IntegerField):
             return int(cast("str | bytes | bytearray | float | int", value))
-        elif isinstance(field, (FloatField, DecimalField)):
+        if isinstance(field, (FloatField, DecimalField)):
             return float(cast("str | bytes | bytearray | float | int", value))
-        elif isinstance(field, DateTimeField):
+        if isinstance(field, DateTimeField):
             return strpdatetime(value if isinstance(value, str) else str(value))
-        elif isinstance(field, DateField):
+        if isinstance(field, DateField):
             return strpdate(value if isinstance(value, str) else str(value))
-        elif isinstance(field, TimeField):
+        if isinstance(field, TimeField):
             return strptime(value if isinstance(value, str) else str(value))
-        elif isinstance(field, BlobField):
+        if isinstance(field, BlobField):
             if not isinstance(value, (str, bytes, bytearray)):
                 raise TypeError("Blob field values must be base64 text or bytes")
             return b64decode(value)
 
         return value
+
+    @staticmethod
+    def _parse_boolean_field(field_id: str, value: object) -> bool:
+        if isinstance(value, (bool, int)):
+            return bool(value)
+        normalized = value.lower() if isinstance(value, str) else ""
+        if normalized in {"t", "true", "1"}:
+            return True
+        if normalized in {"f", "false", "0"}:
+            return False
+        raise TypeError(f"Cannot interpret {value!r} as a boolean for field '{field_id}'")
 
     def model_to_dict(self) -> dict[str, object]:
         """

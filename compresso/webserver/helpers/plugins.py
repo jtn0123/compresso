@@ -234,92 +234,58 @@ def get_plugin_settings(plugin_id: str, library_id: int | None = None) -> list[d
     plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_id, library_id=library_id)
     if plugin_settings:
         for key in plugin_settings:
-            form_input: dict[str, object] = {
-                "key_id": hashlib.md5(key.encode("utf8")).hexdigest(),  # noqa: S324 — used for deterministic ID generation, not security
-                "key": key,
-                "value": plugin_settings.get(key),
-                "input_type": None,
-                "label": None,
-                "description": None,
-                "tooltip": None,
-                "select_options": [],
-                "slider_options": {},
-                "display": "visible",
-                "sub_setting": False,
-            }
-
             plugin_setting_meta_value = plugin_settings_meta.get(key, {})
             plugin_setting_meta = plugin_setting_meta_value if isinstance(plugin_setting_meta_value, Mapping) else {}
-
-            # Set input type for form
-            form_input["input_type"] = plugin_setting_meta.get("input_type", None)
-            if not form_input["input_type"]:
-                form_input["input_type"] = "text"
-                if isinstance(form_input["value"], bool):
-                    form_input["input_type"] = "checkbox"
-
-            # Handle unsupported input types (where they may be supported in future versions of Compresso)
-            supported_input_types = [
-                "text",
-                "textarea",
-                "select",
-                "checkbox",
-                "slider",
-                "browse_directory",
-                "section_header",
-                "section_subheader",
-                "section_details",
-                "section_admonition",
-            ]
-            if form_input["input_type"] not in supported_input_types:
-                form_input["input_type"] = "text"
-
-            # Set input display options
-            form_input["display"] = plugin_setting_meta.get("display", "visible")
-            form_input["sub_setting"] = plugin_setting_meta.get("sub_setting", False)
-
-            # Set input label text
-            form_input["label"] = plugin_setting_meta.get("label", None)
-            if not form_input["label"]:
-                form_input["label"] = key
-
-            # Set input description text
-            form_input["description"] = plugin_setting_meta.get("description", "")
-
-            # Usability level
-            req_lev = narrowing.strict_int(plugin_setting_meta.get("req_lev"))
-            if s.level < req_lev:
-                form_input["display"] = "disabled"
-                form_input["description"] = narrowing.strict_str(form_input.get("description")) + (
-                    " (This option is reserved for supporters of the project)"
-                )
-
-            # Set input tooltip text
-            form_input["tooltip"] = plugin_setting_meta.get("tooltip", "")
-
-            # Set options if form input is select
-            if form_input["input_type"] == "select":
-                form_input["select_options"] = plugin_setting_meta.get("select_options", [])
-                if not form_input["select_options"]:
-                    # No options are given. Revert back to text input
-                    form_input["input_type"] = "text"
-
-            # Set options if form input is slider
-            if form_input["input_type"] == "slider":
-                slider_options_value = plugin_setting_meta.get("slider_options")
-                if not isinstance(slider_options_value, Mapping):
-                    # No options are given. Revert back to text input
-                    form_input["input_type"] = "text"
-                else:
-                    form_input["slider_options"] = {
-                        "min": slider_options_value.get("min", "0"),
-                        "max": slider_options_value.get("max", "1"),
-                        "step": slider_options_value.get("step", "1"),
-                        "suffix": slider_options_value.get("suffix", ""),
-                    }
-
-            settings.append(form_input)
+            settings.append(_plugin_setting_form_input(key, plugin_settings.get(key), plugin_setting_meta, s.level))
     return settings
+
+
+def _plugin_setting_form_input(key: str, value: object, meta: Mapping[str, object], supporter_level: int) -> dict[str, object]:
+    supported_types = {
+        "text",
+        "textarea",
+        "select",
+        "checkbox",
+        "slider",
+        "browse_directory",
+        "section_header",
+        "section_subheader",
+        "section_details",
+        "section_admonition",
+    }
+    input_type = meta.get("input_type") or ("checkbox" if isinstance(value, bool) else "text")
+    if input_type not in supported_types:
+        input_type = "text"
+    description = narrowing.strict_str(meta.get("description"))
+    display = meta.get("display", "visible")
+    if supporter_level < narrowing.strict_int(meta.get("req_lev")):
+        display = "disabled"
+        description += " (This option is reserved for supporters of the project)"
+    select_options = meta.get("select_options", []) if input_type == "select" else []
+    if input_type == "select" and not select_options:
+        input_type = "text"
+    slider_value = meta.get("slider_options")
+    slider_options: dict[str, object] = {}
+    if input_type == "slider" and isinstance(slider_value, Mapping):
+        slider_options = {
+            name: slider_value.get(name, default)
+            for name, default in (("min", "0"), ("max", "1"), ("step", "1"), ("suffix", ""))
+        }
+    elif input_type == "slider":
+        input_type = "text"
+    return {
+        "key_id": hashlib.md5(key.encode("utf8")).hexdigest(),  # noqa: S324 — used for deterministic ID generation, not security
+        "key": key,
+        "value": value,
+        "input_type": input_type,
+        "label": meta.get("label") or key,
+        "description": description,
+        "tooltip": meta.get("tooltip", ""),
+        "select_options": select_options,
+        "slider_options": slider_options,
+        "display": display,
+        "sub_setting": meta.get("sub_setting", False),
+    }
 
 
 def get_plugin_changelog(plugin_id: str) -> list[str]:

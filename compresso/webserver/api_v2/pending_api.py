@@ -591,30 +591,8 @@ class ApiPendingHandler(BaseApiHandler):
             library_name_value = json_request.get("library_name")
             library_name = library_name_value if isinstance(library_name_value, str) else None
 
-            if not library_id and not library_name:
-                self.set_status(self.STATUS_ERROR_EXTERNAL, reason="You must provide either a library_id or library_name")
-                self.write_error()
-                return
-
-            if library_id is None and library_name is not None:
-                library_id = None
-                for library_record in Library.get_all_libraries():
-                    if library_name == library_record.get("name"):
-                        library_id = optional_integer_value(library_record.get("id"))
-                        break
-                if library_id is None:
-                    self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Library not found with name '{library_name}'")
-                    self.write_error()
-                    return
-
-            try:
-                if library_id is None:
-                    raise LibraryLookupError("Library ID is unavailable")
-                selected_library = Library(library_id)
-            except LibraryLookupError as exc:
-                self.handle_base_api_error(
-                    BaseApiError("Invalid library selection", private_detail=f"{type(exc).__name__}: {exc}")
-                )
+            selected_library = self._select_test_library(library_id, library_name)
+            if selected_library is None:
                 return
 
             if not os.path.isabs(path):
@@ -646,6 +624,34 @@ class ApiPendingHandler(BaseApiHandler):
             return
         except Exception as e:
             self.handle_unhandled_error(e)
+
+    def _select_test_library(self, library_id: int | None, library_name: str | None) -> Library | None:
+        if not library_id and not library_name:
+            self.set_status(self.STATUS_ERROR_EXTERNAL, reason="You must provide either a library_id or library_name")
+            self.write_error()
+            return None
+        if library_id is None and library_name is not None:
+            library_id = next(
+                (
+                    optional_integer_value(record.get("id"))
+                    for record in Library.get_all_libraries()
+                    if library_name == record.get("name")
+                ),
+                None,
+            )
+            if library_id is None:
+                self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Library not found with name '{library_name}'")
+                self.write_error()
+                return None
+        try:
+            if library_id is None:
+                raise LibraryLookupError("Library ID is unavailable")
+            return Library(library_id)
+        except LibraryLookupError as exc:
+            self.handle_base_api_error(
+                BaseApiError("Invalid library selection", private_detail=f"{type(exc).__name__}: {exc}")
+            )
+            return None
 
     async def get_pending_status_of_tasks(self) -> None:
         """

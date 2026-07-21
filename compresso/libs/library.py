@@ -32,7 +32,7 @@ Copyright:
 import json
 import random
 from collections.abc import Iterable, Mapping, Sequence
-from typing import NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 from compresso.config import Config
 from compresso.libs import common
@@ -40,6 +40,10 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.peewee_types import execute_count, execute_write
 from compresso.libs.unmodels import EnabledPlugins, Libraries, LibraryPluginFlow, Plugins, Tags, Tasks
+
+if TYPE_CHECKING:
+    from compresso.libs.plugins import PluginsHandler
+    from compresso.libs.unplugins import PluginExecutor
 
 logger = CompressoLogging.get_logger(name=__name__)
 
@@ -716,35 +720,30 @@ class Library:
             configured_plugin_ids.append(flow_item.plugin_id.plugin_id)
 
         for plugin in plugin_list:
-            plugin_id = plugin.get("plugin_id")
-            if not isinstance(plugin_id, str):
-                continue
-            # Ignore already configured plugins
-            if plugin_id in configured_plugin_ids:
-                continue
-            plugin_info = plugin_handler.get_plugin_info(plugin_id)
-            if not isinstance(plugin_info, Mapping):
-                continue
-            plugin_priorities = plugin_info.get("priorities")
-            if isinstance(plugin_priorities, Mapping):
-                # Fetch the plugin info back from the DB
-                plugin_model = Plugins.select().where(Plugins.plugin_id == plugin_id).first()
-                if plugin_model is None:
-                    continue
-                # Fetch all plugin types in this plugin
-                plugin_types_in_plugin = plugin_executor.get_all_plugin_types_in_plugin(plugin_id)
-                # Loop over the plugin types in this plugin
-                for plugin_type in plugin_types_in_plugin:
-                    # get the plugin runner function name for this runner
-                    plugin_type_meta = plugin_executor.get_plugin_type_meta(plugin_type)
-                    runner_string = plugin_type_meta.plugin_runner()
-                    priority = plugin_priorities.get(runner_string)
-                    if isinstance(priority, (int, str)) and int(priority) > 0:
-                        # If the runner has a priority set and that value is greater than 0 (default that wont set anything),
-                        # Save the priority
-                        PluginsHandler.set_plugin_flow_position_for_single_plugin(
-                            plugin_model, plugin_type, self.model.id, int(priority)
-                        )
+            self._set_plugin_default_priority(plugin, configured_plugin_ids, plugin_handler, plugin_executor)
+
+    def _set_plugin_default_priority(
+        self,
+        plugin: Mapping[str, object],
+        configured_plugin_ids: list[str],
+        plugin_handler: "PluginsHandler",
+        plugin_executor: "PluginExecutor",
+    ) -> None:
+        plugin_id = plugin.get("plugin_id")
+        if not isinstance(plugin_id, str) or plugin_id in configured_plugin_ids:
+            return
+        plugin_info = plugin_handler.get_plugin_info(plugin_id)
+        priorities = plugin_info.get("priorities") if isinstance(plugin_info, Mapping) else None
+        plugin_model = Plugins.select().where(Plugins.plugin_id == plugin_id).first()
+        if not isinstance(priorities, Mapping) or plugin_model is None:
+            return
+        for plugin_type in plugin_executor.get_all_plugin_types_in_plugin(plugin_id):
+            runner = plugin_executor.get_plugin_type_meta(plugin_type).plugin_runner()
+            priority = priorities.get(runner)
+            if isinstance(priority, (int, str)) and int(priority) > 0:
+                plugin_handler.set_plugin_flow_position_for_single_plugin(
+                    plugin_model, plugin_type, self.model.id, int(priority)
+                )
 
     def set_enabled_plugins(self, plugin_list: Sequence[Mapping[str, object]]) -> None:
         """

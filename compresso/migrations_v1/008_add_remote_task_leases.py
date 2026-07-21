@@ -4,6 +4,7 @@ from compresso.migrations_v1._types import MigrationDatabase
 
 
 def migrate(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
+    del migrator
     if fake:
         return
 
@@ -30,6 +31,7 @@ def migrate(migrator: object, database: MigrationDatabase, fake: bool = False, *
 
 
 def rollback(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
+    del migrator
     if fake:
         return
     database.execute_sql("DROP INDEX IF EXISTS tasks_job_id")

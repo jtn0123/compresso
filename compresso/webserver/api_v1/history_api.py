@@ -169,33 +169,9 @@ class ApiHistoryHandler(BaseApiHandler):
         )
 
         # Build return data
-        success_count = 0
-        failed_count = 0
-        data: list[dict[str, object]] = []
-
-        # Iterate over historical tasks and append them to the task data
-        for task in task_results:
-            # Set params as required in template
-            finish_time = task.get("finish_time")
-            timestamp = completed_tasks.parse_timestamp_value(finish_time)
-            if timestamp is None:
-                # Surface unparseable stored values instead of rendering epoch 0
-                display_time = str(finish_time) if finish_time else ""
-            else:
-                display_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
-            item: dict[str, object] = {
-                "id": task["id"],
-                "selected": False,
-                "finish_time": display_time,
-                "task_label": task["task_label"],
-                "task_success": task["task_success"],
-            }
-            # Increment counters
-            if item["task_success"]:
-                success_count += 1
-            else:
-                failed_count += 1
-            data.append(item)
+        data = [self._historic_task_item(task) for task in task_results]
+        success_count = sum(bool(item["task_success"]) for item in data)
+        failed_count = len(data) - success_count
 
         # Return results
         return {
@@ -205,4 +181,21 @@ class ApiHistoryHandler(BaseApiHandler):
             "successCount": success_count,
             "failedCount": failed_count,
             "data": data,
+        }
+
+    @staticmethod
+    def _historic_task_item(task: Mapping[str, object]) -> dict[str, object]:
+        finish_time = task.get("finish_time")
+        timestamp = completed_tasks.parse_timestamp_value(finish_time)
+        display_time = (
+            (str(finish_time) if finish_time else "")
+            if timestamp is None
+            else time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+        )
+        return {
+            "id": task["id"],
+            "selected": False,
+            "finish_time": display_time,
+            "task_label": task["task_label"],
+            "task_success": task["task_success"],
         }

@@ -546,9 +546,35 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             await self._send_stream_message("workers_info", workers_info)
             await gen.sleep(self.STREAM_POLL_INTERVALS["workers_info"])
 
+    @staticmethod
+    def _pending_task_results(task_list: Mapping[str, object]) -> list[dict[str, object]]:
+        results: list[dict[str, object]] = []
+        task_results_value = task_list.get("results", [])
+        task_results = task_results_value if isinstance(task_results_value, list) else []
+        for task_result_value in task_results:
+            if not isinstance(task_result_value, Mapping):
+                continue
+            item: dict[str, object] = {
+                "id": task_result_value["id"],
+                "label": task_result_value["abspath"],
+                "priority": task_result_value["priority"],
+                "status": task_result_value["status"],
+            }
+            if task_result_value.get("retry_count"):
+                item["retry_count"] = task_result_value["retry_count"]
+            if task_result_value.get("deferred_until"):
+                item["deferred_until"] = str(task_result_value["deferred_until"])
+            results.append(item)
+        return results
+
+    def _pending_queue_eta(self) -> dict[str, object] | None:
+        try:
+            return estimate_queue_eta(self._foreman())
+        except Exception:
+            return None
+
     async def async_pending_tasks_info(self) -> None:
         while self._stream_is_active(self.sending_pending_tasks_info):
-            results: list[dict[str, object]] = []
             params = {
                 "start": 0,
                 "length": 10,
@@ -559,38 +585,11 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 },
             }
             task_list = pending_tasks.prepare_filtered_pending_tasks(params)
-
-            task_results_value = task_list.get("results", [])
-            task_results = task_results_value if isinstance(task_results_value, list) else []
-            for task_result_value in task_results:
-                if not isinstance(task_result_value, Mapping):
-                    continue
-                task_result = task_result_value
-                # Append the task to the results list
-                item: dict[str, object] = {
-                    "id": task_result["id"],
-                    "label": task_result["abspath"],
-                    "priority": task_result["priority"],
-                    "status": task_result["status"],
-                }
-                # Include retry info when present
-                if task_result.get("retry_count"):
-                    item["retry_count"] = task_result["retry_count"]
-                if task_result.get("deferred_until"):
-                    item["deferred_until"] = str(task_result["deferred_until"])
-                results.append(item)
-
-            # Estimate queue ETA and include in payload
-            try:
-                queue_eta = estimate_queue_eta(self._foreman())
-            except Exception:
-                queue_eta = None
-
             await self._send_stream_message(
                 "pending_tasks",
                 {
-                    "results": results,
-                    "queue_eta": queue_eta,
+                    "results": self._pending_task_results(task_list),
+                    "queue_eta": self._pending_queue_eta(),
                 },
             )
 

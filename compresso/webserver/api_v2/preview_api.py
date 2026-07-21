@@ -75,33 +75,8 @@ class ApiPreviewHandler(BaseApiHandler):
             validate_library_exists(library_id_value)
             library_id = 1 if library_id_value is None else library_id_value
 
-            # Validate source_path is within an allowed directory
             source_path = string_value(json_request.get("source_path"))
-            if source_path:
-                import os
-
-                real_path = os.path.realpath(source_path)
-                allowed_roots = set()
-                try:
-                    from compresso.libs.unmodels import Libraries
-
-                    for lib in Libraries.select(Libraries.path):
-                        if lib.path:
-                            allowed_roots.add(os.path.realpath(lib.path))
-                except Exception as e:
-                    app_log.error("Failed to load library paths for path validation: %s", e)
-                try:
-                    from compresso import config
-
-                    cache_path = config.Config().get_cache_path()
-                    if cache_path:
-                        allowed_roots.add(os.path.realpath(cache_path))
-                except Exception as e:
-                    app_log.error("Failed to load cache path for path validation: %s", e)
-                if not allowed_roots or not any(
-                    real_path.startswith(root + os.sep) or real_path == root for root in allowed_roots
-                ):
-                    raise ValueError("Source path is not within an allowed directory")
+            self._validate_preview_source_path(source_path)
 
             preview_manager = PreviewManager()
             job_id = preview_manager.create_preview(
@@ -130,6 +105,30 @@ class ApiPreviewHandler(BaseApiHandler):
             return
         except Exception as e:
             self.handle_unhandled_error(e)
+
+    @staticmethod
+    def _validate_preview_source_path(source_path: str) -> None:
+        if not source_path:
+            return
+        import os
+
+        allowed_roots: set[str] = set()
+        try:
+            from compresso.libs.unmodels import Libraries
+
+            allowed_roots.update(os.path.realpath(lib.path) for lib in Libraries.select(Libraries.path) if lib.path)
+        except Exception:
+            app_log.exception("Failed to load library paths for path validation")
+        try:
+            from compresso import config
+
+            if cache_path := config.Config().get_cache_path():
+                allowed_roots.add(os.path.realpath(cache_path))
+        except Exception:
+            app_log.exception("Failed to load cache path for path validation")
+        real_path = os.path.realpath(source_path)
+        if not allowed_roots or not any(real_path == root or real_path.startswith(root + os.sep) for root in allowed_roots):
+            raise ValueError("Source path is not within an allowed directory")
 
     async def get_preview_status(self) -> None:
         """

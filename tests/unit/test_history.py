@@ -346,6 +346,23 @@ class TestHistory:
         assert result[0]["task_label"] == "movie_good.mkv"
 
     @pytest.mark.unittest
+    def test_with_source_probe_applies_requested_order_and_page(self):
+        for label in ("delta.mkv", "alpha.mkv", "charlie.mkv", "bravo.mkv"):
+            self._create_task(label=label)
+        self.db_connection.execute_sql("SELECT 1")
+
+        history = self._make_history()
+        result = list(
+            history.get_historic_tasks_list_with_source_probe(
+                order={"column": "task_label", "dir": "asc"},
+                start=1,
+                length=2,
+            )
+        )
+
+        assert [row["task_label"] for row in result] == ["bravo.mkv", "charlie.mkv"]
+
+    @pytest.mark.unittest
     def test_failed_path_exists_uses_path_and_failure_status(self):
         self._create_task(label="failed.mkv", abspath="/media/failed.mkv", success=False)
         self._create_task(label="success.mkv", abspath="/media/success.mkv", success=True)

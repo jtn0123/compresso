@@ -43,6 +43,7 @@ If this column is left as is, no items will be able to be added to the task queu
 
 def migrate(migrator: MigrationRunner, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     """Write your migrations here."""
+    del fake
     # Rename 'ffmpeg_log' field to 'log'' in Tasks model
     if any(cm for cm in database.get_columns("tasks") if cm.name == "ffmpeg_log"):
         migrator.ops.append(migrator.migrator.rename_column("tasks", "ffmpeg_log", "log"))
@@ -50,6 +51,7 @@ def migrate(migrator: MigrationRunner, database: MigrationDatabase, fake: bool =
 
 def rollback(migrator: MigrationRunner, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     """Write your rollback migrations here."""
+    del fake
     # Reverse rename 'ffmpeg_log' field to 'log'' in Tasks model
     if any(cm for cm in database.get_columns("tasks") if cm.name == "log"):
         migrator.ops.append(migrator.migrator.rename_column("tasks", "log", "ffmpeg_log"))

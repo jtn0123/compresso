@@ -186,9 +186,7 @@ class RootService:
         self.threads.append({"name": "LibraryScannerManager", "thread": library_scanner_manager})
         return library_scanner_manager
 
-    def start_inotify_watch_manager(
-        self, data_queues: DataQueues, settings: config.Config
-    ) -> eventmonitor.EventMonitorManager | None:
+    def start_inotify_watch_manager(self, data_queues: DataQueues) -> eventmonitor.EventMonitorManager | None:
         if eventmonitor.event_monitor_module:
             self.logger.info("Starting EventMonitorManager")
             event_monitor_manager = eventmonitor.EventMonitorManager(data_queues, self.event)
@@ -333,7 +331,7 @@ class RootService:
         self.start_library_scanner_manager(data_queues)
 
         # Start inotify watch manager
-        self.start_inotify_watch_manager(data_queues, settings)
+        self.start_inotify_watch_manager(data_queues)
 
         # Start new thread to run the web UI
         self.start_ui_server(data_queues, foreman)
@@ -437,61 +435,9 @@ class RootService:
         return True
 
     def run(self) -> None:
-        # Init the TaskDataStore and PluginChildProcess
-        import atexit
-        from multiprocessing import Manager
-
-        import tornado.autoreload
-
-        from compresso.libs.task import TaskDataStore
-        from compresso.libs.unplugins.child_process import kill_all_plugin_processes, set_shared_manager
-
-        # Init a shared manager
-        manager = Manager()
-        self._mgr = manager
-        # Ensure Manager shuts down on process exit or tornado autoreload (dev mode)
-        atexit.register(manager.shutdown)
-        tornado.autoreload.add_reload_hook(manager.shutdown)
-        # Ensure any PluginChildProcess shuts down on process exit or tornado autoreload (dev mode)
-        atexit.register(kill_all_plugin_processes)
-        tornado.autoreload.add_reload_hook(kill_all_plugin_processes)
-        # Replace the in-process dicts with manager proxies
-        TaskDataStore._runner_state = manager.dict()
-        TaskDataStore._task_state = manager.dict()
-        # Set the shared manager for PluginChildProcess
-        set_shared_manager(manager)
-
+        self._initialize_shared_process_state()
         self.startup_state.reset()
-
-        # Init the configuration
-        try:
-            settings = config.Config()
-            self.startup_state.mark_ready("config_loaded", detail=settings.get_config_path())
-        except Exception as e:
-            message = f"STARTUP_CONFIG_LOAD_FAILED error={str(e)}"
-            self.logger.error(message)
-            self.startup_state.mark_error("config_loaded", message)
-            raise
-
-        # Validate deployment paths before worker startup.
-        try:
-            startup.validate_startup_environment(settings)
-            self.startup_state.mark_ready("startup_validation", detail="validated")
-        except Exception as e:
-            message = f"STARTUP_VALIDATION_FAILED error={str(e)}"
-            self.logger.error(message)
-            self.startup_state.mark_error("startup_validation", message)
-            raise
-
-        # Init the database
-        try:
-            self.db_connection = init_db(settings.get_config_path())
-            self.startup_state.mark_ready("db_ready", detail=settings.get_config_path())
-        except Exception as e:
-            message = f"STARTUP_DB_INIT_FAILED error={str(e)}"
-            self.logger.error(message)
-            self.startup_state.mark_error("db_ready", message)
-            raise
+        settings = self._initialize_startup_dependencies()
 
         # Install bundled plugins
         try:
@@ -513,7 +459,65 @@ class RootService:
                 self.startup_state.mark_error("threads_ready", message)
             raise RuntimeError(message) from e
 
-        # Watch for the term signal
+        self._monitor_until_shutdown()
+
+        # Received term signal. Stop everything
+        self.stop_threads()
+        db_connection = self.db_connection
+        if db_connection is None:
+            raise RuntimeError("database connection was not initialized")
+        db_connection.stop()
+        while not db_connection.is_stopped():
+            time.sleep(0.5)
+        self.logger.info("Exit Compresso")
+
+    def _initialize_shared_process_state(self) -> None:
+        import atexit
+        from multiprocessing import Manager
+
+        import tornado.autoreload
+
+        from compresso.libs.task import TaskDataStore
+        from compresso.libs.unplugins.child_process import kill_all_plugin_processes, set_shared_manager
+
+        manager = Manager()
+        self._mgr = manager
+        atexit.register(manager.shutdown)
+        tornado.autoreload.add_reload_hook(manager.shutdown)
+        atexit.register(kill_all_plugin_processes)
+        tornado.autoreload.add_reload_hook(kill_all_plugin_processes)
+        TaskDataStore._runner_state = manager.dict()
+        TaskDataStore._task_state = manager.dict()
+        set_shared_manager(manager)
+
+    def _initialize_startup_dependencies(self) -> config.Config:
+        try:
+            settings = config.Config()
+            self.startup_state.mark_ready("config_loaded", detail=settings.get_config_path())
+        except Exception as error:
+            message = f"STARTUP_CONFIG_LOAD_FAILED error={error}"
+            self.logger.error(message)
+            self.startup_state.mark_error("config_loaded", message)
+            raise
+        try:
+            startup.validate_startup_environment(settings)
+            self.startup_state.mark_ready("startup_validation", detail="validated")
+        except Exception as error:
+            message = f"STARTUP_VALIDATION_FAILED error={error}"
+            self.logger.error(message)
+            self.startup_state.mark_error("startup_validation", message)
+            raise
+        try:
+            self.db_connection = init_db(settings.get_config_path())
+            self.startup_state.mark_ready("db_ready", detail=settings.get_config_path())
+        except Exception as error:
+            message = f"STARTUP_DB_INIT_FAILED error={error}"
+            self.logger.error(message)
+            self.startup_state.mark_error("db_ready", message)
+            raise
+        return settings
+
+    def _monitor_until_shutdown(self) -> None:
         if os.name == "nt":
             while self.run_threads:
                 try:
@@ -529,17 +533,6 @@ class RootService:
                 time.sleep(1)
                 if self.run_threads:
                     self.monitor_critical_threads()
-
-        # Received term signal. Stop everything
-        self.stop_threads()
-        db_connection = self.db_connection
-        if db_connection is None:
-            raise RuntimeError("database connection was not initialized")
-        db_connection.stop()
-        while not db_connection.is_stopped():
-            time.sleep(0.5)
-            continue
-        self.logger.info("Exit Compresso")
 
 
 def main() -> None:

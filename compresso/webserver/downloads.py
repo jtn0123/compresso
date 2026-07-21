@@ -76,6 +76,37 @@ class DownloadsLinks(metaclass=SingletonType):
 
 
 class DownloadsHandler(web.RequestHandler):
+    @staticmethod
+    def _allowed_roots() -> set[str]:
+        allowed_roots: set[str] = set()
+        try:
+            from compresso.libs.unmodels import Libraries
+
+            allowed_roots.update(os.path.realpath(lib.path) for lib in Libraries.select(Libraries.path) if lib.path)
+        except Exception as e:
+            tornado.log.app_log.error("Failed to load library paths for path validation: %s", e)
+        try:
+            from compresso import config
+
+            if cache_path := config.Config().get_cache_path():
+                allowed_roots.add(os.path.realpath(cache_path))
+        except Exception as e:
+            tornado.log.app_log.error("Failed to load cache path for path validation: %s", e)
+        return allowed_roots
+
+    async def _stream_file(self, abspath: str) -> None:
+        loop = IOLoop.current()
+        file_handle = await loop.run_in_executor(None, open, abspath, "rb")
+        try:
+            while data := await loop.run_in_executor(None, file_handle.read, 1024 * 1024):
+                try:
+                    self.write(data)
+                    await self.flush()
+                except iostream.StreamClosedError:
+                    break
+        finally:
+            await loop.run_in_executor(None, file_handle.close)
+
     async def get(self, link_id: str) -> None:
 
         # Fetch link from
@@ -103,23 +134,7 @@ class DownloadsHandler(web.RequestHandler):
             return
 
         # Security: verify path is within an allowed directory
-        allowed_roots = set()
-        try:
-            from compresso.libs.unmodels import Libraries
-
-            for lib in Libraries.select(Libraries.path):
-                if lib.path:
-                    allowed_roots.add(os.path.realpath(lib.path))
-        except Exception as e:
-            tornado.log.app_log.error("Failed to load library paths for path validation: %s", e)
-        try:
-            from compresso import config
-
-            cache_path = config.Config().get_cache_path()
-            if cache_path:
-                allowed_roots.add(os.path.realpath(cache_path))
-        except Exception as e:
-            tornado.log.app_log.error("Failed to load cache path for path validation: %s", e)
+        allowed_roots = self._allowed_roots()
 
         if not allowed_roots or not any(abspath.startswith(root + os.sep) or abspath == root for root in allowed_roots):
             self.write_error(403)
@@ -135,20 +150,4 @@ class DownloadsHandler(web.RequestHandler):
             ),
         )
 
-        # Serve file download in 1MB chunks
-        loop = IOLoop.current()
-        f = await loop.run_in_executor(None, open, abspath, "rb")
-        try:
-            while True:
-                data = await loop.run_in_executor(None, f.read, 1024 * 1024)
-                if not data:
-                    break
-                try:
-                    self.write(data)
-                    await self.flush()
-                except iostream.StreamClosedError:
-                    break
-                finally:
-                    del data
-        finally:
-            await loop.run_in_executor(None, f.close)
+        await self._stream_file(abspath)

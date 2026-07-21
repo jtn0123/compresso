@@ -8,6 +8,7 @@ from compresso.migrations_v1._types import MigrationDatabase
 
 
 def migrate(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
+    del migrator
     if fake:
         return
 
@@ -31,3 +32,4 @@ def migrate(migrator: object, database: MigrationDatabase, fake: bool = False, *
 
 def rollback(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     """Rollback not required — added columns with defaults can remain unused."""
+    del migrator, database, fake, kwargs

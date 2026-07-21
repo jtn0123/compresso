@@ -428,133 +428,13 @@ def _run_analysis(library_id: int, library_path: str, info: AnalysisInfo) -> Non
         info["progress"]["total"] = 0
         info["progress"]["checked"] = 0
 
-        # Group data: key = (codec, resolution). Files are consumed directly
-        # from os.walk so memory does not grow with library size.
-        groups: dict[tuple[str, str], AnalysisGroup] = {}
-        for filepath in iter_media_files(library_path):
-            info["progress"]["total"] += 1
-            try:
-                analysis_entry = _analyse_file_incremental(str(filepath), generation=generation)
-                codec_value = analysis_entry.get("codec")
-                resolution_value = analysis_entry.get("resolution")
-                codec = codec_value if isinstance(codec_value, str) and codec_value else "unknown"
-                resolution = resolution_value if isinstance(resolution_value, str) and resolution_value else "unknown"
-                file_size = narrowing.coerce_int(analysis_entry.get("file_size"))
-                bitrate_mbps = narrowing.coerce_float(analysis_entry.get("bitrate_mbps"))
-
-                key = (codec, resolution)
-                if key not in groups:
-                    groups[key] = {
-                        "codec": codec,
-                        "resolution": resolution,
-                        "count": 0,
-                        "total_size_bytes": 0,
-                        "total_bitrate": 0,
-                    }
-                groups[key]["count"] += 1
-                groups[key]["total_size_bytes"] += file_size
-                groups[key]["total_bitrate"] += bitrate_mbps
-
-            except Exception as e:
-                logger.debug("Analysis skipped file %s: %s", filepath, str(e))
-
-            info["progress"]["checked"] += 1
+        groups = _collect_analysis_groups(library_path, generation, info)
 
         _cleanup_stale_analysis_paths(library_path, generation)
 
-        # Cross-reference with historical CompressionStats for savings estimates
-        historical = _get_historical_savings()
-
-        # Build final results
-        result_groups: list[dict[str, object]] = []
-        total_files = 0
-        total_size = 0
-        total_estimated_savings = 0
-        already_optimal = 0
-
-        # Get skip codecs for this library
-        try:
-            library = Library(library_id)
-            skip_codecs = [c.lower() for c in library.get_skip_codecs()]
-        except Exception:
-            skip_codecs = []
-
-        for key, group in groups.items():
-            codec, resolution = key
-            count = group["count"]
-            size = group["total_size_bytes"]
-            avg_bitrate = group["total_bitrate"] / count if count > 0 else 0
-
-            total_files += count
-            total_size += size
-
-            # Check if already optimal (in skip list)
-            if codec in skip_codecs:
-                already_optimal += count
-                result_groups.append(
-                    {
-                        "codec": codec,
-                        "resolution": resolution,
-                        "count": count,
-                        "total_size_bytes": size,
-                        "avg_bitrate_mbps": round(avg_bitrate, 1),
-                        "estimated_savings_pct": 0,
-                        "estimated_savings_bytes": 0,
-                        "confidence": "optimal",
-                        "historical_sample_count": 0,
-                    }
-                )
-                continue
-
-            # Look up historical savings
-            savings_pct, sample_count, confidence = _lookup_savings(historical, codec, resolution)
-
-            est_savings_bytes = int(size * savings_pct / 100) if savings_pct > 0 else 0
-            total_estimated_savings += est_savings_bytes
-
-            result_groups.append(
-                {
-                    "codec": codec,
-                    "resolution": resolution,
-                    "count": count,
-                    "total_size_bytes": size,
-                    "avg_bitrate_mbps": round(avg_bitrate, 1),
-                    "estimated_savings_pct": round(savings_pct, 1),
-                    "estimated_savings_bytes": est_savings_bytes,
-                    "confidence": confidence,
-                    "historical_sample_count": sample_count,
-                }
-            )
-
-        # Sort by estimated savings descending
-        result_groups.sort(key=lambda group: narrowing.coerce_int(group.get("estimated_savings_bytes")), reverse=True)
-
-        results: dict[str, object] = {
-            "groups": result_groups,
-            "total_files": total_files,
-            "total_size_bytes": total_size,
-            "already_optimal": already_optimal,
-            "total_estimated_savings_bytes": total_estimated_savings,
-            "last_run": datetime.now().isoformat(),
-        }
-
-        # Save to cache
-        get_or_create_cache = cast("AnalysisCacheGetOrCreate", LibraryAnalysisCache.get_or_create)
-        cache, created = get_or_create_cache(
-            library_id=library_id,
-            defaults={
-                "analysis_json": json.dumps(results),
-                "file_count": total_files,
-                "last_run": datetime.now(),
-                "version": 1,
-            },
-        )
-        if not created:
-            cache.analysis_json = json.dumps(results)
-            cache.file_count = total_files
-            cache.last_run = datetime.now()
-            cache.version += 1
-            cache.save()
+        results = _build_analysis_results(library_id, groups)
+        total_files = narrowing.coerce_int(results["total_files"])
+        _save_analysis_cache(library_id, results, total_files)
 
         info["status"] = "complete"
         logger.info("Library analysis complete for library %s: %d files", library_id, total_files)
@@ -573,6 +453,87 @@ def _run_analysis(library_id: int, library_path: str, info: AnalysisInfo) -> Non
                     _active_analyses.pop(library_id, None)
 
         threading.Thread(target=cleanup, daemon=True).start()
+
+
+def _collect_analysis_groups(library_path: str, generation: str, info: AnalysisInfo) -> dict[tuple[str, str], AnalysisGroup]:
+    groups: dict[tuple[str, str], AnalysisGroup] = {}
+    for filepath in iter_media_files(library_path):
+        info["progress"]["total"] += 1
+        try:
+            entry = _analyse_file_incremental(str(filepath), generation=generation)
+            codec = narrowing.strict_str(entry.get("codec"), "unknown") or "unknown"
+            resolution = narrowing.strict_str(entry.get("resolution"), "unknown") or "unknown"
+            group = groups.setdefault(
+                (codec, resolution),
+                {"codec": codec, "resolution": resolution, "count": 0, "total_size_bytes": 0, "total_bitrate": 0},
+            )
+            group["count"] += 1
+            group["total_size_bytes"] += narrowing.coerce_int(entry.get("file_size"))
+            group["total_bitrate"] += narrowing.coerce_float(entry.get("bitrate_mbps"))
+        except Exception as error:
+            logger.debug("Analysis skipped file %s: %s", filepath, error)
+        info["progress"]["checked"] += 1
+    return groups
+
+
+def _build_analysis_results(library_id: int, groups: dict[tuple[str, str], AnalysisGroup]) -> dict[str, object]:
+    historical = _get_historical_savings()
+    try:
+        skip_codecs = [codec.lower() for codec in Library(library_id).get_skip_codecs()]
+    except Exception:
+        skip_codecs = []
+    result_groups = [_analysis_group_result(key, group, historical, skip_codecs) for key, group in groups.items()]
+    result_groups.sort(key=lambda group: narrowing.coerce_int(group.get("estimated_savings_bytes")), reverse=True)
+    return {
+        "groups": result_groups,
+        "total_files": sum(group["count"] for group in groups.values()),
+        "total_size_bytes": sum(group["total_size_bytes"] for group in groups.values()),
+        "already_optimal": sum(group["count"] for key, group in groups.items() if key[0] in skip_codecs),
+        "total_estimated_savings_bytes": sum(
+            narrowing.coerce_int(group["estimated_savings_bytes"]) for group in result_groups
+        ),
+        "last_run": datetime.now().isoformat(),
+    }
+
+
+def _analysis_group_result(
+    key: tuple[str, str],
+    group: AnalysisGroup,
+    historical: HistoricalSavings,
+    skip_codecs: list[str],
+) -> dict[str, object]:
+    codec, resolution = key
+    count = group["count"]
+    size = group["total_size_bytes"]
+    savings_pct, sample_count, confidence = (
+        (0.0, 0, "optimal") if codec in skip_codecs else _lookup_savings(historical, codec, resolution)
+    )
+    savings_bytes = int(size * savings_pct / 100) if savings_pct > 0 else 0
+    return {
+        "codec": codec,
+        "resolution": resolution,
+        "count": count,
+        "total_size_bytes": size,
+        "avg_bitrate_mbps": round(group["total_bitrate"] / count if count > 0 else 0, 1),
+        "estimated_savings_pct": round(savings_pct, 1),
+        "estimated_savings_bytes": savings_bytes,
+        "confidence": confidence,
+        "historical_sample_count": sample_count,
+    }
+
+
+def _save_analysis_cache(library_id: int, results: dict[str, object], total_files: int) -> None:
+    get_or_create_cache = cast("AnalysisCacheGetOrCreate", LibraryAnalysisCache.get_or_create)
+    cache, created = get_or_create_cache(
+        library_id=library_id,
+        defaults={"analysis_json": json.dumps(results), "file_count": total_files, "last_run": datetime.now(), "version": 1},
+    )
+    if not created:
+        cache.analysis_json = json.dumps(results)
+        cache.file_count = total_files
+        cache.last_run = datetime.now()
+        cache.version += 1
+        cache.save()
 
 
 def _get_historical_savings() -> HistoricalSavings:

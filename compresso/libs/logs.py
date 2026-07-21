@@ -39,7 +39,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from logging.handlers import RotatingFileHandler
 from queue import Empty, Full, Queue
-from typing import ClassVar, Protocol, Self, TextIO, TypedDict
+from typing import BinaryIO, ClassVar, Protocol, Self, TextIO, TypedDict
 
 import requests
 from json_log_formatter import JSONFormatter
@@ -433,39 +433,17 @@ class ForwardLogHandler(logging.Handler):
                     if not stripped:
                         new_offset = line_end
                         continue
-                    try:
-                        entry = _parse_forward_log_entry(json.loads(stripped.decode("utf-8")))
-                    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
-                        logging.getLogger(_FORWARD_HANDLER_NAME).warning(
-                            "Skipping corrupt log entry in %s.",
-                            filename,
-                        )
-                        new_offset = line_end
-                        continue
-
+                    entry = self._parse_buffer_entry(filename, stripped)
                     if entry is None:
-                        logging.getLogger(_FORWARD_HANDLER_NAME).warning(
-                            "Skipping malformed log entry in %s.",
-                            filename,
-                        )
                         new_offset = line_end
                         continue
 
                     entries.append(entry)
                     payload, payload_size = self._build_payload(entries)
                     if payload_size > self.max_chunk_size:
-                        if len(entries) == 1:
-                            logging.getLogger(_FORWARD_HANDLER_NAME).warning(
-                                "Single log entry in %s exceeds max chunk size (%s bytes). Sending anyway.",
-                                filename,
-                                payload_size,
-                            )
-                            new_offset = line_end
-                            break
-                        entries.pop()
-                        payload, payload_size = self._build_payload(entries)
-                        handle.seek(line_start)
-                        new_offset = line_start
+                        payload, payload_size, new_offset = self._trim_oversized_payload(
+                            handle, filename, entries, payload, payload_size, line_start, line_end
+                        )
                         break
 
                     new_offset = line_end
@@ -489,6 +467,37 @@ class ForwardLogHandler(logging.Handler):
             payload, payload_size = self._build_payload(entries)
 
         return file_path, offset, new_offset, entries, payload
+
+    def _trim_oversized_payload(
+        self,
+        handle: BinaryIO,
+        filename: str,
+        entries: list[ForwardLogEntry],
+        payload: ForwardPayload,
+        payload_size: int,
+        line_start: int,
+        line_end: int,
+    ) -> tuple[ForwardPayload, int, int]:
+        if len(entries) == 1:
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning(
+                "Single log entry in %s exceeds max chunk size (%s bytes). Sending anyway.", filename, payload_size
+            )
+            return payload, payload_size, line_end
+        entries.pop()
+        payload, payload_size = self._build_payload(entries)
+        handle.seek(line_start)
+        return payload, payload_size, line_start
+
+    @staticmethod
+    def _parse_buffer_entry(filename: str, raw_line: bytes) -> ForwardLogEntry | None:
+        try:
+            entry = _parse_forward_log_entry(json.loads(raw_line.decode("utf-8")))
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning("Skipping corrupt log entry in %s.", filename)
+            return None
+        if entry is None:
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning("Skipping malformed log entry in %s.", filename)
+        return entry
 
     def _build_payload(self, entries: Sequence[ForwardLogEntry]) -> tuple[ForwardPayload, int]:
         """Return a payload dict and byte size for the given entries."""
@@ -549,27 +558,29 @@ class ForwardLogHandler(logging.Handler):
             except Empty:
                 break
 
-            index = 0
-            while index < len(chunk):
-                sub_entries, consumed, payload = self._slice_entries_for_send(chunk[index:])
-                if not sub_entries:
-                    break
-
-                if not (self.endpoint and self.app_id):
-                    # Discard if no remote endpoint is configured
-                    return processed
-
-                if not self._transmit_buffer(sub_entries, "in-memory chunk", payload):
-                    remaining = list(sub_entries) + chunk[index + consumed :]
-                    if remaining:
-                        with contextlib.suppress(Empty, Full):
-                            self._in_memory_chunks.put_nowait(list(remaining))
-                    return processed
-
-                processed = True
-                index += consumed
+            chunk_processed, should_continue = self._send_memory_chunk(chunk)
+            processed = processed or chunk_processed
+            if not should_continue:
+                return processed
 
         return processed
+
+    def _send_memory_chunk(self, chunk: list[ForwardLogEntry]) -> tuple[bool, bool]:
+        index = 0
+        processed = False
+        while index < len(chunk):
+            sub_entries, consumed, payload = self._slice_entries_for_send(chunk[index:])
+            if not sub_entries or not (self.endpoint and self.app_id):
+                return processed, False
+            if not self._transmit_buffer(sub_entries, "in-memory chunk", payload):
+                remaining = list(sub_entries) + chunk[index + consumed :]
+                if remaining:
+                    with contextlib.suppress(Empty, Full):
+                        self._in_memory_chunks.put_nowait(list(remaining))
+                return processed, False
+            processed = True
+            index += consumed
+        return processed, True
 
     def _slice_entries_for_send(
         self, entries: Sequence[ForwardLogEntry]

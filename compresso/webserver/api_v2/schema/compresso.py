@@ -80,21 +80,7 @@ class CompressoSpecPlugin(TornadoPlugin):
         if urlspec is None:
             raise APISpecError("A Tornado URLSpec is required")
         if not isinstance(urlspec, URLSpec):
-            if len(urlspec) < 2 or len(urlspec) > 4:
-                raise APISpecError("Invalid Tornado URLSpec tuple")
-            pattern, handler = urlspec[:2]
-            if not isinstance(pattern, str) or not isinstance(handler, type) or not issubclass(handler, RequestHandler):
-                raise APISpecError("Invalid Tornado URLSpec tuple")
-            handler_kwargs_value = urlspec[2] if len(urlspec) >= 3 else None
-            name_value = urlspec[3] if len(urlspec) >= 4 else None
-            if handler_kwargs_value is not None and not isinstance(handler_kwargs_value, dict):
-                raise APISpecError("Invalid Tornado handler arguments")
-            if name_value is not None and not isinstance(name_value, str):
-                raise APISpecError("Invalid Tornado route name")
-            handler_kwargs = (
-                {str(key): value for key, value in handler_kwargs_value.items()} if handler_kwargs_value is not None else None
-            )
-            urlspec = URLSpec(pattern, handler, handler_kwargs, name_value)
+            urlspec = self._urlspec_from_tuple(urlspec)
         if operations is None:
             operations = {}
         for operation in self._operations_from_urlspec(urlspec):
@@ -107,3 +93,21 @@ class CompressoSpecPlugin(TornadoPlugin):
         params_method = getattr(urlspec.handler_class, method_name)
         operations.update(self._extensions_from_handler(urlspec.handler_class))
         return self.tornadopath2openapi(urlspec, params_method)
+
+    @staticmethod
+    def _urlspec_from_tuple(values: tuple[object, ...]) -> URLSpec:
+        if len(values) < 2 or len(values) > 4:
+            raise APISpecError("Invalid Tornado URLSpec tuple")
+        pattern, handler = values[:2]
+        if not isinstance(pattern, str) or not isinstance(handler, type) or not issubclass(handler, RequestHandler):
+            raise APISpecError("Invalid Tornado URLSpec tuple")
+        handler_kwargs_value = values[2] if len(values) >= 3 else None
+        name_value = values[3] if len(values) >= 4 else None
+        if handler_kwargs_value is not None and not isinstance(handler_kwargs_value, dict):
+            raise APISpecError("Invalid Tornado handler arguments")
+        if name_value is not None and not isinstance(name_value, str):
+            raise APISpecError("Invalid Tornado route name")
+        handler_kwargs = (
+            {str(key): value for key, value in handler_kwargs_value.items()} if handler_kwargs_value is not None else None
+        )
+        return URLSpec(pattern, handler, handler_kwargs, name_value)

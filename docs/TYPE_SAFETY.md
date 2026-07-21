@@ -32,8 +32,8 @@ changes. CI runs the corresponding `--check-document` command and rejects stale 
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
 | Production Python files | 245 | 250 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,710 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 1,862 / 1,862 | 100% |
+| Production Python nonblank LOC | 44,273 | 47,524 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 2,051 / 2,051 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
 | Production frontend JavaScript files | 33 | 0 | 0 |
@@ -73,10 +73,11 @@ boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit r
 | SIM-06 | Parse each browser WebSocket event once and use one typed Library Settings state object | Complete | Vitest, Vue typecheck, Chrome and WebKit E2E | PR #218 |
 | SIM-07 | Preserve unknown notification-channel fields and collapse generated artifacts in review | Complete | Vitest plus generated-artifact attributes | PR #218 |
 | SIM-08 | Close final merge-readiness findings: GPU history, notification load safety, float coercion, system-log parsing, plugin-save responsibilities, and duplicate CI runs | Complete | Focused regressions, full strict gates, isolated unit suite, Chrome and WebKit E2E | PR #218 |
+| SIM-09 | Resolve the 124 new SonarCloud findings with direct fixes and responsibility-focused refactors | Awaiting SonarCloud | Sonar target replay, Ruff, strict mypy, metrics/OpenAPI drift, and complete isolated unit suite | PR #218 |
 
 ## Verification Evidence
 
-| ID | Evidence recorded 2026-07-20 |
+| ID | Evidence recorded through 2026-07-21 |
 |---|---|
 | TS-00 | `pytest tests/unit/test_type_safety_metrics.py -q` (2 passed); focused Ruff check and format check; reporter ignores installed frontend dependencies |
 | TS-10 | OpenAPI generator reports zero undocumented routes; schema and contract tests (24 passed); backend `--check`, frontend `contract:check`, Prettier, and ESLint pass; drift gates added to local verification and CI |
@@ -87,6 +88,7 @@ boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit r
 | TS-90 | `verify-local.sh full` passed under an isolated Node 24.11.1 runtime with only Playwright skipped: action pins, licenses, locks, both pip audits, Ruff/format, strict mypy, OpenAPI, 4,031 unit tests, 481 frontend tests plus coverage, build, actionlint, 24 integration tests, 11 release tests, 3 release-tool tests, and clean-wheel inspection. Separate Playwright verification uses installed Google Chrome as the primary desktop, mobile, and packaged live-backend browser plus WebKit for Safari coverage: mocked browser tests 9 passed and packaged live-backend tests 3 passed. `npm audit --omit=dev` reports zero production vulnerabilities |
 | SIM-01–07 | Integer, pagination, settings, helper, WebSocket, Library Settings, notification-preservation, and metrics regressions pass. Strict mypy, Ruff, frontend contract/type/lint/test/build gates, the complete isolated unit suite, installed Chrome/mobile Chrome, WebKit, and packaged live-backend Chrome all pass. |
 | SIM-08 | Final review regressions pass; 4,083 isolated backend unit tests and 500 frontend tests pass. OpenAPI and metrics drift, Ruff, strict mypy, TypeScript, ESLint, Prettier, coverage, and the production build pass; the two changed workflows pass actionlint. Installed Chrome/mobile Chrome/WebKit mocked E2E passes 9 tests; packaged live-backend Chrome passes 3. |
+| SIM-09 | All 86 reported complex functions and their extracted helpers are at or below the configured threshold; all non-complexity findings were directly corrected without Sonar suppressions. Ruff, formatting, strict mypy, metrics/OpenAPI drift, and 4,084 backend unit tests pass. Live PR analysis remains pending. |
 
 ## Defects Prevented or Fixed
 
@@ -96,6 +98,8 @@ The migration was kept behavior-preserving except where stricter boundary checks
 - Malformed worker slots/configuration, FFprobe JSON/numeric/path data, API JSON, dynamic routes, and WebSocket messages fail safely instead of reaching typed internals.
 - Session registration no longer passes an installation UUID into a boolean `force` parameter, and service startup no longer initializes `TaskQueue` twice.
 - Peewee writes distinguish required integer row counts from intentionally ignored results, preventing mocks or driver changes from silently becoming truthy control-flow values.
+- Failed tasks now initialize post-processing movement status before branching, preventing an unbound local from masking the original task result.
+- Source-probe history queries now honor requested sorting and pagination instead of silently returning an unbounded, unordered result set.
 - Resource logging uses a real stoppable thread, and optional watchdog types no longer crash an installed wheel when watchdog is absent.
 - The OpenAPI schema now expands nested response shapes and generated frontend declarations are checked for drift.
 - Bundled plugin identifiers and settings filenames are allowlisted and confined to their configured roots, preventing malformed metadata or symlinks from escaping the plugin directory or forging log lines.
