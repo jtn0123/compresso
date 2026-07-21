@@ -173,22 +173,20 @@ class EventMonitorManager(threading.Thread):
                 self.manage_event_queue(pathname, library_id)
                 continue
 
-            enable_inotify = self._inotify_enabled()
-
-            # If at least library has the monitor enabled, then start it. Otherwise stop the monitor process
-            if enable_inotify:
-                # If enabled, ensure it is running and start it if it is not
-                if not self.event_observer_thread:
-                    self.start_event_processor()
-            else:
-                # If not enabled, ensure the EventProcessor is not running and stop it if it is
-                if self.event_observer_thread:
-                    self.stop_event_processor()
+            enable_inotify = self._sync_event_processor()
             # Add delay (longer when no libraries are being monitored)
             self.event.wait(2 if enable_inotify else 20)
 
         self.stop_event_processor()
         self.logger.info("Leaving EventMonitorManager loop...")
+
+    def _sync_event_processor(self) -> bool:
+        enable_inotify = self._inotify_enabled()
+        if enable_inotify and not self.event_observer_thread:
+            self.start_event_processor()
+        elif not enable_inotify and self.event_observer_thread:
+            self.stop_event_processor()
+        return enable_inotify
 
     def _inotify_enabled(self) -> bool:
         enabled = False

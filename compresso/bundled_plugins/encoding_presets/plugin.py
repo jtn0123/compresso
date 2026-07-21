@@ -371,11 +371,7 @@ def _append_video_settings(cmd: list[str], settings: Mapping[str, object]) -> st
     cmd.extend(crf_args)
     preset = narrowing.strict_str(settings.get("encoder_preset"), "medium").strip()
     if preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
-        preset_value = (
-            SVTAV1_PRESET_MAP.get(preset, "5")
-            if video_encoder == "libsvtav1"
-            else (CPU_USED_PRESET_MAP.get(preset, "3") if video_encoder in ("libvpx-vp9", "libaom-av1") else preset)
-        )
+        preset_value = _encoder_preset_value(video_encoder, preset)
         cmd.extend([PRESET_PARAM_MAP.get(video_encoder, "-preset"), preset_value])
     max_bitrate = narrowing.strict_str(settings.get("max_bitrate")).strip()
     if max_bitrate:
@@ -383,6 +379,14 @@ def _append_video_settings(cmd: list[str], settings: Mapping[str, object]) -> st
             cmd.extend(["-b:v", max_bitrate])
         cmd.extend(["-maxrate", max_bitrate, "-bufsize", max_bitrate])
     return video_encoder
+
+
+def _encoder_preset_value(video_encoder: str, preset: str) -> str:
+    if video_encoder == "libsvtav1":
+        return SVTAV1_PRESET_MAP.get(preset, "5")
+    if video_encoder in ("libvpx-vp9", "libaom-av1"):
+        return CPU_USED_PRESET_MAP.get(preset, "3")
+    return preset
 
 
 def _append_audio_settings(cmd: list[str], settings: Mapping[str, object]) -> None:

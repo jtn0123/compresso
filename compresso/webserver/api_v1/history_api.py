@@ -187,11 +187,10 @@ class ApiHistoryHandler(BaseApiHandler):
     def _historic_task_item(task: Mapping[str, object]) -> dict[str, object]:
         finish_time = task.get("finish_time")
         timestamp = completed_tasks.parse_timestamp_value(finish_time)
-        display_time = (
-            (str(finish_time) if finish_time else "")
-            if timestamp is None
-            else time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
-        )
+        if timestamp is None:
+            display_time = str(finish_time) if finish_time else ""
+        else:
+            display_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
         return {
             "id": task["id"],
             "selected": False,

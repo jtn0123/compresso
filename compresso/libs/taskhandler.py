@@ -292,7 +292,7 @@ class TaskHandler(threading.Thread):
         os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
         try:
             shutil.copy2(staged_path, cache_path)
-        except (OSError, shutil.Error):
+        except OSError:
             logger.exception("STARTUP_APPROVED_CACHE_RESTORE_FAILED id=%s", task_id)
             try:
                 os.remove(cache_path)

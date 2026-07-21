@@ -992,7 +992,7 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         if success and data.get("remove_source_file") and os.path.exists(source_data["abspath"]):
             try:
                 tracker.safe_remove(source_data["abspath"])
-            except (OSError, PermissionError, shutil.Error) as error:
+            except OSError as error:
                 self._log("Failed to safely remove source file", message2=str(error), level="error")
                 success = False
         return success

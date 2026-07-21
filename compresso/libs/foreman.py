@@ -322,12 +322,12 @@ class Foreman(threading.Thread):
             self._remove_obsolete_worker_threads(worker_group_ids, worker_group_names)
 
     def _remove_dead_worker_threads(self) -> None:
-        for worker_id in list(self.worker_threads):
+        for worker_id in tuple(self.worker_threads):
             if not self.worker_threads[worker_id].is_alive():
                 del self.worker_threads[worker_id]
 
     def _remove_obsolete_worker_threads(self, worker_group_ids: list[int], worker_group_names: list[str]) -> None:
-        for worker_id, worker in list(self.worker_threads.items()):
+        for worker_id, worker in tuple(self.worker_threads.items()):
             group_removed = worker.worker_group_id not in worker_group_ids
             name_removed = worker.name not in worker_group_names
             if (group_removed or name_removed) and worker.idle:

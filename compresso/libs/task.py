@@ -96,7 +96,7 @@ def prepare_file_destination_data(pathname: str, file_extension: str) -> TaskPat
     return file_data
 
 
-class Task:
+class TaskItem:
     """
     Task
 
@@ -596,6 +596,11 @@ class Task:
         """
         query = Tasks.update(library_id=library_id).where(Tasks.id.in_(id_list))
         return execute_count(query)
+
+
+# Preserve the longstanding public import while avoiding a model field whose
+# name collides with its enclosing class name in static analysis.
+Task = TaskItem
 
 
 class TaskDataStore:

@@ -294,10 +294,11 @@ class Migrations:
     def _sync_model_fields(self, model: type[Model], database: Database, migrator: Migrator) -> list[tuple[str, str, str]]:
         missing_required: list[tuple[str, str, str]] = []
         table_name = str(model._meta.table_name)
-        existing_columns = {column.name for column in database.get_columns(table_name)}
+        database_columns = database.get_columns(table_name)
+        existing_columns = {column.name for column in database_columns} if database_columns else set()
         # The migrator may replace Peewee field metadata while adding a column,
         # so iterate over a stable snapshot rather than the live dictionary.
-        for field in list(model._meta.fields.values()):
+        for field in tuple(model._meta.fields.values()):
             if not isinstance(field, Field):
                 continue
             column_name = str(getattr(field, "column_name", field.name))

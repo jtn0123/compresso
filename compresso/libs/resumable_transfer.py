@@ -18,6 +18,7 @@ from typing import NamedTuple, Protocol, TypedDict, cast
 from compresso.libs.json_state import atomic_json_write
 
 MANIFEST_GLOB = "*.json"
+_INVALID_MANIFEST_SIZES = "Transfer manifest sizes are invalid"
 
 
 class TransferManifest(TypedDict):
@@ -173,11 +174,11 @@ class ResumableTransferStore:
             total_size = manifest["total_size"]
             offset = manifest["offset"]
         except KeyError as error:
-            raise ValueError("Transfer manifest sizes are invalid") from error
+            raise ValueError(_INVALID_MANIFEST_SIZES) from error
         if not isinstance(total_size, int) or isinstance(total_size, bool):
-            raise ValueError("Transfer manifest sizes are invalid")
+            raise ValueError(_INVALID_MANIFEST_SIZES)
         if not isinstance(offset, int) or isinstance(offset, bool) or not 0 <= offset <= total_size:
-            raise ValueError("Transfer manifest sizes are invalid")
+            raise ValueError(_INVALID_MANIFEST_SIZES)
         return total_size, offset
 
     @staticmethod
