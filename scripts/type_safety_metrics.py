@@ -134,9 +134,43 @@ def _is_test_script(path: Path) -> bool:
     return "__tests__" in path.parts or path.name.endswith((".test.js", ".spec.js", ".test.ts", ".spec.ts"))
 
 
+def _vue_script_blocks(source: str) -> list[tuple[str, str]]:
+    folded = source.casefold()
+    blocks: list[tuple[str, str]] = []
+    cursor = 0
+    while True:
+        opening_start = folded.find("<script", cursor)
+        if opening_start < 0:
+            return blocks
+        opening_name_end = opening_start + len("<script")
+        if opening_name_end < len(folded) and not (
+            folded[opening_name_end].isspace() or folded[opening_name_end] == ">"
+        ):
+            cursor = opening_name_end
+            continue
+        opening_end = folded.find(">", opening_name_end)
+        if opening_end < 0:
+            return blocks
+
+        closing_start = folded.find("</script", opening_end + 1)
+        if closing_start < 0:
+            return blocks
+        closing_name_end = closing_start + len("</script")
+        if closing_name_end < len(folded) and not (
+            folded[closing_name_end].isspace() or folded[closing_name_end] == ">"
+        ):
+            cursor = closing_name_end
+            continue
+        closing_end = folded.find(">", closing_name_end)
+        if closing_end < 0:
+            return blocks
+
+        blocks.append((source[opening_start : opening_end + 1], source[opening_end + 1 : closing_start]))
+        cursor = closing_end + 1
+
+
 def _vue_script_loc(source: str) -> int:
-    script_blocks = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script\s*>", source, flags=re.DOTALL | re.IGNORECASE)
-    return sum(_nonblank_count(block.splitlines()) + 2 for block in script_blocks)
+    return sum(_nonblank_count(body.splitlines()) + 2 for _, body in _vue_script_blocks(source))
 
 
 def _collect_frontend(frontend_root: Path) -> FrontendMetrics:
@@ -151,7 +185,12 @@ def _collect_frontend(frontend_root: Path) -> FrontendMetrics:
         if path.suffix == ".vue":
             source = path.read_text(encoding="utf-8")
             vue_files += 1
-            typed_vue_files += int(bool(re.search(r"<script[^>]*\blang=[\"']ts[\"']", source, flags=re.IGNORECASE)))
+            typed_vue_files += int(
+                any(
+                    re.search(r"\blang=[\"']ts[\"']", opening, flags=re.IGNORECASE)
+                    for opening, _ in _vue_script_blocks(source)
+                )
+            )
             vue_script_loc += _vue_script_loc(source)
             continue
         if path.suffix not in {".js", ".ts"}:

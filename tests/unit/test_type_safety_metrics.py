@@ -69,7 +69,7 @@ def test_collect_metrics_recognizes_case_insensitive_vue_script_tags(tmp_path):
     frontend.mkdir(parents=True)
     (tmp_path / "tests").mkdir()
     (frontend / "Panel.vue").write_text(
-        '<template><div /></template>\n<SCRIPT SETUP LANG="TS">\nconst count: number = 1\n</SCRIPT >\n',
+        '<template><div /></template>\n<SCRIPT SETUP LANG="TS">\nconst count: number = 1\n</SCRIPT\t\n data-close>\n',
         encoding="utf-8",
     )
 
