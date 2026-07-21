@@ -86,7 +86,7 @@ def test_root_service_can_start_and_stop_twice_with_temp_paths(monkeypatch, in_m
     def fake_library_scanner(self, data_queues):
         return append_dummy_thread(self, "LibraryScannerManager")
 
-    def fake_inotify(self, data_queues, settings):
+    def fake_inotify(self, data_queues):
         return append_dummy_thread(self, "EventMonitorManager")
 
     def fake_ui_server(self, data_queues, foreman):
@@ -169,7 +169,7 @@ def test_root_service_readiness_fails_when_ui_server_never_becomes_ready(monkeyp
     monkeypatch.setattr(
         RootService,
         "start_inotify_watch_manager",
-        lambda self, data_queues, settings: append_dummy_thread(self, "EventMonitorManager"),
+        lambda self, data_queues: append_dummy_thread(self, "EventMonitorManager"),
     )
     monkeypatch.setattr(
         RootService,
