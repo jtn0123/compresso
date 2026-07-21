@@ -40,7 +40,7 @@ from typing import cast
 import peewee
 
 from compresso import config
-from compresso.libs import history
+from compresso.libs import history, narrowing
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 
@@ -63,19 +63,6 @@ def _issues(value: object) -> list[FileIssue]:
 
 def _optional_bool(value: object) -> bool | None:
     return value if isinstance(value, bool) else None
-
-
-def _int_value(value: object, default: int = 0) -> int:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, (float, str, bytes, bytearray)):
-        try:
-            return int(value)
-        except (OverflowError, TypeError, ValueError):
-            return default
-    return default
 
 
 class FileTest:
@@ -247,7 +234,7 @@ class FileTest:
                     }
                     break
             # Set the priority score modification
-            priority_score_modification = _int_value(data.get("priority_score"))
+            priority_score_modification = narrowing.coerce_int(data.get("priority_score"))
 
         return return_value, file_issues, priority_score_modification, decision_plugin
 

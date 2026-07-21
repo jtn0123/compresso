@@ -9,6 +9,7 @@ import tornado.httpclient
 import tornado.web
 
 from compresso import config
+from compresso.libs import narrowing
 from compresso.libs.installation_link import Links
 from compresso.webserver.request_auth import API_AUTH_HEADER_NAME, authorize_request
 from compresso.webserver.security_headers import SecurityHeadersMixin
@@ -53,10 +54,6 @@ class ProxyTarget(TypedDict):
     url_base: str
     headers: dict[str, str]
     config: dict[str, object]
-
-
-def _string(value: object, default: str = "") -> str:
-    return value if isinstance(value, str) else default
 
 
 def _allowed_headers(headers: Mapping[str, str], allowlist: Sequence[str]) -> dict[str, str]:
@@ -161,7 +158,7 @@ def resolve_proxy_target(target_id: str | None) -> ProxyTarget | None:
         return None
 
     # Construct URL base
-    url_base = _string(target_config.get("address")).rstrip("/")
+    url_base = narrowing.strict_str(target_config.get("address")).rstrip("/")
     if not url_base.startswith("http"):
         url_base = _HTTP_SCHEME + url_base
 
@@ -173,10 +170,10 @@ def resolve_proxy_target(target_id: str | None) -> ProxyTarget | None:
 
     # Auth
     auth_headers: dict[str, str] = {}
-    auth_type = _string(target_config.get("auth"))
+    auth_type = narrowing.strict_str(target_config.get("auth"))
     if auth_type.lower() == "basic":
-        username = _string(target_config.get("username"))
-        password = _string(target_config.get("password"))
+        username = narrowing.strict_str(target_config.get("username"))
+        password = narrowing.strict_str(target_config.get("password"))
         auth_str = f"{username}:{password}"
         auth_bytes = auth_str.encode("ascii")
         base64_bytes = base64.b64encode(auth_bytes)

@@ -15,7 +15,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, TypedDict, cast
 
 from compresso import config
-from compresso.libs import task
+from compresso.libs import narrowing, task
 from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
@@ -38,20 +38,6 @@ class _CountedRows(Protocol):
     def count(self) -> int: ...
 
 
-def _text(value: object, default: str = "") -> str:
-    return value if isinstance(value, str) else default
-
-
-def _integer(value: object, default: int = 0) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) else default
-
-
-def _number(value: object, default: float = 0.0) -> float:
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return float(value)
-    return default
-
-
 def _id_list(value: object) -> list[int]:
     if not isinstance(value, list):
         return []
@@ -72,11 +58,11 @@ def _normalise_quality_min(value: object) -> float:
 
 
 def _build_order(params: Mapping[str, object]) -> TaskOrder:
-    order_by = _text(params.get("order_by"), "finish_time")
+    order_by = narrowing.strict_str(params.get("order_by"), "finish_time")
     if order_by not in APPROVAL_TASK_ORDER_COLUMNS:
         order_by = "finish_time"
 
-    order_direction = _text(params.get("order_direction"), "desc")
+    order_direction = narrowing.strict_str(params.get("order_direction"), "desc")
     return {
         "column": order_by if order_by else "finish_time",
         "dir": order_direction if order_direction in ("asc", "desc") else "desc",
@@ -86,9 +72,9 @@ def _build_order(params: Mapping[str, object]) -> TaskOrder:
 def _build_approval_item(
     approval_task: Mapping[str, object], staging_path: str, include_library: bool = False
 ) -> dict[str, object]:
-    task_id = _integer(approval_task["id"])
-    source_path = _text(approval_task.get("abspath"))
-    source_size = _integer(approval_task.get("source_size"))
+    task_id = narrowing.strict_int(approval_task["id"])
+    source_path = narrowing.strict_str(approval_task.get("abspath"))
+    source_size = narrowing.strict_int(approval_task.get("source_size"))
     item: dict[str, object] = {
         "id": task_id,
         "abspath": approval_task["abspath"],
@@ -100,14 +86,14 @@ def _build_approval_item(
     }
 
     staged_info = _get_staged_file_info(task_id, staging_path)
-    stored_staged_size = _integer(approval_task.get("staged_size"))
+    stored_staged_size = narrowing.strict_int(approval_task.get("staged_size"))
     staged_size = staged_info["size"] or stored_staged_size
     item["staged_size"] = staged_size
     item["staged_path"] = staged_info["path"]
     item["size_delta"] = staged_size - source_size if staged_size else 0
 
     metadata_updates: dict[str, object] = {}
-    stored_source_codec = _text(approval_task.get("source_codec"))
+    stored_source_codec = narrowing.strict_str(approval_task.get("source_codec"))
     source_meta = extract_media_metadata(source_path) if source_path else None
     if stored_source_codec:
         source_codec = stored_source_codec
@@ -119,7 +105,7 @@ def _build_approval_item(
     item["source_resolution"] = source_meta["resolution"] if source_meta else ""
 
     staged_path = staged_info["path"]
-    stored_staged_codec = _text(approval_task.get("staged_codec"))
+    stored_staged_codec = narrowing.strict_str(approval_task.get("staged_codec"))
     if staged_path:
         staged_meta = extract_media_metadata(staged_path)
         item["staged_codec"] = stored_staged_codec or staged_meta.get("codec", "")
@@ -141,7 +127,7 @@ def _build_approval_item(
     _backfill_approval_metadata(task_id, approval_task, metadata_updates)
 
     if include_library:
-        library = Library(_integer(approval_task["library_id"], 1))
+        library = Library(narrowing.strict_int(approval_task["library_id"], 1))
         item["library_id"] = library.get_id()
         item["library_name"] = library.get_name()
 
@@ -172,27 +158,27 @@ def _backfill_approval_metadata(
 
 
 def _approval_summary_item_from_task(approval_task: Mapping[str, object], staging_path: str) -> dict[str, object]:
-    task_id = _integer(approval_task["id"])
+    task_id = narrowing.strict_int(approval_task["id"])
     item: dict[str, object] = {
         "id": task_id,
         "abspath": approval_task.get("abspath", ""),
-        "source_size": _integer(approval_task.get("source_size")),
+        "source_size": narrowing.strict_int(approval_task.get("source_size")),
         "vmaf_score": approval_task.get("vmaf_score"),
         "source_codec": approval_task.get("source_codec") or "",
         "staged_codec": approval_task.get("staged_codec") or "",
-        "staged_size": _integer(approval_task.get("staged_size")),
+        "staged_size": narrowing.strict_int(approval_task.get("staged_size")),
     }
 
     metadata_updates: dict[str, object] = {}
-    source_codec = _text(item["source_codec"])
-    source_path = _text(item["abspath"])
+    source_codec = narrowing.strict_str(item["source_codec"])
+    source_path = narrowing.strict_str(item["abspath"])
     if not source_codec and source_path:
         source_meta = extract_media_metadata(source_path)
         item["source_codec"] = source_meta.get("codec", "")
         if item["source_codec"]:
             metadata_updates["source_codec"] = item["source_codec"]
 
-    if not _text(item["staged_codec"]) or not _integer(item["staged_size"]):
+    if not narrowing.strict_str(item["staged_codec"]) or not narrowing.strict_int(item["staged_size"]):
         staged_info = _get_staged_file_info(task_id, staging_path)
         staged_path = staged_info.get("path", "")
         if staged_info.get("size"):
@@ -204,8 +190,8 @@ def _approval_summary_item_from_task(approval_task: Mapping[str, object], stagin
             if item["staged_codec"]:
                 metadata_updates["staged_codec"] = item["staged_codec"]
 
-    staged_size = _integer(item["staged_size"])
-    source_size = _integer(item["source_size"])
+    staged_size = narrowing.strict_int(item["staged_size"])
+    source_size = narrowing.strict_int(item["source_size"])
     item["size_delta"] = staged_size - source_size if staged_size else 0
     _backfill_approval_metadata(task_id, approval_task, metadata_updates)
     return item
@@ -239,11 +225,11 @@ def _matches_approval_filters(item: Mapping[str, object], codec_filter: object =
 def _get_approval_items(
     params: Mapping[str, object], include_library: bool = False, force_all: bool = False
 ) -> tuple[int, int, list[dict[str, object]]]:
-    start = _integer(params.get("start"))
-    length = _integer(params.get("length"))
-    search_value = _text(params.get("search_value"))
+    start = narrowing.strict_int(params.get("start"))
+    length = narrowing.strict_int(params.get("length"))
+    search_value = narrowing.strict_str(params.get("search_value"))
     library_ids = _id_list(params.get("library_ids"))
-    codec_filter = _text(params.get("codec"))
+    codec_filter = narrowing.strict_str(params.get("codec"))
     quality_min = _normalise_quality_min(params.get("quality_min", 0))
     has_derived_filters = bool(_normalise_codec_filter(codec_filter)) or quality_min > 0
 
@@ -318,9 +304,9 @@ def prepare_approval_summary(params: Mapping[str, object]) -> dict[str, object]:
     :param params: dict with search/filter parameters
     :return: dict with counts, aggregate sizes, VMAF average, and codec options
     """
-    search_value = _text(params.get("search_value"))
+    search_value = narrowing.strict_str(params.get("search_value"))
     library_ids = _id_list(params.get("library_ids"))
-    codec_filter = _text(params.get("codec"))
+    codec_filter = narrowing.strict_str(params.get("codec"))
     quality_min = _normalise_quality_min(params.get("quality_min", 0))
     order = _build_order(params)
 
@@ -340,24 +326,33 @@ def prepare_approval_summary(params: Mapping[str, object]) -> dict[str, object]:
     items = [item for item in items if _matches_approval_filters(item, codec_filter=codec_filter, quality_min=quality_min)]
 
     codec_options = sorted(
-        {codec for item in items for value in (item.get("source_codec"), item.get("staged_codec")) if (codec := _text(value))}
+        {
+            codec
+            for item in items
+            for value in (item.get("source_codec"), item.get("staged_codec"))
+            if (codec := narrowing.strict_str(value))
+        }
     )
-    with_vmaf = [_number(value) for item in items if (value := item.get("vmaf_score")) is not None]
-    items_with_staged_files = [item for item in items if _integer(item.get("staged_size")) > 0]
-    total_source_size = sum(_integer(item.get("source_size")) for item in items)
-    total_staged_size = sum(_integer(item.get("staged_size")) for item in items)
-    total_space_saved = sum(abs(delta) for item in items if (delta := _integer(item.get("size_delta"))) < 0)
+    with_vmaf = [narrowing.strict_float(value) for item in items if (value := item.get("vmaf_score")) is not None]
+    items_with_staged_files = [item for item in items if narrowing.strict_int(item.get("staged_size")) > 0]
+    total_source_size = sum(narrowing.strict_int(item.get("source_size")) for item in items)
+    total_staged_size = sum(narrowing.strict_int(item.get("staged_size")) for item in items)
+    total_space_saved = sum(abs(delta) for item in items if (delta := narrowing.strict_int(item.get("size_delta"))) < 0)
     savings_percentages = [
-        ((_integer(item.get("source_size")) - _integer(item.get("staged_size"))) / _integer(item.get("source_size"))) * 100
+        (
+            (narrowing.strict_int(item.get("source_size")) - narrowing.strict_int(item.get("staged_size")))
+            / narrowing.strict_int(item.get("source_size"))
+        )
+        * 100
         for item in items_with_staged_files
-        if _integer(item.get("source_size")) > 0
+        if narrowing.strict_int(item.get("source_size")) > 0
     ]
     largest: dict[str, object] | None = None
     for item in items_with_staged_files:
-        size_delta = _integer(item.get("size_delta"))
+        size_delta = narrowing.strict_int(item.get("size_delta"))
         if size_delta >= 0:
             continue
-        if largest is None or abs(size_delta) > abs(_integer(largest.get("size_delta"))):
+        if largest is None or abs(size_delta) > abs(narrowing.strict_int(largest.get("size_delta"))):
             largest = item
 
     return {
@@ -367,7 +362,7 @@ def prepare_approval_summary(params: Mapping[str, object]) -> dict[str, object]:
         "total_space_saved": total_space_saved,
         "average_savings_percent": sum(savings_percentages) / len(savings_percentages) if savings_percentages else 0,
         "largest_savings_file": largest.get("abspath", "") if largest else "",
-        "largest_savings_bytes": abs(_integer(largest.get("size_delta"))) if largest else 0,
+        "largest_savings_bytes": abs(narrowing.strict_int(largest.get("size_delta"))) if largest else 0,
         "average_vmaf": sum(with_vmaf) / len(with_vmaf) if with_vmaf else None,
         "codec_options": codec_options,
     }
@@ -395,11 +390,11 @@ def get_approval_task_detail(task_id: int) -> dict[str, object] | None:
     staging_path = settings.get_staging_path()
     staged_info = _get_staged_file_info(task_id, staging_path)
 
-    source_size = _integer(task_data.get("source_size"))
+    source_size = narrowing.strict_int(task_data.get("source_size"))
     staged_size = staged_info["size"]
 
     # Extract media metadata for source and staged files
-    source_path = _text(task_data.get("abspath"))
+    source_path = narrowing.strict_str(task_data.get("abspath"))
     source_meta = extract_media_metadata(source_path) if source_path else None
     staged_path = staged_info["path"]
     staged_meta = extract_media_metadata(staged_path) if staged_path else None

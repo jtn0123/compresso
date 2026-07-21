@@ -32,19 +32,12 @@ Copyright:
 import hashlib
 from collections.abc import Mapping, Sequence
 
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.unplugins import PluginExecutor
 
 logger = CompressoLogging.get_logger(name="webserver.helpers.plugins")
-
-
-def _string(value: object, default: str = "") -> str:
-    return value if isinstance(value, str) else default
-
-
-def _integer(value: object, default: int = 0) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) else default
 
 
 def _optional_integer(value: object) -> int | None:
@@ -59,10 +52,10 @@ def prepare_filtered_plugins(params: Mapping[str, object]) -> dict[str, object]:
     :param params:
     :return:
     """
-    start = _integer(params.get("start"))
-    length = _integer(params.get("length"))
+    start = narrowing.strict_int(params.get("start"))
+    length = narrowing.strict_int(params.get("length"))
 
-    search_value = _string(params.get("search_value"))
+    search_value = narrowing.strict_str(params.get("search_value"))
 
     # Note that plugins can be ordered in multiple ways. So this must be a list
     order_value = params.get("order")
@@ -99,7 +92,7 @@ def prepare_filtered_plugins(params: Mapping[str, object]) -> dict[str, object]:
         }
         # Check if plugin is able to be configured
         has_config = False
-        plugin_id = _string(plugin_result.get("plugin_id"))
+        plugin_id = narrowing.strict_str(plugin_result.get("plugin_id"))
         plugin_settings, _plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_id)
         if plugin_settings:
             has_config = True
@@ -298,10 +291,10 @@ def get_plugin_settings(plugin_id: str, library_id: int | None = None) -> list[d
             form_input["description"] = plugin_setting_meta.get("description", "")
 
             # Usability level
-            req_lev = _integer(plugin_setting_meta.get("req_lev"))
+            req_lev = narrowing.strict_int(plugin_setting_meta.get("req_lev"))
             if s.level < req_lev:
                 form_input["display"] = "disabled"
-                form_input["description"] = _string(form_input.get("description")) + (
+                form_input["description"] = narrowing.strict_str(form_input.get("description")) + (
                     " (This option is reserved for supporters of the project)"
                 )
 
@@ -384,7 +377,9 @@ def prepare_plugin_info_and_settings(
         for plugin in plugin_list:
             if plugin.get("plugin_id") == plugin_id:
                 # Create changelog text from remote changelog text file
-                plugin["changelog"] = plugins_handler.read_remote_changelog_file(_string(plugin.get("changelog_url")))
+                plugin["changelog"] = plugins_handler.read_remote_changelog_file(
+                    narrowing.strict_str(plugin.get("changelog_url"))
+                )
                 # Create list as the 'plugin_results' var above will also have returned a list if any results were found.
                 plugin_results = [plugin]
                 break
@@ -412,11 +407,13 @@ def prepare_plugin_info_and_settings(
             "settings": [],
         }
         if plugin_installed:
-            result_plugin_id = _string(plugin_result.get("plugin_id"))
+            result_plugin_id = narrowing.strict_str(plugin_result.get("plugin_id"))
             plugin_data["settings"] = get_plugin_settings(result_plugin_id, library_id=library_id)
             plugin_data["changelog"] = "".join(get_plugin_changelog(result_plugin_id))
             plugin_data["description"] = (
-                _string(plugin_data.get("description")) + "\n\n" + "".join(get_plugin_long_description(result_plugin_id))
+                narrowing.strict_str(plugin_data.get("description"))
+                + "\n\n"
+                + "".join(get_plugin_long_description(result_plugin_id))
             )
         break
 
@@ -484,7 +481,7 @@ def update_plugin_settings(plugin_id: str, settings: Sequence[Mapping[str, objec
     if settings_to_save:
         plugin_executor = PluginExecutor()
         saved_all_settings = plugin_executor.save_plugin_settings(
-            _string(plugin_data.get("plugin_id")), settings_to_save, library_id=library_id
+            narrowing.strict_str(plugin_data.get("plugin_id")), settings_to_save, library_id=library_id
         )
         # If the save function was successful
         if saved_all_settings:
@@ -511,7 +508,7 @@ def reset_plugin_settings(plugin_id: str, library_id: int | None = None) -> bool
 
     # Reset the plugin settings
     plugin_executor = PluginExecutor()
-    return plugin_executor.reset_plugin_settings(_string(plugin_data.get("plugin_id")), library_id=library_id)
+    return plugin_executor.reset_plugin_settings(narrowing.strict_str(plugin_data.get("plugin_id")), library_id=library_id)
 
 
 def prepare_installable_plugins_list() -> list[dict[str, object]]:
@@ -561,12 +558,12 @@ def prepare_plugin_repos_list() -> list[dict[str, object]]:
     # Remove the default plugin repo from the list
     default_repo = plugins.get_default_repo()
     for repo in current_repos:
-        if not _string(repo.get("path")).startswith(default_repo):
+        if not narrowing.strict_str(repo.get("path")).startswith(default_repo):
             return_repos.append(repo)
 
     # Append metadata from repo cache files
     for repo in return_repos:
-        repo_path = _string(repo.get("path"))
+        repo_path = narrowing.strict_str(repo.get("path"))
         repo_id = plugins.get_plugin_repo_id(repo_path)
         repo_data = plugins.read_repo_data(repo_id)
         repo_metadata_value = repo_data.get("repo", {})

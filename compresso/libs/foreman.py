@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING, TypedDict, cast
 import peewee
 
 from compresso import config
-from compresso.libs import installation_link
+from compresso.libs import installation_link, narrowing
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
@@ -67,36 +67,6 @@ type RemoteManagerInfo = dict[str, object]
 class CurrentConfig(TypedDict):
     settings: LibrarySettingsById
     settings_hash: str
-
-
-def _object_dict(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("dict[str, object]", value)
-
-
-def _string_list(value: object) -> list[str]:
-    if not isinstance(value, (list, tuple, set)):
-        return []
-    return [item for item in value if isinstance(item, str)]
-
-
-def _int_value(value: object, default: int = 0) -> int:
-    if not isinstance(value, (bool, int, float, str, bytes, bytearray)):
-        return default
-    try:
-        return int(value)
-    except (OverflowError, TypeError, ValueError):
-        return default
-
-
-def _float_value(value: object, default: float = 0.0) -> float:
-    if not isinstance(value, (bool, int, float, str, bytes, bytearray)):
-        return default
-    try:
-        return float(value)
-    except (OverflowError, TypeError, ValueError):
-        return default
 
 
 class Foreman(threading.Thread):
@@ -383,19 +353,19 @@ class Foreman(threading.Thread):
             if installation_id not in self.remote_task_manager_threads:
                 manager_info = self.available_remote_managers[installation_id]
                 # Check that a remote worker is on an installation with a matching library name
-                installation_library_names = _string_list(manager_info.get("library_names"))
+                installation_library_names = narrowing.string_list(manager_info.get("library_names"))
                 if library_name is not None and library_name not in installation_library_names:
                     continue
                 configured_uuid = manager_info.get("uuid") or manager_info.get("installation_uuid")
                 if preferred_installation_uuid and configured_uuid != preferred_installation_uuid:
                     continue
-                capabilities = _object_dict(manager_info.get("capabilities"))
+                capabilities = narrowing.string_keyed_dict(manager_info.get("capabilities"))
                 score = WorkerCapabilities.scheduling_score(capabilities, required_encoder)
                 if score is None:
                     continue
                 if score <= 0:
-                    score = max(0.0, _float_value(manager_info.get("scheduling_score")))
-                queue_depth = max(0, _int_value(manager_info.get("queue_depth")))
+                    score = max(0.0, narrowing.coerce_float(manager_info.get("scheduling_score")))
+                queue_depth = max(0, narrowing.coerce_int(manager_info.get("queue_depth")))
                 effective_score = float(score) / (1 + queue_depth)
                 candidates.append((effective_score, installation_id, manager_info))
         if not candidates:
@@ -413,10 +383,10 @@ class Foreman(threading.Thread):
         if not isinstance(enabled_plugins, list):
             return None
         for plugin_value in enabled_plugins:
-            plugin = _object_dict(plugin_value)
+            plugin = narrowing.string_keyed_dict(plugin_value)
             if plugin.get("plugin_id") != "encoding_presets":
                 continue
-            plugin_settings = _object_dict(plugin.get("settings"))
+            plugin_settings = narrowing.string_keyed_dict(plugin.get("settings"))
             encoder = plugin_settings.get("video_encoder")
             if isinstance(encoder, str) and encoder:
                 return encoder
@@ -517,7 +487,7 @@ class Foreman(threading.Thread):
         term_log_msg = "Remote installation link with {} '{}' has been removed from settings. Marking tread for termination"
         for thread in self.remote_task_manager_threads:
             thread_info = self.remote_task_manager_threads[thread].get_info()
-            installation_info = _object_dict(thread_info.get("installation_info"))
+            installation_info = narrowing.string_keyed_dict(thread_info.get("installation_info"))
             thread_assigned_uuid = installation_info.get("uuid")
             thread_assigned_address = installation_info.get("address")
             # Ensure the UUID is still in our config
@@ -546,8 +516,8 @@ class Foreman(threading.Thread):
             remote_password = available_installations[installation_uuid].get("password", "")
             remote_api_token = available_installations[installation_uuid].get("api_token", "")
             remote_library_names = available_installations[installation_uuid].get("library_names", [])
-            available_slots = max(0, _int_value(available_installations[installation_uuid].get("available_slots")))
-            capabilities = _object_dict(available_installations[installation_uuid].get("capabilities"))
+            available_slots = max(0, narrowing.coerce_int(available_installations[installation_uuid].get("available_slots")))
+            capabilities = narrowing.string_keyed_dict(available_installations[installation_uuid].get("capabilities"))
             scheduling_score = available_installations[installation_uuid].get("scheduling_score", 0)
             queue_depth = available_installations[installation_uuid].get("queue_depth", 0)
             for slot_number in range(available_slots):
@@ -613,7 +583,7 @@ class Foreman(threading.Thread):
         library_names: list[str] = []
         for installation_id in self.available_remote_managers:
             configured_names = self.available_remote_managers[installation_id].get("library_names")
-            for library_name in _string_list(configured_names):
+            for library_name in narrowing.string_list(configured_names):
                 if library_name not in library_names:
                     library_names.append(library_name)
         return library_names
@@ -628,7 +598,7 @@ class Foreman(threading.Thread):
         # Workers created by this foreman always receive the integer DB group ID.
         worker_group = WorkerGroup(group_id=cast("int", assigned_worker_group_id))
         tags: object = worker_group.get_tags()
-        return _string_list(tags)
+        return narrowing.string_list(tags)
 
     def postprocessor_queue_full(self) -> bool:
         """

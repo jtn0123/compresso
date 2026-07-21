@@ -25,6 +25,10 @@ def strict_str(value: object, default: str = "") -> str:
     return value if isinstance(value, str) else default
 
 
+def strict_str_or_none(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
 def strict_int(value: object, default: int = 0) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else default
 
@@ -77,6 +81,25 @@ def string_keyed_dict(value: object) -> dict[str, object]:
     if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
         return {}
     return cast("dict[str, object]", value)
+
+
+def string_keyed_dict_or_none(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        return None
+    return cast("dict[str, object]", value)
+
+
+def mapping_dict(value: object) -> dict[str, object]:
+    """Copy any string-keyed Mapping (not just dict subclasses) into a dict."""
+    if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
+        return {}
+    return dict(cast("Mapping[str, object]", value))
+
+
+def string_list(value: object, default: "tuple[str, ...] | list[str]" = ()) -> list[str]:
+    if not isinstance(value, (list, tuple, set)):
+        return list(default)
+    return [item for item in value if isinstance(item, str)]
 
 
 def mapping_value(value: object) -> Mapping[str, object]:

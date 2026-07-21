@@ -41,12 +41,6 @@ type JsonObject = dict[str, object]
 type ManifestRow = dict[str, object]
 
 
-def _object_dict(value: object) -> JsonObject:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("JsonObject", value)
-
-
 @dataclass(frozen=True)
 class ManifestEntryPathTransition:
     path: str | None
@@ -92,7 +86,7 @@ def _verify_manifest_entry(
     seen_relative_paths: set[str],
 ) -> tuple[ManifestRow, int, int, bool]:
     """Verify one manifest entry and return its stable report row and totals."""
-    expected = _object_dict(expected)
+    expected = narrowing.string_keyed_dict(expected)
     relative_path = expected.get("relative_path")
     before_size = _manifest_before_size(expected)
     transition = _manifest_entry_path_transition(root, relative_path, seen_relative_paths)
@@ -154,9 +148,9 @@ def probe_media(path: str | os.PathLike[str]) -> JsonObject:
         command, capture_output=True, text=True, check=True, timeout=120
     )
     raw_probe: object = json.loads(result.stdout)
-    probe = _object_dict(raw_probe)
+    probe = narrowing.string_keyed_dict(raw_probe)
     stream_values = probe.get("streams")
-    streams = [_object_dict(stream) for stream in stream_values] if isinstance(stream_values, list) else []
+    streams = [narrowing.string_keyed_dict(stream) for stream in stream_values] if isinstance(stream_values, list) else []
     counts: Counter[str] = Counter(
         codec_type for stream in streams if isinstance((codec_type := stream.get("codec_type")), str)
     )
@@ -164,7 +158,7 @@ def probe_media(path: str | os.PathLike[str]) -> JsonObject:
         (stream for stream in streams if stream.get("codec_type") == "video"),
         {},
     )
-    format_info = _object_dict(probe.get("format"))
+    format_info = narrowing.string_keyed_dict(probe.get("format"))
     duration = narrowing.coerce_float(format_info.get("duration"))
     chapters = probe.get("chapters")
     return {

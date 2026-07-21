@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import NotRequired, TypedDict
 
 from compresso.config import Config
-from compresso.libs import library_analysis
+from compresso.libs import library_analysis, narrowing
 from compresso.libs.json_state import atomic_json_write
 
 SCHEMA_VERSION = 1
@@ -54,10 +54,6 @@ class Inventory(TypedDict):
 type PlanData = dict[str, object]
 type HistoricalSavings = library_analysis.HistoricalSavings
 type Probe = Callable[[str], Mapping[str, object]]
-
-
-def _integer(value: object, default: int = 0) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) else default
 
 
 def _database_path(settings: Config) -> Path:
@@ -210,7 +206,7 @@ def _savings_summary(
     for sample in samples:
         codec = str(sample.get("codec") or "unknown").lower()
         resolution = str(sample.get("resolution") or "unknown")
-        size = _integer(sample.get("size_bytes"))
+        size = narrowing.strict_int(sample.get("size_bytes"))
         if codec in skip_codecs:
             point, count, confidence = 0.0, 0, "optimal"
         else:
@@ -227,8 +223,8 @@ def _savings_summary(
                 "confidence": confidence if confidence != "none" else "unknown",
             },
         )
-        group["sample_files"] = _integer(group.get("sample_files")) + 1
-        group["sample_bytes"] = _integer(group.get("sample_bytes")) + size
+        group["sample_files"] = narrowing.strict_int(group.get("sample_files")) + 1
+        group["sample_bytes"] = narrowing.strict_int(group.get("sample_bytes")) + size
         if confidence == "none":
             continue
         spread = CONFIDENCE_SPREAD[confidence]
@@ -239,7 +235,7 @@ def _savings_summary(
         weighted_high += size * high
         confidences.append(confidence)
         group["range_pct"] = {"low": round(low, 1), "high": round(high, 1)}
-    sampled_bytes = sum(_integer(sample.get("size_bytes")) for sample in samples)
+    sampled_bytes = sum(narrowing.strict_int(sample.get("size_bytes")) for sample in samples)
     if not known_bytes or not sampled_bytes:
         return {
             "status": "unknown",

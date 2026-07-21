@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import NoReturn, Protocol, TypedDict, cast
 
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
@@ -78,30 +78,6 @@ class AnalysisCacheGetOrCreate(Protocol):
         library_id: int,
         defaults: dict[str, object],
     ) -> tuple[LibraryAnalysisCache, bool]: ...
-
-
-def _object_dict(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("dict[str, object]", value)
-
-
-def _float_value(value: object, default: float = 0.0) -> float:
-    if not isinstance(value, (bool, int, float, str, bytes, bytearray)):
-        return default
-    try:
-        return float(value)
-    except (OverflowError, TypeError, ValueError):
-        return default
-
-
-def _int_value(value: object, default: int = 0) -> int:
-    if not isinstance(value, (bool, int, float, str, bytes, bytearray)):
-        return default
-    try:
-        return int(value)
-    except (OverflowError, TypeError, ValueError):
-        return default
 
 
 # In-progress analyses keyed by library_id
@@ -259,7 +235,7 @@ def get_analysis_status(library_id: int) -> dict[str, object]:
 
     try:
         raw_results: object = json.loads(cache.analysis_json)
-        results = _object_dict(raw_results)
+        results = narrowing.string_keyed_dict(raw_results)
     except (json.JSONDecodeError, TypeError):
         results = {}
 
@@ -281,7 +257,7 @@ def _normalise_codec(codec: object) -> str:
 def _load_json_dict(value: object) -> dict[str, object]:
     try:
         raw_data: object = json.loads(value if isinstance(value, str) and value else "{}")
-        return _object_dict(raw_data)
+        return narrowing.string_keyed_dict(raw_data)
     except (TypeError, json.JSONDecodeError):
         return {}
 
@@ -299,8 +275,8 @@ def _probe_analysis_file(filepath: str | os.PathLike[str]) -> AnalysisEntry:
         }
     except OSError:
         stat_identity = {}
-    bitrate_mbps = _float_value(meta.get("bitrate_mbps"))
-    duration = _float_value(meta.get("duration"))
+    bitrate_mbps = narrowing.coerce_float(meta.get("bitrate_mbps"))
+    duration = narrowing.coerce_float(meta.get("duration"))
     if bitrate_mbps <= 0 and duration > 0:
         bitrate_mbps = file_size * 8 / duration / 1000000
 
@@ -346,7 +322,10 @@ def _cached_analysis_file(
                     path_row.path_type = current_type
                     path_row.updated_at = datetime.now()
                     path_row.save()
-            return _object_dict(cached), (path_row.file_metadata.fingerprint, path_row.file_metadata.fingerprint_algo)
+            return narrowing.string_keyed_dict(cached), (
+                path_row.file_metadata.fingerprint,
+                path_row.file_metadata.fingerprint_algo,
+            )
 
         fingerprint, algo = common.get_file_fingerprint(filepath)
         return None, (fingerprint, algo)
@@ -460,8 +439,8 @@ def _run_analysis(library_id: int, library_path: str, info: AnalysisInfo) -> Non
                 resolution_value = analysis_entry.get("resolution")
                 codec = codec_value if isinstance(codec_value, str) and codec_value else "unknown"
                 resolution = resolution_value if isinstance(resolution_value, str) and resolution_value else "unknown"
-                file_size = _int_value(analysis_entry.get("file_size"))
-                bitrate_mbps = _float_value(analysis_entry.get("bitrate_mbps"))
+                file_size = narrowing.coerce_int(analysis_entry.get("file_size"))
+                bitrate_mbps = narrowing.coerce_float(analysis_entry.get("bitrate_mbps"))
 
                 key = (codec, resolution)
                 if key not in groups:
@@ -548,7 +527,7 @@ def _run_analysis(library_id: int, library_path: str, info: AnalysisInfo) -> Non
             )
 
         # Sort by estimated savings descending
-        result_groups.sort(key=lambda group: _int_value(group.get("estimated_savings_bytes")), reverse=True)
+        result_groups.sort(key=lambda group: narrowing.coerce_int(group.get("estimated_savings_bytes")), reverse=True)
 
         results: dict[str, object] = {
             "groups": result_groups,
@@ -627,9 +606,9 @@ def _get_historical_savings() -> HistoricalSavings:
             resolution_value = row.get("source_resolution")
             codec = codec_value.lower() if isinstance(codec_value, str) else ""
             resolution = resolution_value if isinstance(resolution_value, str) else ""
-            avg_source = _float_value(row.get("avg_source"))
-            avg_dest = _float_value(row.get("avg_dest"))
-            count = _int_value(row.get("cnt"))
+            avg_source = narrowing.coerce_float(row.get("avg_source"))
+            avg_dest = narrowing.coerce_float(row.get("avg_dest"))
+            count = narrowing.coerce_int(row.get("cnt"))
             if avg_source > 0 and count > 0:
                 savings_pct = ((avg_source - avg_dest) / avg_source) * 100
                 results[(codec, resolution)] = {

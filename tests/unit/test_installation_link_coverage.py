@@ -1001,8 +1001,9 @@ class TestSendFileResumableNarrowing:
 class TestPreloadingCountNarrowing:
     def test_missing_preloading_count_defaults_to_int(self):
         """Regression: preloading enabled without a count compared int >= None."""
-        from compresso.libs.installation_link import _int_value
+        from compresso.libs import narrowing
 
-        assert _int_value(None) == 0
-        assert _int_value("3") == 3
-        assert _int_value(2.9, 1) == 1  # non-int scalars fall back to the default
+        assert narrowing.coerce_int(None) == 0
+        assert narrowing.coerce_int("3") == 3
+        assert narrowing.coerce_int(2.9) == 2
+        assert narrowing.coerce_int(object(), 1) == 1

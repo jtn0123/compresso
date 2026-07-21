@@ -42,7 +42,7 @@ from datetime import datetime, timedelta
 from functools import partial
 from typing import Literal, Protocol, cast
 
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.installation_link import Links
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
@@ -55,10 +55,6 @@ from compresso.libs.unmodels.tasks import Tasks
 
 class SafetyEventRecorder(Protocol):
     def __call__(self, code: str, message: str, **details: object) -> object: ...
-
-
-def _string(value: object) -> str | None:
-    return value if isinstance(value, str) else None
 
 
 def _remote_task_id(value: object) -> int | str | None:
@@ -84,12 +80,6 @@ def _json_value(value: object) -> bool:
     if isinstance(value, dict):
         return all(isinstance(key, str) and _json_value(item) for key, item in value.items())
     return False
-
-
-def _object_dict(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("dict[str, object]", value)
 
 
 def _set_task_timestamp(
@@ -355,7 +345,9 @@ class RemoteTaskManager(threading.Thread):
         return LeasePhaseResult(succeeded=acquired, deferred=not acquired)
 
     def _acquire_remote_lease(self) -> bool:
-        installation_uuid = _string(self.installation_info.get("installation_uuid") or self.installation_info.get("uuid"))
+        installation_uuid = narrowing.strict_str_or_none(
+            self.installation_info.get("installation_uuid") or self.installation_info.get("uuid")
+        )
         if installation_uuid is None:
             self._log("Remote installation is missing its UUID", level="error")
             return False
@@ -378,7 +370,7 @@ class RemoteTaskManager(threading.Thread):
         return True
 
     def _remote_identity(self) -> dict[str, object]:
-        identity: dict[str, object] = {"job_id": _string(self._require_task_model().job_id)}
+        identity: dict[str, object] = {"job_id": narrowing.strict_str_or_none(self._require_task_model().job_id)}
         if self.lease_token:
             identity.update(
                 {
@@ -477,7 +469,7 @@ class RemoteTaskManager(threading.Thread):
             return None
         return RemoteTaskContext(
             original_abspath=original_abspath,
-            address=_string(self.installation_info.get("address")),
+            address=narrowing.strict_str_or_none(self.installation_info.get("address")),
             library_name=library.get_name(),
             library_path=library.get_path(),
         )
@@ -549,9 +541,9 @@ class RemoteTaskManager(threading.Thread):
             self.installation_info,
             remote_original_abspath,
             library_id,
-            job_id=_string(identity.get("job_id")),
-            lease_token=_string(identity.get("lease_token")),
-            origin_installation_uuid=_string(identity.get("origin_installation_uuid")),
+            job_id=narrowing.strict_str_or_none(identity.get("job_id")),
+            lease_token=narrowing.strict_str_or_none(identity.get("lease_token")),
+            origin_installation_uuid=narrowing.strict_str_or_none(identity.get("origin_installation_uuid")),
         )
         if not info:
             self._log(
@@ -559,7 +551,7 @@ class RemoteTaskManager(threading.Thread):
                 level="debug",
             )
             return None
-        error = (_string(info.get("error")) or "").lower()
+        error = (narrowing.strict_str_or_none(info.get("error")) or "").lower()
         if "path does not exist" in error:
             self._log(
                 f"Unable to find file in remote library's path '{remote_original_abspath}'. Fallback to sending file.",
@@ -576,7 +568,7 @@ class RemoteTaskManager(threading.Thread):
         return UploadPhaseResult(
             True,
             remote_task_id=_remote_task_id(info.get("id")),
-            remote_task_status=_string(info.get("status")),
+            remote_task_status=narrowing.strict_str_or_none(info.get("status")),
         )
 
     def _network_and_lease_progress(self, lock_key: str | Literal[False] | None, *, require_lock: bool) -> bool:
@@ -614,27 +606,18 @@ class RemoteTaskManager(threading.Thread):
             progress_callback: Callable[[], bool] | None = None
             if self.lease_token or lock_key:
                 progress_callback = partial(self._network_and_lease_progress, lock_key, require_lock=False)
-            job_id = _string(upload_identity.get("job_id"))
-            lease_token = _string(upload_identity.get("lease_token"))
-            origin_installation_uuid = _string(upload_identity.get("origin_installation_uuid"))
+            job_id = narrowing.strict_str_or_none(upload_identity.get("job_id"))
+            lease_token = narrowing.strict_str_or_none(upload_identity.get("lease_token"))
+            origin_installation_uuid = narrowing.strict_str_or_none(upload_identity.get("origin_installation_uuid"))
             try:
-                if progress_callback is None:
-                    info = self.links.send_file_to_remote_installation(
-                        self.installation_info,
-                        context.original_abspath,
-                        job_id=job_id,
-                        lease_token=lease_token,
-                        origin_installation_uuid=origin_installation_uuid,
-                    )
-                else:
-                    info = self.links.send_file_to_remote_installation(
-                        self.installation_info,
-                        context.original_abspath,
-                        job_id=job_id,
-                        lease_token=lease_token,
-                        origin_installation_uuid=origin_installation_uuid,
-                        progress_callback=progress_callback,
-                    )
+                info = self.links.send_file_to_remote_installation(
+                    self.installation_info,
+                    context.original_abspath,
+                    job_id=job_id,
+                    lease_token=lease_token,
+                    origin_installation_uuid=origin_installation_uuid,
+                    progress_callback=progress_callback,
+                )
             finally:
                 self.links.release_network_transfer_lock(lock_key)
             if info:
@@ -656,7 +639,7 @@ class RemoteTaskManager(threading.Thread):
             self.event.wait(2)
 
         remote_task_id = _remote_task_id(info.get("id"))
-        remote_task_status = _string(info.get("status"))
+        remote_task_status = narrowing.strict_str_or_none(info.get("status"))
         if info.get("checksum") != initial_checksum:
             self._record_transfer_corruption("upload", "A remote upload checksum did not match its source")
             self._log(
@@ -847,7 +830,7 @@ class RemoteTaskManager(threading.Thread):
             return None
         for task_state in remote_results:
             if str(task_state.get("id")) == str(remote_task_id):
-                return _string(task_state.get("status"))
+                return narrowing.strict_str_or_none(task_state.get("status"))
         return "removed"
 
     def _remote_poll_failure(
@@ -883,7 +866,7 @@ class RemoteTaskManager(threading.Thread):
                 return worker_id, False
             for worker in workers_status:
                 if str(worker.get("current_task")) == str(remote_task_id):
-                    worker_id = _string(worker.get("id"))
+                    worker_id = narrowing.strict_str_or_none(worker.get("id"))
 
         if worker_id is None:
             return None, False
@@ -893,8 +876,8 @@ class RemoteTaskManager(threading.Thread):
         self.paused = bool(worker_status.get("paused"))
         worker_log = worker_status.get("worker_log_tail")
         self.worker_log = [str(item) for item in worker_log] if isinstance(worker_log, list) else []
-        self.worker_runners_info = _object_dict(worker_status.get("runners_info"))
-        subprocess_info = _object_dict(worker_status.get("subprocess"))
+        self.worker_runners_info = narrowing.string_keyed_dict(worker_status.get("runners_info"))
+        subprocess_info = narrowing.string_keyed_dict(worker_status.get("subprocess"))
         self.worker_subprocess_percent = str(subprocess_info.get("percent", "0"))
         self.worker_subprocess_elapsed = str(subprocess_info.get("elapsed", "0"))
         return worker_id, True

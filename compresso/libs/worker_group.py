@@ -33,6 +33,7 @@ import random
 from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
+from compresso.libs import narrowing
 from compresso.libs.peewee_types import execute_count, execute_write
 from compresso.libs.unmodels.tags import Tags
 from compresso.libs.unmodels.workergroups import WorkerGroups
@@ -173,15 +174,6 @@ def generate_random_worker_group_name() -> str:
     return random.choice(names)  # noqa: S311 — not used for security/crypto
 
 
-def _int_value(value: object, default: int = 0) -> int:
-    if isinstance(value, (int, str)):
-        try:
-            return int(value)
-        except ValueError:
-            return default
-    return default
-
-
 class WorkerGroup:
     """
     WorkerGroup
@@ -277,7 +269,7 @@ class WorkerGroup:
         worker_group_data: dict[str, object] = {
             "locked": bool(data.get("locked", False)),
             "name": name,
-            "number_of_workers": _int_value(data.get("number_of_workers")),
+            "number_of_workers": narrowing.coerce_int(data.get("number_of_workers")),
             "worker_type": str(data.get("worker_type", "cpu")),
         }
         worker_group_id = WorkerGroups.create(**worker_group_data)

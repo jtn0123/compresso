@@ -41,6 +41,7 @@ from typing import cast
 import schedule
 
 from compresso import config
+from compresso.libs import narrowing
 from compresso.libs.filetest import FileTesterThread
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
@@ -54,19 +55,6 @@ def _queue(value: object) -> queue.Queue[object]:
     if not isinstance(value, queue.Queue):
         raise TypeError("library scanner data queue is missing")
     return cast("queue.Queue[object]", value)
-
-
-def _int_value(value: object, default: int = 0) -> int:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, (float, str, bytes, bytearray)):
-        try:
-            return int(value)
-        except (OverflowError, TypeError, ValueError):
-            return default
-    return default
 
 
 def iter_sorted_library_directories(
@@ -301,7 +289,7 @@ class LibraryScannerManager(threading.Thread):
             if not isinstance(path, str):
                 self.logger.warning("Ignoring malformed library scan output without a path")
                 continue
-            self.add_path_to_queue(path, library_id, _int_value(item.get("priority_score")))
+            self.add_path_to_queue(path, library_id, narrowing.coerce_int(item.get("priority_score")))
         if current_file:
             self.update_scan_progress(frontend_messages, f"Testing: {current_file}")
         return current_file
@@ -455,7 +443,7 @@ class LibraryScannerManager(threading.Thread):
                 item = self.files_to_process.get()
                 path = item.get("path")
                 if isinstance(path, str):
-                    self.add_path_to_queue(path, library_id, _int_value(item.get("priority_score")))
+                    self.add_path_to_queue(path, library_id, narrowing.coerce_int(item.get("priority_score")))
                 else:
                     self.logger.warning("Ignoring malformed library scan output without a path")
                 continue

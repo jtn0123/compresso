@@ -35,13 +35,10 @@ import tornado.escape
 import tornado.log
 import tornado.web
 
+from compresso.libs import narrowing
 from compresso.webserver.helpers import plugins
 from compresso.webserver.request_auth import authorize_request
 from compresso.webserver.security_headers import SecurityHeadersMixin
-
-
-def _string(value: object, default: str = "") -> str:
-    return value if isinstance(value, str) else default
 
 
 def get_plugin_by_path(path: str) -> dict[str, object] | None:
@@ -104,7 +101,7 @@ class DataPanelRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
             return
 
         # Run plugin and fetch return data
-        plugin_id = _string(plugin_module.get("plugin_id"))
+        plugin_id = narrowing.strict_str(plugin_module.get("plugin_id"))
         if not plugins.exec_data_panels_plugin_runner(data, plugin_id):
             tornado.log.app_log.error("Failed to execute plugin runner on DataPanel '%s'", plugin_module.get("plugin_id"))
             self.set_status(500)
@@ -183,7 +180,7 @@ class PluginAPIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
             return
 
         # Run plugin and fetch return data
-        plugin_id = _string(plugin_module.get("plugin_id"))
+        plugin_id = narrowing.strict_str(plugin_module.get("plugin_id"))
         try:
             if not plugins.exec_plugin_api_plugin_runner(data, plugin_id):
                 tornado.log.app_log.exception(
@@ -225,5 +222,5 @@ class PluginStaticFileHandler(tornado.web.StaticFileHandler):
     def initialize(self, path: str, default_filename: str | None = None) -> None:
         plugin_module = get_plugin_by_path(self.request.path)
         if plugin_module:
-            path = os.path.join(_string(plugin_module.get("plugin_path")), "static")
+            path = os.path.join(narrowing.strict_str(plugin_module.get("plugin_path")), "static")
         super().initialize(path, default_filename)

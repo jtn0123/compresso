@@ -40,7 +40,7 @@ from collections.abc import Callable, Iterable, Mapping
 from types import ModuleType
 from typing import Protocol, cast
 
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.metadata import CompressoFileMetadata
 
 from ..logs import CompressoLogging
@@ -61,13 +61,6 @@ class _PluginSettings(Protocol):
 
 class _PluginSettingsFactory(Protocol):
     def __call__(self, *, library_id: int | None = None) -> _PluginSettings: ...
-
-
-def _object_dict(value: object) -> dict[str, object]:
-    # Accept any Mapping: plugin Settings implementations may return custom types
-    if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
-        return {}
-    return dict(cast("Mapping[str, object]", value))
 
 
 class PluginExecutor:
@@ -228,7 +221,7 @@ class PluginExecutor:
         info_path = os.path.join(path, "info.json")
         try:
             with open(info_path, encoding="utf-8") as info_file:
-                plugin_info = _object_dict(json.load(info_file))
+                plugin_info = narrowing.mapping_dict(json.load(info_file))
         except (OSError, ValueError, TypeError):
             return False
 
@@ -510,8 +503,8 @@ class PluginExecutor:
             plugin_settings = settings_factory(library_id=library_id)
 
             # Build form first so any in-memory defaults are applied without persisting
-            plugin_form_settings = _object_dict(copy.deepcopy(plugin_settings.get_form_settings()))
-            all_plugin_settings = _object_dict(copy.deepcopy(plugin_settings.get_setting()))
+            plugin_form_settings = narrowing.mapping_dict(copy.deepcopy(plugin_settings.get_form_settings()))
+            all_plugin_settings = narrowing.mapping_dict(copy.deepcopy(plugin_settings.get_setting()))
         except Exception as e:
             self.logger.exception("Exception while fetching settings for plugin '%s' %s", plugin_id, e)
             all_plugin_settings = {}

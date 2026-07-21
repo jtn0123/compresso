@@ -53,7 +53,7 @@ from filelock import FileLock
 from peewee import DoesNotExist
 
 from compresso import config
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.json_state import atomic_json_write
 from compresso.libs.library import Library
@@ -87,20 +87,10 @@ class PluginRows(Protocol):
     def count(self) -> int: ...
 
 
-def _object_dict(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("dict[str, object]", value)
-
-
-def _string(value: object) -> str | None:
-    return value if isinstance(value, str) else None
-
-
 def _object_list(value: object) -> list[PluginRecord]:
     if not isinstance(value, list):
         return []
-    return [_object_dict(item) for item in value if isinstance(item, dict)]
+    return [narrowing.string_keyed_dict(item) for item in value if isinstance(item, dict)]
 
 
 class PluginsHandler(metaclass=SingletonType):
@@ -235,7 +225,7 @@ class PluginsHandler(metaclass=SingletonType):
             )
         if status_code >= 500:
             self.logger.debug("Failed to fetch plugin repo from '%s'. Code:%s", api_path, status_code)
-        return _object_dict(data) if isinstance(data, dict) else None
+        return narrowing.string_keyed_dict(data) if isinstance(data, dict) else None
 
     def update_plugin_repos(self) -> bool:
         """
@@ -280,7 +270,7 @@ class PluginsHandler(metaclass=SingletonType):
         # Fetch settings for each plugin
         plugin_executor = PluginExecutor()
         for plugin in installed_plugins:
-            plugin_id = _string(plugin.get("plugin_id"))
+            plugin_id = narrowing.strict_str_or_none(plugin.get("plugin_id"))
             if plugin_id is None:
                 continue
             plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_id)
@@ -294,7 +284,7 @@ class PluginsHandler(metaclass=SingletonType):
         if os.path.exists(repo_cache):
             with open(repo_cache) as f:
                 repo_data = json.load(f)
-            return _object_dict(repo_data)
+            return narrowing.string_keyed_dict(repo_data)
         return {}
 
     def get_plugin_info(self, plugin_id: str) -> dict[str, object]:
@@ -304,14 +294,14 @@ class PluginsHandler(metaclass=SingletonType):
         if os.path.exists(info_file):
             # Read plugin info.json
             with open(info_file) as json_file:
-                plugin_info = _object_dict(json.load(json_file))
+                plugin_info = narrowing.string_keyed_dict(json.load(json_file))
         return plugin_info
 
     def get_plugins_in_repo_data(self, repo_data: Mapping[str, object]) -> list[PluginRecord]:
         return_list: list[PluginRecord] = []
         if "repo" in repo_data and "plugins" in repo_data:
             # Get URLs for plugin downloads
-            repo_meta = _object_dict(repo_data.get("repo"))
+            repo_meta = narrowing.string_keyed_dict(repo_data.get("repo"))
             repo_data_directory = repo_meta.get("repo_data_directory")
             repo_name = repo_meta.get("name") or repo_meta.get("repo_name")
 
@@ -336,14 +326,14 @@ class PluginsHandler(metaclass=SingletonType):
                         plugin.get("id"),
                     )
                 else:
-                    plugin_package_url = _string(plugin.get("plugin_download_url")) or ""
+                    plugin_package_url = narrowing.strict_str_or_none(plugin.get("plugin_download_url")) or ""
                     plugin_changelog_url = ""
 
                 # Check if plugin is already installed:
                 plugin_status = {
                     "installed": False,
                 }
-                plugin_id = _string(plugin.get("id", plugin.get("plugin_id")))
+                plugin_id = narrowing.strict_str_or_none(plugin.get("id", plugin.get("plugin_id")))
                 if plugin_id is None:
                     continue
                 plugin_info = self.get_plugin_info(plugin_id)
@@ -503,7 +493,7 @@ class PluginsHandler(metaclass=SingletonType):
             # Fetch remote zip file
             destination = self.download_plugin(plugin)
             try:
-                installed_info = self.install_plugin(destination, _string(plugin.get("plugin_id")))
+                installed_info = self.install_plugin(destination, narrowing.strict_str_or_none(plugin.get("plugin_id")))
             finally:
                 if os.path.isfile(destination):
                     os.remove(destination)
@@ -522,7 +512,7 @@ class PluginsHandler(metaclass=SingletonType):
         :param plugin:
         :return:
         """
-        package_url = _string(plugin.get("package_url")) or ""
+        package_url = narrowing.strict_str_or_none(plugin.get("package_url")) or ""
         expected_digest = str(plugin.get("package_sha256") or "").lower()
         if urlparse(package_url).scheme != "https":
             raise ValueError("Remote plugins must be downloaded over HTTPS")
@@ -531,8 +521,8 @@ class PluginsHandler(metaclass=SingletonType):
 
         # Fetch the package and authenticate its bytes before extraction. The
         # digest is supplied by the trusted repository metadata channel.
-        plugin_id = _string(plugin.get("plugin_id"))
-        plugin_version = _string(plugin.get("version"))
+        plugin_id = narrowing.strict_str_or_none(plugin.get("plugin_id"))
+        plugin_version = narrowing.strict_str_or_none(plugin.get("version"))
         if plugin_id is None or plugin_version is None:
             raise ValueError("Remote plugin metadata must include string plugin_id and version values")
         destination = self.get_plugin_download_cache_path(plugin_id, plugin_version)
@@ -624,7 +614,7 @@ class PluginsHandler(metaclass=SingletonType):
         if info_member.file_size > MAX_PLUGIN_INFO_BYTES:
             raise ValueError("Plugin archive info.json is too large")
         try:
-            plugin_info = _object_dict(json.loads(zip_ref.read(info_member).decode("utf-8")))
+            plugin_info = narrowing.string_keyed_dict(json.loads(zip_ref.read(info_member).decode("utf-8")))
         except (UnicodeDecodeError, json.JSONDecodeError, RuntimeError, zipfile.BadZipFile) as exc:
             raise ValueError("Plugin archive contains an invalid info.json") from exc
         if not plugin_info:
@@ -634,7 +624,7 @@ class PluginsHandler(metaclass=SingletonType):
             value = plugin_info.get(field)
             if not isinstance(value, str) or (field != "icon" and not value.strip()):
                 raise ValueError(f"Plugin archive info.json has an invalid or missing '{field}'")
-        plugin_id = _string(plugin_info["id"])
+        plugin_id = narrowing.strict_str_or_none(plugin_info["id"])
         if plugin_id is None:
             raise ValueError("Plugin archive info.json has an invalid plugin ID")
         if not _PLUGIN_ID_PATTERN.fullmatch(plugin_id):
@@ -684,7 +674,7 @@ class PluginsHandler(metaclass=SingletonType):
 
         with zipfile.ZipFile(archive_path, "r") as zip_ref:
             plugin_info, normalized_members = self._validate_plugin_archive(zip_ref, plugin_id)
-            validated_plugin_id = _string(plugin_info.get("id"))
+            validated_plugin_id = narrowing.strict_str_or_none(plugin_info.get("id"))
             if validated_plugin_id is None:
                 raise ValueError("Plugin archive info.json has an invalid plugin ID")
             plugin_id = validated_plugin_id
@@ -697,7 +687,7 @@ class PluginsHandler(metaclass=SingletonType):
         plugin_info: PluginRecord,
         normalized_members: Sequence[NormalizedArchiveMember],
     ) -> PluginRecord:
-        plugin_id = _string(plugin_info.get("id"))
+        plugin_id = narrowing.strict_str_or_none(plugin_info.get("id"))
         if plugin_id is None:
             raise ValueError("Plugin archive info.json has an invalid plugin ID")
         plugins_root = Path(self.settings.get_plugins_path()).resolve()
@@ -1007,7 +997,7 @@ class PluginsHandler(metaclass=SingletonType):
 
         # Remove each plugin from disk
         for record in records_by_id:
-            plugin_id = _string(record.get("plugin_id"))
+            plugin_id = narrowing.strict_str_or_none(record.get("plugin_id"))
             if plugin_id is None:
                 continue
             # Unload plugin modules
@@ -1048,7 +1038,7 @@ class PluginsHandler(metaclass=SingletonType):
 
         # Update each plugin in turn
         for record in records_by_id:
-            plugin_id = _string(record.get("plugin_id"))
+            plugin_id = narrowing.strict_str_or_none(record.get("plugin_id"))
             if plugin_id is not None and self.install_plugin_by_id(plugin_id):
                 continue
             self.logger.debug("Failed to update plugin '%s'", record.get("plugin_id"))
@@ -1223,7 +1213,7 @@ class PluginsHandler(metaclass=SingletonType):
             for record in enabled_plugins:
                 try:
                     # Ensure plugin is compatible
-                    plugin_id = _string(record.get("plugin_id"))
+                    plugin_id = narrowing.strict_str_or_none(record.get("plugin_id"))
                     if plugin_id is None:
                         continue
                     plugin_info = self.get_plugin_info(plugin_id)
@@ -1250,8 +1240,8 @@ class PluginsHandler(metaclass=SingletonType):
                         "name": record.get("name"),
                     }
                 )
-                plugin_id = _string(record.get("plugin_id")) or "unknown"
-                plugin_name = _string(record.get("name")) or "Unknown plugin"
+                plugin_id = narrowing.strict_str_or_none(record.get("plugin_id")) or "unknown"
+                plugin_name = narrowing.strict_str_or_none(record.get("name")) or "Unknown plugin"
                 add_frontend_message(plugin_id, plugin_name)
 
         return incompatible_list
@@ -1269,7 +1259,7 @@ class PluginsHandler(metaclass=SingletonType):
         # Filter out the types without flows
         for plugin_type in types_list:
             if plugin_type.get("has_flow"):
-                plugin_type_id = _string(plugin_type.get("id"))
+                plugin_type_id = narrowing.strict_str_or_none(plugin_type.get("id"))
                 if plugin_type_id is not None:
                     return_plugin_types.append(plugin_type_id)
         return return_plugin_types
@@ -1306,6 +1296,6 @@ class PluginsHandler(metaclass=SingletonType):
         """
         plugin_modules = self.get_enabled_plugin_modules_by_type(plugin_type)
         for plugin_module in plugin_modules:
-            plugin_id = _string(plugin_module.get("plugin_id"))
+            plugin_id = narrowing.strict_str_or_none(plugin_module.get("plugin_id"))
             if plugin_id is None or not self.exec_plugin_runner(data, plugin_id, plugin_type):
                 continue

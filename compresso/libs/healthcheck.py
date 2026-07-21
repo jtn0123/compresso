@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from typing import Literal, Protocol, TypedDict, cast
 
 from compresso.config import Config
+from compresso.libs import narrowing
 from compresso.libs.ffprobe_utils import probe_file
 from compresso.libs.library_analysis import iter_media_files
 from compresso.libs.logs import CompressoLogging
@@ -67,12 +68,6 @@ class HealthStatusGetOrCreate(Protocol):
 class HealthCountRow(Protocol):
     status: str
     count: int
-
-
-def _object_dict(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("dict[str, object]", value)
 
 
 def _initial_scan_progress(library_id: int | None = None, max_workers: int = 1) -> ScanProgress:
@@ -132,7 +127,7 @@ class HealthCheckManager:
         if not streams:
             return False, "No streams found in file"
 
-        fmt = _object_dict(result.get("format"))
+        fmt = narrowing.string_keyed_dict(result.get("format"))
         duration = fmt.get("duration")
         if isinstance(duration, (bool, int, float, str, bytes, bytearray)):
             try:

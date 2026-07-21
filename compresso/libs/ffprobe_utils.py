@@ -13,8 +13,9 @@ import json
 import os
 import re
 import subprocess
-from typing import TypedDict, cast
+from typing import TypedDict
 
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 
 logger = CompressoLogging.get_logger("ffprobe_utils")
@@ -31,12 +32,6 @@ class MediaMetadata(TypedDict):
 class QualityScores(TypedDict):
     vmaf_score: float | None
     ssim_score: float | None
-
-
-def _string_keyed_dict(value: object) -> dict[str, object] | None:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return None
-    return cast("dict[str, object]", value)
 
 
 def _to_float(value: object) -> float:
@@ -75,7 +70,7 @@ def probe_file(filepath: str | os.PathLike[str], timeout: float = 30) -> dict[st
         if result.returncode != 0:
             logger.warning("ffprobe failed for %s: %s", filepath, result.stderr[:500] if result.stderr else "")
             return None
-        return _string_keyed_dict(json.loads(result.stdout))
+        return narrowing.string_keyed_dict_or_none(json.loads(result.stdout))
     except subprocess.TimeoutExpired:
         logger.warning("ffprobe timed out for %s", filepath)
         return None
@@ -119,7 +114,7 @@ def extract_media_metadata(filepath: str | os.PathLike[str]) -> MediaMetadata:
         return result
 
     # Extract duration from format level
-    format_info = _string_keyed_dict(probe_data.get("format")) or {}
+    format_info = narrowing.string_keyed_dict_or_none(probe_data.get("format")) or {}
     with contextlib.suppress(TypeError, ValueError):
         result["duration"] = _to_float(format_info.get("duration"))
     with contextlib.suppress(TypeError, ValueError):
@@ -129,7 +124,7 @@ def extract_media_metadata(filepath: str | os.PathLike[str]) -> MediaMetadata:
     raw_streams = probe_data.get("streams")
     streams = raw_streams if isinstance(raw_streams, list) else []
     for raw_stream in streams:
-        stream = _string_keyed_dict(raw_stream)
+        stream = narrowing.string_keyed_dict_or_none(raw_stream)
         if stream is None:
             continue
         if stream.get("codec_type") == "video":

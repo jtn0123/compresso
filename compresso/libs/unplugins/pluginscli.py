@@ -42,7 +42,7 @@ import inquirer
 import requests
 
 from compresso import config
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.json_state import atomic_json_write
 from compresso.libs.plugins import PluginRecord, PluginsHandler
 from compresso.libs.task import JsonValue, TaskDataStore
@@ -96,16 +96,6 @@ class PluginCLIArgs(Protocol):
     reload_plugins: bool
     remove_plugin: bool
     install_test_data: bool
-
-
-def _object_dict(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("dict[str, object]", value)
-
-
-def _string(value: object) -> str | None:
-    return value if isinstance(value, str) else None
 
 
 class BColours:
@@ -294,9 +284,9 @@ class PluginsCLI:
         return selected_details, []
 
     def _collect_new_plugin_details(self) -> tuple[dict[str, str] | None, list[dict[str, str]] | None]:
-        plugin_details_raw = _object_dict(inquirer.prompt(menus.get("create_plugin")))
-        plugin_name = _string(plugin_details_raw.get("plugin_name"))
-        plugin_id = _string(plugin_details_raw.get("plugin_id"))
+        plugin_details_raw = narrowing.string_keyed_dict(inquirer.prompt(menus.get("create_plugin")))
+        plugin_name = narrowing.strict_str_or_none(plugin_details_raw.get("plugin_name"))
+        plugin_id = narrowing.strict_str_or_none(plugin_details_raw.get("plugin_id"))
 
         # Ensure results are not empty
         if not plugin_name or not plugin_id:
@@ -317,7 +307,7 @@ class PluginsCLI:
         )
 
         # Prompt for selection of Plugin by ID
-        runner_selection = _object_dict(inquirer.prompt([plugin_runners_inquirer]))
+        runner_selection = narrowing.string_keyed_dict(inquirer.prompt([plugin_runners_inquirer]))
         selected_plugin_names = runner_selection.get("selected_plugins") if runner_selection else []
         if not isinstance(selected_plugin_names, list) or not selected_plugin_names:
             print("ERROR! No plugin runner selected.")
@@ -475,7 +465,7 @@ class PluginsCLI:
 
         # Build choice selection list from installed plugins
         for plugin in plugin_results:
-            plugin_id = _string(plugin.get("plugin_id"))
+            plugin_id = narrowing.strict_str_or_none(plugin.get("plugin_id"))
             if plugin_id is None:
                 continue
             print(f"Reloading Plugin - '{plugin_id}'")
@@ -483,7 +473,7 @@ class PluginsCLI:
             # Read plugin info.json
             info_file = os.path.join(plugin_path, "info.json")
             with open(info_file) as json_file:
-                plugin_info = _object_dict(json.load(json_file))
+                plugin_info = narrowing.string_keyed_dict(json.load(json_file))
 
             # Insert plugin details to DB
             try:
@@ -506,7 +496,7 @@ class PluginsCLI:
         table_ids: dict[str, int] = {}
         choices: list[str] = []
         for plugin in plugin_results:
-            plugin_id = _string(plugin.get("plugin_id"))
+            plugin_id = narrowing.strict_str_or_none(plugin.get("plugin_id"))
             plugin_table_id = plugin.get("id")
             if plugin_id is None or not isinstance(plugin_table_id, int):
                 continue
@@ -523,14 +513,14 @@ class PluginsCLI:
         )
 
         # Prompt for selection of Plugin by ID
-        selection = _object_dict(inquirer.prompt([remove_plugin_inquirer]))
+        selection = narrowing.string_keyed_dict(inquirer.prompt([remove_plugin_inquirer]))
 
         # If the 'Go Back' option was given, just return to previous menu
         if not selection or selection.get("cli_action") == _GO_BACK_LABEL:
             return
 
         # Remove the selected Plugin by ID
-        selected_action = _string(selection.get("cli_action"))
+        selected_action = narrowing.strict_str_or_none(selection.get("cli_action"))
         if selected_action is None or selected_action not in table_ids:
             return
         plugin_table_id = table_ids[selected_action]
@@ -594,7 +584,7 @@ class PluginsCLI:
         plugin_results = self.__get_installed_plugins(plugin_id=plugin_id)
         for plugin_result in plugin_results:
             print(f"{BColours.HEADER}Testing plugin: '{plugin_result.get('name')}'{BColours.ENDC}")
-            tested_plugin_id = _string(plugin_result.get("plugin_id"))
+            tested_plugin_id = narrowing.strict_str_or_none(plugin_result.get("plugin_id"))
             if tested_plugin_id is None:
                 continue
 
@@ -643,7 +633,7 @@ class PluginsCLI:
         all_plugin_details: dict[str, PluginRecord] = {}
         choices = ["Configure Testdata", "Test All Plugins"]
         for plugin_details in plugin_results:
-            plugin_id = _string(plugin_details.get("plugin_id"))
+            plugin_id = narrowing.strict_str_or_none(plugin_details.get("plugin_id"))
             if plugin_id is None:
                 continue
             choices.append(plugin_id)
@@ -659,7 +649,7 @@ class PluginsCLI:
                 choices=choices,
                 default=default_selection,
             )
-            selection = _object_dict(inquirer.prompt([plugin_test_inquirer]))
+            selection = narrowing.string_keyed_dict(inquirer.prompt([plugin_test_inquirer]))
 
             # If the 'Go Back' option was given, just return to previous menu
             if not selection or selection.get("selected_plugin") == _GO_BACK_LABEL:
@@ -676,14 +666,14 @@ class PluginsCLI:
                 continue
 
             # Get the details for the selected plugin
-            selected_plugin = _string(selection.get("selected_plugin"))
+            selected_plugin = narrowing.strict_str_or_none(selection.get("selected_plugin"))
             if selected_plugin is None or selected_plugin not in all_plugin_details:
                 continue
             selected_plugin_details = all_plugin_details[selected_plugin]
             # Set that selection as the default for the next time
             default_selection = selected_plugin
             # Test that plugin
-            self.test_installed_plugins(plugin_id=_string(selected_plugin_details.get("plugin_id")))
+            self.test_installed_plugins(plugin_id=narrowing.strict_str_or_none(selected_plugin_details.get("plugin_id")))
 
     def configure_test_data(self) -> None:
 
@@ -700,8 +690,8 @@ class PluginsCLI:
             message="Which Plugin runner will be used?",
             choices=test_files,
         )
-        runner_selection = _object_dict(inquirer.prompt([test_files_inquirer]))
-        selected_file = _string(runner_selection.get("selected_file"))
+        runner_selection = narrowing.string_keyed_dict(inquirer.prompt([test_files_inquirer]))
+        selected_file = narrowing.strict_str_or_none(runner_selection.get("selected_file"))
         if selected_file is None:
             return
         self.test_data_modifiers[_TEST_FILE_IN_KEY] = selected_file
@@ -783,9 +773,9 @@ class PluginsCLI:
     def run(self) -> None:
         print()
         while True:
-            selection = _object_dict(inquirer.prompt(menus.get("main")))
+            selection = narrowing.string_keyed_dict(inquirer.prompt(menus.get("main")))
             if not selection or selection.get("cli_action") == "Exit":
                 break
-            selected_action = _string(selection.get("cli_action"))
+            selected_action = narrowing.strict_str_or_none(selection.get("cli_action"))
             if selected_action is not None:
                 self.main(selected_action)

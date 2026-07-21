@@ -14,6 +14,7 @@ from typing import TypedDict, cast
 
 import requests
 
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 from compresso.libs.task import JsonValue
@@ -53,10 +54,6 @@ type Sender = Callable[[NotificationChannel, str, NotificationContext], None]
 class ChannelTestResult(TypedDict, total=False):
     success: bool
     error: str
-
-
-def _string(value: object) -> str | None:
-    return value if isinstance(value, str) else None
 
 
 def _string_mapping(value: object) -> dict[str, str]:
@@ -125,7 +122,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Route to the correct sender based on channel type."""
-        channel_type = (_string(channel.get("type")) or "").lower()
+        channel_type = (narrowing.strict_str_or_none(channel.get("type")) or "").lower()
         try:
             if channel_type == "discord":
                 self._send_discord(channel, event_type, context)
@@ -147,7 +144,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Send a Discord webhook with a rich embed."""
-        url = _string(channel.get("url")) or ""
+        url = narrowing.strict_str_or_none(channel.get("url")) or ""
         color = DISCORD_COLOR_MAP.get(event_type, 0x808080)
         title = EVENT_TITLES.get(event_type, event_type)
 
@@ -194,7 +191,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Send a Slack incoming webhook with Block Kit blocks."""
-        url = _string(channel.get("url")) or ""
+        url = narrowing.strict_str_or_none(channel.get("url")) or ""
         title = EVENT_TITLES.get(event_type, event_type)
 
         blocks: list[JsonValue] = [
@@ -266,7 +263,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Send a generic JSON POST to a custom webhook URL."""
-        url = _string(channel.get("url")) or ""
+        url = narrowing.strict_str_or_none(channel.get("url")) or ""
         custom_headers = _string_mapping(channel.get("headers"))
 
         headers = {"Content-Type": "application/json"}
@@ -308,7 +305,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
             "message": "This is a test notification from Compresso.",
         }
         try:
-            channel_type = (_string(channel_config.get("type")) or "").lower()
+            channel_type = (narrowing.strict_str_or_none(channel_config.get("type")) or "").lower()
             sender = self._get_sender_for_type(channel_type)
             if sender is None:
                 return {"success": False, "error": f"Unknown channel type '{channel_type}'"}

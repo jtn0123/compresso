@@ -44,7 +44,7 @@ from requests import Response
 from requests_toolbelt import MultipartEncoder
 
 from compresso import config
-from compresso.libs import common, session, task
+from compresso.libs import common, narrowing, session, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.resumable_transfer import file_sha256
@@ -77,20 +77,6 @@ def _json_object(value: object) -> dict[str, object]:
 def _config_string(config_data: Mapping[str, object], key: str) -> str | None:
     value = config_data.get(key)
     return value if isinstance(value, str) else None
-
-
-def _int_value(value: object, default: int = 0) -> int:
-    """Coerce an API scalar to an integer without accepting arbitrary objects."""
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, (str, bytes, bytearray)):
-        try:
-            return int(value)
-        except ValueError:
-            return default
-    return default
 
 
 def _json_objects(value: object) -> list[dict[str, object]]:
@@ -553,7 +539,7 @@ class Links(metaclass=SingletonType):
         if res.status_code == 200:
             capabilities = _json_object(res.json())
 
-        runnable_task_count = _int_value(
+        runnable_task_count = narrowing.coerce_int(
             tasks_data.get(
                 "runnableRecords",
                 tasks_data.get("recordsFiltered", tasks_data.get("recordsTotal", 0)),
@@ -709,7 +695,9 @@ class Links(metaclass=SingletonType):
                         updated_config["enable_sending_tasks"] = remote_link_config.get("enable_receiving_tasks")
                         save_settings = True
                     # Update the distributed_worker_count_target
-                    distributed_worker_count_target = _int_value(remote_config.get("distributed_worker_count_target"))
+                    distributed_worker_count_target = narrowing.coerce_int(
+                        remote_config.get("distributed_worker_count_target")
+                    )
                     # Also sync the last_updated flag
                     updated_config["last_updated"] = remote_link_config.get("last_updated")
 
@@ -995,11 +983,11 @@ class Links(metaclass=SingletonType):
                 if local_config.get("enable_task_preloading"):
                     # Preload with the number of workers (regardless of the worker status) plus an additional one to account
                     # for delays in the downloads
-                    max_pending_tasks = _int_value(local_config.get("preloading_count"))
+                    max_pending_tasks = narrowing.coerce_int(local_config.get("preloading_count"))
                 results = self.remote_api_post(local_config, "/compresso/api/v2/pending/tasks", {"start": 0, "length": 1})
                 if results.get("error"):
                     continue
-                current_pending_tasks = _int_value(results.get("recordsFiltered"))
+                current_pending_tasks = narrowing.coerce_int(results.get("recordsFiltered"))
                 if local_config.get("enable_task_preloading") and current_pending_tasks >= max_pending_tasks:
                     self._log(
                         f"Remote installation has exceeded the max remote pending task count ({current_pending_tasks})",
@@ -1192,7 +1180,7 @@ class Links(metaclass=SingletonType):
         if not isinstance(transfer_id_value, str):
             return {}
         transfer_id = transfer_id_value
-        offset = _int_value(session.get("offset"))
+        offset = narrowing.coerce_int(session.get("offset"))
         with open(path, "rb") as source:
             source.seek(offset)
             while offset < total_size:
@@ -1210,7 +1198,7 @@ class Links(metaclass=SingletonType):
                         "X-Chunk-Checksum": chunk_checksum,
                     },
                 )
-                next_offset = _int_value(status.get("offset"), offset)
+                next_offset = narrowing.coerce_int(status.get("offset"), offset)
                 if next_offset != offset + len(chunk):
                     return {}
                 offset = next_offset

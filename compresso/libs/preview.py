@@ -20,6 +20,7 @@ import uuid
 from typing import TypedDict
 
 from compresso import config
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 
 
@@ -43,10 +44,6 @@ class PreviewJob(TypedDict):
     vmaf_score: float | None
     ssim_score: float | None
     encoded_by_pipeline: bool
-
-
-def _string(value: object) -> str | None:
-    return value if isinstance(value, str) else None
 
 
 def _command(value: object) -> list[str]:
@@ -153,7 +150,7 @@ class PreviewManager:
                         return False
 
                     # Chain: set next input to this output if it exists
-                    plugin_output = _string(data.get("file_out")) or plugin_out
+                    plugin_output = narrowing.strict_str_or_none(data.get("file_out")) or plugin_out
                     if os.path.exists(plugin_output):
                         # Track old file_in for cleanup (but not the original segment)
                         if current_input != segment_path:

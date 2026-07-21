@@ -14,8 +14,9 @@ import sys
 import time
 from collections import deque
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TypedDict
 
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
@@ -41,12 +42,6 @@ class GpuHistorySample(TypedDict):
     memory_used_mb: int
     memory_total_mb: int
     temperature_c: int | None
-
-
-def _string_keyed_dict(value: object) -> dict[str, object] | None:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return None
-    return cast("dict[str, object]", value)
 
 
 class GpuMonitor(metaclass=SingletonType):
@@ -310,7 +305,7 @@ class GpuMonitor(metaclass=SingletonType):
             if result.returncode != 0:
                 return []
 
-            data = _string_keyed_dict(json.loads(result.stdout))
+            data = narrowing.string_keyed_dict_or_none(json.loads(result.stdout))
             if data is None:
                 return []
             displays = data.get("SPDisplaysDataType")
@@ -318,7 +313,7 @@ class GpuMonitor(metaclass=SingletonType):
                 return []
             gpus: list[GpuMetrics] = []
             for i, raw_gpu_info in enumerate(displays):
-                gpu_info = _string_keyed_dict(raw_gpu_info)
+                gpu_info = narrowing.string_keyed_dict_or_none(raw_gpu_info)
                 if gpu_info is None:
                     continue
                 raw_name = gpu_info.get("sppci_model")
