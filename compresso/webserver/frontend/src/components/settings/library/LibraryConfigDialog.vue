@@ -477,8 +477,8 @@ const fetchLibraryConfig = (libraryId: number): void => {
     const libraryConfig = response.data.library_config
     currentID.value = libraryConfig.id ?? libraryId
     locked.value = libraryConfig.locked ?? false
-    name.value = libraryConfig.name
-    path.value = libraryConfig.path
+    name.value = libraryConfig.name ?? null
+    path.value = libraryConfig.path ?? null
     enableReceiveRemoteFilesOnly.value = libraryConfig.enable_remote_only ?? false
     enableScanner.value = libraryConfig.enable_scanner ?? false
     enableInotify.value = libraryConfig.enable_inotify ?? false

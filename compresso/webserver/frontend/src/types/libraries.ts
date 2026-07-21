@@ -17,13 +17,20 @@ export interface LibraryListItem {
   locked: boolean
 }
 
-export interface LibraryEnabledPlugin extends Omit<
-  LibraryEnabledPluginContract,
-  'description' | 'icon' | 'has_config'
-> {
+// Declared explicitly rather than via Omit<contract>: the contract schema
+// accepts unknown keys (additionalProperties), whose index signature would
+// make Omit collapse the specific property types.
+export interface LibraryEnabledPlugin {
+  plugin_id: string
+  name: string
   description: string
   icon: string
   has_config: boolean
+  author?: string
+  version?: string
+  tags?: string
+  library_id?: number | null
+  settings?: Record<string, unknown>
 }
 
 export interface LibraryPageSettings {
@@ -86,9 +93,15 @@ export function parseLibraryPageSettings(settings: Record<string, unknown>): Lib
 
 export function normalizeLibraryEnabledPlugin(plugin: LibraryEnabledPluginContract): LibraryEnabledPlugin {
   return {
-    ...plugin,
+    plugin_id: plugin.plugin_id,
+    name: plugin.name ?? '',
     description: plugin.description ?? '',
     icon: plugin.icon ?? '',
     has_config: plugin.has_config ?? false,
+    ...(plugin.author !== undefined ? { author: plugin.author } : {}),
+    ...(plugin.version !== undefined ? { version: plugin.version } : {}),
+    ...(plugin.tags !== undefined ? { tags: plugin.tags } : {}),
+    ...(plugin.library_id !== undefined ? { library_id: plugin.library_id } : {}),
+    ...(plugin.settings !== undefined ? { settings: plugin.settings } : {}),
   }
 }

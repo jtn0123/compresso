@@ -37,8 +37,11 @@ from typing import NotRequired, TypedDict, cast
 from compresso.config import Config
 from compresso.libs import common
 from compresso.libs.frontend_push_messages import FrontendPushMessages
+from compresso.libs.logs import CompressoLogging
 from compresso.libs.peewee_types import execute_count, execute_write
 from compresso.libs.unmodels import EnabledPlugins, Libraries, LibraryPluginFlow, Plugins, Tags, Tasks
+
+logger = CompressoLogging.get_logger(name=__name__)
 
 
 class LibraryLookupError(ValueError):
@@ -625,6 +628,12 @@ class Library:
         enabled_plugins: list[dict[str, object]] = []
         enabled_plugin_rows = cast("Iterable[dict[str, object]]", query.dicts())
         for enabled_plugin in enabled_plugin_rows:
+            # A dangling EnabledPlugins row (plugin deleted) yields NULL plugin
+            # columns via the LEFT OUTER JOIN; skip it rather than surfacing a
+            # half-empty entry that downstream consumers cannot use.
+            if enabled_plugin.get("name") is None and enabled_plugin.get("plugin_id") is None:
+                logger.warning("Ignoring orphaned enabled-plugin row for library %s", self.model.id)
+                continue
             # Check if plugin is able to be configured
             has_config = False
             plugin_id = enabled_plugin.get("plugin_id")

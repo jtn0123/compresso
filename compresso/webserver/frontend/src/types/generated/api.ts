@@ -9644,9 +9644,9 @@ export interface components {
             /** @example false */
             locked?: boolean;
             /** @example Default */
-            name: string;
+            name?: string;
             /** @example /library */
-            path: string;
+            path?: string;
             /** @example false */
             enable_remote_only?: boolean;
             /** @example false */
@@ -9683,12 +9683,24 @@ export interface components {
             size_guardrail_max_pct?: number;
             /** @example approval_required */
             replacement_policy?: string;
+        } & {
+            [key: string]: unknown;
         };
         SettingsLibraryEnabledPlugin: {
             /** @example notify_plex */
             plugin_id: string;
             /** @example Notify Plex */
-            name: string;
+            name?: string;
+            /** @example 1 */
+            library_id?: number | null;
+            /**
+             * @example {
+             *       "notify_on_failure": true
+             *     }
+             */
+            settings?: {
+                [key: string]: unknown;
+            };
             /** @example Notify Plex on completion. */
             description?: string | null;
             /** @example https://example.invalid/icon.png */
@@ -9701,6 +9713,8 @@ export interface components {
             version?: string;
             /** @example notification,plex */
             tags?: string;
+        } & {
+            [key: string]: unknown;
         };
         SettingsLibraryPlugins: {
             enabled_plugins: components["schemas"]["SettingsLibraryEnabledPlugin"][];

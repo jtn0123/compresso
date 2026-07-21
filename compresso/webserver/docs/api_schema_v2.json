@@ -4003,11 +4003,7 @@
                         "example": "approval_required"
                     }
                 },
-                "required": [
-                    "name",
-                    "path"
-                ],
-                "additionalProperties": false
+                "additionalProperties": true
             },
             "SettingsLibraryEnabledPlugin": {
                 "type": "object",
@@ -4019,6 +4015,18 @@
                     "name": {
                         "type": "string",
                         "example": "Notify Plex"
+                    },
+                    "library_id": {
+                        "type": "integer",
+                        "example": 1,
+                        "nullable": true
+                    },
+                    "settings": {
+                        "type": "object",
+                        "example": {
+                            "notify_on_failure": true
+                        },
+                        "additionalProperties": {}
                     },
                     "description": {
                         "type": "string",
@@ -4048,10 +4056,9 @@
                     }
                 },
                 "required": [
-                    "name",
                     "plugin_id"
                 ],
-                "additionalProperties": false
+                "additionalProperties": true
             },
             "SettingsLibraryPlugins": {
                 "type": "object",

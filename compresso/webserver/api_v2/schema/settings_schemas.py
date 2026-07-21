@@ -6,7 +6,7 @@ compresso.settings_schemas.py
 Marshmallow schemas for settings API endpoints.
 """
 
-from marshmallow import fields, validate
+from marshmallow import INCLUDE, fields, validate
 
 from compresso.webserver.api_v2.schema.schemas import BaseSchema
 
@@ -297,12 +297,20 @@ class RequestLibraryByIdSchema(BaseSchema):
 
 
 class SettingsLibraryConfigSchema(BaseSchema):
-    """Typed library settings accepted and returned by the settings API."""
+    """Typed library settings accepted and returned by the settings API.
+
+    Partial updates are supported: save_library_config falls back to the
+    library's current values for any omitted field, so nothing is required
+    and unknown keys are passed through rather than rejected.
+    """
+
+    class Meta:
+        unknown = INCLUDE
 
     id = fields.Int(required=False, allow_none=True, metadata={"example": 1})
     locked = fields.Boolean(required=False, metadata={"example": False})
-    name = fields.Str(required=True, metadata={"example": "Default"})
-    path = fields.Str(required=True, metadata={"example": _EXAMPLE_LIBRARY_PATH})
+    name = fields.Str(required=False, metadata={"example": "Default"})
+    path = fields.Str(required=False, metadata={"example": _EXAMPLE_LIBRARY_PATH})
     enable_remote_only = fields.Boolean(required=False, metadata={"example": False})
     enable_scanner = fields.Boolean(required=False, metadata={"example": False})
     enable_inotify = fields.Boolean(required=False, metadata={"example": False})
@@ -317,10 +325,19 @@ class SettingsLibraryConfigSchema(BaseSchema):
 
 
 class SettingsLibraryEnabledPluginSchema(BaseSchema):
-    """Plugin fields exchanged by the per-library configuration UI."""
+    """Plugin fields exchanged by the per-library configuration UI.
+
+    Import/export payloads may also carry library_id and a settings blob;
+    both are accepted (settings is applied by the import endpoint only).
+    """
+
+    class Meta:
+        unknown = INCLUDE
 
     plugin_id = fields.Str(required=True, metadata={"example": "notify_plex"})
-    name = fields.Str(required=True, metadata={"example": "Notify Plex"})
+    name = fields.Str(required=False, metadata={"example": "Notify Plex"})
+    library_id = fields.Int(required=False, allow_none=True, metadata={"example": 1})
+    settings = fields.Dict(required=False, metadata={"example": {"notify_on_failure": True}})
     description = fields.Str(required=False, allow_none=True, metadata={"example": "Notify Plex on completion."})
     icon = fields.Str(required=False, allow_none=True, metadata={"example": "https://example.invalid/icon.png"})
     has_config = fields.Boolean(required=False, metadata={"example": True})
