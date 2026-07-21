@@ -17,8 +17,10 @@ export interface LibraryListItem {
   locked: boolean
 }
 
-export interface LibraryEnabledPlugin
-  extends Omit<LibraryEnabledPluginContract, 'description' | 'icon' | 'has_config'> {
+export interface LibraryEnabledPlugin extends Omit<
+  LibraryEnabledPluginContract,
+  'description' | 'icon' | 'has_config'
+> {
   description: string
   icon: string
   has_config: boolean
@@ -46,14 +48,13 @@ function isBooleanSetting(value: unknown): value is boolean {
 }
 
 export function parseLibraryPageSettings(settings: Record<string, unknown>): LibraryPageSettings | null {
-  const approvalRequired =
-    isBooleanSetting(settings.approval_required)
-      ? settings.approval_required
-      : settings.approval_required === 'true'
-        ? true
-        : settings.approval_required === 'false'
-          ? false
-          : null
+  const approvalRequired = isBooleanSetting(settings.approval_required)
+    ? settings.approval_required
+    : settings.approval_required === 'true'
+      ? true
+      : settings.approval_required === 'false'
+        ? false
+        : null
   if (
     typeof settings.library_path !== 'string' ||
     !isBooleanSetting(settings.enable_library_scanner) ||

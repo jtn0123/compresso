@@ -205,11 +205,7 @@ export default defineComponent({
       closeCompressoWebsocket()
     })
   },
-  beforeRouteLeave(
-    _to: RouteLocationNormalized,
-    _from: RouteLocationNormalized,
-    next: NavigationGuardNext,
-  ) {
+  beforeRouteLeave(_to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) {
     if (this.hasUnsavedChanges) {
       this.$q
         .dialog({

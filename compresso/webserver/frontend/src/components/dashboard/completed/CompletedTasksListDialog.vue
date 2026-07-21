@@ -521,10 +521,23 @@ interface CompletedRow {
   status: boolean
   hasMetadata: boolean
 }
-interface CompletedFilters { search_value: string; status: string; after: string | null; before: string | null }
-interface LibraryOption { label: string; value: number }
-interface LibraryWire { id: number; name: string }
-interface TaskListShellController { tableWrapperRef: HTMLElement | null }
+interface CompletedFilters {
+  search_value: string
+  status: string
+  after: string | null
+  before: string | null
+}
+interface LibraryOption {
+  label: string
+  value: number
+}
+interface LibraryWire {
+  id: number
+  name: string
+}
+interface TaskListShellController {
+  tableWrapperRef: HTMLElement | null
+}
 
 const props = defineProps({
   initStatusFilter: {
@@ -763,9 +776,7 @@ const {
 
 const displayError = computed(() => {
   if (!error.value) return ''
-  return error.value instanceof Error || typeof error.value === 'string'
-    ? error.value
-    : String(error.value)
+  return error.value instanceof Error || typeof error.value === 'string' ? error.value : String(error.value)
 })
 
 const selectionBannerPageText = computed(() =>

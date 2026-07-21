@@ -61,7 +61,10 @@ import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue
 import type { DialogController } from 'src/types/ui'
 import type { WorkerScheduleEvent } from 'src/types/workers'
 
-interface SelectOption { label: string; value: string }
+interface SelectOption {
+  label: string
+  value: string
+}
 
 const emit = defineEmits<{
   ok: [event: WorkerScheduleEvent]

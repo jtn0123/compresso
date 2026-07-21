@@ -45,7 +45,10 @@ import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue
 import type { ApiSchema } from 'src/types/contracts'
 import type { DialogController } from 'src/types/ui'
 
-interface DirectoryEntry { name: string; full_path: string }
+interface DirectoryEntry {
+  name: string
+  full_path: string
+}
 
 const toDirectoryEntry = (value: Record<string, unknown>): DirectoryEntry | null =>
   typeof value.name === 'string' && typeof value.full_path === 'string'

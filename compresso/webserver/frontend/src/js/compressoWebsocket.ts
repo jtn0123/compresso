@@ -1,10 +1,6 @@
 import { Notify } from 'quasar'
 import { ref } from 'vue'
-import $compresso, {
-  showEventToast,
-  type CompressoSocket,
-  type RegisteredWebSocketListener,
-} from './compressoGlobals'
+import $compresso, { showEventToast, type CompressoSocket, type RegisteredWebSocketListener } from './compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 import { getWebsocketProtocols } from 'src/js/apiAuth'
 import { displayBasename } from 'src/js/pathUtils'
@@ -75,14 +71,19 @@ export function parseIncomingEnvelope(raw: string): IncomingEnvelope | null {
   } catch {
     return null
   }
-  if (!isRecord(value) || value.success !== true) return isRecord(value) && value.success === false ? { success: false } : null
+  if (!isRecord(value) || value.success !== true)
+    return isRecord(value) && value.success === false ? { success: false } : null
   if (typeof value.server_id !== 'string' || typeof value.type !== 'string') return null
   if (value.type === 'frontend_message') {
     if (!Array.isArray(value.data) || !value.data.every(isFrontendPushMessage)) return null
     return { success: true, server_id: value.server_id, type: value.type, data: value.data }
   }
   if (value.type === 'completed_tasks') {
-    if (!isRecord(value.data) || !Array.isArray(value.data.results) || !value.data.results.every(isCompletedTaskMessage)) {
+    if (
+      !isRecord(value.data) ||
+      !Array.isArray(value.data.results) ||
+      !value.data.results.every(isCompletedTaskMessage)
+    ) {
       return null
     }
     return { success: true, server_id: value.server_id, type: value.type, data: { results: value.data.results } }

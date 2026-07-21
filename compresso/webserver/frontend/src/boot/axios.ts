@@ -38,9 +38,9 @@ export function shouldRetryApiAuth(error: unknown): boolean {
   const request = error.config
   return Boolean(
     error.response.status === 401 &&
-      (request.url === undefined || typeof request.url === 'string') &&
-      isInternalRequestUrl(request.url) &&
-      !request.__compressoAuthRetried,
+    (request.url === undefined || typeof request.url === 'string') &&
+    isInternalRequestUrl(request.url) &&
+    !request.__compressoAuthRetried,
   )
 }
 

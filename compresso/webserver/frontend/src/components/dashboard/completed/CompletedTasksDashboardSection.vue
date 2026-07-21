@@ -76,7 +76,12 @@ import type { PropType } from 'vue'
 import CompletedTasksListDialog from 'components/dashboard/completed/CompletedTasksListDialog.vue'
 import type { DialogController } from 'src/types/ui'
 
-interface CompletedTaskSummary { id: number; label: string; success: boolean; dateTimeSinceCompleted: string }
+interface CompletedTaskSummary {
+  id: number
+  label: string
+  success: boolean
+  dateTimeSinceCompleted: string
+}
 
 export default defineComponent({
   name: 'CompletedTasks',

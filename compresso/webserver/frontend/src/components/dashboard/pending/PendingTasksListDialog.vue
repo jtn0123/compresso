@@ -269,11 +269,26 @@ import CompressoListActionButton from 'components/ui/buttons/CompressoListAction
 import type { ApiSchema } from 'src/types/contracts'
 import type { DialogController } from 'src/types/ui'
 
-interface PendingRow { id: number; name: string; libraryName: string }
-interface LibraryOption { label: string; value: number }
-interface LibraryWire { id: number; name: string }
-interface TaskListShellController { tableWrapperRef: HTMLElement | null }
-interface PendingFilters { search_value: string; library_ids: number[] }
+interface PendingRow {
+  id: number
+  name: string
+  libraryName: string
+}
+interface LibraryOption {
+  label: string
+  value: number
+}
+interface LibraryWire {
+  id: number
+  name: string
+}
+interface TaskListShellController {
+  tableWrapperRef: HTMLElement | null
+}
+interface PendingFilters {
+  search_value: string
+  library_ids: number[]
+}
 
 const emit = defineEmits(['hide'])
 
@@ -432,9 +447,7 @@ void excludedIds
 
 const displayError = computed(() => {
   if (!error.value) return ''
-  return error.value instanceof Error || typeof error.value === 'string'
-    ? error.value
-    : String(error.value)
+  return error.value instanceof Error || typeof error.value === 'string' ? error.value : String(error.value)
 })
 
 const selectionBannerPageText = computed(() =>

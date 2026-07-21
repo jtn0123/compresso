@@ -303,10 +303,21 @@ interface HistoryTaskRow {
   finish_time: number
   [key: string]: string | number | boolean
 }
-interface HistoryResponse { recordsFiltered: number; results: HistoryTaskWire[] }
-interface SelectOption<T> { label: string; value: T }
-interface LibraryWire { id: number; name: string }
-interface HistoryColumn extends QTableColumn { field: string }
+interface HistoryResponse {
+  recordsFiltered: number
+  results: HistoryTaskWire[]
+}
+interface SelectOption<T> {
+  label: string
+  value: T
+}
+interface LibraryWire {
+  id: number
+  name: string
+}
+interface HistoryColumn extends QTableColumn {
+  field: string
+}
 interface TableRequest {
   pagination: { page: number; rowsPerPage: number; sortBy?: string; descending: boolean }
 }
@@ -605,7 +616,9 @@ async function openLog(taskId: number): Promise<void> {
   logLoading.value = true
   logContent.value = ''
   try {
-    const response = await axios.post<ApiSchema<'CompletedTasksLog'>>(getCompressoApiUrl('v2', 'history/task/log'), { task_id: taskId })
+    const response = await axios.post<ApiSchema<'CompletedTasksLog'>>(getCompressoApiUrl('v2', 'history/task/log'), {
+      task_id: taskId,
+    })
     logContent.value = response.data.command_log || t('pages.taskHistory.noLogAvailable')
   } catch {
     logContent.value = t('components.completedTasks.errorGettingDetails')

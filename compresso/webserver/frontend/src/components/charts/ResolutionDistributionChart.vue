@@ -19,7 +19,10 @@ import type { Chart as ChartInstance } from 'chart.js'
 import { useQuasar } from 'quasar'
 import { useChartTheme } from 'src/composables/useChartTheme'
 
-interface ResolutionCount { resolution: string; count: number }
+interface ResolutionCount {
+  resolution: string
+  count: number
+}
 
 export default {
   name: 'ResolutionDistributionChart',

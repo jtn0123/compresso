@@ -357,7 +357,10 @@ import PageHeader from 'components/ui/PageHeader.vue'
 import type { ApiSchema } from 'src/types/contracts'
 
 type ScanMode = 'quick' | 'thorough'
-interface ScanWorker { status: string; current_file: string }
+interface ScanWorker {
+  status: string
+  current_file: string
+}
 interface HealthProgressView extends Omit<ApiSchema<'HealthCheckProgress'>, 'workers'> {
   workers: Record<string, ScanWorker>
 }
@@ -371,12 +374,20 @@ interface HealthStatusRow {
   library_id?: number
   _checking: boolean
 }
-interface LibraryOption { label: string; value: number }
-interface LibraryWire { id: number; name?: string }
+interface LibraryOption {
+  label: string
+  value: number
+}
+interface LibraryWire {
+  id: number
+  name?: string
+}
 interface TableRequest {
   pagination: { page: number; rowsPerPage: number; sortBy: string; descending: boolean }
 }
-interface FileInfoController { probeByPath(path: string): void }
+interface FileInfoController {
+  probeByPath(path: string): void
+}
 
 const normalizeProgress = (progress?: ApiSchema<'HealthCheckProgress'>): HealthProgressView => {
   const workers: Record<string, ScanWorker> = {}
@@ -554,7 +565,9 @@ export default {
 
     async function loadWorkerInfo() {
       try {
-        const response = await axios.get<ApiSchema<'HealthCheckWorkersResponse'>>(getCompressoApiUrl('v2', 'healthcheck/workers'))
+        const response = await axios.get<ApiSchema<'HealthCheckWorkersResponse'>>(
+          getCompressoApiUrl('v2', 'healthcheck/workers'),
+        )
         if (response.data) {
           workerCount.value = response.data.worker_count || 1
           if (response.data.scan_progress) {
@@ -606,15 +619,18 @@ export default {
       loadingStatuses.value = true
       try {
         const start = (pagination.value.page - 1) * pagination.value.rowsPerPage
-        const response = await axios.post<ApiSchema<'HealthCheckStatusResponse'>>(getCompressoApiUrl('v2', 'healthcheck/status'), {
-          start: start,
-          length: pagination.value.rowsPerPage,
-          search_value: searchValue.value,
-          library_id: selectedLibraryId.value,
-          status_filter: statusFilter.value,
-          order_by: pagination.value.sortBy || 'last_checked',
-          order_direction: pagination.value.descending ? 'desc' : 'asc',
-        })
+        const response = await axios.post<ApiSchema<'HealthCheckStatusResponse'>>(
+          getCompressoApiUrl('v2', 'healthcheck/status'),
+          {
+            start: start,
+            length: pagination.value.rowsPerPage,
+            search_value: searchValue.value,
+            library_id: selectedLibraryId.value,
+            status_filter: statusFilter.value,
+            order_by: pagination.value.sortBy || 'last_checked',
+            order_direction: pagination.value.descending ? 'desc' : 'asc',
+          },
+        )
         if (response.data) {
           statusResults.value = (response.data.results || [])
             .filter(isHealthStatusRow)
@@ -637,10 +653,13 @@ export default {
         persistent: false,
       }).onOk(async () => {
         try {
-          const response = await axios.post<ApiSchema<'HealthCheckLibraryScanResponse'>>(getCompressoApiUrl('v2', 'healthcheck/scan-library'), {
-            library_id: selectedLibraryId.value,
-            mode: scanMode.value,
-          })
+          const response = await axios.post<ApiSchema<'HealthCheckLibraryScanResponse'>>(
+            getCompressoApiUrl('v2', 'healthcheck/scan-library'),
+            {
+              library_id: selectedLibraryId.value,
+              mode: scanMode.value,
+            },
+          )
           if (response.data) {
             scanning.value = response.data.started ?? false
             if (response.data.started) {
@@ -674,11 +693,14 @@ export default {
     async function checkSingleFile() {
       singleFileResult.value = null
       try {
-        const response = await axios.post<ApiSchema<'HealthCheckScanResponse'>>(getCompressoApiUrl('v2', 'healthcheck/scan'), {
-          file_path: singleFilePath.value,
-          library_id: selectedLibraryId.value,
-          mode: scanMode.value,
-        })
+        const response = await axios.post<ApiSchema<'HealthCheckScanResponse'>>(
+          getCompressoApiUrl('v2', 'healthcheck/scan'),
+          {
+            file_path: singleFilePath.value,
+            library_id: selectedLibraryId.value,
+            mode: scanMode.value,
+          },
+        )
         if (response.data) {
           singleFileResult.value = response.data
           await loadSummary()

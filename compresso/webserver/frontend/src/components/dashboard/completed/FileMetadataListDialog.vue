@@ -200,9 +200,17 @@ import type { DialogController } from 'src/types/ui'
 import { normalizeMetadataEntry } from 'src/types/metadata'
 import type { MetadataPath } from 'src/types/metadata'
 
-interface MetadataRow { fingerprint: string; paths: MetadataPath[] }
-interface FetchMetadataOptions { reset?: boolean; silent?: boolean }
-interface InfiniteScrollController { trigger(): void }
+interface MetadataRow {
+  fingerprint: string
+  paths: MetadataPath[]
+}
+interface FetchMetadataOptions {
+  reset?: boolean
+  silent?: boolean
+}
+interface InfiniteScrollController {
+  trigger(): void
+}
 
 const emit = defineEmits(['hide'])
 

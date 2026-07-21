@@ -13,10 +13,12 @@ export function normalizeMetadataEntry(entry: ApiSchema<'MetadataEntry'>): Metad
   const paths = (entry.paths ?? []).flatMap((value) => {
     const path = typeof value.path === 'string' ? value.path : null
     if (!path) return []
-    return [{
-      path,
-      path_type: typeof value.path_type === 'string' ? value.path_type : 'path',
-    }]
+    return [
+      {
+        path,
+        path_type: typeof value.path_type === 'string' ? value.path_type : 'path',
+      },
+    ]
   })
   return { ...entry, paths }
 }

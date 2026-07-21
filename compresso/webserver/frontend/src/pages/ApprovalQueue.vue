@@ -630,8 +630,10 @@ import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
 import type { ApiSchema } from 'src/types/contracts'
 
-interface ApprovalDetail extends Omit<ApiSchema<'ApprovalDetailResponse'>,
-  'id' | 'abspath' | 'source_size' | 'staged_size' | 'size_delta' | 'library_id'> {
+interface ApprovalDetail extends Omit<
+  ApiSchema<'ApprovalDetailResponse'>,
+  'id' | 'abspath' | 'source_size' | 'staged_size' | 'size_delta' | 'library_id'
+> {
   id: number
   abspath: string
   source_size: number
@@ -967,7 +969,9 @@ export default {
       resetPreviewState()
       showDetailDialog.value = true
       try {
-        const res = await axios.post<ApiSchema<'ApprovalDetailResponse'>>(getCompressoApiUrl('v2', 'approval/detail'), { id })
+        const res = await axios.post<ApiSchema<'ApprovalDetailResponse'>>(getCompressoApiUrl('v2', 'approval/detail'), {
+          id,
+        })
         detailData.value = normalizeApprovalDetail(res.data)
       } catch {
         $q.notify({

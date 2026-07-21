@@ -314,12 +314,14 @@ const compressoGlobals: CompressoGlobalsService = {
         .catch(() => {
           log.error('Failed to dismiss server notifications')
           resolve()
-      })
+        })
     })
   },
   async loginGetAppAuthCode(t: Translate, onSuccess: (data: ApiSchema<'SessionAuthCode'>) => void): Promise<void> {
     try {
-      const response = await axios.get<ApiSchema<'SessionAuthCode'>>(getCompressoApiUrl('v2', 'session/get_app_auth_code'))
+      const response = await axios.get<ApiSchema<'SessionAuthCode'>>(
+        getCompressoApiUrl('v2', 'session/get_app_auth_code'),
+      )
       onSuccess(response.data)
     } catch (error) {
       log.error('Failed to initiate application authentication', error)

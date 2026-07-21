@@ -123,8 +123,14 @@ import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
 import type { ApiSchema } from 'src/types/contracts'
 
-interface LibraryOption { label: string; value: number }
-interface LibraryWire { id: number; name?: string }
+interface LibraryOption {
+  label: string
+  value: number
+}
+interface LibraryWire {
+  id: number
+  name?: string
+}
 const isLibraryWire = (value: unknown): value is LibraryWire => {
   if (typeof value !== 'object' || value === null) return false
   const library = value as Record<string, unknown>
@@ -188,12 +194,15 @@ export default {
       previewReady.value = false
 
       try {
-        const response = await axios.post<ApiSchema<'PreviewCreateResponse'>>(getCompressoApiUrl('v2', 'preview/create'), {
-          source_path: sourcePath.value,
-          start_time: startTime.value,
-          duration: duration.value,
-          library_id: libraryId.value,
-        })
+        const response = await axios.post<ApiSchema<'PreviewCreateResponse'>>(
+          getCompressoApiUrl('v2', 'preview/create'),
+          {
+            source_path: sourcePath.value,
+            start_time: startTime.value,
+            duration: duration.value,
+            library_id: libraryId.value,
+          },
+        )
 
         if (response.data && response.data.job_id) {
           jobId.value = response.data.job_id
@@ -207,7 +216,9 @@ export default {
         jobStatus.value = 'failed'
         const detail = axios.isAxiosError<{ error?: string }>(error)
           ? error.response?.data.error || error.message
-          : error instanceof Error ? error.message : String(error)
+          : error instanceof Error
+            ? error.message
+            : String(error)
         jobError.value = detail
         $q.notify({
           type: 'negative',
@@ -223,9 +234,12 @@ export default {
       pollTimer = setInterval(async () => {
         try {
           if (!jobId.value) return
-          const response = await axios.post<ApiSchema<'PreviewStatusResponse'>>(getCompressoApiUrl('v2', 'preview/status'), {
-            job_id: jobId.value,
-          })
+          const response = await axios.post<ApiSchema<'PreviewStatusResponse'>>(
+            getCompressoApiUrl('v2', 'preview/status'),
+            {
+              job_id: jobId.value,
+            },
+          )
 
           if (response.data) {
             jobStatus.value = response.data.status ?? ''

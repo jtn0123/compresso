@@ -105,12 +105,7 @@
             </div>
             <div v-if="enableReceiveRemoteFilesOnly !== true" class="q-pb-sm">
               <q-skeleton v-if="enableScanner === null" type="QToggle" />
-              <q-item
-                v-else
-                tag="label"
-                class="border-hover"
-                style="padding-left: 12px"
-              >
+              <q-item v-else tag="label" class="border-hover" style="padding-left: 12px">
                 <q-item-section>
                   <q-item-label>{{ $t('components.settings.library.enableScanner') }}</q-item-label>
                 </q-item-section>
@@ -121,12 +116,7 @@
             </div>
             <div v-if="enableReceiveRemoteFilesOnly !== true" class="q-pb-sm">
               <q-skeleton v-if="enableInotify === null" type="QToggle" />
-              <q-item
-                v-else
-                tag="label"
-                class="border-hover"
-                style="padding-left: 12px"
-              >
+              <q-item v-else tag="label" class="border-hover" style="padding-left: 12px">
                 <q-item-section>
                   <q-item-label>{{ $t('components.settings.library.enableInotify') }}</q-item-label>
                 </q-item-section>

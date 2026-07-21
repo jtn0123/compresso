@@ -310,13 +310,36 @@ import EncodingSpeedChart from 'components/charts/EncodingSpeedChart.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
 import type { ApiSchema } from 'src/types/contracts'
 
-interface LibraryOption { label: string; value: number | null }
-interface LibraryWire { id: number; name?: string }
-interface CodecCount { codec: string; count: number }
-interface ResolutionCount { resolution: string; count: number }
-interface TimelinePoint { date: string; space_saved: number }
-interface EncodingSpeedPoint { date: string; avg_fps: number; avg_speed_ratio: number; count: number }
-interface AnalysisProgress { checked: number; total: number }
+interface LibraryOption {
+  label: string
+  value: number | null
+}
+interface LibraryWire {
+  id: number
+  name?: string
+}
+interface CodecCount {
+  codec: string
+  count: number
+}
+interface ResolutionCount {
+  resolution: string
+  count: number
+}
+interface TimelinePoint {
+  date: string
+  space_saved: number
+}
+interface EncodingSpeedPoint {
+  date: string
+  avg_fps: number
+  avg_speed_ratio: number
+  count: number
+}
+interface AnalysisProgress {
+  checked: number
+  total: number
+}
 interface AnalysisGroup {
   codec: string
   resolution: string
@@ -348,8 +371,12 @@ const isLibraryWire = (value: unknown): value is LibraryWire => {
 const isAnalysisResults = (value: unknown): value is AnalysisResults => {
   if (typeof value !== 'object' || value === null) return false
   const result = value as Record<string, unknown>
-  return Array.isArray(result.groups) && typeof result.total_files === 'number' &&
-    typeof result.total_size_bytes === 'number' && typeof result.total_estimated_savings_bytes === 'number'
+  return (
+    Array.isArray(result.groups) &&
+    typeof result.total_files === 'number' &&
+    typeof result.total_size_bytes === 'number' &&
+    typeof result.total_estimated_savings_bytes === 'number'
+  )
 }
 
 const toAnalysisProgress = (value: unknown): AnalysisProgress => {
@@ -397,7 +424,10 @@ export default {
       avg_ratio_used: 1.0,
     })
 
-    const codecData = ref<{ source_codecs: CodecCount[]; destination_codecs: CodecCount[] }>({ source_codecs: [], destination_codecs: [] })
+    const codecData = ref<{ source_codecs: CodecCount[]; destination_codecs: CodecCount[] }>({
+      source_codecs: [],
+      destination_codecs: [],
+    })
     const resolutionData = ref<ResolutionCount[]>([])
     const timelineData = ref<TimelinePoint[]>([])
     const timelineInterval = ref('day')
@@ -438,7 +468,13 @@ export default {
     ]
 
     function confidenceColor(level: string): string {
-      const map: Record<string, string> = { high: 'positive', medium: 'warning', low: 'grey', none: 'grey-4', optimal: 'grey-4' }
+      const map: Record<string, string> = {
+        high: 'positive',
+        medium: 'warning',
+        low: 'grey',
+        none: 'grey-4',
+        optimal: 'grey-4',
+      }
       return map[level] || 'grey'
     }
     function confidenceLabel(level: string): string {
@@ -468,9 +504,12 @@ export default {
     async function pollAnalysisStatus() {
       if (!selectedLibraryId.value) return
       try {
-        const response = await axios.post<ApiSchema<'LibraryAnalysisStatus'>>(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
-          library_id: selectedLibraryId.value,
-        })
+        const response = await axios.post<ApiSchema<'LibraryAnalysisStatus'>>(
+          getCompressoApiUrl('v2', 'compression/library-analysis/status'),
+          {
+            library_id: selectedLibraryId.value,
+          },
+        )
         if (response.data) {
           analysisStatus.value = response.data.status || 'none'
           analysisProgress.value = toAnalysisProgress(response.data.progress)
@@ -491,9 +530,12 @@ export default {
     async function loadAnalysisIfAvailable() {
       if (!selectedLibraryId.value) return
       try {
-        const response = await axios.post<ApiSchema<'LibraryAnalysisStatus'>>(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
-          library_id: selectedLibraryId.value,
-        })
+        const response = await axios.post<ApiSchema<'LibraryAnalysisStatus'>>(
+          getCompressoApiUrl('v2', 'compression/library-analysis/status'),
+          {
+            library_id: selectedLibraryId.value,
+          },
+        )
         if (response.data) {
           analysisStatus.value = response.data.status || 'none'
           analysisProgress.value = toAnalysisProgress(response.data.progress)
@@ -637,7 +679,9 @@ export default {
 
     async function loadSummary() {
       try {
-        const response = await axios.get<ApiSchema<'CompressionSummary'>>(getCompressoApiUrl('v2', 'compression/summary') + buildLibraryParam())
+        const response = await axios.get<ApiSchema<'CompressionSummary'>>(
+          getCompressoApiUrl('v2', 'compression/summary') + buildLibraryParam(),
+        )
         if (response.data) {
           summary.value = response.data
         }
@@ -651,7 +695,9 @@ export default {
 
     async function loadPendingEstimate() {
       try {
-        const response = await axios.get<ApiSchema<'PendingEstimate'>>(getCompressoApiUrl('v2', 'compression/pending-estimate'))
+        const response = await axios.get<ApiSchema<'PendingEstimate'>>(
+          getCompressoApiUrl('v2', 'compression/pending-estimate'),
+        )
         if (response.data) {
           pendingEstimate.value = response.data
         }

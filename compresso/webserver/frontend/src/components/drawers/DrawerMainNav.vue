@@ -274,7 +274,10 @@ import ApplicationLogsDialog from 'components/docs/ApplicationLogsDialog.vue'
 import type { ApiSchema } from 'src/types/contracts'
 import type { DialogController } from 'src/types/ui'
 
-interface DataPanelLink { id: string; label: string }
+interface DataPanelLink {
+  id: string
+  label: string
+}
 
 export default {
   name: 'DrawerMainNav',
@@ -304,7 +307,9 @@ export default {
 
     async function fetchDataPanelList() {
       try {
-        const response = await axios.get<ApiSchema<'PluginsDataPanelTypesData'>>(getCompressoApiUrl('v2', 'plugins/panels/enabled'))
+        const response = await axios.get<ApiSchema<'PluginsDataPanelTypesData'>>(
+          getCompressoApiUrl('v2', 'plugins/panels/enabled'),
+        )
         availableDataPanels.value = (response.data.results || []).map((p) => ({
           id: p.plugin_id,
           label: p.name,

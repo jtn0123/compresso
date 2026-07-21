@@ -28,7 +28,10 @@ import type { Chart as ChartInstance } from 'chart.js'
 import { useQuasar } from 'quasar'
 import { useChartTheme } from 'src/composables/useChartTheme'
 
-interface CodecCount { codec: string; count: number }
+interface CodecCount {
+  codec: string
+  count: number
+}
 
 export default {
   name: 'CodecDistributionChart',

@@ -6,10 +6,10 @@ export type PluginInfoResult = ApiSchema<'PluginsInfoResults'>
 export type PluginFlowEntry = ApiSchema<'PluginFlowDataResults'>
 export type PluginRepo = ApiSchema<'PluginReposMetadataResults'>
 export type InstallablePluginContract = ApiSchema<'PluginsMetadataInstallableResults'>
-export type SelectablePlugin = Omit<Pick<
-  PluginTableResult,
-  'plugin_id' | 'name' | 'author' | 'description' | 'version' | 'icon' | 'tags' | 'has_config'
->, 'has_config'> & { has_config: boolean }
+export type SelectablePlugin = Omit<
+  Pick<PluginTableResult, 'plugin_id' | 'name' | 'author' | 'description' | 'version' | 'icon' | 'tags' | 'has_config'>,
+  'has_config'
+> & { has_config: boolean }
 export type PluginSettingValue = string | number | boolean | null
 
 export interface PluginSelectOption {
@@ -37,17 +37,18 @@ interface PluginSettingBase {
   sub_setting: boolean
 }
 
-export type PluginSetting = PluginSettingBase & (
-  | { input_type: 'text' | 'textarea' | 'browse_directory'; value: string }
-  | { input_type: 'checkbox'; value: boolean }
-  | { input_type: 'slider'; value: number }
-  | { input_type: 'select'; value: PluginSettingValue }
-  | {
-      input_type: 'section_header' | 'section_subheader' | 'section_details' | 'section_admonition'
-      value: PluginSettingValue
-    }
-  | { input_type: 'unknown'; value: PluginSettingValue }
-)
+export type PluginSetting = PluginSettingBase &
+  (
+    | { input_type: 'text' | 'textarea' | 'browse_directory'; value: string }
+    | { input_type: 'checkbox'; value: boolean }
+    | { input_type: 'slider'; value: number }
+    | { input_type: 'select'; value: PluginSettingValue }
+    | {
+        input_type: 'section_header' | 'section_subheader' | 'section_details' | 'section_admonition'
+        value: PluginSettingValue
+      }
+    | { input_type: 'unknown'; value: PluginSettingValue }
+  )
 
 export interface InstalledPlugin extends Omit<PluginTableResult, 'description' | 'has_config'> {
   description: string
@@ -87,8 +88,10 @@ export interface PluginFlowType {
   labelCode: string
 }
 
-export interface InstallablePlugin
-  extends Omit<InstallablePluginContract, 'status' | 'repo_id' | 'repo_name' | 'package_url' | 'changelog_url'> {
+export interface InstallablePlugin extends Omit<
+  InstallablePluginContract,
+  'status' | 'repo_id' | 'repo_name' | 'package_url' | 'changelog_url'
+> {
   installed: boolean
   update_available: boolean
   repo_id: string
@@ -118,10 +121,7 @@ export function normalizeInstallablePlugin(plugin: InstallablePluginContract): I
 
 export function normalizePluginSetting(input: ApiSchema<'PluginsConfigInputItem'>): PluginSetting {
   const normalizeValue = (value: unknown): PluginSettingValue =>
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    value === null
+    typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null
       ? value
       : String(value ?? '')
 
@@ -136,15 +136,18 @@ export function normalizePluginSetting(input: ApiSchema<'PluginsConfigInputItem'
       value: normalizeValue(option.value),
     })),
     slider_options: {
-      min: typeof input.slider_options.min === 'number' || typeof input.slider_options.min === 'string'
-        ? input.slider_options.min
-        : undefined,
-      max: typeof input.slider_options.max === 'number' || typeof input.slider_options.max === 'string'
-        ? input.slider_options.max
-        : undefined,
-      step: typeof input.slider_options.step === 'number' || typeof input.slider_options.step === 'string'
-        ? input.slider_options.step
-        : undefined,
+      min:
+        typeof input.slider_options.min === 'number' || typeof input.slider_options.min === 'string'
+          ? input.slider_options.min
+          : undefined,
+      max:
+        typeof input.slider_options.max === 'number' || typeof input.slider_options.max === 'string'
+          ? input.slider_options.max
+          : undefined,
+      step:
+        typeof input.slider_options.step === 'number' || typeof input.slider_options.step === 'string'
+          ? input.slider_options.step
+          : undefined,
       suffix: typeof input.slider_options.suffix === 'string' ? input.slider_options.suffix : undefined,
     },
     display: input.display,

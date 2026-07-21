@@ -117,7 +117,9 @@ interface CommunityRepoWire {
   repo_url: string
 }
 
-interface CommunityReposResponse { repos?: CommunityRepoWire[] }
+interface CommunityReposResponse {
+  repos?: CommunityRepoWire[]
+}
 
 const log = createLogger('CommunityRepos')
 

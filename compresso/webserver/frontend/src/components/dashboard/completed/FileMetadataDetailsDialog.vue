@@ -126,8 +126,15 @@ import type { DialogController } from 'src/types/ui'
 import { normalizeMetadataEntry } from 'src/types/metadata'
 import type { MetadataEntryView } from 'src/types/metadata'
 
-interface EditorEntry { pluginId: string; jsonText: string; error: string }
-interface ConfirmState { type: '' | 'plugin' | 'all'; pluginId: string | null }
+interface EditorEntry {
+  pluginId: string
+  jsonText: string
+  error: string
+}
+interface ConfirmState {
+  type: '' | 'plugin' | 'all'
+  pluginId: string | null
+}
 
 const props = defineProps({
   completedTaskId: {

@@ -158,7 +158,11 @@ import { createLogger } from 'src/composables/useLogger'
 import type { LiveGpuMetrics, SystemStatus } from 'src/types/contracts'
 
 type LiveSystemStatus = Omit<SystemStatus, 'gpus'> & { gpus: LiveGpuMetrics[] }
-interface TopBarMetrics { cpu: number; mem: number; gpu: number | null }
+interface TopBarMetrics {
+  cpu: number
+  mem: number
+  gpu: number | null
+}
 
 const PAGE_HEADER_KEYS: Record<string, string> = {
   '/ui/dashboard': 'dashboard',

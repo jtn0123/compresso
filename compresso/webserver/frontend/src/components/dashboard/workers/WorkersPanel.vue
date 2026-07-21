@@ -184,12 +184,7 @@ import { displayBasename } from 'src/js/pathUtils'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import WorkerMoreDetailsDialog from 'components/dashboard/workers/WorkerMoreDetailsDialog.vue'
 import type { DialogController } from 'src/types/ui'
-import type {
-  WorkerDetailsProps,
-  WorkerGroupConfig,
-  WorkerGroupView,
-  WorkerProgressEntry,
-} from 'src/types/workers'
+import type { WorkerDetailsProps, WorkerGroupConfig, WorkerGroupView, WorkerProgressEntry } from 'src/types/workers'
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
@@ -243,17 +238,17 @@ const workerGroups = computed(() => {
 
     const config = workerGroupConfigs.value[groupName]
     const group = (groups[groupName] ??= {
-        name: groupName,
-        active: 0,
-        idle: 0,
-        paused: 0,
-        color: worker.workerGroupColour || generateGroupColour(groupName),
-        workerType: config?.worker_type || worker.workerType || 'cpu',
-        workerCount: config?.number_of_workers ?? null,
-        groupId: config?.id ?? null,
-        saving: savingGroups.value[groupName] || false,
-        workers: [],
-      })
+      name: groupName,
+      active: 0,
+      idle: 0,
+      paused: 0,
+      color: worker.workerGroupColour || generateGroupColour(groupName),
+      workerType: config?.worker_type || worker.workerType || 'cpu',
+      workerCount: config?.number_of_workers ?? null,
+      groupId: config?.id ?? null,
+      saving: savingGroups.value[groupName] || false,
+      workers: [],
+    })
 
     if (worker.paused) {
       group.paused++
@@ -311,7 +306,9 @@ function openWorkerDetails(worker: WorkerProgressEntry): void {
 
 async function fetchWorkerGroupConfigs() {
   try {
-    const response = await axios.get<{ worker_groups: WorkerGroupConfig[] }>(getCompressoApiUrl('v2', 'settings/worker_groups'))
+    const response = await axios.get<{ worker_groups: WorkerGroupConfig[] }>(
+      getCompressoApiUrl('v2', 'settings/worker_groups'),
+    )
     const configs: Record<string, WorkerGroupConfigSummary> = {}
     for (const group of response.data.worker_groups) {
       configs[group.name] = {

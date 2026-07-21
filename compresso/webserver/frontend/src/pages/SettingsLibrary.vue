@@ -418,7 +418,6 @@ export default defineComponent({
       // Close the websocket
       closeCompressoWebsocket()
     })
-
   },
   data() {
     return {

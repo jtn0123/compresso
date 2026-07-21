@@ -132,7 +132,8 @@ function parsePendingTask(value: unknown): PendingTaskMessage | null {
     typeof value.priority !== 'number' ||
     typeof value.label !== 'string' ||
     typeof value.status !== 'string'
-  ) return null
+  )
+    return null
   return { id: value.id, priority: value.priority, label: value.label, status: value.status }
 }
 
@@ -140,7 +141,9 @@ function parsePendingTasks(value: unknown): PendingTasksMessage | null {
   if (!isRecord(value) || !Array.isArray(value.results)) return null
   const results = value.results.map(parsePendingTask)
   if (results.some((entry) => entry === null)) return null
-  const parsed: PendingTasksMessage = { results: results.filter((entry): entry is PendingTaskMessage => entry !== null) }
+  const parsed: PendingTasksMessage = {
+    results: results.filter((entry): entry is PendingTaskMessage => entry !== null),
+  }
   if (isRecord(value.queue_eta) && typeof value.queue_eta.eta_seconds === 'number') {
     const confidence = value.queue_eta.confidence
     parsed.queue_eta = {
@@ -159,7 +162,8 @@ function parseCompletedTask(value: unknown): CompletedTaskMessage | null {
     typeof value.finish_time !== 'number' ||
     typeof value.human_readable_time !== 'string' ||
     typeof value.success !== 'boolean'
-  ) return null
+  )
+    return null
   return {
     id: value.id,
     label: value.label,

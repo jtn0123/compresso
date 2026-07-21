@@ -89,7 +89,10 @@ import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.v
 import type { CompressoSocket } from 'src/js/compressoGlobals'
 import type { DialogController } from 'src/types/ui'
 
-interface SystemLogsData { system_logs?: unknown; logs_path?: unknown }
+interface SystemLogsData {
+  system_logs?: unknown
+  logs_path?: unknown
+}
 
 const emit = defineEmits(['hide'])
 const { t: $t } = useI18n()

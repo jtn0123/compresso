@@ -308,7 +308,9 @@ import { normalizePluginSetting } from 'src/types/plugins'
 import type { PluginSetting, PluginStatus } from 'src/types/plugins'
 
 type AdmonitionType = 'note' | 'tip' | 'warning' | 'caution' | 'important'
-interface DirectorySelection { selectedPath: string }
+interface DirectorySelection {
+  selectedPath: string
+}
 interface PluginInfoRequest {
   plugin_id: string
   prefer_local: boolean

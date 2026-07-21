@@ -34,7 +34,10 @@ import { useQuasar } from 'quasar'
 import { formatBytes } from 'src/js/formatUtils'
 import { useChartTheme } from 'src/composables/useChartTheme'
 
-interface SpaceSavedPoint { date: string; space_saved: number }
+interface SpaceSavedPoint {
+  date: string
+  space_saved: number
+}
 
 export default {
   name: 'SpaceSavedTimelineChart',

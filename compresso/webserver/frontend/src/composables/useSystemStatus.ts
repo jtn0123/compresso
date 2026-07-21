@@ -2,12 +2,7 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
-import type {
-  GpuHistory,
-  LiveSystemMetrics,
-  LiveSystemMetricsMessage,
-  SystemStatus,
-} from 'src/types/contracts'
+import type { GpuHistory, LiveSystemMetrics, LiveSystemMetricsMessage, SystemStatus } from 'src/types/contracts'
 
 const log = createLogger('SystemStatus')
 

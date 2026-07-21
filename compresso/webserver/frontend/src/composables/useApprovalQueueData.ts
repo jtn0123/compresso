@@ -191,7 +191,10 @@ export function useApprovalQueueData({ notify, t }: ApprovalQueueDataOptions = {
     const isSameViewRefresh = payloadKey === lastTaskPayloadKey
 
     try {
-      const res = await axios.post<ApiSchema<'ApprovalTasksResponse'>>(getCompressoApiUrl('v2', 'approval/tasks'), payload)
+      const res = await axios.post<ApiSchema<'ApprovalTasksResponse'>>(
+        getCompressoApiUrl('v2', 'approval/tasks'),
+        payload,
+      )
       if (sequence !== fetchSequence) return null
 
       const data = res.data

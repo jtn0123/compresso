@@ -30,7 +30,10 @@ import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import type { ApiSchema } from 'src/types/contracts'
 
-interface DataPanelLink { id: string; label: string }
+interface DataPanelLink {
+  id: string
+  label: string
+}
 
 export default {
   name: 'DrawerDataPanelsNav',

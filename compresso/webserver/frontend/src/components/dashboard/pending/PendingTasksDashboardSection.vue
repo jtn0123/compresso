@@ -89,8 +89,14 @@ import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import type { DialogController } from 'src/types/ui'
 
-interface PendingTaskSummary { id: number; label: string }
-interface QueueEta { formatted: string | null; confidence: 'high' | 'medium' | 'low' }
+interface PendingTaskSummary {
+  id: number
+  label: string
+}
+interface QueueEta {
+  formatted: string | null
+  confidence: 'high' | 'medium' | 'low'
+}
 
 export default defineComponent({
   name: 'PendingTasks',

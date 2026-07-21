@@ -160,7 +160,10 @@ interface SafetyEvent {
   active: boolean
   acknowledged_at?: string | null
 }
-interface SafetyState { pause_required: boolean; events: SafetyEvent[] }
+interface SafetyState {
+  pause_required: boolean
+  events: SafetyEvent[]
+}
 interface DoctorCheck {
   id?: string
   name: string
@@ -168,7 +171,11 @@ interface DoctorCheck {
   summary?: string
   detail?: string
 }
-interface DoctorReport { overall_status: string; generated_at?: string; checks: DoctorCheck[] }
+interface DoctorReport {
+  overall_status: string
+  generated_at?: string
+  checks: DoctorCheck[]
+}
 interface ReadinessResponse {
   ready: boolean
   doctor_report: DoctorReport | null

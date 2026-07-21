@@ -119,7 +119,10 @@ export function useTaskListController<Row extends TaskRow, Filters extends objec
     }
   }
 
-  const mergePage = (pageRows: Row[], { reset, refreshTop }: Required<Pick<FetchTasksOptions, 'reset' | 'refreshTop'>>) => {
+  const mergePage = (
+    pageRows: Row[],
+    { reset, refreshTop }: Required<Pick<FetchTasksOptions, 'reset' | 'refreshTop'>>,
+  ) => {
     if (refreshTop && rows.value.length > 0) {
       const refreshedIds = new Set(pageRows.map((row) => row.id))
       rows.value = [...pageRows, ...rows.value.filter((row) => !refreshedIds.has(row.id))]

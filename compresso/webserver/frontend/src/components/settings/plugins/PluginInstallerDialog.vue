@@ -229,10 +229,7 @@ import PluginInstallerManageRepos from 'components/settings/plugins/partials/Plu
 import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog.vue'
 import type { ApiSchema } from 'src/types/contracts'
 import type { DialogController } from 'src/types/ui'
-import {
-  normalizeInstallablePlugin,
-  type InstallablePlugin,
-} from 'src/types/plugins'
+import { normalizeInstallablePlugin, type InstallablePlugin } from 'src/types/plugins'
 
 const emit = defineEmits<{ hide: [] }>()
 
