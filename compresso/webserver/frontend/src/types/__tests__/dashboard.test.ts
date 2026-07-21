@@ -79,8 +79,6 @@ describe('parseDashboardEnvelope regressions', () => {
   })
 
   it('still rejects envelopes with unknown stream types', () => {
-    expect(
-      parse(JSON.stringify({ success: true, server_id: 'server-1', type: 'not_a_stream', data: [] })),
-    ).toBeNull()
+    expect(parse(JSON.stringify({ success: true, server_id: 'server-1', type: 'not_a_stream', data: [] }))).toBeNull()
   })
 })
