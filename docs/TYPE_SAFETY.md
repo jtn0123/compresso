@@ -32,8 +32,8 @@ changes. CI runs the corresponding `--check-document` command and rejects stale 
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
 | Production Python files | 245 | 250 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,524 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 2,051 / 2,051 | 100% |
+| Production Python nonblank LOC | 44,273 | 47,532 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 2,052 / 2,052 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
 | Production frontend JavaScript files | 33 | 0 | 0 |
