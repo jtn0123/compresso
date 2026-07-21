@@ -48,3 +48,48 @@ def test_save_library_config_warns_when_plugins_and_library_automation_are_enabl
     assert result is True
     mock_logger.warning.assert_called_once()
     assert "PLUGIN_AUTOMATION_REVIEW_RECOMMENDED" in mock_logger.warning.call_args[0][0]
+
+
+@pytest.mark.unittest
+@patch("compresso.webserver.helpers.settings.PluginExecutor")
+@patch("compresso.webserver.helpers.settings.plugins")
+@patch("compresso.webserver.helpers.settings.Library")
+@patch("compresso.webserver.helpers.settings.logger")
+def test_save_library_config_saves_each_plugins_settings_under_its_own_id(
+    mock_logger,
+    mock_library_class,
+    mock_plugins,
+    mock_plugin_executor,
+):
+    """Regression: the import loop must not reuse the install-loop's last id."""
+    mock_library = MagicMock()
+    mock_library.get_enable_scanner.return_value = False
+    mock_library.get_enable_inotify.return_value = False
+    mock_library.get_name.return_value = "Library"
+    mock_library.get_path.return_value = "/library"
+    mock_library.get_locked.return_value = False
+    mock_library.get_enable_remote_only.return_value = False
+    mock_library.get_priority_score.return_value = 0
+    mock_library.get_tags.return_value = []
+    mock_library.save.return_value = True
+    mock_library_class.return_value = mock_library
+    mock_plugins.check_if_plugin_is_installed.return_value = True
+    mock_plugins.get_plugin_types_with_flows.return_value = []
+
+    result = settings.save_library_config(
+        1,
+        library_config={},
+        plugin_config={
+            "enabled_plugins": [
+                {"plugin_id": "plugin_a", "has_config": True, "settings": {"alpha": 1}},
+                {"plugin_id": "plugin_b", "has_config": True, "settings": {"beta": 2}},
+            ],
+        },
+    )
+
+    assert result is True
+    executor = mock_plugin_executor.return_value
+    saved = [(call.args[0], dict(call.args[1])) for call in executor.save_plugin_settings.call_args_list]
+    assert saved == [("plugin_a", {"alpha": 1}), ("plugin_b", {"beta": 2})]
+    for call in executor.save_plugin_settings.call_args_list:
+        assert call.kwargs == {"library_id": 1}

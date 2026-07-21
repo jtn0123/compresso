@@ -676,3 +676,35 @@ class TestStartResourceLogger:
         service.event.set()
         service.threads[0]["thread"].stop()
         service.threads[0]["thread"].join(2)
+
+
+@pytest.mark.unittest
+class TestResourceLoggerCpuCountFallback:
+    @patch("compresso.service.psutil")
+    def test_resource_logger_handles_missing_cpu_count(self, mock_psutil):
+        """Regression: psutil.cpu_count() may return None; metrics must not die."""
+        with patch("compresso.service.CompressoLogging") as mock_log, patch("compresso.service.startup.StartupState"):
+            mock_log.get_logger.return_value = MagicMock()
+            from compresso.service import RootService
+
+            service = RootService()
+
+            mock_proc = MagicMock()
+            mock_proc.cpu_percent.return_value = 8.0
+            mock_proc.memory_info.return_value = MagicMock(rss=1024, vms=2048)
+            mock_psutil.Process.return_value = mock_proc
+            mock_psutil.cpu_count.return_value = None
+            mock_psutil.virtual_memory.return_value = MagicMock(total=8192)
+
+            with (
+                patch.object(service, "_verify_thread_started"),
+                patch("compresso.service.time.sleep", side_effect=lambda *_: service.event.set()),
+            ):
+                thread = service.start_resource_logger()
+                thread.join(5)
+
+            assert mock_log.log_metric.called
+            metric_kwargs = mock_log.log_metric.call_args.kwargs
+            # cpu_percent divided by the fallback cpu count of 1
+            assert metric_kwargs["cpu_percent"] == 8.0
+            service.logger.warning.assert_not_called()

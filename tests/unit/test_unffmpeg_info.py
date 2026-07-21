@@ -423,3 +423,16 @@ class TestGetAllSupportedCodecs:
         assert "aac" in result["audio"]
         assert "h264" in result["video"]
         assert "srt" in result["subtitle"]
+
+
+@pytest.mark.unittest
+class TestParseCodecListingShortLines:
+    @patch("compresso.libs.unffmpeg.info.cli.ffmpeg_available_encoders")
+    def test_single_token_lines_are_skipped(self, mock_enc):
+        """Regression: a single-token codec line used to IndexError."""
+        mock_enc.return_value = "V\nA\nS\n V..... libx264 H.264 encoder"
+        info = Info()
+        result = info.get_available_ffmpeg_encoders()
+        assert result["audio"] == {}
+        assert result["subtitle"] == {}
+        assert list(result["video"]) == ["libx264"]
