@@ -32,19 +32,16 @@ Copyright:
 import json
 import time
 from collections.abc import Mapping, Sequence
-from typing import Protocol, cast
+from typing import cast
 
 import tornado.escape
 
 from compresso import config
 from compresso.libs import history, narrowing
 from compresso.libs.history import HistoryOrder
+from compresso.libs.peewee_types import CountedRows
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 from compresso.webserver.helpers import completed_tasks
-
-
-class _CountableRows(Protocol):
-    def count(self) -> int: ...
 
 
 class ApiHistoryHandler(BaseApiHandler):
@@ -172,7 +169,7 @@ class ApiHistoryHandler(BaseApiHandler):
         records_total_count = history_logging.get_total_historic_task_list_count()
         # Get quantity after filters (without pagination)
         records_filtered_count = cast(
-            "_CountableRows",
+            "CountedRows",
             history_logging.get_historic_task_list_filtered_and_sorted(
                 order=order, start=0, length=0, search_value=search_value
             ),

@@ -68,22 +68,8 @@ class LinkStatusPatch(TypedDict, total=False):
     next_retry: float
 
 
-def _json_object(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("dict[str, object]", value)
-
-
 def _config_string(config_data: Mapping[str, object], key: str) -> str | None:
-    value = config_data.get(key)
-    return value if isinstance(value, str) else None
-
-
-def _json_objects(value: object) -> list[dict[str, object]]:
-    """Narrow an untrusted JSON array to string-keyed object entries."""
-    if not isinstance(value, list):
-        return []
-    return [_json_object(item) for item in value if isinstance(item, dict)]
+    return narrowing.strict_str_or_none(config_data.get(key))
 
 
 class Links(metaclass=SingletonType):
@@ -313,9 +299,9 @@ class Links(metaclass=SingletonType):
         url = f"{address}{endpoint}"
         res = request_handler.get(url, timeout=timeout)
         if res.status_code == 200:
-            return _json_object(res.json())
+            return narrowing.string_keyed_dict(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = _json_object(res.json())
+            json_data = narrowing.string_keyed_dict(res.json())
             self._log(
                 "Error while executing GET on remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -346,9 +332,9 @@ class Links(metaclass=SingletonType):
         url = f"{address}{endpoint}"
         res = request_handler.post(url, json=data, timeout=timeout)
         if res.status_code == 200:
-            return _json_object(res.json())
+            return narrowing.string_keyed_dict(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = _json_object(res.json())
+            json_data = narrowing.string_keyed_dict(res.json())
             self._log(
                 "Error while executing POST on remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -384,9 +370,9 @@ class Links(metaclass=SingletonType):
             m = MultipartEncoder(fields={"fileName": (os.path.basename(path), fh, "text/plain")})
             res = request_handler.post(url, data=m, headers={"Content-Type": m.content_type})
         if res.status_code == 200:
-            return _json_object(res.json())
+            return narrowing.string_keyed_dict(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = _json_object(res.json())
+            json_data = narrowing.string_keyed_dict(res.json())
             self._log(
                 "Error while uploading file to remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -403,7 +389,7 @@ class Links(metaclass=SingletonType):
         address = self.__format_address(_config_string(remote_config, "address"))
         response = request_handler.post(f"{address}{endpoint}", data=data, headers=headers, timeout=60)
         if response.status_code == 200:
-            return _json_object(response.json())
+            return narrowing.string_keyed_dict(response.json())
         return {}
 
     def remote_api_delete(
@@ -427,9 +413,9 @@ class Links(metaclass=SingletonType):
         url = f"{address}{endpoint}"
         res = request_handler.delete(url, json=data, timeout=timeout)
         if res.status_code == 200:
-            return _json_object(res.json())
+            return narrowing.string_keyed_dict(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = _json_object(res.json())
+            json_data = narrowing.string_keyed_dict(res.json())
             self._log(
                 "Error while executing DELETE on remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -462,10 +448,10 @@ class Links(metaclass=SingletonType):
     def _remote_validation_data(self, response: Response, resource: str) -> tuple[bool, dict[str, object]]:
         """Return JSON from a successful remote validation request and log known failures."""
         if response.status_code == 200:
-            return True, _json_object(response.json())
+            return True, narrowing.string_keyed_dict(response.json())
 
         if response.status_code in {400, 404, 405, 500}:
-            json_data = _json_object(response.json())
+            json_data = narrowing.string_keyed_dict(response.json())
             self._log(
                 f"Error while fetching remote installation {resource}. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
@@ -537,7 +523,7 @@ class Links(metaclass=SingletonType):
         url = f"{address}/compresso/api/v2/system/capabilities"
         res = request_handler.get(url, timeout=2)
         if res.status_code == 200:
-            capabilities = _json_object(res.json())
+            capabilities = narrowing.string_keyed_dict(res.json())
 
         runnable_task_count = narrowing.coerce_int(
             tasks_data.get(
@@ -633,7 +619,7 @@ class Links(metaclass=SingletonType):
             updated_config["available"] = False
             if installation_data:
                 # If we used a temp address-based key, migrate status to the real UUID
-                installation_session = _json_object(installation_data.get("session"))
+                installation_session = narrowing.string_keyed_dict(installation_data.get("session"))
                 real_uuid_value = installation_session.get("uuid")
                 real_uuid = real_uuid_value if isinstance(real_uuid_value, str) else None
                 if real_uuid is not None and link_uuid != real_uuid:
@@ -651,7 +637,7 @@ class Links(metaclass=SingletonType):
                 updated_config["runnable_task_count"] = runnable_task_count
                 updated_config["capabilities"] = installation_data.get("capabilities", {})
 
-                installation_settings = _json_object(installation_data.get("settings"))
+                installation_settings = narrowing.string_keyed_dict(installation_data.get("settings"))
                 merge_dict: dict[str, object] = {
                     "name": installation_settings.get("installation_name"),
                     "version": installation_data.get("version"),
@@ -675,7 +661,7 @@ class Links(metaclass=SingletonType):
 
                 # If the remote configuration is newer than this one, use those values
                 # The remote installation will do the same and this will synchronise
-                remote_link_config = _json_object(remote_config.get("link_config"))
+                remote_link_config = narrowing.string_keyed_dict(remote_config.get("link_config"))
                 local_updated = local_config.get("last_updated", 1)
                 remote_updated = remote_link_config.get("last_updated", 1)
                 if (
@@ -723,7 +709,7 @@ class Links(metaclass=SingletonType):
                     # Fetch remote installation library name list
                     results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
                     existing_library_names = []
-                    for library in _json_objects(results.get("libraries")):
+                    for library in narrowing.string_keyed_dicts(results.get("libraries")):
                         existing_library_names.append(library.get("name"))
                     # Loop over local libraries and create an import object for each one that is missing
                     for library_config in Library.get_all_libraries():
@@ -737,7 +723,7 @@ class Links(metaclass=SingletonType):
                             # Set library ID to 0 to generate new library from this import
                             import_data["library_id"] = 0
                             # Configure remote library to be fore remote files only
-                            imported_library_config = _json_object(import_data.get("library_config"))
+                            imported_library_config = narrowing.string_keyed_dict(import_data.get("library_config"))
                             imported_library_config["enable_remote_only"] = True
                             imported_library_config["enable_scanner"] = False
                             imported_library_config["enable_inotify"] = False
@@ -876,9 +862,9 @@ class Links(metaclass=SingletonType):
         data = {"uuid": self.session.uuid}
         res = request_handler.post(url, json=data, timeout=2)
         if res.status_code == 200:
-            return _json_object(res.json())
+            return narrowing.string_keyed_dict(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = _json_object(res.json())
+            json_data = narrowing.string_keyed_dict(res.json())
             self._log(
                 f"Error while fetching remote installation link config. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
@@ -932,7 +918,7 @@ class Links(metaclass=SingletonType):
         if res.status_code == 200:
             return True
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = _json_object(res.json())
+            json_data = narrowing.string_keyed_dict(res.json())
             self._log(
                 f"Error while pushing remote installation link config. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
@@ -976,7 +962,7 @@ class Links(metaclass=SingletonType):
                 # Define auth
                 # Only installations that have at least one idle worker that is not paused
                 results = self.remote_api_get(local_config, "/compresso/api/v2/workers/status")
-                worker_list = _json_objects(results.get("workers_status"))
+                worker_list = narrowing.string_keyed_dicts(results.get("workers_status"))
 
                 # Only add installations that have not got pending tasks. This is unless we are configured to preload the queue
                 max_pending_tasks = 0
@@ -998,7 +984,7 @@ class Links(metaclass=SingletonType):
                 # Fetch remote installation library name list
                 results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
                 library_names = []
-                for library in _json_objects(results.get("libraries")):
+                for library in narrowing.string_keyed_dicts(results.get("libraries")):
                     library_name = library.get("name")
                     if isinstance(library_name, str):
                         library_names.append(library_name)
@@ -1087,9 +1073,9 @@ class Links(metaclass=SingletonType):
                 data["origin_installation_uuid"] = origin_installation_uuid
             res = request_handler.post(url, json=data, timeout=2)
             if res.status_code in [200, 400]:
-                return _json_object(res.json())
+                return narrowing.string_keyed_dict(res.json())
             elif res.status_code in [404, 405, 500]:
-                json_data = _json_object(res.json())
+                json_data = narrowing.string_keyed_dict(res.json())
                 self._log(
                     f"Error while creating new remote pending task. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
@@ -1320,7 +1306,7 @@ class Links(metaclass=SingletonType):
         try:
             # Fetch remote installation libraries
             results = self.remote_api_get(remote_config, _REMOTE_LIBRARIES_API, timeout=4)
-            for library in _json_objects(results.get("libraries")):
+            for library in narrowing.string_keyed_dicts(results.get("libraries")):
                 if library.get("name") == library_name:
                     return library
         except requests.exceptions.Timeout:
@@ -1421,7 +1407,7 @@ class Links(metaclass=SingletonType):
         """
         try:
             results = self.remote_api_get(remote_config, "/compresso/api/v2/workers/status")
-            return _json_objects(results.get("workers_status"))
+            return narrowing.string_keyed_dicts(results.get("workers_status"))
         except requests.exceptions.Timeout:
             self._log("Request to get worker status timed out", level="warning")
         except requests.exceptions.RequestException as e:
@@ -1484,7 +1470,7 @@ class Links(metaclass=SingletonType):
                 res = self.remote_api_get_download(remote_config, dl_url, safe_path)
                 if res and os.path.exists(safe_path):
                     with open(safe_path) as f:  # noqa: ASYNC230 — called from synchronous thread context
-                        task_data = _json_object(json.load(f))
+                        task_data = narrowing.string_keyed_dict(json.load(f))
         except requests.exceptions.Timeout:
             self._log("Request to fetch remote task data timed out", level="warning")
         except requests.exceptions.RequestException as e:

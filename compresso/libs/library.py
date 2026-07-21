@@ -43,6 +43,11 @@ from compresso.libs.unmodels import EnabledPlugins, Libraries, LibraryPluginFlow
 
 logger = CompressoLogging.get_logger(name=__name__)
 
+# Libraries already warned about orphaned enabled-plugin rows. The read path
+# runs inside the Foreman's ~2s poll loop, so an unthrottled warning for this
+# persistent condition would flood the logs indefinitely.
+_warned_orphan_plugin_libraries: set[int] = set()
+
 
 class LibraryLookupError(ValueError):
     """Raised when a requested library identifier is invalid or missing."""
@@ -632,7 +637,9 @@ class Library:
             # columns via the LEFT OUTER JOIN; skip it rather than surfacing a
             # half-empty entry that downstream consumers cannot use.
             if enabled_plugin.get("name") is None and enabled_plugin.get("plugin_id") is None:
-                logger.warning("Ignoring orphaned enabled-plugin row for library %s", self.model.id)
+                if self.model.id not in _warned_orphan_plugin_libraries:
+                    _warned_orphan_plugin_libraries.add(self.model.id)
+                    logger.warning("Ignoring orphaned enabled-plugin row for library %s", self.model.id)
                 continue
             # Check if plugin is able to be configured
             has_config = False

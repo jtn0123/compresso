@@ -43,7 +43,7 @@ from peewee import OperationalError
 
 from compresso import config
 from compresso.libs import common, task
-from compresso.libs.logs import CompressoLogging
+from compresso.libs.logs import CompressoLogging, log_at_level
 from compresso.libs.peewee_types import execute_write
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.unmodels.tasks import Tasks
@@ -97,12 +97,7 @@ class TaskHandler(threading.Thread):
         self.abort_flag.clear()
 
     def _log(self, message: object, message2: object = "", level: str = "info") -> None:
-        message = common.format_message(message, message2)
-        if level == "exception":
-            # logging has no EXCEPTION level; keep the traceback semantics
-            self.logger.exception(message)
-        else:
-            self.logger.log(getattr(logging, level.upper(), logging.ERROR), message)
+        log_at_level(self.logger, level, common.format_message(message, message2))
 
     def stop(self) -> None:
         self.abort_flag.set()

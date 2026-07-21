@@ -43,9 +43,14 @@ def strict_bool(value: object, default: bool = False) -> bool:
 
 def strict_float(value: object, default: float = 0.0) -> float:
     """Accept real numbers (int or float, never bool) and return them as float."""
+    result = strict_float_or_none(value)
+    return default if result is None else result
+
+
+def strict_float_or_none(value: object) -> float | None:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value)
-    return default
+    return None
 
 
 def coerce_int(value: object, default: int = 0) -> int:
@@ -100,6 +105,13 @@ def string_list(value: object, default: "tuple[str, ...] | list[str]" = ()) -> l
     if not isinstance(value, (list, tuple, set)):
         return list(default)
     return [item for item in value if isinstance(item, str)]
+
+
+def string_keyed_dicts(value: object) -> list[dict[str, object]]:
+    """Narrow an untrusted JSON array to its string-keyed dict entries."""
+    if not isinstance(value, list):
+        return []
+    return [string_keyed_dict(item) for item in value if isinstance(item, dict)]
 
 
 def mapping_value(value: object) -> Mapping[str, object]:

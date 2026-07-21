@@ -2,6 +2,20 @@
  * Shared formatting utility functions.
  */
 
+/**
+ * Parse a finite number from a value that may arrive as a number or a
+ * numeric string (settings storage and some backend fields round-trip
+ * numbers as strings). Returns null when no finite number can be read.
+ */
+export function parseFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
 export function formatBytes(bytes: number): string {
   if (!bytes || bytes === 0) return '0 B'
   const negative = bytes < 0

@@ -30,19 +30,14 @@ Copyright:
 """
 
 import os
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Protocol, cast
+from typing import cast
 
 from compresso.libs import history, narrowing, task
 from compresso.libs.history import HistoryOrder
+from compresso.libs.peewee_types import CountedRows
 from compresso.libs.unmodels import FileMetadataPaths
-
-
-class _CountedRows(Protocol):
-    def __iter__(self) -> Iterable[dict[str, object]]: ...
-
-    def count(self) -> int: ...
 
 
 def _parse_datetime_to_timestamp(value: object) -> float | None:
@@ -61,18 +56,8 @@ def _parse_datetime_to_timestamp(value: object) -> float | None:
 
 def parse_timestamp_value(value: object) -> float | None:
     """Best-effort conversion of a stored start/finish time to a POSIX timestamp."""
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return float(value)
-    return _parse_datetime_to_timestamp(value)
-
-
-def _text_param(params: Mapping[str, object], key: str, default: str) -> str:
-    value = params.get(key, default)
-    return value if isinstance(value, str) else default
-
-
-def _int_param(params: Mapping[str, object], key: str, default: int) -> int:
-    return narrowing.coerce_int(params.get(key, default), default)
+    numeric = narrowing.strict_float_or_none(value)
+    return numeric if numeric is not None else _parse_datetime_to_timestamp(value)
 
 
 def _history_order(params: Mapping[str, object]) -> HistoryOrder:
@@ -93,11 +78,11 @@ def prepare_filtered_completed_tasks(params: Mapping[str, object]) -> dict[str, 
     :param params:
     :return:
     """
-    start = _int_param(params, "start", 0)
-    length = _int_param(params, "length", 0)
+    start = narrowing.coerce_int(params.get("start"), 0)
+    length = narrowing.coerce_int(params.get("length"), 0)
 
-    search_value = _text_param(params, "search_value", "")
-    status = _text_param(params, "status", "all")
+    search_value = narrowing.strict_str(params.get("search_value"))
+    status = narrowing.strict_str(params.get("status"), "all")
 
     order = _history_order(params)
 
@@ -116,14 +101,14 @@ def prepare_filtered_completed_tasks(params: Mapping[str, object]) -> dict[str, 
     # Get total count
     records_total_count = history_logging.get_total_historic_task_list_count()
     # Get total success count
-    success_rows = cast(_CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=True))
+    success_rows = cast(CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=True))
     records_total_success_count = success_rows.count()
     # Get total failed count
-    failed_rows = cast(_CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=False))
+    failed_rows = cast(CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=False))
     records_total_failed_count = failed_rows.count()
     # Get quantity after filters (without pagination)
     filtered_rows = cast(
-        _CountedRows,
+        CountedRows,
         history_logging.get_historic_task_list_filtered_and_sorted(
             order=order,
             start=0,
@@ -188,8 +173,8 @@ def get_filtered_completed_task_ids(params: Mapping[str, object], exclude_ids: S
     :param exclude_ids:
     :return:
     """
-    search_value = _text_param(params, "search_value", "")
-    status = _text_param(params, "status", "all")
+    search_value = narrowing.strict_str(params.get("search_value"))
+    status = narrowing.strict_str(params.get("status"), "all")
 
     task_success = None
     if status == "success":

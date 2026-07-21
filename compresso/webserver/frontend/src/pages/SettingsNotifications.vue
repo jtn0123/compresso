@@ -187,6 +187,7 @@
 
 <script lang="ts">
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
+import { isRecord } from 'src/types/envelope'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -218,8 +219,8 @@ interface ChannelForm {
 // Entries that can't even be normalized must be preserved verbatim, never
 // silently dropped — saveChannels() posts the full list back.
 const normalizeNotificationChannel = (value: unknown): NotificationChannel | null => {
-  if (typeof value !== 'object' || value === null) return null
-  const channel = value as Record<string, unknown>
+  if (!isRecord(value)) return null
+  const channel = value
   if (
     typeof channel.id !== 'string' ||
     (channel.type !== 'discord' && channel.type !== 'slack' && channel.type !== 'webhook') ||
@@ -232,10 +233,11 @@ const normalizeNotificationChannel = (value: unknown): NotificationChannel | nul
     name: typeof channel.name === 'string' ? channel.name : '',
     type: channel.type,
     url: channel.url,
-    headers:
-      typeof channel.headers === 'object' && channel.headers !== null && !Array.isArray(channel.headers)
-        ? (channel.headers as Record<string, string>)
-        : null,
+    headers: isRecord(channel.headers)
+      ? Object.fromEntries(
+          Object.entries(channel.headers).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+        )
+      : null,
     triggers: Array.isArray(channel.triggers)
       ? channel.triggers.filter((trigger): trigger is string => typeof trigger === 'string')
       : [],

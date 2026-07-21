@@ -30,36 +30,17 @@ Copyright:
 """
 
 import os
-from collections.abc import Iterable, Mapping, Sequence
-from typing import Protocol, cast
+from collections.abc import Mapping, Sequence
+from typing import cast
 
 from compresso.libs import filetest, narrowing, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import execute_count
+from compresso.libs.peewee_types import CountedRows, execute_count
 from compresso.libs.task import TaskOrder
 from compresso.libs.unmodels.tasks import Tasks
 
 logger = CompressoLogging.get_logger(name=__name__)
-
-
-class _CountedRows(Protocol):
-    def __iter__(self) -> Iterable[dict[str, object]]: ...
-
-    def count(self) -> int: ...
-
-
-def _text_param(params: Mapping[str, object], key: str, default: str) -> str:
-    value = params.get(key, default)
-    return value if isinstance(value, str) else default
-
-
-def _int_param(params: Mapping[str, object], key: str, default: int) -> int:
-    return narrowing.coerce_int(params.get(key, default), default)
-
-
-def _id_list_param(params: Mapping[str, object], key: str) -> list[int]:
-    return narrowing.int_list(params.get(key), coerce=True)
 
 
 def _task_order(params: Mapping[str, object]) -> TaskOrder:
@@ -82,9 +63,9 @@ def prepare_filtered_pending_tasks_for_table(request_dict: Mapping[str, object])
     """
 
     # Generate filters for query
-    draw = _int_param(request_dict, "draw", 0)
-    start = _int_param(request_dict, "start", 0)
-    length = _int_param(request_dict, "length", 0)
+    draw = narrowing.coerce_int(request_dict.get("draw"), 0)
+    start = narrowing.coerce_int(request_dict.get("start"), 0)
+    length = narrowing.coerce_int(request_dict.get("length"), 0)
 
     search_value = ""
     search = request_dict.get("search")
@@ -103,7 +84,7 @@ def prepare_filtered_pending_tasks_for_table(request_dict: Mapping[str, object])
     records_total_count = task_handler.get_total_task_list_count()
     # Get quantity after filters (without pagination)
     filtered_rows = cast(
-        _CountedRows,
+        CountedRows,
         task_handler.get_task_list_filtered_and_sorted(
             order=order, start=0, length=0, search_value=search_value, status="pending"
         ),
@@ -149,11 +130,11 @@ def prepare_filtered_pending_tasks(params: Mapping[str, object], include_library
     :param include_library:
     :return:
     """
-    start = _int_param(params, "start", 0)
-    length = _int_param(params, "length", 0)
+    start = narrowing.coerce_int(params.get("start"), 0)
+    length = narrowing.coerce_int(params.get("length"), 0)
 
-    search_value = _text_param(params, "search_value", "")
-    library_ids = _id_list_param(params, "library_ids")
+    search_value = narrowing.strict_str(params.get("search_value"))
+    library_ids = narrowing.int_list(params.get("library_ids"), coerce=True)
 
     order = _task_order(params)
 
@@ -163,7 +144,7 @@ def prepare_filtered_pending_tasks(params: Mapping[str, object], include_library
     records_total_count = task_handler.get_total_task_list_count()
     # Get quantity after filters (without pagination)
     filtered_rows = cast(
-        _CountedRows,
+        CountedRows,
         task_handler.get_task_list_filtered_and_sorted(
             order=order, start=0, length=0, search_value=search_value, status="pending", library_ids=library_ids
         ),
@@ -220,8 +201,8 @@ def get_filtered_pending_task_ids(params: Mapping[str, object], exclude_ids: Seq
     :param exclude_ids:
     :return:
     """
-    search_value = _text_param(params, "search_value", "")
-    library_ids = _id_list_param(params, "library_ids")
+    search_value = narrowing.strict_str(params.get("search_value"))
+    library_ids = narrowing.int_list(params.get("library_ids"), coerce=True)
 
     exclude_set = set(exclude_ids or [])
 

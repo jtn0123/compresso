@@ -11,15 +11,15 @@ and fetching detail/comparison data.
 import datetime
 import os
 import shutil
-from collections.abc import Iterable, Mapping, Sequence
-from typing import Protocol, TypedDict, cast
+from collections.abc import Mapping, Sequence
+from typing import TypedDict, cast
 
 from compresso import config
 from compresso.libs import narrowing, task
 from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import execute_write
+from compresso.libs.peewee_types import CountedRows, execute_write
 from compresso.libs.task import TaskOrder
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.webserver.api_v2.schema.approval_schemas import APPROVAL_TASK_ORDER_COLUMNS
@@ -30,18 +30,6 @@ logger = CompressoLogging.get_logger(name=__name__)
 class StagedFileInfo(TypedDict):
     size: int
     path: str
-
-
-class _CountedRows(Protocol):
-    def __iter__(self) -> Iterable[dict[str, object]]: ...
-
-    def count(self) -> int: ...
-
-
-def _id_list(value: object) -> list[int]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, int) and not isinstance(item, bool)]
 
 
 def _normalise_codec_filter(codec: object) -> str:
@@ -228,7 +216,7 @@ def _get_approval_items(
     start = narrowing.strict_int(params.get("start"))
     length = narrowing.strict_int(params.get("length"))
     search_value = narrowing.strict_str(params.get("search_value"))
-    library_ids = _id_list(params.get("library_ids"))
+    library_ids = narrowing.int_list(params.get("library_ids"))
     codec_filter = narrowing.strict_str(params.get("codec"))
     quality_min = _normalise_quality_min(params.get("quality_min", 0))
     has_derived_filters = bool(_normalise_codec_filter(codec_filter)) or quality_min > 0
@@ -267,7 +255,7 @@ def _get_approval_items(
     if has_derived_filters:
         items = [item for item in items if _matches_approval_filters(item, codec_filter=codec_filter, quality_min=quality_min)]
 
-    counted_rows = cast(_CountedRows, count_query)
+    counted_rows = cast(CountedRows, count_query)
     records_filtered_count = len(items) if has_derived_filters or force_all else counted_rows.count()
     if (has_derived_filters or force_all) and length:
         items = items[start : start + length]
@@ -305,7 +293,7 @@ def prepare_approval_summary(params: Mapping[str, object]) -> dict[str, object]:
     :return: dict with counts, aggregate sizes, VMAF average, and codec options
     """
     search_value = narrowing.strict_str(params.get("search_value"))
-    library_ids = _id_list(params.get("library_ids"))
+    library_ids = narrowing.int_list(params.get("library_ids"))
     codec_filter = narrowing.strict_str(params.get("codec"))
     quality_min = _normalise_quality_min(params.get("quality_min", 0))
     order = _build_order(params)

@@ -1,3 +1,4 @@
+import { parseFiniteNumber } from 'src/js/formatUtils'
 import type { ApiSchema } from './contracts'
 
 export type LibraryResult = ApiSchema<'LibraryResults'>
@@ -59,17 +60,14 @@ function toBooleanSetting(value: unknown, fallback: boolean): boolean {
 
 function toNumberSetting(value: unknown, fallback: number): number {
   // Numeric inputs round-trip through settings storage as strings
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return fallback
+  return parseFiniteNumber(value) ?? fallback
 }
 
 // Field-by-field lenient parsing: a settings payload with unexpected or
 // missing values must degrade to defaults, never reject the whole page.
-// Fallbacks mirror the backend defaults in compresso/config.py.
+// Fallbacks mirror the backend defaults in compresso/config.py:
+// DEFAULT_SCAN_INTERVAL_MINUTES (1440), DEFAULT_CONCURRENT_FILE_TESTERS (2),
+// DEFAULT_MAX_TASK_AGE_DAYS (91).
 export function parseLibraryPageSettings(settings: Record<string, unknown>): LibraryPageSettings {
   return {
     libraryPath: typeof settings.library_path === 'string' ? settings.library_path : '',
@@ -92,6 +90,9 @@ export function parseLibraryPageSettings(settings: Record<string, unknown>): Lib
 }
 
 export function normalizeLibraryEnabledPlugin(plugin: LibraryEnabledPluginContract): LibraryEnabledPlugin {
+  // Conditional spreads keep exactOptionalPropertyTypes happy: assigning an
+  // explicit `undefined` would make the type incompatible with the POST
+  // contract this object is sent back through.
   return {
     plugin_id: plugin.plugin_id,
     name: plugin.name ?? '',

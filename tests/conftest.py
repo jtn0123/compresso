@@ -109,7 +109,12 @@ def collect_cyclic_garbage():
 
 @pytest.fixture(autouse=True)
 def isolate_api_security_settings(monkeypatch, request):
-    """Prevent unit tests from inheriting a developer's real API security policy."""
+    """Prevent unit tests from inheriting a developer's real API security policy.
+
+    Applies to every AsyncHTTPTestCase. Tests exercising the enforcement paths
+    must monkeypatch Config.get_api_auth_enforced / get_csrf_protection_enforced
+    back to True, or use their own settings object (see test_api_auth.py).
+    """
     import tornado.testing
 
     if not isinstance(request.instance, tornado.testing.AsyncHTTPTestCase):

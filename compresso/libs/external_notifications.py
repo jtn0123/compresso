@@ -62,12 +62,6 @@ def _string_mapping(value: object) -> dict[str, str]:
     return {key: item for key, item in value.items() if isinstance(key, str) and isinstance(item, str)}
 
 
-def _score_mapping(value: object) -> Mapping[str, object]:
-    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
-        return {}
-    return cast("Mapping[str, object]", value)
-
-
 class ExternalNotificationDispatcher(metaclass=SingletonType):
     """
     Singleton that dispatches external notifications to configured channels
@@ -122,7 +116,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Route to the correct sender based on channel type."""
-        channel_type = (narrowing.strict_str_or_none(channel.get("type")) or "").lower()
+        channel_type = (narrowing.strict_str(channel.get("type"))).lower()
         try:
             if channel_type == "discord":
                 self._send_discord(channel, event_type, context)
@@ -144,7 +138,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Send a Discord webhook with a rich embed."""
-        url = narrowing.strict_str_or_none(channel.get("url")) or ""
+        url = narrowing.strict_str(channel.get("url"))
         color = DISCORD_COLOR_MAP.get(event_type, 0x808080)
         title = EVENT_TITLES.get(event_type, event_type)
 
@@ -156,7 +150,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         if context.get("size_saved"):
             fields.append({"name": "Size Saved", "value": str(context["size_saved"]), "inline": True})
         if context.get("quality_scores"):
-            scores = _score_mapping(context["quality_scores"])
+            scores = narrowing.string_keyed_dict(context["quality_scores"])
             score_parts: list[str] = []
             if scores.get("vmaf") is not None:
                 score_parts.append(f"VMAF: {scores['vmaf']}")
@@ -191,7 +185,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Send a Slack incoming webhook with Block Kit blocks."""
-        url = narrowing.strict_str_or_none(channel.get("url")) or ""
+        url = narrowing.strict_str(channel.get("url"))
         title = EVENT_TITLES.get(event_type, event_type)
 
         blocks: list[JsonValue] = [
@@ -212,7 +206,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         if context.get("size_saved"):
             detail_parts.append(f"*Size Saved:* {context['size_saved']}")
         if context.get("quality_scores"):
-            scores = _score_mapping(context["quality_scores"])
+            scores = narrowing.string_keyed_dict(context["quality_scores"])
             score_parts: list[str] = []
             if scores.get("vmaf") is not None:
                 score_parts.append(f"VMAF: {scores['vmaf']}")
@@ -263,7 +257,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
         context: NotificationContext,
     ) -> None:
         """Send a generic JSON POST to a custom webhook URL."""
-        url = narrowing.strict_str_or_none(channel.get("url")) or ""
+        url = narrowing.strict_str(channel.get("url"))
         custom_headers = _string_mapping(channel.get("headers"))
 
         headers = {"Content-Type": "application/json"}
@@ -305,7 +299,7 @@ class ExternalNotificationDispatcher(metaclass=SingletonType):
             "message": "This is a test notification from Compresso.",
         }
         try:
-            channel_type = (narrowing.strict_str_or_none(channel_config.get("type")) or "").lower()
+            channel_type = (narrowing.strict_str(channel_config.get("type"))).lower()
             sender = self._get_sender_for_type(channel_type)
             if sender is None:
                 return {"success": False, "error": f"Unknown channel type '{channel_type}'"}

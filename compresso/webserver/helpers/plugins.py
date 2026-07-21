@@ -40,10 +40,6 @@ from compresso.libs.unplugins import PluginExecutor
 logger = CompressoLogging.get_logger(name="webserver.helpers.plugins")
 
 
-def _optional_integer(value: object) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
-
-
 def prepare_filtered_plugins(params: Mapping[str, object]) -> dict[str, object]:
     """
     Returns a object of records filtered and sorted

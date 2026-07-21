@@ -45,7 +45,7 @@ import zipfile
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
-from typing import Protocol, cast
+from typing import cast
 from urllib.parse import urlparse
 
 import requests
@@ -58,7 +58,7 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.json_state import atomic_json_write
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import execute_count, execute_write
+from compresso.libs.peewee_types import CountedRows, execute_count, execute_write
 from compresso.libs.session import Session
 from compresso.libs.singleton import SingletonType
 from compresso.libs.unmodels import EnabledPlugins, LibraryPluginFlow, PluginRepos, Plugins
@@ -79,18 +79,6 @@ _PLUGIN_SORT_FIELDS = frozenset({"name", "author", "version", "plugin_id", "posi
 
 type PluginRecord = dict[str, object]
 type NormalizedArchiveMember = tuple[zipfile.ZipInfo, PurePosixPath]
-
-
-class PluginRows(Protocol):
-    def __iter__(self) -> Iterator[PluginRecord]: ...
-
-    def count(self) -> int: ...
-
-
-def _object_list(value: object) -> list[PluginRecord]:
-    if not isinstance(value, list):
-        return []
-    return [narrowing.string_keyed_dict(item) for item in value if isinstance(item, dict)]
 
 
 class PluginsHandler(metaclass=SingletonType):
@@ -225,7 +213,7 @@ class PluginsHandler(metaclass=SingletonType):
             )
         if status_code >= 500:
             self.logger.debug("Failed to fetch plugin repo from '%s'. Code:%s", api_path, status_code)
-        return narrowing.string_keyed_dict(data) if isinstance(data, dict) else None
+        return narrowing.string_keyed_dict_or_none(data)
 
     def update_plugin_repos(self) -> bool:
         """
@@ -306,7 +294,7 @@ class PluginsHandler(metaclass=SingletonType):
             repo_name = repo_meta.get("name") or repo_meta.get("repo_name")
 
             # Loop over
-            for plugin in _object_list(repo_data.get("plugins")):
+            for plugin in narrowing.string_keyed_dicts(repo_data.get("plugins")):
                 # Only show plugins that are compatible with this version
                 # Plugins will require a 'compatibility' entry in their info.json file.
                 #   This must list the plugin handler versions that it is compatible with
@@ -326,7 +314,7 @@ class PluginsHandler(metaclass=SingletonType):
                         plugin.get("id"),
                     )
                 else:
-                    plugin_package_url = narrowing.strict_str_or_none(plugin.get("plugin_download_url")) or ""
+                    plugin_package_url = narrowing.strict_str(plugin.get("plugin_download_url"))
                     plugin_changelog_url = ""
 
                 # Check if plugin is already installed:
@@ -512,7 +500,7 @@ class PluginsHandler(metaclass=SingletonType):
         :param plugin:
         :return:
         """
-        package_url = narrowing.strict_str_or_none(plugin.get("package_url")) or ""
+        package_url = narrowing.strict_str(plugin.get("package_url"))
         expected_digest = str(plugin.get("package_sha256") or "").lower()
         if urlparse(package_url).scheme != "https":
             raise ValueError("Remote plugins must be downloaded over HTTPS")
@@ -896,7 +884,7 @@ class PluginsHandler(metaclass=SingletonType):
         plugin_id: str | None = None,
         plugin_type: str | None = None,
         library_id: int | None = None,
-    ) -> PluginRows | None:
+    ) -> CountedRows | None:
         if order:
             invalid_fields = [item.get("column") for item in order if item.get("column") not in _PLUGIN_SORT_FIELDS]
             if invalid_fields:
@@ -958,7 +946,7 @@ class PluginsHandler(metaclass=SingletonType):
             if length:
                 query = query.limit(length).offset(start)
 
-            return cast("PluginRows", query.dicts())
+            return cast("CountedRows", query.dicts())
 
         except model_does_not_exist:
             # No plugin entries exist yet

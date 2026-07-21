@@ -45,7 +45,7 @@ from typing import Literal, Protocol, cast
 from compresso.libs import common, narrowing
 from compresso.libs.installation_link import Links
 from compresso.libs.library import Library
-from compresso.libs.logs import CompressoLogging
+from compresso.libs.logs import CompressoLogging, log_at_level
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.remote_task_lease import RemoteTaskLease
 from compresso.libs.resumable_transfer import file_sha256
@@ -194,8 +194,7 @@ class RemoteTaskManager(threading.Thread):
         self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
     def _log(self, message: object, message2: object = "", level: str = "info") -> None:
-        message = common.format_message(message, message2)
-        getattr(self.logger, level)(message)
+        log_at_level(self.logger, level, common.format_message(message, message2))
 
     def _require_current_task(self) -> Task:
         current_task = self.current_task
@@ -551,7 +550,7 @@ class RemoteTaskManager(threading.Thread):
                 level="debug",
             )
             return None
-        error = (narrowing.strict_str_or_none(info.get("error")) or "").lower()
+        error = (narrowing.strict_str(info.get("error"))).lower()
         if "path does not exist" in error:
             self._log(
                 f"Unable to find file in remote library's path '{remote_original_abspath}'. Fallback to sending file.",

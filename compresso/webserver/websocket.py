@@ -43,7 +43,7 @@ import tornado.websocket
 from tornado import gen
 
 from compresso import config
-from compresso.libs import common, session
+from compresso.libs import common, narrowing, session
 from compresso.libs.foreman import Foreman
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.gpu_monitor import GpuMetrics, GpuMonitor
@@ -196,9 +196,11 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 raise ValueError("WebSocket command must be an object")
             message_data = {str(key): value for key, value in message_value.items()}
             command = message_data.get("command")
-            if isinstance(command, str):
-                if command not in self.ALLOWED_COMMANDS:
-                    tornado.log.app_log.warning("Rejected unknown WS command: %s", command)
+            if command:
+                # One rejection path for every unusable command: wrong type or
+                # not on the allowlist. Falsy commands stay silently ignored.
+                if not isinstance(command, str) or command not in self.ALLOWED_COMMANDS:
+                    tornado.log.app_log.warning("Rejected unknown WS command: %r", command)
                     self.write_message({"success": False, "error": "Unknown command"})
                     return
                 handler_value = getattr(self, command, None)
@@ -208,10 +210,6 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     return
                 handler = cast("Callable[..., object]", handler_value)
                 handler(params=message_data.get("params", {}))
-            elif command:
-                # Non-string truthy commands get the same rejection as unknown ones
-                tornado.log.app_log.warning("Rejected unknown WS command: %r", command)
-                self.write_message({"success": False, "error": "Unknown command"})
         except (json.decoder.JSONDecodeError, ValueError):
             tornado.log.app_log.error("Received incorrectly formatted message - %r", message, exc_info=False)
 
@@ -620,7 +618,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 task_result = task_result_value
                 # Set human-readable time
                 finish_time_value = task_result.get("finish_time")
-                finish_time = int(finish_time_value) if isinstance(finish_time_value, (int, float, str)) else 0
+                finish_time = narrowing.coerce_int(finish_time_value, 0)
                 if (finish_time + 60) > int(time.time()):
                     human_readable_time = "Just Now"
                 else:

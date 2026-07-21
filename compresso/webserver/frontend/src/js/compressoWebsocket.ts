@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import $compresso, { showEventToast, type CompressoSocket, type RegisteredWebSocketListener } from './compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 import { getWebsocketProtocols } from 'src/js/apiAuth'
-import { KNOWN_STREAM_TYPES } from 'src/types/dashboard'
+import { isRecord, KNOWN_STREAM_TYPES, parseRawEnvelope } from 'src/types/envelope'
 import type { QNotifyUpdateOptions } from 'quasar'
 import type { Translate } from 'src/types/ui'
 
@@ -33,10 +33,6 @@ type IncomingEnvelope =
   | { success: true; server_id: string; type: 'frontend_message'; data: FrontendPushMessage[] }
   | { success: true; server_id: string; type: 'completed_tasks'; data: { results: CompletedTaskMessage[] } }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
 function isFrontendPushMessage(value: unknown): value is FrontendPushMessage {
   if (!isRecord(value)) return false
   return (
@@ -62,36 +58,25 @@ function isCompletedTaskMessage(value: unknown): value is CompletedTaskMessage {
 }
 
 export function parseIncomingEnvelope(raw: string): IncomingEnvelope | null {
-  let value: unknown
-  try {
-    value = JSON.parse(raw) as unknown
-  } catch {
-    return null
-  }
-  if (!isRecord(value) || value.success !== true)
-    return isRecord(value) && value.success === false ? { success: false } : null
-  if (typeof value.server_id !== 'string' || typeof value.type !== 'string') return null
-  if (value.type === 'frontend_message') {
-    if (!Array.isArray(value.data) || !value.data.every(isFrontendPushMessage)) return null
-    return { success: true, server_id: value.server_id, type: value.type, data: value.data }
-  }
-  if (value.type === 'completed_tasks') {
-    if (
-      !isRecord(value.data) ||
-      !Array.isArray(value.data.results) ||
-      !value.data.results.every(isCompletedTaskMessage)
-    ) {
-      return null
+  const envelope = parseRawEnvelope(raw)
+  if (!envelope) return null
+  if (!envelope.success) return envelope
+  const serverId = envelope.server_id
+  switch (envelope.type) {
+    case 'frontend_message': {
+      if (!Array.isArray(envelope.data) || !envelope.data.every(isFrontendPushMessage)) return null
+      return { success: true, server_id: serverId, type: 'frontend_message', data: envelope.data }
     }
-    return { success: true, server_id: value.server_id, type: value.type, data: { results: value.data.results } }
+    case 'completed_tasks': {
+      const data = envelope.data
+      if (!isRecord(data) || !Array.isArray(data.results) || !data.results.every(isCompletedTaskMessage)) return null
+      return { success: true, server_id: serverId, type: 'completed_tasks', data: { results: data.results } }
+    }
   }
   // Valid envelope of a stream this handler does not model (e.g. workers_info,
   // pending_tasks): pass through so the server_id restart check still sees it
   // and no error is logged for another listener's valid traffic.
-  if (KNOWN_STREAM_TYPES.has(value.type)) {
-    return { success: true, server_id: value.server_id, type: 'unhandled' }
-  }
-  return null
+  return KNOWN_STREAM_TYPES.has(envelope.type) ? { success: true, server_id: serverId, type: 'unhandled' } : null
 }
 
 export function escapeHtml(str: string | null | undefined): string {
@@ -440,7 +425,7 @@ export const CompressoWebsocketHandler = function ($t: Translate) {
                 displayMessages(jsonData.data)
                 break
               case 'completed_tasks':
-                if (jsonData.type === 'completed_tasks') {
+                {
                   const connectionAge = Date.now() - connectionEstablishedAt
                   for (const task of jsonData.data.results) {
                     if (task.id && !seenCompletedIds.has(task.id)) {

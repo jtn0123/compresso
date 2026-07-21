@@ -177,8 +177,8 @@ class ApiPendingHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestPendingTableDataSchema())
 
             params = {
-                "start": json_request.get("start", "0"),
-                "length": json_request.get("length", "10"),
+                "start": json_request.get("start", 0),
+                "length": json_request.get("length", 10),
                 "search_value": json_request.get("search_value", ""),
                 "library_ids": json_request.get("library_ids", []),
                 "order": {

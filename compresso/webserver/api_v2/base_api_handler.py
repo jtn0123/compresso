@@ -98,7 +98,7 @@ class ApiRoute(TypedDict):
 
 
 def string_value(value: object, default: str = "") -> str:
-    return value if isinstance(value, str) else default
+    return narrowing.strict_str(value, default)
 
 
 def integer_value(value: object, default: int = 0) -> int:

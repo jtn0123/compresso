@@ -4,10 +4,8 @@
 <script lang="ts">
 import { defineComponent, onBeforeUnmount } from 'vue'
 import { LocalStorage, useQuasar } from 'quasar'
-import { applyTheme, isPaletteName } from 'src/js/compressoTheme'
+import { applyTheme, isPaletteName, isThemeMode } from 'src/js/compressoTheme'
 import type { PaletteName, ThemeMode } from 'src/js/compressoTheme'
-
-const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark'
 
 export default defineComponent({
   name: 'App',

@@ -98,8 +98,9 @@ class ApiHealthcheckHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestHealthCheckScanSchema())
 
             # Only validate an explicitly provided library id (absent means default)
-            healthcheck.validate_library_exists(optional_integer_value(json_request.get("library_id")))
-            library_id = integer_value(json_request.get("library_id"), 1)
+            library_id_value = optional_integer_value(json_request.get("library_id"))
+            healthcheck.validate_library_exists(library_id_value)
+            library_id = 1 if library_id_value is None else library_id_value
 
             result = healthcheck.check_single_file(
                 filepath=string_value(json_request.get("file_path")),
@@ -155,8 +156,9 @@ class ApiHealthcheckHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestHealthCheckLibraryScanSchema())
 
             # Only validate an explicitly provided library id (absent means default)
-            healthcheck.validate_library_exists(optional_integer_value(json_request.get("library_id")))
-            library_id = integer_value(json_request.get("library_id"), 1)
+            library_id_value = optional_integer_value(json_request.get("library_id"))
+            healthcheck.validate_library_exists(library_id_value)
+            library_id = 1 if library_id_value is None else library_id_value
 
             started = healthcheck.scan_library(
                 library_id=library_id,

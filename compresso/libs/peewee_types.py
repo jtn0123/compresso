@@ -1,6 +1,6 @@
 """Typed adapters for the small untyped surface left by Peewee's stubs."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from typing import Protocol, cast
 
 from peewee import Database
@@ -10,6 +10,14 @@ from playhouse.sqliteq import SqliteQueueDatabase
 
 class ExecutableQuery(Protocol):
     def execute(self) -> object: ...
+
+
+class CountedRows(Protocol):
+    """A Peewee ``.dicts()`` result: iterable string-keyed rows plus SQL ``count()``."""
+
+    def __iter__(self) -> Iterator[dict[str, object]]: ...
+
+    def count(self) -> int: ...
 
 
 class IterableQuery[T](Protocol):

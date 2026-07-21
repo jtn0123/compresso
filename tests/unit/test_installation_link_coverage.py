@@ -990,20 +990,3 @@ class TestSendFileResumableNarrowing:
         assert result == {"success": True}
         # Upload started from offset 0 despite the null session offset
         assert mock_bytes.call_args[0][3]["X-Transfer-Offset"] == "0"
-
-
-# ---------------------------------------------------------------------------
-# Preloading count narrowing (find_installations_with_available_workers)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unittest
-class TestPreloadingCountNarrowing:
-    def test_missing_preloading_count_defaults_to_int(self):
-        """Regression: preloading enabled without a count compared int >= None."""
-        from compresso.libs import narrowing
-
-        assert narrowing.coerce_int(None) == 0
-        assert narrowing.coerce_int("3") == 3
-        assert narrowing.coerce_int(2.9) == 2
-        assert narrowing.coerce_int(object(), 1) == 1

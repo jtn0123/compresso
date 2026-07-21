@@ -39,17 +39,33 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from logging.handlers import RotatingFileHandler
 from queue import Empty, Full, Queue
-from typing import ClassVar, Protocol, Self, TextIO, TypedDict, cast
+from typing import ClassVar, Protocol, Self, TextIO, TypedDict
 
 import requests
 from json_log_formatter import JSONFormatter
 
+from compresso.libs import narrowing
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.json_state import atomic_json_write
 from compresso.libs.notifications import Notifications
 
 _FORWARD_HANDLER_NAME = "Compresso.ForwardLogHandler"
 _LOG_FILE_EXT = ".jsonl"
+
+
+def log_at_level(logger: logging.Logger, level: str, message: object) -> None:
+    """Dispatch to the named logger method; "exception" keeps its traceback.
+
+    Unknown level names log at ERROR so misrouted messages stay visible.
+    """
+    if level == "exception":
+        logger.exception(message)
+        return
+    log_method = getattr(logger, level, None)
+    if callable(log_method):
+        log_method(message)
+    else:
+        logger.error(message)
 
 
 class ForwardLogEntry(TypedDict):
@@ -86,15 +102,15 @@ def _parse_forward_log_entry(value: object) -> ForwardLogEntry | None:
     """Parse a buffered entry, coercing scalar values so older buffers still forward."""
     if not isinstance(value, dict):
         return None
-    labels = value.get("labels")
+    labels = narrowing.string_keyed_dict_or_none(value.get("labels"))
     entry = value.get("entry")
-    if not isinstance(labels, dict) or not all(isinstance(key, str) for key in labels):
+    if labels is None:
         return None
     if not isinstance(entry, list) or len(entry) != 2:
         return None
     coerced_labels = {key: item if isinstance(item, str) else str(item) for key, item in labels.items()}
     coerced_entry = [item if isinstance(item, str) else str(item) for item in entry]
-    return ForwardLogEntry(labels=cast("dict[str, str]", coerced_labels), entry=coerced_entry)
+    return ForwardLogEntry(labels=coerced_labels, entry=coerced_entry)
 
 
 class ForwardJSONFormatter(JSONFormatter):

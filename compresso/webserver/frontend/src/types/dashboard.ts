@@ -1,4 +1,6 @@
 import type { LiveGpuMetrics, LiveSystemMetricsMessage } from './contracts'
+import { parseFiniteNumber } from 'src/js/formatUtils'
+import { isRecord, KNOWN_STREAM_TYPES, parseRawEnvelope } from './envelope'
 import type { WorkerInfoMessage, WorkerRunnerInfo, WorkerSubprocessInfo } from './workers'
 
 export interface PendingTaskMessage {
@@ -49,19 +51,6 @@ export interface QueueEta {
   confidence: 'high' | 'medium' | 'low'
 }
 
-// Every stream type the backend websocket can emit (websocket.py
-// STREAM_POLL_INTERVALS). Consumers model a subset; the rest must be
-// passed through silently so shared-socket listeners don't log errors
-// for each other's valid traffic.
-export const KNOWN_STREAM_TYPES: ReadonlySet<string> = new Set([
-  'frontend_message',
-  'system_logs',
-  'workers_info',
-  'pending_tasks',
-  'completed_tasks',
-  'system_status',
-])
-
 export type DashboardEnvelope =
   | { success: false }
   | { success: true; server_id: string; type: 'unhandled' }
@@ -70,23 +59,12 @@ export type DashboardEnvelope =
   | { success: true; server_id: string; type: 'completed_tasks'; data: CompletedTasksMessage }
   | { success: true; server_id: string; type: 'system_status'; data: LiveSystemMetricsMessage }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
 function optionalString(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-function optionalTimestamp(value: unknown): number | null {
-  // The backend serializes worker start times as strings (str(time.time()))
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return null
-}
+// The backend serializes worker start times as strings (str(time.time()))
+const optionalTimestamp = parseFiniteNumber
 
 function parseRunnerInfo(value: unknown): Record<string, WorkerRunnerInfo> {
   if (!isRecord(value)) return {}
@@ -230,49 +208,36 @@ function parseSystemMetrics(value: unknown): LiveSystemMetricsMessage | null {
 }
 
 export function parseDashboardEnvelope(raw: string): DashboardEnvelope | null {
-  let value: unknown
-  try {
-    value = JSON.parse(raw) as unknown
-  } catch {
-    return null
-  }
-  if (!isRecord(value)) return null
-  if (value.success === false) return { success: false }
-  if (value.success !== true || typeof value.server_id !== 'string' || typeof value.type !== 'string') return null
-  if (value.type === 'workers_info' && Array.isArray(value.data)) {
-    const workers = value.data.map(parseWorker)
-    if (!workers.some((worker) => worker === null)) {
+  const envelope = parseRawEnvelope(raw)
+  if (!envelope) return null
+  if (!envelope.success) return envelope
+  const serverId = envelope.server_id
+  switch (envelope.type) {
+    case 'workers_info': {
+      if (!Array.isArray(envelope.data)) return null
+      const workers = envelope.data.map(parseWorker)
+      if (workers.some((worker) => worker === null)) return null
       return {
         success: true,
-        server_id: value.server_id,
-        type: value.type,
+        server_id: serverId,
+        type: 'workers_info',
         data: workers.filter((worker): worker is WorkerInfoMessage => worker !== null),
       }
     }
-  }
-  if (value.type === 'pending_tasks') {
-    const data = parsePendingTasks(value.data)
-    if (data) return { success: true, server_id: value.server_id, type: value.type, data }
-  }
-  if (value.type === 'completed_tasks') {
-    const data = parseCompletedTasks(value.data)
-    if (data) return { success: true, server_id: value.server_id, type: value.type, data }
-  }
-  if (value.type === 'system_status') {
-    const data = parseSystemMetrics(value.data)
-    if (data) return { success: true, server_id: value.server_id, type: value.type, data }
+    case 'pending_tasks': {
+      const data = parsePendingTasks(envelope.data)
+      return data ? { success: true, server_id: serverId, type: 'pending_tasks', data } : null
+    }
+    case 'completed_tasks': {
+      const data = parseCompletedTasks(envelope.data)
+      return data ? { success: true, server_id: serverId, type: 'completed_tasks', data } : null
+    }
+    case 'system_status': {
+      const data = parseSystemMetrics(envelope.data)
+      return data ? { success: true, server_id: serverId, type: 'system_status', data } : null
+    }
   }
   // Valid envelope of a stream this page does not model: pass through so the
   // server_id restart check still sees it and no error is logged.
-  if (KNOWN_STREAM_TYPES.has(value.type) && !DASHBOARD_MODELED_TYPES.has(value.type)) {
-    return { success: true, server_id: value.server_id, type: 'unhandled' }
-  }
-  return null
+  return KNOWN_STREAM_TYPES.has(envelope.type) ? { success: true, server_id: serverId, type: 'unhandled' } : null
 }
-
-const DASHBOARD_MODELED_TYPES: ReadonlySet<string> = new Set([
-  'workers_info',
-  'pending_tasks',
-  'completed_tasks',
-  'system_status',
-])

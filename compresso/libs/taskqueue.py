@@ -30,14 +30,13 @@ Copyright:
 """
 
 import datetime
-import logging
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal, cast
 
 from peewee import ColumnBase
 
 from compresso.libs import common, task
-from compresso.libs.logs import CompressoLogging
+from compresso.libs.logs import CompressoLogging, log_at_level
 from compresso.libs.peewee_types import execute_count
 from compresso.libs.unmodels import Libraries, LibraryTags, Tags
 from compresso.libs.unmodels.tasks import Tasks
@@ -203,12 +202,7 @@ class TaskQueue:
         self.sort_order = "desc"
 
     def _log(self, message: object, message2: object = "", level: str = "info") -> None:
-        message = common.format_message(message, message2)
-        if level == "exception":
-            # logging has no EXCEPTION level; keep the traceback semantics
-            self.logger.exception(message)
-        else:
-            self.logger.log(getattr(logging, level.upper(), logging.ERROR), message)
+        log_at_level(self.logger, level, common.format_message(message, message2))
 
     """
     Last task based on status pending, in_progress or processed

@@ -200,7 +200,8 @@ def test_log_exception_level_preserves_traceback(task_handler):
 def test_log_unknown_level_falls_back_to_error(task_handler):
     import logging
 
+    # A spec'd mock rejects unknown attributes the way a real Logger does
+    task_handler.logger = MagicMock(spec=logging.Logger)
     task_handler._log("odd", level="not_a_level")
 
-    task_handler.logger.log.assert_called_once()
-    assert task_handler.logger.log.call_args[0][0] == logging.ERROR
+    task_handler.logger.error.assert_called_once()

@@ -106,6 +106,16 @@ def save_library_config(  # noqa: C901 — complex validation logic; refactor tr
     enabled_plugins_value = plugin_config.get("enabled_plugins")
     if enabled_plugins_value is not None:
         enabled_plugins = narrowing.mapping_list(enabled_plugins_value)
+        # Narrow each entry exactly once so the install and settings-import
+        # phases below cannot read the same field two different ways.
+        parsed_plugins = [
+            (
+                narrowing.strict_str(ep.get("plugin_id")),
+                bool(ep.get("has_config")),
+                narrowing.mapping_value(ep.get("settings")),
+            )
+            for ep in enabled_plugins
+        ]
         enable_scanner = bool(library_config.get("enable_scanner", library.get_enable_scanner()))
         enable_inotify = bool(library_config.get("enable_inotify", library.get_enable_inotify()))
         if enabled_plugins and (enable_scanner or enable_inotify):
@@ -116,10 +126,11 @@ def save_library_config(  # noqa: C901 — complex validation logic; refactor tr
                 enable_inotify,
                 len(enabled_plugins),
             )
-        # Ensure plugins are installed (install them if they are not)
+        # Ensure plugins are installed (install them if they are not). This
+        # phase stays separate from the settings import: an install failure
+        # must abort before any plugin settings have been written.
         repo_refreshed = False
-        for ep in enabled_plugins:
-            plugin_id = narrowing.strict_str(ep.get("plugin_id"))
+        for plugin_id, _, _ in parsed_plugins:
             if not plugins.check_if_plugin_is_installed(plugin_id):
                 # Trigger plugin repo refresh if this is the first install
                 if not repo_refreshed:
@@ -134,13 +145,9 @@ def save_library_config(  # noqa: C901 — complex validation logic; refactor tr
         library.set_enabled_plugins(enabled_plugins)
         # Import settings
         plugin_executor = PluginExecutor()
-        for ep in enabled_plugins:
-            if ep.get("has_config"):
-                plugin_executor.save_plugin_settings(
-                    narrowing.strict_str(ep.get("plugin_id")),
-                    narrowing.mapping_value(ep.get("settings")),
-                    library_id=library_id,
-                )
+        for plugin_id, has_config, plugin_settings in parsed_plugins:
+            if has_config:
+                plugin_executor.save_plugin_settings(plugin_id, plugin_settings, library_id=library_id)
 
     # Update plugin flow (if the data was given)
     plugin_flow_value = plugin_config.get("plugin_flow")
