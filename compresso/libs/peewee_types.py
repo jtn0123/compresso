@@ -24,6 +24,10 @@ class IterableQuery[T](Protocol):
     def iterator(self) -> Iterable[T]: ...
 
 
+class TableColumn(Protocol):
+    name: str
+
+
 def execute_count(query: object) -> int:
     """Execute a Peewee write query and require its affected-row result."""
     result = cast("ExecutableQuery", query).execute()
@@ -46,6 +50,12 @@ def iterate_query[T](query: object, item_type: type[T]) -> Iterable[T]:
 def get_table_indexes(database: Database, table_name: str) -> list[object]:
     """Fetch index metadata; abstract on the base Database, but every concrete backend returns a list."""
     fetch = cast("Callable[[str], list[object]]", database.get_indexes)
+    return fetch(table_name)
+
+
+def get_table_columns(database: Database, table_name: str) -> list[TableColumn]:
+    """Fetch column metadata from a concrete Peewee database backend."""
+    fetch = cast("Callable[[str], list[TableColumn]]", database.get_columns)
     return fetch(table_name)
 
 

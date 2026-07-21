@@ -32,8 +32,8 @@ changes. CI runs the corresponding `--check-document` command and rejects stale 
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
 | Production Python files | 245 | 250 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,536 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 2,054 / 2,054 | 100% |
+| Production Python nonblank LOC | 44,273 | 47,541 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 2,055 / 2,055 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
 | Production frontend JavaScript files | 33 | 0 | 0 |
@@ -88,7 +88,7 @@ boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit r
 | TS-90 | `verify-local.sh full` passed under an isolated Node 24.11.1 runtime with only Playwright skipped: action pins, licenses, locks, both pip audits, Ruff/format, strict mypy, OpenAPI, 4,031 unit tests, 481 frontend tests plus coverage, build, actionlint, 24 integration tests, 11 release tests, 3 release-tool tests, and clean-wheel inspection. Separate Playwright verification uses installed Google Chrome as the primary desktop, mobile, and packaged live-backend browser plus WebKit for Safari coverage: mocked browser tests 9 passed and packaged live-backend tests 3 passed. `npm audit --omit=dev` reports zero production vulnerabilities |
 | SIM-01–07 | Integer, pagination, settings, helper, WebSocket, Library Settings, notification-preservation, and metrics regressions pass. Strict mypy, Ruff, frontend contract/type/lint/test/build gates, the complete isolated unit suite, installed Chrome/mobile Chrome, WebKit, and packaged live-backend Chrome all pass. |
 | SIM-08 | Final review regressions pass; 4,083 isolated backend unit tests and 500 frontend tests pass. OpenAPI and metrics drift, Ruff, strict mypy, TypeScript, ESLint, Prettier, coverage, and the production build pass; the two changed workflows pass actionlint. Installed Chrome/mobile Chrome/WebKit mocked E2E passes 9 tests; packaged live-backend Chrome passes 3. |
-| SIM-09 | The first live analysis confirmed the original 124 findings were cleared and identified 12 follow-on findings from the refactor; those are directly corrected and 379 focused regressions pass. All 86 originally reported complex functions and their extracted helpers are at or below the configured threshold. Ruff, formatting, strict mypy, metrics/OpenAPI drift, and 4,084 backend unit tests pass. Final live re-analysis remains pending. |
+| SIM-09 | The first live analysis confirmed the original 124 findings were cleared and identified 12 follow-on findings from the refactor; the second reduced that list to two false return-type inferences from Peewee's abstract database stubs, now handled through a typed concrete-backend adapter. The combined changes pass 506 focused regressions plus all 15 migration tests. All 86 originally reported complex functions and their extracted helpers are at or below the configured threshold. Ruff, formatting, strict mypy, metrics/OpenAPI drift, and 4,084 backend unit tests pass. Final live re-analysis remains pending. |
 
 ## Defects Prevented or Fixed
 
