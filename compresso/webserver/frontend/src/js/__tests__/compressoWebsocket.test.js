@@ -291,7 +291,6 @@ describe('init() — basic', () => {
   })
 })
 
-
 describe('parseIncomingEnvelope', () => {
   it('passes through known stream types this handler does not model', () => {
     for (const type of ['workers_info', 'pending_tasks', 'system_status', 'system_logs']) {

@@ -70,9 +70,7 @@ describe('parseDashboardEnvelope regressions', () => {
 
   it('passes through known stream types the dashboard does not model', () => {
     for (const type of ['frontend_message', 'system_logs']) {
-      const parsed = parseDashboardEnvelope(
-        JSON.stringify({ success: true, server_id: 'server-1', type, data: [] }),
-      )
+      const parsed = parseDashboardEnvelope(JSON.stringify({ success: true, server_id: 'server-1', type, data: [] }))
       expect(parsed).toEqual({ success: true, server_id: 'server-1', type: 'unhandled' })
     }
   })

@@ -137,8 +137,7 @@ export type ThemeMode = 'light' | 'dark'
 export type PaletteName = keyof typeof PALETTES
 
 // Derived from PALETTES so adding a palette is a one-place change
-export const isPaletteName = (value: unknown): value is PaletteName =>
-  typeof value === 'string' && value in PALETTES
+export const isPaletteName = (value: unknown): value is PaletteName => typeof value === 'string' && value in PALETTES
 
 /**
  * Apply a theme (mode + palette) to the application.
