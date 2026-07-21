@@ -3,7 +3,8 @@ name: Frontend Lint & Build
 on:
   push:
     branches:
-      - "**"
+      - "master"
+      - "staging"
   pull_request:
     branches:
       - "master"
@@ -17,6 +18,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   frontend_lint_and_build:

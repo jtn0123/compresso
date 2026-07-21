@@ -32,15 +32,15 @@ changes. CI runs the corresponding `--check-document` command and rejects stale 
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
 | Production Python files | 245 | 250 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,702 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 1,860 / 1,860 | 100% |
+| Production Python nonblank LOC | 44,273 | 47,710 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 1,862 / 1,862 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
 | Production frontend JavaScript files | 33 | 0 | 0 |
 | Production frontend JavaScript LOC | 2,451 | 0 | 0 |
-| Production frontend TypeScript files | 0 | 47 | All production modules |
+| Production frontend TypeScript files | 0 | 48 | All production modules |
 | Typed Vue components | 0 / 88 | 88 / 88 | 100% |
-| Vue script LOC | 12,182 | 12,766 | All checked |
+| Vue script LOC | 12,182 | 12,765 | All checked |
 <!-- END GENERATED TYPE SAFETY METRICS -->
 
 ## Work Ledger
@@ -72,6 +72,7 @@ boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit r
 | SIM-05 | Finish safe boundary-helper consolidation | Complete | Focused tests, Ruff, strict mypy | PR #218 |
 | SIM-06 | Parse each browser WebSocket event once and use one typed Library Settings state object | Complete | Vitest, Vue typecheck, Chrome and WebKit E2E | PR #218 |
 | SIM-07 | Preserve unknown notification-channel fields and collapse generated artifacts in review | Complete | Vitest plus generated-artifact attributes | PR #218 |
+| SIM-08 | Close final merge-readiness findings: GPU history, notification load safety, float coercion, system-log parsing, plugin-save responsibilities, and duplicate CI runs | Complete | Focused regressions, full strict gates, isolated unit suite, Chrome and WebKit E2E | PR #218 |
 
 ## Verification Evidence
 
@@ -85,6 +86,7 @@ boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit r
 | PY-30 | All 246 mypy source files pass `mypy --strict`; the complete unit suite passes (4,031 tests), integration passes (24), release contracts pass (11), and the packaged live backend passes (3). Fixed inherited v1 dispatch awaiting its synchronous router, typed write-result handling, malformed WebSocket payloads, optional-watchdog wheel imports, service registration argument misuse, duplicate queue initialization, and stoppable resource logging |
 | TS-90 | `verify-local.sh full` passed under an isolated Node 24.11.1 runtime with only Playwright skipped: action pins, licenses, locks, both pip audits, Ruff/format, strict mypy, OpenAPI, 4,031 unit tests, 481 frontend tests plus coverage, build, actionlint, 24 integration tests, 11 release tests, 3 release-tool tests, and clean-wheel inspection. Separate Playwright verification uses installed Google Chrome as the primary desktop, mobile, and packaged live-backend browser plus WebKit for Safari coverage: mocked browser tests 9 passed and packaged live-backend tests 3 passed. `npm audit --omit=dev` reports zero production vulnerabilities |
 | SIM-01–07 | Integer, pagination, settings, helper, WebSocket, Library Settings, notification-preservation, and metrics regressions pass. Strict mypy, Ruff, frontend contract/type/lint/test/build gates, the complete isolated unit suite, installed Chrome/mobile Chrome, WebKit, and packaged live-backend Chrome all pass. |
+| SIM-08 | Final review regressions pass; 4,083 isolated backend unit tests and 500 frontend tests pass. OpenAPI and metrics drift, Ruff, strict mypy, TypeScript, ESLint, Prettier, coverage, and the production build pass; the two changed workflows pass actionlint. Installed Chrome/mobile Chrome/WebKit mocked E2E passes 9 tests; packaged live-backend Chrome passes 3. |
 
 ## Defects Prevented or Fixed
 
@@ -99,6 +101,7 @@ The migration was kept behavior-preserving except where stricter boundary checks
 - Bundled plugin identifiers and settings filenames are allowlisted and confined to their configured roots, preventing malformed metadata or symlinks from escaping the plugin directory or forging log lines.
 - Worker metric timing no longer accepts and immediately overwrites a caller-supplied interval; the interval now has one clear owner based on current worker activity.
 - A post-review fix pass (2026-07-21) repaired regressions the migration itself introduced: the library settings page rejecting the real `settings/read` payload, plugin-settings imports saving under the wrong plugin id, websocket streams losing their 10-row limit to stringly params, worker start times and exception tracebacks disappearing, and the tightened `settings/library/write` schema rejecting supported partial updates. Boundary narrowing now lives in `compresso/libs/narrowing.py`.
+- The final merge-readiness pass preserves periodic GPU history, prevents notification saves after failed or malformed loads, rejects booleans and bytes at float boundaries, routes system logs through the shared WebSocket parser, separates plugin installation from settings persistence, and avoids duplicate feature-branch CI runs.
 
 ## Decisions
 

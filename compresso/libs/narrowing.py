@@ -20,8 +20,6 @@ can distinguish "absent/invalid" from a legitimate zero value and report it.
 from collections.abc import Mapping
 from typing import cast
 
-_COERCIBLE_SCALARS = (bool, int, float, str, bytes, bytearray)
-
 
 def strict_str(value: object, default: str = "") -> str:
     return value if isinstance(value, str) else default
@@ -79,7 +77,7 @@ def coerce_float(value: object, default: float = 0.0) -> float:
 
 
 def coerce_float_or_none(value: object) -> float | None:
-    if not isinstance(value, _COERCIBLE_SCALARS):
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
         return None
     try:
         return float(value)

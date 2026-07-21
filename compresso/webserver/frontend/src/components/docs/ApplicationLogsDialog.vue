@@ -87,12 +87,8 @@ import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { sanitizeHtml } from 'src/js/sanitize'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import type { CompressoSocket } from 'src/js/compressoGlobals'
+import { parseSystemLogsMessage, type SystemLogsData } from 'src/types/systemLogs'
 import type { DialogController } from 'src/types/ui'
-
-interface SystemLogsData {
-  system_logs?: unknown
-  logs_path?: unknown
-}
 
 const emit = defineEmits(['hide'])
 const { t: $t } = useI18n()
@@ -203,13 +199,8 @@ const initCompressoWebsocket = () => {
   })
 
   compressoWSHandler.addEventListener('message', 'handle_system_logs', (evt) => {
-    if (typeof evt.data !== 'string') {
-      return
-    }
-    const jsonData = JSON.parse(evt.data)
-    if (jsonData.success && jsonData.type === 'system_logs') {
-      updateServerLogs(jsonData.data)
-    }
+    const data = parseSystemLogsMessage(evt)
+    if (data) updateServerLogs(data)
   })
 
   // The shared websocket may already be open before this dialog registers listeners.

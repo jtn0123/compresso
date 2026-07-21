@@ -1,4 +1,4 @@
-import type { LiveGpuMetrics, LiveSystemMetricsMessage } from './contracts'
+import type { GpuHistory, GpuHistoryPoint, LiveGpuMetrics, LiveSystemMetricsMessage } from './contracts'
 import { parseFiniteNumber } from 'src/js/formatUtils'
 import { isRecord, KNOWN_STREAM_TYPES, type RawEnvelope } from './envelope'
 import type { WorkerInfoMessage, WorkerRunnerInfo, WorkerSubprocessInfo } from './workers'
@@ -192,6 +192,33 @@ function parseGpu(value: unknown): LiveGpuMetrics | null {
   return gpu
 }
 
+function parseGpuHistoryPoint(value: unknown): GpuHistoryPoint | null {
+  if (!isRecord(value) || typeof value.timestamp !== 'number') return null
+  const point: GpuHistoryPoint = { timestamp: value.timestamp }
+  if (typeof value.gpu_name === 'string') point.gpu_name = value.gpu_name
+  if (typeof value.utilization_percent === 'number' || value.utilization_percent === null) {
+    point.utilization_percent = value.utilization_percent
+  }
+  if (typeof value.memory_used_mb === 'number') point.memory_used_mb = value.memory_used_mb
+  if (typeof value.memory_total_mb === 'number') point.memory_total_mb = value.memory_total_mb
+  if (typeof value.temperature_c === 'number' || value.temperature_c === null) {
+    point.temperature_c = value.temperature_c
+  }
+  return point
+}
+
+function parseGpuHistory(value: unknown): GpuHistory | null {
+  if (!isRecord(value)) return null
+  const history: GpuHistory = {}
+  for (const [gpuIndex, samples] of Object.entries(value)) {
+    if (!Array.isArray(samples)) return null
+    const parsedSamples = samples.map(parseGpuHistoryPoint)
+    if (parsedSamples.some((sample) => sample === null)) return null
+    history[gpuIndex] = parsedSamples.filter((sample): sample is GpuHistoryPoint => sample !== null)
+  }
+  return history
+}
+
 function parseSystemMetrics(value: unknown): LiveSystemMetricsMessage | null {
   if (!isRecord(value)) return null
   const result: LiveSystemMetricsMessage = {}
@@ -203,6 +230,11 @@ function parseSystemMetrics(value: unknown): LiveSystemMetricsMessage | null {
     const gpus = value.gpus.map(parseGpu)
     if (gpus.some((gpu) => gpu === null)) return null
     result.gpus = gpus.filter((gpu): gpu is LiveGpuMetrics => gpu !== null)
+  }
+  if (value.gpu_history !== undefined && value.gpu_history !== null) {
+    const gpuHistory = parseGpuHistory(value.gpu_history)
+    if (gpuHistory === null) return null
+    result.gpu_history = gpuHistory
   }
   return result
 }

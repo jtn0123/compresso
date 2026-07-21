@@ -15,7 +15,9 @@ export interface LiveGpuMetrics extends Partial<SystemGpu> {
 export interface GpuHistoryPoint {
   timestamp: number
   gpu_name?: string
-  utilization_percent?: number
+  utilization_percent?: number | null
+  memory_used_mb?: number
+  memory_total_mb?: number
   temperature_c?: number | null
 }
 

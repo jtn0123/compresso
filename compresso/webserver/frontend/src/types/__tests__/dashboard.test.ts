@@ -40,6 +40,25 @@ describe('parseDashboardEnvelope', () => {
     }
   })
 
+  it('preserves the GPU history included in periodic system status messages', () => {
+    const gpuHistory = {
+      'nvidia:0': [{ timestamp: 1712345678.9, gpu_name: 'GPU 0', utilization_percent: 42 }],
+    }
+    const parsed = parse(
+      JSON.stringify({
+        success: true,
+        server_id: 'server-1',
+        type: 'system_status',
+        data: { cpu_percent: 25, gpu_history: gpuHistory },
+      }),
+    )
+
+    expect(parsed?.success).toBe(true)
+    if (parsed?.success && parsed.type === 'system_status') {
+      expect(parsed.data.gpu_history).toEqual(gpuHistory)
+    }
+  })
+
   it('rejects malformed task payloads', () => {
     expect(
       parse(

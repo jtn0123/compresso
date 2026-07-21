@@ -51,7 +51,12 @@
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-toggle v-model="channel.enabled" @update:model-value="saveChannels" dense />
+                      <q-toggle
+                        v-model="channel.enabled"
+                        @update:model-value="saveChannels"
+                        :disable="!channelsLoaded"
+                        dense
+                      />
                       <q-btn
                         flat
                         dense
@@ -59,6 +64,7 @@
                         size="sm"
                         @click="testChannel(channel)"
                         :loading="testingId === channel.id"
+                        :disable="!channelsLoaded"
                       >
                         <q-tooltip>{{ $t('pages.settingsNotifications.sendTest') }}</q-tooltip>
                       </q-btn>
@@ -69,6 +75,7 @@
                         size="sm"
                         :aria-label="$t('a11y.editChannel')"
                         @click="editChannel(channel)"
+                        :disable="!channelsLoaded"
                       >
                         <q-tooltip>{{ $t('tooltips.configure') }}</q-tooltip>
                       </q-btn>
@@ -80,6 +87,7 @@
                         size="sm"
                         :aria-label="$t('a11y.deleteChannel')"
                         @click="confirmDelete(channel)"
+                        :disable="!channelsLoaded"
                       >
                         <q-tooltip>{{ $t('tooltips.delete') }}</q-tooltip>
                       </q-btn>
@@ -94,6 +102,7 @@
                   icon="add"
                   :label="$t('pages.settingsNotifications.addChannel')"
                   @click="openAddDialog"
+                  :disable="!channelsLoaded"
                 />
               </q-card-actions>
             </q-card>
@@ -193,6 +202,7 @@ import {
   type ChannelType,
   type NotificationChannel,
 } from 'src/types/notifications'
+import { isRecord } from 'src/types/envelope'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -239,6 +249,7 @@ export default {
   data() {
     return {
       loading: true,
+      channelsLoaded: false,
       channels: [] as NotificationChannel[],
       // Raw entries the UI cannot manage; carried through saves untouched
       unmanagedChannels: [] as unknown[],
@@ -319,12 +330,17 @@ export default {
     },
     fetchChannels() {
       this.loading = true
+      this.channelsLoaded = false
       axios({
         method: 'get',
         url: getCompressoApiUrl('v2', 'notifications/channels'),
       })
         .then((response) => {
-          const channels: unknown[] = Array.isArray(response.data.channels) ? response.data.channels : []
+          const responseData: unknown = response.data
+          if (!isRecord(responseData) || !Array.isArray(responseData.channels)) {
+            throw new TypeError('Notification channel response is invalid')
+          }
+          const channels: unknown[] = responseData.channels
           this.channels = []
           this.unmanagedChannels = []
           for (const entry of channels) {
@@ -332,11 +348,10 @@ export default {
             if (normalized) this.channels.push(normalized)
             else this.unmanagedChannels.push(entry)
           }
+          this.channelsLoaded = true
           this.loading = false
         })
         .catch(() => {
-          this.channels = []
-          this.unmanagedChannels = []
           this.loading = false
           this.$q.notify({
             color: 'negative',
@@ -348,6 +363,7 @@ export default {
         })
     },
     saveChannels() {
+      if (!this.channelsLoaded) return
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'notifications/channels/save'),

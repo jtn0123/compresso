@@ -30,6 +30,12 @@ class TestCoercingFamily:
         assert narrowing.coerce_float(None, 2.0) == 2.0
         assert narrowing.coerce_float_or_none("nope") is None
 
+    def test_coerce_float_rejects_booleans_and_bytes(self):
+        assert narrowing.coerce_float(True, 7.0) == 7.0
+        assert narrowing.coerce_float_or_none(False) is None
+        assert narrowing.coerce_float(b"1.5", 7.0) == 7.0
+        assert narrowing.coerce_float(bytearray(b"1.5"), 7.0) == 7.0
+
 
 @pytest.mark.unittest
 class TestStrictFamily:

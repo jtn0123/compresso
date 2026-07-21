@@ -127,6 +127,32 @@ def _parse_enabled_plugins(value: object) -> tuple[list[Mapping[str, object]], l
     return sources, parsed
 
 
+def _ensure_plugins_installed(
+    library: Library,
+    parsed_plugins: list[_EnabledPlugin],
+    *,
+    new_library: bool,
+) -> None:
+    repo_refreshed = False
+    for plugin in parsed_plugins:
+        if plugins.check_if_plugin_is_installed(plugin.plugin_id):
+            continue
+        if not repo_refreshed:
+            plugins.reload_plugin_repos_data()
+            repo_refreshed = True
+        if not plugins.install_plugin_by_id(plugin.plugin_id):
+            if new_library:
+                library.delete()
+            raise RuntimeError(f"Failed to install plugin by plugin ID '{plugin.plugin_id}'")
+
+
+def _save_enabled_plugin_settings(library_id: int, parsed_plugins: list[_EnabledPlugin]) -> None:
+    plugin_executor = PluginExecutor()
+    for plugin in parsed_plugins:
+        if plugin.has_config:
+            plugin_executor.save_plugin_settings(plugin.plugin_id, plugin.settings, library_id=library_id)
+
+
 def _install_and_enable_plugins(
     library: Library,
     library_id: int,
@@ -147,23 +173,9 @@ def _install_and_enable_plugins(
             len(enabled_plugins),
         )
 
-    repo_refreshed = False
-    for plugin in parsed_plugins:
-        if plugins.check_if_plugin_is_installed(plugin.plugin_id):
-            continue
-        if not repo_refreshed:
-            plugins.reload_plugin_repos_data()
-            repo_refreshed = True
-        if not plugins.install_plugin_by_id(plugin.plugin_id):
-            if new_library:
-                library.delete()
-            raise RuntimeError(f"Failed to install plugin by plugin ID '{plugin.plugin_id}'")
-
+    _ensure_plugins_installed(library, parsed_plugins, new_library=new_library)
     library.set_enabled_plugins(enabled_plugins)
-    plugin_executor = PluginExecutor()
-    for plugin in parsed_plugins:
-        if plugin.has_config:
-            plugin_executor.save_plugin_settings(plugin.plugin_id, plugin.settings, library_id=library_id)
+    _save_enabled_plugin_settings(library_id, parsed_plugins)
 
 
 def _save_plugin_flows(library_id: int, plugin_flow_value: object) -> None:

@@ -3,7 +3,8 @@ name: Python Lint & Run Unit Tests
 on:
   push:
     branches:
-      - '**'
+      - 'master'
+      - 'staging'
   pull_request:
     branches:
       - 'master'
