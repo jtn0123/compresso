@@ -212,18 +212,35 @@ interface ChannelForm {
   triggers: string[]
 }
 
-const isNotificationChannel = (value: unknown): value is NotificationChannel => {
-  if (typeof value !== 'object' || value === null) return false
+// Lenient normalization: channels are stored raw in the backend config, so
+// older or hand-edited entries may miss fields. Defaults mirror the backend
+// dispatcher (external_notifications.py: missing "enabled" means enabled).
+// Entries that can't even be normalized must be preserved verbatim, never
+// silently dropped — saveChannels() posts the full list back.
+const normalizeNotificationChannel = (value: unknown): NotificationChannel | null => {
+  if (typeof value !== 'object' || value === null) return null
   const channel = value as Record<string, unknown>
-  return (
-    typeof channel.id === 'string' &&
-    typeof channel.name === 'string' &&
-    (channel.type === 'discord' || channel.type === 'slack' || channel.type === 'webhook') &&
-    typeof channel.url === 'string' &&
-    Array.isArray(channel.triggers) &&
-    channel.triggers.every((trigger) => typeof trigger === 'string') &&
-    typeof channel.enabled === 'boolean'
-  )
+  if (
+    typeof channel.id !== 'string' ||
+    (channel.type !== 'discord' && channel.type !== 'slack' && channel.type !== 'webhook') ||
+    typeof channel.url !== 'string'
+  ) {
+    return null
+  }
+  return {
+    id: channel.id,
+    name: typeof channel.name === 'string' ? channel.name : '',
+    type: channel.type,
+    url: channel.url,
+    headers:
+      typeof channel.headers === 'object' && channel.headers !== null && !Array.isArray(channel.headers)
+        ? (channel.headers as Record<string, string>)
+        : null,
+    triggers: Array.isArray(channel.triggers)
+      ? channel.triggers.filter((trigger): trigger is string => typeof trigger === 'string')
+      : [],
+    enabled: typeof channel.enabled === 'boolean' ? channel.enabled : true,
+  }
 }
 
 export default {
@@ -258,6 +275,8 @@ export default {
     return {
       loading: true,
       channels: [] as NotificationChannel[],
+      // Raw entries the UI cannot manage; carried through saves untouched
+      unmanagedChannels: [] as unknown[],
       showDialog: false,
       editingChannel: null as NotificationChannel | null,
       testingId: null as string | null,
@@ -341,7 +360,13 @@ export default {
       })
         .then((response) => {
           const channels: unknown[] = Array.isArray(response.data.channels) ? response.data.channels : []
-          this.channels = channels.filter(isNotificationChannel)
+          this.channels = []
+          this.unmanagedChannels = []
+          for (const entry of channels) {
+            const normalized = normalizeNotificationChannel(entry)
+            if (normalized) this.channels.push(normalized)
+            else this.unmanagedChannels.push(entry)
+          }
           this.loading = false
         })
         .catch(() => {
@@ -360,7 +385,7 @@ export default {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'notifications/channels/save'),
-        data: { channels: this.channels },
+        data: { channels: [...this.channels, ...this.unmanagedChannels] },
       })
         .then(() => {
           this.$q.notify({

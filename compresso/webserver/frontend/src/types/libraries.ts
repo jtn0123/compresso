@@ -43,51 +43,44 @@ export interface LibraryPageSettings {
   stagingPath: string
 }
 
-function isBooleanSetting(value: unknown): value is boolean {
-  return typeof value === 'boolean'
+function toBooleanSetting(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') return value
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return fallback
 }
 
-export function parseLibraryPageSettings(settings: Record<string, unknown>): LibraryPageSettings | null {
-  const approvalRequired = isBooleanSetting(settings.approval_required)
-    ? settings.approval_required
-    : settings.approval_required === 'true'
-      ? true
-      : settings.approval_required === 'false'
-        ? false
-        : null
-  if (
-    typeof settings.library_path !== 'string' ||
-    !isBooleanSetting(settings.enable_library_scanner) ||
-    typeof settings.schedule_full_scan_minutes !== 'number' ||
-    !isBooleanSetting(settings.follow_symlinks) ||
-    typeof settings.concurrent_file_testers !== 'number' ||
-    !isBooleanSetting(settings.run_full_scan_on_start) ||
-    !isBooleanSetting(settings.enable_inotify) ||
-    !isBooleanSetting(settings.clear_pending_tasks_on_restart) ||
-    !isBooleanSetting(settings.auto_manage_completed_tasks) ||
-    !isBooleanSetting(settings.compress_completed_tasks_logs) ||
-    typeof settings.max_age_of_completed_tasks !== 'number' ||
-    !isBooleanSetting(settings.always_keep_failed_tasks) ||
-    approvalRequired === null ||
-    (settings.staging_path != null && typeof settings.staging_path !== 'string')
-  ) {
-    return null
+function toNumberSetting(value: unknown, fallback: number): number {
+  // Numeric inputs round-trip through settings storage as strings
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
   }
+  return fallback
+}
+
+// Field-by-field lenient parsing: a settings payload with unexpected or
+// missing values must degrade to defaults, never reject the whole page.
+// Fallbacks mirror the backend defaults in compresso/config.py.
+export function parseLibraryPageSettings(settings: Record<string, unknown>): LibraryPageSettings {
   return {
-    libraryPath: settings.library_path,
-    enableLibraryScanner: settings.enable_library_scanner,
-    libraryScanSchedule: settings.schedule_full_scan_minutes,
-    libraryScanFollowSymlinks: settings.follow_symlinks,
-    concurrentFileTesters: settings.concurrent_file_testers,
-    runLibraryScanOnStart: settings.run_full_scan_on_start,
-    enableLibraryFileMonitor: settings.enable_inotify,
-    clearPendingTasksOnStart: settings.clear_pending_tasks_on_restart,
-    autoManageCompletedTasks: settings.auto_manage_completed_tasks,
-    compressCompletedTasksLogs: settings.compress_completed_tasks_logs,
-    maxAgeOfCompletedTasks: settings.max_age_of_completed_tasks,
-    alwaysKeepFailedTasks: settings.always_keep_failed_tasks,
-    approvalRequired,
-    stagingPath: settings.staging_path ?? '',
+    libraryPath: typeof settings.library_path === 'string' ? settings.library_path : '',
+    enableLibraryScanner: toBooleanSetting(settings.enable_library_scanner, false),
+    libraryScanSchedule: toNumberSetting(settings.schedule_full_scan_minutes, 1440),
+    libraryScanFollowSymlinks: toBooleanSetting(settings.follow_symlinks, true),
+    concurrentFileTesters: toNumberSetting(settings.concurrent_file_testers, 2),
+    runLibraryScanOnStart: toBooleanSetting(settings.run_full_scan_on_start, false),
+    // enable_inotify is a per-library setting and is not part of the global
+    // settings/read payload; it only ever arrives as a default here.
+    enableLibraryFileMonitor: toBooleanSetting(settings.enable_inotify, false),
+    clearPendingTasksOnStart: toBooleanSetting(settings.clear_pending_tasks_on_restart, false),
+    autoManageCompletedTasks: toBooleanSetting(settings.auto_manage_completed_tasks, false),
+    compressCompletedTasksLogs: toBooleanSetting(settings.compress_completed_tasks_logs, false),
+    maxAgeOfCompletedTasks: toNumberSetting(settings.max_age_of_completed_tasks, 91),
+    alwaysKeepFailedTasks: toBooleanSetting(settings.always_keep_failed_tasks, true),
+    approvalRequired: toBooleanSetting(settings.approval_required, false),
+    stagingPath: typeof settings.staging_path === 'string' ? settings.staging_path : '',
   }
 }
 

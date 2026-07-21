@@ -167,7 +167,7 @@
                       v-if="enableLibraryScanner && libraryScanSchedule !== null"
                       outlined
                       type="number"
-                      v-model="libraryScanSchedule"
+                      v-model.number="libraryScanSchedule"
                       :label="$t('components.settings.library.libraryScannerSchedule')"
                       lazy-rules
                       :rules="[
@@ -266,7 +266,7 @@
                       v-if="autoManageCompletedTasks && maxAgeOfCompletedTasks !== null"
                       outlined
                       type="number"
-                      v-model="maxAgeOfCompletedTasks"
+                      v-model.number="maxAgeOfCompletedTasks"
                       :label="
                         compressCompletedTasksLogs
                           ? $t('components.settings.library.maxAgeOfCompletedTasksCompress')
@@ -589,9 +589,7 @@ export default defineComponent({
         url: getCompressoApiUrl('v2', 'settings/read'),
       })
         .then((response) => {
-          const settings = parseLibraryPageSettings(response.data.settings)
-          if (!settings) throw new Error('Invalid library settings response')
-          Object.assign(this, settings)
+          Object.assign(this, parseLibraryPageSettings(response.data.settings))
         })
         .catch(() => {
           this.$q.notify({

@@ -49,8 +49,22 @@ export interface QueueEta {
   confidence: 'high' | 'medium' | 'low'
 }
 
+// Every stream type the backend websocket can emit (websocket.py
+// STREAM_POLL_INTERVALS). Consumers model a subset; the rest must be
+// passed through silently so shared-socket listeners don't log errors
+// for each other's valid traffic.
+export const KNOWN_STREAM_TYPES: ReadonlySet<string> = new Set([
+  'frontend_message',
+  'system_logs',
+  'workers_info',
+  'pending_tasks',
+  'completed_tasks',
+  'system_status',
+])
+
 export type DashboardEnvelope =
   | { success: false }
+  | { success: true; server_id: string; type: 'unhandled' }
   | { success: true; server_id: string; type: 'workers_info'; data: WorkerInfoMessage[] }
   | { success: true; server_id: string; type: 'pending_tasks'; data: PendingTasksMessage }
   | { success: true; server_id: string; type: 'completed_tasks'; data: CompletedTasksMessage }
@@ -62,6 +76,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function optionalString(value: unknown): string {
   return typeof value === 'string' ? value : ''
+}
+
+function optionalTimestamp(value: unknown): number | null {
+  // The backend serializes worker start times as strings (str(time.time()))
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
 }
 
 function parseRunnerInfo(value: unknown): Record<string, WorkerRunnerInfo> {
@@ -117,7 +141,7 @@ function parseWorker(value: unknown): WorkerInfoMessage | null {
     current_task: typeof value.current_task === 'number' ? value.current_task : null,
     runners_info: parseRunnerInfo(value.runners_info),
     subprocess: parseSubprocess(value.subprocess),
-    start_time: typeof value.start_time === 'number' ? value.start_time : null,
+    start_time: optionalTimestamp(value.start_time),
     current_command: optionalString(value.current_command),
     worker_log_tail: Array.isArray(value.worker_log_tail)
       ? value.worker_log_tail.filter((line): line is string => typeof line === 'string')
@@ -238,5 +262,17 @@ export function parseDashboardEnvelope(raw: string): DashboardEnvelope | null {
     const data = parseSystemMetrics(value.data)
     if (data) return { success: true, server_id: value.server_id, type: value.type, data }
   }
+  // Valid envelope of a stream this page does not model: pass through so the
+  // server_id restart check still sees it and no error is logged.
+  if (KNOWN_STREAM_TYPES.has(value.type) && !DASHBOARD_MODELED_TYPES.has(value.type)) {
+    return { success: true, server_id: value.server_id, type: 'unhandled' }
+  }
   return null
 }
+
+const DASHBOARD_MODELED_TYPES: ReadonlySet<string> = new Set([
+  'workers_info',
+  'pending_tasks',
+  'completed_tasks',
+  'system_status',
+])

@@ -21,6 +21,7 @@ vi.mock('quasar', () => ({
 const mockApplyTheme = vi.fn()
 vi.mock('src/js/compressoTheme', () => ({
   applyTheme: (...args) => mockApplyTheme(...args),
+  isPaletteName: (value) => value === 'forest' || value === 'ember',
 }))
 
 import axios from 'axios'

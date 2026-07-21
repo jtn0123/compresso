@@ -136,6 +136,10 @@ const PALETTES = {
 export type ThemeMode = 'light' | 'dark'
 export type PaletteName = keyof typeof PALETTES
 
+// Derived from PALETTES so adding a palette is a one-place change
+export const isPaletteName = (value: unknown): value is PaletteName =>
+  typeof value === 'string' && value in PALETTES
+
 /**
  * Apply a theme (mode + palette) to the application.
  * Sets all Quasar and custom CSS variables.
@@ -144,7 +148,7 @@ export type PaletteName = keyof typeof PALETTES
  * @param {'forest'|'ember'} palette
  */
 export function applyTheme(mode: ThemeMode | string, palette: PaletteName | string): void {
-  const paletteConfig = palette === 'forest' || palette === 'ember' ? PALETTES[palette] : undefined
+  const paletteConfig = isPaletteName(palette) ? PALETTES[palette] : undefined
   const p = paletteConfig && (mode === 'light' || mode === 'dark') ? paletteConfig[mode] : PALETTES.forest.light
 
   // Quasar built-in CSS vars

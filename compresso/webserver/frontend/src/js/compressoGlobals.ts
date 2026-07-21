@@ -2,7 +2,7 @@ import axios, { type AxiosRequestConfig } from 'axios'
 import { ref, reactive } from 'vue'
 import { Notify, LocalStorage, type QNotifyCreateOptions, type QNotifyUpdateOptions } from 'quasar'
 import { createLogger } from 'src/composables/useLogger'
-import { applyTheme, type ThemeMode } from 'src/js/compressoTheme'
+import { applyTheme, isPaletteName, type ThemeMode } from 'src/js/compressoTheme'
 import type { ApiSchema } from 'src/types/contracts'
 import type { Translate } from 'src/types/ui'
 
@@ -159,7 +159,7 @@ export const getCompressoApiUrl = function (apiVersion: string, apiEndpoint: str
 
 export const setTheme = function (mode: ThemeMode): void {
   const storedPalette = LocalStorage.getItem('palette')
-  const palette = storedPalette === 'ember' ? 'ember' : 'forest'
+  const palette = isPaletteName(storedPalette) ? storedPalette : 'forest'
   applyTheme(mode, palette)
 }
 

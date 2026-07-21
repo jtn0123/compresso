@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import $compresso, { showEventToast, type CompressoSocket, type RegisteredWebSocketListener } from './compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 import { getWebsocketProtocols } from 'src/js/apiAuth'
-import { displayBasename } from 'src/js/pathUtils'
+import { KNOWN_STREAM_TYPES } from 'src/types/dashboard'
 import type { QNotifyUpdateOptions } from 'quasar'
 import type { Translate } from 'src/types/ui'
 
@@ -19,17 +19,17 @@ interface FrontendPushMessage {
   timeout: number
 }
 
+// Mirrors websocket.py async_completed_tasks_info: the stream only carries
+// id/label/success (plus finish_time/human_readable_time, unused here).
 interface CompletedTaskMessage {
   id: number
-  abspath?: string
   label?: string
   success: boolean
-  source_size?: number
-  destination_size?: number
 }
 
 type IncomingEnvelope =
   | { success: false }
+  | { success: true; server_id: string; type: 'unhandled' }
   | { success: true; server_id: string; type: 'frontend_message'; data: FrontendPushMessage[] }
   | { success: true; server_id: string; type: 'completed_tasks'; data: { results: CompletedTaskMessage[] } }
 
@@ -57,10 +57,7 @@ function isCompletedTaskMessage(value: unknown): value is CompletedTaskMessage {
     isRecord(value) &&
     typeof value.id === 'number' &&
     typeof value.success === 'boolean' &&
-    (value.abspath === undefined || typeof value.abspath === 'string') &&
-    (value.label === undefined || typeof value.label === 'string') &&
-    (value.source_size === undefined || typeof value.source_size === 'number') &&
-    (value.destination_size === undefined || typeof value.destination_size === 'number')
+    (value.label === undefined || typeof value.label === 'string')
   )
 }
 
@@ -87,6 +84,12 @@ export function parseIncomingEnvelope(raw: string): IncomingEnvelope | null {
       return null
     }
     return { success: true, server_id: value.server_id, type: value.type, data: { results: value.data.results } }
+  }
+  // Valid envelope of a stream this handler does not model (e.g. workers_info,
+  // pending_tasks): pass through so the server_id restart check still sees it
+  // and no error is logged for another listener's valid traffic.
+  if (KNOWN_STREAM_TYPES.has(value.type)) {
+    return { success: true, server_id: value.server_id, type: 'unhandled' }
   }
   return null
 }
@@ -444,23 +447,9 @@ export const CompressoWebsocketHandler = function ($t: Translate) {
                       seenCompletedIds.add(task.id)
                       // Only toast if connected for >5s (skip initial load batch)
                       if (connectionAge > 5000) {
-                        const filename = task.abspath
-                          ? displayBasename(task.abspath)
-                          : task.label || $t('toasts.unknownFile')
+                        const filename = task.label || $t('toasts.unknownFile')
                         if (task.success) {
-                          const savings =
-                            task.source_size && task.source_size > 0
-                              ? ' (' +
-                                Math.round(
-                                  ((task.source_size - (task.destination_size || task.source_size)) /
-                                    task.source_size) *
-                                    100,
-                                ) +
-                                '% ' +
-                                $t('toasts.smaller') +
-                                ')'
-                              : ''
-                          showEventToast('success', $t('toasts.taskCompleted') + ': ' + filename + savings)
+                          showEventToast('success', $t('toasts.taskCompleted') + ': ' + filename)
                         } else {
                           // Retry notifications are delivered via frontend_message (not completed_tasks)
                           showEventToast('error', $t('toasts.taskFailed') + ': ' + filename)
