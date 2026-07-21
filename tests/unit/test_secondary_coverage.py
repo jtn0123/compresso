@@ -1288,7 +1288,7 @@ class TestGetCommunityReposWithCache(ApiTestBase):
 
         with (
             patch.object(ApiPluginsHandler, "initialize", _init),
-            patch.object(ApiPluginsHandler, "_read_json_file", return_value=fresh_cached),
+            patch(PLUGIN_REPOS_MIXIN + "._read_json_file", return_value=fresh_cached),
         ):
             resp = self.get_json("/plugins/repos/community")
         assert resp.code == 200
@@ -1334,8 +1334,8 @@ class TestGetCommunityReposWithCache(ApiTestBase):
 
         with (
             patch.object(ApiPluginsHandler, "initialize", _init),
-            patch.object(ApiPluginsHandler, "_read_json_file", return_value=malformed_cached),
-            patch.object(ApiPluginsHandler, "_write_json_file"),
+            patch(PLUGIN_REPOS_MIXIN + "._read_json_file", return_value=malformed_cached),
+            patch(PLUGIN_REPOS_MIXIN + "._write_json_file"),
         ):
             resp = self.get_json("/plugins/repos/community")
         assert resp.code == 200
@@ -1374,8 +1374,8 @@ class TestGetCommunityReposWithCache(ApiTestBase):
 
         with (
             patch.object(ApiPluginsHandler, "initialize", _init),
-            patch.object(ApiPluginsHandler, "_read_json_file", return_value=stale_cached),
-            patch.object(ApiPluginsHandler, "_write_json_file"),
+            patch(PLUGIN_REPOS_MIXIN + "._read_json_file", return_value=stale_cached),
+            patch(PLUGIN_REPOS_MIXIN + "._write_json_file"),
         ):
             resp = self.get_json("/plugins/repos/community")
         assert resp.code == 200

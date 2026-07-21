@@ -913,6 +913,153 @@
                 ],
                 "additionalProperties": false
             },
+            "VideoStream": {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "integer"
+                    },
+                    "codec_name": {
+                        "type": "string"
+                    },
+                    "codec_long_name": {
+                        "type": "string"
+                    },
+                    "profile": {
+                        "type": "string"
+                    },
+                    "width": {
+                        "type": "integer"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "pix_fmt": {
+                        "type": "string"
+                    },
+                    "bit_rate": {
+                        "type": "integer"
+                    },
+                    "r_frame_rate": {
+                        "type": "string"
+                    },
+                    "avg_frame_rate": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "nb_frames": {
+                        "type": "integer"
+                    },
+                    "color_space": {
+                        "type": "string"
+                    },
+                    "color_transfer": {
+                        "type": "string"
+                    },
+                    "color_primaries": {
+                        "type": "string"
+                    },
+                    "hdr": {
+                        "type": "boolean"
+                    },
+                    "resolution_label": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AudioStream": {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "integer"
+                    },
+                    "codec_name": {
+                        "type": "string"
+                    },
+                    "codec_long_name": {
+                        "type": "string"
+                    },
+                    "profile": {
+                        "type": "string"
+                    },
+                    "sample_rate": {
+                        "type": "integer"
+                    },
+                    "channels": {
+                        "type": "integer"
+                    },
+                    "channel_layout": {
+                        "type": "string"
+                    },
+                    "bit_rate": {
+                        "type": "integer"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "language": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "SubtitleStream": {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "integer"
+                    },
+                    "codec_name": {
+                        "type": "string"
+                    },
+                    "codec_long_name": {
+                        "type": "string"
+                    },
+                    "profile": {
+                        "type": "string"
+                    },
+                    "language": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "FormatInfo": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string"
+                    },
+                    "format_name": {
+                        "type": "string"
+                    },
+                    "format_long_name": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "size": {
+                        "type": "integer"
+                    },
+                    "bit_rate": {
+                        "type": "integer"
+                    },
+                    "nb_streams": {
+                        "type": "integer"
+                    }
+                },
+                "additionalProperties": false
+            },
             "FileInfoResponse": {
                 "type": "object",
                 "properties": {
@@ -923,17 +1070,25 @@
                     },
                     "video_streams": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            "$ref": "#/components/schemas/VideoStream"
+                        }
                     },
                     "audio_streams": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            "$ref": "#/components/schemas/AudioStream"
+                        }
                     },
                     "subtitle_streams": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                            "$ref": "#/components/schemas/SubtitleStream"
+                        }
                     },
-                    "format": {}
+                    "format": {
+                        "$ref": "#/components/schemas/FormatInfo"
+                    }
                 },
                 "required": [
                     "success"
@@ -1646,9 +1801,9 @@
                         "example": 10
                     },
                     "results": {
+                        "type": "array",
                         "minItems": 0,
                         "description": "Results",
-                        "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/CompletedTasksTableResults"
                         }
@@ -1796,6 +1951,181 @@
                 "required": [
                     "command_log",
                     "command_log_lines"
+                ],
+                "additionalProperties": false
+            },
+            "RequestMetadataSearch": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Absolute path to search for metadata",
+                        "example": "/mnt/user/Movies/Example.mkv",
+                        "nullable": true
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Pagination offset",
+                        "example": 0,
+                        "nullable": true
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Pagination limit",
+                        "example": 50,
+                        "nullable": true
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MetadataEntry": {
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "File fingerprint",
+                        "example": "abc123"
+                    },
+                    "fingerprint_algo": {
+                        "type": "string",
+                        "description": "Fingerprint algorithm identifier",
+                        "example": "sampled_sha256_v1"
+                    },
+                    "metadata_json": {
+                        "type": "object",
+                        "description": "Metadata blob keyed by plugin ID",
+                        "example": {
+                            "example_plugin": {
+                                "status": "ignored"
+                            }
+                        },
+                        "additionalProperties": {}
+                    },
+                    "last_task_id": {
+                        "type": "integer",
+                        "description": "Most recent completed task ID that wrote metadata",
+                        "example": 42,
+                        "nullable": true
+                    },
+                    "paths": {
+                        "type": "array",
+                        "description": "Associated file paths for this fingerprint",
+                        "example": [
+                            {
+                                "path": "/mnt/user/Movies/Example.mkv",
+                                "path_type": "destination"
+                            }
+                        ],
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    }
+                },
+                "required": [
+                    "fingerprint",
+                    "fingerprint_algo",
+                    "metadata_json"
+                ],
+                "additionalProperties": false
+            },
+            "MetadataSearchResults": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "minItems": 0,
+                        "description": "Results",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MetadataEntry"
+                        }
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "description": "Total number of matching records",
+                        "example": 120
+                    }
+                },
+                "required": [
+                    "results",
+                    "total_count"
+                ],
+                "additionalProperties": false
+            },
+            "RequestMetadataByTask": {
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "integer",
+                        "description": "The ID of the completed task",
+                        "example": 1
+                    }
+                },
+                "required": [
+                    "task_id"
+                ],
+                "additionalProperties": false
+            },
+            "RequestMetadataByFingerprint": {
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "File fingerprint",
+                        "example": "abc123"
+                    }
+                },
+                "required": [
+                    "fingerprint"
+                ],
+                "additionalProperties": false
+            },
+            "RequestMetadataUpdate": {
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "File fingerprint",
+                        "example": "abc123"
+                    },
+                    "plugin_id": {
+                        "type": "string",
+                        "description": "Plugin identifier",
+                        "example": "mover2"
+                    },
+                    "json_blob": {
+                        "type": "object",
+                        "description": "Plugin metadata dict to merge",
+                        "example": {
+                            "status": "ignored"
+                        },
+                        "additionalProperties": {}
+                    }
+                },
+                "required": [
+                    "fingerprint",
+                    "json_blob",
+                    "plugin_id"
+                ],
+                "additionalProperties": false
+            },
+            "RequestMetadataDelete": {
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "File fingerprint",
+                        "example": "abc123"
+                    },
+                    "plugin_id": {
+                        "type": "string",
+                        "description": "Plugin identifier to delete (omit to delete all)",
+                        "example": "mover2",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "fingerprint"
                 ],
                 "additionalProperties": false
             },
@@ -2041,9 +2371,9 @@
                         "example": 10
                     },
                     "results": {
+                        "type": "array",
                         "minItems": 0,
                         "description": "Results",
-                        "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/PendingTasksTableResults"
                         }
@@ -2514,9 +2844,9 @@
                         "example": 10
                     },
                     "results": {
+                        "type": "array",
                         "minItems": 0,
                         "description": "Results",
-                        "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/PluginsTableResults"
                         }
@@ -3591,11 +3921,164 @@
                 ],
                 "additionalProperties": false
             },
+            "SettingsLibraryConfig": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1,
+                        "nullable": true
+                    },
+                    "locked": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Default"
+                    },
+                    "path": {
+                        "type": "string",
+                        "example": "/library"
+                    },
+                    "enable_remote_only": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "enable_scanner": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "enable_inotify": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "priority_score": {
+                        "type": "integer",
+                        "example": 0
+                    },
+                    "tags": {
+                        "type": "array",
+                        "example": [
+                            "GPU",
+                            "priority"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "target_codecs": {
+                        "type": "array",
+                        "example": [
+                            "h264"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "skip_codecs": {
+                        "type": "array",
+                        "example": [
+                            "hevc",
+                            "av1"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "size_guardrail_enabled": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "size_guardrail_min_pct": {
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "size_guardrail_max_pct": {
+                        "type": "integer",
+                        "example": 80
+                    },
+                    "replacement_policy": {
+                        "type": "string",
+                        "example": "approval_required"
+                    }
+                },
+                "additionalProperties": true
+            },
+            "SettingsLibraryEnabledPlugin": {
+                "type": "object",
+                "properties": {
+                    "plugin_id": {
+                        "type": "string",
+                        "example": "notify_plex"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Notify Plex"
+                    },
+                    "library_id": {
+                        "type": "integer",
+                        "example": 1,
+                        "nullable": true
+                    },
+                    "settings": {
+                        "type": "object",
+                        "example": {
+                            "notify_on_failure": true
+                        },
+                        "additionalProperties": {}
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Notify Plex on completion.",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "example": "https://example.invalid/icon.png",
+                        "nullable": true
+                    },
+                    "has_config": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "author": {
+                        "type": "string",
+                        "example": "Compresso"
+                    },
+                    "version": {
+                        "type": "string",
+                        "example": "1.0.0"
+                    },
+                    "tags": {
+                        "type": "string",
+                        "example": "notification,plex"
+                    }
+                },
+                "required": [
+                    "plugin_id"
+                ],
+                "additionalProperties": true
+            },
+            "SettingsLibraryPlugins": {
+                "type": "object",
+                "properties": {
+                    "enabled_plugins": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SettingsLibraryEnabledPlugin"
+                        }
+                    }
+                },
+                "required": [
+                    "enabled_plugins"
+                ],
+                "additionalProperties": false
+            },
             "SettingsLibraryConfigReadAndWrite": {
                 "type": "object",
                 "properties": {
                     "library_config": {
-                        "type": "object",
                         "description": "The library configuration",
                         "example": {
                             "id": 1,
@@ -3606,10 +4089,13 @@
                             "priority_score": 0,
                             "tags": []
                         },
-                        "additionalProperties": {}
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SettingsLibraryConfig"
+                            }
+                        ]
                     },
                     "plugins": {
-                        "type": "object",
                         "description": "The library's enabled plugins",
                         "example": {
                             "enabled_plugins": [
@@ -3622,7 +4108,11 @@
                                 }
                             ]
                         },
-                        "additionalProperties": {}
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SettingsLibraryPlugins"
+                            }
+                        ]
                     }
                 },
                 "required": [
@@ -3949,6 +4439,22 @@
                     "memory",
                     "platform",
                     "uptime_seconds"
+                ],
+                "additionalProperties": false
+            },
+            "SafetyAcknowledgeRequest": {
+                "type": "object",
+                "properties": {
+                    "event_id": {
+                        "type": "string"
+                    },
+                    "actor": {
+                        "type": "string",
+                        "default": "operator"
+                    }
+                },
+                "required": [
+                    "event_id"
                 ],
                 "additionalProperties": false
             },
@@ -5291,6 +5797,183 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/InternalError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metadata/search": {
+            "get": {
+                "description": "Search file metadata by path, with pagination.",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestMetadataSearch"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Matching metadata records.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetadataSearchResults"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Search file metadata by path, with pagination.",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestMetadataSearch"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Matching metadata records.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetadataSearchResults"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metadata/by-task": {
+            "post": {
+                "description": "Return metadata associated with a completed task.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestMetadataByTask"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Metadata associated with the task.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetadataSearchResults"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metadata/by-fingerprint": {
+            "post": {
+                "description": "Return metadata associated with a file fingerprint.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestMetadataByFingerprint"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Metadata associated with the fingerprint.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetadataSearchResults"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metadata/by-task/{task_id}": {
+            "get": {
+                "description": "Return metadata associated with the task ID in the path.",
+                "responses": {
+                    "200": {
+                        "description": "Metadata associated with the task.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetadataSearchResults"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metadata/update": {
+            "post": {
+                "description": "Replace one plugin's metadata for a fingerprint.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestMetadataUpdate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Metadata was updated.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseSuccess"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metadata": {
+            "delete": {
+                "description": "Delete all metadata or one plugin's metadata for a fingerprint.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestMetadataDelete"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Metadata was deleted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BaseSuccess"
                                 }
                             }
                         }
@@ -8798,6 +9481,124 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/InternalError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system/capabilities": {
+            "get": {
+                "description": "Return hardware, encoder, and current-capacity data for scheduling.",
+                "responses": {
+                    "200": {
+                        "description": "Current worker capabilities.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system/operations": {
+            "get": {
+                "description": "Return queue, worker, transfer, checkpoint, and disk-pressure counters.",
+                "responses": {
+                    "200": {
+                        "description": "Current operational counters.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system/readiness": {
+            "get": {
+                "description": "Combine the latest deployment-doctor evidence with the safety latch.",
+                "responses": {
+                    "200": {
+                        "description": "Current deployment readiness and safety evidence.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system/safety": {
+            "get": {
+                "description": "Return the persistent safety latch and its bounded event history.",
+                "responses": {
+                    "200": {
+                        "description": "Current safety state.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system/safety/acknowledge": {
+            "post": {
+                "description": "Record that an operator investigated and resolved a safety event.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SafetyAcknowledgeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated safety state.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/system/safety/resume": {
+            "post": {
+                "description": "Recheck local capacity, release the latch, then resume local workers.",
+                "responses": {
+                    "200": {
+                        "description": "Updated safety state after the release attempt.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true
                                 }
                             }
                         }

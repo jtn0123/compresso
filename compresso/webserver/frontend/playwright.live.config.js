@@ -50,8 +50,11 @@ export default defineConfig({
   ],
   projects: [
     {
-      name: 'chromium-live-backend',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'chrome-live-backend',
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chrome',
+      },
     },
   ],
 })

@@ -29,73 +29,69 @@ Copyright:
 
 """
 
+from compresso.libs.foreman import Foreman
 from compresso.libs.uiserver import CompressoRunningThreads
 
 
-def pause_worker_by_id(worker_id: int):
+def _foreman() -> Foreman:
+    foreman = CompressoRunningThreads().get_compresso_running_thread("foreman")
+    if foreman is None:
+        raise RuntimeError("Foreman thread is not registered")
+    return foreman
+
+
+def pause_worker_by_id(worker_id: str) -> bool:
     """
     Pause a worker given that worker's ID
 
     :param worker_id:
     :return:
     """
-    urt = CompressoRunningThreads()
-    foreman = urt.get_compresso_running_thread("foreman")
-    return foreman.pause_worker_thread(worker_id)
+    return _foreman().pause_worker_thread(worker_id)
 
 
-def pause_all_workers():
+def pause_all_workers() -> bool:
     """
     Pause all workers
 
     :return:
     """
-    urt = CompressoRunningThreads()
-    foreman = urt.get_compresso_running_thread("foreman")
-    return foreman.pause_all_worker_threads()
+    return _foreman().pause_all_worker_threads()
 
 
-def resume_worker_by_id(worker_id: int):
+def resume_worker_by_id(worker_id: str) -> bool:
     """
     Resume a worker given that worker's ID
 
     :param worker_id:
     :return:
     """
-    urt = CompressoRunningThreads()
-    foreman = urt.get_compresso_running_thread("foreman")
-    return foreman.resume_worker_thread(worker_id)
+    return _foreman().resume_worker_thread(worker_id)
 
 
-def resume_all_workers():
+def resume_all_workers() -> bool:
     """
     Resume all workers
 
     :return:
     """
-    urt = CompressoRunningThreads()
-    foreman = urt.get_compresso_running_thread("foreman")
-    return foreman.resume_all_worker_threads()
+    return _foreman().resume_all_worker_threads()
 
 
-def terminate_worker_by_id(worker_id: int):
+def terminate_worker_by_id(worker_id: str) -> bool:
     """
     Terminate a worker given that worker's ID
 
     :param worker_id:
     :return:
     """
-    urt = CompressoRunningThreads()
-    foreman = urt.get_compresso_running_thread("foreman")
-    return foreman.terminate_worker_thread(worker_id)
+    return _foreman().terminate_worker_thread(worker_id)
 
 
-def terminate_all_workers():
+def terminate_all_workers() -> bool:
     """
     Terminate all workers
 
     :return:
     """
-    urt = CompressoRunningThreads()
-    foreman = urt.get_compresso_running_thread("foreman")
-    return foreman.terminate_all_worker_threads()
+    return _foreman().terminate_all_worker_threads()

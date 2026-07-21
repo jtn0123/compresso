@@ -85,113 +85,26 @@
   </CompressoDialogWindow>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useMobile } from 'src/composables/useMobile'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
+import type { DialogController } from 'src/types/ui'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import WorkerProgressStatusCard from 'components/dashboard/workers/partials/WorkerProgressStatusCard.vue'
 import WorkerProgressLogCard from 'components/dashboard/workers/partials/WorkerProgressLogCard.vue'
+import type { WorkerDetailsProps } from 'src/types/workers'
 
 const $q = useQuasar()
 const { isMobile } = useMobile()
 const { clampPercent, formatPercent, gradientColor } = useWorkerGauges()
 
-const props = defineProps({
-  id: {
-    type: String,
-    required: true,
-  },
-  label: {
-    type: String,
-    required: true,
-  },
-  name: {
-    type: String,
-    required: true,
-  },
-  progress: {
-    type: Number,
-    default: 100,
-  },
-  progressText: {
-    type: String,
-    default: '',
-  },
-  elapsed: {
-    type: String,
-    default: '',
-  },
-  etc: {
-    type: String,
-    default: '',
-  },
-  color: {
-    type: String,
-    default: 'warning',
-  },
-  workerGroupColour: {
-    type: String,
-    default: 'var(--compresso-grey-4)',
-  },
-  state: {
-    type: String,
-    default: 'Waiting for another task...',
-  },
-  currentRunner: {
-    type: String,
-    default: '',
-  },
-  startTime: {
-    type: String,
-    default: '',
-  },
-  timeSinceStart: {
-    type: String,
-    default: '',
-  },
-  indeterminate: {
-    type: Boolean,
-    default: false,
-  },
-  currentCommand: {
-    type: String,
-    default: '',
-  },
-  currentFile: {
-    type: String,
-    default: '',
-  },
-  currentTask: {
-    type: Number,
-    default: null,
-  },
-  runnersInfo: {
-    type: Object,
-    default: () => ({}),
-  },
-  subprocess: {
-    type: Object,
-    default: () => ({}),
-  },
-  workerLog: {
-    type: Array,
-    default: () => [],
-  },
-  idle: {
-    type: Boolean,
-    default: false,
-  },
-  paused: {
-    type: Boolean,
-    default: false,
-  },
-})
+const props = defineProps<WorkerDetailsProps>()
 
 const emit = defineEmits(['hide'])
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 
 const cpuPercentValue = computed(() => {
   const value = clampPercent(Number(props.subprocess?.cpu_percent || 0))
@@ -219,11 +132,11 @@ const memTextColor = computed(() => {
 })
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

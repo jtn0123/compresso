@@ -52,6 +52,9 @@ export default defineConfig(function (ctx) {
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#build
     build: {
       vueRouterMode: 'history', // available values: 'hash', 'history'
+      typescript: {
+        strict: true,
+      },
 
       // Set the root public path to /compresso/*
       publicPath,

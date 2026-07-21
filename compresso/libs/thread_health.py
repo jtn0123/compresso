@@ -2,29 +2,38 @@
 
 import threading
 import time
+from typing import TypedDict
+
+
+class ThreadHealthSnapshot(TypedDict):
+    last_heartbeat_at: float
+    last_success_at: float | None
+    last_error_at: float | None
+    last_error: str | None
+    consecutive_failures: int
 
 
 class ThreadHealthMixin:
-    def _init_thread_health(self):
+    def _init_thread_health(self) -> None:
         self._health_lock = threading.Lock()
         self._last_heartbeat_at = time.time()
-        self._last_success_at = None
-        self._last_error_at = None
-        self._last_error = None
+        self._last_success_at: float | None = None
+        self._last_error_at: float | None = None
+        self._last_error: str | None = None
         self._consecutive_failures = 0
 
-    def _mark_thread_heartbeat(self):
+    def _mark_thread_heartbeat(self) -> None:
         with self._health_lock:
             self._last_heartbeat_at = time.time()
 
-    def _mark_thread_success(self):
+    def _mark_thread_success(self) -> None:
         now = time.time()
         with self._health_lock:
             self._last_heartbeat_at = now
             self._last_success_at = now
             self._consecutive_failures = 0
 
-    def _mark_thread_error(self, error):
+    def _mark_thread_error(self, error: BaseException) -> None:
         now = time.time()
         with self._health_lock:
             self._last_heartbeat_at = now
@@ -32,7 +41,7 @@ class ThreadHealthMixin:
             self._last_error = str(error)
             self._consecutive_failures += 1
 
-    def get_health_snapshot(self):
+    def get_health_snapshot(self) -> ThreadHealthSnapshot:
         with self._health_lock:
             return {
                 "last_heartbeat_at": self._last_heartbeat_at,

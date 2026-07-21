@@ -140,49 +140,39 @@
   </component>
 </template>
 
-<script>
-import { ref } from 'vue'
+<script lang="ts">
+import { defineComponent } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import { openURL, useQuasar } from 'quasar'
-import CommunityRepos from 'components/settings/plugins/CommunityRepos'
+import { openURL } from 'quasar'
+import CommunityRepos from 'components/settings/plugins/CommunityRepos.vue'
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { PluginRepo } from 'src/types/plugins'
+import type { DialogController } from 'src/types/ui'
 
-export default {
+export default defineComponent({
   components: { CommunityRepos, CompressoStandardButton, CompressoStandardButtonDropdown },
   data() {
     return {
-      repoList: [],
+      repoList: [] as PluginRepo[],
       newRepo: '',
     }
   },
   methods: {
-    goToRepoSource: function (url) {
-      openURL(url, null)
+    goToRepoSource: function (url: string): void {
+      openURL(url)
     },
     getRepoInfo: function () {
       // Fetch from server
-      axios({
+      axios<ApiSchema<'PluginReposListResults'>>({
         method: 'get',
         url: getCompressoApiUrl('v2', 'plugins/repos/list'),
       })
         .then((response) => {
           // Set returned data from server results
-          let repos = []
-          for (let i = 0; i < response.data.repos.length; i++) {
-            let repo = response.data.repos[i]
-            repos[repos.length] = {
-              id: repo.id,
-              name: repo.name,
-              icon: repo.icon,
-              path: repo.path,
-              repo_html_url: repo.repo_html_url,
-            }
-          }
-
-          // Clear out existing data and add new
-          this.repoList = repos
+          this.repoList = response.data.repos
         })
         .catch(() => {
           this.$q.notify({
@@ -194,9 +184,9 @@ export default {
           })
         })
     },
-    updateRepoList: function (updatedReposList) {
+    updateRepoList: function (updatedReposList: string[]) {
       // POST that list to the API
-      let data = {
+      const data: ApiSchema<'RequestUpdatePluginReposList'> = {
         repos_list: updatedReposList,
       }
       return axios({
@@ -210,7 +200,7 @@ export default {
         method: 'post',
         url: getCompressoApiUrl('v2', 'plugins/repos/reload'),
       })
-        .then((response) => {
+        .then(() => {
           // Notify success
           this.$q.notify({
             color: 'positive',
@@ -236,15 +226,16 @@ export default {
           })
         })
     },
-    saveNewRepo: function (repoUrl = null) {
+    saveNewRepo: function (repoUrl?: string): void {
       const urlToAdd = typeof repoUrl === 'string' ? repoUrl : this.newRepo
 
       if (urlToAdd.length > 0) {
-        let updatedReposList = []
+        const updatedReposList: string[] = []
 
         // Check if urlToAdd already exists in repo list
         for (let i = 0; i < this.repoList.length; i++) {
-          let repoPath = this.repoList[i].path
+          const repoPath = this.repoList[i]?.path
+          if (!repoPath) continue
           if (urlToAdd.trim() === repoPath) {
             this.$q.notify({
               color: 'negative',
@@ -265,7 +256,7 @@ export default {
 
         // POST that list to the API
         this.updateRepoList(updatedReposList)
-          .then((response) => {
+          .then(() => {
             // Notify save
             this.$q.notify({
               color: 'positive',
@@ -297,7 +288,7 @@ export default {
           })
       }
     },
-    getRepoDisplayUrl: function (repo) {
+    getRepoDisplayUrl: function (repo: PluginRepo): string {
       if (repo.repo_html_url) {
         return repo.repo_html_url
       }
@@ -306,13 +297,14 @@ export default {
       }
       return ''
     },
-    removeRepo: function (repoPath) {
-      let updatedReposList = []
+    removeRepo: function (repoPath: string): void {
+      const updatedReposList: string[] = []
 
       // Check if repoPath actually exists in repo list
       // Create updatedReposList from all other paths but the one we want removed
       for (let i = 0; i < this.repoList.length; i++) {
-        let repo = this.repoList[i]
+        const repo = this.repoList[i]
+        if (!repo) continue
         if (repoPath.trim() !== repo.path) {
           updatedReposList[updatedReposList.length] = repo.path
         }
@@ -320,7 +312,7 @@ export default {
 
       // POST the updated repo list to the API
       this.updateRepoList(updatedReposList)
-        .then((response) => {
+        .then(() => {
           // Notify save
           this.$q.notify({
             color: 'positive',
@@ -347,14 +339,16 @@ export default {
         })
     },
     openCommunityDialog() {
-      this.$refs.communityRepos.show()
+      ;(this.$refs.communityRepos as DialogController).show()
     },
   },
   created() {
     this.getRepoInfo()
   },
-  emits: ['repoReloaded'],
-}
+  emits: {
+    repoReloaded: (_reloaded?: boolean) => true,
+  },
+})
 </script>
 
 <style scoped>

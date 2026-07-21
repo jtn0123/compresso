@@ -29,7 +29,10 @@ Copyright:
 
 """
 
+from collections.abc import Mapping
+
 from . import video_codecs
+from ._contracts import EncodingArguments, probe_streams, stream_int, stream_text, string_keyed_dict
 
 
 class VideoCodecHandle:
@@ -39,9 +42,9 @@ class VideoCodecHandle:
     Handle FFMPEG operations pertaining to video codec streams
     """
 
-    def __init__(self, file_probe):
+    def __init__(self, file_probe: Mapping[str, object]) -> None:
         self.file_probe = file_probe
-        self.encoding_args = {}
+        self.encoding_args = EncodingArguments(streams_to_map=[], streams_to_encode=[])
         self.video_tracks_count = 0
 
         # Configurable settings
@@ -50,7 +53,7 @@ class VideoCodecHandle:
         self.video_codec = "h264"  # Default to h264
         self.video_encoder = "libx264"  # Default to libx264
 
-    def args(self):
+    def args(self) -> EncodingArguments:
         """
         Return a dictionary of streams to map and streams to encode
         :return:
@@ -58,53 +61,27 @@ class VideoCodecHandle:
         # Read stream data
         self.encoding_args["streams_to_map"] = []
         self.encoding_args["streams_to_encode"] = []
-        for stream in self.file_probe["streams"]:
-            # If this is a video stream, then process the args
-            if stream["codec_type"] == "video":
-                # By default the video stream will be re-encoded
-                just_copy_video_stream = False
-
-                # Ignore certain codec types (images)
-                if stream["codec_name"] in ["mjpeg"]:
-                    just_copy_video_stream = True
-
-                # If this video stream is really an embedded jpeg file (image/jpeg), simply copy the stream
-                if "tags" in stream and "mimetype" in stream["tags"] and stream["tags"]["mimetype"] == "image/jpeg":
-                    just_copy_video_stream = True
-
-                # If this video encoding is disabled. Then copy the stream
-                if self.disable_video_encoding:
-                    just_copy_video_stream = True
-
-                # If the current video codec is the same as the configured destination
-                # codec, then do not re-encode the video
-                if stream["codec_name"] == self.video_codec:
-                    just_copy_video_stream = True
-
-                if just_copy_video_stream:
-                    # Video stream just needs to be copied
-                    self.encoding_args["streams_to_encode"] = self.encoding_args["streams_to_encode"] + [
-                        f"-c:v:{self.video_tracks_count}",
-                        "copy",
-                    ]
-                else:
-                    # Video stream to be re-encoded
-                    self.encoding_args["streams_to_encode"] = self.encoding_args["streams_to_encode"] + [
-                        f"-c:v:{self.video_tracks_count}",
-                        self.video_encoder,
-                    ]
-
-                self.video_tracks_count += 1
-
-                # Map this video stream to be processed
-                self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + [
-                    "-map",
-                    f"0:{stream['index']}",
-                ]
+        for stream in probe_streams(self.file_probe):
+            if stream_text(stream, "codec_type") != "video":
+                continue
+            encoder = "copy" if self._should_copy_stream(stream) else self.video_encoder
+            self.encoding_args["streams_to_encode"].extend([f"-c:v:{self.video_tracks_count}", encoder])
+            self.video_tracks_count += 1
+            self.encoding_args["streams_to_map"].extend(["-map", f"0:{stream_int(stream, 'index')}"])
 
         return self.encoding_args
 
-    def set_video_codec_with_default_encoder(self, codec_name):
+    def _should_copy_stream(self, stream: Mapping[str, object]) -> bool:
+        codec_name = stream_text(stream, "codec_name")
+        tags = string_keyed_dict(stream.get("tags"))
+        return (
+            codec_name == "mjpeg"
+            or (tags is not None and stream_text(tags, "mimetype") == "image/jpeg")
+            or self.disable_video_encoding
+            or codec_name == self.video_codec
+        )
+
+    def set_video_codec_with_default_encoder(self, codec_name: str) -> None:
         """
         Set the video encoder
 

@@ -30,7 +30,7 @@ Copyright:
 """
 
 from compresso.libs import session
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.filebrowser_schemas import (
     DirectoryListingResultsSchema,
@@ -40,9 +40,9 @@ from compresso.webserver.helpers.filebrowser import DirectoryListing
 
 
 class ApiFilebrowserHandler(BaseApiHandler):
-    session = None
-    params = None
-    compresso_data_queues = None
+    session: session.Session
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -52,13 +52,13 @@ class ApiFilebrowserHandler(BaseApiHandler):
         }
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    async def fetch_directory_listing(self):
+    async def fetch_directory_listing(self) -> None:
         """
         Filebrowser - List files and/or subdirectories in a given directory
         ---
@@ -105,8 +105,12 @@ class ApiFilebrowserHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestDirectoryListingDataSchema())
 
-            directory_listing = DirectoryListing(json_request.get("list_type", "all"))
-            path_data = directory_listing.fetch_path_data(json_request.get("current_path", "/"))
+            list_type_value = json_request.get("list_type", "all")
+            list_type = list_type_value if isinstance(list_type_value, str) else "all"
+            current_path_value = json_request.get("current_path", "/")
+            current_path = current_path_value if isinstance(current_path_value, str) else "/"
+            directory_listing = DirectoryListing(list_type)
+            path_data = directory_listing.fetch_path_data(current_path)
 
             response = self.build_response(
                 DirectoryListingResultsSchema(),

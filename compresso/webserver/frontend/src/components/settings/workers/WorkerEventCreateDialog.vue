@@ -53,21 +53,31 @@
   </CompressoDialogPopup>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue'
+<script setup lang="ts">
+import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
+import type { DialogController } from 'src/types/ui'
+import type { WorkerScheduleEvent } from 'src/types/workers'
 
-const emit = defineEmits(['ok', 'hide'])
+interface SelectOption {
+  label: string
+  value: string
+}
+
+const emit = defineEmits<{
+  ok: [event: WorkerScheduleEvent]
+  hide: []
+}>()
 
 const $q = useQuasar()
 const { t } = useI18n()
 
-const workerEventCreateDialogRef = ref(null)
+const workerEventCreateDialogRef = ref<DialogController | null>(null)
 
-const repetition = ref('')
-const repetitionOptions = [
+const repetition = ref<SelectOption | null>(null)
+const repetitionOptions: SelectOption[] = [
   { label: t('components.settings.workers.scheduleLabels.daily'), value: 'daily' },
   { label: t('components.settings.workers.scheduleLabels.weekday'), value: 'weekday' },
   { label: t('components.settings.workers.scheduleLabels.weekend'), value: 'weekend' },
@@ -81,8 +91,8 @@ const repetitionOptions = [
 ]
 
 const scheduleTime = ref('00:00')
-const scheduleTask = ref('')
-const scheduleTaskOptions = [
+const scheduleTask = ref<SelectOption | null>(null)
+const scheduleTaskOptions: SelectOption[] = [
   { label: t('components.settings.workers.scheduleLabels.count'), value: 'count' },
   { label: t('components.settings.workers.scheduleLabels.pause'), value: 'pause' },
   { label: t('components.settings.workers.scheduleLabels.resume'), value: 'resume' },
@@ -100,11 +110,11 @@ const dialogActions = [
 ]
 
 const show = () => {
-  workerEventCreateDialogRef.value.show()
+  workerEventCreateDialogRef.value?.show()
 }
 
 const hide = () => {
-  workerEventCreateDialogRef.value.hide()
+  workerEventCreateDialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -113,7 +123,7 @@ const onDialogHide = () => {
 
 const addNewScheduledEvent = () => {
   // validate
-  if (typeof repetition.value.value === 'undefined' || typeof scheduleTask.value.value === 'undefined') {
+  if (!repetition.value || !scheduleTask.value) {
     $q.notify({
       color: 'negative',
       position: 'top',

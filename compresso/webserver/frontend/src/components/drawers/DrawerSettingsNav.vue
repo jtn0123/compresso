@@ -103,24 +103,26 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref } from 'vue'
 import compressoGlobals from 'src/js/compressoGlobals'
 import PrivacyPolicyDialog from 'components/docs/PrivacyPolicyDialog.vue'
 import HelpSupportDialog from 'components/docs/HelpSupportDialog.vue'
 import ApplicationLogsDialog from 'components/docs/ApplicationLogsDialog.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
 
 export default {
   name: 'DrawerSettingsNav',
   components: { PrivacyPolicyDialog, HelpSupportDialog, ApplicationLogsDialog },
   setup() {
-    const compressoSession = ref(null)
-    const formAction = ref(null)
-    const uuid = ref(null)
-    const currentUri = ref(null)
-    const privacyPolicyDialogRef = ref(null)
-    const helpSupportDialogRef = ref(null)
-    const applicationLogsDialogRef = ref(null)
+    const compressoSession = ref<ApiSchema<'SessionStateSuccess'> | null>(null)
+    const formAction = ref<string | null>(null)
+    const uuid = ref<string | null>(null)
+    const currentUri = ref<string | null>(null)
+    const privacyPolicyDialogRef = ref<DialogController | null>(null)
+    const helpSupportDialogRef = ref<DialogController | null>(null)
+    const applicationLogsDialogRef = ref<DialogController | null>(null)
 
     compressoGlobals.getCompressoSession().then((session) => {
       compressoSession.value = session

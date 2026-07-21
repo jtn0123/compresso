@@ -128,7 +128,7 @@
                         {{ $t('components.completedTasks.metadataPathsTitle') }}:
                       </span>
                       <span v-if="props.row.paths.length">
-                        {{ props.row.paths.map((item) => item.path).join(', ') }}
+                        {{ formatPaths(props.row.paths) }}
                       </span>
                       <span v-else>-</span>
                     </div>
@@ -182,7 +182,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
@@ -194,6 +194,23 @@ import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButt
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import FileMetadataDetailsDialog from 'components/dashboard/completed/FileMetadataDetailsDialog.vue'
+import type { QTableColumn } from 'quasar'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+import { normalizeMetadataEntry } from 'src/types/metadata'
+import type { MetadataPath } from 'src/types/metadata'
+
+interface MetadataRow {
+  fingerprint: string
+  paths: MetadataPath[]
+}
+interface FetchMetadataOptions {
+  reset?: boolean
+  silent?: boolean
+}
+interface InfiniteScrollController {
+  trigger(): void
+}
 
 const emit = defineEmits(['hide'])
 
@@ -201,25 +218,25 @@ const $q = useQuasar()
 const { t: $t } = useI18n()
 const { isMobile } = useMobile()
 
-const dialogRef = ref(null)
-const metadataDialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
+const metadataDialogRef = ref<DialogController | null>(null)
 const metadataDialogFingerprint = ref('')
-const tableWrapperRef = ref(null)
-const infiniteScrollRef = ref(null)
+const tableWrapperRef = ref<HTMLElement | null>(null)
+const infiniteScrollRef = ref<InfiniteScrollController | null>(null)
 const showScrollTop = ref(false)
 
 const loading = ref(false)
 const loadingMore = ref(false)
-const rows = ref([])
+const rows = ref<MetadataRow[]>([])
 const totalCount = ref(0)
 const pageSize = 50
 const offset = ref(0)
 
 const searchValue = ref('')
 const actionsExpanded = ref(true)
-const selectedFingerprints = ref([])
+const selectedFingerprints = ref<string[]>([])
 
-const columns = computed(() => [
+const columns = computed<QTableColumn[]>(() => [
   {
     name: 'select',
     label: '',
@@ -246,6 +263,8 @@ const columns = computed(() => [
   },
 ])
 
+const formatPaths = (paths: MetadataPath[]): string => paths.map((item) => item.path).join(', ')
+
 const filterSortActiveColor = 'warning'
 const filterSortButtonSize = computed(() => ($q.screen.width < 450 ? 'sm' : 'md'))
 const searchLabelColor = computed(() => (searchValue.value.trim().length > 0 ? filterSortActiveColor : 'secondary'))
@@ -266,16 +285,16 @@ const allLoaded = computed(() => {
   return rows.value.length >= totalCount.value
 })
 
-let searchTimer = null
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
   showScrollTop.value = false
   fetchMetadata({ reset: true, silent: true })
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -287,8 +306,8 @@ const toggleActionsExpanded = () => {
   actionsExpanded.value = !actionsExpanded.value
 }
 
-const handleTableScroll = (event) => {
-  const wrapper = event?.target || tableWrapperRef.value
+const handleTableScroll = (event?: Event): void => {
+  const wrapper = event?.target instanceof HTMLElement ? event.target : tableWrapperRef.value
   if (!wrapper) {
     return
   }
@@ -307,9 +326,9 @@ const scrollToTop = () => {
   showScrollTop.value = false
 }
 
-const isRowSelected = (row) => selectedFingerprints.value.includes(row.fingerprint)
+const isRowSelected = (row: MetadataRow): boolean => selectedFingerprints.value.includes(row.fingerprint)
 
-const toggleRowSelection = (row, value) => {
+const toggleRowSelection = (row: MetadataRow, value: boolean): void => {
   if (value) {
     if (!selectedFingerprints.value.includes(row.fingerprint)) {
       selectedFingerprints.value.push(row.fingerprint)
@@ -319,7 +338,7 @@ const toggleRowSelection = (row, value) => {
   }
 }
 
-const toggleSelectPage = (value) => {
+const toggleSelectPage = (value: boolean): void => {
   if (value) {
     selectedFingerprints.value = rows.value.map((row) => row.fingerprint)
   } else {
@@ -331,7 +350,7 @@ const resetSelection = () => {
   selectedFingerprints.value = []
 }
 
-const fetchMetadata = ({ reset = false, silent = false } = {}) => {
+const fetchMetadata = ({ reset = false, silent = false }: FetchMetadataOptions = {}): void => {
   if (reset) {
     offset.value = 0
     rows.value = []
@@ -343,7 +362,7 @@ const fetchMetadata = ({ reset = false, silent = false } = {}) => {
     loading.value = true
   }
 
-  const payload = {
+  const payload: ApiSchema<'RequestMetadataSearch'> = {
     offset: offset.value,
     limit: pageSize,
   }
@@ -351,7 +370,7 @@ const fetchMetadata = ({ reset = false, silent = false } = {}) => {
     payload.path = searchValue.value.trim()
   }
 
-  axios({
+  axios<ApiSchema<'MetadataSearchResults'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'metadata/search'),
     data: payload,
@@ -359,9 +378,9 @@ const fetchMetadata = ({ reset = false, silent = false } = {}) => {
     .then((response) => {
       const results = response.data.results || []
       totalCount.value = response.data.total_count || results.length
-      const mapped = results.map((entry) => ({
+      const mapped = results.map(normalizeMetadataEntry).map((entry) => ({
         fingerprint: entry.fingerprint,
-        paths: entry.paths || [],
+        paths: entry.paths,
       }))
       if (offset.value === 0) {
         rows.value = mapped
@@ -384,7 +403,7 @@ const fetchMetadata = ({ reset = false, silent = false } = {}) => {
     })
 }
 
-const loadMore = (index, done) => {
+const loadMore = (_index: number, done: () => void): void => {
   if (loadingMore.value) {
     done()
     return
@@ -426,12 +445,10 @@ const deleteSelected = () => {
     })
 }
 
-const openMetadataDialog = (fingerprint) => {
+const openMetadataDialog = (fingerprint: string): void => {
   metadataDialogFingerprint.value = fingerprint
   nextTick(() => {
-    if (metadataDialogRef.value) {
-      metadataDialogRef.value.show()
-    }
+    metadataDialogRef.value?.show()
   })
 }
 

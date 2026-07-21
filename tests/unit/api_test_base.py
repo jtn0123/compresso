@@ -26,6 +26,12 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
 
     handler_class = None
 
+    # NOTE: auth/CSRF enforcement is disabled for every AsyncHTTPTestCase by the
+    # autouse `isolate_api_security_settings` fixture in tests/conftest.py — do
+    # not duplicate that here. Tests that exercise the enforcement paths must
+    # monkeypatch Config.get_api_auth_enforced / get_csrf_protection_enforced
+    # back to True (or use their own settings object, as test_api_auth.py does).
+
     def setUp(self):
         if self.handler_class is None:
             return

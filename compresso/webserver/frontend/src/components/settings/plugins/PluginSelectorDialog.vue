@@ -60,14 +60,18 @@
   <PluginInstallerDialog ref="pluginInstallerDialog" @hide="onPluginInstallerHide" />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
 import PluginInstallerDialog from 'components/settings/plugins/PluginInstallerDialog.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+import type { SelectablePlugin } from 'src/types/plugins'
 
 const props = defineProps({
   title: {
@@ -75,21 +79,24 @@ const props = defineProps({
     default: '',
   },
   hidePlugins: {
-    type: Array,
+    type: Array as PropType<string[]>,
     default: () => [],
   },
 })
 
-const emit = defineEmits(['hide', 'selected'])
+const emit = defineEmits<{
+  hide: []
+  selected: [plugin: SelectablePlugin]
+}>()
 
 const { t } = useI18n()
 const { isMobile } = useMobile()
 
-const dialogRef = ref(null)
-const pluginInstallerDialog = ref(null)
-const plugins = ref([])
+const dialogRef = ref<DialogController | null>(null)
+const pluginInstallerDialog = ref<DialogController | null>(null)
+const plugins = ref<SelectablePlugin[]>([])
 const filter = ref('')
-const currentPlugin = ref(null)
+const currentPlugin = ref<SelectablePlugin | null>(null)
 
 const dialogTitle = computed(() => props.title || t('headers.selectPlugin'))
 
@@ -101,7 +108,7 @@ const fetchPluginsList = () => {
     order_by: 'name',
     order_direction: 'asc',
   }
-  axios({
+  axios<ApiSchema<'PluginsData'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'plugins/installed'),
     data: data,
@@ -117,22 +124,20 @@ const fetchPluginsList = () => {
         version: plugin.version,
         icon: plugin.icon,
         tags: plugin.tags,
-        has_config: plugin.has_config,
+        has_config: plugin.has_config ?? false,
       }))
     plugins.value = pluginList
   })
 }
 
-const selectPlugin = (plugin) => {
+const selectPlugin = (plugin: SelectablePlugin): void => {
   currentPlugin.value = plugin
   emit('selected', plugin)
   hide()
 }
 
 const openPluginInstaller = () => {
-  if (pluginInstallerDialog.value) {
-    pluginInstallerDialog.value.show()
-  }
+  pluginInstallerDialog.value?.show()
 }
 
 const onPluginInstallerHide = () => {
@@ -140,18 +145,13 @@ const onPluginInstallerHide = () => {
 }
 
 const show = () => {
-  if (!dialogRef.value) {
-    return
-  }
   currentPlugin.value = null
-  dialogRef.value.show()
+  dialogRef.value?.show()
   fetchPluginsList()
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

@@ -158,12 +158,8 @@ class TestGetMetadataByTask(ApiTestBase):
     @patch(f"{META_API}.CompletedTasks")
     def test_get_metadata_by_task_not_found(self, mock_ct):
         """POST /metadata/by-task returns 400 if task not found."""
+        from peewee import DoesNotExist
 
-        # Create a real exception class for DoesNotExist
-        class DoesNotExist(Exception):
-            pass
-
-        mock_ct.DoesNotExist = DoesNotExist
         mock_ct.get_by_id.side_effect = DoesNotExist
         resp = self.post_json("/metadata/by-task", {"task_id": 999})
         assert resp.code == 400

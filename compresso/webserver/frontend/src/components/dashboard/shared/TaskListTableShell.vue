@@ -101,13 +101,15 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
+import type { PropType } from 'vue'
+import type { QTableColumn } from 'quasar'
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 
 defineProps({
-  rows: { type: Array, required: true },
-  columns: { type: Array, required: true },
+  rows: { type: Array as PropType<unknown[]>, required: true },
+  columns: { type: Array as PropType<QTableColumn[]>, required: true },
   loading: { type: Boolean, default: false },
   allLoaded: { type: Boolean, default: true },
   error: { type: [Error, Object, String], default: null },
@@ -128,11 +130,11 @@ defineProps({
 
 const emit = defineEmits(['load-more', 'select-all-matching', 'clear-selection', 'retry', 'scroll', 'scroll-top'])
 
-const infiniteScrollRef = ref(null)
-const tableWrapperRef = ref(null)
+const infiniteScrollRef = ref<{ trigger(): void } | null>(null)
+const tableWrapperRef = ref<HTMLElement | null>(null)
 
 const manualLoadMore = () => infiniteScrollRef.value?.trigger()
-const onScroll = (event) => emit('scroll', event)
+const onScroll = (event: Event): void => emit('scroll', event)
 
 defineExpose({ tableWrapperRef, manualLoadMore })
 </script>

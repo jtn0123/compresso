@@ -36,17 +36,59 @@ import re
 import shutil
 import threading
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
+from typing import Literal, Protocol, cast
 
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.installation_link import Links
 from compresso.libs.library import Library
-from compresso.libs.logs import CompressoLogging
+from compresso.libs.logs import CompressoLogging, log_at_level
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.remote_task_lease import RemoteTaskLease
 from compresso.libs.resumable_transfer import file_sha256
-from compresso.libs.task import TaskDataStore
+from compresso.libs.task import JsonValue, Task, TaskDataStore
+from compresso.libs.unmodels.tasks import Tasks
+
+
+class SafetyEventRecorder(Protocol):
+    def __call__(self, code: str, message: str, **details: object) -> object: ...
+
+
+def _remote_task_id(value: object) -> int | str | None:
+    if isinstance(value, bool):
+        return None
+    return value if isinstance(value, (int, str)) else None
+
+
+def _remote_task_id_as_int(value: int | str | None) -> int:
+    if isinstance(value, bool) or value is None:
+        raise RuntimeError("Remote task response did not include a task ID")
+    try:
+        return int(value)
+    except ValueError as error:
+        raise RuntimeError(f"Remote task response contained an invalid task ID: {value!r}") from error
+
+
+def _json_value(value: object) -> bool:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return True
+    if isinstance(value, list):
+        return all(_json_value(item) for item in value)
+    if isinstance(value, dict):
+        return all(isinstance(key, str) and _json_value(item) for key, item in value.items())
+    return False
+
+
+def _set_task_timestamp(
+    task_model: Tasks,
+    field: Literal["start_time", "finish_time"],
+    value: float | None,
+) -> None:
+    """Bridge Peewee's write-time timestamp coercion and hydrated field type."""
+    setattr(task_model, field, value)
 
 
 @dataclass
@@ -76,7 +118,7 @@ class UploadPhaseResult:
 @dataclass(frozen=True)
 class MonitoringPhaseResult:
     succeeded: bool
-    worker_id: object | None = None
+    worker_id: str | None = None
     cleanup_remote: bool = False
 
 
@@ -101,19 +143,27 @@ class CleanupPhaseResult:
 
 
 class RemoteTaskManager(threading.Thread):
-    paused = False
+    paused: bool = False
 
-    current_task = None
-    worker_log = None
-    start_time = None
-    finish_time = None
+    current_task: Task | None = None
+    worker_log: list[str] | None = None
+    start_time: float | None = None
+    finish_time: float | None = None
 
     worker_subprocess_percent = "0"
     worker_subprocess_elapsed = "0"
 
-    worker_runners_info: dict = {}
+    worker_runners_info: dict[str, object] = {}
 
-    def __init__(self, thread_id, name, installation_info, pending_queue, complete_queue, event):
+    def __init__(
+        self,
+        thread_id: int | str,
+        name: str,
+        installation_info: dict[str, object],
+        pending_queue: queue.Queue[Task],
+        complete_queue: queue.Queue[Task],
+        event: threading.Event,
+    ) -> None:
         super().__init__(name=name)
         self.thread_id = thread_id
         self.name = name
@@ -123,9 +173,14 @@ class RemoteTaskManager(threading.Thread):
         self.complete_queue = complete_queue
 
         self.links = Links()
-        self.lease_token = None
-        self.origin_installation_uuid = None
-        self.safety_event_recorder = None
+        self.lease_token: str | None = None
+        self.origin_installation_uuid: str | None = None
+        self.safety_event_recorder: SafetyEventRecorder | None = None
+        self.current_task = None
+        self.worker_log = None
+        self.start_time = None
+        self.finish_time = None
+        self.worker_runners_info = {}
 
         # Create 'redundancy' flag. When this is set, the worker should die
         self.redundant_flag = threading.Event()
@@ -136,14 +191,31 @@ class RemoteTaskManager(threading.Thread):
         self.paused_flag.clear()
 
         # Create logger for this worker
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
-    def _log(self, message, message2="", level="info"):
-        message = common.format_message(message, message2)
-        getattr(self.logger, level)(message)
+    def _log(self, message: object, message2: object = "", level: str = "info") -> None:
+        log_at_level(self.logger, level, common.format_message(message, message2))
+
+    def _require_current_task(self) -> Task:
+        current_task = self.current_task
+        if current_task is None:
+            raise RuntimeError("remote task manager has no current task")
+        return current_task
+
+    def _require_task_model(self) -> Tasks:
+        task_model = self._require_current_task().task
+        if task_model is None:
+            raise RuntimeError("remote task manager current task is not loaded")
+        return task_model
+
+    def _require_worker_log(self) -> list[str]:
+        worker_log = self.worker_log
+        if worker_log is None:
+            raise RuntimeError("remote task manager worker log is not initialized")
+        return worker_log
 
     @staticmethod
-    def _existing_library_result(candidate_path, library_path):
+    def _existing_library_result(candidate_path: str, library_path: str) -> str | None:
         """Return an existing result only after confining it to the local library."""
         library_root = os.path.realpath(library_path)
         candidate = os.path.realpath(candidate_path)
@@ -155,13 +227,13 @@ class RemoteTaskManager(threading.Thread):
             return None
         return candidate
 
-    def get_info(self):
+    def get_info(self) -> dict[str, object]:
         return {
             "name": self.name,
             "installation_info": self.installation_info,
         }
 
-    def run(self):
+    def run(self) -> None:
         # A manager should only run for a single task and connection to a single worker.
         # If either of these become unavailable, then the manager should exit
         self._log(f"Starting remote task manager {self.thread_id} - {self.installation_info.get('address')}")
@@ -196,7 +268,7 @@ class RemoteTaskManager(threading.Thread):
 
         self._log(f"Stopping remote task manager {self.thread_id} - {self.installation_info.get('address')}")
 
-    def __set_current_task(self, current_task):
+    def __set_current_task(self, current_task: Task) -> None:
         """Sets the given task to the worker class"""
         self.current_task = current_task
         self.worker_log = []
@@ -216,12 +288,12 @@ class RemoteTaskManager(threading.Thread):
         plugin_handler = PluginsHandler()
         plugin_handler.run_event_plugins_for_plugin_type("events.task_scheduled", event_data)
 
-    def __unset_current_task(self):
+    def __unset_current_task(self) -> None:
         self.current_task = None
         self.worker_runners_info = {}
         self.worker_log = []
 
-    def __process_task_queue_item(self):
+    def __process_task_queue_item(self) -> None:
         """
         Processes the set task.
 
@@ -230,20 +302,22 @@ class RemoteTaskManager(threading.Thread):
         # Set the progress to an empty string
         self.worker_subprocess_percent = "0"
         self.worker_subprocess_elapsed = "0"
+        current_task = self._require_current_task()
+        task_model = self._require_task_model()
 
         lease_result = self._lease_phase()
         if not lease_result.succeeded:
-            self.current_task.task.deferred_until = datetime.now() + timedelta(seconds=10)
-            self.current_task.task.save()
-            self.current_task.set_status("pending")
+            task_model.deferred_until = datetime.now() + timedelta(seconds=10)
+            task_model.save()
+            current_task.set_status("pending")
             self.__unset_current_task()
             return
 
         # Log the start of the job
-        self._log(f"Picked up job - {self.current_task.get_source_abspath()}")
+        self._log(f"Picked up job - {current_task.get_source_abspath()}")
 
         # Mark as being "in progress"
-        self.current_task.set_status("in_progress")
+        current_task.set_status("in_progress")
 
         # Start current task stats
         self.__set_start_task_stats()
@@ -251,16 +325,16 @@ class RemoteTaskManager(threading.Thread):
         # Process the file. Will return true if success, otherwise false
         success = self.__send_task_to_remote_worker_and_monitor()
         # Mark the task as either success or not
-        self.current_task.set_success(success)
+        current_task.set_success(success)
 
         # Mark task completion statistics
         self.__set_finish_task_stats()
 
         # Log completion of job
-        self._log(f"Finished job - {self.current_task.get_source_abspath()}")
+        self._log(f"Finished job - {current_task.get_source_abspath()}")
 
         # Place the task into the completed queue
-        self.complete_queue.put(self.current_task)
+        self.complete_queue.put(current_task)
 
         # Reset the current file info for the next task
         self.__unset_current_task()
@@ -269,16 +343,22 @@ class RemoteTaskManager(threading.Thread):
         acquired = self._acquire_remote_lease()
         return LeasePhaseResult(succeeded=acquired, deferred=not acquired)
 
-    def _acquire_remote_lease(self):
-        installation_uuid = self.installation_info.get("installation_uuid") or self.installation_info.get("uuid")
-        self.lease_token = RemoteTaskLease.acquire(self.current_task.task, installation_uuid)
+    def _acquire_remote_lease(self) -> bool:
+        installation_uuid = narrowing.strict_str_or_none(
+            self.installation_info.get("installation_uuid") or self.installation_info.get("uuid")
+        )
+        if installation_uuid is None:
+            self._log("Remote installation is missing its UUID", level="error")
+            return False
+        current_task = self._require_current_task()
+        self.lease_token = RemoteTaskLease.acquire(self._require_task_model(), installation_uuid)
         if not self.lease_token:
             if self.safety_event_recorder is not None:
                 self.safety_event_recorder(
                     "duplicate-lease",
                     "A remote task already has a different active owner",
                     installation_uuid=installation_uuid,
-                    task_id=self.current_task.get_task_id(),
+                    task_id=current_task.get_task_id(),
                 )
             self._log(
                 f"Unable to acquire remote task lease for installation '{installation_uuid}'",
@@ -288,8 +368,8 @@ class RemoteTaskManager(threading.Thread):
         self.origin_installation_uuid = self.links.session.get_installation_uuid()
         return True
 
-    def _remote_identity(self):
-        identity = {"job_id": self.current_task.task.job_id}
+    def _remote_identity(self) -> dict[str, object]:
+        identity: dict[str, object] = {"job_id": narrowing.strict_str_or_none(self._require_task_model().job_id)}
         if self.lease_token:
             identity.update(
                 {
@@ -299,12 +379,12 @@ class RemoteTaskManager(threading.Thread):
             )
         return identity
 
-    def _heartbeat_remote_lease(self):
+    def _heartbeat_remote_lease(self) -> bool:
         if not self.lease_token:
             return False
-        return RemoteTaskLease.heartbeat(self.current_task.task, self.lease_token)
+        return RemoteTaskLease.heartbeat(self._require_task_model(), self.lease_token)
 
-    def __set_start_task_stats(self):
+    def __set_start_task_stats(self) -> None:
         """Sets the initial stats for the start of a task"""
         # Set the start time to now
         self.start_time = time.time()
@@ -313,30 +393,34 @@ class RemoteTaskManager(threading.Thread):
         self.finish_time = None
 
         # Format our starting statistics data
-        self.current_task.task.processed_by_worker = self.name
-        self.current_task.task.start_time = self.start_time
-        self.current_task.task.finish_time = self.finish_time
+        task_model = self._require_task_model()
+        task_model.processed_by_worker = self.name
+        # Peewee's DateTimeField accepts Unix timestamps at runtime, while its
+        # descriptor type only exposes the value returned after hydration.
+        _set_task_timestamp(task_model, "start_time", self.start_time)
+        _set_task_timestamp(task_model, "finish_time", self.finish_time)
 
-    def __set_finish_task_stats(self):
+    def __set_finish_task_stats(self) -> None:
         """Sets the final stats for the end of a task"""
         # Set the finish time to now
         self.finish_time = time.time()
 
         # Set the finish time in the statistics data
-        self.current_task.task.finish_time = self.finish_time
+        _set_task_timestamp(self._require_task_model(), "finish_time", self.finish_time)
 
-    def __write_failure_to_worker_log(self):
+    def __write_failure_to_worker_log(self) -> None:
         """Persist the standard remote-task failure explanation."""
-        self.worker_log.append("\n\nREMOTE TASK FAILED!")
-        self.worker_log.append("\nAn error occurred during one of these stages:")
-        self.worker_log.append("\n    - while sending task to remote installation")
-        self.worker_log.append("\n    - during the remote task processing")
-        self.worker_log.append("\n    - while attempting to retrieve the completed task from the remote installation")
-        self.worker_log.append("\nCheck Compresso logs for more information.")
-        self.worker_log.append(f"\nRelevant logs will be prefixed with 'ERROR:Compresso.{self.name}'")
-        self.current_task.save_command_log(self.worker_log)
+        worker_log = self._require_worker_log()
+        worker_log.append("\n\nREMOTE TASK FAILED!")
+        worker_log.append("\nAn error occurred during one of these stages:")
+        worker_log.append("\n    - while sending task to remote installation")
+        worker_log.append("\n    - during the remote task processing")
+        worker_log.append("\n    - while attempting to retrieve the completed task from the remote installation")
+        worker_log.append("\nCheck Compresso logs for more information.")
+        worker_log.append(f"\nRelevant logs will be prefixed with 'ERROR:Compresso.{self.name}'")
+        self._require_current_task().save_command_log(worker_log)
 
-    def __send_task_to_remote_worker_and_monitor(self):
+    def __send_task_to_remote_worker_and_monitor(self) -> bool:
         """Run the remote task lifecycle through explicit typed phases."""
         context = self._prepare_remote_task_context()
         if context is None:
@@ -362,19 +446,20 @@ class RemoteTaskManager(threading.Thread):
 
         return self._cleanup_phase(context).succeeded
 
-    def _finish_failed_phase(self, context, cleanup_remote):
-        if cleanup_remote:
+    def _finish_failed_phase(self, context: RemoteTaskContext, cleanup_remote: bool) -> bool:
+        if cleanup_remote and context.remote_task_id is not None:
             self._cleanup_phase(context)
         return False
 
-    def _prepare_remote_task_context(self):
-        original_abspath = self.current_task.get_source_abspath()
+    def _prepare_remote_task_context(self) -> RemoteTaskContext | None:
+        current_task = self._require_current_task()
+        original_abspath = current_task.get_source_abspath()
         if not os.path.exists(original_abspath):
             self._log(f"File no longer exists '{original_abspath}'. Was it removed?", level="warning")
             self.__write_failure_to_worker_log()
             return None
 
-        library_id = self.current_task.get_task_library_id()
+        library_id = current_task.get_task_library_id()
         try:
             library = Library(library_id)
         except Exception:
@@ -383,7 +468,7 @@ class RemoteTaskManager(threading.Thread):
             return None
         return RemoteTaskContext(
             original_abspath=original_abspath,
-            address=self.installation_info.get("address"),
+            address=narrowing.strict_str_or_none(self.installation_info.get("address")),
             library_name=library.get_name(),
             library_path=library.get_path(),
         )
@@ -418,11 +503,9 @@ class RemoteTaskManager(threading.Thread):
             self.__write_failure_to_worker_log()
             return UploadPhaseResult(False)
 
-        current_task = self.current_task
-        if current_task is None:
-            raise RuntimeError("remote task disappeared during upload")
-        current_task.task.remote_task_id = int(result.remote_task_id)
-        current_task.task.save()
+        task_model = self._require_task_model()
+        task_model.remote_task_id = int(result.remote_task_id)
+        task_model.save()
         if not self._set_remote_task_library(context, result):
             return UploadPhaseResult(
                 False,
@@ -442,18 +525,24 @@ class RemoteTaskManager(threading.Thread):
     def _create_remote_task_from_library_path(
         self,
         context: RemoteTaskContext,
-        library_config: dict,
+        library_config: Mapping[str, object],
     ) -> UploadPhaseResult | None:
         remote_library_path = library_config.get("path")
         if not isinstance(remote_library_path, str) or not remote_library_path:
             return None
         original_relpath = os.path.relpath(context.original_abspath, context.library_path)
         remote_original_abspath = os.path.join(remote_library_path, original_relpath)
+        library_id = library_config.get("id")
+        if not isinstance(library_id, int) or isinstance(library_id, bool):
+            return None
+        identity = self._remote_identity()
         info = self.links.new_pending_task_create_on_remote_installation(
             self.installation_info,
             remote_original_abspath,
-            library_config.get("id"),
-            **self._remote_identity(),
+            library_id,
+            job_id=narrowing.strict_str_or_none(identity.get("job_id")),
+            lease_token=narrowing.strict_str_or_none(identity.get("lease_token")),
+            origin_installation_uuid=narrowing.strict_str_or_none(identity.get("origin_installation_uuid")),
         )
         if not info:
             self._log(
@@ -461,7 +550,7 @@ class RemoteTaskManager(threading.Thread):
                 level="debug",
             )
             return None
-        error = info.get("error", "").lower()
+        error = (narrowing.strict_str(info.get("error"))).lower()
         if "path does not exist" in error:
             self._log(
                 f"Unable to find file in remote library's path '{remote_original_abspath}'. Fallback to sending file.",
@@ -477,25 +566,30 @@ class RemoteTaskManager(threading.Thread):
             return UploadPhaseResult(False)
         return UploadPhaseResult(
             True,
-            remote_task_id=info.get("id"),
-            remote_task_status=info.get("status"),
+            remote_task_id=_remote_task_id(info.get("id")),
+            remote_task_status=narrowing.strict_str_or_none(info.get("status")),
         )
+
+    def _network_and_lease_progress(self, lock_key: str | Literal[False] | None, *, require_lock: bool) -> bool:
+        lock_active = self.links.refresh_network_transfer_lock(lock_key) if lock_key else not require_lock
+        lease_active = self._heartbeat_remote_lease() if self.lease_token else True
+        return bool(lock_active and lease_active)
 
     def _upload_remote_task_source(self, context: RemoteTaskContext) -> UploadPhaseResult:
         initial_checksum = file_sha256(context.original_abspath)
         initial_file_size = os.path.getsize(context.original_abspath)
         upload_deadline = time.monotonic() + 1800
-        info = {}
+        info: dict[str, object] = {}
         while not self.redundant_flag.is_set():
             if time.monotonic() > upload_deadline:
                 self._log(f"Upload retry deadline exceeded for '{context.original_abspath}'", level="error")
                 self.__write_failure_to_worker_log()
                 return UploadPhaseResult(False)
 
-            lock_key = None
+            lock_key: str | Literal[False] | None = None
             if initial_file_size > 100000000:
                 lock_key = self.links.acquire_network_transfer_lock(
-                    context.address,
+                    context.address or "",
                     transfer_limit=1,
                     lock_type="send",
                 )
@@ -508,19 +602,20 @@ class RemoteTaskManager(threading.Thread):
                 level="debug",
             )
             upload_identity = self._remote_identity()
-
-            def upload_progress(active_lock=lock_key):
-                lock_active = not active_lock or self.links.refresh_network_transfer_lock(active_lock)
-                lease_active = self._heartbeat_remote_lease() if self.lease_token else True
-                return bool(lock_active and lease_active)
-
+            progress_callback: Callable[[], bool] | None = None
             if self.lease_token or lock_key:
-                upload_identity["progress_callback"] = upload_progress
+                progress_callback = partial(self._network_and_lease_progress, lock_key, require_lock=False)
+            job_id = narrowing.strict_str_or_none(upload_identity.get("job_id"))
+            lease_token = narrowing.strict_str_or_none(upload_identity.get("lease_token"))
+            origin_installation_uuid = narrowing.strict_str_or_none(upload_identity.get("origin_installation_uuid"))
             try:
                 info = self.links.send_file_to_remote_installation(
                     self.installation_info,
                     context.original_abspath,
-                    **upload_identity,
+                    job_id=job_id,
+                    lease_token=lease_token,
+                    origin_installation_uuid=origin_installation_uuid,
+                    progress_callback=progress_callback,
                 )
             finally:
                 self.links.release_network_transfer_lock(lock_key)
@@ -542,8 +637,8 @@ class RemoteTaskManager(threading.Thread):
                 return UploadPhaseResult(False)
             self.event.wait(2)
 
-        remote_task_id = info.get("id")
-        remote_task_status = info.get("status")
+        remote_task_id = _remote_task_id(info.get("id"))
+        remote_task_status = narrowing.strict_str_or_none(info.get("status"))
         if info.get("checksum") != initial_checksum:
             self._record_transfer_corruption("upload", "A remote upload checksum did not match its source")
             self._log(
@@ -559,16 +654,16 @@ class RemoteTaskManager(threading.Thread):
             )
         return UploadPhaseResult(True, remote_task_id, remote_task_status)
 
-    def _record_transfer_corruption(self, phase, message):
+    def _record_transfer_corruption(self, phase: str, message: str) -> None:
         if self.safety_event_recorder is not None:
             self.safety_event_recorder(
                 "manifest-corruption",
                 message,
-                task_id=self.current_task.get_task_id(),
+                task_id=self._require_current_task().get_task_id(),
                 phase=phase,
             )
 
-    def _set_remote_task_library(self, context, upload):
+    def _set_remote_task_library(self, context: RemoteTaskContext, upload: UploadPhaseResult) -> bool:
         deadline = time.monotonic() + 1800
         while not self.redundant_flag.is_set():
             if upload.remote_task_status in {"in_progress", "processed", "complete"}:
@@ -582,7 +677,7 @@ class RemoteTaskManager(threading.Thread):
                 return False
             result = self.links.set_the_remote_task_library(
                 self.installation_info,
-                upload.remote_task_id,
+                _remote_task_id_as_int(upload.remote_task_id),
                 context.library_name,
             )
             if result is None:
@@ -597,7 +692,7 @@ class RemoteTaskManager(threading.Thread):
             break
         return True
 
-    def _start_remote_task(self, context, upload):
+    def _start_remote_task(self, context: RemoteTaskContext, upload: UploadPhaseResult) -> bool:
         deadline = time.monotonic() + 1800
         while not self.redundant_flag.is_set():
             if upload.remote_task_status in {"in_progress", "processed", "complete"}:
@@ -611,7 +706,7 @@ class RemoteTaskManager(threading.Thread):
                 return False
             result = self.links.start_the_remote_task_by_id(
                 self.installation_info,
-                upload.remote_task_id,
+                _remote_task_id_as_int(upload.remote_task_id),
             )
             if not result:
                 self.event.wait(2)
@@ -653,7 +748,7 @@ class RemoteTaskManager(threading.Thread):
 
             all_task_states = self.links.get_remote_pending_task_state(
                 self.installation_info,
-                context.remote_task_id,
+                _remote_task_id_as_int(context.remote_task_id),
             )
             task_status = ""
             polling_delay = 5
@@ -667,13 +762,14 @@ class RemoteTaskManager(threading.Thread):
                     return MonitoringPhaseResult(False, worker_id)
                 consecutive_poll_failures = 0
                 first_failure_time = None
-                task_status = self._parse_remote_task_status(
+                parsed_status = self._parse_remote_task_status(
                     all_task_states,
                     context.remote_task_id,
                     context.original_abspath,
                 )
-                if task_status is None:
+                if parsed_status is None:
                     return MonitoringPhaseResult(False, worker_id)
+                task_status = parsed_status
 
             if task_status == "complete":
                 break
@@ -720,7 +816,9 @@ class RemoteTaskManager(threading.Thread):
         self._log(f"Remote task completed '{context.original_abspath}'", level="info")
         return MonitoringPhaseResult(True, worker_id)
 
-    def _parse_remote_task_status(self, all_task_states, remote_task_id, original_abspath):
+    def _parse_remote_task_status(
+        self, all_task_states: Mapping[str, object], remote_task_id: int | str | None, original_abspath: str
+    ) -> str | None:
         remote_results = all_task_states.get("results") if isinstance(all_task_states, dict) else None
         if not isinstance(remote_results, list) or not all(isinstance(item, dict) for item in remote_results):
             self._log(
@@ -731,15 +829,21 @@ class RemoteTaskManager(threading.Thread):
             return None
         for task_state in remote_results:
             if str(task_state.get("id")) == str(remote_task_id):
-                return task_state.get("status")
+                return narrowing.strict_str_or_none(task_state.get("status"))
         return "removed"
 
-    def _remote_poll_failure(self, context, failure_count, time_now, first_failure_time):
+    def _remote_poll_failure(
+        self,
+        context: RemoteTaskContext,
+        failure_count: int,
+        time_now: float,
+        first_failure_time: float | None,
+    ) -> tuple[int, float]:
         if failure_count == 3 and self.lease_token and self.safety_event_recorder is not None:
             self.safety_event_recorder(
                 "remote-poll-loss",
                 "Three consecutive remote status polls failed while this node held the task lease",
-                task_id=self.current_task.get_task_id(),
+                task_id=self._require_current_task().get_task_id(),
                 installation_uuid=self.installation_info.get("installation_uuid") or self.installation_info.get("uuid"),
             )
         if first_failure_time is None:
@@ -752,23 +856,29 @@ class RemoteTaskManager(threading.Thread):
         )
         return polling_delay, first_failure_time
 
-    def _update_remote_worker_progress(self, remote_task_id, worker_id):
+    def _update_remote_worker_progress(
+        self, remote_task_id: int | str | None, worker_id: str | None
+    ) -> tuple[str | None, bool]:
         if not worker_id:
             workers_status = self.links.get_all_worker_status(self.installation_info)
             if not workers_status:
                 return worker_id, False
             for worker in workers_status:
                 if str(worker.get("current_task")) == str(remote_task_id):
-                    worker_id = worker.get("id")
+                    worker_id = narrowing.strict_str_or_none(worker.get("id"))
 
+        if worker_id is None:
+            return None, False
         worker_status = self.links.get_single_worker_status(self.installation_info, worker_id)
         if not worker_status:
             return worker_id, False
-        self.paused = worker_status.get("paused")
-        self.worker_log = worker_status.get("worker_log_tail")
-        self.worker_runners_info = worker_status.get("runners_info")
-        self.worker_subprocess_percent = worker_status.get("subprocess", {}).get("percent")
-        self.worker_subprocess_elapsed = worker_status.get("subprocess", {}).get("elapsed")
+        self.paused = bool(worker_status.get("paused"))
+        worker_log = worker_status.get("worker_log_tail")
+        self.worker_log = [str(item) for item in worker_log] if isinstance(worker_log, list) else []
+        self.worker_runners_info = narrowing.string_keyed_dict(worker_status.get("runners_info"))
+        subprocess_info = narrowing.string_keyed_dict(worker_status.get("subprocess"))
+        self.worker_subprocess_percent = str(subprocess_info.get("percent", "0"))
+        self.worker_subprocess_elapsed = str(subprocess_info.get("elapsed", "0"))
         return worker_id, True
 
     def _download_phase(self, context: RemoteTaskContext) -> DownloadPhaseResult:
@@ -841,14 +951,15 @@ class RemoteTaskManager(threading.Thread):
             checksum=downloaded_checksum,
         )
 
-    def _fetch_remote_result_data(self, context):
-        task_cache_path = self.current_task.get_cache_path()
+    def _fetch_remote_result_data(self, context: RemoteTaskContext) -> tuple[dict[str, object] | None, str]:
+        current_task = self._require_current_task()
+        task_cache_path = current_task.get_cache_path()
         cache_directory = os.path.dirname(os.path.abspath(task_cache_path))
         if not os.path.exists(cache_directory):
             os.makedirs(cache_directory)
         data = self.links.fetch_remote_task_data(
             self.installation_info,
-            context.remote_task_id,
+            _remote_task_id_as_int(context.remote_task_id),
             os.path.join(cache_directory, "remote_data.json"),
         )
         if not isinstance(data, dict) or not data:
@@ -860,23 +971,24 @@ class RemoteTaskManager(threading.Thread):
             self.__write_failure_to_worker_log()
             return None, cache_directory
 
-        self.worker_log = [data.get("log")]
-        self.current_task.save_command_log(self.worker_log)
+        self.worker_log = [str(data.get("log") or "")]
+        current_task.save_command_log(self.worker_log)
         task_state = data.get("task_state")
-        self.logger.warn("Importing task_state into TaskDataStore: %s", task_state)
+        self.logger.warning("Importing task_state into TaskDataStore: %s", task_state)
         if task_state:
-            if not isinstance(task_state, dict):
+            if not isinstance(task_state, dict) or not _json_value(task_state):
                 self._log(
                     f"Remote task state was malformed for '{context.original_abspath}'",
                     level="error",
                 )
                 self.__write_failure_to_worker_log()
                 return None, cache_directory
-            TaskDataStore.import_task_state(self.current_task.get_task_id(), task_state)
+            typed_task_state = cast("dict[str, JsonValue]", task_state)
+            TaskDataStore.import_task_state(current_task.get_task_id(), typed_task_state)
         return data, cache_directory
 
-    def _copy_shared_remote_result(self, context, task_cache_path, cache_directory):
-        self.current_task.cache_path = task_cache_path
+    def _copy_shared_remote_result(self, context: RemoteTaskContext, task_cache_path: str, cache_directory: str) -> str | None:
+        self._require_task_model().cache_path = task_cache_path
         self._log(f"abspath exists - task cache path: '{task_cache_path}'", level="debug")
         tcp_base = os.path.basename(task_cache_path)
         local_match = re.search(r"-\w{5}-\d{10}", cache_directory)
@@ -920,17 +1032,20 @@ class RemoteTaskManager(threading.Thread):
             f"File successfully copied from remote library located cache to main instance cache at '{output}'",
             level="info",
         )
-        self.current_task.cache_path = output
+        self._require_task_model().cache_path = output
         return output
 
-    def _set_download_cache_path(self, remote_result_path, cache_directory):
+    def _set_download_cache_path(self, remote_result_path: str, cache_directory: str) -> str:
         file_extension = os.path.splitext(remote_result_path)[1].lstrip(".")
-        self.current_task.set_cache_path(cache_directory, file_extension)
-        task_cache_path = self.current_task.get_cache_path()
+        current_task = self._require_current_task()
+        current_task.set_cache_path(cache_directory, file_extension)
+        task_cache_path = current_task.get_cache_path()
         self._log(f"task cache path: '{task_cache_path}'", level="debug")
         return task_cache_path
 
-    def _download_remote_result(self, context, task_label, task_cache_path):
+    def _download_remote_result(
+        self, context: RemoteTaskContext, task_label: object, task_cache_path: str
+    ) -> tuple[bool, bool]:
         download_deadline = time.monotonic() + 1800
         while not self.redundant_flag.is_set():
             if time.monotonic() > download_deadline:
@@ -938,7 +1053,7 @@ class RemoteTaskManager(threading.Thread):
                 self.__write_failure_to_worker_log()
                 return False, False
             lock_key = self.links.acquire_network_transfer_lock(
-                context.address,
+                context.address or "",
                 transfer_limit=2,
                 lock_type="receive",
             )
@@ -973,25 +1088,24 @@ class RemoteTaskManager(threading.Thread):
             self.event.wait(2)
         return False, False
 
-    def _fetch_remote_result_file(self, context, task_cache_path, lock_key):
+    def _fetch_remote_result_file(self, context: RemoteTaskContext, task_cache_path: str, lock_key: str) -> bool:
         try:
             if not self.lease_token:
                 return self.links.fetch_remote_task_completed_file(
                     self.installation_info,
-                    context.remote_task_id,
+                    _remote_task_id_as_int(context.remote_task_id),
                     task_cache_path,
                 )
 
-            def download_progress(active_lock=lock_key):
-                lock_active = self.links.refresh_network_transfer_lock(active_lock)
-                lease_active = self._heartbeat_remote_lease()
-                return bool(lock_active and lease_active)
-
             return self.links.fetch_remote_task_completed_file_resumable(
                 self.installation_info,
-                context.remote_task_id,
+                _remote_task_id_as_int(context.remote_task_id),
                 task_cache_path,
-                progress_callback=download_progress,
+                progress_callback=partial(
+                    self._network_and_lease_progress,
+                    lock_key,
+                    require_lock=True,
+                ),
             )
         finally:
             self.links.release_network_transfer_lock(lock_key)
@@ -1001,13 +1115,17 @@ class RemoteTaskManager(threading.Thread):
         context: RemoteTaskContext,
         download: DownloadPhaseResult,
     ) -> FinalizationPhaseResult:
-        current_task = self.current_task
-        if current_task is None:
-            raise RuntimeError("remote task disappeared during finalization")
+        current_task = self._require_current_task()
+        task_model = self._require_task_model()
+        checksum = download.checksum
+        if checksum is None:
+            self._log("Remote task completion did not include a checksum", level="error")
+            self.__write_failure_to_worker_log()
+            return FinalizationPhaseResult(False)
         if self.lease_token and not RemoteTaskLease.complete(
-            current_task.task,
+            task_model,
             self.lease_token,
-            download.checksum,
+            checksum,
         ):
             if self.safety_event_recorder is not None:
                 self.safety_event_recorder(
@@ -1023,10 +1141,16 @@ class RemoteTaskManager(threading.Thread):
             return FinalizationPhaseResult(False)
         return FinalizationPhaseResult(True)
 
-    def _cleanup_phase(self, context) -> CleanupPhaseResult:
+    def _cleanup_phase(self, context: RemoteTaskContext) -> CleanupPhaseResult:
+        try:
+            remote_task_id = _remote_task_id_as_int(context.remote_task_id)
+        except RuntimeError as error:
+            # A bad remote id must not abort cleanup; the remote delete is best-effort
+            self._log(f"Skipping remote task removal: {error}", level="warning")
+            return CleanupPhaseResult(succeeded=False, remote_removed=False)
         response = self.links.remove_task_from_remote_installation(
             self.installation_info,
-            context.remote_task_id,
+            remote_task_id,
         )
         remote_removed = bool(response.get("success")) if isinstance(response, dict) else bool(response)
         return CleanupPhaseResult(succeeded=remote_removed, remote_removed=remote_removed)

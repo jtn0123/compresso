@@ -29,7 +29,7 @@ Copyright:
 
 """
 
-from . import Containers
+from ..base_containers import Containers
 
 
 class Matroska(Containers):

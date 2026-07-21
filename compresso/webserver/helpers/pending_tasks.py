@@ -30,16 +30,30 @@ Copyright:
 """
 
 import os
+from collections.abc import Mapping, Sequence
 
 from compresso.libs import filetest, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.peewee_types import execute_count
+from compresso.libs.task import TaskOrder
 from compresso.libs.unmodels.tasks import Tasks
+from compresso.webserver.helpers.pagination import parse_page_params
 
 logger = CompressoLogging.get_logger(name=__name__)
 
 
-def prepare_filtered_pending_tasks_for_table(request_dict):
+def _task_order(params: Mapping[str, object]) -> TaskOrder:
+    value = params.get("order")
+    if isinstance(value, Mapping):
+        column = value.get("column")
+        direction = value.get("dir")
+        if isinstance(column, str) and isinstance(direction, str):
+            return {"column": column, "dir": direction}
+    return {"column": "priority", "dir": "desc"}
+
+
+def prepare_filtered_pending_tasks_for_table(request_dict: Mapping[str, object]) -> dict[str, object]:
     """
     Returns a object of records filtered and sorted
     according to the provided request.
@@ -49,15 +63,10 @@ def prepare_filtered_pending_tasks_for_table(request_dict):
     """
 
     # Generate filters for query
-    draw = request_dict.get("draw")
-    start = request_dict.get("start")
-    length = request_dict.get("length")
-
-    search = request_dict.get("search")
-    search_value = search.get("value")
+    page = parse_page_params(request_dict, data_tables=True)
 
     # Force sort order always by ID desc
-    order = {
+    order: TaskOrder = {
         "column": "priority",
         "dir": "desc",
     }
@@ -67,22 +76,24 @@ def prepare_filtered_pending_tasks_for_table(request_dict):
     # Get total count
     records_total_count = task_handler.get_total_task_list_count()
     # Get quantity after filters (without pagination)
-    records_filtered_count = task_handler.get_task_list_filtered_and_sorted(
-        order=order, start=0, length=0, search_value=search_value, status="pending"
-    ).count()
+    filtered_rows = task_handler.get_task_list_filtered_and_sorted(
+        order=order, start=0, length=0, search_value=page.search_value, status="pending"
+    )
+    records_filtered_count = filtered_rows.count()
     # Get filtered/sorted results
     pending_task_results = task_handler.get_task_list_filtered_and_sorted(
-        order=order, start=start, length=length, search_value=search_value, status="pending"
+        order=order, start=page.start, length=page.length, search_value=page.search_value, status="pending"
     )
 
     # Build return data
-    return_data = {
-        "draw": draw,
+    data: list[dict[str, object]] = []
+    return_data: dict[str, object] = {
+        "draw": page.draw,
         "recordsTotal": records_total_count,
         "recordsFiltered": records_filtered_count,
         "successCount": 0,
         "failedCount": 0,
-        "data": [],
+        "data": data,
     }
 
     # Iterate over tasks and append them to the task data
@@ -94,13 +105,13 @@ def prepare_filtered_pending_tasks_for_table(request_dict):
             "abspath": pending_task["abspath"],
             "status": pending_task["status"],
         }
-        return_data["data"].append(item)
+        data.append(item)
 
     # Return results
     return return_data
 
 
-def prepare_filtered_pending_tasks(params, include_library=False):
+def prepare_filtered_pending_tasks(params: Mapping[str, object], include_library: bool = False) -> dict[str, object]:
     """
     Returns a object of records filtered and sorted
     according to the provided request.
@@ -109,39 +120,41 @@ def prepare_filtered_pending_tasks(params, include_library=False):
     :param include_library:
     :return:
     """
-    start = params.get("start", 0)
-    length = params.get("length", 0)
+    page = parse_page_params(params)
 
-    search_value = params.get("search_value", "")
-    library_ids = params.get("library_ids") or []
-
-    order = params.get(
-        "order",
-        {
-            "column": "priority",
-            "dir": "desc",
-        },
-    )
+    order = _task_order(params)
 
     # Fetch tasks
     task_handler = task.Task()
     # Get total count
     records_total_count = task_handler.get_total_task_list_count()
     # Get quantity after filters (without pagination)
-    records_filtered_count = task_handler.get_task_list_filtered_and_sorted(
-        order=order, start=0, length=0, search_value=search_value, status="pending", library_ids=library_ids
-    ).count()
+    filtered_rows = task_handler.get_task_list_filtered_and_sorted(
+        order=order,
+        start=0,
+        length=0,
+        search_value=page.search_value,
+        status="pending",
+        library_ids=page.library_ids,
+    )
+    records_filtered_count = filtered_rows.count()
     # Get filtered/sorted results
     pending_task_results = task_handler.get_task_list_filtered_and_sorted(
-        order=order, start=start, length=length, search_value=search_value, status="pending", library_ids=library_ids
+        order=order,
+        start=page.start,
+        length=page.length,
+        search_value=page.search_value,
+        status="pending",
+        library_ids=page.library_ids,
     )
 
     # Build return data
-    return_data = {
+    results: list[dict[str, object]] = []
+    return_data: dict[str, object] = {
         "recordsTotal": records_total_count,
         "recordsFiltered": records_filtered_count,
         "runnableRecords": task_handler.get_runnable_task_count(),
-        "results": [],
+        "results": results,
     }
 
     # Iterate over tasks and append them to the task data
@@ -161,16 +174,19 @@ def prepare_filtered_pending_tasks(params, include_library=False):
             item["deferred_until"] = str(pending_task["deferred_until"])
         if include_library:
             # Get library
-            library = Library(pending_task["library_id"])
+            library_id_value = pending_task["library_id"]
+            if not isinstance(library_id_value, int):
+                continue
+            library = Library(library_id_value)
             item["library_id"] = library.get_id()
             item["library_name"] = library.get_name()
-        return_data["results"].append(item)
+        results.append(item)
 
     # Return results
     return return_data
 
 
-def get_filtered_pending_task_ids(params, exclude_ids=None):
+def get_filtered_pending_task_ids(params: Mapping[str, object], exclude_ids: Sequence[int] | None = None) -> list[int]:
     """
     Returns a list of pending task IDs filtered according to the provided request.
 
@@ -178,20 +194,24 @@ def get_filtered_pending_task_ids(params, exclude_ids=None):
     :param exclude_ids:
     :return:
     """
-    search_value = params.get("search_value", "")
-    library_ids = params.get("library_ids") or []
+    page = parse_page_params(params)
 
     exclude_set = set(exclude_ids or [])
 
     task_handler = task.Task()
     query = task_handler.get_task_list_filtered_and_sorted(
-        order=None, start=0, length=0, search_value=search_value, status="pending", library_ids=library_ids
+        order=None,
+        start=0,
+        length=0,
+        search_value=page.search_value,
+        status="pending",
+        library_ids=page.library_ids,
     )
 
-    id_list = []
+    id_list: list[int] = []
     for record in query:
         task_id = record.get("id")
-        if task_id is None:
+        if not isinstance(task_id, int):
             continue
         if task_id in exclude_set:
             continue
@@ -200,7 +220,7 @@ def get_filtered_pending_task_ids(params, exclude_ids=None):
     return id_list
 
 
-def remove_pending_tasks(pending_task_ids):
+def remove_pending_tasks(pending_task_ids: Sequence[int]) -> bool:
     """
     Removes a list of pending tasks
 
@@ -212,7 +232,7 @@ def remove_pending_tasks(pending_task_ids):
     return task_handler.delete_tasks_recursively(id_list=pending_task_ids)
 
 
-def reorder_pending_tasks(pending_task_ids, direction="top"):
+def reorder_pending_tasks(pending_task_ids: Sequence[int], direction: str = "top") -> int:
     """
     Moves a list of pending tasks to either the top of the
     list of bottom depending on the provided direction.
@@ -226,7 +246,7 @@ def reorder_pending_tasks(pending_task_ids, direction="top"):
     return task_handler.reorder_tasks(pending_task_ids, direction)
 
 
-def add_remote_tasks(pathname, job_id=None):
+def add_remote_tasks(pathname: str, job_id: str | None = None) -> dict[str, object] | bool:
     """
     Adds an upload file path to the pending task list as a 'remote' task
     Returns the task ID
@@ -245,17 +265,14 @@ def add_remote_tasks(pathname, job_id=None):
             new_task.task = existing_task
             return new_task.get_task_data()
 
-    create_kwargs = {"task_type": "remote"}
-    if job_id:
-        create_kwargs["job_id"] = job_id
-    if not new_task.create_task_by_absolute_path(abspath, **create_kwargs):
+    if not new_task.create_task_by_absolute_path(abspath, task_type="remote", job_id=job_id):
         # File was not created.
         # Do not carry on.
         return False
     return new_task.get_task_data()
 
 
-def update_pending_tasks_status(pending_task_ids, status="pending"):
+def update_pending_tasks_status(pending_task_ids: Sequence[int], status: str = "pending") -> int:
     """
     Updates the status of a number pending tasks given their table IDs
 
@@ -267,7 +284,7 @@ def update_pending_tasks_status(pending_task_ids, status="pending"):
     return task.Task.set_tasks_status(pending_task_ids, status)
 
 
-def update_pending_tasks_library(pending_task_ids, library_name):
+def update_pending_tasks_library(pending_task_ids: Sequence[int], library_name: str) -> int | bool:
     """
     Updates the status of a number pending tasks given their table IDs
 
@@ -280,7 +297,8 @@ def update_pending_tasks_library(pending_task_ids, library_name):
     libraries = Library.get_all_libraries()
     for library in libraries:
         if library.get("name") == library_name:
-            library_id = library.get("id")
+            candidate_id = library.get("id")
+            library_id = candidate_id if isinstance(candidate_id, int) else None
             break
     # Ensure a library was found matching the name
     if library_id is None:
@@ -289,7 +307,7 @@ def update_pending_tasks_library(pending_task_ids, library_name):
     return task.Task.set_tasks_library_id(pending_task_ids, library_id)
 
 
-def fetch_tasks_status(pending_task_ids):
+def fetch_tasks_status(pending_task_ids: Sequence[int]) -> list[dict[str, object]]:
     """
     Fetch the status of a number of pending remote tasks given their table IDs
 
@@ -301,7 +319,7 @@ def fetch_tasks_status(pending_task_ids):
     remote_pending_tasks = task_handler.get_task_list_filtered_and_sorted(id_list=pending_task_ids)
 
     # Iterate over tasks and append them to the task data
-    return_data = []
+    return_data: list[dict[str, object]] = []
     for pending_task in remote_pending_tasks:
         # Set params as required in template
         item = {
@@ -315,13 +333,20 @@ def fetch_tasks_status(pending_task_ids):
     return return_data
 
 
-def check_if_task_exists_matching_path(abspath):
+def check_if_task_exists_matching_path(abspath: str) -> bool:
     from compresso.libs.taskhandler import TaskHandler
 
     return bool(TaskHandler.check_if_task_exists_matching_path(abspath))
 
 
-def create_task(abspath, library_id=1, library_name=None, task_type="local", priority_score=0, job_id=None):
+def create_task(
+    abspath: str,
+    library_id: int = 1,
+    library_name: str | None = None,
+    task_type: str = "local",
+    priority_score: int = 0,
+    job_id: str | None = None,
+) -> dict[str, object] | bool:
     """
     Create a pending task given the path to a file and a library ID or name
 
@@ -333,25 +358,26 @@ def create_task(abspath, library_id=1, library_name=None, task_type="local", pri
     :return:
     """
     if library_name is not None:
-        for library in Library.get_all_libraries():
-            if library_name == library.get("name"):
-                library_id = library.get("id")
+        for library_config in Library.get_all_libraries():
+            if library_name == library_config.get("name"):
+                candidate_id = library_config.get("id")
+                if isinstance(candidate_id, int):
+                    library_id = candidate_id
 
     # Ensure the library provided exists (prevents errors as the task library_id column is not a foreign key
-    library = Library(library_id)
+    selected_library = Library(library_id)
 
     # Create a new task
     new_task = task.Task()
 
     # Create the task as a local task as the path provided is local
-    create_kwargs = {
-        "task_type": task_type,
-        "library_id": library.get_id(),
-        "priority_score": priority_score,
-    }
-    if job_id:
-        create_kwargs["job_id"] = job_id
-    if not new_task.create_task_by_absolute_path(abspath, **create_kwargs):
+    if not new_task.create_task_by_absolute_path(
+        abspath,
+        task_type=task_type,
+        library_id=selected_library.get_id(),
+        priority_score=priority_score,
+        job_id=job_id,
+    ):
         # File was not created.
         # Do not carry on.
         return False
@@ -369,7 +395,7 @@ def create_task(abspath, library_id=1, library_name=None, task_type="local", pri
     }
 
 
-def get_task_by_job_id(job_id):
+def get_task_by_job_id(job_id: str | None) -> dict[str, object] | None:
     if not job_id:
         return None
     task_model = Tasks.get_or_none(Tasks.job_id == job_id)
@@ -380,8 +406,12 @@ def get_task_by_job_id(job_id):
     return task_object.get_task_data()
 
 
-def bind_remote_task_identity(task_id, lease_token=None, origin_installation_uuid=None):
-    values = {}
+def bind_remote_task_identity(
+    task_id: int,
+    lease_token: str | None = None,
+    origin_installation_uuid: str | None = None,
+) -> bool:
+    values: dict[str, str] = {}
     if lease_token:
         values["lease_token"] = lease_token
     if origin_installation_uuid:
@@ -393,10 +423,10 @@ def bind_remote_task_identity(task_id, lease_token=None, origin_installation_uui
         condition &= Tasks.lease_token.is_null() | (Tasks.lease_token == lease_token)
     if origin_installation_uuid:
         condition &= Tasks.remote_installation_uuid.is_null() | (Tasks.remote_installation_uuid == origin_installation_uuid)
-    return bool(Tasks.update(**values).where(condition).execute())
+    return bool(execute_count(Tasks.update(**values).where(condition)))
 
 
-def test_path_for_pending_task(abspath, library_id):
+def test_path_for_pending_task(abspath: str, library_id: int) -> dict[str, object]:
     """
     Test a file path against library file test plugins without queueing a task.
 

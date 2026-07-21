@@ -276,44 +276,81 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
+import type { QTableColumn } from 'quasar'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import dateTools from 'src/js/dateTools'
 import PageHeader from 'components/ui/PageHeader.vue'
+import type { ApiSchema } from 'src/types/contracts'
+
+interface HistoryTaskWire extends ApiSchema<'CompletedTasksTableResults'> {
+  codec?: string
+  file_size?: number
+  processing_duration?: number
+}
+interface HistoryTaskRow {
+  id: number
+  task_label: string
+  task_success: boolean
+  codec: string
+  size_display: string
+  duration_display: string
+  finish_time_display: string
+  finish_time: number
+  [key: string]: string | number | boolean
+}
+interface HistoryResponse {
+  recordsFiltered: number
+  results: HistoryTaskWire[]
+}
+interface SelectOption<T> {
+  label: string
+  value: T
+}
+interface LibraryWire {
+  id: number
+  name: string
+}
+interface HistoryColumn extends QTableColumn {
+  field: string
+}
+interface TableRequest {
+  pagination: { page: number; rowsPerPage: number; sortBy?: string; descending: boolean }
+}
 
 const { t } = useI18n()
 const $q = useQuasar()
 
 // --- State ---
 const loading = ref(false)
-const tasks = ref([])
-const selected = ref([])
+const tasks = ref<HistoryTaskRow[]>([])
+const selected = ref<HistoryTaskRow[]>([])
 const totalCount = ref(0)
 
 const searchValue = ref('')
 const statusFilter = ref('all')
-const afterDate = ref(null)
-const beforeDate = ref(null)
-const codecFilter = ref(null)
-const libraryFilter = ref(null)
+const afterDate = ref<string | null>(null)
+const beforeDate = ref<string | null>(null)
+const codecFilter = ref<string | null>(null)
+const libraryFilter = ref<number | null>(null)
 const sortBy = ref('finish_time')
 const descending = ref(true)
 
-const codecOptions = ref([])
-const libraryOptions = ref([])
+const codecOptions = ref<SelectOption<string>[]>([])
+const libraryOptions = ref<SelectOption<number>[]>([])
 
 const logDialogOpen = ref(false)
 const logLoading = ref(false)
 const logContent = ref('')
 
 const selectLibraryOpen = ref(false)
-const selectedLibraryId = ref(null)
-const reprocessLibraryOptions = ref([])
-const pendingReprocessIds = ref([])
+const selectedLibraryId = ref<number | null>(null)
+const reprocessLibraryOptions = ref<SelectOption<number>[]>([])
+const pendingReprocessIds = ref<number[]>([])
 
 const COLUMN_STORAGE_KEY = 'compresso-task-history-columns'
 
@@ -326,7 +363,7 @@ const pagination = ref({
 })
 
 // --- Columns ---
-const allColumns = computed(() => [
+const allColumns = computed<HistoryColumn[]>(() => [
   {
     name: 'task_label',
     label: t('pages.taskHistory.colFileName'),
@@ -378,10 +415,13 @@ const allColumns = computed(() => [
   },
 ])
 
-function loadVisibleColumns() {
+function loadVisibleColumns(): string[] {
   try {
     const stored = localStorage.getItem(COLUMN_STORAGE_KEY)
-    if (stored) return JSON.parse(stored)
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored)
+      if (Array.isArray(parsed) && parsed.every((name) => typeof name === 'string')) return parsed
+    }
   } catch {
     /* ignore */
   }
@@ -392,7 +432,7 @@ const visibleColumnNames = ref(loadVisibleColumns())
 
 const visibleColumns = computed(() => allColumns.value.filter((c) => visibleColumnNames.value.includes(c.name)))
 
-function toggleColumn(name) {
+function toggleColumn(name: string): void {
   const idx = visibleColumnNames.value.indexOf(name)
   if (idx >= 0) {
     // Don't allow removing the last column
@@ -474,7 +514,7 @@ const activeFilterChips = computed(() => {
 })
 
 // --- Fetch tasks ---
-function buildPayload(page, rowsPerPage) {
+function buildPayload(page: number, rowsPerPage: number) {
   const start = (page - 1) * rowsPerPage
   return {
     start,
@@ -496,7 +536,7 @@ async function fetchTasks({ reset = false } = {}) {
   loading.value = true
   try {
     const data = buildPayload(pagination.value.page, pagination.value.rowsPerPage)
-    const response = await axios.post(getCompressoApiUrl('v2', 'history/tasks'), data)
+    const response = await axios.post<HistoryResponse>(getCompressoApiUrl('v2', 'history/tasks'), data)
     totalCount.value = response.data.recordsFiltered
     pagination.value.rowsNumber = totalCount.value
 
@@ -523,7 +563,7 @@ async function fetchTasks({ reset = false } = {}) {
   }
 }
 
-function onRequest(props) {
+function onRequest(props: TableRequest): void {
   const { page, rowsPerPage, sortBy: col, descending: desc } = props.pagination
   pagination.value.page = page
   pagination.value.rowsPerPage = rowsPerPage
@@ -538,7 +578,7 @@ function onRequest(props) {
 async function fetchLibraries() {
   try {
     const response = await axios.get(getCompressoApiUrl('v2', 'settings/libraries'))
-    libraryOptions.value = (response.data.libraries || []).map((lib) => ({
+    libraryOptions.value = (response.data.libraries || []).map((lib: LibraryWire) => ({
       label: lib.name,
       value: lib.id,
     }))
@@ -558,8 +598,8 @@ async function fetchCodecs() {
       order_by: 'finish_time',
       order_direction: 'desc',
     })
-    const codecs = new Set()
-    ;(response.data.results || []).forEach((r) => {
+    const codecs = new Set<string>()
+    ;(response.data.results || []).forEach((r: HistoryTaskWire) => {
       if (r.codec) codecs.add(r.codec)
     })
     codecOptions.value = Array.from(codecs)
@@ -571,13 +611,15 @@ async function fetchCodecs() {
 }
 
 // --- Log viewer ---
-async function openLog(taskId) {
+async function openLog(taskId: number): Promise<void> {
   logDialogOpen.value = true
   logLoading.value = true
   logContent.value = ''
   try {
-    const response = await axios.post(getCompressoApiUrl('v2', 'history/task/log'), { task_id: taskId })
-    logContent.value = response.data.log || t('pages.taskHistory.noLogAvailable')
+    const response = await axios.post<ApiSchema<'CompletedTasksLog'>>(getCompressoApiUrl('v2', 'history/task/log'), {
+      task_id: taskId,
+    })
+    logContent.value = response.data.command_log || t('pages.taskHistory.noLogAvailable')
   } catch {
     logContent.value = t('components.completedTasks.errorGettingDetails')
   } finally {
@@ -586,7 +628,7 @@ async function openLog(taskId) {
 }
 
 // --- Reprocess ---
-function reprocessSingle(row) {
+function reprocessSingle(row: HistoryTaskRow): void {
   pendingReprocessIds.value = [row.id]
   openLibrarySelect()
 }
@@ -599,14 +641,14 @@ function selectLibraryForReprocess() {
 async function openLibrarySelect() {
   try {
     const response = await axios.get(getCompressoApiUrl('v2', 'settings/libraries'))
-    const libs = (response.data.libraries || []).map((lib) => ({
+    const libs: SelectOption<number>[] = (response.data.libraries || []).map((lib: LibraryWire) => ({
       label: lib.name,
       value: lib.id,
     }))
     reprocessLibraryOptions.value = libs
 
     if (libs.length === 1) {
-      selectedLibraryId.value = libs[0].value
+      selectedLibraryId.value = libs[0]?.value ?? null
       confirmReprocess()
     } else {
       selectedLibraryId.value = libs[0]?.value || null
@@ -645,7 +687,7 @@ async function confirmReprocess() {
 }
 
 // --- Delete ---
-function deleteSingle(row) {
+function deleteSingle(row: HistoryTaskRow): void {
   $q.dialog({
     title: t('headers.confirm'),
     message: t('pages.taskHistory.confirmDelete'),
@@ -728,7 +770,7 @@ function exportCsv() {
 }
 
 // --- Utilities ---
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   if (!bytes || bytes === 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']

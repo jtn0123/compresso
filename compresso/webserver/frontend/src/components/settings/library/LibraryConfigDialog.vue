@@ -79,7 +79,6 @@
                 v-model="path"
                 label-slot
                 :placeholder="path"
-                :disable="enableReceiveRemoteFilesOnly === true"
                 @click="updateLibraryWithDirectoryBrowser"
               >
                 <template #label>
@@ -91,14 +90,6 @@
                   <q-icon @click="updateLibraryWithDirectoryBrowser" class="cursor-pointer" name="folder_open" />
                 </template>
               </q-input>
-              <q-tooltip
-                v-if="enableReceiveRemoteFilesOnly === true"
-                class="bg-white text-primary"
-                anchor="bottom left"
-                self="bottom left"
-              >
-                {{ $t('components.settings.library.pathDisabledReceiveRemoteFilesOnly') }}
-              </q-tooltip>
             </div>
 
             <div class="q-pb-sm">
@@ -114,53 +105,25 @@
             </div>
             <div v-if="enableReceiveRemoteFilesOnly !== true" class="q-pb-sm">
               <q-skeleton v-if="enableScanner === null" type="QToggle" />
-              <q-item
-                v-else
-                tag="label"
-                class="border-hover"
-                style="padding-left: 12px"
-                :disable="enableReceiveRemoteFilesOnly === true"
-              >
+              <q-item v-else tag="label" class="border-hover" style="padding-left: 12px">
                 <q-item-section>
                   <q-item-label>{{ $t('components.settings.library.enableScanner') }}</q-item-label>
                 </q-item-section>
                 <q-item-section avatar>
-                  <q-toggle v-model="enableScanner" :disable="enableReceiveRemoteFilesOnly === true" />
+                  <q-toggle v-model="enableScanner" />
                 </q-item-section>
               </q-item>
-              <q-tooltip
-                v-if="enableReceiveRemoteFilesOnly === true"
-                class="bg-white text-primary"
-                anchor="bottom left"
-                self="bottom left"
-              >
-                {{ $t('components.settings.library.pathDisabledReceiveRemoteFilesOnly') }}
-              </q-tooltip>
             </div>
             <div v-if="enableReceiveRemoteFilesOnly !== true" class="q-pb-sm">
               <q-skeleton v-if="enableInotify === null" type="QToggle" />
-              <q-item
-                v-else
-                tag="label"
-                class="border-hover"
-                style="padding-left: 12px"
-                :disable="enableReceiveRemoteFilesOnly === true"
-              >
+              <q-item v-else tag="label" class="border-hover" style="padding-left: 12px">
                 <q-item-section>
                   <q-item-label>{{ $t('components.settings.library.enableInotify') }}</q-item-label>
                 </q-item-section>
                 <q-item-section avatar>
-                  <q-toggle v-model="enableInotify" :disable="enableReceiveRemoteFilesOnly === true" />
+                  <q-toggle v-model="enableInotify" />
                 </q-item-section>
               </q-item>
-              <q-tooltip
-                v-if="enableReceiveRemoteFilesOnly === true"
-                class="bg-white text-primary"
-                anchor="bottom left"
-                self="bottom left"
-              >
-                {{ $t('components.settings.library.pathDisabledReceiveRemoteFilesOnly') }}
-              </q-tooltip>
             </div>
 
             <div class="q-pb-sm">
@@ -367,7 +330,7 @@
   </CompressoDialogMenu>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { useQuasar, Loading } from 'quasar'
@@ -377,55 +340,58 @@ import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
 import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
 import PluginSelectorDialog from 'components/settings/plugins/PluginSelectorDialog.vue'
-import LibraryConfigurePluginFlowList from 'components/settings/library/partials/LibraryConfigurePluginFlowList'
+import LibraryConfigurePluginFlowList from 'components/settings/library/partials/LibraryConfigurePluginFlowList.vue'
 import FlowSummaryBar from 'components/settings/library/partials/FlowSummaryBar.vue'
 import JsonImportExportDialog from 'components/settings/library/JsonImportExportDialog.vue'
-import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog'
+import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
 import { createLogger } from 'src/composables/useLogger'
+import type { DialogController } from 'src/types/ui'
+import type { SelectablePlugin } from 'src/types/plugins'
+import {
+  normalizeLibraryEnabledPlugin,
+  type LibraryConfigExchange,
+  type LibraryConfigExport,
+  type LibraryEnabledPlugin,
+} from 'src/types/libraries'
 
 const log = createLogger('LibraryConfig')
 
-const props = defineProps({
-  libraryId: {
-    type: Number,
-    required: true,
-  },
-})
+const props = defineProps<{ libraryId: number }>()
 
-const emit = defineEmits(['ok', 'hide', 'saved'])
+const emit = defineEmits<{ ok: []; hide: []; saved: [] }>()
 
 const $q = useQuasar()
 const { t } = useI18n()
 const { isMobile } = useMobile()
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 
-const currentID = ref(null)
+const currentID = ref<number | null>(null)
 const locked = ref(false)
-const name = ref(null)
-const path = ref(null)
-const enableReceiveRemoteFilesOnly = ref(null)
-const enableScanner = ref(null)
-const enableInotify = ref(null)
-const priorityScore = ref(null)
-const tags = ref(null)
-const targetCodecs = ref([])
-const skipCodecs = ref([])
+const name = ref<string | null>(null)
+const path = ref<string | null>(null)
+const enableReceiveRemoteFilesOnly = ref<boolean | null>(null)
+const enableScanner = ref<boolean | null>(null)
+const enableInotify = ref<boolean | null>(null)
+const priorityScore = ref<number | null>(null)
+const tags = ref<string[] | null>(null)
+const targetCodecs = ref<string[]>([])
+const skipCodecs = ref<string[]>([])
 const sizeGuardrailEnabled = ref(false)
 const sizeGuardrailMinPct = ref(20)
 const sizeGuardrailMaxPct = ref(80)
 const replacementPolicy = ref('')
-const enabledPlugins = ref(null)
+const enabledPlugins = ref<LibraryEnabledPlugin[] | null>(null)
 const componentKey = ref(1)
 const showLoading = ref(false)
-const originalSnapshot = ref(null)
-const selectDirectoryDialogRef = ref(null)
+const originalSnapshot = ref<string | null>(null)
+const selectDirectoryDialogRef = ref<DialogController | null>(null)
 const selectDirectoryInitialPath = ref('')
 const selectDirectoryListType = ref('directories')
-const pluginSelectorDialogRef = ref(null)
-const pluginSelectorHidePlugins = ref([])
+const pluginSelectorDialogRef = ref<DialogController | null>(null)
+const pluginSelectorHidePlugins = ref<string[]>([])
 const targetCodecOptions = ['h264', 'mpeg4', 'mpeg2video', 'wmv3', 'vc1', 'theora', 'vp8', 'xvid', 'divx']
 const skipCodecOptions = ['hevc', 'av1', 'vp9']
 const replacementPolicyOptions = [
@@ -501,36 +467,48 @@ const updateSnapshot = () => {
   }
 }
 
-const fetchLibraryConfig = (libraryId) => {
+const fetchLibraryConfig = (libraryId: number): void => {
   const data = { id: libraryId }
-  axios({
+  axios<LibraryConfigExchange>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/library/read'),
     data: data,
   }).then((response) => {
     const libraryConfig = response.data.library_config
-    currentID.value = libraryConfig.id
-    locked.value = libraryConfig.locked
-    name.value = libraryConfig.name
-    path.value = libraryConfig.path
-    enableReceiveRemoteFilesOnly.value = libraryConfig.enable_remote_only
-    enableScanner.value = libraryConfig.enable_scanner
-    enableInotify.value = libraryConfig.enable_inotify
-    priorityScore.value = libraryConfig.priority_score
-    tags.value = libraryConfig.tags
+    currentID.value = libraryConfig.id ?? libraryId
+    locked.value = libraryConfig.locked ?? false
+    name.value = libraryConfig.name ?? null
+    path.value = libraryConfig.path ?? null
+    enableReceiveRemoteFilesOnly.value = libraryConfig.enable_remote_only ?? false
+    enableScanner.value = libraryConfig.enable_scanner ?? false
+    enableInotify.value = libraryConfig.enable_inotify ?? false
+    priorityScore.value = libraryConfig.priority_score ?? 0
+    tags.value = libraryConfig.tags ?? []
     targetCodecs.value = libraryConfig.target_codecs || []
     skipCodecs.value = libraryConfig.skip_codecs || []
     sizeGuardrailEnabled.value = libraryConfig.size_guardrail_enabled || false
     sizeGuardrailMinPct.value = libraryConfig.size_guardrail_min_pct ?? 20
     sizeGuardrailMaxPct.value = libraryConfig.size_guardrail_max_pct ?? 80
     replacementPolicy.value = libraryConfig.replacement_policy || ''
-    enabledPlugins.value = response.data.plugins.enabled_plugins
+    enabledPlugins.value = (response.data.plugins?.enabled_plugins ?? []).map(normalizeLibraryEnabledPlugin)
     updateSnapshot()
   })
 }
 
-const saveLibraryConfig = async ({ hideOnSuccess = false } = {}) => {
-  const data = {
+const saveLibraryConfig = async ({ hideOnSuccess = false }: { hideOnSuccess?: boolean } = {}): Promise<boolean> => {
+  if (
+    name.value === null ||
+    path.value === null ||
+    enableReceiveRemoteFilesOnly.value === null ||
+    enableScanner.value === null ||
+    enableInotify.value === null ||
+    priorityScore.value === null ||
+    tags.value === null ||
+    enabledPlugins.value === null
+  ) {
+    return false
+  }
+  const data: LibraryConfigExchange = {
     library_config: {
       id: currentID.value,
       locked: locked.value,
@@ -572,7 +550,7 @@ const saveLibraryConfig = async ({ hideOnSuccess = false } = {}) => {
       hide()
     }
     return true
-  } catch (error) {
+  } catch {
     $q.notify({
       color: 'negative',
       position: 'top',
@@ -587,45 +565,45 @@ const saveLibraryConfig = async ({ hideOnSuccess = false } = {}) => {
 const save = async () => saveLibraryConfig({ hideOnSuccess: true })
 
 const updateLibraryWithDirectoryBrowser = () => {
-  selectDirectoryInitialPath.value = path.value
+  selectDirectoryInitialPath.value = path.value ?? ''
   selectDirectoryListType.value = 'directories'
   if (selectDirectoryDialogRef.value) {
     selectDirectoryDialogRef.value.show()
   }
 }
 
-const onDirectorySelected = (payload) => {
+const onDirectorySelected = (payload: { selectedPath?: string }): void => {
   if (payload && payload.selectedPath) {
     path.value = payload.selectedPath
   }
 }
 
 const selectPluginFromList = () => {
-  pluginSelectorHidePlugins.value = enabledPlugins.value.map((p) => p.plugin_id)
+  pluginSelectorHidePlugins.value = (enabledPlugins.value ?? []).map((p) => p.plugin_id)
   if (pluginSelectorDialogRef.value) {
     pluginSelectorDialogRef.value.show()
   }
 }
 
-const onPluginSelected = (plugin) => {
+const onPluginSelected = (plugin: SelectablePlugin): void => {
   if (!plugin) {
     return
   }
-  const list = [...enabledPlugins.value]
-  list.push(plugin)
+  const list = [...(enabledPlugins.value ?? [])]
+  list.push(normalizeLibraryEnabledPlugin(plugin))
   list.sort((a, b) => a.name.localeCompare(b.name))
   enabledPlugins.value = list
   saveLibraryConfig()
 }
 
-const removePluginFromList = (index) => {
-  const list = [...enabledPlugins.value]
+const removePluginFromList = (index: number): void => {
+  const list = [...(enabledPlugins.value ?? [])]
   list.splice(index, 1)
   enabledPlugins.value = list
   saveLibraryConfig()
 }
 
-const openPluginInfo = (pluginId, tab) => {
+const openPluginInfo = (pluginId: string, tab: 'settings' | 'info'): void => {
   if (!pluginId) {
     $q.notify({
       color: 'negative',
@@ -648,7 +626,7 @@ const openPluginInfo = (pluginId, tab) => {
 
 const exportPluginConfig = () => {
   const data = { id: currentID.value }
-  axios({
+  axios<LibraryConfigExport>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/library/export'),
     data: data,
@@ -674,12 +652,18 @@ const exportPluginConfig = () => {
     })
 }
 
-const importData = (importString, silent) => {
-  let data
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+const importData = (importString: string, silent = false): void => {
+  let data: unknown
   try {
     data = JSON.parse(importString)
   } catch (e) {
     log.error('Failed to parse import string: ' + e)
+    return
+  }
+  if (!isRecord(data) || currentID.value === null) {
+    log.error('Imported library configuration is not an object')
     return
   }
   data.library_id = currentID.value
@@ -717,7 +701,7 @@ const importData = (importString, silent) => {
       showLoading.value = false
       Loading.hide()
       componentKey.value += 1
-      fetchLibraryConfig(currentID.value)
+      if (currentID.value !== null) fetchLibraryConfig(currentID.value)
     })
     .catch(() => {
       $q.notify({
@@ -749,13 +733,13 @@ const importPluginConfig = () => {
 
 const cloneLibrary = () => {
   const data = { id: currentID.value }
-  axios({
+  axios<LibraryConfigExport>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/library/export'),
     data: data,
   })
     .then((response) => {
-      const configData = response.data
+      const configData: LibraryConfigExport = response.data
       const randomString = (Math.random() + 1).toString(36).substring(7)
       const newName = name.value + ' (' + t('navigation.copy') + ' - ' + randomString + ')'
       configData.library_config = {
@@ -785,11 +769,11 @@ const cloneLibrary = () => {
 }
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

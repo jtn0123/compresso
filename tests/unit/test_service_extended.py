@@ -57,10 +57,11 @@ class TestInitDb:
 
         mock_select_db.return_value = MagicMock()
         init_db("/config/path")
-        call_args = mock_select_db.call_args[0][0]
-        assert call_args["TYPE"] == "SQLITE"
-        assert "compresso.db" in call_args["FILE"]
-        assert "migrations_v1" in call_args["MIGRATIONS_DIR"]
+        database_settings = mock_select_db.call_args[0][0]
+        migration_settings = mock_migrations.call_args[0][0]
+        assert database_settings["TYPE"] == "SQLITE"
+        assert "compresso.db" in database_settings["FILE"]
+        assert "migrations_v1" in migration_settings["MIGRATIONS_DIR"]
 
 
 @pytest.mark.unittest
@@ -76,7 +77,7 @@ class TestRootServiceInit:
         assert service.threads == []
         assert service.run_threads is True
         assert service.db_connection is None
-        assert service.developer is None
+        assert service.developer is False
         assert service.dev_api is None
 
 
@@ -294,14 +295,14 @@ class TestStartInotifyWatchManager:
         mock_emm = MagicMock()
         mock_emm.is_alive.return_value = True
         mock_emm_cls.return_value = mock_emm
-        service.start_inotify_watch_manager({}, MagicMock())
+        service.start_inotify_watch_manager({})
         mock_emm.start.assert_called_once()
         assert service.threads[0]["name"] == "EventMonitorManager"
 
     @patch("compresso.service.eventmonitor.event_monitor_module", None)
     def test_without_watchdog(self):
         service = self._make_service()
-        result = service.start_inotify_watch_manager({}, MagicMock())
+        result = service.start_inotify_watch_manager({})
         assert result is None
         assert len(service.threads) == 0
 
@@ -642,7 +643,7 @@ class TestInitialRegisterCompresso:
         mock_session.get_installation_uuid.return_value = "uuid-123"
         mock_session_cls.return_value = mock_session
         service.initial_register_compresso()
-        mock_session.register_compresso.assert_called_once_with("uuid-123")
+        mock_session.register_compresso.assert_called_once_with()
 
 
 @pytest.mark.unittest
@@ -675,3 +676,35 @@ class TestStartResourceLogger:
         service.event.set()
         service.threads[0]["thread"].stop()
         service.threads[0]["thread"].join(2)
+
+
+@pytest.mark.unittest
+class TestResourceLoggerCpuCountFallback:
+    @patch("compresso.service.psutil")
+    def test_resource_logger_handles_missing_cpu_count(self, mock_psutil):
+        """Regression: psutil.cpu_count() may return None; metrics must not die."""
+        with patch("compresso.service.CompressoLogging") as mock_log, patch("compresso.service.startup.StartupState"):
+            mock_log.get_logger.return_value = MagicMock()
+            from compresso.service import RootService
+
+            service = RootService()
+
+            mock_proc = MagicMock()
+            mock_proc.cpu_percent.return_value = 8.0
+            mock_proc.memory_info.return_value = MagicMock(rss=1024, vms=2048)
+            mock_psutil.Process.return_value = mock_proc
+            mock_psutil.cpu_count.return_value = None
+            mock_psutil.virtual_memory.return_value = MagicMock(total=8192)
+
+            with (
+                patch.object(service, "_verify_thread_started"),
+                patch("compresso.service.time.sleep", side_effect=lambda *_: service.event.set()),
+            ):
+                thread = service.start_resource_logger()
+                thread.join(5)
+
+            assert mock_log.log_metric.called
+            metric_kwargs = mock_log.log_metric.call_args.kwargs
+            # cpu_percent divided by the fallback cpu count of 1
+            assert metric_kwargs["cpu_percent"] == 8.0
+            service.logger.warning.assert_not_called()

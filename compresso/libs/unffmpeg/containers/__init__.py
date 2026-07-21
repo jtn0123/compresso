@@ -33,14 +33,13 @@ import inspect
 import os
 import pkgutil
 import sys
-import warnings
 from importlib import import_module
 from pathlib import Path
 
-from ..base_containers import Containers
+from ..base_containers import ContainerDescription, Containers
 
 
-def grab_module(module_name, *args, **kwargs):
+def grab_module(module_name: str) -> Containers:
     """
     Fetch a module by name and return the instance of that class
 
@@ -57,30 +56,30 @@ def grab_module(module_name, *args, **kwargs):
 
         module = import_module("." + module_name, package=__name__)
         module_class = getattr(module, class_name)
-        instance = module_class(*args, **kwargs)
-
-        return instance
+        if not isinstance(module_class, type) or not issubclass(module_class, Containers):
+            raise AttributeError(class_name)
+        return module_class()
 
     except (AttributeError, AssertionError, ModuleNotFoundError):
         raise ImportError(f"{module_name} is not part of our supported containers!") from None
 
 
-def get_all_containers():
+def get_all_containers() -> dict[str, ContainerDescription]:
     """
     Fetch a list of supported containers and
     return a dictionary of their data
 
     :return:
     """
-    containers_dic = {}
+    containers_dic: dict[str, ContainerDescription] = {}
 
-    for _, module_name, _ in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
+    for _finder, module_name, _is_package in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
         instance = grab_module(module_name)
-        container_data = {
-            "extension": instance.container_extension(),
-            "description": instance.container_description(),
-            "supports_subtitles": instance.container_supports_subtitles(),
-        }
+        container_data = ContainerDescription(
+            extension=instance.container_extension(),
+            description=instance.container_description(),
+            supports_subtitles=instance.container_supports_subtitles(),
+        )
         containers_dic[module_name] = container_data
 
     return containers_dic
@@ -90,14 +89,14 @@ def get_all_containers():
 Import all submodules for this package
 
 """
-for _, name, _ in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):  # type: ignore[assignment]
-    imported_module = import_module("." + name, package=__name__)
+for _finder, discovered_name, _is_package in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
+    imported_module = import_module("." + discovered_name, package=__name__)
 
     for i in dir(imported_module):
         attribute = getattr(imported_module, i)
 
         if inspect.isclass(attribute) and issubclass(attribute, Containers):
-            setattr(sys.modules[__name__], name, attribute)
+            setattr(sys.modules[__name__], discovered_name, attribute)
 
 __author__ = "Josh.5 (jsunnex@gmail.com)"
 

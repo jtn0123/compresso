@@ -22,7 +22,8 @@
                   item-key="order"
                   tag="transition-group"
                   :component-data="{ tag: 'ul', name: 'flip-list', type: 'transition' }"
-                  v-model="pluginFlowByType[pt.type]"
+                  :model-value="pluginFlowByType[pt.type] ?? []"
+                  @update:model-value="updatePluginFlow(pt.type, $event)"
                   v-bind="dragOptions"
                   @end="savePluginFlow(pt.type)"
                 >
@@ -85,73 +86,83 @@
   <!-- END PLUGIN TYPES LIST-->
 </template>
 
-<script>
+<script lang="ts">
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import draggable from 'vuedraggable'
-import { ref } from 'vue'
+import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
 import { createLogger } from 'src/composables/useLogger'
+import type { ApiSchema } from 'src/types/contracts'
+import type { PluginFlowEntry, PluginFlowType } from 'src/types/plugins'
 
 // Plugin flow list refreshes when the parent dialog is opened
-export default {
+export default defineComponent({
   name: 'LibraryConfigurePluginFlowList',
   components: {
     draggable,
   },
   props: {
     libraryId: {
-      type: Number,
+      type: Number as PropType<number | null>,
       required: false,
       default: null,
     },
   },
   created() {
-    this._log = createLogger('PluginFlowList')
     this.fetchPluginTypes()
   },
   methods: {
-    fetchPluginTypes: function () {
+    fetchPluginTypes: function (): void {
       // Fetch from server
-      axios({
+      axios<ApiSchema<'PluginTypesResults'>>({
         method: 'get',
         url: getCompressoApiUrl('v2', 'plugins/flow/types'),
       }).then((response) => {
-        let results = response.data.results
-        let pluginTypes = []
+        const results = response.data.results
+        const pluginTypes: PluginFlowType[] = []
         for (let i = 0; i < results.length; i++) {
-          let labelCode = results[i]
+          const pluginType = results[i]
+          if (!pluginType) continue
+          const labelCode = pluginType
             .split('_')
-            .map((word, index) => {
+            .map((word: string, index: number) => {
               if (index === 0) return word
               return word.slice(0, 1).toUpperCase() + word.slice(1).toLowerCase()
             })
             .join('')
-          pluginTypes[pluginTypes.length] = {
-            type: results[i],
+          pluginTypes.push({
+            type: pluginType,
             labelCode: 'components.plugins.types.' + labelCode,
-          }
+          })
+          this.pluginFlowByType[pluginType] = []
         }
         this.pluginTypes = pluginTypes
 
         this.fetchPluginFlow()
       })
     },
-    fetchPluginFlow: function () {
+    fetchPluginFlow: function (): void {
       for (let i = 0; i < this.pluginTypes.length; i++) {
+        const pluginType = this.pluginTypes[i]
+        if (!pluginType) continue
         let data = {
-          plugin_type: this.pluginTypes[i].type,
+          plugin_type: pluginType.type,
           library_id: this.libraryId,
         }
-        axios({
+        axios<ApiSchema<'PluginFlowResults'>>({
           method: 'post',
           url: getCompressoApiUrl('v2', 'plugins/flow'),
           data: data,
         }).then((response) => {
-          this.pluginFlowByType[this.pluginTypes[i].type] = response.data.results
+          this.pluginFlowByType[pluginType.type] = response.data.results
         })
       }
     },
-    savePluginFlow: function (pluginType) {
+    updatePluginFlow: function (pluginType: string, flow: PluginFlowEntry[]): void {
+      this.pluginFlowByType[pluginType] = flow
+    },
+    savePluginFlow: function (pluginType: string): void {
       let data = {
         plugin_type: pluginType,
         plugin_flow: this.pluginFlowByType[pluginType],
@@ -162,7 +173,7 @@ export default {
         url: getCompressoApiUrl('v2', 'plugins/flow/save'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           // Notify save
           /*this.$q.notify({
           color: 'positive',
@@ -183,30 +194,36 @@ export default {
           })
         })
     },
-    movePluginInFlow: function (pluginType, currentIndex, pluginId, direction) {
-      let pluginFlow = this.pluginFlowByType[pluginType].slice()
+    movePluginInFlow: function (
+      pluginType: string,
+      currentIndex: number,
+      _pluginId: string,
+      direction: 'up' | 'down',
+    ): void {
+      const currentFlow = this.pluginFlowByType[pluginType]
+      if (!currentFlow) return
+      const pluginFlow = currentFlow.slice()
 
       // Generate new index
-      let newIndex
       if (direction === 'up') {
         // Dont move up if already at the top
         if (currentIndex === 0) {
-          this._log.debug('Cannot move up - already at the top')
+          this.log.debug('Cannot move up - already at the top')
           return
         }
-        newIndex = currentIndex - 1
       }
       if (direction === 'down') {
-        newIndex = currentIndex + 1
         // Dont move down if already at the bottom
-        if (newIndex === pluginFlow.length) {
-          this._log.debug('Cannot move down - already at the bottom')
+        if (currentIndex + 1 === pluginFlow.length) {
+          this.log.debug('Cannot move down - already at the bottom')
           return
         }
       }
 
       // Extract item data to insert below
-      let pluginData = pluginFlow[currentIndex]
+      const pluginData = pluginFlow[currentIndex]
+      if (!pluginData) return
+      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
 
       // Reorder flow and reorder
       pluginFlow.splice(currentIndex, 1)
@@ -223,9 +240,10 @@ export default {
         dropzoneSelector: '.q-list',
         draggableSelector: '.q-item',
       },
-      pluginTypes: ref([]),
-      pluginFlowByType: ref({}),
-      files: ref([]),
+      pluginTypes: [] as PluginFlowType[],
+      pluginFlowByType: {} as Record<string, PluginFlowEntry[]>,
+      files: [] as unknown[],
+      log: createLogger('PluginFlowList'),
     }
   },
   computed: {
@@ -244,7 +262,7 @@ export default {
   setup() {
     return {}
   },
-}
+})
 </script>
 <style>
 .library-plugin-flow-group {

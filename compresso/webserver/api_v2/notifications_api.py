@@ -31,22 +31,23 @@ Copyright:
 
 import json
 import re
+from collections.abc import Mapping
 
 from compresso import config
 from compresso.libs import session
 from compresso.libs.external_notifications import ExternalNotificationDispatcher
 from compresso.libs.notifications import Notifications
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.notification_schemas import RequestNotificationsDataSchema
 from compresso.webserver.api_v2.schema.schemas import RequestTableUpdateByUuidList
 
 
 class ApiNotificationsHandler(BaseApiHandler):
-    session = None
-    config = None
-    params = None
-    compresso_data_queues = None
+    session: session.Session
+    config: config.Config
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -76,14 +77,14 @@ class ApiNotificationsHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
         self.config = config.Config()
 
-    async def get_notifications(self):
+    async def get_notifications(self) -> None:
         """
         Notifications - read
         ---
@@ -139,7 +140,7 @@ class ApiNotificationsHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def remove_notifications(self):
+    async def remove_notifications(self) -> None:
         """
         Notifications - delete
         ---
@@ -187,7 +188,9 @@ class ApiNotificationsHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestTableUpdateByUuidList())
 
             notifications = Notifications()
-            for notification_uuid in json_request.get("uuid_list", []):
+            raw_uuid_list = json_request.get("uuid_list", [])
+            uuid_list = [value for value in raw_uuid_list if isinstance(value, str)] if isinstance(raw_uuid_list, list) else []
+            for notification_uuid in uuid_list:
                 if not notifications.remove(notification_uuid):
                     self.set_status(
                         self.STATUS_ERROR_EXTERNAL, reason=f"Failed to delete the notification with UUID '{notification_uuid}'"
@@ -204,7 +207,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             self.handle_unhandled_error(e)
 
     @staticmethod
-    def _mask_url(url):
+    def _mask_url(url: str) -> str:
         """
         Partially mask a webhook URL for display security.
         Shows the protocol + first 12 chars of the rest, then '***'.
@@ -222,7 +225,7 @@ class ApiNotificationsHandler(BaseApiHandler):
             return url[:12] + "***"
         return url
 
-    async def get_notification_channels(self):
+    async def get_notification_channels(self) -> None:
         """
         Notification Channels - read
         ---
@@ -237,17 +240,18 @@ class ApiNotificationsHandler(BaseApiHandler):
         try:
             channels = self.config.get_notification_channels()
             # Mask URLs for display security
-            masked = []
+            masked: list[dict[str, object]] = []
             for ch in channels:
                 masked_ch = dict(ch)
-                masked_ch["url"] = self._mask_url(ch.get("url", ""))
+                url_value = ch.get("url", "")
+                masked_ch["url"] = self._mask_url(url_value if isinstance(url_value, str) else "")
                 masked.append(masked_ch)
             self.write_success({"channels": masked})
             return
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def save_notification_channels(self):
+    async def save_notification_channels(self) -> None:
         """
         Notification Channels - save
         ---
@@ -270,7 +274,7 @@ class ApiNotificationsHandler(BaseApiHandler):
                 description: Internal error
         """
         try:
-            body = json.loads(self.request.body)
+            body: object = json.loads(self.request.body)
             if not isinstance(body, dict):
                 raise TypeError("Notification settings payload must be an object")
             channels = body.get("channels")
@@ -289,7 +293,7 @@ class ApiNotificationsHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def test_notification_channel(self):
+    async def test_notification_channel(self) -> None:
         """
         Notification Channels - test
         ---
@@ -312,16 +316,16 @@ class ApiNotificationsHandler(BaseApiHandler):
                 description: Internal error
         """
         try:
-            body = json.loads(self.request.body)
+            body: object = json.loads(self.request.body)
             if not isinstance(body, dict):
                 raise TypeError("Notification test payload must be an object")
             channel_config = body.get("channel")
-            if not isinstance(channel_config, dict):
+            if not isinstance(channel_config, Mapping) or not all(isinstance(key, str) for key in channel_config):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="'channel' must be an object")
                 self.write_error()
                 return
             dispatcher = ExternalNotificationDispatcher()
-            result = dispatcher.test_channel(channel_config)
+            result = dispatcher.test_channel({str(key): value for key, value in channel_config.items()})
             self.write_success(result)
             return
         except (json.JSONDecodeError, TypeError) as exc:

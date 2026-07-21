@@ -171,7 +171,7 @@
   </q-dialog>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -181,6 +181,33 @@ import {
   formatBitrate as sharedFormatBitrate,
   formatDuration as sharedFormatDuration,
 } from 'src/js/formatUtils'
+import type { ApiSchema } from 'src/types/contracts'
+
+type FileInfoResponse = ApiSchema<'FileInfoResponse'>
+type CompleteFileInfo = FileInfoResponse & {
+  format: NonNullable<FileInfoResponse['format']>
+  video_streams: NonNullable<FileInfoResponse['video_streams']>
+  audio_streams: NonNullable<FileInfoResponse['audio_streams']>
+  subtitle_streams: NonNullable<FileInfoResponse['subtitle_streams']>
+}
+
+function normalizeFileInfo(response: FileInfoResponse): CompleteFileInfo | null {
+  if (!response.success || !response.format) return null
+  return {
+    ...response,
+    format: response.format,
+    video_streams: response.video_streams ?? [],
+    audio_streams: response.audio_streams ?? [],
+    subtitle_streams: response.subtitle_streams ?? [],
+  }
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError<{ error?: string }>(error)) {
+    return error.response?.data?.error ?? error.message ?? fallback
+  }
+  return error instanceof Error ? error.message : fallback
+}
 
 export default {
   name: 'FileInfoDialog',
@@ -192,7 +219,7 @@ export default {
     const dialogVisible = ref(false)
     const loading = ref(false)
     const error = ref('')
-    const fileInfo = ref(null)
+    const fileInfo = ref<CompleteFileInfo | null>(null)
 
     const healthBadgeColor = computed(() => {
       if (props.healthStatus === 'healthy') return 'positive'
@@ -209,61 +236,65 @@ export default {
       dialogVisible.value = false
     }
 
-    async function probeByPath(filePath) {
+    async function probeByPath(filePath: string): Promise<void> {
       loading.value = true
       error.value = ''
       fileInfo.value = null
       show()
 
       try {
-        const response = await axios.post(getCompressoApiUrl('v2', 'fileinfo/probe'), {
+        const request: ApiSchema<'RequestFileInfoProbe'> = {
           file_path: filePath,
-        })
-        if (response.data && response.data.success) {
-          fileInfo.value = response.data
+        }
+        const response = await axios.post<FileInfoResponse>(getCompressoApiUrl('v2', 'fileinfo/probe'), request)
+        const normalized = normalizeFileInfo(response.data)
+        if (normalized) {
+          fileInfo.value = normalized
         } else {
           error.value = t('components.fileInfo.probeFileFailed')
         }
-      } catch (err) {
-        error.value = err.response?.data?.error || err.message || t('components.fileInfo.probeFileFailed')
+      } catch (err: unknown) {
+        error.value = errorMessage(err, t('components.fileInfo.probeFileFailed'))
       } finally {
         loading.value = false
       }
     }
 
-    async function probeByTaskId(taskId) {
+    async function probeByTaskId(taskId: number): Promise<void> {
       loading.value = true
       error.value = ''
       fileInfo.value = null
       show()
 
       try {
-        const response = await axios.post(getCompressoApiUrl('v2', 'fileinfo/task'), {
+        const request: ApiSchema<'RequestFileInfoTask'> = {
           task_id: taskId,
-        })
-        if (response.data && response.data.success) {
-          fileInfo.value = response.data
+        }
+        const response = await axios.post<FileInfoResponse>(getCompressoApiUrl('v2', 'fileinfo/task'), request)
+        const normalized = normalizeFileInfo(response.data)
+        if (normalized) {
+          fileInfo.value = normalized
         } else {
           error.value = t('components.fileInfo.probeTaskFailed')
         }
-      } catch (err) {
-        error.value = err.response?.data?.error || err.message || t('components.fileInfo.probeTaskFailed')
+      } catch (err: unknown) {
+        error.value = errorMessage(err, t('components.fileInfo.probeTaskFailed'))
       } finally {
         loading.value = false
       }
     }
 
-    function formatBytes(bytes) {
+    function formatBytes(bytes: number | undefined): string {
       if (!bytes || bytes === 0) return t('components.fileInfo.fields.notAvailable')
       return sharedFormatBytes(bytes)
     }
 
-    function formatBitrate(bps) {
+    function formatBitrate(bps: number | undefined): string {
       if (!bps || bps === 0) return t('components.fileInfo.fields.notAvailable')
       return sharedFormatBitrate(bps)
     }
 
-    function formatDuration(seconds) {
+    function formatDuration(seconds: number | undefined): string {
       if (!seconds || seconds === 0) return t('components.fileInfo.fields.notAvailable')
       return sharedFormatDuration(seconds)
     }

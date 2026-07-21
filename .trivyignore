@@ -13,6 +13,10 @@ CVE-2026-26960
 CVE-2026-29786
 CVE-2026-31802
 
+# tar: DoS via crafted gzip bomb / malformed archive header (npm-internal)
+CVE-2026-59873
+CVE-2026-59874
+
 # Ubuntu base-image findings. These are in packages shipped by the
 # ubuntu:24.04 base image (pinned by SHA in docker/Dockerfile.base) and
 # get refreshed when the base image is rebuilt by the

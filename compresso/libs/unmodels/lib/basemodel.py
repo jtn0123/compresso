@@ -31,7 +31,8 @@ Copyright:
 
 import logging
 from base64 import b64decode
-from datetime import datetime
+from datetime import date, datetime, time
+from typing import TypedDict, cast
 
 from peewee import (
     AutoField,
@@ -46,8 +47,8 @@ from peewee import (
     Model,
     TimeField,
 )
-from playhouse.shortcuts import model_to_dict
-from playhouse.sqliteq import SqliteQueueDatabase
+
+from compresso.libs.peewee_types import create_sqlite_queue_database, model_as_dict
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,12 @@ DATETIME_FORMAT = DATETIME_BASE.format(DATE_FORMAT, TIME_FORMAT)
 DATETIME_FORMAT_ALT = DATETIME_BASE.format(DATE_FORMAT, TIME_FORMAT_ALT)
 
 
-def strpdatetime(string):
+class DatabaseConfig(TypedDict):
+    TYPE: str
+    FILE: str
+
+
+def strpdatetime(string: str | None) -> datetime | None:
     """
     Parses the datetime from a string.
 
@@ -74,18 +80,20 @@ def strpdatetime(string):
             return datetime.strptime(string, DATETIME_FORMAT)
         except ValueError:
             return datetime.strptime(string, DATETIME_FORMAT_ALT)
+    return None
 
 
-def strpdate(string):
+def strpdate(string: str | None) -> date | None:
     """
     Parses the date from a string.
 
     """
     if string is not None:
         return datetime.strptime(string, DATE_FORMAT).date()
+    return None
 
 
-def strptime(string):
+def strptime(string: str | None) -> time | None:
     """
     Parses the time from a string.
 
@@ -95,6 +103,7 @@ def strptime(string):
             return datetime.strptime(string, TIME_FORMAT).time()
         except ValueError:
             return datetime.strptime(string, TIME_FORMAT_ALT).time()
+    return None
 
 
 class NoSuchFieldError(TypeError):
@@ -119,7 +128,7 @@ class Database:
     """
 
     @staticmethod
-    def select_database(config):
+    def select_database(config: DatabaseConfig) -> DatabaseProxy:
         existing_database = getattr(db, "obj", None)
         if existing_database is not None:
             try:
@@ -137,7 +146,7 @@ class Database:
         # Based on configuration, use a different database.
         if config["TYPE"] == "SQLITE":
             # use SqliteQueueDatabase
-            database = SqliteQueueDatabase(
+            database = create_sqlite_queue_database(
                 config["FILE"],
                 use_gevent=False,
                 autostart=True,
@@ -166,23 +175,23 @@ class BaseModel(Model):
     class Meta:
         database = db
 
-    def get_fields(self):
+    def get_fields(self) -> dict[str, object]:
         """
         Return a dictionary of this models field metadata
 
         :return:
         """
-        return self._meta.fields
+        return cast("dict[str, object]", self._meta.fields)
 
-    def get_current_field_values_dict(self):
+    def get_current_field_values_dict(self) -> dict[str, object]:
         """
         Return a dictionary of this models fields and their current values
 
         :return:
         """
-        return self.__data__
+        return cast("dict[str, object]", self.__data__)
 
-    def parse_field_value_by_type(self, field_id, value):
+    def parse_field_value_by_type(self, field_id: str, value: object) -> object:
         """
         Fetches the field type for this field.
         Return the passed value with the correct type.
@@ -200,38 +209,49 @@ class BaseModel(Model):
         field = model_fields[field_id]
 
         if value is None:
-            if not field.null:
+            if not getattr(field, "null", False):
                 raise NullError()
             return value
 
         if isinstance(field, BooleanField):
-            if isinstance(value, (bool, int)):
-                return bool(value)
-            elif value.lower() in ["t", "true", "1"]:
-                return True
-            elif value.lower() in ["f", "false", "0"]:
-                return False
-            return False
-        elif isinstance(field, IntegerField):
-            return int(value)
-        elif isinstance(field, (FloatField, DecimalField)):
-            return float(value)
-        elif isinstance(field, DateTimeField):
-            return strpdatetime(value)
-        elif isinstance(field, DateField):
-            return strpdate(value)
-        elif isinstance(field, TimeField):
-            return strptime(value)
-        elif isinstance(field, BlobField):
+            return self._parse_boolean_field(field_id, value)
+        return self._parse_non_boolean_field(field, value)
+
+    @staticmethod
+    def _parse_non_boolean_field(field: object, value: object) -> object:
+        if isinstance(field, IntegerField):
+            return int(cast("str | bytes | bytearray | float | int", value))
+        if isinstance(field, (FloatField, DecimalField)):
+            return float(cast("str | bytes | bytearray | float | int", value))
+        if isinstance(field, DateTimeField):
+            return strpdatetime(value if isinstance(value, str) else str(value))
+        if isinstance(field, DateField):
+            return strpdate(value if isinstance(value, str) else str(value))
+        if isinstance(field, TimeField):
+            return strptime(value if isinstance(value, str) else str(value))
+        if isinstance(field, BlobField):
+            if not isinstance(value, (str, bytes, bytearray)):
+                raise TypeError("Blob field values must be base64 text or bytes")
             return b64decode(value)
 
         return value
 
-    def model_to_dict(self):
+    @staticmethod
+    def _parse_boolean_field(field_id: str, value: object) -> bool:
+        if isinstance(value, (bool, int)):
+            return bool(value)
+        normalized = value.lower() if isinstance(value, str) else ""
+        if normalized in {"t", "true", "1"}:
+            return True
+        if normalized in {"f", "false", "0"}:
+            return False
+        raise TypeError(f"Cannot interpret {value!r} as a boolean for field '{field_id}'")
+
+    def model_to_dict(self) -> dict[str, object]:
         """
         Retrieve all related objects recursively and
         then converts the resulting objects to a dictionary.
 
         :return:
         """
-        return model_to_dict(self, backrefs=True)
+        return model_as_dict(self, backrefs=True)

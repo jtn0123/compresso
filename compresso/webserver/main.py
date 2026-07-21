@@ -44,17 +44,19 @@ class MainUIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
     foreman = None
     components = None
 
-    def initialize(self):
+    def initialize(self) -> None:
         self.name = "main"
         self.session = session.Session()
 
-    def get(self, path):
+    def get(self, path: str) -> None:
         self.set_header("Content-Type", "text/html")
         self.set_html_security_headers()
         self.render("index.html")
 
-    def handle_ajax_call(self, query):
+    def handle_ajax_call(self, query: str) -> None:
         self.set_header("Content-Type", "application/json")
         if query == "login":
+            if self.session is None:
+                raise RuntimeError("Session is unavailable")
             self.session.register_compresso(force=True)
             self.redirect("/compresso/ui/dashboard/")

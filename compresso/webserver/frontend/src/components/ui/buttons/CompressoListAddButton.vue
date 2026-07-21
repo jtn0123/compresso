@@ -6,7 +6,7 @@
   </q-btn>
 </template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
   tooltip: {
     type: String,

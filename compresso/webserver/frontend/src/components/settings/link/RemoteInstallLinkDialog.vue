@@ -238,7 +238,7 @@
   </CompressoDialogMenu>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
@@ -246,6 +246,7 @@ import { useI18n } from 'vue-i18n'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
+import type { DialogController } from 'src/types/ui'
 
 const props = defineProps({
   uuid: {
@@ -260,32 +261,32 @@ const $q = useQuasar()
 const { t } = useI18n()
 const { isMobile } = useMobile()
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const isOpen = ref(false)
-const originalSnapshot = ref(null)
+const originalSnapshot = ref<string | null>(null)
 
-const currentUuid = ref(null)
+const currentUuid = ref<string | null>(null)
 const address = ref('')
 const authType = ref('None')
 const authOptions = ref(['None', 'Basic'])
-const username = ref(null)
-const password = ref(null)
-const apiToken = ref(null)
+const username = ref<string | null>(null)
+const password = ref<string | null>(null)
+const apiToken = ref<string | null>(null)
 const showPassword = ref(true)
 const showApiToken = ref(true)
 const available = ref(false)
 const name = ref('')
 const version = ref('')
-const enableReceivingTasks = ref(null)
-const enableSendingTasks = ref(null)
-const enableTaskPreloading = ref(null)
-const preloadingCount = ref(null)
-const enableChecksumValidation = ref(null)
-const enableConfigMissingLibraries = ref(null)
-const enableDistributedWorkerCount = ref(null)
-const distributedWorkerCountTarget = ref(null)
+const enableReceivingTasks = ref<boolean | null>(null)
+const enableSendingTasks = ref<boolean | null>(null)
+const enableTaskPreloading = ref<boolean | null>(null)
+const preloadingCount = ref<number | null>(null)
+const enableChecksumValidation = ref<boolean | null>(null)
+const enableConfigMissingLibraries = ref<boolean | null>(null)
+const enableDistributedWorkerCount = ref<boolean | null>(null)
+const distributedWorkerCountTarget = ref<number | null>(null)
 
-const validateAddress = (val) => {
+const validateAddress = (val: string): boolean => {
   if (!val) return true
   if (val === '???') return true
   return val.toLowerCase().startsWith('http')
@@ -378,7 +379,7 @@ const resetState = () => {
   originalSnapshot.value = null
 }
 
-const fetchInstallationLinkConfig = (uuid) => {
+const fetchInstallationLinkConfig = (uuid: string): void => {
   const data = { uuid: uuid }
   axios({
     method: 'post',
@@ -441,7 +442,7 @@ const saveInstallationLinkConfig = async () => {
     })
     updateSnapshot()
     return true
-  } catch (error) {
+  } catch {
     $q.notify({
       color: 'negative',
       position: 'top',
@@ -462,11 +463,8 @@ const save = async () => {
 }
 
 const show = () => {
-  if (!dialogRef.value) {
-    return
-  }
   isOpen.value = true
-  dialogRef.value.show()
+  dialogRef.value?.show()
   if (props.uuid) {
     resetState()
     fetchInstallationLinkConfig(props.uuid)
@@ -474,9 +472,7 @@ const show = () => {
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

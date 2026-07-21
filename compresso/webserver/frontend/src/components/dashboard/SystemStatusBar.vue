@@ -63,14 +63,14 @@
               <span class="text-caption text-grey-7">GPU{{ liveGpus.length > 1 ? gpu.index : '' }}</span>
               <q-linear-progress
                 class="col"
-                :class="{ 'progress-critical': gpu.utilization_percent > 90 }"
-                :value="gpu.utilization_percent / 100"
+                :class="{ 'progress-critical': (gpu.utilization_percent ?? 0) > 90 }"
+                :value="(gpu.utilization_percent ?? 0) / 100"
                 size="4px"
-                :color="gpuColor(gpu.utilization_percent)"
+                :color="gpuColor(gpu.utilization_percent ?? 0)"
                 track-color="transparent"
               />
               <span class="text-caption text-weight-medium" style="min-width: 36px; text-align: right">
-                {{ Math.round(gpu.utilization_percent) }}%
+                {{ Math.round(gpu.utilization_percent ?? 0) }}%
               </span>
               <q-tooltip>
                 {{ gpu.memory_used_mb }}MB / {{ gpu.memory_total_mb }}MB &middot; {{ gpu.temperature_c }}&deg;C
@@ -125,19 +125,18 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
-import { useQuasar } from 'quasar'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import { wsConnectionState } from 'src/js/compressoWebsocket'
-
-const $q = useQuasar()
+import type { LiveGpuMetrics, LiveSystemMetrics, SystemStatus } from 'src/types/contracts'
 
 const props = defineProps({
-  systemInfo: { type: Object, default: null },
+  systemInfo: { type: Object as PropType<SystemStatus | null>, default: null },
   liveMetrics: {
-    type: Object,
+    type: Object as PropType<LiveSystemMetrics>,
     default: () => ({
       cpu_percent: 0,
       memory_percent: 0,
@@ -164,24 +163,13 @@ const gpuList = computed(() => {
   return props.systemInfo?.gpus || []
 })
 
-const gpuColor = (percent) => gradientColor(percent)
+const gpuColor = (percent: number): string => gradientColor(percent)
 
-function gpuDisplayName(gpu) {
+function gpuDisplayName(gpu: LiveGpuMetrics): string {
   if (gpu.type === 'nvidia') return gpu.name || 'NVIDIA'
   if (gpu.type === 'vaapi') return 'VAAPI'
-  return gpu.name || gpu.type
+  return gpu.name || gpu.type || 'GPU'
 }
-
-const connectionColor = computed(() => {
-  switch (connectionState.value) {
-    case 'connected':
-      return 'positive'
-    case 'connecting':
-      return 'warning'
-    default:
-      return 'negative'
-  }
-})
 
 const connectionTextClass = computed(() => {
   switch (connectionState.value) {

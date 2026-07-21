@@ -32,11 +32,12 @@ Copyright:
 import json
 import subprocess
 
+from .._contracts import string_keyed_dict
 from ..exceptions.ffmpeg import FFMpegError
 from ..exceptions.ffprobe import FFProbeError
 
 
-def ffmpeg_cmd(params):
+def ffmpeg_cmd(params: list[str]) -> str:
     """
     Execute a ffmpeg command subprocess and read the output
 
@@ -61,7 +62,7 @@ def ffmpeg_cmd(params):
     return raw_output
 
 
-def ffprobe_cmd(params):
+def ffprobe_cmd(params: list[str]) -> str:
     """
     Execute a ffprobe command subprocess and read the output
 
@@ -86,7 +87,7 @@ def ffprobe_cmd(params):
     return raw_output
 
 
-def ffprobe_file(vid_file_path):
+def ffprobe_file(vid_file_path: object) -> dict[str, object]:
     """
     Returns a dictionary result from ffprobe command line prove of a file
 
@@ -101,14 +102,16 @@ def ffprobe_file(vid_file_path):
     # Check result
     results = ffprobe_cmd(params)
     try:
-        info = json.loads(results)
+        info = string_keyed_dict(json.loads(results))
     except Exception as e:
         raise FFProbeError(vid_file_path, str(e)) from e
 
+    if info is None:
+        raise FFProbeError(vid_file_path, "ffprobe returned a non-object JSON document")
     return info
 
 
-def ffmpeg_version_info():
+def ffmpeg_version_info() -> dict[str, object]:
     """
     Returns a dictionary result of the current FFMPEG versions
 
@@ -124,14 +127,16 @@ def ffmpeg_version_info():
 
     results = ffprobe_cmd(params)
     try:
-        info = json.loads(results)
+        info = string_keyed_dict(json.loads(results))
     except Exception as e:
         raise FFProbeError("ffmpeg_version_info function", str(e)) from e
 
+    if info is None:
+        raise FFProbeError("ffmpeg_version_info function", "ffprobe returned a non-object JSON document")
     return info
 
 
-def ffmpeg_available_encoders():
+def ffmpeg_available_encoders() -> str:
     """
     Return the raw output of encoders supported by ffmpeg
       Encoders:
@@ -155,7 +160,7 @@ def ffmpeg_available_encoders():
     return ffmpeg_cmd(params)
 
 
-def ffmpeg_available_decoders():
+def ffmpeg_available_decoders() -> str:
     """
     Return the raw output of decoders supported by ffmpeg
       Decoders:
@@ -180,7 +185,7 @@ def ffmpeg_available_decoders():
     return ffmpeg_cmd(params)
 
 
-def ffmpeg_available_hw_acceleration_methods():
+def ffmpeg_available_hw_acceleration_methods() -> str:
     """
     Return the raw output of hardware accelration methods supported by ffmpeg
       Hardware acceleration methods:

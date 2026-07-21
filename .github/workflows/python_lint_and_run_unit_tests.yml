@@ -3,7 +3,8 @@ name: Python Lint & Run Unit Tests
 on:
   push:
     branches:
-      - '**'
+      - 'master'
+      - 'staging'
   pull_request:
     branches:
       - 'master'
@@ -74,7 +75,14 @@ jobs:
 
     - name: Type check with mypy
       run: |
-        mypy compresso/ --ignore-missing-imports --no-error-summary
+        mypy --strict compresso/ --no-error-summary
+        mypy --strict scripts/type_safety_metrics.py scripts/openapi_contract.py --no-error-summary
+
+    - name: Check OpenAPI contract drift
+      run: python scripts/openapi_contract.py --check
+
+    - name: Check type-safety metrics drift
+      run: python scripts/type_safety_metrics.py --check-document docs/TYPE_SAFETY.md
 
   py_unit_test:
     name: Unit Tests (${{ matrix.os }}, shard ${{ matrix.shard }}/3)

@@ -29,7 +29,10 @@ Copyright:
 
 """
 
+from collections.abc import Mapping
+
 from . import audio_codecs
+from ._contracts import EncodingArguments, probe_streams, stream_int, stream_text, string_keyed_dict
 
 
 class AudioCodecHandle:
@@ -39,9 +42,9 @@ class AudioCodecHandle:
     Handle FFMPEG operations pertaining to audio codec streams
     """
 
-    def __init__(self, file_probe):
+    def __init__(self, file_probe: Mapping[str, object]) -> None:
         self.file_probe = file_probe
-        self.encoding_args = {}
+        self.encoding_args = EncodingArguments(streams_to_map=[], streams_to_encode=[])
         self.audio_tracks_count = 0
 
         # Configurable settings
@@ -56,64 +59,64 @@ class AudioCodecHandle:
         self.audio_encoder_cloning = "aac"  # Default to aac
         self.audio_stereo_stream_bitrate = "128k"  # Default to 128k
 
-    def copy_stream(self, stream):
+    def copy_stream(self, stream: Mapping[str, object]) -> None:
         """
         Copy the audio stream. It will not be modified
 
         :param stream:
         :return:
         """
-        self.encoding_args["streams_to_encode"] = self.encoding_args["streams_to_encode"] + [
-            f"-c:a:{self.audio_tracks_count}",
-            "copy",
-        ]
+        self.encoding_args["streams_to_encode"].extend(
+            [
+                f"-c:a:{self.audio_tracks_count}",
+                "copy",
+            ]
+        )
         # Map this stream
-        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", f"0:{stream['index']}"]
+        self.encoding_args["streams_to_map"].extend(["-map", f"0:{stream_int(stream, 'index')}"])
         self.audio_tracks_count += 1
 
-    def transcode_stream(self, stream):
+    def transcode_stream(self, stream: Mapping[str, object]) -> None:
         """
         Transcode the audio stream to the configured audio codec
 
         :param stream:
         :return:
         """
-        self.encoding_args["streams_to_encode"] = self.encoding_args["streams_to_encode"] + [
-            f"-c:a:{self.audio_tracks_count}",
-            self.audio_encoder_transcoding,
-        ]
+        self.encoding_args["streams_to_encode"].extend([f"-c:a:{self.audio_tracks_count}", self.audio_encoder_transcoding])
         # Map this stream
-        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", f"0:{stream['index']}"]
+        self.encoding_args["streams_to_map"].extend(["-map", f"0:{stream_int(stream, 'index')}"])
         self.audio_tracks_count += 1
 
-    def clone_stereo_stream(self, stream):
+    def clone_stereo_stream(self, stream: Mapping[str, object]) -> None:
         """
         Generate a stereo clone of a given stream
 
         :param stream:
         :return:
         """
-        try:
-            audio_tag = "".join([i for i in stream["tags"]["title"] if not i.isdigit()]).rstrip(".") + "Stereo"
-        except Exception:
-            audio_tag = "Stereo"
+        tags = string_keyed_dict(stream.get("tags"))
+        title = stream_text(tags, "title") if tags is not None else ""
+        audio_tag = "".join(character for character in title if not character.isdigit()).rstrip(".") + "Stereo"
 
         # Map a duplicated stream
-        self.encoding_args["streams_to_map"] = self.encoding_args["streams_to_map"] + ["-map", f" 0:{stream['index']}"]
+        self.encoding_args["streams_to_map"].extend(["-map", f" 0:{stream_int(stream, 'index')}"])
 
-        self.encoding_args["streams_to_encode"] = self.encoding_args["streams_to_encode"] + [
-            f"-c:a:{self.audio_tracks_count}",
-            self.audio_encoder_cloning,
-            f"-b:a:{self.audio_tracks_count}",
-            self.audio_stereo_stream_bitrate,
-            f"-ac:a:{self.audio_tracks_count}",
-            "2",
-            f"-metadata:s:a:{self.audio_tracks_count}",
-            f"title='{audio_tag}'",
-        ]
+        self.encoding_args["streams_to_encode"].extend(
+            [
+                f"-c:a:{self.audio_tracks_count}",
+                self.audio_encoder_cloning,
+                f"-b:a:{self.audio_tracks_count}",
+                self.audio_stereo_stream_bitrate,
+                f"-ac:a:{self.audio_tracks_count}",
+                "2",
+                f"-metadata:s:a:{self.audio_tracks_count}",
+                f"title='{audio_tag}'",
+            ]
+        )
         self.audio_tracks_count += 1
 
-    def args(self):
+    def args(self) -> EncodingArguments:
         """
         Return a dictionary of streams to map and streams to encode
         :return:
@@ -121,31 +124,26 @@ class AudioCodecHandle:
         # Read stream data
         self.encoding_args["streams_to_map"] = []
         self.encoding_args["streams_to_encode"] = []
-        for stream in self.file_probe["streams"]:
-            # If this is a audio stream, then process the args
-            if stream["codec_type"] == "audio":
-                if self.disable_audio_encoding:
-                    # Audio re-encoding is disabled. Just copy the stream
-                    self.copy_stream(stream)
-                else:
-                    # Transcode stream if configured to do so
-                    if self.enable_audio_stream_transcoding:
-                        # If the current audio codec of this stream is the same as the configured
-                        # destination codec, then do not re-encode this audio stream
-                        if stream["codec_name"] == self.audio_codec_transcoding:
-                            self.copy_stream(stream)
-                        else:
-                            self.transcode_stream(stream)
-                    else:
-                        self.copy_stream(stream)
-
-                    # If we have enabled stream cloning and this stream has more than 2 channels
-                    if self.enable_audio_stream_stereo_cloning and stream["channels"] > 2:
-                        self.clone_stereo_stream(stream)
+        for stream in probe_streams(self.file_probe):
+            if stream_text(stream, "codec_type") == "audio":
+                self._encode_audio_stream(stream)
 
         return self.encoding_args
 
-    def set_audio_codec_with_default_encoder_cloning(self, codec_name):
+    def _encode_audio_stream(self, stream: Mapping[str, object]) -> None:
+        should_transcode = (
+            not self.disable_audio_encoding
+            and self.enable_audio_stream_transcoding
+            and stream_text(stream, "codec_name") != self.audio_codec_transcoding
+        )
+        if should_transcode:
+            self.transcode_stream(stream)
+        else:
+            self.copy_stream(stream)
+        if not self.disable_audio_encoding and self.enable_audio_stream_stereo_cloning and stream_int(stream, "channels") > 2:
+            self.clone_stereo_stream(stream)
+
+    def set_audio_codec_with_default_encoder_cloning(self, codec_name: str) -> None:
         """
         Set the audio encoder for cloned streams
 
@@ -155,7 +153,7 @@ class AudioCodecHandle:
         self.audio_codec_cloning = codec_name
         self.audio_encoder_cloning = codec.codec_default_encoder()
 
-    def set_audio_codec_with_default_encoder_transcoding(self, codec_name):
+    def set_audio_codec_with_default_encoder_transcoding(self, codec_name: str) -> None:
         """
         Set the audio encoder for transcoding streams
 

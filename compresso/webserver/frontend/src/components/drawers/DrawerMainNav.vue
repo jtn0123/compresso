@@ -260,17 +260,24 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import compressoGlobals from 'src/js/compressoGlobals'
-import ThemeSwitch from 'components/ThemeSwitch'
-import PaletteSwitch from 'components/PaletteSwitch'
+import ThemeSwitch from 'components/ThemeSwitch.vue'
+import PaletteSwitch from 'components/PaletteSwitch.vue'
 import PrivacyPolicyDialog from 'components/docs/PrivacyPolicyDialog.vue'
 import HelpSupportDialog from 'components/docs/HelpSupportDialog.vue'
 import ApplicationLogsDialog from 'components/docs/ApplicationLogsDialog.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+
+interface DataPanelLink {
+  id: string
+  label: string
+}
 
 export default {
   name: 'DrawerMainNav',
@@ -288,19 +295,21 @@ export default {
   emits: ['update:pinned'],
   setup() {
     const route = useRoute()
-    const privacyPolicyDialogRef = ref(null)
-    const helpSupportDialogRef = ref(null)
-    const applicationLogsDialogRef = ref(null)
+    const privacyPolicyDialogRef = ref<DialogController | null>(null)
+    const helpSupportDialogRef = ref<DialogController | null>(null)
+    const applicationLogsDialogRef = ref<DialogController | null>(null)
     const approvalCount = ref(0)
-    const availableDataPanels = ref([])
+    const availableDataPanels = ref<DataPanelLink[]>([])
     const compressoVersion = ref('')
-    let approvalInterval = null
+    let approvalInterval: ReturnType<typeof setInterval> | null = null
 
     const isDataPanelsRoute = computed(() => route.path === '/ui/data-panels')
 
     async function fetchDataPanelList() {
       try {
-        const response = await axios.get(getCompressoApiUrl('v2', 'plugins/panels/enabled'))
+        const response = await axios.get<ApiSchema<'PluginsDataPanelTypesData'>>(
+          getCompressoApiUrl('v2', 'plugins/panels/enabled'),
+        )
         availableDataPanels.value = (response.data.results || []).map((p) => ({
           id: p.plugin_id,
           label: p.name,

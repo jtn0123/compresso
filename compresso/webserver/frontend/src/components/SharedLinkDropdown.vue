@@ -53,11 +53,10 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { sharedLinksStore } from 'src/js/sharedLinksStore'
-import compressoGlobals from 'src/js/compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 
 const log = createLogger('SharedLinkDropdown')
@@ -86,7 +85,7 @@ const currentIcon = computed(() => {
   return isRemote.value ? 'cloud' : 'computer'
 })
 
-const setTarget = (target) => {
+const setTarget = (target: string): void => {
   sharedLinksStore.setTarget(target)
 }
 

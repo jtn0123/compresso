@@ -35,13 +35,16 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from logging.handlers import RotatingFileHandler
 from queue import Empty, Full, Queue
+from typing import BinaryIO, ClassVar, Protocol, Self, TextIO, TypedDict
 
 import requests
 from json_log_formatter import JSONFormatter
 
+from compresso.libs import narrowing
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.json_state import atomic_json_write
 from compresso.libs.notifications import Notifications
@@ -50,12 +53,72 @@ _FORWARD_HANDLER_NAME = "Compresso.ForwardLogHandler"
 _LOG_FILE_EXT = ".jsonl"
 
 
+def log_at_level(logger: logging.Logger, level: str, message: object) -> None:
+    """Dispatch to the named logger method; "exception" keeps its traceback.
+
+    Unknown level names log at ERROR so misrouted messages stay visible.
+    """
+    if level == "exception":
+        logger.exception(message)
+        return
+    log_method = getattr(logger, level, None)
+    if callable(log_method):
+        log_method(message)
+    else:
+        logger.error(message)
+
+
+class ForwardLogEntry(TypedDict):
+    labels: dict[str, str]
+    entry: list[str]
+
+
+class ForwardStream(TypedDict):
+    stream: dict[str, str]
+    values: list[list[str]]
+
+
+class ForwardData(TypedDict):
+    streams: list[ForwardStream]
+
+
+class ForwardPayload(TypedDict):
+    app_id: str | None
+    data: ForwardData
+
+
+type DiskChunk = tuple[str, int, int, list[ForwardLogEntry], ForwardPayload]
+
+
+class LoggingSettings(Protocol):
+    def get_log_path(self) -> str: ...
+
+    def get_debugging(self) -> bool: ...
+
+    def get_installation_name(self) -> str: ...
+
+
+def _parse_forward_log_entry(value: object) -> ForwardLogEntry | None:
+    """Parse a buffered entry, coercing scalar values so older buffers still forward."""
+    if not isinstance(value, dict):
+        return None
+    labels = narrowing.string_keyed_dict_or_none(value.get("labels"))
+    entry = value.get("entry")
+    if labels is None:
+        return None
+    if not isinstance(entry, list) or len(entry) != 2:
+        return None
+    coerced_labels = {key: item if isinstance(item, str) else str(item) for key, item in labels.items()}
+    coerced_entry = [item if isinstance(item, str) else str(item) for item in entry]
+    return ForwardLogEntry(labels=coerced_labels, entry=coerced_entry)
+
+
 class ForwardJSONFormatter(JSONFormatter):
     """
     JSON log formatter which adds log record attributes if debugging is enabled.
     """
 
-    def json_record(self, message, extra, record):
+    def json_record(self, message: str, extra: dict[str, object], record: logging.LogRecord) -> dict[str, object]:
         # Check the logger's effective level
         logger = logging.getLogger(record.name)
         # Always include levelname used for labels
@@ -78,7 +141,7 @@ class ForwardJSONFormatter(JSONFormatter):
             extra["threadName"] = record.threadName
         # Choose time from metric_timestamp or data_timestamp
         ts_str = extra.get("metric_timestamp") or extra.get("data_timestamp")
-        if ts_str:
+        if isinstance(ts_str, (str, bytes, int, float)) and ts_str:
             try:
                 ts_float = float(ts_str)
                 extra["time"] = datetime.fromtimestamp(ts_float, tz=UTC).isoformat()
@@ -98,31 +161,38 @@ class ForwardLogHandler(logging.Handler):
     _BATCH_MAX_ITEMS = 256
     _CLEANUP_INTERVAL_SECONDS = 600
 
-    def __init__(self, buffer_path, installation_name, labels=None, flush_interval=5, max_chunk_size=5 * 1024 * 1024):
+    def __init__(
+        self,
+        buffer_path: str | os.PathLike[str],
+        installation_name: str,
+        labels: Mapping[str, str] | None = None,
+        flush_interval: float = 5,
+        max_chunk_size: int = 5 * 1024 * 1024,
+    ) -> None:
         """Initialise buffering paths, runtime state, and background threads."""
         super().__init__()
-        self.buffer_path = buffer_path
-        self.endpoint = None
-        self.app_id = None
+        self.buffer_path = os.fspath(buffer_path)
+        self.endpoint: str | None = None
+        self.app_id: str | None = None
         self.installation_name = installation_name
-        self.labels = labels if labels is not None else {"job": "compresso"}
+        self.labels = dict(labels) if labels is not None else {"job": "compresso"}
         self.flush_interval = flush_interval
         self.max_chunk_size = max_chunk_size
 
-        self.buffer_retention_max_days = None
+        self.buffer_retention_max_days: int | None = None
         self._retention_disabled = False
 
         self._state_lock = threading.Lock()
         self._buffer_state_path = os.path.join(self.buffer_path, self.STATE_FILENAME)
         self._buffer_state = self._load_buffer_state()
 
-        self._in_memory_chunks = Queue(maxsize=1000)
-        self.log_queue = Queue(maxsize=10000)
+        self._in_memory_chunks: Queue[list[ForwardLogEntry]] = Queue(maxsize=1000)
+        self.log_queue: Queue[ForwardLogEntry | None] = Queue(maxsize=10000)
         self.stop_event = threading.Event()
 
         self._last_cleanup = time.monotonic()
         self.previous_connection_failed = False
-        self._notified_failures = set()
+        self._notified_failures: set[str] = set()
 
         self._sync_state_with_disk()
 
@@ -132,14 +202,16 @@ class ForwardLogHandler(logging.Handler):
         self.sender_thread = threading.Thread(target=self._sender_loop, daemon=True)
         self.sender_thread.start()
 
-    def configure_endpoint(self, endpoint, app_id):
+    def configure_endpoint(self, endpoint: str | None, app_id: str | None) -> None:
         """Update the remote endpoint used for forwarding."""
         self.endpoint = endpoint
         self.app_id = app_id
 
-    def configure_retention(self, max_days):
+    def configure_retention(self, max_days: object) -> None:
         """Toggle disk retention and track the configured horizon in days."""
         try:
+            if not isinstance(max_days, (str, bytes, int, float)):
+                raise TypeError
             max_days_int = int(max_days)
         except (TypeError, ValueError):
             if max_days is not None:
@@ -158,7 +230,7 @@ class ForwardLogHandler(logging.Handler):
         if previously_disabled and not self._retention_disabled:
             self._spill_memory_chunks_to_disk()
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         """Format a record and enqueue it for asynchronous handling."""
         try:
             # If retention is disabled and there is no remote endpoint configured, discard
@@ -182,25 +254,28 @@ class ForwardLogHandler(logging.Handler):
             }
 
             # If the record has a log_type attribute, override
-            if hasattr(record, "log_type") and record.log_type:
-                labels["log_type"] = record.log_type
+            log_type = getattr(record, "log_type", None)
+            if isinstance(log_type, str) and log_type:
+                labels["log_type"] = log_type
 
             # If the record has a metric_name attribute, add it as a label
-            if hasattr(record, "metric_name") and record.metric_name:
-                labels["metric_name"] = record.metric_name
+            metric_name = getattr(record, "metric_name", None)
+            if isinstance(metric_name, str) and metric_name:
+                labels["metric_name"] = metric_name
 
             # If the record has a data_primary_key attribute, add it as a label
-            if hasattr(record, "data_primary_key") and record.data_primary_key:
-                labels["data_primary_key"] = record.data_primary_key
+            data_primary_key = getattr(record, "data_primary_key", None)
+            if isinstance(data_primary_key, str) and data_primary_key:
+                labels["data_primary_key"] = data_primary_key
 
             with contextlib.suppress(Full):
-                self.log_queue.put_nowait({"labels": labels, "entry": [ts, log_entry]})
+                self.log_queue.put_nowait(ForwardLogEntry(labels=labels, entry=[ts, log_entry]))
         except (ValueError, TypeError, AttributeError, OSError) as e:
             logging.getLogger(_FORWARD_HANDLER_NAME).error("Failed to enqueue log: %s", e)
 
-    def _writer_loop(self):
+    def _writer_loop(self) -> None:
         """Drain the queue into either the disk-backed buffer or the in-memory queue."""
-        batch = []
+        batch: list[ForwardLogEntry] = []
         last_flush = time.monotonic()
 
         while not self.stop_event.is_set():
@@ -225,7 +300,7 @@ class ForwardLogHandler(logging.Handler):
         if batch:
             self._handle_batch(batch)
 
-    def _handle_batch(self, batch):
+    def _handle_batch(self, batch: Sequence[ForwardLogEntry]) -> None:
         """Send a batch to in-memory or disk storage depending on retention mode."""
         if not batch:
             return
@@ -248,7 +323,7 @@ class ForwardLogHandler(logging.Handler):
             return
         self._append_to_disk(batch)
 
-    def _append_to_disk(self, batch):
+    def _append_to_disk(self, batch: Sequence[ForwardLogEntry]) -> None:
         """Append log entries to the current hour's JSONL buffer file."""
         if not batch:
             return
@@ -263,14 +338,14 @@ class ForwardLogHandler(logging.Handler):
         except (OSError, PermissionError, json.JSONDecodeError, UnicodeEncodeError) as exc:
             logging.getLogger(_FORWARD_HANDLER_NAME).error("Failed to save logs to disk: %s", exc)
 
-    def _ensure_state_entry(self, filename):
+    def _ensure_state_entry(self, filename: str) -> None:
         """Register a new buffer file with an initial offset of zero."""
         with self._state_lock:
             if filename not in self._buffer_state:
                 self._buffer_state[filename] = 0
                 self._persist_state_locked()
 
-    def _sender_loop(self):
+    def _sender_loop(self) -> None:
         """Continuously attempt to forward buffered logs, oldest first."""
         while not self.stop_event.is_set():
             processed = False
@@ -289,7 +364,7 @@ class ForwardLogHandler(logging.Handler):
             wait_time = 0.2 if processed else 2
             self.stop_event.wait(timeout=wait_time)
 
-    def _send_next_disk_batch(self):
+    def _send_next_disk_batch(self) -> bool:
         """Send the next available chunk from disk, returning True on success."""
         if not (self.endpoint and self.app_id):
             return False
@@ -298,7 +373,7 @@ class ForwardLogHandler(logging.Handler):
         if not chunk:
             return False
 
-        file_path, start_offset, end_offset, entries, payload = chunk
+        file_path, _start_offset, end_offset, entries, payload = chunk
         filename = os.path.basename(file_path)
 
         if not self._transmit_buffer(entries, filename, payload):
@@ -308,7 +383,7 @@ class ForwardLogHandler(logging.Handler):
         self._maybe_remove_consumed_file(file_path)
         return True
 
-    def _read_next_disk_chunk(self):
+    def _read_next_disk_chunk(self) -> DiskChunk | None:
         """Determine the next readable slice of buffered logs on disk."""
         files = self._list_buffer_files()
         if not files:
@@ -338,10 +413,10 @@ class ForwardLogHandler(logging.Handler):
 
         return None
 
-    def _read_file_chunk(self, file_path, filename, offset):
+    def _read_file_chunk(self, file_path: str, filename: str, offset: int) -> DiskChunk | None:
         """Read entries from a single file until the payload nears the 5 MB threshold."""
-        entries = []
-        payload = None
+        entries: list[ForwardLogEntry] = []
+        payload: ForwardPayload | None = None
         payload_size = 0
         new_offset = offset
 
@@ -358,31 +433,17 @@ class ForwardLogHandler(logging.Handler):
                     if not stripped:
                         new_offset = line_end
                         continue
-                    try:
-                        entry = json.loads(stripped.decode("utf-8"))
-                    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
-                        logging.getLogger(_FORWARD_HANDLER_NAME).warning(
-                            "Skipping corrupt log entry in %s.",
-                            filename,
-                        )
+                    entry = self._parse_buffer_entry(filename, stripped)
+                    if entry is None:
                         new_offset = line_end
                         continue
 
                     entries.append(entry)
                     payload, payload_size = self._build_payload(entries)
                     if payload_size > self.max_chunk_size:
-                        if len(entries) == 1:
-                            logging.getLogger(_FORWARD_HANDLER_NAME).warning(
-                                "Single log entry in %s exceeds max chunk size (%s bytes). Sending anyway.",
-                                filename,
-                                payload_size,
-                            )
-                            new_offset = line_end
-                            break
-                        entries.pop()
-                        payload, payload_size = self._build_payload(entries)
-                        handle.seek(line_start)
-                        new_offset = line_start
+                        payload, payload_size, new_offset = self._trim_oversized_payload(
+                            handle, filename, entries, payload, payload_size, line_start, line_end
+                        )
                         break
 
                     new_offset = line_end
@@ -407,19 +468,50 @@ class ForwardLogHandler(logging.Handler):
 
         return file_path, offset, new_offset, entries, payload
 
-    def _build_payload(self, entries):
+    def _trim_oversized_payload(
+        self,
+        handle: BinaryIO,
+        filename: str,
+        entries: list[ForwardLogEntry],
+        payload: ForwardPayload,
+        payload_size: int,
+        line_start: int,
+        line_end: int,
+    ) -> tuple[ForwardPayload, int, int]:
+        if len(entries) == 1:
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning(
+                "Single log entry in %s exceeds max chunk size (%s bytes). Sending anyway.", filename, payload_size
+            )
+            return payload, payload_size, line_end
+        entries.pop()
+        payload, payload_size = self._build_payload(entries)
+        handle.seek(line_start)
+        return payload, payload_size, line_start
+
+    @staticmethod
+    def _parse_buffer_entry(filename: str, raw_line: bytes) -> ForwardLogEntry | None:
+        try:
+            entry = _parse_forward_log_entry(json.loads(raw_line.decode("utf-8")))
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning("Skipping corrupt log entry in %s.", filename)
+            return None
+        if entry is None:
+            logging.getLogger(_FORWARD_HANDLER_NAME).warning("Skipping malformed log entry in %s.", filename)
+        return entry
+
+    def _build_payload(self, entries: Sequence[ForwardLogEntry]) -> tuple[ForwardPayload, int]:
         """Return a payload dict and byte size for the given entries."""
         payload = self._create_payload(entries)
         payload_bytes = json.dumps(payload).encode("utf-8")
         return payload, len(payload_bytes)
 
-    def _update_state_offset(self, filename, offset):
+    def _update_state_offset(self, filename: str, offset: int) -> None:
         """Persist the latest read offset for a buffer file."""
         with self._state_lock:
             self._buffer_state[filename] = offset
             self._persist_state_locked()
 
-    def _maybe_remove_consumed_file(self, file_path):
+    def _maybe_remove_consumed_file(self, file_path: str) -> None:
         """Delete a buffer file once all bytes have been transmitted and it's past the hour."""
         filename = os.path.basename(file_path)
         try:
@@ -443,7 +535,7 @@ class ForwardLogHandler(logging.Handler):
             os.remove(file_path)
         self._remove_state_entry(filename)
 
-    def _cleanup_retention(self):
+    def _cleanup_retention(self) -> None:
         """Remove buffer files that sit beyond the configured retention horizon."""
         if not self.buffer_retention_max_days or self.buffer_retention_max_days <= 0:
             return
@@ -457,7 +549,7 @@ class ForwardLogHandler(logging.Handler):
                     os.remove(file_path)
                 self._remove_state_entry(filename)
 
-    def _send_from_memory(self):
+    def _send_from_memory(self) -> bool:
         """Drain in-memory batches while enforcing the 5 MB payload limit."""
         processed = False
         while True:
@@ -466,35 +558,39 @@ class ForwardLogHandler(logging.Handler):
             except Empty:
                 break
 
-            index = 0
-            while index < len(chunk):
-                sub_entries, consumed, payload = self._slice_entries_for_send(chunk[index:])
-                if not sub_entries:
-                    break
-
-                if not (self.endpoint and self.app_id):
-                    # Discard if no remote endpoint is configured
-                    return processed
-
-                if not self._transmit_buffer(sub_entries, "in-memory chunk", payload):
-                    remaining = list(sub_entries) + chunk[index + consumed :]
-                    if remaining:
-                        with contextlib.suppress(Empty, Full):
-                            self._in_memory_chunks.put_nowait(list(remaining))
-                    return processed
-
-                processed = True
-                index += consumed
+            chunk_processed, should_continue = self._send_memory_chunk(chunk)
+            processed = processed or chunk_processed
+            if not should_continue:
+                return processed
 
         return processed
 
-    def _slice_entries_for_send(self, entries):
+    def _send_memory_chunk(self, chunk: list[ForwardLogEntry]) -> tuple[bool, bool]:
+        index = 0
+        processed = False
+        while index < len(chunk):
+            sub_entries, consumed, payload = self._slice_entries_for_send(chunk[index:])
+            if not sub_entries or not (self.endpoint and self.app_id):
+                return processed, False
+            if not self._transmit_buffer(sub_entries, "in-memory chunk", payload):
+                remaining = list(sub_entries) + chunk[index + consumed :]
+                if remaining:
+                    with contextlib.suppress(Empty, Full):
+                        self._in_memory_chunks.put_nowait(list(remaining))
+                return processed, False
+            processed = True
+            index += consumed
+        return processed, True
+
+    def _slice_entries_for_send(
+        self, entries: Sequence[ForwardLogEntry]
+    ) -> tuple[list[ForwardLogEntry], int, ForwardPayload | None]:
         """Return a sub-batch that fits inside the max payload size."""
         if not entries:
             return [], 0, None
 
-        chunk = []
-        payload = None
+        chunk: list[ForwardLogEntry] = []
+        payload: ForwardPayload | None = None
         payload_size = 0
 
         for entry in entries:
@@ -515,13 +611,13 @@ class ForwardLogHandler(logging.Handler):
 
         return chunk, len(chunk), payload
 
-    def _get_hourly_buffer_file(self):
+    def _get_hourly_buffer_file(self) -> str:
         """Return the JSONL filename for the current UTC hour."""
         current_hour = datetime.now(tz=UTC).replace(minute=0, second=0, microsecond=0)
         timestamp = current_hour.strftime("%Y%m%dT%H")
         return os.path.join(self.buffer_path, f"log_buffer_{timestamp}{_LOG_FILE_EXT}")
 
-    def _list_buffer_files(self):
+    def _list_buffer_files(self) -> list[str]:
         """Return all buffer filenames sorted chronologically."""
         if not os.path.isdir(self.buffer_path):
             return []
@@ -533,7 +629,7 @@ class ForwardLogHandler(logging.Handler):
         files.sort()
         return files
 
-    def _parse_buffer_filename_timestamp(self, filename):
+    def _parse_buffer_filename_timestamp(self, filename: str) -> datetime | None:
         """Parse the UTC hour encoded in a JSONL buffer filename."""
         prefix = "log_buffer_"
         suffix = _LOG_FILE_EXT
@@ -545,9 +641,9 @@ class ForwardLogHandler(logging.Handler):
         except ValueError:
             return None
 
-    def _spill_memory_chunks_to_disk(self):
+    def _spill_memory_chunks_to_disk(self) -> None:
         """Persist in-memory batches when retention becomes enabled again."""
-        pending = []
+        pending: list[ForwardLogEntry] = []
         while True:
             try:
                 pending.extend(self._in_memory_chunks.get_nowait())
@@ -560,27 +656,33 @@ class ForwardLogHandler(logging.Handler):
         for start in range(0, len(pending), self._BATCH_MAX_ITEMS):
             self._append_to_disk(pending[start : start + self._BATCH_MAX_ITEMS])
 
-    def _load_buffer_state(self):
+    def _load_buffer_state(self) -> dict[str, int]:
         """Read the persisted offsets mapping from disk, if present."""
         if not os.path.exists(self._buffer_state_path):
             return {}
         try:
             with open(self._buffer_state_path, encoding="utf-8") as handle:
-                data = json.load(handle)
+                data: object = json.load(handle)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError, PermissionError):
             logging.getLogger(_FORWARD_HANDLER_NAME).warning("Failed to load log buffer state. Starting fresh.")
             return {}
 
-        files = data.get("files", {})
-        state = {}
+        if not isinstance(data, dict):
+            return {}
+        files = data.get("files")
+        if not isinstance(files, dict):
+            return {}
+        state: dict[str, int] = {}
         for name, offset in files.items():
+            if not isinstance(name, str) or not isinstance(offset, (str, bytes, int, float)):
+                continue
             try:
                 state[name] = int(offset)
             except (TypeError, ValueError):
                 continue
         return state
 
-    def _persist_state_locked(self):
+    def _persist_state_locked(self) -> None:
         """Write the state file atomically; caller must hold `_state_lock`."""
         try:
             os.makedirs(self.buffer_path, exist_ok=True)
@@ -591,19 +693,19 @@ class ForwardLogHandler(logging.Handler):
                 exc,
             )
 
-    def _persist_state(self):
+    def _persist_state(self) -> None:
         """Public helper to persist state with locking."""
         with self._state_lock:
             self._persist_state_locked()
 
-    def _remove_state_entry(self, filename):
+    def _remove_state_entry(self, filename: str) -> None:
         """Drop a single filename from the persisted offsets mapping."""
         with self._state_lock:
             if filename in self._buffer_state:
                 del self._buffer_state[filename]
                 self._persist_state_locked()
 
-    def _sync_state_with_disk(self):
+    def _sync_state_with_disk(self) -> None:
         """Ensure state entries only reference buffer files that still exist."""
         if not os.path.isdir(self.buffer_path):
             return
@@ -623,7 +725,12 @@ class ForwardLogHandler(logging.Handler):
             if changed:
                 self._persist_state_locked()
 
-    def _transmit_buffer(self, entries, buffer_label, payload=None):
+    def _transmit_buffer(
+        self,
+        entries: Sequence[ForwardLogEntry],
+        buffer_label: str,
+        payload: ForwardPayload | None = None,
+    ) -> bool:
         """Send a payload to the remote endpoint, logging any retriable failures."""
         if not entries:
             return True
@@ -636,7 +743,7 @@ class ForwardLogHandler(logging.Handler):
         try:
             response = requests.post(
                 f"{self.endpoint}/api/v1/push",
-                json=payload,
+                data=json.dumps(payload),
                 headers={"Content-Type": "application/json"},
                 timeout=30,
             )
@@ -697,24 +804,18 @@ class ForwardLogHandler(logging.Handler):
             self._notified_failures.add("EXCEPTION")
         return False
 
-    def _create_payload(self, buffer):
+    def _create_payload(self, buffer: Sequence[ForwardLogEntry]) -> ForwardPayload:
         """Group entries by labels to produce the payload expected by the remote API."""
-        combined_streams = {}
+        combined_streams: dict[frozenset[tuple[str, str]], ForwardStream] = {}
         for log_item in buffer:
             stream_key = frozenset(log_item["labels"].items())
             if stream_key not in combined_streams:
-                combined_streams[stream_key] = {
-                    "stream": dict(log_item["labels"]),
-                    "values": [],
-                }
+                combined_streams[stream_key] = ForwardStream(stream=dict(log_item["labels"]), values=[])
             combined_streams[stream_key]["values"].append(log_item["entry"])
 
-        return {
-            "app_id": self.app_id,
-            "data": {"streams": list(combined_streams.values())},
-        }
+        return ForwardPayload(app_id=self.app_id, data=ForwardData(streams=list(combined_streams.values())))
 
-    def close(self):
+    def close(self) -> None:
         """
         Stop the log handler gracefully.
         Ensures all logs in the queue are flushed to disk.
@@ -730,7 +831,7 @@ class ForwardLogHandler(logging.Handler):
         self.sender_thread.join()
 
         # Explicitly flush any remaining logs in the queue
-        remaining_logs = []
+        remaining_logs: list[ForwardLogEntry] = []
         while True:
             try:
                 log_entry = self.log_queue.get_nowait()
@@ -749,21 +850,27 @@ class ForwardLogHandler(logging.Handler):
 
 
 class CompressoLogging:
-    METRIC = 9
-    DATA = 8
-    _instance = None
-    _lock = threading.Lock()
-    _configured = False
-    _log_path = None
-    stream_handler = None  # Stream handler
-    file_handler = None  # File handler
-    remote_handler = None  # Remote log handler
+    METRIC: ClassVar[int] = 9
+    DATA: ClassVar[int] = 8
+    _instance: ClassVar[Self | None] = None
+    _lock: ClassVar[threading.Lock] = threading.Lock()
+    _configured: bool
+    _log_path: str | None
+    stream_handler: logging.StreamHandler[TextIO] | None
+    file_handler: RotatingFileHandler | None
+    remote_handler: ForwardLogHandler | None
+    _logger: logging.Logger
 
-    def __new__(cls):
+    def __new__(cls) -> Self:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
                 cls._instance._logger = logging.getLogger("Compresso")
+                cls._instance._configured = False
+                cls._instance._log_path = None
+                cls._instance.stream_handler = None
+                cls._instance.file_handler = None
+                cls._instance.remote_handler = None
                 logging.addLevelName(cls._instance.METRIC, "METRIC")
                 logging.addLevelName(cls._instance.DATA, "DATA")
                 cls._instance._logger.setLevel(logging.INFO)
@@ -771,7 +878,7 @@ class CompressoLogging:
             return cls._instance
 
     @staticmethod
-    def get_logger(name=None, settings=None):
+    def get_logger(name: str | None = None, settings: LoggingSettings | None = None) -> logging.Logger:
         """
         Get a child logger. Configure the root logger if 'settings' are provided.
         """
@@ -783,7 +890,7 @@ class CompressoLogging:
             return logging.getLogger(f"Compresso.{name}")
         return logger_instance._logger
 
-    def configure(self, settings):
+    def configure(self, settings: LoggingSettings) -> None:
         """
         Configure the logger using the provided Config settings instance.
 
@@ -838,7 +945,7 @@ class CompressoLogging:
             self._configured = True
 
     @staticmethod
-    def log_metric(name: str, timestamp: datetime | None = None, **kwargs):
+    def log_metric(name: str, timestamp: datetime | None = None, **kwargs: object) -> None:
         """
         Custom log method for the METRIC level.
         Logs directly to the remote_handler, if enabled.
@@ -846,7 +953,7 @@ class CompressoLogging:
         instance = CompressoLogging()
         if not timestamp:
             timestamp = datetime.now()
-        log_record = {
+        log_record: dict[str, object] = {
             "log_type": "METRIC",
             "metric_name": name,
             "metric_timestamp": f"{int(timestamp.timestamp())}.{timestamp.microsecond}",
@@ -858,7 +965,12 @@ class CompressoLogging:
         instance._emit_structured_log(instance.METRIC, log_message, log_record)
 
     @staticmethod
-    def log_data(data_primary_key: str, data_search_key: str | None = None, timestamp: datetime | None = None, **kwargs):
+    def log_data(
+        data_primary_key: str,
+        data_search_key: str | None = None,
+        timestamp: datetime | None = None,
+        **kwargs: object,
+    ) -> None:
         """
         Custom log method for the DATA level.
         Logs directly to the remote_handler, if enabled.
@@ -866,7 +978,7 @@ class CompressoLogging:
         instance = CompressoLogging()
         if not timestamp:
             timestamp = datetime.now()
-        log_record = {
+        log_record: dict[str, object] = {
             "log_type": "DATA",
             "data_primary_key": data_primary_key,
             "data_search_key": data_search_key,
@@ -876,7 +988,7 @@ class CompressoLogging:
         log_message = "DATA STREAM"
         instance._emit_structured_log(instance.DATA, log_message, log_record)
 
-    def _emit_structured_log(self, level, message, extra):
+    def _emit_structured_log(self, level: int, message: str, extra: Mapping[str, object]) -> None:
         """
         Emit structured metric/data records even when their custom log levels
         sit below the logger's normal application level.
@@ -894,7 +1006,7 @@ class CompressoLogging:
         self._logger.handle(record)
 
     @staticmethod
-    def enable_debugging():
+    def enable_debugging() -> None:
         """
         Enable debugging globally across all threads.
         """
@@ -903,7 +1015,7 @@ class CompressoLogging:
         instance._logger.info("Log level set to DEBUG")
 
     @staticmethod
-    def disable_debugging():
+    def disable_debugging() -> None:
         """
         Disable debugging globally across all threads.
         """
@@ -912,7 +1024,7 @@ class CompressoLogging:
         instance._logger.info("Log level set to INFO")
 
     @staticmethod
-    def disable_file_handler(debugging=False):
+    def disable_file_handler(debugging: bool = False) -> None:
         """
         Disable logging to file and only log to stdout.
 
@@ -932,7 +1044,7 @@ class CompressoLogging:
             instance._logger.info("Stream logging set to %s", "DEBUG" if debugging else "INFO")
 
     @staticmethod
-    def update_stream_formatter(formatter):
+    def update_stream_formatter(formatter: logging.Formatter) -> None:
         """
         Update the formatter of the stream handler.
 
@@ -946,25 +1058,31 @@ class CompressoLogging:
             instance._logger.warning("No stream handler found to update formatter.")
 
     @staticmethod
-    def enable_remote_logging(endpoint, app_id, log_buffer_retention):
+    def enable_remote_logging(endpoint: str, app_id: str, log_buffer_retention: object) -> None:
         instance = CompressoLogging()
+        if instance.remote_handler is None:
+            return
         instance.remote_handler.configure_retention(log_buffer_retention)
         instance.remote_handler.configure_endpoint(endpoint, app_id)
 
         instance._logger.info("Remote logging enabled.")
 
     @staticmethod
-    def disable_remote_logging(log_buffer_retention):
+    def disable_remote_logging(log_buffer_retention: object) -> None:
         instance = CompressoLogging()
+        if instance.remote_handler is None:
+            return
         instance.remote_handler.configure_retention(log_buffer_retention)
         instance.remote_handler.configure_endpoint(None, None)
         instance._logger.info("Remote logging disabled.")
 
     @staticmethod
-    def set_remote_logging_retention(log_buffer_retention):
+    def set_remote_logging_retention(log_buffer_retention: object) -> None:
         """
         Enable debugging globally across all threads.
         """
         instance = CompressoLogging()
+        if instance.remote_handler is None:
+            return
         instance.remote_handler.configure_retention(log_buffer_retention)
         instance._logger.info("Remote logging buffer retention set to %s days.", log_buffer_retention)

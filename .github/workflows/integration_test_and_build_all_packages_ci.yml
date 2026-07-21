@@ -143,6 +143,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Check generated API type drift
+        run: npm run contract:check
+
       - name: Lint frontend
         run: npm run lint
 

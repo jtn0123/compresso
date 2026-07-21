@@ -7,7 +7,7 @@ Mixin providing worker group management endpoints for ApiSettingsHandler.
 """
 
 from compresso.libs.worker_group import WorkerGroup
-from compresso.webserver.api_v2.base_api_handler import BaseApiError
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler, integer_value
 from compresso.webserver.api_v2.schema.schemas import RequestDatabaseItemByIdSchema
 from compresso.webserver.api_v2.schema.settings_schemas import (
     SettingsWorkerGroupConfigSchema,
@@ -15,10 +15,10 @@ from compresso.webserver.api_v2.schema.settings_schemas import (
 )
 
 
-class WorkerGroupsMixin:
+class WorkerGroupsMixin(BaseApiHandler):
     """Mixin for worker group CRUD endpoints."""
 
-    async def get_all_worker_groups(self):
+    async def get_all_worker_groups(self) -> None:
         """
         Settings - get list of all worker groups
         ---
@@ -71,7 +71,7 @@ class WorkerGroupsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def read_worker_group_config(self):
+    async def read_worker_group_config(self) -> None:
         """
         Settings - read the configuration of a worker group
         ---
@@ -119,7 +119,7 @@ class WorkerGroupsMixin:
             json_request = self.read_json_request(RequestDatabaseItemByIdSchema())
 
             # Fetch all data for this worker group
-            worker_group = WorkerGroup(json_request.get("id"))
+            worker_group = WorkerGroup(integer_value(json_request.get("id")))
             if not worker_group:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Unable to find worker group config by its ID")
                 self.write_error()
@@ -145,7 +145,7 @@ class WorkerGroupsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def write_worker_group_config(self):
+    async def write_worker_group_config(self) -> None:
         """
         Settings - write the configuration of a worker group
         ---
@@ -205,7 +205,7 @@ class WorkerGroupsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def remove_worker_group(self):
+    async def remove_worker_group(self) -> None:
         """
         Settings - remove a worker group
         ---
@@ -253,7 +253,7 @@ class WorkerGroupsMixin:
             json_request = self.read_json_request(RequestDatabaseItemByIdSchema())
 
             # Fetch existing worker group by ID
-            worker_group = WorkerGroup(json_request.get("id"))
+            worker_group = WorkerGroup(integer_value(json_request.get("id")))
 
             # Delete the worker group
             if not worker_group.delete():

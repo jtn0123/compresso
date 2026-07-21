@@ -68,7 +68,7 @@
   </CompressoDialogPopup>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
@@ -76,6 +76,8 @@ import axios from 'axios'
 import { copyToClipboard, useQuasar } from 'quasar'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
 import { createLogger } from 'src/composables/useLogger'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
 
 const log = createLogger('Login')
 
@@ -87,10 +89,10 @@ const emit = defineEmits(['ok', 'hide', 'path'])
 // Reactive references
 const userCode = ref('')
 const verificationUri = ref('')
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const remainingTime = ref(1)
 const totalTime = ref(1)
-let timerInterval = null
+let timerInterval: ReturnType<typeof setInterval> | null = null
 
 // Computed properties for progress bar and timer text
 const timerProgress = computed(() => (totalTime.value > 0 ? remainingTime.value / totalTime.value : 0))
@@ -122,7 +124,7 @@ function onDialogHide() {
   emit('hide')
 }
 
-function startCountdown(expiresIn) {
+function startCountdown(expiresIn: number): void {
   totalTime.value = expiresIn
   remainingTime.value = expiresIn
   if (timerInterval) clearInterval(timerInterval)
@@ -149,13 +151,13 @@ function startCountdown(expiresIn) {
           })
       }
     } else {
-      clearInterval(timerInterval)
+      if (timerInterval) clearInterval(timerInterval)
       hide()
     }
   }, 1000)
 }
 
-function setAuthCodeFromData(data) {
+function setAuthCodeFromData(data: ApiSchema<'SessionAuthCode'>): void {
   userCode.value = data.user_code
   verificationUri.value = data.verification_uri
   startCountdown(data.expires_in)

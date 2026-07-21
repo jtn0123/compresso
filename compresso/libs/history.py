@@ -31,20 +31,74 @@ Copyright:
 
 import json
 import threading
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Protocol, Self, TypedDict, cast
 
-from peewee import fn
+from peewee import DoesNotExist, fn
 
 from compresso import config
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.unmodels import CompletedTasks, CompletedTasksCommandLogs, CompressionStats
-
-try:
-    from json.decoder import JSONDecodeError
-except ImportError:
-    JSONDecodeError = ValueError  # type: ignore[assignment,misc]
-
+from compresso.libs.peewee_types import CountedRows, execute_write
+from compresso.libs.unmodels.completedtasks import CompletedTasks
+from compresso.libs.unmodels.completedtaskscommandlogs import CompletedTasksCommandLogs
+from compresso.libs.unmodels.compressionstats import CompressionStats
 
 _MSG_NO_HISTORIC_TASKS = "No historic tasks exist yet."
+
+HistoryRows = Iterable[dict[str, object]]
+
+
+class HistoryOrder(TypedDict):
+    column: str
+    dir: str
+
+
+class CompressionSummaryRow(Protocol):
+    library_id: int
+    total_source: int | None
+    total_dest: int | None
+    file_count: int | None
+
+
+class CompressionTaskRow(Protocol):
+    id: int
+    completedtask_id: int
+    completedtask: CompletedTasks
+    source_size: int
+    destination_size: int
+    source_codec: str | None
+    destination_codec: str | None
+    source_resolution: str | None
+    library_id: int
+
+
+class CompressionStatsQuery(Protocol):
+    def where(self, *expressions: object) -> Self: ...
+
+    def count(self) -> int: ...
+
+    def order_by(self, *expressions: object) -> Self: ...
+
+    def limit(self, value: int) -> Self: ...
+
+    def offset(self, value: int) -> Self: ...
+
+    def __iter__(self) -> Iterator[object]: ...
+
+
+class NamedCountRow(Protocol):
+    source_codec: str | None
+    destination_codec: str | None
+    source_resolution: str | None
+    source_container: str | None
+    destination_container: str | None
+    count: int
+
+
+class SpaceSavedRow(Protocol):
+    date_group: str
+    space_saved: int | None
+    file_count: int | None
 
 
 class History:
@@ -56,93 +110,79 @@ class History:
 
     _write_lock = threading.Lock()
 
-    def __init__(self):
-        self.name = __class__.__name__
+    def __init__(self) -> None:
+        self.name = type(self).__name__
         self.settings = config.Config()
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
-    def get_historic_task_list(self, limit=None):
+    def get_historic_task_list(self, limit: int | None = None) -> HistoryRows:
         """
         Read all historic tasks entries
 
         :return:
         """
-        try:
-            # Fetch a single row (get() will raise DoesNotExist exception if no results are found)
-            if limit:
-                historic_tasks = CompletedTasks.select().order_by(CompletedTasks.id.desc()).limit(limit)
-            else:
-                historic_tasks = CompletedTasks.select().order_by(CompletedTasks.id.desc())
-        except CompletedTasks.DoesNotExist:
-            # No historic entries exist yet
-            self.logger.warning(_MSG_NO_HISTORIC_TASKS)
-            historic_tasks = []
+        historic_tasks = CompletedTasks.select().order_by(CompletedTasks.id.desc())
+        if limit:
+            historic_tasks = historic_tasks.limit(limit)
+        return cast(HistoryRows, historic_tasks.dicts())
 
-        return historic_tasks.dicts()
-
-    def get_total_historic_task_list_count(self):
+    def get_total_historic_task_list_count(self) -> int:
         query = CompletedTasks.select().order_by(CompletedTasks.id.desc())
-        return query.count()
+        return int(query.count())
 
     def get_historic_task_list_filtered_and_sorted(
         self,
-        order=None,
-        start=0,
-        length=None,
-        search_value=None,
-        id_list=None,
-        task_success=None,
-        after_time=None,
-        before_time=None,
-    ):
-        try:
-            query = CompletedTasks.select()
+        order: HistoryOrder | None = None,
+        start: int = 0,
+        length: int | None = None,
+        search_value: str | None = None,
+        id_list: Sequence[int] | None = None,
+        task_success: bool | None = None,
+        after_time: float | None = None,
+        before_time: float | None = None,
+    ) -> CountedRows:
+        query = CompletedTasks.select()
 
-            if id_list:
-                query = query.where(CompletedTasks.id.in_(id_list))
+        if id_list:
+            query = query.where(CompletedTasks.id.in_(id_list))
 
-            if search_value:
-                query = query.where(CompletedTasks.task_label.contains(search_value))
+        if search_value:
+            query = query.where(CompletedTasks.task_label.contains(search_value))
 
-            if task_success is not None:
-                query = query.where(CompletedTasks.task_success.in_([task_success]))
+        if task_success is not None:
+            query = query.where(CompletedTasks.task_success.in_([task_success]))
 
-            if after_time is not None:
-                query = query.where(CompletedTasks.finish_time >= after_time)
+        if after_time is not None:
+            query = query.where(CompletedTasks.finish_time >= after_time)
 
-            if before_time is not None:
-                query = query.where(CompletedTasks.finish_time <= before_time)
+        if before_time is not None:
+            query = query.where(CompletedTasks.finish_time <= before_time)
 
-            # Get order by
-            ALLOWED_ORDER_COLUMNS = {
-                "id",
-                "task_label",
-                "task_success",
-                "start_time",
-                "finish_time",
-                "processed_by_worker",
-                "abspath",
-            }
-            if order:
-                col = order.get("column", "id")
-                if col not in ALLOWED_ORDER_COLUMNS:
-                    col = "id"
-                order_field = getattr(CompletedTasks, col, CompletedTasks.id)
-                order_by = order_field.asc() if order.get("dir") == "asc" else order_field.desc()
+        # Get order by
+        ALLOWED_ORDER_COLUMNS = {
+            "id",
+            "task_label",
+            "task_success",
+            "start_time",
+            "finish_time",
+            "processed_by_worker",
+            "abspath",
+        }
+        if order:
+            col = order.get("column", "id")
+            if col not in ALLOWED_ORDER_COLUMNS:
+                col = "id"
+            order_field = getattr(CompletedTasks, col, CompletedTasks.id)
+            order_by = order_field.asc() if order.get("dir") == "asc" else order_field.desc()
 
-                query = query.order_by(order_by)
+            query = query.order_by(order_by)
 
-            if length:
-                query = query.limit(length).offset(start)
+        if length:
+            query = query.limit(length).offset(start)
 
-        except CompletedTasks.DoesNotExist:
-            # No historic entries exist yet
-            self.logger.warning(_MSG_NO_HISTORIC_TASKS)
-            query = []
+        return cast("CountedRows", query.dicts())
 
-        return query.dicts()
-
-    def get_current_path_of_historic_tasks_by_id(self, id_list=None):
+    def get_current_path_of_historic_tasks_by_id(self, id_list: Sequence[int] | None = None) -> HistoryRows:
         """
         Returns a list of CompletedTasks filtered by id_list and joined with the current absolute path of that file.
         For failures this will be the source path
@@ -167,11 +207,18 @@ class History:
         if id_list:
             query = query.where(CompletedTasks.id.in_(id_list))
 
-        return query.dicts()
+        return cast(HistoryRows, query.dicts())
 
     def get_historic_tasks_list_with_source_probe(
-        self, order=None, start=0, length=None, search_value=None, id_list=None, task_success=None, abspath=None
-    ):
+        self,
+        order: HistoryOrder | None = None,
+        start: int = 0,
+        length: int | None = None,
+        search_value: str | None = None,
+        id_list: Sequence[int] | None = None,
+        task_success: bool | None = None,
+        abspath: str | None = None,
+    ) -> HistoryRows:
         """
         Return a list of matching historic tasks with their source file's ffmpeg probe.
 
@@ -200,18 +247,27 @@ class History:
         if abspath:
             query = query.where(CompletedTasks.abspath.in_([abspath]))
 
-        return query.dicts()
+        if order:
+            allowed_order_columns = {"id", "task_label", "task_success", "abspath"}
+            column = order.get("column", "id")
+            order_field = getattr(CompletedTasks, column if column in allowed_order_columns else "id")
+            query = query.order_by(order_field.asc() if order.get("dir") == "asc" else order_field.desc())
+
+        if length:
+            query = query.limit(length).offset(start)
+
+        return cast(HistoryRows, query.dicts())
 
     @staticmethod
-    def failed_path_exists(abspath):
+    def failed_path_exists(abspath: str) -> bool:
         """Use the composite history index instead of loading every failure."""
-        return (
+        return bool(
             CompletedTasks.select(CompletedTasks.id)
             .where((CompletedTasks.abspath == abspath) & (CompletedTasks.task_success == False))  # noqa: E712
             .exists()
         )
 
-    def get_historic_task_data_dictionary(self, task_id):
+    def get_historic_task_data_dictionary(self, task_id: int) -> dict[str, object] | bool:
         """
         Read all data for a task and return a dictionary of that data
 
@@ -221,7 +277,7 @@ class History:
         try:
             # Fetch the historic task (get() will raise DoesNotExist exception if no results are found)
             historic_tasks = CompletedTasks.get_by_id(task_id)
-        except CompletedTasks.DoesNotExist:
+        except DoesNotExist:
             self.logger.exception("Failed to retrieve historic task from database for id %s.", task_id)
             return False
         # Get all saved data for this task and create dictionary of task data
@@ -229,7 +285,7 @@ class History:
         # Return task data dictionary
         return historic_task
 
-    def delete_historic_tasks_recursively(self, id_list=None):
+    def delete_historic_tasks_recursively(self, id_list: Iterable[int] | None = None) -> bool:
         """
         Deletes a given list of historic tasks based on their IDs
 
@@ -256,11 +312,12 @@ class History:
 
             return True
 
-        except CompletedTasks.DoesNotExist:
+        except DoesNotExist:
             # No historic entries exist yet
             self.logger.warning(_MSG_NO_HISTORIC_TASKS)
+            return False
 
-    def delete_historic_task_command_logs(self, id_list=None):
+    def delete_historic_task_command_logs(self, id_list: Iterable[int] | None = None) -> bool:
         """
         Deletes command logs for a given list of historic task IDs.
 
@@ -273,13 +330,13 @@ class History:
 
         try:
             query = CompletedTasksCommandLogs.delete().where(CompletedTasksCommandLogs.completedtask_id.in_(id_list))
-            query.execute()
+            execute_write(query)
             return True
         except Exception:
             self.logger.exception("An error occurred while deleting historic task command logs.")
             return False
 
-    def save_task_history(self, task_data):
+    def save_task_history(self, task_data: dict[str, object]) -> bool:
         """
         Record a task's data and state to the database.
 
@@ -333,7 +390,7 @@ class History:
         return True
 
     @staticmethod
-    def create_historic_task_ffmpeg_log_entry(historic_task, log):
+    def create_historic_task_ffmpeg_log_entry(historic_task: CompletedTasks, log: object) -> None:
         """
         Create an entry of the stdout log from the ffmpeg command
 
@@ -343,7 +400,7 @@ class History:
         """
         CompletedTasksCommandLogs.create(completedtask_id=historic_task, dump=log)
 
-    def create_historic_task_entry(self, task_data):
+    def create_historic_task_entry(self, task_data: dict[str, object]) -> CompletedTasks:
         """
         Create a historic task entry
 
@@ -373,20 +430,20 @@ class History:
 
     @staticmethod
     def create_compression_stats_entry(
-        historic_task,
-        source_size=0,
-        destination_size=0,
-        source_codec="",
-        destination_codec="",
-        source_resolution="",
-        library_id=1,
-        source_container="",
-        destination_container="",
-        encoding_duration_seconds=0,
-        avg_encoding_fps=0,
-        source_duration_seconds=0,
-        encoding_speed_ratio=0,
-    ):
+        historic_task: CompletedTasks,
+        source_size: object = 0,
+        destination_size: object = 0,
+        source_codec: object = "",
+        destination_codec: object = "",
+        source_resolution: object = "",
+        library_id: object = 1,
+        source_container: object = "",
+        destination_container: object = "",
+        encoding_duration_seconds: object = 0,
+        avg_encoding_fps: object = 0,
+        source_duration_seconds: object = 0,
+        encoding_speed_ratio: object = 0,
+    ) -> None:
         """
         Create a compression stats entry for a completed task.
 
@@ -421,7 +478,7 @@ class History:
             encoding_speed_ratio=encoding_speed_ratio or 0,
         )
 
-    def get_library_compression_summary(self, library_id=None):
+    def get_library_compression_summary(self, library_id: int | None = None) -> dict[str, object]:
         """
         Get aggregate compression statistics, optionally filtered by library.
 
@@ -440,12 +497,13 @@ class History:
 
         query = query.group_by(CompressionStats.library_id)
 
-        per_library = []
+        per_library: list[dict[str, object]] = []
         grand_total_source = 0
         grand_total_dest = 0
         grand_file_count = 0
 
-        for row in query:
+        for model_row in query:
+            row = cast("CompressionSummaryRow", model_row)
             total_source = row.total_source or 0
             total_dest = row.total_dest or 0
             file_count = row.file_count or 0
@@ -477,7 +535,7 @@ class History:
             "per_library": per_library,
         }
 
-    def get_compression_stats_for_task(self, task_id):
+    def get_compression_stats_for_task(self, task_id: int) -> dict[str, object] | None:
         """
         Get compression stats for a single completed task.
 
@@ -497,21 +555,31 @@ class History:
                 "ratio": round(ratio, 4),
                 "space_saved": stats.source_size - stats.destination_size,
             }
-        except CompressionStats.DoesNotExist:
+        except DoesNotExist:
             return None
 
-    def get_compression_stats_paginated(self, start=0, length=10, search_value=None, library_id=None, order=None):
+    def get_compression_stats_paginated(
+        self,
+        start: int = 0,
+        length: int = 10,
+        search_value: str | None = None,
+        library_id: int | None = None,
+        order: HistoryOrder | None = None,
+    ) -> dict[str, object]:
         """
         Get paginated compression stats joined with completed task labels.
 
         :return: dict with recordsTotal, recordsFiltered, results
         """
-        query = CompressionStats.select(
-            CompressionStats,
-            CompletedTasks.task_label,
-            CompletedTasks.task_success,
-            CompletedTasks.finish_time,
-        ).join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id))
+        query = cast(
+            "CompressionStatsQuery",
+            CompressionStats.select(
+                CompressionStats,
+                CompletedTasks.task_label,
+                CompletedTasks.task_success,
+                CompletedTasks.finish_time,
+            ).join(CompletedTasks, on=(CompressionStats.completedtask == CompletedTasks.id)),
+        )
 
         if library_id is not None:
             query = query.where(CompressionStats.library_id == library_id)
@@ -522,47 +590,12 @@ class History:
         records_total = CompressionStats.select().count()
         records_filtered = query.count()
 
-        # Default order
-        ALLOWED_CS_COLUMNS = {"source_size", "destination_size", "library_id"}
-        ALLOWED_CT_COLUMNS = {"finish_time", "task_label", "task_success"}
-        if order:
-            col = order.get("column", "finish_time")
-            direction = order.get("dir", "desc")
-            if col in ALLOWED_CS_COLUMNS:
-                order_field = getattr(CompressionStats, col)
-            elif col in ALLOWED_CT_COLUMNS:
-                order_field = getattr(CompletedTasks, col)
-            else:
-                order_field = CompletedTasks.finish_time
-            query = query.order_by(order_field.asc()) if direction == "asc" else query.order_by(order_field.desc())
-        else:
-            query = query.order_by(CompletedTasks.finish_time.desc())
+        query = self._order_compression_stats(query, order)
 
         if length:
             query = query.limit(length).offset(start)
 
-        results = []
-        for row in query:
-            source_size = row.source_size or 0
-            dest_size = row.destination_size or 0
-            ratio = (dest_size / source_size) if source_size > 0 else 0
-            results.append(
-                {
-                    "id": row.id,
-                    "completedtask_id": row.completedtask_id,
-                    "task_label": row.completedtask.task_label,
-                    "task_success": row.completedtask.task_success,
-                    "finish_time": row.completedtask.finish_time,
-                    "source_size": source_size,
-                    "destination_size": dest_size,
-                    "source_codec": row.source_codec or "",
-                    "destination_codec": row.destination_codec or "",
-                    "source_resolution": row.source_resolution or "",
-                    "library_id": row.library_id,
-                    "ratio": round(ratio, 4),
-                    "space_saved": source_size - dest_size,
-                }
-            )
+        results = [self._compression_stats_item(cast("CompressionTaskRow", row)) for row in query]
 
         return {
             "recordsTotal": records_total,
@@ -570,7 +603,42 @@ class History:
             "results": results,
         }
 
-    def get_codec_distribution(self, library_id=None):
+    @staticmethod
+    def _order_compression_stats(query: CompressionStatsQuery, order: HistoryOrder | None) -> CompressionStatsQuery:
+        if not order:
+            return query.order_by(CompletedTasks.finish_time.desc())
+        column = order.get("column", "finish_time")
+        if column in {"source_size", "destination_size", "library_id"}:
+            order_field = getattr(CompressionStats, column)
+        elif column in {"finish_time", "task_label", "task_success"}:
+            order_field = getattr(CompletedTasks, column)
+        else:
+            order_field = CompletedTasks.finish_time
+        direction = order.get("dir", "desc")
+        return query.order_by(order_field.asc()) if direction == "asc" else query.order_by(order_field.desc())
+
+    @staticmethod
+    def _compression_stats_item(row: CompressionTaskRow) -> dict[str, object]:
+        source_size = row.source_size or 0
+        dest_size = row.destination_size or 0
+        ratio = (dest_size / source_size) if source_size > 0 else 0
+        return {
+            "id": row.id,
+            "completedtask_id": row.completedtask_id,
+            "task_label": row.completedtask.task_label,
+            "task_success": row.completedtask.task_success,
+            "finish_time": row.completedtask.finish_time,
+            "source_size": source_size,
+            "destination_size": dest_size,
+            "source_codec": row.source_codec or "",
+            "destination_codec": row.destination_codec or "",
+            "source_resolution": row.source_resolution or "",
+            "library_id": row.library_id,
+            "ratio": round(ratio, 4),
+            "space_saved": source_size - dest_size,
+        }
+
+    def get_codec_distribution(self, library_id: int | None = None) -> dict[str, object]:
         """
         Get distribution of source and destination codecs.
 
@@ -593,15 +661,23 @@ class History:
         source_query = source_query.where(CompressionStats.source_codec != "").group_by(CompressionStats.source_codec)
         dest_query = dest_query.where(CompressionStats.destination_codec != "").group_by(CompressionStats.destination_codec)
 
-        source_codecs = [{"codec": row.source_codec, "count": row.count} for row in source_query]
-        dest_codecs = [{"codec": row.destination_codec, "count": row.count} for row in dest_query]
+        source_codecs = [
+            {"codec": row.source_codec, "count": row.count}
+            for model_row in source_query
+            if (row := cast("NamedCountRow", model_row))
+        ]
+        dest_codecs = [
+            {"codec": row.destination_codec, "count": row.count}
+            for model_row in dest_query
+            if (row := cast("NamedCountRow", model_row))
+        ]
 
         return {
             "source_codecs": source_codecs,
             "destination_codecs": dest_codecs,
         }
 
-    def get_resolution_distribution(self, library_id=None):
+    def get_resolution_distribution(self, library_id: int | None = None) -> list[dict[str, object]]:
         """
         Get distribution of source resolutions.
 
@@ -618,9 +694,13 @@ class History:
 
         query = query.where(CompressionStats.source_resolution != "").group_by(CompressionStats.source_resolution)
 
-        return [{"resolution": row.source_resolution, "count": row.count} for row in query]
+        return [
+            {"resolution": row.source_resolution, "count": row.count}
+            for model_row in query
+            if (row := cast("NamedCountRow", model_row))
+        ]
 
-    def get_container_distribution(self, library_id=None):
+    def get_container_distribution(self, library_id: int | None = None) -> dict[str, object]:
         """
         Get distribution of source and destination containers.
 
@@ -645,15 +725,23 @@ class History:
             CompressionStats.destination_container
         )
 
-        source_containers = [{"container": row.source_container, "count": row.count} for row in source_query]
-        dest_containers = [{"container": row.destination_container, "count": row.count} for row in dest_query]
+        source_containers = [
+            {"container": row.source_container, "count": row.count}
+            for model_row in source_query
+            if (row := cast("NamedCountRow", model_row))
+        ]
+        dest_containers = [
+            {"container": row.destination_container, "count": row.count}
+            for model_row in dest_query
+            if (row := cast("NamedCountRow", model_row))
+        ]
 
         return {
             "source_containers": source_containers,
             "destination_containers": dest_containers,
         }
 
-    def get_space_saved_over_time(self, library_id=None, interval="day"):
+    def get_space_saved_over_time(self, library_id: int | None = None, interval: str = "day") -> list[dict[str, object]]:
         """
         Get space saved over time, grouped by date interval.
 
@@ -679,8 +767,9 @@ class History:
 
         query = query.group_by(date_trunc).order_by(date_trunc.asc())
 
-        results = []
-        for row in query:
+        results: list[dict[str, object]] = []
+        for model_row in query:
+            row = cast("SpaceSavedRow", model_row)
             results.append(
                 {
                     "date": row.date_group,

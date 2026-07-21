@@ -9,12 +9,38 @@ start/stop event processor, and event queue management.
 """
 
 import queue
+import subprocess
+import sys
 import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from compresso.libs.singleton import SingletonType
+
+
+@pytest.mark.unittest
+def test_eventmonitor_imports_without_optional_watchdog_dependency():
+    code = """
+import builtins
+
+real_import = builtins.__import__
+
+def blocked_import(name, *args, **kwargs):
+    if name == 'watchdog' or name.startswith('watchdog.'):
+        raise ImportError('watchdog intentionally unavailable')
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = blocked_import
+from compresso.libs import eventmonitor
+
+assert eventmonitor.event_monitor_module is None
+assert isinstance(eventmonitor.EventHandler, type)
+"""
+    result = subprocess.run(  # noqa: S603 - executes the current trusted test interpreter
+        [sys.executable, "-c", code], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.fixture(autouse=True)

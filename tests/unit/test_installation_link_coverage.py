@@ -946,3 +946,47 @@ class TestImportRemoteLibraryConfigGenericException:
 
 if __name__ == "__main__":
     pytest.main(["-s", "--log-cli-level=INFO", __file__])
+
+
+# ---------------------------------------------------------------------------
+# Resumable upload boundary narrowing (_send_file_resumable)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unittest
+class TestSendFileResumableNarrowing:
+    def _make_source_file(self, tmp_path):
+        source = tmp_path / "upload.bin"
+        source.write_bytes(b"payload-bytes")
+        return str(source)
+
+    def test_session_without_transfer_id_fails_cleanly(self, tmp_path):
+        """Regression: a session response missing transfer_id used to KeyError."""
+        links = _make_links()
+        path = self._make_source_file(tmp_path)
+        with patch.object(links, "remote_api_post", return_value={"offset": 0}):
+            result = links._send_file_resumable(_BASE_CONFIG, path, "job-1")
+        assert result == {}
+
+    def test_null_offset_is_coerced_to_zero(self, tmp_path):
+        """Regression: a null/garbage offset used to raise TypeError."""
+        links = _make_links()
+        path = self._make_source_file(tmp_path)
+        chunk_len = len(b"payload-bytes")
+        session_response = {"transfer_id": "t1", "offset": None}
+        finalize_response = {"success": True}
+
+        def fake_post(remote_config, endpoint, payload, timeout=60):
+            if "session" in endpoint:
+                return session_response
+            return finalize_response
+
+        with (
+            patch.object(links, "remote_api_post", side_effect=fake_post),
+            patch.object(links, "remote_api_post_bytes", return_value={"offset": chunk_len}) as mock_bytes,
+        ):
+            result = links._send_file_resumable(_BASE_CONFIG, path, "job-1")
+
+        assert result == {"success": True}
+        # Upload started from offset 0 despite the null session offset
+        assert mock_bytes.call_args[0][3]["X-Transfer-Offset"] == "0"

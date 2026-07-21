@@ -6,7 +6,7 @@
   </CompressoDialogPopup>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
@@ -15,20 +15,21 @@ import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { markdownToHTML } from 'src/js/markupParser'
 import { sanitizeHtml } from 'src/js/sanitize'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
+import type { DialogController } from 'src/types/ui'
 
 const { t } = useI18n()
 const $q = useQuasar()
 
-const dialogRef = ref(null)
-const releaseNotes = ref(null)
+const dialogRef = ref<DialogController | null>(null)
+const releaseNotes = ref<string | null>(null)
 const symVer = ref('')
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const markAsViewed = () => {
@@ -43,7 +44,7 @@ const markAsViewed = () => {
     url: getCompressoApiUrl('v2', 'settings/write'),
     data: data,
   })
-    .then((response) => {
+    .then(() => {
       // Save success, Don't show feedback, just close
     })
     .catch(() => {
@@ -152,7 +153,7 @@ const displayReleaseNotes = () => {
           // Display dialog
           show()
         })
-        .catch((error) => {})
+        .catch(() => {})
     })
   })
 }

@@ -29,9 +29,33 @@ Copyright:
 
 """
 
+from collections.abc import Sequence
+from typing import TypedDict
+
 from . import audio_codecs, subtitle_codecs, video_codecs
+from .base_codecs import CodecDescription
 from .lib import cli
 from .probe import Probe
+
+
+class EncoderDescription(TypedDict):
+    capabilities: str
+    description: str
+
+
+type EncoderIndex = dict[str, EncoderDescription]
+
+
+class AvailableEncoders(TypedDict):
+    audio: EncoderIndex
+    subtitle: EncoderIndex
+    video: EncoderIndex
+
+
+class SupportedCodecs(TypedDict):
+    audio: dict[str, CodecDescription]
+    subtitle: dict[str, CodecDescription]
+    video: dict[str, CodecDescription]
 
 
 class Info:
@@ -41,11 +65,11 @@ class Info:
     Provide information on FFMPEG commands and configuration
     """
 
-    available_encoders = None
-    available_decoders = None
+    available_encoders: AvailableEncoders | None = None
+    available_decoders: AvailableEncoders | None = None
 
     @staticmethod
-    def versions():
+    def versions() -> dict[str, object]:
         """
         Return the system ffmpeg version as a string
 
@@ -53,7 +77,7 @@ class Info:
         """
         return cli.ffmpeg_version_info()
 
-    def file_probe(self, vid_file_path):
+    def file_probe(self, vid_file_path: str) -> dict[str, object]:
         """
         Probe a media file and return the result dictionary.
 
@@ -63,92 +87,51 @@ class Info:
         """
         return Probe.file(vid_file_path)
 
-    def get_available_ffmpeg_encoders(self):
+    @staticmethod
+    def _parse_codec_listing(info: str) -> AvailableEncoders:
+        available = AvailableEncoders(audio={}, subtitle={}, video={})
+        headers = {"A..... = Audio", "S..... = Subtitle", "V..... = Video"}
+        for raw_line in info.splitlines():
+            line = raw_line.strip()
+            if not line or line in headers:
+                continue
+            if line[0] == "A":
+                codec_index = available["audio"]
+            elif line[0] == "S":
+                codec_index = available["subtitle"]
+            elif line[0] == "V":
+                codec_index = available["video"]
+            else:
+                continue
+            data = line.split()
+            if len(data) < 2:
+                continue
+            capabilities, codec, *description = data
+            codec_index[codec] = EncoderDescription(capabilities=capabilities, description=" ".join(description))
+        return available
+
+    def get_available_ffmpeg_encoders(self) -> AvailableEncoders:
         """
         Sets a dictionary of encoders supported by ffmpeg
         """
-        available_audio_encoders = {}
-        available_subtitle_encoders = {}
-        available_video_encoders = {}
-
         # Get raw ffmpeg output of available encoders
         info = cli.ffmpeg_available_encoders()
-
-        # Sort through the lines and create a dictionary of audio, subtitle and video encoders
-        for line in info.splitlines():
-            line = line.rstrip().lstrip()
-            if line.startswith("A") and line != "A..... = Audio":
-                # Audio encoder
-                data = line.split()
-                capabilities = data.pop(0)
-                codec = data.pop(0)
-                available_audio_encoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
-            elif line.startswith("S") and line != "S..... = Subtitle":
-                # Subtitle encoder
-                data = line.split()
-                capabilities = data.pop(0)
-                codec = data.pop(0)
-                available_subtitle_encoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
-            elif line.startswith("V") and line != "V..... = Video":
-                # Video encoder
-                data = line.split()
-                capabilities = data.pop(0)
-                codec = data.pop(0)
-                available_video_encoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
-
-        # Combine dictionaries into one
-        self.available_encoders = {
-            "audio": available_audio_encoders,
-            "subtitle": available_subtitle_encoders,
-            "video": available_video_encoders,
-        }
+        self.available_encoders = self._parse_codec_listing(info)
 
         return self.available_encoders
 
-    def get_available_ffmpeg_decoders(self):
+    def get_available_ffmpeg_decoders(self) -> AvailableEncoders:
         """
         Sets a dictionary of decoders supported by ffmpeg
         """
-        available_audio_decoders = {}
-        available_subtitle_decoders = {}
-        available_video_decoders = {}
-
         # Get raw ffmpeg output of available decoders
         info = cli.ffmpeg_available_decoders()
-
-        # Sort through the lines and create a dictionary of audio, subtitle and video decoders
-        for line in info.splitlines():
-            line = line.rstrip().lstrip()
-            if line.startswith("A") and line != "A..... = Audio":
-                # Audio decoder
-                data = line.split()
-                capabilities = data.pop(0)
-                codec = data.pop(0)
-                available_audio_decoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
-            elif line.startswith("S") and line != "S..... = Subtitle":
-                # Subtitle decoder
-                data = line.split()
-                capabilities = data.pop(0)
-                codec = data.pop(0)
-                available_subtitle_decoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
-            elif line.startswith("V") and line != "V..... = Video":
-                # Video decoder
-                data = line.split()
-                capabilities = data.pop(0)
-                codec = data.pop(0)
-                available_video_decoders[codec] = {"capabilities": capabilities, "description": " ".join(data)}
-
-        # Combine dictionaries into one
-        self.available_decoders = {
-            "audio": available_audio_decoders,
-            "subtitle": available_subtitle_decoders,
-            "video": available_video_decoders,
-        }
+        self.available_decoders = self._parse_codec_listing(info)
 
         return self.available_decoders
 
-    def get_available_ffmpeg_hw_acceleration_methods(self):
-        methods = []
+    def get_available_ffmpeg_hw_acceleration_methods(self) -> list[str]:
+        methods: list[str] = []
 
         # Get raw ffmpeg output of available encoders
         info = cli.ffmpeg_available_hw_acceleration_methods()
@@ -163,7 +146,7 @@ class Info:
 
         return methods
 
-    def get_ffmpeg_audio_encoders(self):
+    def get_ffmpeg_audio_encoders(self) -> EncoderIndex:
         """
         Fetch all audio encoders supported by ffmpeg
 
@@ -171,9 +154,9 @@ class Info:
         """
         if self.available_encoders is None:
             self.get_available_ffmpeg_encoders()
-        return self.available_encoders["audio"]
+        return self.available_encoders["audio"] if self.available_encoders is not None else {}
 
-    def get_ffmpeg_subtitle_encoders(self):
+    def get_ffmpeg_subtitle_encoders(self) -> EncoderIndex:
         """
         Fetch all subtitle encoders supported by ffmpeg
 
@@ -181,9 +164,9 @@ class Info:
         """
         if self.available_encoders is None:
             self.get_available_ffmpeg_encoders()
-        return self.available_encoders["subtitle"]
+        return self.available_encoders["subtitle"] if self.available_encoders is not None else {}
 
-    def get_ffmpeg_video_encoders(self):
+    def get_ffmpeg_video_encoders(self) -> EncoderIndex:
         """
         Fetch all video encoders supported by ffmpeg
 
@@ -191,9 +174,9 @@ class Info:
         """
         if self.available_encoders is None:
             self.get_available_ffmpeg_encoders()
-        return self.available_encoders["video"]
+        return self.available_encoders["video"] if self.available_encoders is not None else {}
 
-    def filter_available_encoders_for_codec(self, codec_encoders, codec_type):
+    def filter_available_encoders_for_codec(self, codec_encoders: Sequence[str], codec_type: str) -> list[str]:
         """
         Filter a given list of encoders. Removes any that are not available with FFMPEG
 
@@ -201,7 +184,7 @@ class Info:
         :param codec_encoders:
         :return:
         """
-        available_encoders = {}
+        available_encoders: EncoderIndex = {}
         if codec_type == "audio":
             available_encoders = self.get_ffmpeg_audio_encoders()
         elif codec_type == "subtitle":
@@ -213,15 +196,15 @@ class Info:
         # class attribute shared across calls.
         return [encoder for encoder in codec_encoders if encoder in available_encoders]
 
-    def get_all_supported_codecs_of_type(self, codec_type):
+    def get_all_supported_codecs_of_type(self, codec_type: str) -> dict[str, CodecDescription]:
         """
         Fetch a list of supported codecs and
         return a dictionary of their data
 
         :return:
         """
-        codec_dict = {}
-        return_codec_dict = {}
+        codec_dict: dict[str, CodecDescription] = {}
+        return_codec_dict: dict[str, CodecDescription] = {}
         if codec_type == "audio":
             codec_dict = audio_codecs.get_all_audio_codecs()
         elif codec_type == "subtitle":
@@ -241,14 +224,14 @@ class Info:
             return_codec_dict[codec_name] = codec
         return return_codec_dict
 
-    def get_all_supported_video_codecs(self):
+    def get_all_supported_video_codecs(self) -> dict[str, CodecDescription]:
         """
         Fetch a list of supported video codecs and
         return a dictionary of their data
 
         :return:
         """
-        return_codec_dict = {}
+        return_codec_dict: dict[str, CodecDescription] = {}
         codec_dict = video_codecs.get_all_video_codecs()
         for codec_name in codec_dict:
             codec = codec_dict[codec_name]
@@ -262,10 +245,14 @@ class Info:
             return_codec_dict[codec_name] = codec
         return return_codec_dict
 
-    def get_all_supported_codecs(self):
+    def get_all_supported_codecs(self) -> SupportedCodecs:
         supported_audio_codecs = self.get_all_supported_codecs_of_type("audio")
         supported_subtitle_codecs = self.get_all_supported_codecs_of_type("subtitle")
         supported_video_codecs = self.get_all_supported_codecs_of_type("video")
 
         # Combine dictionaries into one and return
-        return {"audio": supported_audio_codecs, "subtitle": supported_subtitle_codecs, "video": supported_video_codecs}
+        return SupportedCodecs(
+            audio=supported_audio_codecs,
+            subtitle=supported_subtitle_codecs,
+            video=supported_video_codecs,
+        )

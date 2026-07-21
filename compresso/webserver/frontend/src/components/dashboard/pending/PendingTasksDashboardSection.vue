@@ -81,17 +81,28 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import { defineComponent, ref } from 'vue'
+import type { PropType } from 'vue'
 import PendingTasksListDialog from 'components/dashboard/pending/PendingTasksListDialog.vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import type { DialogController } from 'src/types/ui'
+
+interface PendingTaskSummary {
+  id: number
+  label: string
+}
+interface QueueEta {
+  formatted: string | null
+  confidence: 'high' | 'medium' | 'low'
+}
 
 export default defineComponent({
   name: 'PendingTasks',
   components: { PendingTasksListDialog },
   setup() {
-    const pendingTasksDetailsDialogRef = ref(null)
+    const pendingTasksDetailsDialogRef = ref<DialogController | null>(null)
 
     return {
       pendingTasksDetailsDialogRef,
@@ -99,24 +110,24 @@ export default defineComponent({
   },
   props: {
     taskList: {
-      type: Array,
+      type: Array as PropType<PendingTaskSummary[]>,
       required: true,
     },
     queueEta: {
-      type: Object,
+      type: Object as PropType<QueueEta | null>,
       default: null,
     },
   },
   methods: {
     openDetails() {
-      this.pendingTasksDetailsDialogRef.show()
+      this.pendingTasksDetailsDialogRef?.show()
     },
     rescanLibrary: function () {
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'pending/rescan'),
       })
-        .then((response) => {
+        .then(() => {
           this.$q.notify({
             color: 'positive',
             position: 'top',

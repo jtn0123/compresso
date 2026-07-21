@@ -29,69 +29,79 @@ Copyright:
 
 """
 
-import tornado.log
-import tornado.routing
+from collections.abc import Mapping
 
-from compresso.webserver.api_v2.base_api_handler import BaseApiHandler as V2BaseApiHandler
+from tornado.log import app_log
+from tornado.routing import PathMatches
+
+from compresso.webserver.api_v2.base_api_handler import (
+    ApiRoute,
+)
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiHandler as V2BaseApiHandler,
+)
 
 
 class BaseApiHandler(V2BaseApiHandler):
     """Deprecated v1 router with the same cross-cutting guards as API v2."""
 
     api_version = 1
-    routes: list = []
+    routes: list[ApiRoute] = []
     MUTATING_GET_PATHS = frozenset({"/pending/rescan", "/plugins/repos/fetch"})
 
-    def set_default_headers(self):
+    def set_default_headers(self) -> None:
         super().set_default_headers()
         self.set_header("Deprecation", "true")
         self.set_header("Warning", '299 Compresso "API v1 is deprecated and will be removed in the next major release"')
 
-    def _requires_mutation_protection(self):
+    def _requires_mutation_protection(self) -> bool:
         if self.request.method == "GET" and self._request_api_path() in self.MUTATING_GET_PATHS:
             return True
         return super()._requires_mutation_protection()
 
-    def handle_404(self):
+    def handle_404(self) -> None:
         self.set_status(404)
         self.write("404 Not Found")
 
-    def action_route(self):
-        request_api_endpoint = self.request.uri.split("?", 1)[0]
+    def _route_request(self, route: ApiRoute, request_api_endpoint: str) -> bool:
+        supported_methods = route.get("supported_methods")
+        if supported_methods and self.request.method not in supported_methods:
+            return False
+
+        route_parts = list(filter(None, route.get("path_pattern").split("/")))
+        if list(filter(None, request_api_endpoint.split("/"))) == route_parts:
+            app_log.debug(f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True)
+            self._route_method(self, route)()
+            return True
+
+        params = PathMatches(route["path_pattern"]).match(self.request)
+        if not params:
+            return False
+        app_log.debug(
+            "Routing API to {}.{}(*args={}, **kwargs={})".format(
+                self.__class__.__name__, route.get("call_method"), params["path_args"], params["path_kwargs"]
+            ),
+            exc_info=True,
+        )
+        raw_path_args: object = params["path_args"]
+        raw_path_kwargs: object = params["path_kwargs"]
+        path_args = tuple(raw_path_args) if isinstance(raw_path_args, (list, tuple)) else ()
+        path_kwargs = (
+            {str(key): value for key, value in raw_path_kwargs.items() if isinstance(key, str)}
+            if isinstance(raw_path_kwargs, Mapping)
+            else {}
+        )
+        self._route_method(self, route)(*path_args, **path_kwargs)
+        return True
+
+    def action_route(self) -> None:
+        request_api_endpoint = (self.request.uri or "").split("?", 1)[0]
         if request_api_endpoint.startswith("/compresso"):
             request_api_endpoint = request_api_endpoint[len("/compresso") :]
         for route in self.routes:
-            # Check if the rout supports the supported http methods
-            supported_methods = route.get("supported_methods")
-            if supported_methods and self.request.method not in supported_methods:
-                # The request's method is not supported by this route.
-                continue
-
-            # If the route does not have any params an it matches the current request URI, then route to that method.
-            if list(filter(None, request_api_endpoint.split("/"))) == list(filter(None, route.get("path_pattern").split("/"))):
-                tornado.log.app_log.debug(
-                    f"Routing API to {self.__class__.__name__}.{route.get('call_method')}()", exc_info=True
-                )
-                getattr(self, route.get("call_method"))()
-                return
-
-            # Fetch the path match from this route's path pattern
-            path_match = tornado.routing.PathMatches(route.get("path_pattern"))
-
-            # Check if the path matches, and get any params from a match
-            params = path_match.match(self.request)
-
-            # If we have a match and were returned some params, load that method
-            if params:
-                tornado.log.app_log.debug(
-                    "Routing API to {}.{}(*args={}, **kwargs={})".format(
-                        self.__class__.__name__, route.get("call_method"), params["path_args"], params["path_kwargs"]
-                    ),
-                    exc_info=True,
-                )
-                getattr(self, route.get("call_method"))(*params["path_args"], **params["path_kwargs"])
+            if self._route_request(route, request_api_endpoint):
                 return
 
         # If we got this far, then the URI does not match any of our configured routes.
-        tornado.log.app_log.warning(f"No match found for API route: {self.request.uri}", exc_info=True)
+        app_log.warning(f"No match found for API route: {self.request.uri}", exc_info=True)
         self.handle_404()

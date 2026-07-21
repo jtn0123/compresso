@@ -256,7 +256,7 @@
   </CompressoDialogWindow>
 </template>
 
-<script>
+<script lang="ts">
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
@@ -264,6 +264,7 @@ import axios from 'axios'
 import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { openURL } from 'quasar'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
+import type { DialogController } from 'src/types/ui'
 
 export default {
   name: 'HelpSupportDialog',
@@ -276,11 +277,11 @@ export default {
     useI18n()
     const logsPath = ref('')
 
-    const appVersion = ref(null)
-    const pythonVersion = ref(null)
-    const platform = ref(null)
-    const configPath = ref(null)
-    const userdataPath = ref(null)
+    const appVersion = ref<string | null>(null)
+    const pythonVersion = ref<string | null>(null)
+    const platform = ref<string | null>(null)
+    const configPath = ref<string | null>(null)
+    const userdataPath = ref<string | null>(null)
 
     return {
       logsPath,
@@ -293,26 +294,22 @@ export default {
   },
   data() {
     return {
-      debugging: ref(null),
+      debugging: null as boolean | null,
     }
   },
   methods: {
     show() {
-      if (this.$refs.dialogRef) {
-        this.$refs.dialogRef.show()
-      }
+      ;(this.$refs.dialogRef as DialogController | undefined)?.show()
       this.fetchSettings()
       this.fetchSystemConfig()
     },
     hide() {
-      if (this.$refs.dialogRef) {
-        this.$refs.dialogRef.hide()
-      }
+      ;(this.$refs.dialogRef as DialogController | undefined)?.hide()
     },
     onDialogHide() {
       this.$emit('hide')
     },
-    openExternalURL: function (url) {
+    openExternalURL: function (url: string) {
       openURL(url)
     },
     fetchSettings: function () {

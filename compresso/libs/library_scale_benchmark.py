@@ -13,7 +13,7 @@ import tracemalloc
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 import psutil
 
@@ -30,21 +30,21 @@ def synthetic_walk(entry_count: int, files_per_directory: int = 1_000) -> Iterat
 
 
 class _RssSampler:
-    def __init__(self):
+    def __init__(self) -> None:
         self.process = psutil.Process()
         self.baseline = self.process.memory_info().rss
         self.peak = self.baseline
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._sample, name="LibraryScaleRssSampler", daemon=True)
 
-    def _sample(self):
+    def _sample(self) -> None:
         while not self._stop.wait(0.01):
             self.peak = max(self.peak, self.process.memory_info().rss)
 
-    def start(self):
+    def start(self) -> None:
         self._thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         self.peak = max(self.peak, self.process.memory_info().rss)
         self._stop.set()
         self._thread.join(timeout=1)
@@ -58,7 +58,7 @@ def _percentile(values: list[float], percentile: float = 0.95) -> float:
     return ordered[index]
 
 
-def _create_database(connection: sqlite3.Connection):
+def _create_database(connection: sqlite3.Connection) -> None:
     connection.executescript(
         """
         PRAGMA journal_mode=WAL;
@@ -216,7 +216,6 @@ def run_real_pipeline_benchmark(entry_count: int, batch_size: int = 1_000) -> di
                 {
                     "TYPE": "SQLITE",
                     "FILE": str(database_path),
-                    "MIGRATIONS_DIR": str(temp / "migrations"),
                 }
             )
             try:
@@ -280,10 +279,11 @@ def run_real_pipeline_benchmark(entry_count: int, batch_size: int = 1_000) -> di
     }
 
 
-def matching_threshold(entry_count: int, threshold_config: dict[str, Any]) -> dict[str, float]:
-    tiers = threshold_config.get("tiers", {})
-    if not isinstance(tiers, dict):
+def matching_threshold(entry_count: int, threshold_config: dict[str, object]) -> dict[str, float]:
+    tiers_value = threshold_config.get("tiers")
+    if not isinstance(tiers_value, dict) or not all(isinstance(key, str) for key in tiers_value):
         raise ValueError("threshold configuration has no tiers object")
+    tiers = cast("dict[str, object]", tiers_value)
     if not tiers:
         raise ValueError("threshold configuration has no tier entries")
     eligible = sorted(int(count) for count in tiers if int(count) >= entry_count)
@@ -291,7 +291,13 @@ def matching_threshold(entry_count: int, threshold_config: dict[str, Any]) -> di
     selected = tiers[tier_key]
     if not isinstance(selected, dict):
         raise ValueError(f"threshold tier {tier_key} is not an object")
-    return {str(name): float(value) for name, value in selected.items()}
+    selected_values = cast("dict[object, object]", selected)
+    thresholds: dict[str, float] = {}
+    for name, value in selected_values.items():
+        if not isinstance(value, (bool, int, float, str, bytes, bytearray)):
+            raise ValueError(f"threshold {name} is not numeric")
+        thresholds[str(name)] = float(value)
+    return thresholds
 
 
 def threshold_failures(result: dict[str, object], thresholds: dict[str, float]) -> list[str]:
@@ -313,5 +319,5 @@ def threshold_failures(result: dict[str, object], thresholds: dict[str, float]) 
     return failures
 
 
-def write_result(result: dict[str, object], output_path: Path):
+def write_result(result: dict[str, object], output_path: Path) -> None:
     atomic_json_write(output_path, result, mode=0o600)

@@ -8,7 +8,15 @@ Provides endpoints to list, approve, reject, and inspect tasks
 that are awaiting user approval before file replacement.
 """
 
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    boolean_value,
+    float_value,
+    integer_list_value,
+    integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.schema.approval_schemas import (
     ApprovalCountResponseSchema,
     ApprovalDetailResponseSchema,
@@ -55,7 +63,7 @@ class ApiApprovalHandler(BaseApiHandler):
         },
     ]
 
-    async def get_approval_tasks(self):
+    async def get_approval_tasks(self) -> None:
         """
         Approval - list tasks
         ---
@@ -91,7 +99,7 @@ class ApiApprovalHandler(BaseApiHandler):
                     "codec": json_request.get("codec", ""),
                     "quality_min": json_request.get("quality_min", 0),
                 },
-                include_library=json_request.get("include_library", False),
+                include_library=boolean_value(json_request.get("include_library")),
             )
 
             result["success"] = True
@@ -104,7 +112,7 @@ class ApiApprovalHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_approval_summary(self):
+    async def get_approval_summary(self) -> None:
         """
         Approval - summary
         ---
@@ -150,7 +158,7 @@ class ApiApprovalHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def approve_tasks(self):
+    async def approve_tasks(self) -> None:
         """
         Approval - approve tasks
         ---
@@ -176,15 +184,15 @@ class ApiApprovalHandler(BaseApiHandler):
 
             from compresso.webserver.helpers import approval
 
-            if json_request.get("all_matching", False):
+            if boolean_value(json_request.get("all_matching")):
                 ids = approval.get_all_matching_task_ids(
-                    search_value=json_request.get("search_value", ""),
-                    library_ids=json_request.get("library_ids", []),
-                    codec=json_request.get("codec", ""),
-                    quality_min=json_request.get("quality_min", 0),
+                    search_value=string_value(json_request.get("search_value")),
+                    library_ids=integer_list_value(json_request.get("library_ids")),
+                    codec=string_value(json_request.get("codec")),
+                    quality_min=float_value(json_request.get("quality_min")),
                 )
             else:
-                ids = json_request.get("id_list", [])
+                ids = integer_list_value(json_request.get("id_list"))
             approval.approve_tasks(ids)
 
             self.write_success()
@@ -195,7 +203,7 @@ class ApiApprovalHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def reject_tasks(self):
+    async def reject_tasks(self) -> None:
         """
         Approval - reject tasks
         ---
@@ -221,18 +229,18 @@ class ApiApprovalHandler(BaseApiHandler):
 
             from compresso.webserver.helpers import approval
 
-            if json_request.get("all_matching", False):
+            if boolean_value(json_request.get("all_matching")):
                 ids = approval.get_all_matching_task_ids(
-                    search_value=json_request.get("search_value", ""),
-                    library_ids=json_request.get("library_ids", []),
-                    codec=json_request.get("codec", ""),
-                    quality_min=json_request.get("quality_min", 0),
+                    search_value=string_value(json_request.get("search_value")),
+                    library_ids=integer_list_value(json_request.get("library_ids")),
+                    codec=string_value(json_request.get("codec")),
+                    quality_min=float_value(json_request.get("quality_min")),
                 )
             else:
-                ids = json_request.get("id_list", [])
+                ids = integer_list_value(json_request.get("id_list"))
             approval.reject_tasks(
                 task_ids=ids,
-                requeue=json_request.get("requeue", False),
+                requeue=boolean_value(json_request.get("requeue")),
             )
 
             self.write_success()
@@ -243,7 +251,7 @@ class ApiApprovalHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_task_detail(self):
+    async def get_task_detail(self) -> None:
         """
         Approval - task detail
         ---
@@ -268,7 +276,7 @@ class ApiApprovalHandler(BaseApiHandler):
 
             from compresso.webserver.helpers import approval
 
-            detail = approval.get_approval_task_detail(json_request.get("id"))
+            detail = approval.get_approval_task_detail(integer_value(json_request.get("id")))
 
             if detail is None:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Task not found or not awaiting approval")
@@ -285,7 +293,7 @@ class ApiApprovalHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_approval_count(self):
+    async def get_approval_count(self) -> None:
         """
         Approval - count
         ---

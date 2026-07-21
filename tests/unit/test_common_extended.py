@@ -145,7 +145,7 @@ class TestCleanFilesInCacheDir:
         with patch("compresso.libs.common.logger") as mock_logger:
             with patch("compresso.libs.common.shutil.rmtree", side_effect=OSError("Permission denied")):
                 common.clean_files_in_cache_dir(str(tmp_path))
-            mock_logger.error.assert_called()
+            mock_logger.exception.assert_called()
 
     def test_handles_multiple_matching_dirs(self, tmp_path):
         dir1 = tmp_path / "compresso_file_conversion-001"

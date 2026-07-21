@@ -35,12 +35,13 @@ import tornado.escape
 import tornado.log
 import tornado.web
 
+from compresso.libs import narrowing
 from compresso.webserver.helpers import plugins
 from compresso.webserver.request_auth import authorize_request
 from compresso.webserver.security_headers import SecurityHeadersMixin
 
 
-def get_plugin_by_path(path):
+def get_plugin_by_path(path: str) -> dict[str, object] | None:
     # Get the plugin ID from the url
     split_path = path.split("/")
     if len(split_path) < 4:
@@ -63,29 +64,29 @@ def get_plugin_by_path(path):
 
 
 class DataPanelRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
-    name = None
+    name: str
 
-    def initialize(self):
+    def initialize(self) -> None:
         self.name = "DataPanel"
 
-    def get(self, path):
+    def get(self, path: str) -> None:
         self.handle_panel_request()
 
-    def handle_panel_request(self):
+    def handle_panel_request(self) -> None:
         # Get the remainder of the path after the plugin ID. This will be passed as path
         path = list(filter(None, self.request.path.split("/")[4:]))
 
         # Escape user-provided values to prevent reflected XSS
         safe_path = "/" + "/".join(tornado.escape.xhtml_escape(p) for p in path)
-        safe_uri = tornado.escape.xhtml_escape(self.request.uri)
-        safe_query = tornado.escape.xhtml_escape(self.request.query)
+        safe_uri = tornado.escape.xhtml_escape(self.request.uri or "")
+        safe_query = tornado.escape.xhtml_escape(self.request.query or "")
         safe_arguments = {
             k: [tornado.escape.xhtml_escape(v.decode("utf-8", errors="replace")) for v in vals]
             for k, vals in self.request.arguments.items()
         }
 
         # Generate default data
-        data = {
+        data: dict[str, object] = {
             "content_type": "text/html",
             "content": "<!doctype html><html><head></head><body></body></html>",
             "path": safe_path,
@@ -100,7 +101,8 @@ class DataPanelRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
             return
 
         # Run plugin and fetch return data
-        if not plugins.exec_data_panels_plugin_runner(data, plugin_module.get("plugin_id")):
+        plugin_id = narrowing.strict_str(plugin_module.get("plugin_id"))
+        if not plugins.exec_data_panels_plugin_runner(data, plugin_id):
             tornado.log.app_log.error("Failed to execute plugin runner on DataPanel '%s'", plugin_module.get("plugin_id"))
             self.set_status(500)
             self.write("Plugin execution failed")
@@ -109,7 +111,7 @@ class DataPanelRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
         self.render_data(data)
         return
 
-    def render_data(self, data):
+    def render_data(self, data: dict[str, object]) -> None:
         # Always serve DataPanel content as escaped HTML to prevent reflected XSS.
         # Plugin runners receive sanitized inputs and generate the content, but we
         # escape on output as defense-in-depth since the data dict is mutable.
@@ -120,41 +122,41 @@ class DataPanelRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
 
 
 class PluginAPIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
-    name = None
+    name: str
 
-    def initialize(self):
+    def initialize(self) -> None:
         self.name = "PluginAPI"
 
-    def prepare(self):
+    def prepare(self) -> None:
         if not authorize_request(self):
             return
 
-    def get(self, path):
+    def get(self, path: str) -> None:
         self.handle_panel_request()
 
-    def post(self, path):
+    def post(self, path: str) -> None:
         self.handle_panel_request()
 
-    def delete(self, path):
+    def delete(self, path: str) -> None:
         self.handle_panel_request()
 
-    def put(self, path):
+    def put(self, path: str) -> None:
         self.handle_panel_request()
 
-    def handle_panel_request(self):
+    def handle_panel_request(self) -> None:
         path = list(filter(None, self.request.path.split("/")[4:]))
 
         # Sanitize user-provided values to break taint flow from request to output.
         # Even though output is JSON-serialized, sanitizing inputs prevents any
         # plugin runner from inadvertently reflecting raw user input.
         safe_path = "/" + "/".join(tornado.escape.xhtml_escape(p) for p in path)
-        safe_uri = tornado.escape.xhtml_escape(self.request.uri)
-        safe_query = tornado.escape.xhtml_escape(self.request.query)
+        safe_uri = tornado.escape.xhtml_escape(self.request.uri or "")
+        safe_query = tornado.escape.xhtml_escape(self.request.query or "")
         safe_arguments = {
             k: [tornado.escape.xhtml_escape(v.decode("utf-8", errors="replace")) for v in vals]
             for k, vals in self.request.arguments.items()
         }
-        data = {
+        data: dict[str, object] = {
             "content_type": "application/json",
             "content": {},
             "status": 200,
@@ -178,8 +180,9 @@ class PluginAPIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
             return
 
         # Run plugin and fetch return data
+        plugin_id = narrowing.strict_str(plugin_module.get("plugin_id"))
         try:
-            if not plugins.exec_plugin_api_plugin_runner(data, plugin_module.get("plugin_id")):
+            if not plugins.exec_plugin_api_plugin_runner(data, plugin_id):
                 tornado.log.app_log.exception(
                     f"Exception while carrying out plugin runner on PluginAPI '{plugin_module.get('plugin_id')}'"
                 )
@@ -199,11 +202,12 @@ class PluginAPIRequestHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
 
         self.render_data(data)
 
-    def render_data(self, data):
+    def render_data(self, data: dict[str, object]) -> None:
         # Always force JSON content type for API responses to prevent XSS
         self.set_header("Content-Type", "application/json")
         self.set_security_headers()
-        self.set_status(data.get("status"))
+        status_value = data.get("status")
+        self.set_status(status_value if isinstance(status_value, int) else 200)
         content = data.get("content", {})
         # Use Tornado's json_encode which escapes '</' sequences to prevent
         # script injection when JSON is embedded in HTML contexts
@@ -215,8 +219,8 @@ class PluginStaticFileHandler(tornado.web.StaticFileHandler):
     A static file handler which serves static content from a plugin '/static/' directory.
     """
 
-    def initialize(self, path, default_filename=None):
+    def initialize(self, path: str, default_filename: str | None = None) -> None:
         plugin_module = get_plugin_by_path(self.request.path)
         if plugin_module:
-            path = os.path.join(plugin_module.get("plugin_path"), "static")
+            path = os.path.join(narrowing.strict_str(plugin_module.get("plugin_path")), "static")
         super().initialize(path, default_filename)

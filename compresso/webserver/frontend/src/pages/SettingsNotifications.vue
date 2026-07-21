@@ -51,7 +51,12 @@
                   </q-item-section>
                   <q-item-section side>
                     <div class="row items-center q-gutter-xs">
-                      <q-toggle v-model="channel.enabled" @update:model-value="saveChannels" dense />
+                      <q-toggle
+                        v-model="channel.enabled"
+                        @update:model-value="saveChannels"
+                        :disable="!channelsLoaded"
+                        dense
+                      />
                       <q-btn
                         flat
                         dense
@@ -59,6 +64,7 @@
                         size="sm"
                         @click="testChannel(channel)"
                         :loading="testingId === channel.id"
+                        :disable="!channelsLoaded"
                       >
                         <q-tooltip>{{ $t('pages.settingsNotifications.sendTest') }}</q-tooltip>
                       </q-btn>
@@ -69,6 +75,7 @@
                         size="sm"
                         :aria-label="$t('a11y.editChannel')"
                         @click="editChannel(channel)"
+                        :disable="!channelsLoaded"
                       >
                         <q-tooltip>{{ $t('tooltips.configure') }}</q-tooltip>
                       </q-btn>
@@ -80,6 +87,7 @@
                         size="sm"
                         :aria-label="$t('a11y.deleteChannel')"
                         @click="confirmDelete(channel)"
+                        :disable="!channelsLoaded"
                       >
                         <q-tooltip>{{ $t('tooltips.delete') }}</q-tooltip>
                       </q-btn>
@@ -94,6 +102,7 @@
                   icon="add"
                   :label="$t('pages.settingsNotifications.addChannel')"
                   @click="openAddDialog"
+                  :disable="!channelsLoaded"
                 />
               </q-card-actions>
             </q-card>
@@ -185,14 +194,29 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import {
+  normalizeNotificationChannel,
+  serializeNotificationChannel,
+  type ChannelType,
+  type NotificationChannel,
+} from 'src/types/notifications'
+import { isRecord } from 'src/types/envelope'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
+import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
+
+interface ChannelForm {
+  name: string
+  type: ChannelType | ''
+  url: string
+  headersRaw: string
+  triggers: string[]
+}
 
 export default {
   name: 'SettingsNotifications',
@@ -203,11 +227,10 @@ export default {
   setup() {
     const { t: $t } = useI18n()
 
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    const compressoWSHandler = CompressoWebsocketHandler($t)
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      compressoWSHandler.init()
     }
 
     function closeCompressoWebsocket() {
@@ -225,17 +248,20 @@ export default {
   },
   data() {
     return {
-      loading: ref(true),
-      channels: ref([]),
-      showDialog: ref(false),
-      editingChannel: ref(null),
-      testingId: ref(null),
-      dialogForm: ref({
+      loading: true,
+      channelsLoaded: false,
+      channels: [] as NotificationChannel[],
+      // Raw entries the UI cannot manage; carried through saves untouched
+      unmanagedChannels: [] as unknown[],
+      showDialog: false,
+      editingChannel: null as NotificationChannel | null,
+      testingId: null as string | null,
+      dialogForm: ref<ChannelForm>({
         name: '',
         type: '',
         url: '',
         headersRaw: '',
-        triggers: [],
+        triggers: [] as string[],
       }),
     }
   },
@@ -267,7 +293,7 @@ export default {
     },
   },
   methods: {
-    channelIcon(type) {
+    channelIcon(type: ChannelType): string {
       const icons = {
         discord: 'fab fa-discord',
         slack: 'fab fa-slack',
@@ -275,7 +301,7 @@ export default {
       }
       return icons[type] || 'webhook'
     },
-    channelColor(type) {
+    channelColor(type: ChannelType): string {
       const colors = {
         discord: 'indigo',
         slack: 'green',
@@ -283,7 +309,7 @@ export default {
       }
       return colors[type] || 'grey'
     },
-    channelTypeLabel(type) {
+    channelTypeLabel(type: ChannelType): string {
       const labels = {
         discord: 'Discord',
         slack: 'Slack',
@@ -304,16 +330,28 @@ export default {
     },
     fetchChannels() {
       this.loading = true
+      this.channelsLoaded = false
       axios({
         method: 'get',
         url: getCompressoApiUrl('v2', 'notifications/channels'),
       })
         .then((response) => {
-          this.channels = response.data.channels || []
+          const responseData: unknown = response.data
+          if (!isRecord(responseData) || !Array.isArray(responseData.channels)) {
+            throw new TypeError('Notification channel response is invalid')
+          }
+          const channels: unknown[] = responseData.channels
+          this.channels = []
+          this.unmanagedChannels = []
+          for (const entry of channels) {
+            const normalized = normalizeNotificationChannel(entry)
+            if (normalized) this.channels.push(normalized)
+            else this.unmanagedChannels.push(entry)
+          }
+          this.channelsLoaded = true
           this.loading = false
         })
         .catch(() => {
-          this.channels = []
           this.loading = false
           this.$q.notify({
             color: 'negative',
@@ -325,10 +363,13 @@ export default {
         })
     },
     saveChannels() {
+      if (!this.channelsLoaded) return
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'notifications/channels/save'),
-        data: { channels: this.channels },
+        data: {
+          channels: [...this.channels.map(serializeNotificationChannel), ...this.unmanagedChannels],
+        },
       })
         .then(() => {
           this.$q.notify({
@@ -349,12 +390,12 @@ export default {
           })
         })
     },
-    testChannel(channel) {
+    testChannel(channel: NotificationChannel) {
       this.testingId = channel.id
       axios({
         method: 'post',
         url: getCompressoApiUrl('v2', 'notifications/channels/test'),
-        data: { channel: channel },
+        data: { channel: serializeNotificationChannel(channel) },
       })
         .then(() => {
           this.testingId = null
@@ -388,7 +429,7 @@ export default {
       }
       this.showDialog = true
     },
-    editChannel(channel) {
+    editChannel(channel: NotificationChannel) {
       this.editingChannel = channel
       this.dialogForm = {
         name: channel.name,
@@ -406,10 +447,19 @@ export default {
       }
 
       // Parse custom headers if provided
-      let headers = null
+      let headers: Record<string, string> | null = null
       if (this.dialogForm.type === 'webhook' && this.dialogForm.headersRaw) {
         try {
-          headers = JSON.parse(this.dialogForm.headersRaw)
+          const parsed: unknown = JSON.parse(this.dialogForm.headersRaw)
+          if (
+            typeof parsed !== 'object' ||
+            parsed === null ||
+            Array.isArray(parsed) ||
+            !Object.values(parsed).every((value) => typeof value === 'string')
+          ) {
+            throw new TypeError('Headers must be a JSON object with string values')
+          }
+          headers = parsed as Record<string, string>
         } catch {
           this.$q.notify({
             color: 'negative',
@@ -423,15 +473,17 @@ export default {
 
       if (this.editingChannel) {
         // Update existing channel
-        const idx = this.channels.findIndex((c) => c.id === this.editingChannel.id)
-        if (idx !== -1) {
-          this.channels[idx].name = this.dialogForm.name
-          this.channels[idx].type = this.dialogForm.type
-          this.channels[idx].url = this.dialogForm.url
-          this.channels[idx].headers = headers
-          this.channels[idx].triggers = [...this.dialogForm.triggers]
+        const editingChannelId = this.editingChannel.id
+        const idx = this.channels.findIndex((c) => c.id === editingChannelId)
+        const channel = this.channels[idx]
+        if (channel && this.dialogForm.type) {
+          channel.name = this.dialogForm.name
+          channel.type = this.dialogForm.type
+          channel.url = this.dialogForm.url
+          channel.headers = headers
+          channel.triggers = [...this.dialogForm.triggers]
         }
-      } else {
+      } else if (this.dialogForm.type) {
         // Add new channel
         this.channels.push({
           id: this.generateId(),
@@ -441,13 +493,14 @@ export default {
           headers: headers,
           triggers: [...this.dialogForm.triggers],
           enabled: true,
+          source: {},
         })
       }
 
       this.showDialog = false
       this.saveChannels()
     },
-    confirmDelete(channel) {
+    confirmDelete(channel: NotificationChannel) {
       this.$q
         .dialog({
           title: this.$t('headers.confirm'),

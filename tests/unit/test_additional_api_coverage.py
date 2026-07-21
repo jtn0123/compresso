@@ -84,8 +84,8 @@ class TestFileinfoApiCoverage(ApiTestBase):
     @patch("compresso.webserver.api_v2.fileinfo_api.os.path.exists", return_value=True)
     def test_probe_file_success(self, _mock_exists, mock_probe):
         mock_probe.return_value = {
-            "video_streams": [{"codec": "h264"}],
-            "audio_streams": [{"codec": "aac"}],
+            "video_streams": [{"codec_name": "h264"}],
+            "audio_streams": [{"codec_name": "aac"}],
             "subtitle_streams": [],
             "format": {"duration": "10.0"},
         }
@@ -94,7 +94,7 @@ class TestFileinfoApiCoverage(ApiTestBase):
 
         assert resp.code == 200
         data = self.parse_response(resp)
-        assert data["format"]["duration"] == "10.0"
+        assert data["format"]["duration"] == 10.0
 
     @patch("compresso.webserver.api_v2.fileinfo_api.os.path.exists", return_value=False)
     def test_probe_file_missing_file(self, _mock_exists):
@@ -127,7 +127,7 @@ class TestFileinfoApiCoverage(ApiTestBase):
             resp = self.post_json("/fileinfo/task", {"task_id": 1})
 
         assert resp.code == 200
-        assert self.parse_response(resp)["format"]["duration"] == "22.0"
+        assert self.parse_response(resp)["format"]["duration"] == 22.0
 
     def test_probe_task_file_not_found(self):
         from compresso.libs.unmodels import CompletedTasks

@@ -31,7 +31,7 @@ Copyright:
 
 
 class FFMpegError(Exception):
-    def __init__(self, command, info):
+    def __init__(self, command: list[str], info: object) -> None:
         Exception.__init__(self, f"Unable to fetch data from ffmpeg command - {info}. Command: {' '.join(command)}")
         self.path = command
         self.info = info

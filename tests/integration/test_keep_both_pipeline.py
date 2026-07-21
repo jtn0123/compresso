@@ -57,6 +57,8 @@ def _real_task(cache_path, source_abspath, task_id=1):
         library_id=1,
         success=True,
         type="local",
+        start_time=None,
+        finish_time=None,
     )
     return t
 

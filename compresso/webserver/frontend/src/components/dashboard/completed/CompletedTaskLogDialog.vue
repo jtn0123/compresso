@@ -10,7 +10,7 @@
   </CompressoDialogWindow>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
@@ -18,6 +18,8 @@ import { sanitizeHtml } from 'src/js/sanitize'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
 
 const props = defineProps({
   completedTaskId: {
@@ -27,17 +29,17 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['hide', 'ok'])
-const dialogRef = ref(null)
-const taskDetails = ref([])
+const dialogRef = ref<DialogController | null>(null)
+const taskDetails = ref<string[]>([])
 const $q = useQuasar()
 const { t: $t } = useI18n()
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -46,9 +48,9 @@ const onDialogHide = () => {
 
 const fetchCompletedTaskLog = () => {
   let data = {
-    task_id: props.completedTaskId,
+    task_id: Number(props.completedTaskId),
   }
-  axios({
+  axios<ApiSchema<'CompletedTasksLog'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'history/task/log'),
     data: data,
