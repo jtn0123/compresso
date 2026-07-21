@@ -142,14 +142,14 @@ def _generate_changelog_from_git() -> list[str] | None:
         return None
 
 
+def _read_file_lines(path: str | os.PathLike[str]) -> list[str]:
+    with open(path) as f:
+        return f.readlines()
+
+
 class ApiDocsHandler(BaseApiHandler):
     session: session.Session
     params: object
-
-    @staticmethod
-    def _read_file_lines(path: str) -> list[str]:
-        with open(path) as f:
-            return f.readlines()
 
     compresso_data_queues: DataQueues
 
@@ -218,7 +218,7 @@ class ApiDocsHandler(BaseApiHandler):
                 privacy_policy_file = os.path.join(os.path.dirname(__file__), "..", "docs", "privacy_policy.md")
                 if os.path.exists(privacy_policy_file):
                     loop = IOLoop.current()
-                    changelog_content = await loop.run_in_executor(None, self._read_file_lines, privacy_policy_file)
+                    changelog_content = await loop.run_in_executor(None, _read_file_lines, privacy_policy_file)
 
             if not changelog_content:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Unable to generate changelog.")

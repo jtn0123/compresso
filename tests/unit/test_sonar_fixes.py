@@ -99,18 +99,18 @@ class TestPluginLogSanitization:
 @pytest.mark.unittest
 class TestPluginReposMixinHelpers:
     def test_read_json_file(self, tmp_path):
-        from compresso.webserver.api_v2.plugin_repos_mixin import PluginReposMixin
+        from compresso.webserver.api_v2.plugin_repos_mixin import _read_json_file
 
         p = tmp_path / "test.json"
         p.write_text('{"key": "value"}')
-        result = PluginReposMixin._read_json_file(str(p))
+        result = _read_json_file(str(p))
         assert result == {"key": "value"}
 
     def test_write_json_file(self, tmp_path):
-        from compresso.webserver.api_v2.plugin_repos_mixin import PluginReposMixin
+        from compresso.webserver.api_v2.plugin_repos_mixin import _write_json_file
 
         p = tmp_path / "out.json"
-        PluginReposMixin._write_json_file(str(p), {"hello": "world"})
+        _write_json_file(str(p), {"hello": "world"})
         with open(str(p)) as f:
             assert json.load(f) == {"hello": "world"}
 
@@ -123,9 +123,9 @@ class TestPluginReposMixinHelpers:
 @pytest.mark.unittest
 class TestDocsApiHelpers:
     def test_read_file_lines(self, tmp_path):
-        from compresso.webserver.api_v2.docs_api import ApiDocsHandler
+        from compresso.webserver.api_v2.docs_api import _read_file_lines
 
         p = tmp_path / "test.txt"
         p.write_text("line1\nline2\n")
-        result = ApiDocsHandler._read_file_lines(str(p))
+        result = _read_file_lines(str(p))
         assert result == ["line1\n", "line2\n"]

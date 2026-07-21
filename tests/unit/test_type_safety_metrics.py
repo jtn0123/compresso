@@ -59,3 +59,21 @@ def test_metrics_json_is_machine_readable(tmp_path):
 
     assert payload["python_production"]["files"] == 0
     assert payload["frontend"]["production_js_files"] == 0
+
+
+@pytest.mark.unittest
+def test_collect_metrics_recognizes_case_insensitive_vue_script_tags(tmp_path):
+    from scripts.type_safety_metrics import collect_metrics
+
+    frontend = tmp_path / "compresso" / "webserver" / "frontend" / "src"
+    frontend.mkdir(parents=True)
+    (tmp_path / "tests").mkdir()
+    (frontend / "Panel.vue").write_text(
+        '<template><div /></template>\n<SCRIPT SETUP LANG="TS">\nconst count: number = 1\n</SCRIPT>\n',
+        encoding="utf-8",
+    )
+
+    metrics = collect_metrics(tmp_path)
+
+    assert metrics.frontend.typed_vue_files == 1
+    assert metrics.frontend.vue_script_loc == 3

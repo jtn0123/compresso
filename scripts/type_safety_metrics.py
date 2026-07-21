@@ -135,7 +135,7 @@ def _is_test_script(path: Path) -> bool:
 
 
 def _vue_script_loc(source: str) -> int:
-    script_blocks = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", source, flags=re.DOTALL)
+    script_blocks = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", source, flags=re.DOTALL | re.IGNORECASE)
     return sum(_nonblank_count(block.splitlines()) + 2 for block in script_blocks)
 
 
@@ -151,7 +151,7 @@ def _collect_frontend(frontend_root: Path) -> FrontendMetrics:
         if path.suffix == ".vue":
             source = path.read_text(encoding="utf-8")
             vue_files += 1
-            typed_vue_files += int(bool(re.search(r"<script[^>]*\blang=[\"']ts[\"']", source)))
+            typed_vue_files += int(bool(re.search(r"<script[^>]*\blang=[\"']ts[\"']", source, flags=re.IGNORECASE)))
             vue_script_loc += _vue_script_loc(source)
             continue
         if path.suffix not in {".js", ".ts"}:

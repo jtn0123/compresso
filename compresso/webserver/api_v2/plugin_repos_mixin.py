@@ -26,22 +26,22 @@ from compresso.webserver.api_v2.schema.plugin_schemas import (
 from compresso.webserver.helpers import plugins
 
 
+def _read_json_file(path: str | os.PathLike[str]) -> dict[str, object]:
+    with open(path) as f:
+        value = json.load(f)
+    if not isinstance(value, Mapping):
+        raise ValueError("Community repository cache must contain an object")
+    return {str(key): item for key, item in value.items()}
+
+
+def _write_json_file(path: str | os.PathLike[str], data: object) -> None:
+    atomic_json_write(path, data, mode=0o600)
+
+
 class PluginReposMixin(BaseApiHandler):
     """Mixin for plugin repository management endpoints."""
 
     session: Session | None
-
-    @staticmethod
-    def _read_json_file(path: str | os.PathLike[str]) -> dict[str, object]:
-        with open(path) as f:
-            value = json.load(f)
-        if not isinstance(value, Mapping):
-            raise ValueError("Community repository cache must contain an object")
-        return {str(key): item for key, item in value.items()}
-
-    @staticmethod
-    def _write_json_file(path: str | os.PathLike[str], data: object) -> None:
-        atomic_json_write(path, data, mode=0o600)
 
     async def update_repo_list(self) -> None:
         """
@@ -230,7 +230,7 @@ class PluginReposMixin(BaseApiHandler):
 
             if not self.settings.get("serve_traceback") and os.path.exists(cache_path):
                 try:
-                    cached = await IOLoop.current().run_in_executor(None, self._read_json_file, cache_path)
+                    cached = await IOLoop.current().run_in_executor(None, _read_json_file, cache_path)
                     cached_at_value = cached.get("cached_at", 0)
                     cached_at = float(cached_at_value) if isinstance(cached_at_value, (int, float)) else 0.0
                     cached_response_value = cached.get("response")
@@ -264,7 +264,7 @@ class PluginReposMixin(BaseApiHandler):
             if not self.settings.get("serve_traceback"):
                 try:
                     await IOLoop.current().run_in_executor(
-                        None, partial(self._write_json_file, cache_path, {"cached_at": time.time(), "response": response})
+                        None, partial(_write_json_file, cache_path, {"cached_at": time.time(), "response": response})
                     )
                 except Exception:
                     tornado.log.app_log.warning("Failed to write community repos cache", exc_info=True)
