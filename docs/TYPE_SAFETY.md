@@ -9,7 +9,7 @@ checklists or metrics.
 | Status | Complete |
 | Baseline | `f3f566a8` (`v1.17.0`) |
 | Started | 2026-07-20 |
-| Last verified | 2026-07-20 |
+| Last verified | 2026-07-21 |
 | Target | Strict production Python and direct production frontend TypeScript |
 | Tests | Legacy tests may remain untyped; shared helpers and new or touched tests are typed |
 
@@ -30,9 +30,9 @@ The reporter is read-only; update this table in the same PR that changes a work 
 
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
-| Production Python files | 245 | 248 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,681 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 1,889 / 1,889 | 100% |
+| Production Python files | 245 | 249 | All checked |
+| Production Python nonblank LOC | 44,273 | 47,683 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 1,869 / 1,869 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
 | Normal mypy errors | 0 | 0 | 0 |
@@ -42,7 +42,7 @@ The reporter is read-only; update this table in the same PR that changes a work 
 | Production frontend JavaScript LOC | 2,451 | 0 | 0 |
 | Production frontend TypeScript files | 0 | 45 | All production modules |
 | Typed Vue components | 0 / 88 | 88 / 88 | 100% |
-| Vue script LOC | 12,182 | 12,783 | All checked |
+| Vue script LOC | 12,182 | 12,805 | All checked |
 
 ## Work Ledger
 
@@ -83,6 +83,7 @@ The migration was kept behavior-preserving except where stricter boundary checks
 - The OpenAPI schema now expands nested response shapes and generated frontend declarations are checked for drift.
 - Bundled plugin identifiers and settings filenames are allowlisted and confined to their configured roots, preventing malformed metadata or symlinks from escaping the plugin directory or forging log lines.
 - Worker metric timing no longer accepts and immediately overwrites a caller-supplied interval; the interval now has one clear owner based on current worker activity.
+- A post-review fix pass (2026-07-21) repaired regressions the migration itself introduced: the library settings page rejecting the real `settings/read` payload, plugin-settings imports saving under the wrong plugin id, websocket streams losing their 10-row limit to stringly params, worker start times and exception tracebacks disappearing, and the tightened `settings/library/write` schema rejecting supported partial updates. Boundary narrowing now lives in `compresso/libs/narrowing.py`.
 
 ## Decisions
 
@@ -95,6 +96,8 @@ The migration was kept behavior-preserving except where stricter boundary checks
 | REST contracts | Generate from the backend OpenAPI 3 schema | Prevents manually maintained request/response drift |
 | WebSocket/browser contracts | Hand-written discriminated unions with runtime narrowing | These inputs are not represented by the REST schema |
 | Runtime validation | Preserve Marshmallow and explicit boundary guards | Static types do not validate untrusted runtime data |
+| Browser test matrix | Installed Google Chrome + WebKit; Firefox smoke projects removed from the local Playwright config and CI | The migration validated against branded Chrome (matching the primary user base) after reproducible local Firefox launch failures; the full Linux CI parity gate retains its own coverage. Revisit if Gecko-specific regressions surface |
+| Boundary narrowing helpers | Single `compresso/libs/narrowing.py` module with explicit `strict_*` vs `coerce_*` families | Divergent per-module private helpers caused real regressions (stringly websocket stream params silently defaulting); one module makes the chosen semantics visible at each call site |
 
 ## Exception Ledger
 

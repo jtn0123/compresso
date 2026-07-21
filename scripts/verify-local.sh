@@ -52,6 +52,7 @@ echo "==> Running Python lint, format, and type gates"
 "${PYTHON_BIN}" -m ruff check compresso/ tests/
 "${PYTHON_BIN}" -m ruff format --check compresso/ tests/
 "${PYTHON_BIN}" -m mypy --strict compresso/ --no-error-summary
+"${PYTHON_BIN}" -m mypy --strict scripts/type_safety_metrics.py scripts/openapi_contract.py --no-error-summary
 "${PYTHON_BIN}" scripts/openapi_contract.py --check
 
 echo "==> Running Python unit tests"

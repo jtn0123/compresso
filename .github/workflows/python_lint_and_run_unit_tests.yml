@@ -75,6 +75,7 @@ jobs:
     - name: Type check with mypy
       run: |
         mypy --strict compresso/ --no-error-summary
+        mypy --strict scripts/type_safety_metrics.py scripts/openapi_contract.py --no-error-summary
 
     - name: Check OpenAPI contract drift
       run: python scripts/openapi_contract.py --check

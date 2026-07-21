@@ -9,7 +9,6 @@ Base class for testing Tornado API handlers using tornado.testing.
 
 import gc
 import json
-from unittest.mock import patch
 
 import tornado.testing
 import tornado.web
@@ -27,15 +26,15 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
 
     handler_class = None
 
+    # NOTE: auth/CSRF enforcement is disabled for every AsyncHTTPTestCase by the
+    # autouse `isolate_api_security_settings` fixture in tests/conftest.py — do
+    # not duplicate that here. Tests that exercise the enforcement paths must
+    # monkeypatch Config.get_api_auth_enforced / get_csrf_protection_enforced
+    # back to True (or use their own settings object, as test_api_auth.py does).
+
     def setUp(self):
         if self.handler_class is None:
             return
-        self._security_patchers = [
-            patch("compresso.config.Config.get_api_auth_enforced", return_value=False),
-            patch("compresso.config.Config.get_csrf_protection_enforced", return_value=False),
-        ]
-        for patcher in self._security_patchers:
-            patcher.start()
         # Reset the rate limiter singleton between tests
         import compresso.webserver.api_v2.rate_limiter as rl_module
 
@@ -48,8 +47,6 @@ class ApiTestBase(tornado.testing.AsyncHTTPTestCase):
         try:
             super().tearDown()
         finally:
-            for patcher in reversed(self._security_patchers):
-                patcher.stop()
             # Tornado closes these objects in its own teardown, but explicitly
             # dropping the large references between handler tests keeps long
             # pytest runs from accumulating request/IOLoop object graphs.
