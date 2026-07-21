@@ -42,7 +42,7 @@ from peewee import Database, Field, Model, Proxy, SqliteDatabase
 from peewee_migrate import Migrator, Router
 
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.peewee_types import execute_write
+from compresso.libs.peewee_types import execute_write, get_table_indexes
 from compresso.libs.unmodels.lib import BaseModel
 
 _logger = logging.getLogger(__name__)
@@ -332,7 +332,7 @@ class Migrations:
     def _sync_model_indexes(self, model: type[Model], database: Database, migrator: Migrator) -> None:
         table_name = str(model._meta.table_name)
         try:
-            existing = database.get_indexes(table_name)
+            existing = get_table_indexes(database, table_name)
         except Exception:
             self.logger.exception("Failed to fetch indexes for table %s", table_name)
             return

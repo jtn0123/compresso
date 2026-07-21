@@ -43,6 +43,12 @@ def iterate_query[T](query: object, item_type: type[T]) -> Iterable[T]:
     return cast("IterableQuery[T]", query).iterator()
 
 
+def get_table_indexes(database: Database, table_name: str) -> list[object]:
+    """Fetch index metadata; abstract on the base Database, but every concrete backend returns a list."""
+    fetch = cast("Callable[[str], list[object]]", database.get_indexes)
+    return fetch(table_name)
+
+
 def model_as_dict(model: object, *, backrefs: bool = False) -> dict[str, object]:
     serializer = cast("Callable[..., dict[str, object]]", model_to_dict)
     return serializer(model, backrefs=backrefs)

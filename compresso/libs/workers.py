@@ -89,9 +89,9 @@ def _run_worker_plugin(
     plugin_handler: PluginsHandler,
     data: dict[str, object],
     runner_id: str,
-    result: dict[str, bool | None],
+    outcome: "queue.Queue[bool]",
 ) -> None:
-    result["success"] = plugin_handler.exec_plugin_runner(data, runner_id, "worker.process")
+    outcome.put(plugin_handler.exec_plugin_runner(data, runner_id, "worker.process"))
 
 
 class Worker(threading.Thread):
@@ -613,10 +613,10 @@ class Worker(threading.Thread):
         runner_id: str,
         plugin_name: object,
     ) -> bool:
-        result: dict[str, bool | None] = {"success": None}
+        outcome: queue.Queue[bool] = queue.Queue(maxsize=1)
         runner_thread = threading.Thread(
             target=_run_worker_plugin,
-            args=(plugin_handler, data, runner_id, result),
+            args=(plugin_handler, data, runner_id, outcome),
             daemon=True,
         )
         runner_thread.start()
@@ -624,7 +624,11 @@ class Worker(threading.Thread):
         if self.redundant_flag.is_set():
             self.__record_terminated_worker_plugin(runner_thread, runner_id, data)
             return False
-        if result["success"]:
+        try:
+            success = outcome.get_nowait()
+        except queue.Empty:
+            success = False
+        if success:
             return True
         self.log.append("\n\nPLUGIN FAILED!")
         self.log.append(f"\nFailed to execute Plugin '{plugin_name}'")
