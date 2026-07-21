@@ -34,8 +34,10 @@ import tempfile
 from pathlib import Path
 
 import tornado.web
+from tornado.httputil import HTTPFile
 
 from compresso import config
+from compresso.libs.plugins import PluginsHandler
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 
 MB = 1024 * 1024
@@ -47,7 +49,7 @@ TRANSFER_SUCCESSORS = {
 }
 
 
-def _persist_plugin_upload(upload_root, body):
+def _persist_plugin_upload(upload_root: Path, body: bytes) -> Path:
     """Write a framework-parsed upload outside the async request loop."""
     upload_root.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor, temporary_path = tempfile.mkstemp(prefix="plugin-", suffix=".zip", dir=upload_root)
@@ -63,7 +65,7 @@ def _persist_plugin_upload(upload_root, body):
     return upload_path
 
 
-def _install_plugin_serialized(plugins_handler, upload_path):
+def _install_plugin_serialized(plugins_handler: PluginsHandler, upload_path: Path) -> bool:
     """Compatibility wrapper; the installer now locks by validated plugin ID."""
     return plugins_handler.install_plugin_from_path_on_disk(upload_path)
 
@@ -80,15 +82,15 @@ class ApiUploadHandler(BaseApiHandler):
         }
     ]
 
-    def prepare(self):
+    def prepare(self) -> None:
         super().prepare()
         if not self._finished:
             self._write_retirement_response()
 
-    def data_received(self, chunk):
+    def data_received(self, chunk: bytes) -> None:
         """Discard bytes if a client races the early 410 response."""
 
-    def _write_retirement_response(self):
+    def _write_retirement_response(self) -> None:
         self.set_status(410)
         self.finish(
             {
@@ -97,7 +99,7 @@ class ApiUploadHandler(BaseApiHandler):
             }
         )
 
-    async def retire_pending_upload(self):
+    async def retire_pending_upload(self) -> None:
         """Return the resumable-transfer successor contract.
         ---
         description: This legacy media-ingress route is retired; use resumable transfer endpoints.
@@ -121,11 +123,13 @@ class ApiPluginUploadHandler(BaseApiHandler):
         }
     ]
 
-    def initialize(self, **kwargs):
+    config: config.Config
+
+    def initialize(self, **kwargs: object) -> None:
         super().initialize(**kwargs)
         self.config = config.Config()
 
-    def _plugin_upload(self):
+    def _plugin_upload(self) -> HTTPFile:
         content_length = self.request.headers.get("Content-Length")
         if content_length is not None:
             try:
@@ -142,7 +146,7 @@ class ApiPluginUploadHandler(BaseApiHandler):
                 return upload
         raise BaseApiError("A plugin ZIP file is required", status_code=400)
 
-    async def upload_and_install_plugin(self):
+    async def upload_and_install_plugin(self) -> None:
         """Install one ordinary multipart plugin upload and remove its temp copy.
         ---
         description: Upload a plugin ZIP archive limited to 64 MiB compressed.
@@ -164,13 +168,11 @@ class ApiPluginUploadHandler(BaseApiHandler):
           413:
             description: Compressed plugin archive exceeds 64 MiB.
         """
-        upload_path = None
+        upload_path: Path | None = None
         try:
             upload = self._plugin_upload()
             upload_root = Path(self.config.get_cache_path()).resolve() / "plugin_uploads"
             upload_path = await asyncio.to_thread(_persist_plugin_upload, upload_root, upload.body)
-
-            from compresso.libs.plugins import PluginsHandler
 
             installed = await asyncio.to_thread(_install_plugin_serialized, PluginsHandler(), upload_path)
             if not installed:

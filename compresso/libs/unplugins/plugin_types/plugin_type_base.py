@@ -31,7 +31,10 @@ Copyright:
 
 import inspect
 import json
+from collections.abc import Callable, Mapping
 from copy import deepcopy
+from types import ModuleType
+from typing import cast
 
 from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.task import TaskDataStore
@@ -47,10 +50,10 @@ class PluginType:
     name = ""
     runner = ""
     runner_docstring = ""
-    data_schema: dict = {}
-    test_data: dict = {}
+    data_schema: dict[str, dict[str, object]] = {}
+    test_data: dict[str, object] = {}
 
-    def plugin_type_name(self):
+    def plugin_type_name(self) -> str:
         """
         Return the plugin runner string
 
@@ -58,7 +61,7 @@ class PluginType:
         """
         return self.name
 
-    def plugin_runner(self):
+    def plugin_runner(self) -> str:
         """
         Return the plugin runner string
 
@@ -66,7 +69,7 @@ class PluginType:
         """
         return self.runner
 
-    def plugin_runner_docstring(self):
+    def plugin_runner_docstring(self) -> str:
         """
         Return the plugin runner docstring
 
@@ -74,15 +77,15 @@ class PluginType:
         """
         return self.runner_docstring
 
-    def get_plugin_runner_function(self, plugin_module):
+    def get_plugin_runner_function(self, plugin_module: ModuleType) -> Callable[..., object] | None:
         plugin_runner = self.plugin_runner()
         # Check if this module contains the given plugin type runner function
         if hasattr(plugin_module, plugin_runner):
             # If it does, add it to the plugin_modules list
-            return getattr(plugin_module, plugin_runner)
+            return cast("Callable[..., object]", getattr(plugin_module, plugin_runner))
         return None
 
-    def get_data_schema(self):
+    def get_data_schema(self) -> dict[str, dict[str, object]]:
         """
         Return the plugin data schema dictionary
 
@@ -90,7 +93,7 @@ class PluginType:
         """
         return self.data_schema
 
-    def get_test_data(self):
+    def get_test_data(self) -> dict[str, object]:
         """
         Return the plugin test data dictionary
 
@@ -99,13 +102,23 @@ class PluginType:
         return self.test_data
 
     @staticmethod
-    def modify_test_data(d: dict, v: dict):
+    def modify_test_data(d: Mapping[str, object], v: Mapping[str, str]) -> dict[str, object]:
         dict_str = json.dumps(d)
         for a, b in v.items():
             dict_str = dict_str.replace(a, b)
-        return json.loads(dict_str)
+        result = json.loads(dict_str)
+        if not isinstance(result, dict) or not all(isinstance(key, str) for key in result):
+            return {}
+        return cast("dict[str, object]", result)
 
-    def __data_schema_test_data(self, plugin_id, plugin_runner, result_data, data_schema, data_tree="/"):
+    def __data_schema_test_data(
+        self,
+        plugin_id: str,
+        plugin_runner: str,
+        result_data: object,
+        data_schema: Mapping[str, object],
+        data_tree: str = "/",
+    ) -> list[str]:
         """
         Ensure the test data returned is valid according to the schema
 
@@ -117,7 +130,7 @@ class PluginType:
         :return:
         """
 
-        def test_data_type(provided_data, expected_data_type):
+        def test_data_type(provided_data: object, expected_data_type: object) -> bool:
             # Test for NoneType
             # Callable functions are best tested with the callable function
             # Everything else should be tested with the isinstance function
@@ -126,18 +139,22 @@ class PluginType:
             elif expected_data_type == "callable":
                 if callable(provided_data):
                     return True
-            elif isinstance(provided_data, expected_data_type):
+            elif isinstance(expected_data_type, type) and isinstance(provided_data, expected_data_type):
                 return True
             return False
 
-        errors = []
+        errors: list[str] = []
         if not isinstance(result_data, dict):
             # This runner function is not returning anything
             error = f"Plugin '{plugin_id} - {plugin_runner}()' has failed to return any output data."
             errors.append(error)
             return errors
         for key in data_schema:
-            schema_meta = data_schema.get(key)
+            schema_meta_value = data_schema.get(key)
+            if not isinstance(schema_meta_value, dict):
+                errors.append(f"Plugin schema for '{data_tree}{key}' must be an object.")
+                continue
+            schema_meta = cast("dict[str, object]", schema_meta_value)
             if schema_meta.get("required") and key not in result_data:
                 error = (
                     f"Plugin '{plugin_id} - {plugin_runner}()' is missing required key '{data_tree}{key}' in the output data."
@@ -155,7 +172,7 @@ class PluginType:
                 #   iterate over that list and test all types.
                 correct_type = False
                 if isinstance(data_type, list):
-                    for dt in data_type:
+                    for dt in cast("list[object]", data_type):
                         if test_data_type(child_data, dt):
                             correct_type = True
                             break
@@ -173,7 +190,7 @@ class PluginType:
                     errors.append(error)
                 # Check if data_schema has children
                 children_data_schema = schema_meta.get("children")
-                if children_data_schema:
+                if isinstance(children_data_schema, dict):
                     child_data_tree = f"{data_tree}{key}>"
                     errors += self.__data_schema_test_data(
                         plugin_id, plugin_runner, child_data, children_data_schema, data_tree=child_data_tree
@@ -181,7 +198,7 @@ class PluginType:
 
         return errors
 
-    def run_data_schema_tests(self, plugin_id, plugin_module, test_data):
+    def run_data_schema_tests(self, plugin_id: str, plugin_module: ModuleType, test_data: Mapping[str, object]) -> list[str]:
         """
         With a given set of test data, this method tests the provided
         plugin module's data output against the schema dictionary.
@@ -193,24 +210,34 @@ class PluginType:
         """
         plugin_runner = self.plugin_runner()
         plugin_runner_function = self.get_plugin_runner_function(plugin_module)
+        if plugin_runner_function is None:
+            return [f"Plugin '{plugin_id}' does not provide runner '{plugin_runner}'."]
         plugin_runner_sig = inspect.signature(plugin_runner_function)
 
         # Get test data
         if not test_data:
             test_data = self.get_test_data()
-        test_data_copy = deepcopy(test_data)
+        test_data_copy: dict[str, object] = deepcopy(dict(test_data))
 
         # Get data schema
         data_schema = self.get_data_schema()
+
+        params = plugin_runner_sig.parameters
+
+        def supports_kwarg(name: str) -> bool:
+            if name in params:
+                return True
+            return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
         # Execute plugin function
         run_count = 0
         while run_count < 2:
             # if we have a task_id, bind context for store-based calls
             task_id = test_data_copy.get("task_id")
-            if task_id is not None:
+            typed_task_id = task_id if isinstance(task_id, int) and not isinstance(task_id, bool) else None
+            if typed_task_id is not None:
                 TaskDataStore.bind_runner_context(
-                    task_id=task_id,
+                    task_id=typed_task_id,
                     plugin_id=plugin_id,
                     runner=plugin_runner,
                 )
@@ -218,21 +245,14 @@ class PluginType:
             metadata_path = test_data_copy.get("path") or test_data_copy.get("file_path")
             CompressoFileMetadata.bind_runner_context(
                 plugin_id=plugin_id,
-                task_id=task_id,
-                path=metadata_path,
+                task_id=typed_task_id,
+                path=metadata_path if isinstance(metadata_path, str) else None,
             )
-
-            params = plugin_runner_sig.parameters
-
-            def supports_kwarg(name, params=params):
-                if name in params:
-                    return True
-                return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
 
             # v2.0: kwargs-only plugin runner contract (matches executor.py).
             # Legacy positional fallback removed; non-conforming plugins
             # will raise TypeError, surfaced as a clean test-data error.
-            kwargs = {}
+            kwargs: dict[str, object] = {}
             if supports_kwarg("task_data_store"):
                 kwargs["task_data_store"] = TaskDataStore
             if supports_kwarg("file_metadata"):

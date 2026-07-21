@@ -21,25 +21,29 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import type { PropType } from 'vue'
+import type { Chart as ChartInstance } from 'chart.js'
 import { useQuasar } from 'quasar'
 import { useChartTheme } from 'src/composables/useChartTheme'
+
+interface CodecCount { codec: string; count: number }
 
 export default {
   name: 'CodecDistributionChart',
   props: {
-    sourceCodecs: { type: Array, default: () => [] },
-    destinationCodecs: { type: Array, default: () => [] },
+    sourceCodecs: { type: Array as PropType<CodecCount[]>, default: () => [] },
+    destinationCodecs: { type: Array as PropType<CodecCount[]>, default: () => [] },
     loading: { type: Boolean, default: false },
   },
   setup(props) {
     const $q = useQuasar()
     const { getChartColors } = useChartTheme()
-    const sourceChartRef = ref(null)
-    const destChartRef = ref(null)
-    let sourceChart = null
-    let destChart = null
+    const sourceChartRef = ref<HTMLCanvasElement | null>(null)
+    const destChartRef = ref<HTMLCanvasElement | null>(null)
+    let sourceChart: ChartInstance<'doughnut'> | null = null
+    let destChart: ChartInstance<'doughnut'> | null = null
 
     async function renderCharts() {
       const { Chart, DoughnutController, ArcElement, Tooltip, Legend } = await import('chart.js')

@@ -35,9 +35,12 @@ import os
 import shutil
 import threading
 import time
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
+from typing import TypedDict
 
 import schedule
+from peewee import DoesNotExist
 
 from compresso import config
 from compresso.libs import task
@@ -52,24 +55,38 @@ from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.libs.worker_group import WorkerGroup
 
 
+class InstallationCandidate(TypedDict):
+    id: str
+    score: float
+
+
+def _reported_count(value: object) -> int:
+    """Support Peewee query-like iterables and test doubles without trusting arbitrary values."""
+    count = getattr(value, "count", None)
+    if not callable(count):
+        return 0
+    reported: object = count()
+    return reported if isinstance(reported, int) and not isinstance(reported, bool) else 0
+
+
 class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
     """
     Manage any tasks that Compresso needs to execute at regular intervals
     """
 
-    def __init__(self, event):
+    def __init__(self, event: threading.Event) -> None:
         super().__init__(name="ScheduledTasksManager")
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.event = event
         self.abort_flag = threading.Event()
         self.abort_flag.clear()
         self.scheduler = schedule.Scheduler()
         self._init_thread_health()
 
-    def stop(self):
+    def stop(self) -> None:
         self.abort_flag.set()
 
-    def run(self):
+    def run(self) -> None:
         self.logger.info("Starting ScheduledTasks Monitor loop")
 
         # Create scheduled tasks
@@ -112,29 +129,32 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         self.scheduler.clear()
         self.logger.info("Leaving ScheduledTasks Monitor loop...")
 
-    def register_compresso(self):
+    def register_compresso(self) -> None:
         self.logger.info("Updating session data")
         s = Session()
         s.register_compresso(force=True)
 
-    def plugin_repo_update(self):
+    def plugin_repo_update(self) -> None:
         self.logger.info("Checking for updates to plugin repos")
         plugin_handler = PluginsHandler()
         plugin_handler.update_plugin_repos()
 
-    def update_remote_installation_links(self):
+    def update_remote_installation_links(self) -> None:
         # Don't log this as it will happen often
         links = Links()
         links.update_all_remote_installation_links()
 
     @staticmethod
-    def _worker_group_allocations(worker_groups, target_total):
+    def _worker_group_allocations(worker_groups: Sequence[Mapping[str, object]], target_total: int) -> list[int]:
         """Allocate an installation-level target across its worker groups."""
         if not worker_groups:
             return []
 
         target_total = max(0, int(target_total))
-        current_counts = [max(0, int(group.get("number_of_workers", 0))) for group in worker_groups]
+        current_counts = [
+            max(0, int(value)) if isinstance((value := group.get("number_of_workers", 0)), (int, str)) else 0
+            for group in worker_groups
+        ]
         current_total = sum(current_counts)
         if current_total == 0:
             return [target_total, *([0] * (len(worker_groups) - 1))]
@@ -151,7 +171,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             allocations[index] += 1
         return allocations
 
-    def _set_local_worker_group_total(self, target_total):
+    def _set_local_worker_group_total(self, target_total: int) -> None:
         """Persist a distributed worker target to the worker-group model used by Foreman."""
         worker_groups = WorkerGroup.get_all_worker_groups()
         allocations = self._worker_group_allocations(worker_groups, target_total)
@@ -161,16 +181,19 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             worker_group.save()
 
     @staticmethod
-    def _installation_worker_allocations(candidates, target_total, runnable_demand):
+    def _installation_worker_allocations(
+        candidates: Sequence[Mapping[str, object]], target_total: int, runnable_demand: int
+    ) -> dict[str, int]:
         """Allocate a bounded global worker target by deterministic capacity score."""
         target_total = min(max(0, int(target_total)), max(0, int(runnable_demand)))
         if target_total == 0 or not candidates:
-            return {candidate["id"]: 0 for candidate in candidates}
+            return {str(candidate["id"]): 0 for candidate in candidates}
 
         weighted = []
         for candidate in candidates:
+            score_value = candidate.get("score", 0)
             try:
-                score = float(candidate.get("score", 0))
+                score = float(score_value) if isinstance(score_value, (int, float, str)) else 0
             except (TypeError, ValueError):
                 score = 0
             weighted.append((str(candidate["id"]), score if math.isfinite(score) and score > 0 else 1.0))
@@ -187,7 +210,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             allocations[candidate_id] += 1
         return allocations
 
-    def set_worker_count_based_on_remote_installation_links(self):
+    def set_worker_count_based_on_remote_installation_links(self) -> None:
         settings = config.Config()
 
         # Count only work a worker could claim now. Approval, completed, and
@@ -213,16 +236,18 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         # Get runnable demand across all linked installations.
         total_tasks = local_task_count
         for linked_config in linked_configs:
-            total_tasks += int(linked_config.get("runnable_task_count", linked_config.get("task_count", 0)))
+            task_count = linked_config.get("runnable_task_count", linked_config.get("task_count", 0))
+            if isinstance(task_count, (int, str)):
+                total_tasks += int(task_count)
 
         try:
             local_capabilities = WorkerCapabilities().snapshot(settings)
         except Exception:
             local_capabilities = {}
-        candidates = [
+        candidates: list[InstallationCandidate] = [
             {
                 "id": "__local__",
-                "score": WorkerCapabilities.scheduling_score(local_capabilities),
+                "score": WorkerCapabilities.scheduling_score(local_capabilities) or 0.0,
             }
         ]
         for index, linked_config in enumerate(linked_configs):
@@ -231,7 +256,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             candidates.append(
                 {
                     "id": str(linked_config.get("uuid") or linked_config.get("address") or f"remote-{index}"),
-                    "score": WorkerCapabilities.scheduling_score(linked_config.get("capabilities", {})),
+                    "score": WorkerCapabilities.scheduling_score(linked_config.get("capabilities", {})) or 0.0,
                 }
             )
         allocations = self._installation_worker_allocations(candidates, target_count, total_tasks)
@@ -240,7 +265,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         self.logger.info("Configuring worker count as %s for this installation", target_workers_for_this_installation)
         self._set_local_worker_group_total(target_workers_for_this_installation)
 
-    def manage_completed_tasks(self):
+    def manage_completed_tasks(self) -> None:
         settings = config.Config()
         # Only run if configured to auto manage completed tasks
         if not settings.get_auto_manage_completed_tasks():
@@ -252,7 +277,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         date_x_days_ago = datetime.now() - timedelta(days=int(max_age_in_days))
         before_time = date_x_days_ago.timestamp()
 
-        task_success = True
+        task_success: bool | None = True
         inc_status = "successfully"
         if not settings.get_always_keep_failed_tasks():
             inc_status = "successfully or failed"
@@ -262,12 +287,14 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         from compresso.libs import history
 
         history_logging = history.History()
-        count = history_logging.get_historic_task_list_filtered_and_sorted(
-            task_success=task_success, before_time=before_time
-        ).count()
-        results = history_logging.get_historic_task_list_filtered_and_sorted(
-            task_success=task_success, before_time=before_time
+        result_rows = history_logging.get_historic_task_list_filtered_and_sorted(
+            task_success=task_success,
+            before_time=before_time,
         )
+        results = list(result_rows)
+        count = len(results)
+        if count == 0:
+            count = _reported_count(result_rows)
 
         if count == 0:
             self.logger.info("Found no %s completed tasks older than %s days", inc_status, max_age_in_days)
@@ -277,7 +304,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             self.logger.info(
                 "Found %s %s completed tasks older than %s days that should be compressed", count, inc_status, max_age_in_days
             )
-            task_ids = [historic_task.id for historic_task in results]
+            task_ids = [task_id for historic_task in results if isinstance((task_id := historic_task.get("id")), int)]
             if not history_logging.delete_historic_task_command_logs(task_ids):
                 self.logger.error("Failed to compress %s %s completed tasks", count, inc_status)
                 return
@@ -287,13 +314,14 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         self.logger.info(
             "Found %s %s completed tasks older than %s days that should be removed", count, inc_status, max_age_in_days
         )
-        if not history_logging.delete_historic_tasks_recursively(results):
+        task_ids = [task_id for historic_task in results if isinstance((task_id := historic_task.get("id")), int)]
+        if not history_logging.delete_historic_tasks_recursively(task_ids):
             self.logger.error("Failed to delete %s %s completed tasks", count, inc_status)
             return
 
         self.logger.info("Deleted %s %s completed tasks", count, inc_status)
 
-    def cleanup_old_previews(self):
+    def cleanup_old_previews(self) -> None:
         """Clean up preview jobs older than 24 hours."""
         try:
             from compresso.libs.preview import PreviewManager
@@ -303,7 +331,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         except Exception as e:
             self.logger.error("Failed to cleanup old previews: %s", e)
 
-    def cleanup_stale_transfers(self):
+    def cleanup_stale_transfers(self) -> None:
         """Remove abandoned partial chunks after the configured resume window."""
         settings = config.Config()
         transfer_root = os.path.join(settings.get_cache_path(), "remote_transfers")
@@ -313,13 +341,15 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             self.logger.info("Removed %s stale resumable transfer(s)", len(removed))
 
     @staticmethod
-    def _task_artifact_timestamp(task_model):
+    def _task_artifact_timestamp(task_model: Tasks) -> float | None:
         try:
             if task_model.abspath and os.path.exists(task_model.abspath):
                 return os.path.getmtime(task_model.abspath)
         except OSError:
             pass
         finish_time = task_model.finish_time
+        if finish_time is None:
+            return None
         if isinstance(finish_time, datetime):
             return finish_time.timestamp()
         try:
@@ -327,11 +357,11 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
         except (TypeError, ValueError):
             return None
 
-    def cleanup_orphaned_remote_tasks(self):
+    def cleanup_orphaned_remote_tasks(self) -> None:
         """Expire remote results that were never acknowledged by their master."""
         settings = config.Config()
         cutoff = time.time() - (settings.get_remote_artifact_retention_hours() * 60 * 60)
-        expired_ids = []
+        expired_ids: list[int] = []
         transfer_completed_root = os.path.realpath(os.path.join(settings.get_cache_path(), "remote_transfers", "completed"))
         remote_tasks = Tasks.select().where((Tasks.type == "remote") & (Tasks.status == "complete"))
         for remote_task in remote_tasks:
@@ -355,7 +385,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
             task.Task().delete_tasks_recursively(expired_ids)
             self.logger.info("Removed %s expired remote task artifact(s)", len(expired_ids))
 
-    def cleanup_expired_staging(self):
+    def cleanup_expired_staging(self) -> None:
         """Remove staging directories for tasks that have expired or no longer exist."""
         settings = config.Config()
         expiry_days = settings.get_staging_expiry_days()
@@ -398,7 +428,7 @@ class ScheduledTasksManager(ThreadHealthMixin, threading.Thread):
                         shutil.rmtree(entry.path)
                     except OSError as e:
                         self.logger.warning("Failed to remove orphaned staging dir for task %s: %s", task_id, e)
-            except Tasks.DoesNotExist:
+            except DoesNotExist:
                 # Task was already deleted — clean up orphaned staging
                 self.logger.info("Cleaning orphaned staging dir for deleted task %s", task_id)
                 try:

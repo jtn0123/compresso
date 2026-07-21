@@ -30,13 +30,22 @@ Copyright:
 """
 
 import os
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
+from typing import Protocol, cast
 
 from compresso.libs import history, task
+from compresso.libs.history import HistoryOrder
 from compresso.libs.unmodels import FileMetadataPaths
 
 
-def _parse_datetime_to_timestamp(value):
+class _CountedRows(Protocol):
+    def __iter__(self) -> Iterable[dict[str, object]]: ...
+
+    def count(self) -> int: ...
+
+
+def _parse_datetime_to_timestamp(value: object) -> float | None:
     if not value:
         return None
     if isinstance(value, datetime):
@@ -50,7 +59,27 @@ def _parse_datetime_to_timestamp(value):
     return None
 
 
-def prepare_filtered_completed_tasks(params):
+def _text_param(params: Mapping[str, object], key: str, default: str) -> str:
+    value = params.get(key, default)
+    return value if isinstance(value, str) else default
+
+
+def _int_param(params: Mapping[str, object], key: str, default: int) -> int:
+    value = params.get(key, default)
+    return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _history_order(params: Mapping[str, object]) -> HistoryOrder:
+    value = params.get("order")
+    if isinstance(value, Mapping):
+        column = value.get("column")
+        direction = value.get("dir")
+        if isinstance(column, str) and isinstance(direction, str):
+            return {"column": column, "dir": direction}
+    return {"column": "finish_time", "dir": "desc"}
+
+
+def prepare_filtered_completed_tasks(params: Mapping[str, object]) -> dict[str, object]:
     """
     Returns a object of historical records filtered and sorted
     according to the provided request.
@@ -58,19 +87,13 @@ def prepare_filtered_completed_tasks(params):
     :param params:
     :return:
     """
-    start = params.get("start", 0)
-    length = params.get("length", 0)
+    start = _int_param(params, "start", 0)
+    length = _int_param(params, "length", 0)
 
-    search_value = params.get("search_value", "")
-    status = params.get("status", "all")
+    search_value = _text_param(params, "search_value", "")
+    status = _text_param(params, "status", "all")
 
-    order = params.get(
-        "order",
-        {
-            "column": "finish_time",
-            "dir": "desc",
-        },
-    )
+    order = _history_order(params)
 
     # Define filters
     task_success = None
@@ -87,19 +110,25 @@ def prepare_filtered_completed_tasks(params):
     # Get total count
     records_total_count = history_logging.get_total_historic_task_list_count()
     # Get total success count
-    records_total_success_count = history_logging.get_historic_task_list_filtered_and_sorted(task_success=True).count()
+    success_rows = cast(_CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=True))
+    records_total_success_count = success_rows.count()
     # Get total failed count
-    records_total_failed_count = history_logging.get_historic_task_list_filtered_and_sorted(task_success=False).count()
+    failed_rows = cast(_CountedRows, history_logging.get_historic_task_list_filtered_and_sorted(task_success=False))
+    records_total_failed_count = failed_rows.count()
     # Get quantity after filters (without pagination)
-    records_filtered_count = history_logging.get_historic_task_list_filtered_and_sorted(
-        order=order,
-        start=0,
-        length=0,
-        search_value=search_value,
-        task_success=task_success,
-        after_time=after_time,
-        before_time=before_time,
-    ).count()
+    filtered_rows = cast(
+        _CountedRows,
+        history_logging.get_historic_task_list_filtered_and_sorted(
+            order=order,
+            start=0,
+            length=0,
+            search_value=search_value,
+            task_success=task_success,
+            after_time=after_time,
+            before_time=before_time,
+        ),
+    )
+    records_filtered_count = filtered_rows.count()
     # Get filtered/sorted results
     task_results = history_logging.get_historic_task_list_filtered_and_sorted(
         order=order,
@@ -112,20 +141,22 @@ def prepare_filtered_completed_tasks(params):
     )
 
     # Build return data
-    return_data = {
+    results: list[dict[str, object]] = []
+    return_data: dict[str, object] = {
         "recordsTotal": records_total_count,
         "recordsFiltered": records_filtered_count,
         "successCount": records_total_success_count,
         "failedCount": records_total_failed_count,
-        "results": [],
+        "results": results,
     }
 
-    matched_paths = set()
-    task_paths = [task.get("abspath") for task in task_results if task.get("abspath")]
+    matched_paths: set[str] = set()
+    task_paths = [path for row in task_results if isinstance((path := row.get("abspath")), str) and path]
     if task_paths:
         query = FileMetadataPaths.select(FileMetadataPaths.path).where(FileMetadataPaths.path.in_(task_paths))
         for row in query:
-            matched_paths.add(row.path)
+            if isinstance(row.path, str):
+                matched_paths.add(row.path)
 
     # Iterate over tasks and append them to the task data
     for task in task_results:
@@ -137,13 +168,13 @@ def prepare_filtered_completed_tasks(params):
             "finish_time": int(_parse_datetime_to_timestamp(task["finish_time"]) or 0),
             "has_metadata": task.get("abspath") in matched_paths,
         }
-        return_data["results"].append(item)
+        results.append(item)
 
     # Return results
     return return_data
 
 
-def get_filtered_completed_task_ids(params, exclude_ids=None):
+def get_filtered_completed_task_ids(params: Mapping[str, object], exclude_ids: Sequence[int] | None = None) -> list[int]:
     """
     Returns a list of completed task IDs filtered according to the provided request.
 
@@ -151,8 +182,8 @@ def get_filtered_completed_task_ids(params, exclude_ids=None):
     :param exclude_ids:
     :return:
     """
-    search_value = params.get("search_value", "")
-    status = params.get("status", "all")
+    search_value = _text_param(params, "search_value", "")
+    status = _text_param(params, "status", "all")
 
     task_success = None
     if status == "success":
@@ -176,10 +207,10 @@ def get_filtered_completed_task_ids(params, exclude_ids=None):
         before_time=before_time,
     )
 
-    id_list = []
+    id_list: list[int] = []
     for record in query:
         task_id = record.get("id")
-        if task_id is None:
+        if not isinstance(task_id, int):
             continue
         if task_id in exclude_set:
             continue
@@ -188,7 +219,7 @@ def get_filtered_completed_task_ids(params, exclude_ids=None):
     return id_list
 
 
-def remove_completed_tasks(completed_task_ids):
+def remove_completed_tasks(completed_task_ids: Sequence[int]) -> bool:
     """
     Removes a list of completed tasks
 
@@ -200,7 +231,9 @@ def remove_completed_tasks(completed_task_ids):
     return task_handler.delete_historic_tasks_recursively(id_list=completed_task_ids)
 
 
-def add_historic_tasks_to_pending_tasks_list(historic_task_ids, library_id=None):
+def add_historic_tasks_to_pending_tasks_list(
+    historic_task_ids: Sequence[int], library_id: int | None = None
+) -> dict[int, str]:
     """
     Adds a list of historical tasks to the pending tasks list.
 
@@ -208,51 +241,66 @@ def add_historic_tasks_to_pending_tasks_list(historic_task_ids, library_id=None)
     :param library_id:
     :return:
     """
-    errors = {}
+    errors: dict[int, str] = {}
     # Fetch historical tasks
     history_logging = history.History()
     # Get total count
     records_by_id = history_logging.get_current_path_of_historic_tasks_by_id(id_list=historic_task_ids)
     for record in records_by_id:
         # Fetch the abspath name
-        abspath = os.path.abspath(record.get("abspath"))
+        path_value = record.get("abspath")
+        record_id = record.get("id")
+        if not isinstance(path_value, str) or not isinstance(record_id, int):
+            continue
+        abspath = os.path.abspath(path_value)
 
         # Ensure path exists
         if not os.path.exists(abspath):
-            errors[record.get("id")] = f"Path does not exist - '{abspath}'"
+            errors[record_id] = f"Path does not exist - '{abspath}'"
             continue
 
         # Create a new task
         new_task = task.Task()
 
-        if not new_task.create_task_by_absolute_path(abspath, library_id=library_id):
+        if not new_task.create_task_by_absolute_path(abspath, library_id=library_id if library_id is not None else 1):
             # If file exists in task queue already this will return false.
             # Do not carry on.
-            errors[record.get("id")] = f"File already in task queue - '{abspath}'"
+            errors[record_id] = f"File already in task queue - '{abspath}'"
 
         continue
     return errors
 
 
-def read_command_log_for_task(task_id):
-    data = {
+def read_command_log_for_task(task_id: int) -> dict[str, object]:
+    command_log_lines: list[str] = []
+    data: dict[str, object] = {
         "command_log": "",
-        "command_log_lines": [],
+        "command_log_lines": command_log_lines,
     }
     task_handler = history.History()
     task_data = task_handler.get_historic_task_data_dictionary(task_id=task_id)
-    if not task_data:
+    if not isinstance(task_data, dict):
         return data
 
-    for command_log in task_data.get("completedtaskscommandlogs_set", []):
-        data["command_log"] += command_log["dump"]
-        data["command_log_lines"] += format_ffmpeg_log_text(command_log["dump"].split("\n"))
+    raw_logs = task_data.get("completedtaskscommandlogs_set", [])
+    logs = raw_logs if isinstance(raw_logs, list) else []
+    combined_log = ""
+    for command_log in logs:
+        if not isinstance(command_log, Mapping):
+            continue
+        dump = command_log.get("dump")
+        if not isinstance(dump, str):
+            continue
+        combined_log += dump
+        command_log_lines.extend(format_ffmpeg_log_text(dump.split("\n")))
+
+    data["command_log"] = combined_log
 
     return data
 
 
-def format_ffmpeg_log_text(log_lines):
-    return_list = []
+def format_ffmpeg_log_text(log_lines: Sequence[str]) -> list[str]:
+    return_list: list[str] = []
     pre_text = False
     termination_headers = {
         "WORKER TERMINATED!",

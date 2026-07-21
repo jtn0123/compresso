@@ -29,6 +29,8 @@ Copyright:
 
 """
 
+from collections.abc import Mapping, Sequence
+
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unplugins import PluginExecutor
@@ -37,7 +39,39 @@ from compresso.webserver.helpers import plugins
 logger = CompressoLogging.get_logger(name="SettingsHelper")
 
 
-def save_library_config(library_id, library_config=None, plugin_config=None):  # noqa: C901 — complex validation logic; refactor tracked in JTN-7
+def _string(value: object, default: str = "") -> str:
+    return value if isinstance(value, str) else default
+
+
+def _integer(value: object, default: int = 0) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _boolean(value: object, default: bool = False) -> bool:
+    return value if isinstance(value, bool) else default
+
+
+def _string_list(value: object, default: Sequence[str] = ()) -> list[str]:
+    if not isinstance(value, list):
+        return list(default)
+    return [item for item in value if isinstance(item, str)]
+
+
+def _mapping_list(value: object) -> list[Mapping[str, object]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, Mapping)]
+
+
+def _mapping(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def save_library_config(  # noqa: C901 — complex validation logic; refactor tracked in JTN-7
+    library_id: int,
+    library_config: Mapping[str, object] | None = None,
+    plugin_config: Mapping[str, object] | None = None,
+) -> int:
     """
     Save a complete library configuration
 
@@ -53,7 +87,7 @@ def save_library_config(library_id, library_config=None, plugin_config=None):  #
         library_config = {}
 
     # Check if this save requires a new library entry
-    if int(library_id) > 0:
+    if library_id > 0:
         # Fetch existing library by ID
         new_library = False
         library = Library(library_id)
@@ -62,39 +96,41 @@ def save_library_config(library_id, library_config=None, plugin_config=None):  #
         new_library = True
         library = Library.create(
             {
-                "name": library_config.get("name"),
-                "path": library_config.get("path"),
+                "name": _string(library_config.get("name")),
+                "path": _string(library_config.get("path")),
             }
         )
         library_id = library.get_id()
 
     # Update library config (if the data was given)
     if library_config:
-        library.set_name(library_config.get("name", library.get_name()))
-        library.set_path(library_config.get("path", library.get_path()))
-        library.set_locked(library_config.get("locked", library.get_locked()))
-        library.set_enable_remote_only(library_config.get("enable_remote_only", library.get_enable_remote_only()))
-        library.set_enable_scanner(library_config.get("enable_scanner", library.get_enable_scanner()))
-        library.set_enable_inotify(library_config.get("enable_inotify", library.get_enable_inotify()))
-        library.set_priority_score(library_config.get("priority_score", library.get_priority_score()))
-        library.set_tags(library_config.get("tags", library.get_tags()))
+        library.set_name(_string(library_config.get("name"), library.get_name()))
+        library.set_path(_string(library_config.get("path"), library.get_path()))
+        library.set_locked(_boolean(library_config.get("locked"), library.get_locked()))
+        library.set_enable_remote_only(_boolean(library_config.get("enable_remote_only"), library.get_enable_remote_only()))
+        library.set_enable_scanner(_boolean(library_config.get("enable_scanner"), library.get_enable_scanner()))
+        library.set_enable_inotify(_boolean(library_config.get("enable_inotify"), library.get_enable_inotify()))
+        library.set_priority_score(_integer(library_config.get("priority_score"), library.get_priority_score()))
+        library.set_tags(_string_list(library_config.get("tags"), library.get_tags()))
         # Flow settings
         if "target_codecs" in library_config:
-            library.set_target_codecs(library_config.get("target_codecs"))
+            library.set_target_codecs(_string_list(library_config.get("target_codecs")))
         if "skip_codecs" in library_config:
-            library.set_skip_codecs(library_config.get("skip_codecs"))
+            library.set_skip_codecs(_string_list(library_config.get("skip_codecs")))
         if "size_guardrail_enabled" in library_config:
             library.set_size_guardrail_enabled(library_config.get("size_guardrail_enabled"))
         if "size_guardrail_min_pct" in library_config:
-            library.set_size_guardrail_min_pct(library_config.get("size_guardrail_min_pct"))
+            library.set_size_guardrail_min_pct(_integer(library_config.get("size_guardrail_min_pct")))
         if "size_guardrail_max_pct" in library_config:
-            library.set_size_guardrail_max_pct(library_config.get("size_guardrail_max_pct"))
+            library.set_size_guardrail_max_pct(_integer(library_config.get("size_guardrail_max_pct")))
         if "replacement_policy" in library_config:
-            library.set_replacement_policy(library_config.get("replacement_policy"))
+            replacement_policy = library_config.get("replacement_policy")
+            library.set_replacement_policy(replacement_policy if isinstance(replacement_policy, str) else None)
 
     # Update enabled plugins (if the data was given)
-    enabled_plugins = plugin_config.get("enabled_plugins")
-    if enabled_plugins is not None:
+    enabled_plugins_value = plugin_config.get("enabled_plugins")
+    if enabled_plugins_value is not None:
+        enabled_plugins = _mapping_list(enabled_plugins_value)
         enable_scanner = bool(library_config.get("enable_scanner", library.get_enable_scanner()))
         enable_inotify = bool(library_config.get("enable_inotify", library.get_enable_inotify()))
         if enabled_plugins and (enable_scanner or enable_inotify):
@@ -108,30 +144,36 @@ def save_library_config(library_id, library_config=None, plugin_config=None):  #
         # Ensure plugins are installed (install them if they are not)
         repo_refreshed = False
         for ep in enabled_plugins:
-            if not plugins.check_if_plugin_is_installed(ep.get("plugin_id")):
+            plugin_id = _string(ep.get("plugin_id"))
+            if not plugins.check_if_plugin_is_installed(plugin_id):
                 # Trigger plugin repo refresh if this is the first install
                 if not repo_refreshed:
                     plugins.reload_plugin_repos_data()
                     repo_refreshed = True
                 # Install the plugin
-                if not plugins.install_plugin_by_id(ep.get("plugin_id")):
+                if not plugins.install_plugin_by_id(plugin_id):
                     if new_library:
                         library.delete()
-                    raise Exception(f"Failed to install plugin by plugin ID '{ep.get('plugin_id')}'")
+                    raise RuntimeError(f"Failed to install plugin by plugin ID '{plugin_id}'")
         # Enable the plugins against this library
         library.set_enabled_plugins(enabled_plugins)
         # Import settings
         plugin_executor = PluginExecutor()
         for ep in enabled_plugins:
             if ep.get("has_config"):
-                plugin_executor.save_plugin_settings(ep.get("plugin_id"), ep.get("settings", {}), library_id=library_id)
+                plugin_executor.save_plugin_settings(plugin_id, _mapping(ep.get("settings")), library_id=library_id)
 
     # Update plugin flow (if the data was given)
-    plugin_flow = plugin_config.get("plugin_flow")
-    if plugin_flow is not None:
+    plugin_flow_value = plugin_config.get("plugin_flow")
+    if isinstance(plugin_flow_value, Mapping):
         for plugin_type in plugins.get_plugin_types_with_flows():
-            flow = []
-            for plugin_id in plugin_flow.get(plugin_type, []):
+            flow: list[dict[str, object]] = []
+            plugin_ids = plugin_flow_value.get(plugin_type, [])
+            if not isinstance(plugin_ids, list):
+                continue
+            for plugin_id in plugin_ids:
+                if not isinstance(plugin_id, str):
+                    continue
                 flow.append({"plugin_id": plugin_id})
             plugins.save_enabled_plugin_flows_for_plugin_type(plugin_type, library_id, flow)
 
@@ -139,7 +181,7 @@ def save_library_config(library_id, library_config=None, plugin_config=None):  #
     return library.save()
 
 
-def save_worker_group_config(data):
+def save_worker_group_config(data: Mapping[str, object]) -> int | None:
     """
     Save a complete worker group configuration
 
@@ -155,23 +197,25 @@ def save_worker_group_config(data):
     # Create new worker group
     if not data.get("id"):
         WorkerGroup.create(data)
-        return
+        return None
 
     # Update existing worker group
     # NOTE: If this is updated in the future with new options, then be sure to apply the same save logic to the create method
-    worker_group = WorkerGroup(data.get("id"))
+    worker_group = WorkerGroup(_integer(data.get("id")))
     # Store locked status
-    worker_group.set_locked(data.get("locked", worker_group.get_locked()))
+    worker_group.set_locked(_boolean(data.get("locked"), worker_group.get_locked()))
     # Store name
-    worker_group.set_name(data.get("name", worker_group.get_name()))
+    worker_group.set_name(_string(data.get("name"), worker_group.get_name()))
     # Store the number of workers
-    worker_group.set_number_of_workers(data.get("number_of_workers", worker_group.get_number_of_workers()))
+    worker_group.set_number_of_workers(_integer(data.get("number_of_workers"), worker_group.get_number_of_workers()))
     # Store the worker type
-    worker_group.set_worker_type(data.get("worker_type", worker_group.get_worker_type()))
+    worker_group.set_worker_type(_string(data.get("worker_type"), worker_group.get_worker_type()))
 
     # Set lists
-    worker_group.set_tags(data.get("tags", worker_group.get_tags()))
-    worker_group.set_worker_event_schedules(data.get("worker_event_schedules", worker_group.get_worker_event_schedules()))
+    worker_group.set_tags(_string_list(data.get("tags"), worker_group.get_tags()))
+    worker_group.set_worker_event_schedules(
+        _mapping_list(data.get("worker_event_schedules", worker_group.get_worker_event_schedules()))
+    )
 
     # Save config
     return worker_group.save()

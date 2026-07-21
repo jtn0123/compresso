@@ -31,18 +31,20 @@ Copyright:
 
 import json
 import time
+from collections.abc import Mapping, Sequence
 
 import tornado.escape
 
 from compresso import config
 from compresso.libs import history
+from compresso.libs.history import HistoryOrder
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
 
 class ApiHistoryHandler(BaseApiHandler):
-    name = None
-    config = None
-    params = None
+    name: str
+    config: config.Config
+    params: object
 
     routes = [
         {
@@ -57,23 +59,24 @@ class ApiHistoryHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.name = "history_api"
         self.config = config.Config()
         self.params = kwargs.get("params")
 
-    def set_default_headers(self):
+    def set_default_headers(self) -> None:
         """Set the default response header to be JSON."""
         super().set_default_headers()
 
-    def post(self, path):
+    async def post(self, path: str) -> None:
         self.action_route()
 
-    def fetch_by_id(self, *args, **kwargs):
+    def fetch_by_id(self, *args: object, **kwargs: object) -> None:
         """
         v1 endpoint kept for route-compatibility only. Fetch-by-id was
         never implemented and the supported surface is v2 going forward.
         """
+        del args, kwargs
         self.set_status(501)
         self.write(
             json.dumps(
@@ -84,13 +87,18 @@ class ApiHistoryHandler(BaseApiHandler):
             )
         )
 
-    def manage_historic_tasks_list(self, *args, **kwargs):
-        request_dict = json.loads(self.request.body)
+    def manage_historic_tasks_list(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
+        request_value = json.loads(self.request.body)
+        if not isinstance(request_value, Mapping):
+            self.write({"success": False})
+            return
+        request_dict = {str(key): value for key, value in request_value.items()}
 
         # Delete a list of historical tasks.
         #   (on success will continue to return the current list of historical tasks)
         if request_dict.get("customActionName") == "delete-from-history":
-            success = self.delete_historic_tasks(request_dict.get("id"))
+            success = self.delete_historic_tasks(self._integer_list(request_dict.get("id")))
             if not success:
                 self.write({"success": False})
                 return
@@ -99,7 +107,13 @@ class ApiHistoryHandler(BaseApiHandler):
         results = self.prepare_filtered_historic_tasks(request_dict)
         self.finish(tornado.escape.json_encode(results))
 
-    def delete_historic_tasks(self, historic_task_ids):
+    @staticmethod
+    def _integer_list(value: object) -> list[int]:
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, int) and not isinstance(item, bool)]
+
+    def delete_historic_tasks(self, historic_task_ids: Sequence[int]) -> bool:
         """
         Deletes a list of historic tasks
 
@@ -111,7 +125,7 @@ class ApiHistoryHandler(BaseApiHandler):
         # Delete by ID
         return history_logging.delete_historic_tasks_recursively(id_list=historic_task_ids)
 
-    def prepare_filtered_historic_tasks(self, request_dict):
+    def prepare_filtered_historic_tasks(self, request_dict: Mapping[str, object]) -> dict[str, object]:
         """
         Returns a object of historical records filtered and sorted
         according to the provided request.
@@ -122,18 +136,31 @@ class ApiHistoryHandler(BaseApiHandler):
 
         # Generate filters for query
         draw = request_dict.get("draw")
-        start = request_dict.get("start")
-        length = request_dict.get("length")
+        start_value = request_dict.get("start")
+        length_value = request_dict.get("length")
+        start = start_value if isinstance(start_value, int) and not isinstance(start_value, bool) else 0
+        length = length_value if isinstance(length_value, int) and not isinstance(length_value, bool) else 0
 
-        search = request_dict.get("search")
-        search_value = search.get("value")
+        search_value_raw = request_dict.get("search")
+        search = search_value_raw if isinstance(search_value_raw, Mapping) else {}
+        search_value_entry = search.get("value")
+        search_value = search_value_entry if isinstance(search_value_entry, str) else ""
 
         # Get sort order
-        filter_order = request_dict.get("order")[0]
-        order_direction = filter_order.get("dir")
-        columns = request_dict.get("columns")
-        order_column_name = columns[filter_order.get("column")].get("name")
-        order = {
+        order_entries = request_dict.get("order")
+        filter_order_value = order_entries[0] if isinstance(order_entries, list) and order_entries else {}
+        filter_order = filter_order_value if isinstance(filter_order_value, Mapping) else {}
+        order_direction_value = filter_order.get("dir")
+        order_direction = order_direction_value if isinstance(order_direction_value, str) else "desc"
+        column_index_value = filter_order.get("column")
+        column_index = column_index_value if isinstance(column_index_value, int) else 0
+        columns_value = request_dict.get("columns")
+        columns = columns_value if isinstance(columns_value, list) else []
+        column_value = columns[column_index] if 0 <= column_index < len(columns) else {}
+        column = column_value if isinstance(column_value, Mapping) else {}
+        order_column_value = column.get("name")
+        order_column_name = order_column_value if isinstance(order_column_value, str) else "finish_time"
+        order: HistoryOrder = {
             "column": order_column_name,
             "dir": order_direction,
         }
@@ -143,40 +170,48 @@ class ApiHistoryHandler(BaseApiHandler):
         # Get total count
         records_total_count = history_logging.get_total_historic_task_list_count()
         # Get quantity after filters (without pagination)
-        records_filtered_count = history_logging.get_historic_task_list_filtered_and_sorted(
-            order=order, start=0, length=0, search_value=search_value
-        ).count()
+        records_filtered_count = len(
+            list(
+                history_logging.get_historic_task_list_filtered_and_sorted(
+                    order=order, start=0, length=0, search_value=search_value
+                )
+            )
+        )
         # Get filtered/sorted results
         task_results = history_logging.get_historic_task_list_filtered_and_sorted(
             order=order, start=start, length=length, search_value=search_value
         )
 
         # Build return data
-        return_data = {
-            "draw": draw,
-            "recordsTotal": records_total_count,
-            "recordsFiltered": records_filtered_count,
-            "successCount": 0,
-            "failedCount": 0,
-            "data": [],
-        }
+        success_count = 0
+        failed_count = 0
+        data: list[dict[str, object]] = []
 
         # Iterate over historical tasks and append them to the task data
         for task in task_results:
             # Set params as required in template
-            item = {
+            finish_time = task.get("finish_time")
+            timestamp = float(finish_time) if isinstance(finish_time, (int, float)) else 0.0
+            item: dict[str, object] = {
                 "id": task["id"],
                 "selected": False,
-                "finish_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(task["finish_time"])),
+                "finish_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)),
                 "task_label": task["task_label"],
                 "task_success": task["task_success"],
             }
             # Increment counters
             if item["task_success"]:
-                return_data["successCount"] += 1
+                success_count += 1
             else:
-                return_data["failedCount"] += 1
-            return_data["data"].append(item)
+                failed_count += 1
+            data.append(item)
 
         # Return results
-        return return_data
+        return {
+            "draw": draw,
+            "recordsTotal": records_total_count,
+            "recordsFiltered": records_filtered_count,
+            "successCount": success_count,
+            "failedCount": failed_count,
+            "data": data,
+        }

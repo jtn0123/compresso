@@ -37,6 +37,9 @@ import random
 import shutil
 import string
 import sys
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import BinaryIO, TypedDict
 
 import xxhash
 
@@ -45,8 +48,23 @@ from compresso.libs.logs import CompressoLogging
 
 logger = CompressoLogging.get_logger("common")
 
+type PathLike = str | os.PathLike[str]
 
-def get_home_dir():
+
+class JsonWriteResult(TypedDict):
+    errors: list[str]
+    success: bool
+
+
+@dataclass(frozen=True)
+class _FingerprintAlgorithm:
+    sample_size: int | None
+    sample_count: int | None
+    full_hash_limit: int
+    fallback_algo: str | None = None
+
+
+def get_home_dir() -> str:
     # Attempt to get the HOME_DIR environment variable
     home_dir = os.environ.get("HOME_DIR")
     # If HOME_DIR is unset/empty, expand ~; otherwise resolve tilde and relative paths to absolute.
@@ -54,14 +72,14 @@ def get_home_dir():
     return home_dir
 
 
-def get_default_root_path():
+def get_default_root_path() -> str:
     root = os.path.join(os.sep)
     if os.name == "nt":
         root = os.path.join("c:", os.sep)
     return root
 
 
-def get_default_library_path():
+def get_default_library_path() -> str:
     library_path = os.path.join(get_default_root_path(), "library")
     if sys.platform == "darwin":
         library_path = os.path.join(os.path.expanduser("~"), "Movies")
@@ -70,7 +88,7 @@ def get_default_library_path():
     return library_path
 
 
-def get_default_cache_path():
+def get_default_cache_path() -> str:
     cache_path = os.path.join(get_default_root_path(), "tmp", "compresso")
     if sys.platform == "darwin":
         cache_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "Compresso")
@@ -79,7 +97,7 @@ def get_default_cache_path():
     return cache_path
 
 
-def format_message(message, message2=""):
+def format_message(message: object, message2: object = "") -> str:
     message = str(message)
     if message2:
         # Message2 can support other objects:
@@ -96,7 +114,7 @@ def format_message(message, message2=""):
     return message
 
 
-def make_timestamp_human_readable(ts):
+def make_timestamp_human_readable(ts: float) -> str:
     """
     Accept a unix timestamp, return a human readable timedelta string.
 
@@ -144,18 +162,18 @@ def make_timestamp_human_readable(ts):
     return the_tense.format(", ".join(human_readable_list))
 
 
-def ensure_dir(file_path):
+def ensure_dir(file_path: PathLike) -> None:
     directory = os.path.dirname(file_path)
     if not os.path.exists(directory):
         os.makedirs(directory)
 
 
-def time_string_to_seconds(time_string):
+def time_string_to_seconds(time_string: str) -> int:
     pt = datetime.datetime.strptime(time_string, "%H:%M:%S.%f")
     return pt.second + pt.minute * 60 + pt.hour * 3600
 
 
-def tail(f, n, offset=0):
+def tail(f: BinaryIO, n: int, offset: int = 0) -> list[bytes]:
     """Reads a n lines from f with an offset of offset lines."""
     avg_line_length = 153
     to_read = n + offset
@@ -170,21 +188,34 @@ def tail(f, n, offset=0):
         lines = f.read().splitlines()
         if len(lines) >= to_read or pos == 0:
             return lines
-        avg_line_length *= 1.3
+        avg_line_length = int(avg_line_length * 1.3)
 
 
-def touch(fname, mode=0o666, dir_fd=None, **kwargs):
+def touch(
+    fname: PathLike,
+    mode: int = 0o666,
+    dir_fd: int | None = None,
+    *,
+    times: tuple[float, float] | None = None,
+    ns: tuple[int, int] | None = None,
+    follow_symlinks: bool = True,
+) -> None:
     """Touch a file. If it does not exist, create it."""
     flags = os.O_CREAT | os.O_APPEND
     with os.fdopen(os.open(fname, flags=flags, mode=mode, dir_fd=dir_fd)) as f:
-        os.utime(f.fileno() if os.utime in os.supports_fd else fname, dir_fd=None if os.supports_fd else dir_fd, **kwargs)
+        target = f.fileno() if os.utime in os.supports_fd else fname
+        target_dir_fd = None if os.utime in os.supports_fd else dir_fd
+        if ns is not None:
+            os.utime(target, ns=ns, dir_fd=target_dir_fd, follow_symlinks=follow_symlinks)
+        else:
+            os.utime(target, times=times, dir_fd=target_dir_fd, follow_symlinks=follow_symlinks)
 
 
-def clean_files_in_cache_dir(cache_directory, protected_paths=None):
+def clean_files_in_cache_dir(cache_directory: PathLike, protected_paths: Sequence[PathLike] | None = None) -> None:
     """Remove abandoned task cache directories while retaining active files."""
     protected_paths = [os.path.realpath(path) for path in (protected_paths or []) if path]
 
-    def contains_protected_path(directory):
+    def contains_protected_path(directory: PathLike) -> bool:
         directory = os.path.realpath(directory)
         for path in protected_paths:
             try:
@@ -217,13 +248,19 @@ def clean_files_in_cache_dir(cache_directory, protected_paths=None):
                     logger.error("Exception while clearing remote library cache path - %s", str(e))
 
 
-def random_string(string_length=5):
+def random_string(string_length: int = 5) -> str:
     """Generate a random string of fixed length"""
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(string_length))  # noqa: S311 — not used for security/crypto
 
 
-def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True, file_mode=None):
+def json_dump_to_file(
+    json_data: object,
+    out_file: PathLike,
+    check: bool = True,
+    rollback_on_fail: bool = True,
+    file_mode: int | None = None,
+) -> JsonWriteResult:
     """Compatibility wrapper for atomically writing a JSON document.
 
     ``rollback_on_fail`` remains only for existing callers. Atomic replacement
@@ -232,7 +269,7 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True, fi
     """
     import json
 
-    result = {"errors": [], "success": False}
+    result = JsonWriteResult(errors=[], success=False)
     try:
         atomic_json_write(out_file, json_data, mode=file_mode)
         if check:
@@ -246,7 +283,7 @@ def json_dump_to_file(json_data, out_file, check=True, rollback_on_fail=True, fi
     return result
 
 
-def extract_video_codecs_from_file_properties(file_properties: dict):
+def extract_video_codecs_from_file_properties(file_properties: dict[str, object]) -> list[str]:
     """
     Read a dictionary of file properties
     Extract a list of video codecs from the video streams
@@ -254,14 +291,20 @@ def extract_video_codecs_from_file_properties(file_properties: dict):
     :param file_properties:
     :return:
     """
-    codecs = []
-    for stream in file_properties["streams"]:
-        if stream["codec_type"] == "video":
-            codecs.append(stream["codec_name"])
+    codecs: list[str] = []
+    streams = file_properties.get("streams")
+    if not isinstance(streams, list):
+        return codecs
+    for stream in streams:
+        if not isinstance(stream, dict) or stream.get("codec_type") != "video":
+            continue
+        codec_name = stream.get("codec_name")
+        if isinstance(codec_name, str):
+            codecs.append(codec_name)
     return codecs
 
 
-def get_file_checksum(path):
+def get_file_checksum(path: PathLike) -> str:
     """
     Read a checksum of a file.
 
@@ -278,7 +321,7 @@ def get_file_checksum(path):
     return copy.copy(file_hash.hexdigest())
 
 
-def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
+def get_file_fingerprint(path: PathLike, algo: str = "sampled_xxhash_v1") -> tuple[str, str]:
     """
     Create a content-based fingerprint for a file.
 
@@ -294,29 +337,21 @@ def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
     :param algo:
     :return:
     """
-    algos = {
-        "sampled_sha256_v1": {
-            "sample_size": 8 * 1024 * 1024,
-            "sample_count": 10,
-            "full_hash_limit": 100 * 1024 * 1024,
-            "fallback_algo": "full_sha256_v1",
-        },
-        "full_sha256_v1": {
-            "sample_size": None,
-            "sample_count": None,
-            "full_hash_limit": 0,
-        },
-        "sampled_xxhash_v1": {
-            "sample_size": 8 * 1024 * 1024,
-            "sample_count": 10,
-            "full_hash_limit": 100 * 1024 * 1024,
-            "fallback_algo": "full_xxhash_v1",
-        },
-        "full_xxhash_v1": {
-            "sample_size": None,
-            "sample_count": None,
-            "full_hash_limit": 0,
-        },
+    algos: dict[str, _FingerprintAlgorithm] = {
+        "sampled_sha256_v1": _FingerprintAlgorithm(
+            sample_size=8 * 1024 * 1024,
+            sample_count=10,
+            full_hash_limit=100 * 1024 * 1024,
+            fallback_algo="full_sha256_v1",
+        ),
+        "full_sha256_v1": _FingerprintAlgorithm(sample_size=None, sample_count=None, full_hash_limit=0),
+        "sampled_xxhash_v1": _FingerprintAlgorithm(
+            sample_size=8 * 1024 * 1024,
+            sample_count=10,
+            full_hash_limit=100 * 1024 * 1024,
+            fallback_algo="full_xxhash_v1",
+        ),
+        "full_xxhash_v1": _FingerprintAlgorithm(sample_size=None, sample_count=None, full_hash_limit=0),
     }
 
     if algo not in algos:
@@ -326,8 +361,9 @@ def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
 
     actual_algo_to_use = algo
 
-    if algo in ["sampled_sha256_v1", "sampled_xxhash_v1"] and file_size <= algos[algo]["full_hash_limit"]:
-        actual_algo_to_use = algos[algo]["fallback_algo"]
+    algorithm = algos[algo]
+    if algo in ["sampled_sha256_v1", "sampled_xxhash_v1"] and file_size <= algorithm.full_hash_limit:
+        actual_algo_to_use = algorithm.fallback_algo or algo
 
     file_hash_obj = xxhash.xxh64() if actual_algo_to_use in ["full_xxhash_v1", "sampled_xxhash_v1"] else hashlib.sha256()
 
@@ -343,8 +379,11 @@ def get_file_fingerprint(path, algo="sampled_xxhash_v1"):
                 file_hash_obj.update(chunk)
         return file_hash_obj.hexdigest(), actual_algo_to_use
 
-    sample_size = algos[actual_algo_to_use]["sample_size"]
-    sample_count = algos[actual_algo_to_use]["sample_count"]
+    selected_algorithm = algos[actual_algo_to_use]
+    sample_size = selected_algorithm.sample_size
+    sample_count = selected_algorithm.sample_count
+    if sample_size is None or sample_count is None:
+        raise RuntimeError(f"Sampled fingerprint algorithm {actual_algo_to_use!r} is incomplete")
     max_offset = max(0, file_size - sample_size)
     if sample_count < 2:
         sample_count = 2

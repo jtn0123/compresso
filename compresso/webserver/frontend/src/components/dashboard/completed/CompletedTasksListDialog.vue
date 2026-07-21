@@ -150,7 +150,7 @@
         :columns="columns"
         :loading="loading"
         :all-loaded="allLoaded"
-        :error="error"
+        :error="displayError"
         :show-scroll-top="showScrollTop"
         :selection-visible="(allPageSelected || selectAllMatching) && actionsExpanded"
         :show-select-all-prompt="showSelectAllMatchingPrompt"
@@ -493,8 +493,9 @@
   <FileMetadataListDialog ref="metadataBrowserRef" />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import type { QTableColumn } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
@@ -510,6 +511,20 @@ import FileMetadataListDialog from 'components/dashboard/completed/FileMetadataL
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+
+interface CompletedRow {
+  id: number
+  name: string
+  dateTimeCompleted: string
+  status: boolean
+  hasMetadata: boolean
+}
+interface CompletedFilters { search_value: string; status: string; after: string | null; before: string | null }
+interface LibraryOption { label: string; value: number }
+interface LibraryWire { id: number; name: string }
+interface TaskListShellController { tableWrapperRef: HTMLElement | null }
 
 const props = defineProps({
   initStatusFilter: {
@@ -522,21 +537,21 @@ const emit = defineEmits(['hide'])
 
 const { t } = useI18n()
 const $q = useQuasar()
-const dialogRef = ref(null)
-const metadataDialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
+const metadataDialogRef = ref<DialogController | null>(null)
 const metadataDialogTaskId = ref('')
-const metadataBrowserRef = ref(null)
-const taskListShellRef = ref(null)
+const metadataBrowserRef = ref<DialogController | null>(null)
+const taskListShellRef = ref<TaskListShellController | null>(null)
 const tableWrapperRef = computed(() => taskListShellRef.value?.tableWrapperRef ?? null)
 const showScrollTop = ref(false)
 
 const searchValue = ref('')
 const statusFilter = ref('all')
 const draftStatusFilter = ref('all')
-const sinceDate = ref(null)
-const beforeDate = ref(null)
-const draftSinceDate = ref(null)
-const draftBeforeDate = ref(null)
+const sinceDate = ref<string | null>(null)
+const beforeDate = ref<string | null>(null)
+const draftSinceDate = ref<string | null>(null)
+const draftBeforeDate = ref<string | null>(null)
 const sortBy = ref('finish_time')
 const draftSortBy = ref('finish_time')
 const descending = ref(true)
@@ -549,10 +564,10 @@ const deleteDialogOpen = ref(false)
 const actionsExpanded = ref(true)
 
 const selectLibrary = ref(false)
-const selectedLibraryId = ref(null)
-const libraryOptions = ref([])
+const selectedLibraryId = ref<number | null>(null)
+const libraryOptions = ref<LibraryOption[]>([])
 
-const columns = computed(() => [
+const columns = computed<QTableColumn[]>(() => [
   {
     name: 'select',
     label: '',
@@ -686,8 +701,8 @@ const buildFiltersPayload = () => ({
   before: beforeDate.value,
 })
 
-const fetchCompletedPage = async ({ start, length }) => {
-  const response = await axios({
+const fetchCompletedPage = async ({ start, length }: { start: number; length: number }) => {
+  const response = await axios<ApiSchema<'CompletedTasks'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'history/tasks'),
     data: {
@@ -700,7 +715,7 @@ const fetchCompletedPage = async ({ start, length }) => {
   })
   return {
     total: response.data.recordsFiltered,
-    rows: response.data.results.map((result) => ({
+    rows: response.data.results.map((result: ApiSchema<'CompletedTasksTableResults'>) => ({
       id: result.id,
       name: result.task_label,
       dateTimeCompleted: dateTools.printDateTimeString(result.finish_time),
@@ -727,7 +742,6 @@ const {
   totalCount,
   selectedIds,
   selectAllMatching,
-  excludedIds,
   allLoaded,
   allPageSelected,
   selectedCount,
@@ -741,10 +755,17 @@ const {
   getSelectionPayload,
   fetchTasks: fetchCompletedTasks,
   loadMore,
-} = useTaskListController({
+} = useTaskListController<CompletedRow, CompletedFilters>({
   fetchPage: fetchCompletedPage,
   buildFiltersPayload,
   onFetchError: notifyFetchError,
+})
+
+const displayError = computed(() => {
+  if (!error.value) return ''
+  return error.value instanceof Error || typeof error.value === 'string'
+    ? error.value
+    : String(error.value)
 })
 
 const selectionBannerPageText = computed(() =>
@@ -771,15 +792,15 @@ const selectionBannerAllSelectedText = computed(() => {
   return t('components.completedTasks.selectionBanner.allSelected', { count: totalCount.value })
 })
 
-let reloadInterval = null
+let reloadInterval: ReturnType<typeof setInterval> | null = null
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
   showScrollTop.value = false
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -826,7 +847,7 @@ const applySortDrafts = () => {
   descending.value = draftDescending.value
 }
 
-const toggleDraftSort = (option) => {
+const toggleDraftSort = (option: string): void => {
   if (draftSortBy.value === option) {
     draftDescending.value = !draftDescending.value
   } else {
@@ -858,7 +879,7 @@ const deleteSelected = () => {
   performDeleteSelected(false)
 }
 
-const performDeleteSelected = (deleteMetadata) => {
+const performDeleteSelected = (deleteMetadata: boolean): void => {
   const data = getSelectionPayload()
 
   const deleteTasks = () =>
@@ -873,9 +894,9 @@ const performDeleteSelected = (deleteMetadata) => {
       return false
     }
 
-    const fingerprints = new Set()
+    const fingerprints = new Set<string>()
     const requests = selectedIds.value.map((id) =>
-      axios({
+      axios<ApiSchema<'MetadataSearchResults'>>({
         method: 'post',
         url: getCompressoApiUrl('v2', 'metadata/by-task'),
         data: {
@@ -886,7 +907,7 @@ const performDeleteSelected = (deleteMetadata) => {
 
     const responses = await Promise.all(requests)
     responses.forEach((response) => {
-      ;(response.data.results || []).forEach((entry) => {
+      ;(response.data.results || []).forEach((entry: ApiSchema<'MetadataEntry'>) => {
         if (entry.fingerprint) {
           fingerprints.add(entry.fingerprint)
         }
@@ -911,7 +932,7 @@ const performDeleteSelected = (deleteMetadata) => {
     if (deleteMetadata) {
       try {
         await deleteMetadataForSelection()
-      } catch (error) {
+      } catch {
         $q.notify({
           color: 'negative',
           position: 'top',
@@ -941,7 +962,7 @@ const performDeleteSelected = (deleteMetadata) => {
   run()
 }
 
-const confirmDeleteSelected = (deleteMetadata) => {
+const confirmDeleteSelected = (deleteMetadata: boolean): void => {
   deleteDialogOpen.value = false
   performDeleteSelected(deleteMetadata)
 }
@@ -952,10 +973,11 @@ const selectLibraryForRecreateTask = () => {
     url: getCompressoApiUrl('v2', 'settings/libraries'),
   })
     .then((response) => {
-      const libraryPathsList = []
-      let defaultSelection
+      const libraryPathsList: LibraryOption[] = []
+      let defaultSelection: number | undefined
       for (let i = 0; i < response.data.libraries.length; i++) {
-        const libraryPath = response.data.libraries[i]
+        const libraryPath = response.data.libraries[i] as LibraryWire | undefined
+        if (!libraryPath) continue
         if (typeof defaultSelection === 'undefined') {
           defaultSelection = libraryPath.id
         }
@@ -968,7 +990,7 @@ const selectLibraryForRecreateTask = () => {
 
       selectedLibraryId.value = 1
       if (libraryPathsList.length === 1) {
-        selectedLibraryId.value = defaultSelection
+        selectedLibraryId.value = defaultSelection ?? null
         addSelectedToPendingTaskList()
       } else {
         selectLibrary.value = true
@@ -1022,7 +1044,7 @@ const addSelectedToPendingTaskList = () => {
     })
 }
 
-const openDetailsDialog = (id) => {
+const openDetailsDialog = (id: number): void => {
   $q.dialog({
     component: CompletedTaskLogDialog,
     componentProps: {
@@ -1031,20 +1053,16 @@ const openDetailsDialog = (id) => {
   })
 }
 
-const openMetadataDialog = (id) => {
+const openMetadataDialog = (id: number): void => {
   metadataDialogTaskId.value = String(id)
   nextTick(() => {
-    if (metadataDialogRef.value) {
-      metadataDialogRef.value.show()
-    }
+    metadataDialogRef.value?.show()
   })
 }
 
 const openMetadataBrowser = () => {
   nextTick(() => {
-    if (metadataBrowserRef.value) {
-      metadataBrowserRef.value.show()
-    }
+    metadataBrowserRef.value?.show()
   })
 }
 

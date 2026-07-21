@@ -23,6 +23,8 @@ Some examples (model - class or model name)::
 
 import peewee as pw
 
+from compresso.migrations_v1._types import MigrationDatabase, MigrationRunner
+
 SQL = pw.SQL
 
 """NOTES:
@@ -39,14 +41,14 @@ If this column is left as is, no items will be able to be added to the task queu
 """
 
 
-def migrate(migrator, database, fake=False, **kwargs):
+def migrate(migrator: MigrationRunner, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     """Write your migrations here."""
     # Rename 'ffmpeg_log' field to 'log'' in Tasks model
     if any(cm for cm in database.get_columns("tasks") if cm.name == "ffmpeg_log"):
         migrator.ops.append(migrator.migrator.rename_column("tasks", "ffmpeg_log", "log"))
 
 
-def rollback(migrator, database, fake=False, **kwargs):
+def rollback(migrator: MigrationRunner, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     """Write your rollback migrations here."""
     # Reverse rename 'ffmpeg_log' field to 'log'' in Tasks model
     if any(cm for cm in database.get_columns("tasks") if cm.name == "log"):

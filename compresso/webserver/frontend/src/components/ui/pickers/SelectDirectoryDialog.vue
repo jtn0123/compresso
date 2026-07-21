@@ -35,13 +35,22 @@
   </CompressoDialogPopup>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+
+interface DirectoryEntry { name: string; full_path: string }
+
+const toDirectoryEntry = (value: Record<string, unknown>): DirectoryEntry | null =>
+  typeof value.name === 'string' && typeof value.full_path === 'string'
+    ? { name: value.name, full_path: value.full_path }
+    : null
 
 const props = defineProps({
   title: {
@@ -58,32 +67,37 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['hide', 'selected'])
+const emit = defineEmits<{
+  hide: []
+  selected: [payload: { selectedPath: string }]
+}>()
 
 const $q = useQuasar()
 const { t } = useI18n()
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const isOpen = ref(false)
 const currentPath = ref('')
-const directories = ref([])
-const files = ref([])
+const directories = ref<DirectoryEntry[]>([])
+const files = ref<Record<string, unknown>[]>([])
 
 const dialogTitle = computed(() => props.title || t('headers.selectDirectory'))
 
-const fetchDirectoryListing = (path) => {
+const fetchDirectoryListing = (path: string): void => {
   currentPath.value = path
   const data = {
     current_path: currentPath.value,
     list_type: props.listType,
   }
-  axios({
+  axios<ApiSchema<'DirectoryListingResults'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'filebrowser/list'),
     data: data,
   })
     .then((response) => {
       directories.value = response.data.directories
+        .map(toDirectoryEntry)
+        .filter((entry): entry is DirectoryEntry => entry !== null)
       files.value = response.data.files
     })
     .catch(() => {
@@ -92,18 +106,13 @@ const fetchDirectoryListing = (path) => {
 }
 
 const show = () => {
-  if (!dialogRef.value) {
-    return
-  }
   isOpen.value = true
-  dialogRef.value.show()
+  dialogRef.value?.show()
   fetchDirectoryListing(props.initialPath)
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

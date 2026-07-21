@@ -1,7 +1,9 @@
 """Migration 008: Durable job identity, remote leases, and idempotent results."""
 
+from compresso.migrations_v1._types import MigrationDatabase
 
-def migrate(migrator, database, fake=False, **kwargs):
+
+def migrate(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     if fake:
         return
 
@@ -27,7 +29,7 @@ def migrate(migrator, database, fake=False, **kwargs):
     database.execute_sql("CREATE INDEX IF NOT EXISTS tasks_lease_expires_at ON tasks (lease_expires_at)")
 
 
-def rollback(migrator, database, fake=False, **kwargs):
+def rollback(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     if fake:
         return
     database.execute_sql("DROP INDEX IF EXISTS tasks_job_id")

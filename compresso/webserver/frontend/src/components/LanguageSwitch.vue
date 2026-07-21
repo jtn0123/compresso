@@ -12,13 +12,13 @@
   />
 </template>
 
-<script>
+<script lang="ts">
 import { LocalStorage } from 'quasar'
 import { useI18n } from 'vue-i18n'
 
 // Human-readable labels for known locales.
 // Use ISO codes from table: https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
-const LOCALE_LABELS = {
+const LOCALE_LABELS: Record<string, string> = {
   en: 'English',
   mi: 'Maori/te reo Māori',
   zh: 'Chinese/中文',
@@ -51,7 +51,7 @@ export default {
     }
   },
   watch: {
-    locale(lang) {
+    locale(lang: string) {
       LocalStorage.set('locale', lang)
     },
   },

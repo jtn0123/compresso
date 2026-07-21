@@ -35,6 +35,8 @@ import logging
 import os
 import re
 import shutil
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from typing import Protocol, cast
 
 import inquirer
 import requests
@@ -42,8 +44,8 @@ import requests
 from compresso import config
 from compresso.libs import common
 from compresso.libs.json_state import atomic_json_write
-from compresso.libs.plugins import PluginsHandler
-from compresso.libs.task import TaskDataStore
+from compresso.libs.plugins import PluginRecord, PluginsHandler
+from compresso.libs.task import JsonValue, TaskDataStore
 from compresso.libs.unplugins import PluginExecutor
 from compresso.libs.unplugins.child_process import kill_all_plugin_processes, set_shared_manager
 
@@ -82,6 +84,30 @@ menus = {
 }
 
 
+class PluginCLIArgs(Protocol):
+    test_file_in: str | None
+    test_file_out: str | None
+    create_plugin: bool
+    plugin_id: str | None
+    plugin_name: str | None
+    plugin_runners: str | Sequence[str] | None
+    test_plugin: str | None
+    test_plugins: bool
+    reload_plugins: bool
+    remove_plugin: bool
+    install_test_data: bool
+
+
+def _object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        return {}
+    return cast("dict[str, object]", value)
+
+
+def _string(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
 class BColours:
     HEADER = "\033[44m"
     SUBHEADER = "\033[94m"
@@ -95,7 +121,12 @@ class BColours:
     UNDERLINE = "\033[4m"
 
 
-def print_table(table_data, col_list=None, sep="\ufffa", max_col_width=9):
+def print_table(
+    table_data: Sequence[Mapping[str, object]],
+    col_list: Sequence[str] | None = None,
+    sep: str = "\ufffa",
+    max_col_width: int = 9,
+) -> None:
     """
     Pretty print a list of dictionaries (myDict) as a dynamically sized table.
     If column names (col_list) aren't specified, they will show in random order.
@@ -105,9 +136,9 @@ def print_table(table_data, col_list=None, sep="\ufffa", max_col_width=9):
     """
     if not col_list:
         col_list = list(table_data[0].keys() if table_data else [])
-    my_list = [col_list]  # 1st row = header
-    for item in table_data:
-        my_list.append([str(item[col] or "") for col in col_list])
+    my_list: list[list[str]] = [list(col_list)]  # 1st row = header
+    for record in table_data:
+        my_list.append([str(record[col] or "") for col in col_list])
     original_col_size = [max(map(len, (sep.join(col)).split(sep))) for col in zip(*my_list, strict=False)]
     col_size = []
     for col in original_col_size:
@@ -116,21 +147,21 @@ def print_table(table_data, col_list=None, sep="\ufffa", max_col_width=9):
         col_size.append(col)
     format_str = " | ".join([f"{{:<{i}}}" for i in col_size])
     line = format_str.replace(" | ", "-+-").format(*["-" * i for i in col_size])
-    item = my_list.pop(0)
+    row_values = my_list.pop(0)
     line_done = False
     while my_list:
-        if all(not i for i in item):
-            item = my_list.pop(0)
+        if all(not i for i in row_values):
+            row_values = my_list.pop(0)
             if line and (sep != "\ufffa" or not line_done):
                 print(line)
                 line_done = True
-        row = [i[:max_col_width].split(sep, 1) for i in item]
+        row = [i[:max_col_width].split(sep, 1) for i in row_values]
         print(format_str.format(*[i[0] for i in row]))
-        item = [i[1] if len(i) > 1 else "" for i in row]
+        row_values = [i[1] if len(i) > 1 else "" for i in row]
 
 
 class PluginsCLI:
-    def __init__(self, plugins_directory=None):
+    def __init__(self, plugins_directory: str | None = None) -> None:
         from multiprocessing import Manager
 
         # Read settings
@@ -150,35 +181,39 @@ class PluginsCLI:
         )
         CompressoLogging.disable_file_handler(debugging=True)
         CompressoLogging.enable_debugging()
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
         # Ensure PluginChildProcess has a shared manager during CLI tests.
         self._mgr = Manager()
         atexit.register(self._mgr.shutdown)
         atexit.register(kill_all_plugin_processes)
-        TaskDataStore._runner_state = self._mgr.dict()
-        TaskDataStore._task_state = self._mgr.dict()
+        TaskDataStore._runner_state = cast("MutableMapping[int, dict[str, dict[str, dict[str, JsonValue]]]]", self._mgr.dict())
+        TaskDataStore._task_state = cast("MutableMapping[int, dict[str, JsonValue]]", self._mgr.dict())
         set_shared_manager(self._mgr)
 
-        self.test_data_modifiers = {
+        self.test_data_modifiers: dict[str, str] = {
             "{cache_path}": dev_cache_directory,
             "{library_path}": dev_library_directory,
             _TEST_FILE_IN_KEY: "Big_Buck_Bunny_1080_10s_30MB_h264.mkv",
             _TEST_FILE_OUT_KEY: "Big_Buck_Bunny_1080_10s_30MB_h264-1616571944.7296877-WORKING-1.mkv",
         }
 
-    def _get_plugin_type_choices(self):
+    def _get_plugin_type_choices(
+        self,
+    ) -> tuple[list[str], dict[str, dict[str, str]], dict[str, dict[str, str]]]:
         # Get list of plugin types
         all_plugin_types = plugin_types.get_all_plugin_types()
 
         # Build choice selection list from installed plugins
-        plugin_details_by_name = {}
-        plugin_details_by_runner = {}
-        choices = []
+        plugin_details_by_name: dict[str, dict[str, str]] = {}
+        plugin_details_by_runner: dict[str, dict[str, str]] = {}
+        choices: list[str] = []
         for plugin_type in all_plugin_types:
             plugin_type_details = all_plugin_types[plugin_type]
             plugin_name = plugin_type_details.get("name")
             plugin_runner = plugin_type_details.get("runner")
+            if plugin_name is None or plugin_runner is None:
+                continue
             choices.append(plugin_name)
             plugin_details_by_name[plugin_name] = plugin_type_details
             plugin_details_by_runner[plugin_runner] = plugin_type_details
@@ -186,14 +221,16 @@ class PluginsCLI:
         return choices, plugin_details_by_name, plugin_details_by_runner
 
     @staticmethod
-    def _normalize_plugin_id(plugin_id):
+    def _normalize_plugin_id(plugin_id: str) -> str:
         # Ensure plugin ID has only underscore and a-z, 0-9
         plugin_id = re.sub("[^0-9a-zA-Z]+", "_", plugin_id)
         # Ensure plugin ID is lower case
         return plugin_id.lower()
 
     @staticmethod
-    def _order_plugin_type_details(plugin_type_details_list):
+    def _order_plugin_type_details(
+        plugin_type_details_list: Sequence[dict[str, str]],
+    ) -> list[dict[str, str]]:
         runner_priority = [
             "on_library_management_file_test",
             "on_worker_process",
@@ -206,7 +243,7 @@ class PluginsCLI:
         emit_priority = len(runner_priority)
         fallback_priority = emit_priority + 1
 
-        def sort_key(details):
+        def sort_key(details: Mapping[str, str]) -> tuple[int, str]:
             runner = details.get("runner") or ""
             if runner.startswith("emit_"):
                 return (emit_priority, runner)
@@ -217,27 +254,35 @@ class PluginsCLI:
 
         return sorted(plugin_type_details_list, key=sort_key)
 
-    def _parse_runner_inputs(self, runner_inputs, plugin_details_by_name, plugin_details_by_runner):
+    def _parse_runner_inputs(
+        self,
+        runner_inputs: str | Sequence[str] | None,
+        plugin_details_by_name: Mapping[str, dict[str, str]],
+        plugin_details_by_runner: Mapping[str, dict[str, str]],
+    ) -> tuple[list[dict[str, str]] | None, list[str]]:
         runner_inputs = runner_inputs or []
         if isinstance(runner_inputs, str):
             runner_inputs = [runner_inputs]
 
-        runner_tokens = []
+        runner_tokens: list[str] = []
         for runner_input in runner_inputs:
             runner_tokens.extend([token.strip() for token in runner_input.split(",") if token.strip()])
 
         if not runner_tokens:
             return None, ["No runner types specified."]
 
-        selected_details = []
-        invalid_tokens = []
-        selected_runners = set()
+        selected_details: list[dict[str, str]] = []
+        invalid_tokens: list[str] = []
+        selected_runners: set[str] = set()
         for token in runner_tokens:
             plugin_type_details = plugin_details_by_runner.get(token) or plugin_details_by_name.get(token)
             if not plugin_type_details:
                 invalid_tokens.append(token)
                 continue
             runner = plugin_type_details.get("runner")
+            if runner is None:
+                invalid_tokens.append(token)
+                continue
             if runner in selected_runners:
                 continue
             selected_runners.add(runner)
@@ -248,15 +293,17 @@ class PluginsCLI:
 
         return selected_details, []
 
-    def _collect_new_plugin_details(self):
-        plugin_details = inquirer.prompt(menus.get("create_plugin"))
+    def _collect_new_plugin_details(self) -> tuple[dict[str, str] | None, list[dict[str, str]] | None]:
+        plugin_details_raw = _object_dict(inquirer.prompt(menus.get("create_plugin")))
+        plugin_name = _string(plugin_details_raw.get("plugin_name"))
+        plugin_id = _string(plugin_details_raw.get("plugin_id"))
 
         # Ensure results are not empty
-        if not plugin_details.get("plugin_name") or not plugin_details.get("plugin_id"):
+        if not plugin_name or not plugin_id:
             print("ERROR! Invalid input.")
             return None, None
 
-        plugin_details["plugin_id"] = self._normalize_plugin_id(plugin_details.get("plugin_id"))
+        plugin_details = {"plugin_name": plugin_name, "plugin_id": self._normalize_plugin_id(plugin_id)}
 
         choices, plugin_details_by_name, _ = self._get_plugin_type_choices()
 
@@ -270,21 +317,30 @@ class PluginsCLI:
         )
 
         # Prompt for selection of Plugin by ID
-        runner_selection = inquirer.prompt([plugin_runners_inquirer])
+        runner_selection = _object_dict(inquirer.prompt([plugin_runners_inquirer]))
         selected_plugin_names = runner_selection.get("selected_plugins") if runner_selection else []
-        if not selected_plugin_names:
+        if not isinstance(selected_plugin_names, list) or not selected_plugin_names:
             print("ERROR! No plugin runner selected.")
             return None, None
 
         # Fetch plugin type details from selection
-        plugin_type_details_list = [plugin_details_by_name[name] for name in selected_plugin_names]
+        plugin_type_details_list = [
+            plugin_details_by_name[name]
+            for name in selected_plugin_names
+            if isinstance(name, str) and name in plugin_details_by_name
+        ]
         return plugin_details, plugin_type_details_list
 
-    def create_new_plugin_files(self, plugin_details, plugin_type_details_list):
+    def create_new_plugin_files(
+        self, plugin_details: Mapping[str, str], plugin_type_details_list: Sequence[dict[str, str]]
+    ) -> None:
         ordered_plugin_type_details = self._order_plugin_type_details(plugin_type_details_list)
 
         # Create new plugin path
-        new_plugin_path = os.path.join(self.plugins_directory, plugin_details.get("plugin_id"))
+        plugin_id = plugin_details.get("plugin_id")
+        if not plugin_id:
+            raise ValueError("Plugin details require plugin_id")
+        new_plugin_path = os.path.join(self.plugins_directory, plugin_id)
         if not os.path.exists(new_plugin_path):
             os.makedirs(new_plugin_path)
 
@@ -311,7 +367,7 @@ class PluginsCLI:
         ]
 
         # Create runner function templates
-        runner_templates = []
+        runner_templates: list[str] = []
         for plugin_type_details in ordered_plugin_type_details:
             selected_plugin_runner = plugin_type_details.get("runner")
             selected_plugin_runner_docstring = plugin_type_details.get("runner_docstring")
@@ -338,10 +394,12 @@ class PluginsCLI:
 
         # Write plugin info.json
         info_file = os.path.join(new_plugin_path, "info.json")
-        priorities = {}
+        priorities: dict[str, int] = {}
         for plugin_type_details in ordered_plugin_type_details:
-            priorities[plugin_type_details.get("runner")] = 0
-        plugin_info = {
+            runner = plugin_type_details.get("runner")
+            if runner:
+                priorities[runner] = 0
+        plugin_info: dict[str, object] = {
             "id": plugin_details.get("plugin_id"),
             "name": plugin_details.get("plugin_name"),
             "author": "",
@@ -381,13 +439,15 @@ class PluginsCLI:
 
         print(f"Plugin created - '{plugin_details.get('plugin_id')}'")
 
-    def create_new_plugins(self):
+    def create_new_plugins(self) -> None:
         plugin_details, plugin_type_details_list = self._collect_new_plugin_details()
         if not plugin_details or not plugin_type_details_list:
             return
         self.create_new_plugin_files(plugin_details, plugin_type_details_list)
 
-    def create_new_plugins_from_args(self, plugin_id, plugin_name, runner_inputs):
+    def create_new_plugins_from_args(
+        self, plugin_id: str | None, plugin_name: str | None, runner_inputs: str | Sequence[str] | None
+    ) -> None:
         if not plugin_id or not plugin_name:
             print("ERROR! Missing plugin_id or plugin_name.")
             return
@@ -403,24 +463,27 @@ class PluginsCLI:
             plugin_details_by_name,
             plugin_details_by_runner,
         )
-        if errors:
+        if errors or plugin_type_details_list is None:
             print(f"ERROR! {' '.join(errors)}")
             return
 
         self.create_new_plugin_files(plugin_details, plugin_type_details_list)
 
-    def reload_plugin_from_disk(self):
+    def reload_plugin_from_disk(self) -> None:
         # Fetch list of installed plugins
         plugin_results = self.__get_installed_plugins()
 
         # Build choice selection list from installed plugins
         for plugin in plugin_results:
-            print(f"Reloading Plugin - '{plugin.get('plugin_id')}'")
-            plugin_path = os.path.join(self.plugins_directory, plugin.get("plugin_id"))
+            plugin_id = _string(plugin.get("plugin_id"))
+            if plugin_id is None:
+                continue
+            print(f"Reloading Plugin - '{plugin_id}'")
+            plugin_path = os.path.join(self.plugins_directory, plugin_id)
             # Read plugin info.json
             info_file = os.path.join(plugin_path, "info.json")
             with open(info_file) as json_file:
-                plugin_info = json.load(json_file)
+                plugin_info = _object_dict(json.load(json_file))
 
             # Insert plugin details to DB
             try:
@@ -435,16 +498,20 @@ class PluginsCLI:
             print()
         print()
 
-    def remove_plugin(self):
+    def remove_plugin(self) -> None:
         # Fetch list of installed plugins
         plugin_results = self.__get_installed_plugins()
 
         # Build choice selection list from installed plugins
-        table_ids = {}
-        choices = []
+        table_ids: dict[str, int] = {}
+        choices: list[str] = []
         for plugin in plugin_results:
-            choices.append(plugin.get("plugin_id"))
-            table_ids[plugin.get("plugin_id")] = plugin.get("id")
+            plugin_id = _string(plugin.get("plugin_id"))
+            plugin_table_id = plugin.get("id")
+            if plugin_id is None or not isinstance(plugin_table_id, int):
+                continue
+            choices.append(plugin_id)
+            table_ids[plugin_id] = plugin_table_id
         # Append a "return" option
         choices.append(_GO_BACK_LABEL)
 
@@ -456,17 +523,20 @@ class PluginsCLI:
         )
 
         # Prompt for selection of Plugin by ID
-        selection = inquirer.prompt([remove_plugin_inquirer])
+        selection = _object_dict(inquirer.prompt([remove_plugin_inquirer]))
 
         # If the 'Go Back' option was given, just return to previous menu
         if not selection or selection.get("cli_action") == _GO_BACK_LABEL:
             return
 
         # Remove the selected Plugin by ID
-        plugin_table_id = table_ids[selection.get("cli_action")]
+        selected_action = _string(selection.get("cli_action"))
+        if selected_action is None or selected_action not in table_ids:
+            return
+        plugin_table_id = table_ids[selected_action]
         self._uninstall_plugin_by_db_table_id(plugin_table_id)
 
-    def remove_plugin_by_id(self, plugin_id):
+    def remove_plugin_by_id(self, plugin_id: str | None) -> None:
         if not plugin_id:
             print("ERROR! Missing plugin_id.")
             return
@@ -481,22 +551,23 @@ class PluginsCLI:
             print(f"ERROR! Plugin record missing id for '{plugin_id}'.")
             return
 
-        self._uninstall_plugin_by_db_table_id(plugin_table_id)
+        if isinstance(plugin_table_id, int) and not isinstance(plugin_table_id, bool):
+            self._uninstall_plugin_by_db_table_id(plugin_table_id)
 
     @staticmethod
-    def _uninstall_plugin_by_db_table_id(plugin_table_id):
+    def _uninstall_plugin_by_db_table_id(plugin_table_id: int) -> None:
         plugins = PluginsHandler()
         plugins.uninstall_plugins_by_db_table_id([plugin_table_id])
         print()
 
-    def list_installed_plugins(self):
+    def list_installed_plugins(self) -> None:
         plugin_results = self.__get_installed_plugins()
         print_table(plugin_results)
         print()
         print()
 
     @staticmethod
-    def __get_installed_plugins(plugin_id=None):
+    def __get_installed_plugins(plugin_id: str | None = None) -> list[PluginRecord]:
         plugins = PluginsHandler()
         order = [
             {
@@ -505,10 +576,12 @@ class PluginsCLI:
             },
         ]
         if plugin_id:
-            return plugins.get_plugin_list_filtered_and_sorted(order=order, start=0, length=None, plugin_id=plugin_id)
-        return plugins.get_plugin_list_filtered_and_sorted(order=order, start=0, length=None)
+            rows = plugins.get_plugin_list_filtered_and_sorted(order=order, start=0, length=None, plugin_id=plugin_id)
+        else:
+            rows = plugins.get_plugin_list_filtered_and_sorted(order=order, start=0, length=None)
+        return list(rows or [])
 
-    def test_installed_plugins(self, plugin_id=None):
+    def test_installed_plugins(self, plugin_id: str | None = None) -> None:
         """
         Test all plugin runners for correct return data.
         If plugin_id is provided, only the matching plugin will be tested.
@@ -521,14 +594,16 @@ class PluginsCLI:
         plugin_results = self.__get_installed_plugins(plugin_id=plugin_id)
         for plugin_result in plugin_results:
             print(f"{BColours.HEADER}Testing plugin: '{plugin_result.get('name')}'{BColours.ENDC}")
-            plugin_id = plugin_result.get("plugin_id")
+            tested_plugin_id = _string(plugin_result.get("plugin_id"))
+            if tested_plugin_id is None:
+                continue
 
             # Reload the plugin
-            plugin_executor.reload_plugin_module(plugin_id)
+            plugin_executor.reload_plugin_module(tested_plugin_id)
 
             # Test Plugin settings
             print(f"  {BColours.SUBHEADER}Testing settings{BColours.ENDC}")
-            errors, plugin_settings = plugin_executor.test_plugin_settings(plugin_id)
+            errors, plugin_settings = plugin_executor.test_plugin_settings(tested_plugin_id)
             print(f"    {BColours.SECTION}Plugin settings schema{BColours.ENDC}")
             if errors:
                 for error in errors:
@@ -541,7 +616,7 @@ class PluginsCLI:
 
             # Test Plugin runners
             print(f"  {BColours.SUBHEADER}Testing runners{BColours.ENDC}")
-            plugin_types_in_plugin = plugin_executor.get_all_plugin_types_in_plugin(plugin_id)
+            plugin_types_in_plugin = plugin_executor.get_all_plugin_types_in_plugin(tested_plugin_id)
             if not plugin_types_in_plugin:
                 error = "No runners found in plugin"
                 print(f"  -- {BColours.FAIL}FAILED: {error}{BColours.ENDC}")
@@ -550,7 +625,7 @@ class PluginsCLI:
                 for plugin_type_in_plugin in plugin_types_in_plugin:
                     print(f"    {BColours.SECTION}{plugin_type_in_plugin}{BColours.ENDC}")
                     errors = plugin_executor.test_plugin_runner(
-                        plugin_id, plugin_type_in_plugin, test_data_modifiers=self.test_data_modifiers
+                        tested_plugin_id, plugin_type_in_plugin, test_data_modifiers=self.test_data_modifiers
                     )
                     if errors:
                         for error in errors:
@@ -561,15 +636,18 @@ class PluginsCLI:
             print()
             print()
 
-    def test_plugins(self):
+    def test_plugins(self) -> None:
         plugin_results = self.__get_installed_plugins()
 
         # Generate menu choices
-        all_plugin_details = {}
+        all_plugin_details: dict[str, PluginRecord] = {}
         choices = ["Configure Testdata", "Test All Plugins"]
         for plugin_details in plugin_results:
-            choices.append(plugin_details.get("plugin_id"))
-            all_plugin_details[plugin_details.get("plugin_id")] = plugin_details
+            plugin_id = _string(plugin_details.get("plugin_id"))
+            if plugin_id is None:
+                continue
+            choices.append(plugin_id)
+            all_plugin_details[plugin_id] = plugin_details
         choices.append(_GO_BACK_LABEL)
 
         print()
@@ -581,7 +659,7 @@ class PluginsCLI:
                 choices=choices,
                 default=default_selection,
             )
-            selection = inquirer.prompt([plugin_test_inquirer])
+            selection = _object_dict(inquirer.prompt([plugin_test_inquirer]))
 
             # If the 'Go Back' option was given, just return to previous menu
             if not selection or selection.get("selected_plugin") == _GO_BACK_LABEL:
@@ -598,13 +676,16 @@ class PluginsCLI:
                 continue
 
             # Get the details for the selected plugin
-            selected_plugin_details = all_plugin_details[selection.get("selected_plugin")]
+            selected_plugin = _string(selection.get("selected_plugin"))
+            if selected_plugin is None or selected_plugin not in all_plugin_details:
+                continue
+            selected_plugin_details = all_plugin_details[selected_plugin]
             # Set that selection as the default for the next time
-            default_selection = selection.get("selected_plugin")
+            default_selection = selected_plugin
             # Test that plugin
-            self.test_installed_plugins(plugin_id=selected_plugin_details.get("plugin_id"))
+            self.test_installed_plugins(plugin_id=_string(selected_plugin_details.get("plugin_id")))
 
-    def configure_test_data(self):
+    def configure_test_data(self) -> None:
 
         test_files = []
         for _dir_path, _dir_names, file_names in os.walk(dev_library_directory):
@@ -619,13 +700,15 @@ class PluginsCLI:
             message="Which Plugin runner will be used?",
             choices=test_files,
         )
-        runner_selection = {}
-        runner_selection = {**inquirer.prompt([test_files_inquirer]), **runner_selection}
-        self.test_data_modifiers[_TEST_FILE_IN_KEY] = runner_selection.get("selected_file")
-        split_file_in = os.path.splitext(runner_selection.get("selected_file"))
+        runner_selection = _object_dict(inquirer.prompt([test_files_inquirer]))
+        selected_file = _string(runner_selection.get("selected_file"))
+        if selected_file is None:
+            return
+        self.test_data_modifiers[_TEST_FILE_IN_KEY] = selected_file
+        split_file_in = os.path.splitext(selected_file)
         self.test_data_modifiers[_TEST_FILE_OUT_KEY] = f"{split_file_in[0]}-WORKING-1{split_file_in[1]}"
 
-    def install_test_data(self):
+    def install_test_data(self) -> None:
         sample_files = {
             "Big_Buck_Bunny_1080_10s_30MB_h264.mkv": "https://test-videos.co.uk/vids/bigbuckbunny/mkv/1080/Big_Buck_Bunny_1080_10s_30MB.mkv",
             "Big_Buck_Bunny_1080_10s_30MB_h264.mp4": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4",
@@ -637,9 +720,8 @@ class PluginsCLI:
             os.makedirs(dev_cache_directory)
         if not os.path.exists(dev_library_directory):
             os.makedirs(dev_library_directory)
-        for key in sample_files:
+        for key, file_url in sample_files.items():
             library_file = os.path.join(dev_library_directory, key)
-            file_url = sample_files.get(key)
             print()
             print(f"Downloading sample file: '{file_url}'")
             with requests.get(file_url, stream=True, timeout=30) as r:
@@ -653,7 +735,7 @@ class PluginsCLI:
             cache_file = os.path.join(dev_cache_directory, f"{split_file_in[0]}-WORKING-1{split_file_in[1]}")
             shutil.copyfile(library_file, cache_file)
 
-    def main(self, arg):
+    def main(self, arg: str) -> None:
         switcher = {
             "List all installed plugins": "list_installed_plugins",
             "Test plugins": "test_plugins",
@@ -664,12 +746,12 @@ class PluginsCLI:
         }
         function = switcher.get(arg)
         if function:
-            getattr(self, function)()
+            cast("Callable[[], object]", getattr(self, function))()
         else:
             self.logger.info("Invalid selection")
             return
 
-    def run_from_args(self, args):
+    def run_from_args(self, args: PluginCLIArgs) -> None:
         if args.test_file_in:
             self.test_data_modifiers[_TEST_FILE_IN_KEY] = args.test_file_in
         if args.test_file_out:
@@ -698,10 +780,12 @@ class PluginsCLI:
             return
         self.logger.info("Invalid plugin CLI arguments")
 
-    def run(self):
+    def run(self) -> None:
         print()
         while True:
-            selection = inquirer.prompt(menus.get("main"))
+            selection = _object_dict(inquirer.prompt(menus.get("main")))
             if not selection or selection.get("cli_action") == "Exit":
                 break
-            self.main(selection.get("cli_action"))
+            selected_action = _string(selection.get("cli_action"))
+            if selected_action is not None:
+                self.main(selected_action)

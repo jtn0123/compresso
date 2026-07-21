@@ -29,33 +29,57 @@ Copyright:
 
 """
 
+from __future__ import annotations
+
 import os
 import queue
 import threading
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypedDict, cast
 
 import peewee
 
 from compresso import config
+from compresso.libs.filetest import FileTest
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.taskhandler import QueuedPath
 
-try:
-    from watchdog.events import FileSystemEventHandler
+event_monitor_module: str | None
+if TYPE_CHECKING:
+    from watchdog.events import FileSystemEvent, FileSystemEventHandler
     from watchdog.observers import Observer
+    from watchdog.observers.api import BaseObserver
 
     event_monitor_module = "watchdog"
-except ImportError:
+else:
+    try:
+        from watchdog.events import FileSystemEvent, FileSystemEventHandler
+        from watchdog.observers import Observer
+        from watchdog.observers.api import BaseObserver
 
-    class Observer:  # type: ignore[no-redef]
-        pass
+        event_monitor_module = "watchdog"
+    except ImportError:
 
-    class FileSystemEventHandler:  # type: ignore[no-redef]
-        pass
+        class Observer:
+            pass
 
-    event_monitor_module = None  # type: ignore[assignment]
+        class FileSystemEventHandler:
+            pass
 
-from compresso.libs.filetest import FileTest
+        event_monitor_module = None
+
+
+class MonitoredPath(TypedDict):
+    src_path: str
+    library_id: int
+
+
+def _queue(value: object) -> queue.Queue[object]:
+    if not isinstance(value, queue.Queue):
+        raise TypeError("event monitor data queue is missing")
+    return cast("queue.Queue[object]", value)
 
 
 class EventHandler(FileSystemEventHandler):
@@ -77,15 +101,16 @@ class EventHandler(FileSystemEventHandler):
     From this, the only event we really need to monitor is the "created" and "closed" events.
     """
 
-    def __init__(self, files_to_test, library_id):
-        self.name = __class__.__name__
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+    def __init__(self, files_to_test: queue.Queue[MonitoredPath], library_id: int) -> None:
+        super().__init__()
+        self.name = type(self).__name__
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.files_to_test = files_to_test
         self.library_id = library_id
         self.abort_flag = threading.Event()
         self.abort_flag.clear()
 
-    def on_any_event(self, event):
+    def on_any_event(self, event: FileSystemEvent) -> None:
         if event.event_type in ["created", "closed"]:
             # Ensure event was not for a directory
             if event.is_directory:
@@ -94,7 +119,7 @@ class EventHandler(FileSystemEventHandler):
                 self.logger.info("Detected '%s' event on file path '%s'", event.event_type, event.src_path)
                 self.files_to_test.put(
                     {
-                        "src_path": event.src_path,
+                        "src_path": os.fsdecode(event.src_path),
                         "library_id": self.library_id,
                     }
                 )
@@ -110,27 +135,28 @@ class EventMonitorManager(threading.Thread):
 
     """
 
-    def __init__(self, data_queues, event):
+    def __init__(self, data_queues: Mapping[str, object], event: threading.Event) -> None:
         super().__init__(name="EventMonitorManager")
-        self.name = __class__.__name__
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.name = type(self).__name__
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.data_queues = data_queues
         self.settings = config.Config()
         self.event = event
 
         # Create an event queue
-        self.files_to_test = queue.Queue()
+        self.files_to_test: queue.Queue[MonitoredPath] = queue.Queue()
+        self.inotifytasks = cast("queue.Queue[QueuedPath]", _queue(data_queues["inotifytasks"]))
 
         self.abort_flag = threading.Event()
         self.abort_flag.clear()
 
-        self.event_observer_thread = None
-        self.event_observer_threads = []
+        self.event_observer_thread: BaseObserver | None = None
+        self.event_observer_threads: list[BaseObserver] = []
 
-    def stop(self):
+    def stop(self) -> None:
         self.abort_flag.set()
 
-    def run(self):
+    def run(self) -> None:
         self.logger.info("Starting EventMonitorManager loop")
         while not self.abort_flag.is_set():
             self.event.wait(0.5)
@@ -177,7 +203,7 @@ class EventMonitorManager(threading.Thread):
         self.stop_event_processor()
         self.logger.info("Leaving EventMonitorManager loop...")
 
-    def system_configuration_is_valid(self):
+    def system_configuration_is_valid(self) -> bool:
         """
         Check and ensure the system configuration is correct for running
 
@@ -186,7 +212,7 @@ class EventMonitorManager(threading.Thread):
         plugin_handler = PluginsHandler()
         return not plugin_handler.get_incompatible_enabled_plugins()
 
-    def start_event_processor(self):
+    def start_event_processor(self) -> None:
         """
         Start the EventProcessor thread if it is not already running.
 
@@ -222,7 +248,7 @@ class EventMonitorManager(threading.Thread):
         else:
             self.logger.info("Given signal to start the EventProcessor thread, but it is already running....")
 
-    def stop_event_processor(self):
+    def stop_event_processor(self) -> None:
         """
         Stop the EventProcessor thread if it is running.
 
@@ -242,7 +268,7 @@ class EventMonitorManager(threading.Thread):
 
         self.event_observer_thread = None
 
-    def manage_event_queue(self, pathname, library_id):
+    def manage_event_queue(self, pathname: str, library_id: int) -> None:
         """
         Manage all monitored events
 
@@ -259,7 +285,7 @@ class EventMonitorManager(threading.Thread):
             result, issues, priority_score, _ = file_test.should_file_be_added_to_task_list(pathname)
             # Log any error messages
             for issue in issues:
-                if type(issue) is dict:
+                if isinstance(issue, dict):
                     self.logger.info(issue.get("message"))
                 else:
                     self.logger.info(issue)
@@ -273,7 +299,7 @@ class EventMonitorManager(threading.Thread):
         except Exception:
             self.logger.exception("Exception testing file path in %s. Ignoring.", self.name)
 
-    def __add_path_to_queue(self, pathname, library_id, priority_score):
+    def __add_path_to_queue(self, pathname: str, library_id: int, priority_score: int) -> None:
         """
         Add a given path to the pending task queue
 
@@ -282,7 +308,7 @@ class EventMonitorManager(threading.Thread):
         :param priority_score:
         :return:
         """
-        self.data_queues.get("inotifytasks").put(
+        self.inotifytasks.put(
             {
                 "pathname": pathname,
                 "library_id": library_id,

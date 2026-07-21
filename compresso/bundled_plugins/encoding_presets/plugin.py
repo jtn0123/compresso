@@ -11,6 +11,7 @@ and audio bitrate.
 import logging
 import os
 import re
+from typing import Protocol, cast
 
 from compresso.libs.unplugins.settings import PluginSettings
 
@@ -197,26 +198,44 @@ CRF_PARAM_MAP = {
 }
 
 
-def _videotoolbox_quality_from_crf(crf):
+class ProgressParser(Protocol):
+    def __call__(
+        self,
+        line_text: object,
+        pid: int | None = None,
+        proc_start_time: float | None = None,
+        unset: bool = False,
+    ) -> dict[str, str]: ...
+
+
+def _string(value: object, default: str = "") -> str:
+    return value if isinstance(value, str) else default
+
+
+def _integer(value: object, default: int = 0) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _videotoolbox_quality_from_crf(crf: object) -> int:
     """Map the UI's lower-is-better CRF scale to VideoToolbox 1-100 quality."""
-    bounded_crf = max(0, min(63, int(crf)))
+    bounded_crf = max(0, min(63, _integer(crf, 23)))
     return round(100 - (bounded_crf / 63) * 99)
 
 
-def _get_source_extension(file_path):
+def _get_source_extension(file_path: str) -> str:
     """Extract file extension without the dot."""
     _, ext = os.path.splitext(file_path)
     return ext.lstrip(".").lower()
 
 
-def _build_ffmpeg_progress_parser(data):
+def _build_ffmpeg_progress_parser(data: dict[str, object]) -> ProgressParser:
     """
     Build a progress parser that extracts percentage from FFmpeg output.
     Uses duration from file_in to calculate percent.
     """
     import subprocess
 
-    duration = 0
+    duration = 0.0
 
     try:
         probe_cmd = [
@@ -227,14 +246,20 @@ def _build_ffmpeg_progress_parser(data):
             "format=duration",
             "-of",
             "default=noprint_wrappers=1:nokey=1",
-            data.get("file_in", ""),
+            _string(data.get("file_in")),
         ]
         result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=30)  # noqa: S603 - trusted ffprobe command built internally
         duration = float(result.stdout.strip())
     except Exception as e:
         logger.debug("Failed to probe duration for progress tracking: %s", e)
 
-    def parser(line_text, pid=None, proc_start_time=None, unset=False):
+    def parser(
+        line_text: object,
+        pid: int | None = None,
+        proc_start_time: float | None = None,
+        unset: bool = False,
+    ) -> dict[str, str]:
+        del pid, proc_start_time
         if unset or duration <= 0:
             return {}
         # Parse time=HH:MM:SS.ss from FFmpeg output
@@ -251,32 +276,36 @@ def _build_ffmpeg_progress_parser(data):
     return parser
 
 
-def on_worker_process(data, **kwargs):
+def on_worker_process(data: dict[str, object], **kwargs: object) -> None:
     """
     Runner function — builds an FFmpeg command based on the configured encoding presets.
 
     Reads settings, constructs the FFmpeg command with appropriate codec, quality,
     preset, bitrate, scaling, and audio parameters, then sets data['exec_command'].
     """
-    settings = Settings(library_id=data.get("library_id"))
+    del kwargs
+    library_id = data.get("library_id")
+    settings = Settings(library_id=library_id if isinstance(library_id, int) and not isinstance(library_id, bool) else None)
     settings.get_setting()
 
     s = settings.settings_configured
 
-    file_in = data.get("file_in")
+    file_in = _string(data.get("file_in"))
+    worker_log_value = data.get("worker_log")
+    worker_log = cast("list[object]", worker_log_value) if isinstance(worker_log_value, list) else []
     if not file_in:
-        data["worker_log"].append("[Encoding Presets] No input file — skipping.\n")
+        worker_log.append("[Encoding Presets] No input file — skipping.\n")
         return
 
     # Determine output format
     source_ext = _get_source_extension(file_in)
-    output_format = s.get("output_format", "").strip() or source_ext
+    output_format = _string(s.get("output_format")).strip() or source_ext
     if not output_format:
         output_format = "mkv"
 
     # Build output path
     file_in_basename = os.path.splitext(os.path.basename(file_in))[0]
-    cache_dir = os.path.dirname(data.get("file_out") or file_in)
+    cache_dir = os.path.dirname(_string(data.get("file_out")) or file_in)
     file_out = os.path.join(cache_dir, f"{file_in_basename}.{output_format}")
     data["file_out"] = file_out
 
@@ -295,8 +324,8 @@ def on_worker_process(data, **kwargs):
     ]
 
     # Video settings
-    video_codec = s.get("video_codec", "").strip()
-    video_encoder = s.get("video_encoder", "").strip()
+    video_codec = _string(s.get("video_codec")).strip()
+    video_encoder = _string(s.get("video_encoder")).strip()
 
     if video_codec and not video_encoder:
         video_encoder = CODEC_ENCODER_MAP.get(video_codec, video_codec)
@@ -305,15 +334,15 @@ def on_worker_process(data, **kwargs):
         cmd.extend(["-c:v", video_encoder])
 
         # CRF / quality
-        crf = s.get("crf", 23)
+        crf = _integer(s.get("crf"), 23)
         if video_encoder in VIDEOTOOLBOX_ENCODERS:
             cmd.extend(["-q:v", str(_videotoolbox_quality_from_crf(crf))])
         else:
             crf_param = CRF_PARAM_MAP.get(video_encoder, "-crf")
-            cmd.extend([crf_param, str(int(crf))])
+            cmd.extend([crf_param, str(crf)])
 
         # Encoder preset
-        preset = s.get("encoder_preset", "medium").strip()
+        preset = _string(s.get("encoder_preset"), "medium").strip()
         if preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
             preset_param = PRESET_PARAM_MAP.get(video_encoder, "-preset")
             # Map named presets to numbers for SVT-AV1 and VP9/libaom
@@ -326,7 +355,7 @@ def on_worker_process(data, **kwargs):
             cmd.extend([preset_param, preset_value])
 
         # Max bitrate
-        max_bitrate = s.get("max_bitrate", "").strip()
+        max_bitrate = _string(s.get("max_bitrate")).strip()
         if max_bitrate:
             if video_encoder in VIDEOTOOLBOX_ENCODERS:
                 cmd.extend(["-b:v", max_bitrate])
@@ -336,16 +365,16 @@ def on_worker_process(data, **kwargs):
         cmd.extend(["-c:v", "copy"])
 
     # Resolution scaling
-    scale_height = int(s.get("scale_height", 0) or 0)
+    scale_height = _integer(s.get("scale_height"))
     if scale_height > 0 and video_encoder:
         # Scale to target height, auto-calculate width (divisible by 2)
         cmd.extend(["-vf", f"scale=-2:{scale_height}"])
 
     # Audio settings
-    audio_codec = s.get("audio_codec", "").strip()
+    audio_codec = _string(s.get("audio_codec")).strip()
     if audio_codec:
         cmd.extend(["-c:a", audio_codec])
-        audio_bitrate = s.get("audio_bitrate", "").strip()
+        audio_bitrate = _string(s.get("audio_bitrate")).strip()
         if audio_bitrate:
             cmd.extend(["-b:a", audio_bitrate])
     else:
@@ -357,7 +386,7 @@ def on_worker_process(data, **kwargs):
     cmd.extend(["-c:s", "copy", "-c:d", "copy", "-c:t", "copy"])
 
     # Extra flags
-    extra_flags = s.get("extra_flags", "").strip()
+    extra_flags = _string(s.get("extra_flags")).strip()
     if extra_flags:
         cmd.extend(extra_flags.split())
 
@@ -370,7 +399,8 @@ def on_worker_process(data, **kwargs):
 
     # Update current command display for the UI
     if isinstance(data.get("current_command"), list):
-        data["current_command"].clear()
-        data["current_command"].append(" ".join(cmd))
+        current_command = cast("list[object]", data["current_command"])
+        current_command.clear()
+        current_command.append(" ".join(cmd))
 
-    data["worker_log"].append(f"[Encoding Presets] Command: {' '.join(cmd)}\n")
+    worker_log.append(f"[Encoding Presets] Command: {' '.join(cmd)}\n")

@@ -33,22 +33,40 @@ import contextlib
 import re
 import threading
 import time
+from typing import Protocol, TypedDict, cast
 
 import psutil
 
 from compresso.libs.logs import CompressoLogging
 
 
+class ParentWorker(Protocol):
+    event: threading.Event
+    redundant_flag: threading.Event
+    paused_flag: threading.Event
+
+
+class ProgressStatus(TypedDict):
+    killed: bool
+    paused: bool
+    percent: str
+
+
+class EncodingSpeedStats(TypedDict):
+    avg_encoding_fps: float
+    encoding_speed_ratio: float
+
+
 class WorkerCommandError(Exception):
-    def __init__(self, command):
+    def __init__(self, command: object) -> None:
         Exception.__init__(self, f"Worker command returned non 0 status. Command: {command}")
         self.command = command
 
 
 class WorkerSubprocessMonitor(threading.Thread):
-    def __init__(self, parent_worker):
+    def __init__(self, parent_worker: ParentWorker) -> None:
         super().__init__(daemon=True)
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self._stop_event = threading.Event()
         self._terminate_lock = threading.Lock()
 
@@ -59,27 +77,27 @@ class WorkerSubprocessMonitor(threading.Thread):
         self.paused = False
 
         # Set current subprocess to None
-        self.subprocess_pid = None
-        self.subprocess = None
-        self.subprocess_start_time = 0
-        self.subprocess_pause_time = 0
-        self._pause_time_counter = None
+        self.subprocess_pid: int | None = None
+        self.subprocess: psutil.Process | None = None
+        self.subprocess_start_time: float = 0
+        self.subprocess_pause_time: int = 0
+        self._pause_time_counter: float | None = None
 
         # Subprocess stats
-        self.subprocess_percent = 0
-        self.subprocess_elapsed = 0
-        self.subprocess_cpu_percent = 0
-        self.subprocess_mem_percent = 0
-        self.subprocess_rss_bytes = 0
-        self.subprocess_vms_bytes = 0
+        self.subprocess_percent: int = 0
+        self.subprocess_elapsed: int = 0
+        self.subprocess_cpu_percent: float = 0
+        self.subprocess_mem_percent: float = 0
+        self.subprocess_rss_bytes: int = 0
+        self.subprocess_vms_bytes: int = 0
 
         # Encoding speed tracking
-        self.last_encoding_fps = 0
-        self.last_encoding_speed = 0
-        self._fps_samples = []
-        self._speed_samples = []
+        self.last_encoding_fps: float = 0
+        self.last_encoding_speed: float = 0
+        self._fps_samples: list[float] = []
+        self._speed_samples: list[float] = []
 
-    def set_proc(self, pid):
+    def set_proc(self, pid: int) -> None:
         try:
             if pid != self.subprocess_pid:
                 self.subprocess_pid = pid
@@ -101,7 +119,7 @@ class WorkerSubprocessMonitor(threading.Thread):
         except Exception:
             self.logger.exception("Exception in set_proc()")
 
-    def unset_proc(self):
+    def unset_proc(self) -> None:
         try:
             # Preserve the final elapsed time before clearing the subprocess
             self.subprocess_elapsed = self.get_subprocess_elapsed()
@@ -114,13 +132,19 @@ class WorkerSubprocessMonitor(threading.Thread):
         except Exception:
             self.logger.exception("Exception in unset_proc()")
 
-    def set_proc_resources_in_parent_worker(self, normalised_cpu_percent, rss_bytes, vms_bytes, mem_percent):
+    def set_proc_resources_in_parent_worker(
+        self,
+        normalised_cpu_percent: float,
+        rss_bytes: int,
+        vms_bytes: int,
+        mem_percent: float,
+    ) -> None:
         self.subprocess_cpu_percent = normalised_cpu_percent
         self.subprocess_rss_bytes = rss_bytes
         self.subprocess_vms_bytes = vms_bytes
         self.subprocess_mem_percent = mem_percent
 
-    def suspend_proc(self):
+    def suspend_proc(self) -> None:
         # Stop the process if the worker is paused.
         # Resume is handled separately so the monitor loop can keep running.
         try:
@@ -143,7 +167,7 @@ class WorkerSubprocessMonitor(threading.Thread):
         except Exception:
             self.logger.exception("Exception in suspend_proc()")
 
-    def resume_proc(self):
+    def resume_proc(self) -> None:
         try:
             if not self.subprocess or not self.subprocess.is_running():
                 return
@@ -166,7 +190,7 @@ class WorkerSubprocessMonitor(threading.Thread):
         except Exception:
             self.logger.exception("Exception in resume_proc()")
 
-    def terminate_proc(self):
+    def terminate_proc(self) -> None:
         with self._terminate_lock:
             try:
                 # If the process is still running, kill it
@@ -178,13 +202,14 @@ class WorkerSubprocessMonitor(threading.Thread):
             except Exception:
                 self.logger.exception("Exception in terminate_proc()")
 
-    def __log_proc_terminated(self, proc: psutil.Process):
+    def __log_proc_terminated(self, proc: psutil.Process) -> None:
         try:
-            self.logger.info("Process %s terminated with exit code %s", proc, proc.returncode)
+            returncode = cast("int | None", getattr(proc, "returncode", None))
+            self.logger.info("Process %s terminated with exit code %s", proc, returncode)
         except Exception:
             self.logger.exception("Exception in __log_proc_terminated()")
 
-    def __terminate_proc_tree(self, proc: psutil.Process):
+    def __terminate_proc_tree(self, proc: psutil.Process) -> None:
         """
         Terminate the process tree (including grandchildren).
         Ensures any suspended processes are first resumed so that
@@ -222,7 +247,7 @@ class WorkerSubprocessMonitor(threading.Thread):
         except Exception:
             self.logger.exception("Exception in __terminate_proc_tree()")
 
-    def get_subprocess_elapsed(self):
+    def get_subprocess_elapsed(self) -> int:
         try:
             subprocess_elapsed = self.subprocess_elapsed
             if self.subprocess is not None:
@@ -239,7 +264,7 @@ class WorkerSubprocessMonitor(threading.Thread):
             self.logger.exception("Exception in get_subprocess_elapsed()")
             return self.subprocess_elapsed
 
-    def get_subprocess_stats(self):
+    def get_subprocess_stats(self) -> dict[str, object]:
         try:
             elapsed = self.get_subprocess_elapsed()
             percent = self.subprocess_percent
@@ -277,7 +302,7 @@ class WorkerSubprocessMonitor(threading.Thread):
                 "encoding_speed": 0,
             }
 
-    def parse_ffmpeg_speed(self, line_text):
+    def parse_ffmpeg_speed(self, line_text: object) -> None:
         """Parse FFmpeg progress output for fps and speed values."""
         try:
             line = str(line_text).strip()
@@ -298,10 +323,10 @@ class WorkerSubprocessMonitor(threading.Thread):
         except Exception as e:
             self.logger.debug("Failed to parse FFmpeg speed output: %s", e)
 
-    def get_encoding_speed_stats(self):
+    def get_encoding_speed_stats(self) -> EncodingSpeedStats:
         """Return average encoding speed metrics collected during processing."""
-        avg_fps = 0
-        avg_speed = 0
+        avg_fps = 0.0
+        avg_speed = 0.0
         if self._fps_samples:
             avg_fps = sum(self._fps_samples) / len(self._fps_samples)
         if self._speed_samples:
@@ -311,28 +336,34 @@ class WorkerSubprocessMonitor(threading.Thread):
             "encoding_speed_ratio": round(avg_speed, 2),
         }
 
-    def reset_encoding_speed_stats(self):
+    def reset_encoding_speed_stats(self) -> None:
         """Reset encoding speed tracking for a new task."""
         self.last_encoding_fps = 0
         self.last_encoding_speed = 0
         self._fps_samples = []
         self._speed_samples = []
 
-    def set_subprocess_start_time(self, proc_start_time):
+    def set_subprocess_start_time(self, proc_start_time: float) -> None:
         try:
             self.subprocess_start_time = proc_start_time
         except Exception:
             self.logger.exception("Exception in set_subprocess_start_time()")
 
-    def set_subprocess_percent(self, percent):
+    def set_subprocess_percent(self, percent: object) -> None:
         try:
-            self.subprocess_percent = max(0, min(100, int(float(percent))))
+            self.subprocess_percent = max(0, min(100, int(float(str(percent)))))
         except (TypeError, ValueError):
             self.subprocess_percent = 0
         except Exception:
             self.logger.exception("Exception in set_subprocess_percent()")
 
-    def default_progress_parser(self, line_text, pid=None, proc_start_time=None, unset=False):
+    def default_progress_parser(
+        self,
+        line_text: object,
+        pid: int | None = None,
+        proc_start_time: float | None = None,
+        unset: bool = False,
+    ) -> ProgressStatus:
         if unset:
             # Here we provide a plugin with the ability to unset a subprocess (indicating that it completed)
             self.unset_proc()
@@ -365,9 +396,9 @@ class WorkerSubprocessMonitor(threading.Thread):
                 "percent": str(self.subprocess_percent),
             }
 
-    def run(self):
+    def run(self) -> None:
         # First fetch the number of CPUs for normalising the CPU percent
-        cpu_count = psutil.cpu_count(logical=True)
+        cpu_count = psutil.cpu_count(logical=True) or 1
         # Loop while thread is expected to be running
         self.logger.warning("Starting WorkerMonitor loop")
         while True:
@@ -443,6 +474,6 @@ class WorkerSubprocessMonitor(threading.Thread):
 
         self.logger.info("Exiting WorkerMonitor loop")
 
-    def stop(self):
+    def stop(self) -> None:
         self.terminate_proc()
         self._stop_event.set()

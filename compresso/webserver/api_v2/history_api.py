@@ -29,12 +29,18 @@ Copyright:
 
 """
 
-import tornado.log
+from tornado.log import app_log
 
 from compresso import config
 from compresso.libs import session
-from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    integer_list_value,
+    integer_value,
+    optional_integer_value,
+)
 from compresso.webserver.api_v2.schema.history_schemas import (
     CompletedTasksLogRequestSchema,
     CompletedTasksLogSchema,
@@ -47,10 +53,10 @@ from compresso.webserver.helpers import completed_tasks
 
 
 class ApiHistoryHandler(BaseApiHandler):
-    session = None
-    config = None
-    params = None
-    compresso_data_queues = None
+    session: session.Session
+    config: config.Config
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -75,14 +81,14 @@ class ApiHistoryHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
         self.config = config.Config()
 
-    async def get_completed_tasks(self):
+    async def get_completed_tasks(self) -> None:
         """
         History - list tasks
         ---
@@ -161,7 +167,7 @@ class ApiHistoryHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def delete_completed_tasks(self):
+    async def delete_completed_tasks(self) -> None:
         """
         History - delete
         ---
@@ -215,10 +221,10 @@ class ApiHistoryHandler(BaseApiHandler):
                     "after": json_request.get("after"),
                     "before": json_request.get("before"),
                 }
-                exclude_ids = json_request.get("exclude_ids", [])
+                exclude_ids = integer_list_value(json_request.get("exclude_ids"))
                 id_list = completed_tasks.get_filtered_completed_task_ids(filter_params, exclude_ids=exclude_ids)
             else:
-                id_list = json_request.get("id_list", [])
+                id_list = integer_list_value(json_request.get("id_list"))
 
             if not id_list:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="No completed tasks selected")
@@ -238,7 +244,7 @@ class ApiHistoryHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def add_completed_tasks_to_pending_list(self):
+    async def add_completed_tasks_to_pending_list(self) -> None:
         """
         History - reprocess
         ---
@@ -292,11 +298,11 @@ class ApiHistoryHandler(BaseApiHandler):
                     "after": json_request.get("after"),
                     "before": json_request.get("before"),
                 }
-                exclude_ids = json_request.get("exclude_ids", [])
+                exclude_ids = integer_list_value(json_request.get("exclude_ids"))
                 id_list = completed_tasks.get_filtered_completed_task_ids(filter_params, exclude_ids=exclude_ids)
             else:
-                id_list = json_request.get("id_list", [])
-            library_id = json_request.get("library_id")
+                id_list = integer_list_value(json_request.get("id_list"))
+            library_id = optional_integer_value(json_request.get("library_id"))
 
             if not id_list:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="No completed tasks selected")
@@ -308,7 +314,8 @@ class ApiHistoryHandler(BaseApiHandler):
                 failed_ids = ""
                 for task_id in errors:
                     failed_ids += f" {task_id}"
-                    tornado.log.app_log.error(f"ApiHistoryHandler.{self.route.get('call_method')}: {errors.get(task_id)}")
+                    call_method = self.route.get("call_method") if self.route else "unknown"
+                    app_log.error(f"ApiHistoryHandler.{call_method}: {errors.get(task_id)}")
                 self.set_status(
                     self.STATUS_ERROR_INTERNAL,
                     reason=f"Failed to add the provided completed tasks to the pending task list: '{failed_ids}'",
@@ -324,7 +331,7 @@ class ApiHistoryHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_completed_task_log(self):
+    async def get_completed_task_log(self) -> None:
         """
         History - details
         ---
@@ -371,7 +378,7 @@ class ApiHistoryHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(CompletedTasksLogRequestSchema())
 
-            command_log = completed_tasks.read_command_log_for_task(json_request.get("task_id"))
+            command_log = completed_tasks.read_command_log_for_task(integer_value(json_request.get("task_id")))
 
             response = self.build_response(
                 CompletedTasksLogSchema(),

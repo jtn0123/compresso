@@ -30,13 +30,33 @@ Copyright:
 """
 
 import random
+from collections.abc import Mapping, Sequence
+from typing import TypedDict
 
-from compresso.libs.unmodels import Tags
+from compresso.libs.peewee_types import execute_count, execute_write
+from compresso.libs.unmodels.tags import Tags
 from compresso.libs.unmodels.workergroups import WorkerGroups
 from compresso.libs.unmodels.workerschedules import WorkerSchedules
 
 
-def generate_random_worker_group_name():
+class WorkerScheduleConfig(TypedDict):
+    repetition: str
+    schedule_task: str
+    schedule_time: str
+    schedule_worker_count: int | None
+
+
+class WorkerGroupConfig(TypedDict):
+    id: int
+    locked: bool
+    name: str
+    number_of_workers: int
+    worker_type: str
+    tags: list[str]
+    worker_event_schedules: list[WorkerScheduleConfig]
+
+
+def generate_random_worker_group_name() -> str:
     names = [
         "Altoa",
         "Anje",
@@ -153,6 +173,15 @@ def generate_random_worker_group_name():
     return random.choice(names)  # noqa: S311 — not used for security/crypto
 
 
+def _int_value(value: object, default: int = 0) -> int:
+    if isinstance(value, (int, str)):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
 class WorkerGroup:
     """
     WorkerGroup
@@ -161,20 +190,21 @@ class WorkerGroup:
 
     """
 
-    def __init__(self, group_id: int):
+    def __init__(self, group_id: int) -> None:
         # Ensure worker group ID is not 0
         if group_id < 1:
             raise Exception("Worker group ID cannot be less than 1")
-        self.model = WorkerGroups.get_or_none(id=group_id)
-        if not self.model:
+        model = WorkerGroups.get_or_none(id=group_id)
+        if model is None:
             raise Exception(f"Unable to fetch Worker group  with ID {group_id}")
+        self.model = model
 
     @staticmethod
-    def random_name():
+    def random_name() -> str:
         return generate_random_worker_group_name()
 
     @staticmethod
-    def get_all_worker_groups():
+    def get_all_worker_groups() -> list[WorkerGroupConfig]:
         """
         Return a list of all worker groups
 
@@ -188,7 +218,7 @@ class WorkerGroup:
             # to migrate from. New installs start with a single default
             # worker group; the user configures workers through worker
             # groups directly.
-            default_worker_group = {
+            default_worker_group: WorkerGroupConfig = {
                 "id": 1,
                 "locked": False,
                 "name": generate_random_worker_group_name(),
@@ -201,9 +231,9 @@ class WorkerGroup:
             return [default_worker_group]
 
         # Loop over results
-        worker_groups = []
+        worker_groups: list[WorkerGroupConfig] = []
         for group in configured_worker_groups:
-            group_config = {
+            group_config: WorkerGroupConfig = {
                 "id": group.id,
                 "locked": group.locked,
                 "name": group.name,
@@ -216,7 +246,8 @@ class WorkerGroup:
             for tag in group.tags.order_by(Tags.name):
                 group_config["tags"].append(tag.name)
             # Append worker_event_schedules
-            for event_schedule in group.worker_schedules:
+            schedules = WorkerSchedules.select().where(WorkerSchedules.worker_group_id == group.id)
+            for event_schedule in schedules:
                 group_config["worker_event_schedules"].append(
                     {
                         "repetition": event_schedule.repetition,
@@ -232,22 +263,22 @@ class WorkerGroup:
         return worker_groups
 
     @staticmethod
-    def create(data: dict):
+    def create(data: Mapping[str, object]) -> None:
         """
         Create a new library
 
         :param data:
         :return:
         """
-        # Ensure the name is not blank
-        if not data.get("name"):
-            data["name"] = generate_random_worker_group_name()
+        name = data.get("name")
+        if not isinstance(name, str) or not name:
+            name = generate_random_worker_group_name()
 
-        worker_group_data = {
-            "locked": data.get("locked"),
-            "name": data.get("name"),
-            "number_of_workers": data.get("number_of_workers"),
-            "worker_type": data.get("worker_type", "cpu"),
+        worker_group_data: dict[str, object] = {
+            "locked": bool(data.get("locked", False)),
+            "name": name,
+            "number_of_workers": _int_value(data.get("number_of_workers")),
+            "worker_type": str(data.get("worker_type", "cpu")),
         }
         worker_group_id = WorkerGroups.create(**worker_group_data)
 
@@ -255,11 +286,21 @@ class WorkerGroup:
         worker_group = WorkerGroup(int(worker_group_id.id))
 
         # Set lists
-        worker_group.set_tags(data.get("tags", []))
-        worker_group.set_worker_event_schedules(data.get("worker_event_schedules", []))
+        tags = data.get("tags", [])
+        worker_group.set_tags(
+            [tag for tag in tags if isinstance(tag, str)]
+            if isinstance(tags, Sequence) and not isinstance(tags, (str, bytes))
+            else []
+        )
+        schedules = data.get("worker_event_schedules", [])
+        worker_group.set_worker_event_schedules(
+            [schedule for schedule in schedules if isinstance(schedule, Mapping)]
+            if isinstance(schedules, Sequence) and not isinstance(schedules, (str, bytes))
+            else []
+        )
 
     @staticmethod
-    def create_schedules(worker_group_id: int, worker_event_schedules: list):
+    def create_schedules(worker_group_id: int, worker_event_schedules: Sequence[Mapping[str, object]]) -> None:
         for worker_event_schedule in worker_event_schedules:
             worker_event_schedule_data = {
                 "worker_group_id": worker_group_id,
@@ -270,7 +311,7 @@ class WorkerGroup:
             }
             WorkerSchedules.create(**worker_event_schedule_data)
 
-    def __remove_schedules(self):
+    def __remove_schedules(self) -> int:
         """
         Remove all schedules
 
@@ -278,30 +319,30 @@ class WorkerGroup:
         """
         query = WorkerSchedules.delete()
         query = query.where(WorkerSchedules.worker_group_id == self.model.id)
-        return query.execute()
+        return execute_count(query)
 
-    def get_id(self):
-        return self.model.id
+    def get_id(self) -> int:
+        return int(self.model.id)
 
-    def get_name(self):
-        return self.model.name
+    def get_name(self) -> str:
+        return str(self.model.name)
 
-    def set_name(self, value):
+    def set_name(self, value: str) -> None:
         self.model.name = value
 
-    def get_locked(self):
-        return self.model.locked
+    def get_locked(self) -> bool:
+        return bool(self.model.locked)
 
-    def set_locked(self, value):
+    def set_locked(self, value: bool) -> None:
         self.model.locked = value
 
-    def get_number_of_workers(self):
-        return self.model.number_of_workers
+    def get_number_of_workers(self) -> int:
+        return int(self.model.number_of_workers)
 
-    def set_number_of_workers(self, value):
+    def set_number_of_workers(self, value: int) -> None:
         self.model.number_of_workers = value
 
-    def get_worker_type(self):
+    def get_worker_type(self) -> str:
         """
         Returns the worker type ('cpu' or 'gpu') for this group.
 
@@ -309,34 +350,35 @@ class WorkerGroup:
         Task routing is determined by tags, not worker_type.
         Future versions may use this for hardware-aware scheduling.
         """
-        return self.model.worker_type
+        return str(self.model.worker_type)
 
-    def set_worker_type(self, value):
+    def set_worker_type(self, value: str) -> None:
         if value not in ("cpu", "gpu"):
             raise ValueError("worker_type must be 'cpu' or 'gpu'")
         self.model.worker_type = value
 
-    def get_tags(self):
-        return_value = []
+    def get_tags(self) -> list[str]:
+        return_value: list[str] = []
         for tag in self.model.tags.order_by(Tags.name):
             return_value.append(tag.name)
         return return_value
 
-    def set_tags(self, value):
+    def set_tags(self, value: Sequence[str]) -> None:
         # Create any missing tags
         for tag_name in value:
             # Do not update any current tags with on_conflict_replace() as this will also change their IDs
             # Instead, just ignore them
-            Tags.insert(name=tag_name).on_conflict_ignore().execute()
+            execute_write(Tags.insert(name=tag_name).on_conflict_ignore())
         # Create a SELECT query for all tags with the listed names
         tags_select_query = Tags.select().where(Tags.name.in_(value))
         # Clear out the current linking table of tags linked to this library
         # Add new links for each tag that was fetched matching the provided names
         self.model.tags.add(tags_select_query, clear_existing=True)
 
-    def get_worker_event_schedules(self):
-        return_value = []
-        for event_schedule in self.model.worker_schedules:
+    def get_worker_event_schedules(self) -> list[WorkerScheduleConfig]:
+        return_value: list[WorkerScheduleConfig] = []
+        schedules = WorkerSchedules.select().where(WorkerSchedules.worker_group_id == self.model.id)
+        for event_schedule in schedules:
             return_value.append(
                 {
                     "repetition": event_schedule.repetition,
@@ -347,14 +389,14 @@ class WorkerGroup:
             )
         return return_value
 
-    def set_worker_event_schedules(self, value):
+    def set_worker_event_schedules(self, value: Sequence[Mapping[str, object]]) -> None:
         # Remove all schedules
         self.__remove_schedules()
         # Save the event schedules
         if value:
             WorkerGroup.create_schedules(self.model.id, value)
 
-    def save(self):
+    def save(self) -> int:
         """
         Save the data for this library
 
@@ -365,9 +407,9 @@ class WorkerGroup:
             self.set_name(generate_random_worker_group_name())
 
         # Save changes made to model
-        self.model.save()
+        return int(self.model.save())
 
-    def delete(self):
+    def delete(self) -> int:
         """
         Delete the current library
 
@@ -381,4 +423,4 @@ class WorkerGroup:
         self.__remove_schedules()
 
         # Remove the library entry
-        return self.model.delete_instance(recursive=True)
+        return int(self.model.delete_instance(recursive=True))

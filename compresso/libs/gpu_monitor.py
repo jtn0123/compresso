@@ -14,6 +14,7 @@ import sys
 import time
 from collections import deque
 from pathlib import Path
+from typing import TypedDict, cast
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
@@ -24,12 +25,36 @@ INTEL_VENDOR_ID = "0x8086"
 AMD_VENDOR_ID = "0x1002"
 
 
+class GpuMetrics(TypedDict):
+    index: int
+    type: str
+    name: str
+    utilization_percent: float | None
+    memory_used_mb: int
+    memory_total_mb: int
+    temperature_c: int | None
+
+
+class GpuHistorySample(TypedDict):
+    timestamp: float
+    utilization_percent: float | None
+    memory_used_mb: int
+    memory_total_mb: int
+    temperature_c: int | None
+
+
+def _string_keyed_dict(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        return None
+    return cast("dict[str, object]", value)
+
+
 class GpuMonitor(metaclass=SingletonType):
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = CompressoLogging.get_logger(name=self.__class__.__name__)
-        self._history: dict[str, deque] = {}
+        self._history: dict[str, deque[GpuHistorySample]] = {}
         self._capabilities = self._probe_capabilities()
-        self._macos_gpu_cache: list[dict] = []
+        self._macos_gpu_cache: list[GpuMetrics] = []
 
     def _probe_capabilities(self) -> dict[str, bool]:
         """Check which GPU monitoring backends are available on this system."""
@@ -68,7 +93,7 @@ class GpuMonitor(metaclass=SingletonType):
         self.logger.debug("GPU capabilities: %s", caps)
         return caps
 
-    def get_realtime_metrics(self) -> list[dict]:
+    def get_realtime_metrics(self) -> list[GpuMetrics]:
         """
         Poll all available GPU backends and return current metrics.
 
@@ -76,7 +101,7 @@ class GpuMonitor(metaclass=SingletonType):
             index, type, name, utilization_percent, memory_used_mb,
             memory_total_mb, temperature_c
         """
-        gpus = []
+        gpus: list[GpuMetrics] = []
         gpus.extend(self._poll_nvidia())
         gpus.extend(self._poll_intel())
         gpus.extend(self._poll_amd())
@@ -84,7 +109,7 @@ class GpuMonitor(metaclass=SingletonType):
         self._record_history(gpus)
         return gpus
 
-    def _poll_nvidia(self) -> list[dict]:
+    def _poll_nvidia(self) -> list[GpuMetrics]:
         """Query NVIDIA GPUs via nvidia-smi."""
         if not self._capabilities.get("nvidia"):
             return []
@@ -104,7 +129,7 @@ class GpuMonitor(metaclass=SingletonType):
                 self.logger.debug("nvidia-smi returned non-zero exit code: %d", result.returncode)
                 return []
 
-            gpus = []
+            gpus: list[GpuMetrics] = []
             for line in result.stdout.strip().split("\n"):
                 if not line.strip():
                     continue
@@ -132,12 +157,12 @@ class GpuMonitor(metaclass=SingletonType):
             self.logger.warning("NVIDIA GPU polling failed: %s", e)
         return []
 
-    def _poll_intel(self) -> list[dict]:
+    def _poll_intel(self) -> list[GpuMetrics]:
         """Best-effort Intel GPU metrics via sysfs."""
         if not self._capabilities.get("intel"):
             return []
 
-        gpus = []
+        gpus: list[GpuMetrics] = []
         try:
             drm_path = Path(_DRM_SYSFS_PATH)
             for card_dir in sorted(drm_path.glob("card[0-9]*")):
@@ -195,12 +220,12 @@ class GpuMonitor(metaclass=SingletonType):
             self.logger.warning("Intel GPU polling failed: %s", e)
         return gpus
 
-    def _poll_amd(self) -> list[dict]:
+    def _poll_amd(self) -> list[GpuMetrics]:
         """Best-effort AMD GPU metrics via sysfs."""
         if not self._capabilities.get("amd"):
             return []
 
-        gpus = []
+        gpus: list[GpuMetrics] = []
         try:
             drm_path = Path(_DRM_SYSFS_PATH)
             for card_dir in sorted(drm_path.glob("card[0-9]*")):
@@ -266,7 +291,7 @@ class GpuMonitor(metaclass=SingletonType):
             self.logger.warning("AMD GPU polling failed: %s", e)
         return gpus
 
-    def _poll_macos_gpu(self) -> list[dict]:
+    def _poll_macos_gpu(self) -> list[GpuMetrics]:
         """Detect GPU info on macOS via system_profiler. Cached after first call
         since GPU identity/VRAM are static hardware info."""
         if not self._capabilities.get("videotoolbox"):
@@ -285,11 +310,19 @@ class GpuMonitor(metaclass=SingletonType):
             if result.returncode != 0:
                 return []
 
-            data = json.loads(result.stdout)
-            displays = data.get("SPDisplaysDataType", [])
-            gpus = []
-            for i, gpu_info in enumerate(displays):
-                name = gpu_info.get("sppci_model", "Apple GPU")
+            data = _string_keyed_dict(json.loads(result.stdout))
+            if data is None:
+                return []
+            displays = data.get("SPDisplaysDataType")
+            if not isinstance(displays, list):
+                return []
+            gpus: list[GpuMetrics] = []
+            for i, raw_gpu_info in enumerate(displays):
+                gpu_info = _string_keyed_dict(raw_gpu_info)
+                if gpu_info is None:
+                    continue
+                raw_name = gpu_info.get("sppci_model")
+                name = raw_name if isinstance(raw_name, str) else "Apple GPU"
                 # VRAM may be reported as a string like "8 GB" or missing entirely
                 vram_str = gpu_info.get("spdisplays_vram", gpu_info.get("sppci_vram", ""))
                 memory_total_mb = 0
@@ -321,7 +354,7 @@ class GpuMonitor(metaclass=SingletonType):
             self.logger.warning("macOS GPU polling failed: %s", e)
         return []
 
-    def _record_history(self, gpus: list[dict]) -> None:
+    def _record_history(self, gpus: list[GpuMetrics]) -> None:
         """Append current metrics with timestamp to rolling history.
 
         Uses composite key 'type:index' to avoid collisions when multiple GPU
@@ -342,7 +375,7 @@ class GpuMonitor(metaclass=SingletonType):
                 }
             )
 
-    def get_history(self, gpu_index=None) -> dict:
+    def get_history(self, gpu_index: str | None = None) -> dict[str, list[GpuHistorySample]]:
         """
         Return historical samples.
 

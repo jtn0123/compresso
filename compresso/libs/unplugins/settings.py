@@ -33,6 +33,7 @@ import contextlib
 import json
 import os
 import sys
+from typing import cast
 
 from compresso import config
 from compresso.libs.json_state import atomic_json_write
@@ -47,37 +48,41 @@ class PluginSettings:
 
     """
 
-    settings: dict = {}
+    settings: dict[str, object] = {}
 
     """
     A dictionary of form settings used by Compresso's WebUI to configure
     the plugin's settings form.
 
     """
-    form_settings: dict = {}
+    form_settings: dict[str, object] = {}
 
     """
     A cached copy of settings as they are stored on disk.
 
     """
-    settings_configured = None
+    settings_configured: dict[str, object] = {}
 
     """
     The library ID that we are fetching settings for.
 
     """
-    library_id = None
+    library_id: int | None = None
 
-    def __init__(self, *args, **kwargs):
-        self.library_id = kwargs.get("library_id")
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        library_id = kwargs.get("library_id")
+        self.library_id = None
         # If the given library is not None, ensure that it is a number
-        if self.library_id:
+        if library_id:
             try:
-                self.library_id = int(self.library_id)
-            except ValueError:
-                raise Exception(f"Library ID needs to be an integer. You have provided '{self.library_id}'") from None
+                if not isinstance(library_id, (str, bytes, bytearray, int, float)):
+                    raise ValueError
+                self.library_id = int(library_id)
+            except (TypeError, ValueError):
+                raise Exception(f"Library ID needs to be an integer. You have provided '{library_id}'") from None
+        self.settings_configured = {}
 
-    def __get_plugin_settings_file(self, force_library_settings=False):
+    def __get_plugin_settings_file(self, force_library_settings: bool = False) -> str:
         profile_directory = self.get_profile_directory()
         # The legacy migration that moved settings.json from the plugin
         # directory to the profile directory has been removed in
@@ -91,7 +96,7 @@ class PluginSettings:
                 plugin_settings_file = os.path.join(profile_directory, _SETTINGS_FILENAME)
         return plugin_settings_file
 
-    def __export_configured_settings(self):
+    def __export_configured_settings(self) -> None:
         """
         Write settings to settings file
 
@@ -101,7 +106,7 @@ class PluginSettings:
 
         atomic_json_write(plugin_settings_file, self.settings_configured, mode=0o600)
 
-    def __import_configured_settings(self):
+    def __import_configured_settings(self) -> None:
         """
         Read settings from settings file
 
@@ -121,7 +126,8 @@ class PluginSettings:
 
         # Read plugin settings from file
         with open(plugin_settings_file) as infile:
-            plugin_settings = json.load(infile)
+            raw_settings = json.load(infile)
+            plugin_settings = cast("dict[str, object]", raw_settings) if isinstance(raw_settings, dict) else {}
 
         # Loop over settings
         for key in self.settings:
@@ -132,7 +138,7 @@ class PluginSettings:
                     value = self.settings.get(key)
                 self.settings_configured[key] = value
 
-    def reset_settings_to_defaults(self):
+    def reset_settings_to_defaults(self) -> bool:
         """
         Remove all currently configured settings by deleting the settings.json file
 
@@ -151,16 +157,19 @@ class PluginSettings:
 
         return bool(not os.path.exists(plugin_settings_file))
 
-    def get_plugin_directory(self):
+    def get_plugin_directory(self) -> str:
         """
         Return the absolute path to the Plugin's directory.
         This is where the Plugin is currently installed.
 
         :return:
         """
-        return os.path.dirname(os.path.abspath(sys.modules[self.__class__.__module__].__file__))
+        module_file = getattr(sys.modules[self.__class__.__module__], "__file__", None)
+        if not isinstance(module_file, str):
+            raise RuntimeError("Plugin module does not have a filesystem path")
+        return os.path.dirname(os.path.abspath(module_file))
 
-    def get_profile_directory(self):
+    def get_profile_directory(self) -> str:
         """
         Return the absolute path to the Plugin's profile directory.
         This is where Plugin settings are saved and where all mutable data for the
@@ -177,7 +186,7 @@ class PluginSettings:
             os.makedirs(profile_directory)
         return profile_directory
 
-    def get_form_settings(self):
+    def get_form_settings(self) -> dict[str, object]:
         """
         Return the current form settings.
 
@@ -185,7 +194,7 @@ class PluginSettings:
         """
         return self.form_settings
 
-    def get_setting(self, key=None):
+    def get_setting(self, key: str | None = None) -> object:
         """
         Fetch a single configuration value, or, when passed "all" as the key argument,
         return the full configuration dictionary.
@@ -208,7 +217,7 @@ class PluginSettings:
             return self.settings_configured
         return self.settings_configured.get(key)
 
-    def set_setting(self, key, value):
+    def set_setting(self, key: str, value: object) -> bool:
         """
         Set a singe configuration value.
         Used by the Compresso WebUI to save user settings.
@@ -235,7 +244,7 @@ class PluginSettings:
 
         return True
 
-    def get_default_setting(self, key=None):
+    def get_default_setting(self, key: str | None = None) -> object:
         """
         Fetch a single configuration value, or, when passed "all" as the key argument,
         return the full configuration dictionary.

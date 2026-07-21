@@ -16,24 +16,39 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import type { PropType } from 'vue'
+import type { Chart as ChartInstance } from 'chart.js'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
 import { useChartTheme } from 'src/composables/useChartTheme'
 
+interface EncodingSpeedPoint {
+  date: string
+  avg_fps: number
+  avg_speed_ratio: number
+  count: number
+}
+
+interface EncodingSpeedAggregate {
+  fps_sum: number
+  speed_sum: number
+  count: number
+}
+
 export default {
   name: 'EncodingSpeedChart',
   props: {
-    data: { type: Array, default: () => [] },
+    data: { type: Array as PropType<EncodingSpeedPoint[]>, default: () => [] },
     loading: { type: Boolean, default: false },
   },
   setup(props) {
     const { t } = useI18n()
     const $q = useQuasar()
     const { getChartColor, chartBgColor } = useChartTheme()
-    const chartRef = ref(null)
-    let chart = null
+    const chartRef = ref<HTMLCanvasElement | null>(null)
+    let chart: ChartInstance<'line'> | null = null
 
     async function renderChart() {
       const {
@@ -71,19 +86,24 @@ export default {
         const titleColor = isDark ? '#eee' : '#333'
 
         // Group by date, averaging across codecs
-        const dateMap = {}
+        const dateMap: Record<string, EncodingSpeedAggregate> = {}
         for (const d of props.data) {
-          if (!dateMap[d.date]) {
-            dateMap[d.date] = { fps_sum: 0, speed_sum: 0, count: 0 }
-          }
-          dateMap[d.date].fps_sum += d.avg_fps * d.count
-          dateMap[d.date].speed_sum += d.avg_speed_ratio * d.count
-          dateMap[d.date].count += d.count
+          const aggregate = dateMap[d.date] ?? { fps_sum: 0, speed_sum: 0, count: 0 }
+          aggregate.fps_sum += d.avg_fps * d.count
+          aggregate.speed_sum += d.avg_speed_ratio * d.count
+          aggregate.count += d.count
+          dateMap[d.date] = aggregate
         }
 
         const dates = Object.keys(dateMap).sort()
-        const fpsData = dates.map((d) => (dateMap[d].count > 0 ? dateMap[d].fps_sum / dateMap[d].count : 0))
-        const speedData = dates.map((d) => (dateMap[d].count > 0 ? dateMap[d].speed_sum / dateMap[d].count : 0))
+        const fpsData = dates.map((d) => {
+          const aggregate = dateMap[d]
+          return aggregate && aggregate.count > 0 ? aggregate.fps_sum / aggregate.count : 0
+        })
+        const speedData = dates.map((d) => {
+          const aggregate = dateMap[d]
+          return aggregate && aggregate.count > 0 ? aggregate.speed_sum / aggregate.count : 0
+        })
 
         chart = new Chart(chartRef.value, {
           type: 'line',
@@ -119,8 +139,9 @@ export default {
               tooltip: {
                 callbacks: {
                   label: (ctx) => {
-                    if (ctx.datasetIndex === 0) return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + ' fps'
-                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + 'x'
+                    const value = ctx.parsed.y ?? 0
+                    if (ctx.datasetIndex === 0) return ctx.dataset.label + ': ' + value.toFixed(1) + ' fps'
+                    return ctx.dataset.label + ': ' + value.toFixed(2) + 'x'
                   },
                 },
               },

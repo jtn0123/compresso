@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 compresso.installation_link.py
 
@@ -29,14 +28,19 @@ Copyright:
 
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os.path
 import re
 import threading
 import time
+from collections.abc import Callable, Mapping
+from typing import Literal, TypedDict, cast
 
 import requests
+from requests import Response
 from requests_toolbelt import MultipartEncoder
 
 from compresso import config
@@ -50,24 +54,71 @@ from compresso.libs.worker_capabilities import WorkerCapabilities
 _REMOTE_LIBRARIES_API = "/compresso/api/v2/settings/libraries"
 
 
+class LinkStatus(TypedDict):
+    status: str
+    last_seen: float | None
+    consecutive_failures: int
+    next_retry: float
+
+
+class LinkStatusPatch(TypedDict, total=False):
+    status: str
+    last_seen: float | None
+    consecutive_failures: int
+    next_retry: float
+
+
+def _json_object(value: object) -> dict[str, object]:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        return {}
+    return cast("dict[str, object]", value)
+
+
+def _config_string(config_data: Mapping[str, object], key: str) -> str | None:
+    value = config_data.get(key)
+    return value if isinstance(value, str) else None
+
+
+def _int_value(value: object, default: int = 0) -> int:
+    """Coerce an API scalar to an integer without accepting arbitrary objects."""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, (str, bytes, bytearray)):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _json_objects(value: object) -> list[dict[str, object]]:
+    """Narrow an untrusted JSON array to string-keyed object entries."""
+    if not isinstance(value, list):
+        return []
+    return [_json_object(item) for item in value if isinstance(item, dict)]
+
+
 class Links(metaclass=SingletonType):
     NETWORK_TRANSFER_LOCK_TTL_SECONDS = 30 * 60
-    _network_transfer_lock: dict = {}
+    _network_transfer_lock: dict[str, dict[str, float]] = {}
     _transfer_lock = threading.RLock()
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         self.settings = config.Config()
         self.session = session.Session()
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         # {uuid: {'status': 'connected', 'last_seen': time.time(),
         #         'consecutive_failures': 0, 'next_retry': 0}}
-        self._link_status = {}
+        self._link_status: dict[str, LinkStatus] = {}
 
-    def _log(self, message, message2="", level="info"):
+    def _log(self, message: object, message2: object = "", level: str = "info") -> None:
         message = common.format_message(message, message2)
-        getattr(self.logger, level)(message)
+        log_method = cast("Callable[[object], None]", getattr(self.logger, level))
+        log_method(message)
 
-    def get_link_status(self, uuid):
+    def get_link_status(self, uuid: str) -> LinkStatus:
         """Get status of a remote installation link."""
         status = self._link_status.get(uuid)
         if status is None:
@@ -77,9 +128,9 @@ class Links(metaclass=SingletonType):
                 "consecutive_failures": 0,
                 "next_retry": 0,
             }
-        return dict(status)
+        return cast("LinkStatus", dict(status))
 
-    def set_link_status(self, uuid, status):
+    def set_link_status(self, uuid: str, status: LinkStatusPatch) -> None:
         """Update status of a remote installation link."""
         if uuid not in self._link_status:
             self._link_status[uuid] = {
@@ -90,13 +141,14 @@ class Links(metaclass=SingletonType):
             }
         self._link_status[uuid].update(status)
 
-    def get_all_link_statuses(self):
+    def get_all_link_statuses(self) -> dict[str, LinkStatus]:
         """Get all link statuses for WebSocket push."""
-        return {k: dict(v) for k, v in self._link_status.items()}
+        return {k: cast("LinkStatus", dict(v)) for k, v in self._link_status.items()}
 
-    def _record_link_success(self, uuid):
+    def _record_link_success(self, uuid: str) -> None:
         """Record successful communication with a remote link."""
-        was_reconnecting = self._link_status.get(uuid, {}).get("status") == "reconnecting"
+        current = self._link_status.get(uuid)
+        was_reconnecting = current is not None and current["status"] == "reconnecting"
         self._link_status[uuid] = {
             "status": "connected",
             "last_seen": time.time(),
@@ -106,18 +158,18 @@ class Links(metaclass=SingletonType):
         if was_reconnecting:
             self._notify_link_status_change(uuid, "connected")
 
-    def _record_link_failure(self, uuid):
+    def _record_link_failure(self, uuid: str) -> None:
         """Record failed communication with a remote link, apply exponential backoff."""
-        current = self._link_status.get(uuid, {"consecutive_failures": 0})
-        failures = current.get("consecutive_failures", 0) + 1
+        current = self._link_status.get(uuid)
+        failures = (current["consecutive_failures"] if current is not None else 0) + 1
         backoff = min(300, 10 * (2 ** min(failures, 5)))  # cap at 5 min
 
         new_status = "reconnecting" if failures <= 10 else "disconnected"
-        was_connected = current.get("status") in ("connected", "unknown", None)
+        was_connected = current is None or current["status"] in ("connected", "unknown")
 
         self._link_status[uuid] = {
             "status": new_status,
-            "last_seen": current.get("last_seen"),
+            "last_seen": current["last_seen"] if current is not None else None,
             "consecutive_failures": failures,
             "next_retry": time.time() + backoff,
         }
@@ -125,13 +177,13 @@ class Links(metaclass=SingletonType):
         if was_connected:
             self._notify_link_status_change(uuid, new_status)
 
-    def _should_skip_link(self, uuid):
+    def _should_skip_link(self, uuid: str) -> bool:
         """Check if a link is in backoff period and should be skipped."""
-        status = self._link_status.get(uuid, {})
-        next_retry = status.get("next_retry", 0)
+        status = self._link_status.get(uuid)
+        next_retry = status["next_retry"] if status is not None else 0
         return next_retry > 0 and time.time() < next_retry
 
-    def _notify_link_status_change(self, uuid, new_status):
+    def _notify_link_status_change(self, uuid: str, new_status: str) -> None:
         """Push link status change to frontend."""
         try:
             from compresso.libs.frontend_push_messages import FrontendPushMessages
@@ -150,7 +202,7 @@ class Links(metaclass=SingletonType):
         except Exception:  # noqa: S110 — best-effort UI notification; FrontendPushMessages may not be available
             pass
 
-    def __format_address(self, address: str | None):
+    def __format_address(self, address: str | None) -> str:
         if address is None:
             address = ""
         # Strip all whitespace
@@ -163,15 +215,15 @@ class Links(metaclass=SingletonType):
         return address
 
     @staticmethod
-    def _request_handler(remote_config):
+    def _request_handler(remote_config: Mapping[str, object]) -> RequestHandler:
         return RequestHandler(
-            auth=remote_config.get("auth"),
-            username=remote_config.get("username"),
-            password=remote_config.get("password"),
-            api_token=remote_config.get("api_token"),
+            auth=_config_string(remote_config, "auth") or "",
+            username=_config_string(remote_config, "username"),
+            password=_config_string(remote_config, "password"),
+            api_token=_config_string(remote_config, "api_token"),
         )
 
-    def __merge_config_dicts(self, config_dict, compare_dict):
+    def __merge_config_dicts(self, config_dict: dict[str, object], compare_dict: Mapping[str, object]) -> None:
         for key in config_dict:
             if config_dict.get(key) != compare_dict.get(key) and compare_dict.get(key) is not None:
                 # Apply the new value
@@ -179,7 +231,7 @@ class Links(metaclass=SingletonType):
                 # Also flag the dict as updated
                 config_dict["last_updated"] = time.time()
 
-    def __generate_default_config(self, config_dict: dict):
+    def __generate_default_config(self, config_dict: Mapping[str, object]) -> dict[str, object]:
         return {
             "address": config_dict.get("address", "???"),
             "auth": config_dict.get("auth", "None"),
@@ -203,7 +255,9 @@ class Links(metaclass=SingletonType):
             "last_updated": config_dict.get("last_updated", time.time()),
         }
 
-    def acquire_network_transfer_lock(self, url, transfer_limit=1, lock_type="send"):
+    def acquire_network_transfer_lock(
+        self, url: str, transfer_limit: int = 1, lock_type: str = "send"
+    ) -> str | Literal[False]:
         """
         Limit transfers to each installation to 1 at a time
 
@@ -232,7 +286,7 @@ class Links(metaclass=SingletonType):
             # Failed to acquire network transfer lock
             return False
 
-    def refresh_network_transfer_lock(self, lock_key):
+    def refresh_network_transfer_lock(self, lock_key: str | Literal[False] | None) -> bool:
         """Renew an actively progressing transfer lease without changing its slot."""
         if not lock_key:
             return False
@@ -242,7 +296,7 @@ class Links(metaclass=SingletonType):
             self._network_transfer_lock[lock_key]["expires"] = time.time() + self.NETWORK_TRANSFER_LOCK_TTL_SECONDS
             return True
 
-    def release_network_transfer_lock(self, lock_key):
+    def release_network_transfer_lock(self, lock_key: str | Literal[False] | None) -> bool:
         """
         Expire the transfer lock for the given lock_key
 
@@ -257,7 +311,9 @@ class Links(metaclass=SingletonType):
             self._network_transfer_lock[lock_key] = {}
             return True
 
-    def remote_api_get(self, remote_config: dict, endpoint: str, timeout=2):
+    def remote_api_get(
+        self, remote_config: Mapping[str, object], endpoint: str, timeout: int | float = 2
+    ) -> dict[str, object]:
         """
         GET to remote installation API
 
@@ -267,13 +323,13 @@ class Links(metaclass=SingletonType):
         :return:
         """
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         url = f"{address}{endpoint}"
         res = request_handler.get(url, timeout=timeout)
         if res.status_code == 200:
-            return res.json()
+            return _json_object(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = res.json()
+            json_data = _json_object(res.json())
             self._log(
                 "Error while executing GET on remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -283,7 +339,13 @@ class Links(metaclass=SingletonType):
             )
         return {}
 
-    def remote_api_post(self, remote_config: dict, endpoint: str, data: dict, timeout=2):
+    def remote_api_post(
+        self,
+        remote_config: Mapping[str, object],
+        endpoint: str,
+        data: Mapping[str, object],
+        timeout: int | float = 2,
+    ) -> dict[str, object]:
         """
         POST to remote installation API
 
@@ -294,13 +356,13 @@ class Links(metaclass=SingletonType):
         :return:
         """
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         url = f"{address}{endpoint}"
         res = request_handler.post(url, json=data, timeout=timeout)
         if res.status_code == 200:
-            return res.json()
+            return _json_object(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = res.json()
+            json_data = _json_object(res.json())
             self._log(
                 "Error while executing POST on remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -311,7 +373,7 @@ class Links(metaclass=SingletonType):
             return json_data
         return {}
 
-    def remote_api_post_file(self, remote_config: dict, endpoint: str, path: str):
+    def remote_api_post_file(self, remote_config: Mapping[str, object], endpoint: str, path: str) -> dict[str, object]:
         """
         Send a file to the remote installation
         No timeout is set so the request will continue until closed
@@ -322,7 +384,7 @@ class Links(metaclass=SingletonType):
         :return:
         """
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         url = f"{address}{endpoint}"
         # NOTE: If you remove a content type from the upload (text/plain) the file upload fails
         # NOTE2: The 'ith open(path, "rb") as f' method reads the file into memory before uploading.
@@ -336,9 +398,9 @@ class Links(metaclass=SingletonType):
             m = MultipartEncoder(fields={"fileName": (os.path.basename(path), fh, "text/plain")})
             res = request_handler.post(url, data=m, headers={"Content-Type": m.content_type})
         if res.status_code == 200:
-            return res.json()
+            return _json_object(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = res.json()
+            json_data = _json_object(res.json())
             self._log(
                 "Error while uploading file to remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -348,15 +410,23 @@ class Links(metaclass=SingletonType):
             )
         return {}
 
-    def remote_api_post_bytes(self, remote_config: dict, endpoint: str, data: bytes, headers: dict):
+    def remote_api_post_bytes(
+        self, remote_config: Mapping[str, object], endpoint: str, data: bytes, headers: Mapping[str, str]
+    ) -> dict[str, object]:
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         response = request_handler.post(f"{address}{endpoint}", data=data, headers=headers, timeout=60)
         if response.status_code == 200:
-            return response.json()
+            return _json_object(response.json())
         return {}
 
-    def remote_api_delete(self, remote_config: dict, endpoint: str, data: dict, timeout=2):
+    def remote_api_delete(
+        self,
+        remote_config: Mapping[str, object],
+        endpoint: str,
+        data: Mapping[str, object],
+        timeout: int | float = 2,
+    ) -> dict[str, object]:
         """
         DELETE to remote installation API
 
@@ -367,13 +437,13 @@ class Links(metaclass=SingletonType):
         :return:
         """
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         url = f"{address}{endpoint}"
         res = request_handler.delete(url, json=data, timeout=timeout)
         if res.status_code == 200:
-            return res.json()
+            return _json_object(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = res.json()
+            json_data = _json_object(res.json())
             self._log(
                 "Error while executing DELETE on remote installation API - {}. Message: '{}'".format(
                     endpoint, json_data.get("error")
@@ -383,7 +453,7 @@ class Links(metaclass=SingletonType):
             )
         return {}
 
-    def remote_api_get_download(self, remote_config: dict, endpoint: str, path: str):
+    def remote_api_get_download(self, remote_config: Mapping[str, object], endpoint: str, path: str) -> bool:
         """
         Download a file from a remote installation
 
@@ -393,7 +463,7 @@ class Links(metaclass=SingletonType):
         :return:
         """
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         url = f"{address}{endpoint}"
         with request_handler.get(url, stream=True) as r:
             r.raise_for_status()
@@ -403,13 +473,13 @@ class Links(metaclass=SingletonType):
                         f.write(chunk)
         return True
 
-    def _remote_validation_data(self, response, resource: str) -> tuple[bool, dict]:
+    def _remote_validation_data(self, response: Response, resource: str) -> tuple[bool, dict[str, object]]:
         """Return JSON from a successful remote validation request and log known failures."""
         if response.status_code == 200:
-            return True, response.json()
+            return True, _json_object(response.json())
 
         if response.status_code in {400, 404, 405, 500}:
-            json_data = response.json()
+            json_data = _json_object(response.json())
             self._log(
                 f"Error while fetching remote installation {resource}. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
@@ -417,7 +487,7 @@ class Links(metaclass=SingletonType):
             )
         return False, {}
 
-    def validate_remote_installation(self, address: str, **kwargs):
+    def validate_remote_installation(self, address: str, **kwargs: object) -> dict[str, object]:
         """
         Validate a remote Compresso installation by requesting
         its system info and version
@@ -429,11 +499,15 @@ class Links(metaclass=SingletonType):
         """
         address = self.__format_address(address)
 
+        auth = kwargs.get("auth")
+        username = kwargs.get("username")
+        password = kwargs.get("password")
+        api_token = kwargs.get("api_token")
         request_handler = RequestHandler(
-            auth=kwargs.get("auth"),
-            username=kwargs.get("username"),
-            password=kwargs.get("password"),
-            api_token=kwargs.get("api_token"),
+            auth=auth if isinstance(auth, str) else "",
+            username=username if isinstance(username, str) else None,
+            password=password if isinstance(password, str) else None,
+            api_token=api_token if isinstance(api_token, str) else None,
         )
 
         # Fetch config
@@ -473,13 +547,13 @@ class Links(metaclass=SingletonType):
             return {}
 
         # Capacity is advisory: an older peer can omit it and still remain linked.
-        capabilities = {}
+        capabilities: dict[str, object] = {}
         url = f"{address}/compresso/api/v2/system/capabilities"
         res = request_handler.get(url, timeout=2)
         if res.status_code == 200:
-            capabilities = res.json()
+            capabilities = _json_object(res.json())
 
-        runnable_task_count = int(
+        runnable_task_count = _int_value(
             tasks_data.get(
                 "runnableRecords",
                 tasks_data.get("recordsFiltered", tasks_data.get("recordsTotal", 0)),
@@ -502,15 +576,17 @@ class Links(metaclass=SingletonType):
             "capabilities": capabilities,
         }
 
-    def update_all_remote_installation_links(self):  # noqa: C901 — multi-step remote link sync with error recovery
+    def update_all_remote_installation_links(  # noqa: C901 — multi-step remote link sync with error recovery
+        self,
+    ) -> list[dict[str, object]]:
         """
         Updates the link status and configuration of linked remote installations
 
         :return:
         """
         save_settings = False
-        installation_id_list = []
-        remote_installations = []
+        installation_id_list: list[object] = []
+        remote_installations: list[dict[str, object]] = []
         distributed_worker_count_target = self.settings.get_distributed_worker_count_target()
         for local_config in self.settings.get_remote_installations():
             # Ensure address is not added twice by comparing installation IDs
@@ -533,7 +609,8 @@ class Links(metaclass=SingletonType):
 
             # Check if this link is in backoff period
             # Derive a stable per-link key even when uuid is not yet synced
-            raw_uuid = local_config.get("uuid", "???")
+            raw_uuid_value = local_config.get("uuid", "???")
+            raw_uuid = raw_uuid_value if isinstance(raw_uuid_value, str) else "???"
             link_uuid = f"_addr_{local_config.get('address', 'unknown')}" if raw_uuid == "???" else raw_uuid
             if self._should_skip_link(link_uuid):
                 # Still in backoff -- keep existing config but mark unavailable
@@ -547,7 +624,7 @@ class Links(metaclass=SingletonType):
             installation_data = None
             try:
                 installation_data = self.validate_remote_installation(
-                    local_config.get("address"),
+                    _config_string(local_config, "address") or "",
                     auth=local_config.get("auth"),
                     username=local_config.get("username"),
                     password=local_config.get("password"),
@@ -559,7 +636,7 @@ class Links(metaclass=SingletonType):
                     "Link %s unreachable: %s (retry in %ds)",
                     link_uuid,
                     e,
-                    int(self._link_status.get(link_uuid, {}).get("next_retry", 0) - time.time()),
+                    int((self._link_status[link_uuid]["next_retry"] if link_uuid in self._link_status else 0) - time.time()),
                 )
             except Exception as e:
                 self._record_link_failure(link_uuid)
@@ -570,8 +647,10 @@ class Links(metaclass=SingletonType):
             updated_config["available"] = False
             if installation_data:
                 # If we used a temp address-based key, migrate status to the real UUID
-                real_uuid = installation_data.get("session", {}).get("uuid")
-                if real_uuid and link_uuid != real_uuid:
+                installation_session = _json_object(installation_data.get("session"))
+                real_uuid_value = installation_session.get("uuid")
+                real_uuid = real_uuid_value if isinstance(real_uuid_value, str) else None
+                if real_uuid is not None and link_uuid != real_uuid:
                     if link_uuid in self._link_status:
                         self._link_status[real_uuid] = self._link_status.pop(link_uuid)
                     link_uuid = real_uuid
@@ -586,10 +665,11 @@ class Links(metaclass=SingletonType):
                 updated_config["runnable_task_count"] = runnable_task_count
                 updated_config["capabilities"] = installation_data.get("capabilities", {})
 
-                merge_dict = {
-                    "name": installation_data.get("settings", {}).get("installation_name"),
+                installation_settings = _json_object(installation_data.get("settings"))
+                merge_dict: dict[str, object] = {
+                    "name": installation_settings.get("installation_name"),
                     "version": installation_data.get("version"),
-                    "uuid": installation_data.get("session", {}).get("uuid"),
+                    "uuid": installation_session.get("uuid"),
                 }
                 self.__merge_config_dicts(updated_config, merge_dict)
 
@@ -609,8 +689,14 @@ class Links(metaclass=SingletonType):
 
                 # If the remote configuration is newer than this one, use those values
                 # The remote installation will do the same and this will synchronise
-                remote_link_config = remote_config.get("link_config", {})
-                if local_config.get("last_updated", 1) < remote_link_config.get("last_updated", 1):
+                remote_link_config = _json_object(remote_config.get("link_config"))
+                local_updated = local_config.get("last_updated", 1)
+                remote_updated = remote_link_config.get("last_updated", 1)
+                if (
+                    isinstance(local_updated, (int, float))
+                    and isinstance(remote_updated, (int, float))
+                    and local_updated < remote_updated
+                ):
                     # Note that the configuration options are reversed when reading from the remote installation config
                     # These items are not synced here:
                     #   - enable_task_preloading
@@ -623,7 +709,7 @@ class Links(metaclass=SingletonType):
                         updated_config["enable_sending_tasks"] = remote_link_config.get("enable_receiving_tasks")
                         save_settings = True
                     # Update the distributed_worker_count_target
-                    distributed_worker_count_target = remote_config.get("distributed_worker_count_target", 0)
+                    distributed_worker_count_target = _int_value(remote_config.get("distributed_worker_count_target"))
                     # Also sync the last_updated flag
                     updated_config["last_updated"] = remote_link_config.get("last_updated")
 
@@ -649,26 +735,28 @@ class Links(metaclass=SingletonType):
                     # Fetch remote installation library name list
                     results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
                     existing_library_names = []
-                    for library in results.get("libraries", []):
+                    for library in _json_objects(results.get("libraries")):
                         existing_library_names.append(library.get("name"))
                     # Loop over local libraries and create an import object for each one that is missing
-                    for library in Library.get_all_libraries():
+                    for library_config in Library.get_all_libraries():
                         # Ignore local libraries that are configured for remote only
-                        if library.get("enable_remote_only"):
+                        if library_config["enable_remote_only"]:
                             continue
                         # For each of the missing libraries, create a new remote library with that config.
-                        if library.get("name") not in existing_library_names:
+                        if library_config["name"] not in existing_library_names:
                             # Export library config
-                            import_data = Library.export(library.get("id"))
+                            import_data = Library.export(library_config["id"])
                             # Set library ID to 0 to generate new library from this import
                             import_data["library_id"] = 0
                             # Configure remote library to be fore remote files only
-                            import_data["library_config"]["enable_remote_only"] = True
-                            import_data["library_config"]["enable_scanner"] = False
-                            import_data["library_config"]["enable_inotify"] = False
+                            imported_library_config = _json_object(import_data.get("library_config"))
+                            imported_library_config["enable_remote_only"] = True
+                            imported_library_config["enable_scanner"] = False
+                            imported_library_config["enable_inotify"] = False
+                            import_data["library_config"] = imported_library_config
                             # Import library on remote installation
                             self._log(
-                                f"Importing remote library config '{library.get('name')}'",
+                                f"Importing remote library config '{library_config['name']}'",
                                 message2=import_data,
                                 level="debug",
                             )
@@ -677,10 +765,10 @@ class Links(metaclass=SingletonType):
                                 # There was a connection issue of some kind. This was already logged.
                                 continue
                             if result.get("success"):
-                                self._log(f"Successfully imported library '{library.get('name')}'", level="debug")
+                                self._log(f"Successfully imported library '{library_config['name']}'", level="debug")
                                 continue
                             self._log(
-                                f"Failed to import library config '{library.get('name')}'",
+                                f"Failed to import library config '{library_config['name']}'",
                                 message2=result.get("error"),
                                 level="error",
                             )
@@ -700,7 +788,7 @@ class Links(metaclass=SingletonType):
 
         return remote_installations
 
-    def read_remote_installation_link_config(self, uuid: str):
+    def read_remote_installation_link_config(self, uuid: str) -> dict[str, object]:
         """
         Returns the configuration of the remote installation
 
@@ -715,7 +803,9 @@ class Links(metaclass=SingletonType):
         # Ensure we have settings data from the remote installation
         raise Exception("Unable to read installation link configuration.")
 
-    def update_single_remote_installation_link_config(self, configuration: dict, distributed_worker_count_target=0):
+    def update_single_remote_installation_link_config(
+        self, configuration: dict[str, object], distributed_worker_count_target: int = 0
+    ) -> None:
         """
         Returns the configuration of the remote installation after updating it
 
@@ -760,7 +850,7 @@ class Links(metaclass=SingletonType):
         }
         self.settings.set_bulk_config_items(settings_dict, save_settings=True)
 
-    def delete_remote_installation_link_config(self, uuid: str):
+    def delete_remote_installation_link_config(self, uuid: str) -> bool:
         """
         Removes a link configuration for a remote installation given its uuid
         If no uuid match is found, returns False
@@ -785,7 +875,7 @@ class Links(metaclass=SingletonType):
         self.settings.set_bulk_config_items(settings_dict, save_settings=True)
         return removed
 
-    def fetch_remote_installation_link_config_for_this(self, remote_config: dict):
+    def fetch_remote_installation_link_config_for_this(self, remote_config: Mapping[str, object]) -> dict[str, object]:
         """
         Fetches and returns the corresponding link configuration from a remote installation
 
@@ -793,14 +883,14 @@ class Links(metaclass=SingletonType):
         :return:
         """
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         url = f"{address}/compresso/api/v2/settings/link/read"
         data = {"uuid": self.session.uuid}
         res = request_handler.post(url, json=data, timeout=2)
         if res.status_code == 200:
-            return res.json()
+            return _json_object(res.json())
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = res.json()
+            json_data = _json_object(res.json())
             self._log(
                 f"Error while fetching remote installation link config. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
@@ -808,7 +898,7 @@ class Links(metaclass=SingletonType):
             )
         return {}
 
-    def push_remote_installation_link_config(self, configuration: dict):
+    def push_remote_installation_link_config(self, configuration: Mapping[str, object]) -> bool:
         """
         Pushes the given link config to the remote installation returns
         the corresponding link configuration from a remote installation
@@ -817,7 +907,7 @@ class Links(metaclass=SingletonType):
         :return:
         """
         request_handler = self._request_handler(configuration)
-        address = self.__format_address(configuration.get("address"))
+        address = self.__format_address(_config_string(configuration, "address"))
         url = f"{address}/compresso/api/v2/settings/link/write"
 
         # First generate an updated config
@@ -854,7 +944,7 @@ class Links(metaclass=SingletonType):
         if res.status_code == 200:
             return True
         elif res.status_code in [400, 404, 405, 500]:
-            json_data = res.json()
+            json_data = _json_object(res.json())
             self._log(
                 f"Error while pushing remote installation link config. Message: '{json_data.get('error')}'",
                 message2=json_data.get("traceback", []),
@@ -862,7 +952,7 @@ class Links(metaclass=SingletonType):
             )
         return False
 
-    def check_remote_installation_for_available_workers(self):
+    def check_remote_installation_for_available_workers(self) -> dict[str, dict[str, object]]:
         """
         Return a list of installations with workers available for a remote task.
         This list is filtered by:
@@ -873,7 +963,7 @@ class Links(metaclass=SingletonType):
 
         :return:
         """
-        installations_with_info = {}
+        installations_with_info: dict[str, dict[str, object]] = {}
         for lc in self.settings.get_remote_installations():
             local_config = self.__generate_default_config(lc)
 
@@ -886,29 +976,30 @@ class Links(metaclass=SingletonType):
                 continue
 
             # No valid UUID, no valid connection. This link may still be syncing
-            if len(local_config.get("uuid", "")) < 20:
+            local_uuid = _config_string(local_config, "uuid") or ""
+            if len(local_uuid) < 20:
                 continue
 
             # Skip links in backoff period
-            if self._should_skip_link(local_config.get("uuid")):
+            if self._should_skip_link(local_uuid):
                 continue
 
             try:
                 # Define auth
                 # Only installations that have at least one idle worker that is not paused
                 results = self.remote_api_get(local_config, "/compresso/api/v2/workers/status")
-                worker_list = results.get("workers_status", [])
+                worker_list = _json_objects(results.get("workers_status"))
 
                 # Only add installations that have not got pending tasks. This is unless we are configured to preload the queue
                 max_pending_tasks = 0
                 if local_config.get("enable_task_preloading"):
                     # Preload with the number of workers (regardless of the worker status) plus an additional one to account
                     # for delays in the downloads
-                    max_pending_tasks = local_config.get("preloading_count")
+                    max_pending_tasks = _int_value(local_config.get("preloading_count"))
                 results = self.remote_api_post(local_config, "/compresso/api/v2/pending/tasks", {"start": 0, "length": 1})
                 if results.get("error"):
                     continue
-                current_pending_tasks = int(results.get("recordsFiltered", 0))
+                current_pending_tasks = _int_value(results.get("recordsFiltered"))
                 if local_config.get("enable_task_preloading") and current_pending_tasks >= max_pending_tasks:
                     self._log(
                         f"Remote installation has exceeded the max remote pending task count ({current_pending_tasks})",
@@ -919,8 +1010,10 @@ class Links(metaclass=SingletonType):
                 # Fetch remote installation library name list
                 results = self.remote_api_get(local_config, _REMOTE_LIBRARIES_API)
                 library_names = []
-                for library in results.get("libraries", []):
-                    library_names.append(library.get("name"))
+                for library in _json_objects(results.get("libraries")):
+                    library_name = library.get("name")
+                    if isinstance(library_name, str):
+                        library_names.append(library_name)
 
                 try:
                     capabilities = self.remote_api_get(local_config, "/compresso/api/v2/system/capabilities")
@@ -937,7 +1030,7 @@ class Links(metaclass=SingletonType):
                 available_slots = idle_slots + preload_slots
 
                 if available_slots:
-                    installations_with_info[local_config.get("uuid")] = {
+                    installations_with_info[local_uuid] = {
                         "address": local_config.get("address"),
                         "auth": local_config.get("auth"),
                         "username": local_config.get("username"),
@@ -963,7 +1056,7 @@ class Links(metaclass=SingletonType):
 
         return installations_with_info
 
-    def within_enabled_link_limits(self):
+    def within_enabled_link_limits(self) -> bool:
         """
         All features unlocked — no link count limits.
 
@@ -973,13 +1066,13 @@ class Links(metaclass=SingletonType):
 
     def new_pending_task_create_on_remote_installation(
         self,
-        remote_config: dict,
+        remote_config: Mapping[str, object],
         abspath: str,
         library_id: int,
-        job_id=None,
-        lease_token=None,
-        origin_installation_uuid=None,
-    ):
+        job_id: str | None = None,
+        lease_token: str | None = None,
+        origin_installation_uuid: str | None = None,
+    ) -> dict[str, object] | None:
         """
         Create a new pending task on a remote installation.
         The remote installation will return the ID of a generated task.
@@ -991,7 +1084,7 @@ class Links(metaclass=SingletonType):
         """
         try:
             request_handler = self._request_handler(remote_config)
-            address = self.__format_address(remote_config.get("address"))
+            address = self.__format_address(_config_string(remote_config, "address"))
             url = f"{address}/compresso/api/v2/pending/create"
             data = {
                 "path": abspath,
@@ -1006,9 +1099,9 @@ class Links(metaclass=SingletonType):
                 data["origin_installation_uuid"] = origin_installation_uuid
             res = request_handler.post(url, json=data, timeout=2)
             if res.status_code in [200, 400]:
-                return res.json()
+                return _json_object(res.json())
             elif res.status_code in [404, 405, 500]:
-                json_data = res.json()
+                json_data = _json_object(res.json())
                 self._log(
                     f"Error while creating new remote pending task. Message: '{json_data.get('error')}'",
                     message2=json_data.get("traceback", []),
@@ -1027,13 +1120,13 @@ class Links(metaclass=SingletonType):
 
     def send_file_to_remote_installation(
         self,
-        remote_config: dict,
+        remote_config: Mapping[str, object],
         path: str,
-        job_id=None,
-        lease_token=None,
-        origin_installation_uuid=None,
-        progress_callback=None,
-    ):
+        job_id: str | None = None,
+        lease_token: str | None = None,
+        origin_installation_uuid: str | None = None,
+        progress_callback: Callable[[], bool | None] | None = None,
+    ) -> dict[str, object]:
         """
         Send a file to a remote installation.
         The remote installation will return the ID of a generated task.
@@ -1046,17 +1139,21 @@ class Links(metaclass=SingletonType):
             if not job_id:
                 self._log("Refusing distributed upload without a stable job ID", level="error")
                 return {}
-            resumable_kwargs = {
-                "lease_token": lease_token,
-                "origin_installation_uuid": origin_installation_uuid,
-            }
-            if progress_callback:
-                resumable_kwargs["progress_callback"] = progress_callback
+            if progress_callback is not None:
+                return self._send_file_resumable(
+                    remote_config,
+                    path,
+                    job_id,
+                    lease_token=lease_token,
+                    origin_installation_uuid=origin_installation_uuid,
+                    progress_callback=progress_callback,
+                )
             return self._send_file_resumable(
                 remote_config,
                 path,
                 job_id,
-                **resumable_kwargs,
+                lease_token=lease_token,
+                origin_installation_uuid=origin_installation_uuid,
             )
         except requests.exceptions.RequestException as e:
             self._log("Request to upload to remote installation failed", message2=str(e), level="warning")
@@ -1066,14 +1163,14 @@ class Links(metaclass=SingletonType):
 
     def _send_file_resumable(
         self,
-        remote_config,
-        path,
-        job_id,
-        lease_token=None,
-        origin_installation_uuid=None,
-        chunk_size=8 * 1024 * 1024,
-        progress_callback=None,
-    ):
+        remote_config: Mapping[str, object],
+        path: str,
+        job_id: str,
+        lease_token: str | None = None,
+        origin_installation_uuid: str | None = None,
+        chunk_size: int = 8 * 1024 * 1024,
+        progress_callback: Callable[[], bool | None] | None = None,
+    ) -> dict[str, object]:
         total_size = os.path.getsize(path)
         expected_checksum = file_sha256(path)
         session = self.remote_api_post(
@@ -1091,8 +1188,11 @@ class Links(metaclass=SingletonType):
         )
         if not session:
             return {}
-        transfer_id = session["transfer_id"]
-        offset = int(session.get("offset", 0))
+        transfer_id_value = session.get("transfer_id")
+        if not isinstance(transfer_id_value, str):
+            return {}
+        transfer_id = transfer_id_value
+        offset = _int_value(session.get("offset"))
         with open(path, "rb") as source:
             source.seek(offset)
             while offset < total_size:
@@ -1110,7 +1210,7 @@ class Links(metaclass=SingletonType):
                         "X-Chunk-Checksum": chunk_checksum,
                     },
                 )
-                next_offset = int(status.get("offset", offset))
+                next_offset = _int_value(status.get("offset"), offset)
                 if next_offset != offset + len(chunk):
                     return {}
                 offset = next_offset
@@ -1125,12 +1225,12 @@ class Links(metaclass=SingletonType):
 
     def fetch_remote_task_completed_file_resumable(
         self,
-        remote_config,
-        remote_task_id,
-        path,
-        chunk_size=8 * 1024 * 1024,
-        progress_callback=None,
-    ):
+        remote_config: Mapping[str, object],
+        remote_task_id: int,
+        path: str,
+        chunk_size: int = 8 * 1024 * 1024,
+        progress_callback: Callable[[], bool | None] | None = None,
+    ) -> bool:
         manifest = self.remote_api_get(
             remote_config,
             f"/compresso/api/v2/transfer/source/{remote_task_id}/manifest",
@@ -1167,7 +1267,7 @@ class Links(metaclass=SingletonType):
             offset = 0
 
         request_handler = self._request_handler(remote_config)
-        address = self.__format_address(remote_config.get("address"))
+        address = self.__format_address(_config_string(remote_config, "address"))
         with open(partial_path, "ab") as output:  # NOSONAR - partial_path is constrained to cache_root above
             while offset < total_size:
                 response = request_handler.get(
@@ -1196,7 +1296,9 @@ class Links(metaclass=SingletonType):
         os.replace(partial_path, safe_path)  # NOSONAR - both paths are constrained to cache_root above
         return True
 
-    def remove_task_from_remote_installation(self, remote_config: dict, remote_task_id: int):
+    def remove_task_from_remote_installation(
+        self, remote_config: Mapping[str, object], remote_task_id: int
+    ) -> dict[str, object] | None:
         """
         Remove a task from the pending queue
 
@@ -1217,7 +1319,9 @@ class Links(metaclass=SingletonType):
             self._log("Failed to remove remote pending task", message2=str(e), level="error")
         return {}
 
-    def get_the_remote_library_config_by_name(self, remote_config: dict, library_name: str):
+    def get_the_remote_library_config_by_name(
+        self, remote_config: Mapping[str, object], library_name: str
+    ) -> dict[str, object] | None:
         """
         Fetch a remote library's configuration by its name
 
@@ -1228,7 +1332,7 @@ class Links(metaclass=SingletonType):
         try:
             # Fetch remote installation libraries
             results = self.remote_api_get(remote_config, _REMOTE_LIBRARIES_API, timeout=4)
-            for library in results.get("libraries", []):
+            for library in _json_objects(results.get("libraries")):
                 if library.get("name") == library_name:
                     return library
         except requests.exceptions.Timeout:
@@ -1241,7 +1345,9 @@ class Links(metaclass=SingletonType):
             self._log("Failed to set remote task library", message2=str(e), level="error")
         return {}
 
-    def set_the_remote_task_library(self, remote_config: dict, remote_task_id: int, library_name: str):
+    def set_the_remote_task_library(
+        self, remote_config: Mapping[str, object], remote_task_id: int, library_name: str
+    ) -> dict[str, object] | None:
         """
         Set the library for the remote task
         Defaults to the remote installation's default library
@@ -1270,7 +1376,9 @@ class Links(metaclass=SingletonType):
             self._log("Failed to set remote task library", message2=str(e), level="error")
         return {}
 
-    def get_remote_pending_task_state(self, remote_config: dict, remote_task_id: int):
+    def get_remote_pending_task_state(
+        self, remote_config: Mapping[str, object], remote_task_id: int
+    ) -> dict[str, object] | None:
         """
         Get the remote pending task status
 
@@ -1290,7 +1398,9 @@ class Links(metaclass=SingletonType):
             self._log("Failed to get status of remote pending task", message2=str(e), level="error")
         return None
 
-    def start_the_remote_task_by_id(self, remote_config: dict, remote_task_id: int):
+    def start_the_remote_task_by_id(
+        self, remote_config: Mapping[str, object], remote_task_id: int
+    ) -> dict[str, object] | None:
         """
         Start the remote pending task
 
@@ -1314,7 +1424,7 @@ class Links(metaclass=SingletonType):
             self._log("Failed to start remote pending task", message2=str(e), level="error")
         return {}
 
-    def get_all_worker_status(self, remote_config: dict):
+    def get_all_worker_status(self, remote_config: Mapping[str, object]) -> list[dict[str, object]]:
         """
         Start the remote pending task
 
@@ -1323,7 +1433,7 @@ class Links(metaclass=SingletonType):
         """
         try:
             results = self.remote_api_get(remote_config, "/compresso/api/v2/workers/status")
-            return results.get("workers_status", [])
+            return _json_objects(results.get("workers_status"))
         except requests.exceptions.Timeout:
             self._log("Request to get worker status timed out", level="warning")
         except requests.exceptions.RequestException as e:
@@ -1332,7 +1442,7 @@ class Links(metaclass=SingletonType):
             self._log("Failed to get worker status", message2=str(e), level="error")
         return []
 
-    def get_single_worker_status(self, remote_config: dict, worker_id: str):
+    def get_single_worker_status(self, remote_config: Mapping[str, object], worker_id: str) -> dict[str, object]:
         """
         Start the remote pending task
 
@@ -1346,7 +1456,7 @@ class Links(metaclass=SingletonType):
                 return worker
         return {}
 
-    def terminate_remote_worker(self, remote_config: dict, worker_id: str):
+    def terminate_remote_worker(self, remote_config: Mapping[str, object], worker_id: str) -> dict[str, object]:
         """
         Start the remote pending task
 
@@ -1365,7 +1475,7 @@ class Links(metaclass=SingletonType):
             self._log("Failed to terminate remote worker", message2=str(e), level="error")
         return {}
 
-    def fetch_remote_task_data(self, remote_config: dict, remote_task_id: int, path: str):
+    def fetch_remote_task_data(self, remote_config: Mapping[str, object], remote_task_id: int, path: str) -> dict[str, object]:
         """
         Fetch the completed remote task data
 
@@ -1386,7 +1496,7 @@ class Links(metaclass=SingletonType):
                 res = self.remote_api_get_download(remote_config, dl_url, safe_path)
                 if res and os.path.exists(safe_path):
                     with open(safe_path) as f:  # noqa: ASYNC230 — called from synchronous thread context
-                        task_data = json.load(f)
+                        task_data = _json_object(json.load(f))
         except requests.exceptions.Timeout:
             self._log("Request to fetch remote task data timed out", level="warning")
         except requests.exceptions.RequestException as e:
@@ -1395,7 +1505,7 @@ class Links(metaclass=SingletonType):
             self._log("Failed to fetch remote task data", message2=str(e), level="error")
         return task_data
 
-    def fetch_remote_task_completed_file(self, remote_config: dict, remote_task_id: int, path: str):
+    def fetch_remote_task_completed_file(self, remote_config: Mapping[str, object], remote_task_id: int, path: str) -> bool:
         """
         Fetch the completed remote task file
 
@@ -1423,7 +1533,9 @@ class Links(metaclass=SingletonType):
             self._log("Failed to fetch remote task completed file", message2=str(e), level="error")
         return False
 
-    def import_remote_library_config(self, remote_config: dict, import_data: dict):
+    def import_remote_library_config(
+        self, remote_config: Mapping[str, object], import_data: Mapping[str, object]
+    ) -> dict[str, object] | None:
         """
         Import a library config on a remote installation
 
@@ -1451,7 +1563,7 @@ class Links(metaclass=SingletonType):
 from compresso.libs.request_handler import RequestHandler  # noqa: E402, F401
 
 
-def __getattr__(name):
+def __getattr__(name: str) -> object:
     if name == "RemoteTaskManager":
         from compresso.libs.remote_task_manager import RemoteTaskManager
 

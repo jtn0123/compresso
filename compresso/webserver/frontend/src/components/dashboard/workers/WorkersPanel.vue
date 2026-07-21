@@ -174,7 +174,7 @@
   </q-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
@@ -183,24 +183,30 @@ import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { displayBasename } from 'src/js/pathUtils'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import WorkerMoreDetailsDialog from 'components/dashboard/workers/WorkerMoreDetailsDialog.vue'
+import type { DialogController } from 'src/types/ui'
+import type {
+  WorkerDetailsProps,
+  WorkerGroupConfig,
+  WorkerGroupView,
+  WorkerProgressEntry,
+} from 'src/types/workers'
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
 const { generateGroupColour } = useWorkerGauges()
 
-const props = defineProps({
-  workerProgressList: {
-    type: Object,
-    default: () => ({}),
-  },
+const props = withDefaults(defineProps<{ workerProgressList?: Record<string, WorkerProgressEntry> }>(), {
+  workerProgressList: () => ({}),
 })
 
 defineEmits(['pause-all', 'resume-all', 'terminate-all'])
 
-const workerGroupConfigs = ref({})
-const savingGroups = ref({})
-const workerDetailsDialogRef = ref(null)
-const selectedWorkerProps = ref({
+type WorkerGroupConfigSummary = Pick<WorkerGroupConfig, 'id' | 'worker_type' | 'number_of_workers'>
+
+const workerGroupConfigs = ref<Record<string, WorkerGroupConfigSummary>>({})
+const savingGroups = ref<Record<string, boolean>>({})
+const workerDetailsDialogRef = ref<DialogController | null>(null)
+const selectedWorkerProps = ref<WorkerDetailsProps>({
   id: '',
   label: '',
   name: '',
@@ -228,55 +234,54 @@ const selectedWorkerProps = ref({
 const hasWorkers = computed(() => Object.keys(props.workerProgressList).length > 0)
 
 const workerGroups = computed(() => {
-  const groups = {}
+  const groups: Record<string, WorkerGroupView> = {}
   for (const key in props.workerProgressList) {
     const worker = props.workerProgressList[key]
+    if (!worker) continue
     const nameParts = worker.name ? worker.name.split('-Worker-') : []
-    const groupName = nameParts.length > 0 ? nameParts[0] : 'Unknown'
+    const groupName = nameParts[0] || 'Unknown'
 
-    if (!groups[groupName]) {
-      const config = workerGroupConfigs.value[groupName] || {}
-      groups[groupName] = {
+    const config = workerGroupConfigs.value[groupName]
+    const group = (groups[groupName] ??= {
         name: groupName,
         active: 0,
         idle: 0,
         paused: 0,
         color: worker.workerGroupColour || generateGroupColour(groupName),
-        workerType: config.worker_type || worker.workerType || 'cpu',
-        workerCount: config.number_of_workers ?? null,
-        groupId: config.id ?? null,
+        workerType: config?.worker_type || worker.workerType || 'cpu',
+        workerCount: config?.number_of_workers ?? null,
+        groupId: config?.id ?? null,
         saving: savingGroups.value[groupName] || false,
         workers: [],
-      }
-    }
+      })
 
     if (worker.paused) {
-      groups[groupName].paused++
+      group.paused++
     } else if (worker.idle) {
-      groups[groupName].idle++
+      group.idle++
     } else {
-      groups[groupName].active++
+      group.active++
     }
 
-    groups[groupName].workers.push(worker)
+    group.workers.push(worker)
   }
   return Object.values(groups)
 })
 
-function workerShortName(name) {
+function workerShortName(name: string): string {
   if (!name) return ''
   const parts = name.split('-Worker-')
-  return parts.length > 1 ? 'W-' + parts[1] : name
+  return parts.length > 1 ? 'W-' + (parts[1] ?? '') : name
 }
 
-function truncateFile(file) {
+function truncateFile(file: string): string {
   if (!file) return ''
   const name = displayBasename(file)
   if (name.length > 25) return name.substring(0, 23) + '..'
   return name
 }
 
-function openWorkerDetails(worker) {
+function openWorkerDetails(worker: WorkerProgressEntry): void {
   selectedWorkerProps.value = {
     id: worker.id || '',
     label: worker.label || '',
@@ -301,13 +306,13 @@ function openWorkerDetails(worker) {
     idle: worker.idle || false,
     paused: worker.paused || false,
   }
-  workerDetailsDialogRef.value.show()
+  workerDetailsDialogRef.value?.show()
 }
 
 async function fetchWorkerGroupConfigs() {
   try {
-    const response = await axios.get(getCompressoApiUrl('v2', 'settings/worker_groups'))
-    const configs = {}
+    const response = await axios.get<{ worker_groups: WorkerGroupConfig[] }>(getCompressoApiUrl('v2', 'settings/worker_groups'))
+    const configs: Record<string, WorkerGroupConfigSummary> = {}
     for (const group of response.data.worker_groups) {
       configs[group.name] = {
         id: group.id,
@@ -321,7 +326,7 @@ async function fetchWorkerGroupConfigs() {
   }
 }
 
-async function changeGroupWorkerCount(group, delta) {
+async function changeGroupWorkerCount(group: WorkerGroupView, delta: number): Promise<void> {
   if (group.groupId === null) return
   const newCount = Math.max(0, (group.workerCount || 0) + delta)
   savingGroups.value[group.name] = true
@@ -330,9 +335,8 @@ async function changeGroupWorkerCount(group, delta) {
       id: group.groupId,
       number_of_workers: newCount,
     })
-    if (workerGroupConfigs.value[group.name]) {
-      workerGroupConfigs.value[group.name].number_of_workers = newCount
-    }
+    const config = workerGroupConfigs.value[group.name]
+    if (config) config.number_of_workers = newCount
     $q.notify({
       color: 'positive',
       position: 'top',

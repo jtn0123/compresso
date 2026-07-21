@@ -137,26 +137,30 @@
   </q-layout>
 </template>
 
-<script>
+<script lang="ts">
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import axios from 'axios'
 import { LocalStorage, useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import DrawerMainNav from 'components/drawers/DrawerMainNav'
-import ThemeSwitch from 'components/ThemeSwitch'
-import PaletteSwitch from 'components/PaletteSwitch'
-import DrawerNotifications from 'components/drawers/DrawerNotifications'
-import SharedLinkDropdown from 'components/SharedLinkDropdown'
+import DrawerMainNav from 'components/drawers/DrawerMainNav.vue'
+import ThemeSwitch from 'components/ThemeSwitch.vue'
+import PaletteSwitch from 'components/PaletteSwitch.vue'
+import DrawerNotifications from 'components/drawers/DrawerNotifications.vue'
+import SharedLinkDropdown from 'components/SharedLinkDropdown.vue'
 import SafetyStatusBanner from 'components/SafetyStatusBanner.vue'
-import KeyboardShortcutsDialog from 'components/ui/KeyboardShortcutsDialog'
-import FirstRunWizard from 'components/ui/FirstRunWizard'
+import KeyboardShortcutsDialog from 'components/ui/KeyboardShortcutsDialog.vue'
+import FirstRunWizard from 'components/ui/FirstRunWizard.vue'
 import compressoGlobals, { getCompressoApiUrl, notificationsCount } from 'src/js/compressoGlobals'
 import { wsConnectionState } from 'src/js/compressoWebsocket'
 import { useKeyboardShortcuts } from 'src/composables/useKeyboardShortcuts'
 import { createLogger } from 'src/composables/useLogger'
+import type { LiveGpuMetrics, SystemStatus } from 'src/types/contracts'
 
-const PAGE_HEADER_KEYS = {
+type LiveSystemStatus = Omit<SystemStatus, 'gpus'> & { gpus: LiveGpuMetrics[] }
+interface TopBarMetrics { cpu: number; mem: number; gpu: number | null }
+
+const PAGE_HEADER_KEYS: Record<string, string> = {
   '/ui/dashboard': 'dashboard',
   '/ui/compression': 'compression',
   '/ui/approval': 'approval',
@@ -215,7 +219,7 @@ export default {
       if (!isMobile.value) sidebarHovered.value = false
     }
 
-    function onPinToggle(val) {
+    function onPinToggle(val: boolean): void {
       sidebarPinned.value = val
       LocalStorage.set('sidebar_pinned', val)
     }
@@ -231,10 +235,10 @@ export default {
     })
 
     // Top bar system meters (polled — independent of page websockets)
-    const systemMetrics = ref({ cpu: 0, mem: 0, gpu: null })
-    let metricsInterval = null
+    const systemMetrics = ref<TopBarMetrics>({ cpu: 0, mem: 0, gpu: null })
+    let metricsInterval: ReturnType<typeof setInterval> | null = null
 
-    function meterColor(percent) {
+    function meterColor(percent: number): string {
       if (percent >= 85) return 'var(--q-negative)'
       if (percent >= 50) return 'var(--q-warning)'
       return 'var(--q-positive)'
@@ -253,12 +257,13 @@ export default {
 
     async function fetchSystemMetrics() {
       try {
-        const response = await axios.get(getCompressoApiUrl('v2', 'system/status'))
+        const response = await axios.get<LiveSystemStatus>(getCompressoApiUrl('v2', 'system/status'))
         const gpus = response.data.gpus || []
+        const firstGpu = gpus[0]
         systemMetrics.value = {
           cpu: response.data.cpu?.percent || 0,
           mem: response.data.memory?.percent || 0,
-          gpu: gpus.length > 0 && gpus[0].utilization_percent != null ? gpus[0].utilization_percent : null,
+          gpu: firstGpu?.utilization_percent ?? null,
         }
       } catch (err) {
         log.debug('Failed to fetch system metrics for top bar: ' + err)

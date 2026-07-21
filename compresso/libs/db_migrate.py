@@ -33,15 +33,27 @@ import inspect
 import logging
 import os
 import sys
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Protocol, cast
 from unittest import mock
 
-from peewee import Field, SqliteDatabase
+from peewee import Database, Field, Model, Proxy, SqliteDatabase
 from peewee_migrate import Migrator, Router
 
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.peewee_types import execute_write
 from compresso.libs.unmodels.lib import BaseModel
 
 _logger = logging.getLogger(__name__)
+
+
+class MigrationFunction(Protocol):
+    def __call__(self, migrator: Migrator, database: Database | Proxy, *, fake: bool) -> object: ...
+
+
+class AddFieldsFunction(Protocol):
+    def __call__(self, model: type[Model], **fields: Field) -> object: ...
 
 
 class PatchedRouter(Router):
@@ -53,7 +65,27 @@ class PatchedRouter(Router):
     calls cursor.fetchall(). This override adds the missing mock attributes.
     """
 
-    def run_one(self, name, migrator, *, fake=True, downgrade=False, force=False):
+    def read(self, name: str) -> tuple[MigrationFunction, MigrationFunction]:
+        """Load a migration module while keeping the dynamic code boundary explicit."""
+        migrate_dir = Path(self.migrate_dir)
+        scope: dict[str, object] = {}
+        code = compile((migrate_dir / f"{name}.py").read_text(encoding="utf-8"), "<migration>", "exec")
+        exec(code, scope, None)  # noqa: S102 - migrations are trusted application code loaded from the configured directory
+        migrate = scope.get("migrate")
+        rollback = scope.get("rollback")
+        if not callable(migrate) or not callable(rollback):
+            raise RuntimeError(f"Migration {name!r} does not define migrate and rollback callables")
+        return cast("MigrationFunction", migrate), cast("MigrationFunction", rollback)
+
+    def run_one(
+        self,
+        name: str,
+        migrator: Migrator,
+        *,
+        fake: bool = True,
+        downgrade: bool = False,
+        force: bool = False,
+    ) -> str:
         try:
             migrate_fn, rollback_fn = self.read(name)
             if fake:
@@ -84,7 +116,7 @@ class PatchedRouter(Router):
                     self.logger.info("Rolling back %s", name)
                     rollback_fn(migrator, self.database, fake=fake)
                     migrator()
-                    self.model.delete().where(self.model.name == name).execute()
+                    execute_write(self.model.delete().where(self.model.name == name))
 
                 self.logger.info("Done %s", name)
                 return name
@@ -106,19 +138,27 @@ class Migrations:
     Handle all migrations during application start.
     """
 
-    database = None
+    database: SqliteDatabase | None
+    router: PatchedRouter | None
+    migrator: Migrator | None
 
-    def __init__(self, config):
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+    def __init__(self, config: Mapping[str, object]) -> None:
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
+        self.database = None
+        self.router = None
+        self.migrator = None
 
         # Based on configuration, select database to connect to.
-        if config["TYPE"] == "SQLITE":
+        if config.get("TYPE") == "SQLITE":
+            database_file = config.get("FILE")
+            if not isinstance(database_file, str):
+                raise ValueError("SQLite migration config requires a FILE path")
             # Create SQLite directory if not exists
-            db_file_directory = os.path.dirname(config["FILE"])
+            db_file_directory = os.path.dirname(database_file)
             if not os.path.exists(db_file_directory):
                 os.makedirs(db_file_directory)
             self.database = SqliteDatabase(
-                config["FILE"],
+                database_file,
                 pragmas=(
                     ("foreign_keys", 1),
                     ("journal_mode", "wal"),
@@ -128,22 +168,24 @@ class Migrations:
             self.router = PatchedRouter(
                 database=self.database,
                 migrate_table=f"migratehistory_{config.get('MIGRATIONS_HISTORY_VERSION')}",
-                migrate_dir=config.get("MIGRATIONS_DIR"),
+                migrate_dir=str(config["MIGRATIONS_DIR"]) if config.get("MIGRATIONS_DIR") is not None else None,
                 logger=self.logger,
             )
 
             self.migrator = Migrator(self.database)
 
-    def __run_all_migrations(self):
+    def __run_all_migrations(self) -> None:
         """
         Run all new migrations.
         Migrations that have already been run will be ignored.
 
         :return:
         """
+        if self.router is None:
+            raise RuntimeError("Migration router is unavailable")
         self.router.run()
 
-    def __add_column_to_model(self, model, field_name, field):
+    def __add_column_to_model(self, model: type[Model], field_name: str, field: Field) -> None:
         """
         Add a field/column for a model using whichever migrator API is available.
 
@@ -151,19 +193,21 @@ class Migrations:
         across releases. We prefer `add_fields` when present and fall back to
         `add_columns` for compatibility with older variants.
         """
-        add_fields = getattr(self.migrator, "add_fields", None)
+        if self.migrator is None:
+            raise RuntimeError("Database migrator is unavailable")
+        add_fields = cast("AddFieldsFunction | None", getattr(self.migrator, "add_fields", None))
         if callable(add_fields):
             add_fields(model, **{field_name: field})
             return
 
-        add_columns = getattr(self.migrator, "add_columns", None)
+        add_columns = cast("AddFieldsFunction | None", getattr(self.migrator, "add_columns", None))
         if callable(add_columns):
             add_columns(model, **{field_name: field})
             return
 
         raise AttributeError("Migrator does not support adding columns (expected add_fields or add_columns).")
 
-    def update_schema(self):  # noqa: C901 — migration logic with many conditional branches
+    def update_schema(self) -> None:  # noqa: C901 — migration logic with many conditional branches
         """
         Bring the database schema up-to-date at application startup.
 
@@ -200,17 +244,22 @@ class Migrations:
 
         :return:
         """
+        database = self.database
+        migrator = self.migrator
+        if database is None or migrator is None:
+            raise RuntimeError("Database migrations are not configured")
+
         # Fetch all model classes
         discovered_models = inspect.getmembers(sys.modules["compresso.libs.unmodels"], inspect.isclass)
-        all_models = [tup[1] for tup in discovered_models]
+        all_models = [cast("type[Model]", candidate) for _name, candidate in discovered_models]
 
         # Start by creating all models
         self.logger.info("Initialising database tables")
         try:
-            with self.database.transaction():
+            with database.transaction():
                 for model in all_models:
-                    self.migrator.create_model(model)
-                self.migrator()
+                    migrator.create_model(model)
+                migrator()
         except Exception:
             self.logger.exception("Initialising tables failed")
             raise
@@ -221,37 +270,37 @@ class Migrations:
         # Newly added fields can be auto added with this function... no need for a migration script
         # Ensure all files are also present for each of the model classes
         self.logger.info("Updating database fields")
-        missing_required_columns = []
+        missing_required_columns: list[tuple[str, str, str]] = []
         for model in all_models:
             if issubclass(model, BaseModel):
                 # Fetch all peewee fields for the model class
                 # https://stackoverflow.com/questions/22573558/peewee-determining-meta-data-about-model-at-run-time
                 fields = model._meta.fields
-                table_name = model._meta.table_name
+                table_name = str(model._meta.table_name)
                 # loop over the fields and ensure each on exists in the table
                 field_keys = [f for f in fields]
                 for fk in field_keys:
                     field = fields.get(fk)
                     if isinstance(field, Field):
-                        column_name = getattr(field, "column_name", field.name)
+                        column_name = str(getattr(field, "column_name", field.name))
                         if getattr(field, "primary_key", False):
                             # SQLite cannot safely add primary key columns via ALTER TABLE.
                             # These must be handled explicitly in migrations if ever required.
-                            if not any(f for f in self.database.get_columns(table_name) if f.name == column_name):
+                            if not any(f for f in database.get_columns(table_name) if f.name == column_name):
                                 missing_required_columns.append((table_name, column_name, "primary key"))
                             continue
                         if not field.null and field.default is None:
                             # Non-null columns without a default cannot be added safely.
-                            if not any(f for f in self.database.get_columns(table_name) if f.name == column_name):
+                            if not any(f for f in database.get_columns(table_name) if f.name == column_name):
                                 missing_required_columns.append((table_name, column_name, "non-null without default"))
                             continue
-                        if not any(f for f in self.database.get_columns(table_name) if f.name == column_name):
+                        if not any(f for f in database.get_columns(table_name) if f.name == column_name):
                             # Field does not exist in DB table
                             self.logger.info("Adding missing column")
                             try:
-                                with self.database.transaction():
+                                with database.transaction():
                                     self.__add_column_to_model(model, field.name, field)
-                                    self.migrator()
+                                    migrator()
                             except Exception:
                                 self.logger.exception("Update failed")
                                 raise
@@ -269,9 +318,9 @@ class Migrations:
             if not issubclass(model, BaseModel):
                 continue
 
-            table_name = model._meta.table_name
+            table_name = str(model._meta.table_name)
             try:
-                existing_indexes = self.database.get_indexes(table_name)
+                existing_indexes = database.get_indexes(table_name)
             except Exception:
                 self.logger.exception("Failed to fetch indexes for table %s", table_name)
                 continue
@@ -279,20 +328,20 @@ class Migrations:
             existing_index_columns = set(tuple(getattr(idx, "columns", [])) for idx in existing_indexes)
             existing_index_names = set(getattr(idx, "name", None) for idx in existing_indexes if getattr(idx, "name", None))
 
-            declared_indexes = []
+            declared_indexes: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
             for columns, unique in model._meta.indexes:
                 if unique:
                     continue
                 if all(isinstance(col, str) for col in columns):
-                    compare_columns = []
+                    normalized_columns: list[str] = []
                     for col in columns:
                         field = model._meta.fields.get(col)
-                        compare_columns.append(field.column_name if field else col)
-                    declared_indexes.append((tuple(columns), tuple(compare_columns)))
+                        normalized_columns.append(str(field.column_name) if field else col)
+                    declared_indexes.append((tuple(columns), tuple(normalized_columns)))
 
             for field_name, field in model._meta.fields.items():
                 if getattr(field, "index", False) and not getattr(field, "unique", False):
-                    declared_indexes.append(((field_name,), (field.column_name,)))
+                    declared_indexes.append(((field_name,), (str(field.column_name),)))
 
             for add_columns, compare_columns in declared_indexes:
                 if compare_columns in existing_index_columns:
@@ -302,10 +351,10 @@ class Migrations:
                     continue
                 try:
                     self.logger.info("Adding missing index on %s (%s)", table_name, ", ".join(add_columns))
-                    with self.database.transaction():
-                        self.migrator.add_index(model, *add_columns, unique=False)
-                        self.migrator()
+                    with database.transaction():
+                        migrator.add_index(model, *add_columns, unique=False)
+                        migrator()
                 except Exception:
-                    self.database.rollback()
+                    database.rollback()
                     self.logger.exception("Failed to add index %s on table %s", add_columns, table_name)
                     raise

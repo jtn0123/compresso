@@ -13,20 +13,26 @@
   </q-btn>
 </template>
 
-<script>
+<script lang="ts">
 import { LocalStorage, useQuasar } from 'quasar'
 import { ref } from 'vue'
 import { applyTheme } from 'src/js/compressoTheme'
+import { getPaletteNames } from 'src/js/compressoTheme'
+import type { PaletteName } from 'src/js/compressoTheme'
 
 export default {
   setup() {
     const $q = useQuasar()
     const compressoDarkMode = ref($q.dark.isActive)
 
-    function toggleMode() {
+    function toggleMode(): void {
       compressoDarkMode.value = !compressoDarkMode.value
       const themeName = compressoDarkMode.value ? 'dark' : 'light'
-      const palette = LocalStorage.getItem('palette') || 'forest'
+      const storedPalette = LocalStorage.getItem('palette')
+      const palette: PaletteName =
+        typeof storedPalette === 'string' && getPaletteNames().includes(storedPalette as PaletteName)
+          ? (storedPalette as PaletteName)
+          : 'forest'
       LocalStorage.set('theme', themeName)
       LocalStorage.set('theme_explicit', true)
       $q.dark.set(compressoDarkMode.value)

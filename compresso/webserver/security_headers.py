@@ -7,7 +7,17 @@ Mixin that adds standard security headers to all HTTP responses.
 Applied to API handlers, the main UI handler, and plugin handlers.
 """
 
+from typing import Protocol, cast
 from urllib.parse import urlparse
+
+from tornado.httputil import HTTPServerRequest
+from tornado.web import RequestHandler
+
+
+class _HeaderOwner(Protocol):
+    request: HTTPServerRequest
+
+    def set_header(self, name: str, value: str) -> None: ...
 
 
 class SecurityHeadersMixin:
@@ -18,28 +28,33 @@ class SecurityHeadersMixin:
     or at the top of individual handler methods.
     """
 
-    def set_security_headers(self):
+    def _header_owner(self) -> _HeaderOwner:
+        return cast(_HeaderOwner, self)
+
+    def set_security_headers(self) -> None:
+        owner = self._header_owner()
         # Prevent MIME-type sniffing
-        self.set_header("X-Content-Type-Options", "nosniff")
+        owner.set_header("X-Content-Type-Options", "nosniff")
 
         # Prevent clickjacking
-        self.set_header("X-Frame-Options", "DENY")
+        owner.set_header("X-Frame-Options", "DENY")
 
         # Disable legacy XSS filter (modern browsers don't need it;
         # setting to "0" avoids XSS-auditor-based attacks)
-        self.set_header("X-XSS-Protection", "0")
+        owner.set_header("X-XSS-Protection", "0")
 
         # Control referrer information leakage
-        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        owner.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
 
         # Restrict browser features the app doesn't need
-        self.set_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        owner.set_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
         # HSTS only when the request arrived over HTTPS
-        if getattr(self, "request", None) and self.request.protocol == "https":
-            self.set_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        request: object = getattr(self, "request", None)
+        if getattr(request, "protocol", None) == "https":
+            owner.set_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
-    def set_html_security_headers(self):
+    def set_html_security_headers(self) -> None:
         """Additional headers appropriate for HTML responses (not JSON APIs)."""
         self.set_security_headers()
 
@@ -47,7 +62,7 @@ class SecurityHeadersMixin:
         # build emits external module scripts and does not require eval or
         # inline JavaScript. Quasar still applies dynamic style attributes, so
         # that narrowly-scoped exception remains in style-src-attr.
-        self.set_header(
+        self._header_owner().set_header(
             "Content-Security-Policy",
             "default-src 'self'; "
             "base-uri 'self'; "
@@ -64,7 +79,7 @@ class SecurityHeadersMixin:
         )
 
 
-def check_websocket_origin(handler, origin):
+def check_websocket_origin(handler: RequestHandler, origin: str) -> bool:
     """Validate that a WebSocket origin matches the server host.
 
     Returns True if the origin is acceptable, False otherwise.
@@ -76,6 +91,8 @@ def check_websocket_origin(handler, origin):
     origin_host = parsed.hostname
     # Compare against the Host header (which includes port for non-default)
     request_host = handler.request.headers.get("Host", "")
+    if not isinstance(request_host, str):
+        return False
     # Strip port from both for comparison
     request_hostname = request_host.split(":")[0]
     return origin_host == request_hostname

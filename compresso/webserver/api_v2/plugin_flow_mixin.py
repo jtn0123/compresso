@@ -6,7 +6,9 @@ compresso.plugin_flow_mixin.py
 Mixin providing plugin flow configuration endpoints for ApiPluginsHandler.
 """
 
-from compresso.webserver.api_v2.base_api_handler import BaseApiError
+from collections.abc import Mapping
+
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler, integer_value, string_value
 from compresso.webserver.api_v2.schema.plugin_schemas import (
     PluginFlowResultsSchema,
     PluginTypesResultsSchema,
@@ -16,10 +18,10 @@ from compresso.webserver.api_v2.schema.plugin_schemas import (
 from compresso.webserver.helpers import plugins
 
 
-class PluginFlowMixin:
+class PluginFlowMixin(BaseApiHandler):
     """Mixin for plugin flow configuration endpoints."""
 
-    async def get_plugin_types_with_flows(self):
+    async def get_plugin_types_with_flows(self) -> None:
         """
         Plugins - Get a list of all plugin types that have flows
         ---
@@ -72,7 +74,7 @@ class PluginFlowMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_enabled_plugins_flow_by_type(self):
+    async def get_enabled_plugins_flow_by_type(self) -> None:
         """
         Plugins - Get the plugin flow for a requested plugin type
         ---
@@ -120,7 +122,7 @@ class PluginFlowMixin:
             json_request = self.read_json_request(RequestPluginsFlowByPluginTypeSchema())
 
             results = plugins.get_enabled_plugin_flows_for_plugin_type(
-                json_request.get("plugin_type"), json_request.get("library_id")
+                string_value(json_request.get("plugin_type")), integer_value(json_request.get("library_id"))
             )
             response = self.build_response(
                 PluginFlowResultsSchema(),
@@ -136,7 +138,7 @@ class PluginFlowMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def save_enabled_plugin_flow(self):
+    async def save_enabled_plugin_flow(self) -> None:
         """
         Plugins - Save the plugin flow for a requested plugin type
         ---
@@ -183,8 +185,16 @@ class PluginFlowMixin:
         try:
             json_request = self.read_json_request(RequestSavingPluginsFlowByPluginTypeSchema())
 
+            plugin_flow_value = json_request.get("plugin_flow")
+            plugin_flow = (
+                [item for item in plugin_flow_value if isinstance(item, Mapping)]
+                if isinstance(plugin_flow_value, list)
+                else []
+            )
             if not plugins.save_enabled_plugin_flows_for_plugin_type(
-                json_request.get("plugin_type"), json_request.get("library_id"), json_request.get("plugin_flow")
+                string_value(json_request.get("plugin_type")),
+                integer_value(json_request.get("library_id")),
+                plugin_flow,
             ):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to update plugin flow by type")
                 self.write_error()

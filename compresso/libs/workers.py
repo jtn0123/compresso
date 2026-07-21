@@ -37,16 +37,52 @@ import subprocess
 import threading
 import time
 from collections import deque
+from collections.abc import Callable, Mapping
+from typing import Literal, Protocol, cast
 
 import psutil
 
 from compresso import config
 from compresso.libs import common
-from compresso.libs.disk_space_guard import DiskSpaceGuard
+from compresso.libs.disk_space_guard import DiskSpaceCheck, DiskSpaceGuard
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
-from compresso.libs.safety_state import record_safety_event
+from compresso.libs.safety_state import SafetyForeman, record_safety_event
+from compresso.libs.task import Task
+from compresso.libs.unmodels.tasks import Tasks
 from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
+
+type WorkerLog = deque[str] | list[str]
+type RunnerInfo = dict[str, dict[str, object]]
+
+
+class SafetyEventRecorder(Protocol):
+    def __call__(
+        self,
+        settings: config.Config,
+        foreman: SafetyForeman | None,
+        code: str,
+        message: str,
+        **details: object,
+    ) -> object: ...
+
+
+def _set_task_timestamp(
+    task_model: Tasks,
+    field: Literal["start_time", "finish_time"],
+    value: float | None,
+) -> None:
+    """Bridge Peewee's write-time timestamp coercion and hydrated field type."""
+    setattr(task_model, field, value)
+
+
+def _run_worker_plugin(
+    plugin_handler: PluginsHandler,
+    data: dict[str, object],
+    runner_id: str,
+    result: dict[str, bool | None],
+) -> None:
+    result["success"] = plugin_handler.exec_plugin_runner(data, runner_id, "worker.process")
 
 
 class Worker(threading.Thread):
@@ -54,12 +90,20 @@ class Worker(threading.Thread):
     # shared-mutable-default footgun of class-level `{}` / mutable attributes.
     idle: bool
     paused: bool
-    worker_log: "deque | None"
-    start_time: "float | None"
-    finish_time: "float | None"
-    worker_runners_info: dict
+    worker_log: WorkerLog | None
+    start_time: float | None
+    finish_time: float | None
+    worker_runners_info: RunnerInfo
 
-    def __init__(self, thread_id, name, worker_group_id, pending_queue, complete_queue, event):
+    def __init__(
+        self,
+        thread_id: int | str,
+        name: str,
+        worker_group_id: int | str,
+        pending_queue: queue.Queue[Task],
+        complete_queue: queue.Queue[Task],
+        event: threading.Event,
+    ) -> None:
         super().__init__(name=name)
         self.thread_id = thread_id
         self.name = name
@@ -73,15 +117,15 @@ class Worker(threading.Thread):
         self.finish_time = None
         self.worker_runners_info = {}
 
-        self.current_task = None
-        self.current_command_ref = None
+        self.current_task: Task | None = None
+        self.current_command_ref: list[str] | None = None
         self.pending_queue = pending_queue
         self.complete_queue = complete_queue
-        self.worker_subprocess_monitor = None
-        self._disk_space_guard = None
+        self.worker_subprocess_monitor: WorkerSubprocessMonitor | None = None
+        self._disk_space_guard: DiskSpaceGuard | None = None
         self.disk_pressure_paused = False
-        self.disk_pressure = None
-        self._safety_event_recorder = record_safety_event
+        self.disk_pressure: dict[str, bool | str | int] | None = None
+        self._safety_event_recorder: SafetyEventRecorder = record_safety_event
 
         # Create 'redundancy' flag. When this is set, the worker should die
         self.redundant_flag = threading.Event()
@@ -92,14 +136,45 @@ class Worker(threading.Thread):
         self.paused_flag.clear()
 
         # Create logger for this worker
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
-    def run(self):
+    def _require_current_task(self) -> Task:
+        current_task = self.current_task
+        if current_task is None:
+            raise RuntimeError("worker has no current task")
+        return current_task
+
+    @property
+    def task(self) -> Task:
+        return self._require_current_task()
+
+    @property
+    def model(self) -> Tasks:
+        task_model = self.task.task
+        if task_model is None:
+            raise RuntimeError("worker current task is not loaded")
+        return task_model
+
+    @property
+    def log(self) -> WorkerLog:
+        worker_log = self.worker_log
+        if worker_log is None:
+            raise RuntimeError("worker log is not initialized")
+        return worker_log
+
+    @property
+    def monitor(self) -> WorkerSubprocessMonitor:
+        monitor = self.worker_subprocess_monitor
+        if monitor is None:
+            raise RuntimeError("worker subprocess monitor is not running")
+        return monitor
+
+    def run(self) -> None:
         self.logger.info("Starting worker")
 
         # Create proc monitor
         self.worker_subprocess_monitor = WorkerSubprocessMonitor(self)
-        self.worker_subprocess_monitor.start()
+        self.monitor.start()
 
         while not self.redundant_flag.is_set():
             self.event.wait(1)  # Add delay for preventing loop maxing compute resources
@@ -130,11 +205,11 @@ class Worker(threading.Thread):
                     self._fail_current_task_after_unexpected_error(e)
 
         self.logger.info("Stopping worker")
-        self.worker_subprocess_monitor.stop()
-        self.worker_subprocess_monitor.join()
+        self.monitor.stop()
+        self.monitor.join()
         self.worker_subprocess_monitor = None
 
-    def set_task(self, new_task):
+    def set_task(self, new_task: Task) -> None:
         """Sets the given task to the worker class"""
         # Ensure only one task can be set for a worker
         if self.current_task:
@@ -144,7 +219,7 @@ class Worker(threading.Thread):
         self.worker_log = deque(maxlen=500)
         self.idle = False
 
-    def get_status(self):
+    def get_status(self) -> dict[str, object]:
         """
         Fetch the status of this worker.
 
@@ -152,7 +227,7 @@ class Worker(threading.Thread):
         """
         subprocess_stats = None
         if self.worker_subprocess_monitor:
-            subprocess_stats = self.worker_subprocess_monitor.get_subprocess_stats()
+            subprocess_stats = self.monitor.get_subprocess_stats()
         current_command = ""
         try:
             if self.current_command_ref:
@@ -161,7 +236,7 @@ class Worker(threading.Thread):
                     current_command = shared_command
         except (AttributeError, TypeError, IndexError) as e:
             self.logger.exception("Exception in fetching current command of worker %s: %s", self.name, e)
-        status = {
+        status: dict[str, object] = {
             "id": str(self.thread_id),
             "name": self.name,
             "idle": self.idle,
@@ -179,7 +254,7 @@ class Worker(threading.Thread):
         if self.current_task:
             # Fetch the current file
             try:
-                status["current_task"] = self.current_task.get_task_id()
+                status["current_task"] = self.task.get_task_id()
             except (AttributeError, KeyError, TypeError) as e:
                 self.logger.exception("Exception in fetching the current task ID for worker %s: %s", self.name, e)
             except Exception as e:
@@ -187,7 +262,7 @@ class Worker(threading.Thread):
 
             # Fetch the current file
             try:
-                status["current_file"] = self.current_task.get_source_basename()
+                status["current_file"] = self.task.get_source_basename()
             except (AttributeError, KeyError, TypeError) as e:
                 self.logger.exception("Exception in fetching the current file of worker %s: %s", self.name, e)
             except Exception as e:
@@ -198,7 +273,7 @@ class Worker(threading.Thread):
                 if self.worker_log and len(self.worker_log) > 40:
                     status["worker_log_tail"] = list(self.worker_log)[-39:]
                 else:
-                    status["worker_log_tail"] = list(self.worker_log)
+                    status["worker_log_tail"] = list(self.worker_log or [])
             except (AttributeError, TypeError, IndexError) as e:
                 self.logger.exception("Exception in fetching log tail of worker: %s", e)
 
@@ -209,19 +284,19 @@ class Worker(threading.Thread):
                 self.logger.exception("Exception in runners info of worker %s: %s", self.name, e)
         return status
 
-    def __unset_current_task(self):
+    def __unset_current_task(self) -> None:
         self.current_task = None
         self.worker_runners_info = {}
         self.worker_log = deque(maxlen=500)
 
-    def _fail_current_task_after_unexpected_error(self, error):
+    def _fail_current_task_after_unexpected_error(self, error: Exception) -> None:
         """Release a poisoned task so one exception cannot wedge a worker forever."""
         failed_task = self.current_task
         if failed_task is None:
             return
 
         if self.worker_subprocess_monitor is not None:
-            self.worker_subprocess_monitor.terminate_proc()
+            self.monitor.terminate_proc()
 
         try:
             failed_task.set_success(False)
@@ -235,7 +310,7 @@ class Worker(threading.Thread):
         finally:
             self.__unset_current_task()
 
-    def __process_task_queue_item(self):
+    def __process_task_queue_item(self) -> None:
         """
         Processes the set task.
 
@@ -245,7 +320,7 @@ class Worker(threading.Thread):
         self.idle = False
 
         # Log the start of the job
-        self.logger.info("Picked up job - %s", self.current_task.get_source_abspath())
+        self.logger.info("Picked up job - %s", self.task.get_source_abspath())
 
         disk_check = self._check_task_disk_space()
         if not disk_check.ok:
@@ -279,25 +354,25 @@ class Worker(threading.Thread):
         self.__set_start_task_stats()
 
         # Mark as being "in progress"
-        self.current_task.set_status("in_progress")
+        self.task.set_status("in_progress")
 
         # Process the file. Will return true if success, otherwise false
         success = self.__exec_worker_runners_on_set_task()
         # Mark the task as either success or not
-        self.current_task.set_success(success)
+        self.task.set_success(success)
 
         # Store encoding speed stats on the task for postprocessor
         if self.worker_subprocess_monitor is not None:
-            speed_stats = self.worker_subprocess_monitor.get_encoding_speed_stats()
-            elapsed = self.worker_subprocess_monitor.get_subprocess_elapsed()
-            self.current_task.statistics["encoding_speed"] = {
+            speed_stats = self.monitor.get_encoding_speed_stats()
+            elapsed = self.monitor.get_subprocess_elapsed()
+            self.task.statistics["encoding_speed"] = {
                 "avg_encoding_fps": speed_stats.get("avg_encoding_fps", 0),
                 "encoding_speed_ratio": speed_stats.get("encoding_speed_ratio", 0),
                 "encoding_duration_seconds": elapsed,
             }
-            self.worker_subprocess_monitor.reset_encoding_speed_stats()
+            self.monitor.reset_encoding_speed_stats()
         else:
-            self.current_task.statistics["encoding_speed"] = {
+            self.task.statistics["encoding_speed"] = {
                 "avg_encoding_fps": 0,
                 "encoding_speed_ratio": 0,
                 "encoding_duration_seconds": 0,
@@ -307,23 +382,23 @@ class Worker(threading.Thread):
         self.__set_finish_task_stats()
 
         # Log completion of job
-        self.logger.info("Finished job - %s", self.current_task.get_source_abspath())
+        self.logger.info("Finished job - %s", self.task.get_source_abspath())
 
         # Place the task into the completed queue
-        self.complete_queue.put(self.current_task)
+        self.complete_queue.put(self.task)
 
         # Reset the current file info for the next task
         self.__unset_current_task()
 
-    def _check_task_disk_space(self):
+    def _check_task_disk_space(self) -> DiskSpaceCheck:
         if self._disk_space_guard is None:
             self._disk_space_guard = DiskSpaceGuard(config.Config())
         return self._disk_space_guard.check_cache_capacity(
-            self.current_task.get_source_abspath(),
-            self.current_task.get_cache_path(),
+            self.task.get_source_abspath(),
+            self.task.get_cache_path(),
         )
 
-    def __set_start_task_stats(self):
+    def __set_start_task_stats(self) -> None:
         """Sets the initial stats for the start of a task"""
         # Set the start time to now
         self.start_time = time.time()
@@ -332,26 +407,26 @@ class Worker(threading.Thread):
         self.finish_time = None
 
         # Format our starting statistics data
-        self.current_task.task.processed_by_worker = str(self.name)
-        self.current_task.task.start_time = self.start_time
-        self.current_task.task.finish_time = self.finish_time
+        self.model.processed_by_worker = str(self.name)
+        _set_task_timestamp(self.model, "start_time", self.start_time)
+        _set_task_timestamp(self.model, "finish_time", self.finish_time)
 
-    def __set_finish_task_stats(self):
+    def __set_finish_task_stats(self) -> None:
         """Sets the final stats for the end of a task"""
         # Set the finish time to now
         self.finish_time = time.time()
 
         # Set the finish time in the statistics data
-        self.current_task.task.finish_time = self.finish_time
+        _set_task_timestamp(self.model, "finish_time", self.finish_time)
 
-    def __exec_worker_runners_on_set_task(self):  # noqa: C901 — multi-phase plugin runner with file lifecycle management
+    def __exec_worker_runners_on_set_task(self) -> bool:  # noqa: C901 — ordered multi-plugin file lifecycle
         """
         Executes the configured plugin runners against the set task.
 
         :return:
         """
         # Init plugins
-        library_id = self.current_task.get_task_library_id()
+        library_id = self.task.get_task_library_id()
         plugin_handler = PluginsHandler()
         plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type("worker.process", library_id=library_id)
 
@@ -359,11 +434,11 @@ class Worker(threading.Thread):
         self.worker_runners_info = self.__build_worker_runners_info(plugin_modules)
 
         # Set the absolute path to the original file
-        original_abspath = self.current_task.get_source_abspath()
+        original_abspath = self.task.get_source_abspath()
 
         # Process item in loop.
         # First process the item for each plugin that configures it, then run the default Compresso configuration
-        task_cache_path = self.current_task.get_cache_path()
+        task_cache_path = self.task.get_cache_path()
         cache_directory = os.path.dirname(os.path.abspath(task_cache_path))
         # Set the current input file to the original file path
         file_in = original_abspath
@@ -383,8 +458,8 @@ class Worker(threading.Thread):
             "events.worker_process_started",
             {
                 "library_id": library_id,
-                "task_id": self.current_task.get_task_id(),
-                "task_type": self.current_task.get_task_type(),
+                "task_id": self.task.get_task_id(),
+                "task_type": self.task.get_task_type(),
                 "original_file_path": original_abspath,
                 "cache_directory": cache_directory,
                 "worker_runners_info": self.worker_runners_info,
@@ -392,8 +467,8 @@ class Worker(threading.Thread):
         )
 
         # Generate default data object for the runner functions
-        task_id = self.current_task.get_task_id()
-        data = {
+        task_id = self.task.get_task_id()
+        data: dict[str, object] = {
             "worker_log": self.worker_log,
             "library_id": library_id,
             "exec_command": [],
@@ -409,6 +484,9 @@ class Worker(threading.Thread):
             # Increment the runners count (first runner will be set as #1)
             runner_count += 1
             runner_id = plugin_module.get("plugin_id")
+            if not isinstance(runner_id, str):
+                self.logger.warning("Skipping worker plugin without a valid plugin ID")
+                continue
 
             if not overall_success:
                 # If one of the Plugins fails, don't continue.
@@ -438,26 +516,28 @@ class Worker(threading.Thread):
                 # Reset data object for this runner functions
                 data["library_id"] = library_id
                 data["exec_command"] = []
-                data["current_command"] = []
-                data["command_progress_parser"] = self.worker_subprocess_monitor.default_progress_parser
+                current_command: list[str] = []
+                data["current_command"] = current_command
+                data["command_progress_parser"] = self.monitor.default_progress_parser
                 data["file_in"] = file_in
                 data["file_out"] = file_out
                 data["original_file_path"] = original_abspath
                 data["repeat"] = False
                 data["task_id"] = task_id
-                self.current_command_ref = data["current_command"]
+                self.current_command_ref = current_command
 
                 self.event.wait(0.2)  # Add delay for preventing loop maxing compute resources
-                self.worker_log.append(f"\n\nRUNNER: \n{plugin_module.get('name')} [Pass #{runner_pass_count}]\n\n")
-                self.worker_log.append("\nExecuting plugin runner... Please wait\n")
+                self.log.append(f"\n\nRUNNER: \n{plugin_module.get('name')} [Pass #{runner_pass_count}]\n\n")
+                self.log.append("\nExecuting plugin runner... Please wait\n")
 
                 # Run plugin (in its own thread) to update data
-                result = {"success": None}
+                result: dict[str, bool | None] = {"success": None}
 
-                def _run_plugin(result=result, runner_id=runner_id):
-                    result["success"] = plugin_handler.exec_plugin_runner(data, runner_id, "worker.process")
-
-                runner_thread = threading.Thread(target=_run_plugin, daemon=True)
+                runner_thread = threading.Thread(
+                    target=_run_worker_plugin,
+                    args=(plugin_handler, data, runner_id, result),
+                    daemon=True,
+                )
                 runner_thread.start()
 
                 # monitor the thread, bail if redundancy requested
@@ -479,7 +559,7 @@ class Worker(threading.Thread):
                     self.worker_runners_info[runner_id]["success"] = False
                     runner_failed = True
                     overall_success = False
-                    self.worker_log.append("\n\nWORKER TERMINATED!")
+                    self.log.append("\n\nWORKER TERMINATED!")
                     break
 
                 # now check the plugin result
@@ -491,9 +571,9 @@ class Worker(threading.Thread):
                     # Set overall success status to failed
                     overall_success = False
                     # Append long entry to say the worker was terminated
-                    self.worker_log.append("\n\nPLUGIN FAILED!")
-                    self.worker_log.append(f"\nFailed to execute Plugin '{plugin_module.get('name')}'")
-                    self.worker_log.append("\nCheck Compresso logs for more information")
+                    self.log.append("\n\nPLUGIN FAILED!")
+                    self.log.append(f"\nFailed to execute Plugin '{plugin_module.get('name')}'")
+                    self.log.append("\nCheck Compresso logs for more information")
                     self.current_command_ref = None
                     data["current_command"] = []
                     break
@@ -502,12 +582,28 @@ class Worker(threading.Thread):
                 self.logger.debug("Worker process '%s' (in) %s", runner_id, data.get("file_in"))
                 self.logger.debug("Worker process '%s' (out) %s", runner_id, data.get("file_out"))
 
+                plugin_file_in = data.get("file_in")
+                plugin_file_out = data.get("file_out")
+                if not isinstance(plugin_file_in, str) or (
+                    plugin_file_out is not None and not isinstance(plugin_file_out, str)
+                ):
+                    self.logger.error("Worker plugin '%s' returned invalid file paths", runner_id)
+                    self.worker_runners_info[runner_id]["success"] = False
+                    runner_failed = True
+                    overall_success = False
+                    break
+
                 # Only run the conversion process if "exec_command" is not empty
                 if data.get("exec_command"):
-                    self.worker_log.append("\nPlugin runner requested for a command to be executed by Compresso")
+                    self.log.append("\nPlugin runner requested for a command to be executed by Compresso")
 
                     # Exec command as subprocess
-                    self.current_command_ref = data["current_command"]
+                    command_ref_value = data.get("current_command")
+                    self.current_command_ref = (
+                        command_ref_value
+                        if isinstance(command_ref_value, list) and all(isinstance(item, str) for item in command_ref_value)
+                        else None
+                    )
                     success = self.__exec_command_subprocess(data)
                     no_exec_command_run = False
 
@@ -520,7 +616,7 @@ class Worker(threading.Thread):
                         # Set overall success status to failed
                         overall_success = False
                         # Append long entry to say the worker was terminated
-                        self.worker_log.append("\n\nWORKER TERMINATED!")
+                        self.log.append("\n\nWORKER TERMINATED!")
                         self.current_command_ref = None
                         data["current_command"] = []
                         # Don't continue
@@ -532,19 +628,19 @@ class Worker(threading.Thread):
                         self.logger.info("Successfully ran worker process '%s' on file '%s'", runner_id, data.get("file_in"))
                         # Check if 'file_out' was nulled by the plugin.
                         # If it is, we assume the plugin modified the file_in in-place
-                        if not data.get("file_out"):
+                        if not plugin_file_out:
                             # The 'file_out' is None. Ensure the new 'file_in' is set to
                             # whatever the plugin returned for 'file_in' for the next loop
-                            file_in = data.get("file_in")
+                            file_in = plugin_file_in
                         # Ensure the 'file_out' that was specified by the plugin to be created was actually created.
-                        elif os.path.exists(data.get("file_out")):
+                        elif os.path.exists(plugin_file_out):
                             # The outfile exists. Clean up the intermediate input file as we go to
                             # avoid unnecessary disk use in the cache directory. The guard logic that
                             # prevents deleting the original (or the new output) lives in the helper.
-                            self.__remove_intermediate_input_file(data.get("file_in"), data.get("file_out"), original_abspath)
+                            self.__remove_intermediate_input_file(plugin_file_in, plugin_file_out, original_abspath)
 
                             # Set the new 'file_in' as the previous runner's 'file_out' for the next loop
-                            file_in = data.get("file_out")
+                            file_in = plugin_file_out
                     else:
                         # If file conversion was not successful
                         self.logger.error("WORKER_RUNNER_FAILED runner=%s file=%s", runner_id, original_abspath)
@@ -554,18 +650,14 @@ class Worker(threading.Thread):
                         overall_success = False
                 else:
                     # Ensure the new 'file_in' is set to the previous runner's 'file_in' for the next loop
-                    file_in = data.get("file_in")
+                    file_in = plugin_file_in
                     # Log that this plugin did not request to execute anything
-                    self.worker_log.append("\nRunner did not request for Compresso to execute a command")
+                    self.log.append("\nRunner did not request for Compresso to execute a command")
                     self.logger.debug("Worker process '%s' did not request to execute a command.", runner_id)
 
-                if data.get("file_out") and os.path.exists(data.get("file_out")):
-                    # Set the current file out to the most recently completed cache file
-                    # If the file out does not exist, it is likely never used by the plugin.
-                    current_file_out = data.get("file_out")
-                else:
-                    # Ensure the current_file_out is set the currently set 'file_in'
-                    current_file_out = data.get("file_in")
+                # Prefer the most recently completed output; otherwise preserve
+                # the plugin's validated input for the next runner.
+                current_file_out = plugin_file_out if plugin_file_out and os.path.exists(plugin_file_out) else plugin_file_in
 
                 # Exec command was handled, clear shared command reference for the UI.
                 self.current_command_ref = None
@@ -587,10 +679,10 @@ class Worker(threading.Thread):
         if no_exec_command_run:
             # If no jobs were carried out on this task
             self.logger.warning("No Plugin requested for Compresso to run commands for this file '%s'", original_abspath)
-            self.worker_log.append(f"\n\nNo Plugin requested for Compresso to run commands for this file '{original_abspath}'")
+            self.log.append(f"\n\nNo Plugin requested for Compresso to run commands for this file '{original_abspath}'")
 
         # Save the completed command log
-        self.current_task.save_command_log(self.worker_log)
+        self.task.save_command_log(self.log)
 
         # If all plugins that were executed completed successfully, then this was overall a successful task.
         # At this point we need to move the final out file to the original task cache path so the postprocessor can collect it.
@@ -610,8 +702,8 @@ class Worker(threading.Thread):
             "events.worker_process_complete",
             {
                 "library_id": library_id,
-                "task_id": self.current_task.get_task_id(),
-                "task_type": self.current_task.get_task_type(),
+                "task_id": self.task.get_task_id(),
+                "task_type": self.task.get_task_type(),
                 "original_file_path": original_abspath,
                 "final_cache_path": task_cache_path,
                 "overall_success": overall_success,
@@ -627,17 +719,20 @@ class Worker(threading.Thread):
         return overall_success
 
     @staticmethod
-    def __build_worker_runners_info(plugin_modules):
+    def __build_worker_runners_info(plugin_modules: list[dict[str, object]]) -> RunnerInfo:
         """
         Build the initial per-runner status map that is surfaced to the frontend.
 
         :param plugin_modules: Enabled ``worker.process`` plugin module dicts.
         :return: dict keyed by plugin_id with pending status entries.
         """
-        runners_info = {}
+        runners_info: RunnerInfo = {}
         for plugin_module in plugin_modules:
-            runners_info[plugin_module.get("plugin_id")] = {
-                "plugin_id": plugin_module.get("plugin_id"),
+            plugin_id = plugin_module.get("plugin_id")
+            if not isinstance(plugin_id, str):
+                continue
+            runners_info[plugin_id] = {
+                "plugin_id": plugin_id,
                 "status": "pending",
                 "name": plugin_module.get("name"),
                 "author": plugin_module.get("author"),
@@ -648,7 +743,7 @@ class Worker(threading.Thread):
         return runners_info
 
     @staticmethod
-    def __remove_intermediate_input_file(file_in, file_out, original_abspath):
+    def __remove_intermediate_input_file(file_in: str, file_out: str, original_abspath: str) -> None:
         """
         Remove an intermediate worker input file once a runner has produced a new
         output, freeing cache space between passes.
@@ -675,7 +770,13 @@ class Worker(threading.Thread):
             return
         os.remove(file_in_abs)
 
-    def __move_final_output_to_cache(self, current_file_out, cache_directory, original_abspath, fallback_cache_path):
+    def __move_final_output_to_cache(
+        self,
+        current_file_out: str,
+        cache_directory: str,
+        original_abspath: str,
+        fallback_cache_path: str,
+    ) -> tuple[bool, str]:
         """
         Move the final worker output to the task cache path for the postprocessor.
 
@@ -694,9 +795,9 @@ class Worker(threading.Thread):
             # Set the new file out as the extension may have changed
             split_file_name = os.path.splitext(current_file_out)
             file_extension = split_file_name[1].lstrip(".")
-            self.current_task.set_cache_path(cache_directory, file_extension)
+            self.task.set_cache_path(cache_directory, file_extension)
             # Read the updated cache path
-            task_cache_path = self.current_task.get_cache_path()
+            task_cache_path = self.task.get_cache_path()
 
             # Move file to original cache path
             self.logger.info("Moving final cache file from '%s' to '%s'", current_file_out, task_cache_path)
@@ -734,7 +835,7 @@ class Worker(threading.Thread):
             )
             return False, task_cache_path
 
-    def __exec_command_subprocess(self, data):
+    def __exec_command_subprocess(self, data: dict[str, object]) -> bool:
         """
         Executes a command as a shell subprocess.
         Uses the given parser to record progress data from the shell STDOUT.
@@ -746,12 +847,19 @@ class Worker(threading.Thread):
         exec_command = data.get("exec_command", [])
 
         # Fetch the command progress parser function
-        command_progress_parser = data.get("command_progress_parser", self.worker_subprocess_monitor.default_progress_parser)
+        parser_value = data.get("command_progress_parser", self.monitor.default_progress_parser)
+        command_progress_parser = (
+            cast("Callable[[object], object]", parser_value)
+            if callable(parser_value)
+            else self.monitor.default_progress_parser
+        )
 
         # Log the command for debugging
-        command_string = exec_command
-        if isinstance(exec_command, list):
-            command_string = shlex.join(exec_command)
+        command_string = (
+            shlex.join(exec_command)
+            if isinstance(exec_command, list) and all(isinstance(argument, str) for argument in exec_command)
+            else str(exec_command)
+        )
         self.logger.debug("Executing: %s", command_string)
         current_command_ref = data.get("current_command")
         if isinstance(current_command_ref, list):
@@ -759,7 +867,7 @@ class Worker(threading.Thread):
             current_command_ref.append(command_string)
 
         # Append start of command to worker subprocess stdout
-        self.worker_log.extend(
+        self.log.extend(
             [
                 "\n\n",
                 "COMMAND:\n",
@@ -770,8 +878,9 @@ class Worker(threading.Thread):
         )
 
         # Create output path if file_out is present and the path does not exists
-        if data.get("file_out"):
-            common.ensure_dir(data.get("file_out"))
+        file_out_value = data.get("file_out")
+        if isinstance(file_out_value, str) and file_out_value:
+            common.ensure_dir(file_out_value)
 
         # Convert file
         try:
@@ -793,17 +902,20 @@ class Worker(threading.Thread):
                 shell=False,
                 start_new_session=True,
             )
+            if sub_proc.stdout is None:
+                raise RuntimeError("Worker subprocess did not expose stdout")
 
             # Fetch process using psutil for control (sending SIGSTOP on windows will not work)
             proc = psutil.Process(pid=sub_proc.pid)
 
             # Create proc monitor
-            self.worker_subprocess_monitor.set_proc(sub_proc.pid)
+            self.monitor.set_proc(sub_proc.pid)
 
             # Set process priority (cross-platform via psutil)
             try:
                 if os.name == "nt":
-                    proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+                    below_normal_priority = cast("int", getattr(psutil, "BELOW_NORMAL_PRIORITY_CLASS", 0x4000))
+                    proc.nice(below_normal_priority)
                 else:
                     parent_proc = psutil.Process(os.getpid())
                     proc.nice(parent_proc.nice() + 1)
@@ -828,7 +940,7 @@ class Worker(threading.Thread):
 
                 # Fetch command stdout and append it to the current task object (to be saved during post process)
                 line_text = sub_proc.stdout.readline()
-                self.worker_log.append(line_text)
+                self.log.append(line_text)
 
                 # Check if the command has completed. If it has, exit the loop
                 if line_text == "" and sub_proc.poll() is not None:
@@ -836,13 +948,13 @@ class Worker(threading.Thread):
                     break
 
                 # Parse encoding speed from FFmpeg output
-                self.worker_subprocess_monitor.parse_ffmpeg_speed(line_text)
+                self.monitor.parse_ffmpeg_speed(line_text)
 
                 # Parse the progress
                 try:
-                    progress_dict = command_progress_parser(line_text)
-                    progress_percent = progress_dict.get("percent", 0)
-                    self.worker_subprocess_monitor.set_subprocess_percent(progress_percent)
+                    progress_value = command_progress_parser(line_text)
+                    progress_percent = progress_value.get("percent", 0) if isinstance(progress_value, Mapping) else 0
+                    self.monitor.set_subprocess_percent(progress_percent)
                 except (ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
                     # Only need to show any sort of exception if we have debugging enabled.
                     # So we should log it as a debug rather than an exception.
@@ -854,13 +966,13 @@ class Worker(threading.Thread):
                     sub_proc.communicate(timeout=30)
                 except subprocess.TimeoutExpired:
                     self.logger.warning("Subprocess communicate() timed out after 30s, terminating")
-                    self.worker_subprocess_monitor.terminate_proc()
+                    self.monitor.terminate_proc()
 
             # If the process is still running, kill it
-            self.worker_subprocess_monitor.terminate_proc()
+            self.monitor.terminate_proc()
 
             # Stop proc monitor
-            self.worker_subprocess_monitor.unset_proc()
+            self.monitor.unset_proc()
             if isinstance(current_command_ref, list):
                 current_command_ref.clear()
 

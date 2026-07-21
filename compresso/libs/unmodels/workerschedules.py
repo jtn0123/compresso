@@ -31,8 +31,8 @@ Copyright:
 
 from peewee import ForeignKeyField, IntegerField, TextField
 
-from compresso.libs.unmodels import WorkerGroups
 from compresso.libs.unmodels.lib import BaseModel
+from compresso.libs.unmodels.workergroups import WorkerGroups
 
 
 class WorkerSchedules(BaseModel):

@@ -33,16 +33,13 @@ import contextlib
 import json
 import os
 import secrets
+from collections.abc import KeysView, Mapping
+from typing import TypedDict, Unpack, cast
 
 from compresso import metadata
 from compresso.libs import common
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
-
-try:
-    from json.decoder import JSONDecodeError
-except ImportError:
-    JSONDecodeError = ValueError  # type: ignore[assignment,misc]
 
 logger = CompressoLogging.get_logger(name="Config")
 
@@ -64,7 +61,17 @@ DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS = 168
 DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT = 500
 
 
-def _as_bool(value):
+class ConfigInitOptions(TypedDict, total=False):
+    compresso_path: str | None
+    port: int | None
+    address: str | None
+
+
+type RemoteInstallation = dict[str, object]
+type NotificationChannel = dict[str, object]
+
+
+def _as_bool(value: object) -> bool:
     if isinstance(value, str):
         return value.lower() in ("true", "1", "yes", "on")
     return bool(value)
@@ -75,15 +82,19 @@ class Config(metaclass=SingletonType):
 
     test = ""
 
-    def __init__(self, config_path=None, **kwargs):
+    def __init__(
+        self,
+        config_path: str | os.PathLike[str] | None = None,
+        **kwargs: Unpack[ConfigInitOptions],
+    ) -> None:
         # Set the default UI Port
         self.ui_port = DEFAULT_UI_PORT
         self.ui_address = "127.0.0.1"
 
         # SSL/TLS settings
-        self.ssl_enabled = False
-        self.ssl_certfilepath = None
-        self.ssl_keyfilepath = None
+        self.ssl_enabled: bool | str = False
+        self.ssl_certfilepath: str | None = None
+        self.ssl_keyfilepath: str | None = None
 
         # Set default directories
         home_directory = common.get_home_dir()
@@ -100,8 +111,8 @@ class Config(metaclass=SingletonType):
 
         # Configure first run (future feature)
         self.first_run = False
-        self.release_notes_viewed = None
-        self.trial_welcome_viewed = None
+        self.release_notes_viewed: str | None = None
+        self.trial_welcome_viewed: bool | None = None
 
         # Library Settings:
         self.library_path = common.get_default_library_path()
@@ -130,7 +141,7 @@ class Config(metaclass=SingletonType):
         # Link settings
         self.installation_name = ""
         self.installation_public_address = ""
-        self.remote_installations = []
+        self.remote_installations: list[RemoteInstallation] = []
         self.distributed_worker_count_target = 0
 
         # Approval workflow settings
@@ -144,7 +155,7 @@ class Config(metaclass=SingletonType):
         self.staging_expiry_days = 7  # 0 = disabled
 
         # External notification channels (Discord, Slack, Webhook)
-        self.notification_channels = []
+        self.notification_channels: object = []
 
         # Onboarding wizard
         self.onboarding_completed = False
@@ -163,16 +174,17 @@ class Config(metaclass=SingletonType):
         self.allow_lan_proxy_targets = True
         # Optional containment roots for the UI file browser. When set, the
         # /filebrowser API can only list paths under these directories.
-        self.browse_root_paths = []
+        self.browse_root_paths: list[str] | str = []
 
         # Import env variables and override all previous settings.
         self.__import_settings_from_env()
 
         # Import Compresso path settings from command params
-        if kwargs.get("compresso_path"):
-            self.set_config_item("config_path", os.path.join(kwargs.get("compresso_path"), "config"), save_settings=False)
-            self.set_config_item("plugins_path", os.path.join(kwargs.get("compresso_path"), "plugins"), save_settings=False)
-            self.set_config_item("userdata_path", os.path.join(kwargs.get("compresso_path"), "userdata"), save_settings=False)
+        compresso_path = kwargs.get("compresso_path")
+        if compresso_path:
+            self.set_config_item("config_path", os.path.join(compresso_path, "config"), save_settings=False)
+            self.set_config_item("plugins_path", os.path.join(compresso_path, "plugins"), save_settings=False)
+            self.set_config_item("userdata_path", os.path.join(compresso_path, "userdata"), save_settings=False)
 
         # Finally, re-read config from file and override all previous settings.
         self.__import_settings_from_file(config_path)
@@ -197,7 +209,7 @@ class Config(metaclass=SingletonType):
         self.__setup_compresso_logger()
         self.__ensure_api_auth_token()
 
-    def __ensure_api_auth_token(self):
+    def __ensure_api_auth_token(self) -> None:
         """Generate and persist a token when auth is enforced without one configured."""
         if not self.get_api_auth_enforced() or self.get_api_auth_token():
             return
@@ -211,7 +223,7 @@ class Config(metaclass=SingletonType):
             "(setting 'api_auth_token'). Use it to sign in when the UI prompts for an API token."
         )
 
-    def __apply_large_library_safe_defaults(self):
+    def __apply_large_library_safe_defaults(self) -> None:
         if not self.get_large_library_safe_defaults():
             return
 
@@ -220,15 +232,15 @@ class Config(metaclass=SingletonType):
         self.run_full_scan_on_start = False if self.run_full_scan_on_start is None else self.run_full_scan_on_start
         self.concurrent_file_testers = int(self.concurrent_file_testers or 2)
 
-    def get_config_as_dict(self):
+    def get_config_as_dict(self) -> dict[str, object]:
         """
         Return a dictionary of configuration fields and their current values
 
         :return:
         """
-        return self.__dict__
+        return cast("dict[str, object]", self.__dict__)
 
-    def get_config_keys(self):
+    def get_config_keys(self) -> KeysView[str]:
         """
         Return a list of configuration fields
 
@@ -236,7 +248,7 @@ class Config(metaclass=SingletonType):
         """
         return self.get_config_as_dict().keys()
 
-    def __setup_compresso_logger(self):
+    def __setup_compresso_logger(self) -> None:
         """
         Pass configuration to the global logger
 
@@ -244,7 +256,7 @@ class Config(metaclass=SingletonType):
         """
         CompressoLogging.get_logger(settings=self)
 
-    def __import_settings_from_env(self):
+    def __import_settings_from_env(self) -> None:
         """
         Read configuration from environment variables.
         This is useful for running in a docker container or for unit testing.
@@ -255,7 +267,7 @@ class Config(metaclass=SingletonType):
             if setting in os.environ:
                 self.set_config_item(setting, os.environ.get(setting), save_settings=False)
 
-    def __import_settings_from_file(self, config_path=None):
+    def __import_settings_from_file(self, config_path: str | os.PathLike[str] | None = None) -> None:
         """
         Read configuration from the settings JSON file.
 
@@ -269,7 +281,7 @@ class Config(metaclass=SingletonType):
             os.makedirs(config_path, exist_ok=True)
         settings_file = os.path.join(config_path, "settings.json")
         if os.path.exists(settings_file):
-            data = {}
+            data: object = {}
             try:
                 with open(settings_file) as infile:
                     data = json.load(infile)
@@ -280,16 +292,16 @@ class Config(metaclass=SingletonType):
                 logger.error("Ignoring settings file because its JSON root is not an object: %s", settings_file)
                 return
             # Set data to Config class
-            self.set_bulk_config_items(data, save_settings=False)
+            self.set_bulk_config_items(cast("dict[str, object]", data), save_settings=False)
 
-    def reload(self):
+    def reload(self) -> None:
         """
         Reload configuration from file
         :return:
         """
         self.__import_settings_from_file()
 
-    def __write_settings_to_file(self):
+    def __write_settings_to_file(self) -> None:
         """
         Dump current settings to the settings JSON file.
 
@@ -305,7 +317,7 @@ class Config(metaclass=SingletonType):
                 logger.error(message)
             raise Exception("Exception in writing settings to file")
 
-    def get_config_item(self, key):
+    def get_config_item(self, key: str) -> object | None:
         """
         Get setting from either this class or the Settings model
 
@@ -316,9 +328,11 @@ class Config(metaclass=SingletonType):
         if hasattr(self, f"get_{key}"):
             getter = getattr(self, f"get_{key}")
             if callable(getter):
-                return getter()
+                value: object = getter()
+                return value
+        return None
 
-    def set_config_item(self, key, value, save_settings=True):
+    def set_config_item(self, key: str, value: object, save_settings: bool = True) -> None:
         """
         Assigns a value to a given configuration field.
         This is applied to both this class.
@@ -355,7 +369,7 @@ class Config(metaclass=SingletonType):
             except Exception:
                 logger.exception("Failed to write settings to file")
 
-    def set_bulk_config_items(self, items, save_settings=True):
+    def set_bulk_config_items(self, items: Mapping[str, object], save_settings: bool = True) -> None:
         """
         Write bulk config items to this class.
 
@@ -371,7 +385,7 @@ class Config(metaclass=SingletonType):
                 self.set_config_item(config_key, items[config_key], save_settings=save_settings)
 
     @staticmethod
-    def read_version():
+    def read_version() -> str:
         """
         Return the application's version number as a string
 
@@ -379,7 +393,7 @@ class Config(metaclass=SingletonType):
         """
         return metadata.read_version_string("long")
 
-    def read_system_logs(self, lines=None):
+    def read_system_logs(self, lines: int | None = None) -> list[str]:
         """
         Return an array of system log lines
 
@@ -393,7 +407,7 @@ class Config(metaclass=SingletonType):
             all_lines = all_lines[-lines:]
         return [line.rstrip() for line in all_lines]
 
-    def get_ui_port(self):
+    def get_ui_port(self) -> int:
         """
         Get setting - ui_port
 
@@ -401,7 +415,7 @@ class Config(metaclass=SingletonType):
         """
         return self.ui_port
 
-    def get_ui_address(self):
+    def get_ui_address(self) -> str:
         """
         Get setting - ui_address
 
@@ -409,7 +423,7 @@ class Config(metaclass=SingletonType):
         """
         return self.ui_address
 
-    def get_cache_path(self):
+    def get_cache_path(self) -> str:
         """
         Get setting - cache_path
 
@@ -417,7 +431,7 @@ class Config(metaclass=SingletonType):
         """
         return self.cache_path
 
-    def set_cache_path(self, cache_path):
+    def set_cache_path(self, cache_path: str) -> None:
         """
         Get setting - cache_path
 
@@ -428,7 +442,7 @@ class Config(metaclass=SingletonType):
             cache_path = common.get_default_cache_path()
         self.cache_path = cache_path
 
-    def get_config_path(self):
+    def get_config_path(self) -> str:
         """
         Get setting - config_path
 
@@ -436,7 +450,7 @@ class Config(metaclass=SingletonType):
         """
         return self.config_path
 
-    def get_debugging(self):
+    def get_debugging(self) -> bool:
         """
         Get setting - debugging
 
@@ -444,7 +458,7 @@ class Config(metaclass=SingletonType):
         """
         return self.debugging
 
-    def set_debugging(self, value):
+    def set_debugging(self, value: object) -> None:
         """
         Set setting - debugging
 
@@ -452,13 +466,14 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        if value:
+        debugging = _as_bool(value)
+        if debugging:
             CompressoLogging.enable_debugging()
         else:
             CompressoLogging.disable_debugging()
-        self.debugging = value
+        self.debugging = debugging
 
-    def get_log_buffer_retention(self):
+    def get_log_buffer_retention(self) -> int:
         """
         Get setting - log_buffer_retention
 
@@ -466,7 +481,7 @@ class Config(metaclass=SingletonType):
         """
         return self.log_buffer_retention
 
-    def set_log_buffer_retention(self, value):
+    def set_log_buffer_retention(self, value: object) -> None:
         """
         Set setting - log_buffer_retention
 
@@ -475,6 +490,8 @@ class Config(metaclass=SingletonType):
         :return:
         """
         try:
+            if not isinstance(value, (str, bytes, int, float)):
+                raise TypeError
             retention_days = int(value)
         except (TypeError, ValueError):
             raise ValueError(f"log_buffer_retention must be an integer, got {value!r}") from None
@@ -483,7 +500,7 @@ class Config(metaclass=SingletonType):
             CompressoLogging.set_remote_logging_retention(retention_days)
         self.log_buffer_retention = retention_days
 
-    def get_first_run(self):
+    def get_first_run(self) -> bool:
         """
         Get setting - first_run
 
@@ -491,7 +508,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.first_run)
 
-    def get_release_notes_viewed(self):
+    def get_release_notes_viewed(self) -> str | None:
         """
         Get setting - release_notes_viewed
 
@@ -499,7 +516,7 @@ class Config(metaclass=SingletonType):
         """
         return self.release_notes_viewed
 
-    def get_trial_welcome_viewed(self):
+    def get_trial_welcome_viewed(self) -> bool | None:
         """
         Get setting - trial_welcome_viewed
 
@@ -507,7 +524,7 @@ class Config(metaclass=SingletonType):
         """
         return self.trial_welcome_viewed
 
-    def get_library_path(self):
+    def get_library_path(self) -> str:
         """
         Get setting - library_path
 
@@ -515,7 +532,7 @@ class Config(metaclass=SingletonType):
         """
         return self.library_path
 
-    def get_clear_pending_tasks_on_restart(self):
+    def get_clear_pending_tasks_on_restart(self) -> bool:
         """
         Get setting - clear_pending_tasks_on_restart
 
@@ -523,7 +540,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.clear_pending_tasks_on_restart)
 
-    def get_auto_manage_completed_tasks(self):
+    def get_auto_manage_completed_tasks(self) -> bool:
         """
         Get setting - auto_manage_completed_tasks
 
@@ -531,7 +548,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.auto_manage_completed_tasks)
 
-    def get_max_age_of_completed_tasks(self):
+    def get_max_age_of_completed_tasks(self) -> int:
         """
         Get setting - max_age_of_completed_tasks
 
@@ -539,7 +556,7 @@ class Config(metaclass=SingletonType):
         """
         return self.max_age_of_completed_tasks
 
-    def get_compress_completed_tasks_logs(self):
+    def get_compress_completed_tasks_logs(self) -> bool:
         """
         Get setting - compress_completed_tasks_logs
 
@@ -547,7 +564,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.compress_completed_tasks_logs)
 
-    def get_always_keep_failed_tasks(self):
+    def get_always_keep_failed_tasks(self) -> bool:
         """
         Get setting - always_keep_failed_tasks
 
@@ -555,7 +572,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.always_keep_failed_tasks)
 
-    def get_log_path(self):
+    def get_log_path(self) -> str:
         """
         Get setting - log_path
 
@@ -563,7 +580,7 @@ class Config(metaclass=SingletonType):
         """
         return self.log_path
 
-    def get_enable_library_scanner(self):
+    def get_enable_library_scanner(self) -> bool:
         """
         Get setting - enable_library_scanner
 
@@ -571,7 +588,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.enable_library_scanner)
 
-    def get_run_full_scan_on_start(self):
+    def get_run_full_scan_on_start(self) -> bool:
         """
         Get setting - run_full_scan_on_start
 
@@ -579,7 +596,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.run_full_scan_on_start)
 
-    def get_schedule_full_scan_minutes(self):
+    def get_schedule_full_scan_minutes(self) -> int:
         """
         Get setting - schedule_full_scan_minutes
 
@@ -587,7 +604,7 @@ class Config(metaclass=SingletonType):
         """
         return self.schedule_full_scan_minutes
 
-    def get_follow_symlinks(self):
+    def get_follow_symlinks(self) -> bool:
         """
         Get setting - follow_symlinks
 
@@ -595,14 +612,14 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.follow_symlinks)
 
-    def get_library_scan_queue_limit(self):
+    def get_library_scan_queue_limit(self) -> int:
         """Maximum number of discovered files awaiting scan tests."""
         try:
             return max(1, int(self.library_scan_queue_limit))
         except (TypeError, ValueError):
             return DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT
 
-    def get_concurrent_file_testers(self):
+    def get_concurrent_file_testers(self) -> int:
         """
         Get setting - concurrent_file_testers
 
@@ -610,7 +627,7 @@ class Config(metaclass=SingletonType):
         """
         return self.concurrent_file_testers
 
-    def get_plugins_path(self):
+    def get_plugins_path(self) -> str:
         """
         Get setting - config_path
 
@@ -618,7 +635,7 @@ class Config(metaclass=SingletonType):
         """
         return self.plugins_path
 
-    def get_userdata_path(self):
+    def get_userdata_path(self) -> str:
         """
         Get setting - userdata_path
 
@@ -626,7 +643,7 @@ class Config(metaclass=SingletonType):
         """
         return self.userdata_path
 
-    def get_installation_name(self):
+    def get_installation_name(self) -> str:
         """
         Get setting - installation_name
 
@@ -634,7 +651,7 @@ class Config(metaclass=SingletonType):
         """
         return self.installation_name
 
-    def get_installation_public_address(self):
+    def get_installation_public_address(self) -> str:
         """
         Get setting - installation_public_address
 
@@ -642,7 +659,7 @@ class Config(metaclass=SingletonType):
         """
         return self.installation_public_address
 
-    def get_large_library_safe_defaults(self):
+    def get_large_library_safe_defaults(self) -> bool:
         """
         Get setting - large_library_safe_defaults
 
@@ -650,7 +667,7 @@ class Config(metaclass=SingletonType):
         """
         return _as_bool(self.large_library_safe_defaults)
 
-    def get_startup_readiness_timeout_seconds(self):
+    def get_startup_readiness_timeout_seconds(self) -> int:
         """
         Get setting - startup_readiness_timeout_seconds
 
@@ -658,7 +675,7 @@ class Config(metaclass=SingletonType):
         """
         return max(1, int(self.startup_readiness_timeout_seconds))
 
-    def get_default_worker_cap(self):
+    def get_default_worker_cap(self) -> int:
         """
         Get setting - default_worker_cap
 
@@ -666,61 +683,61 @@ class Config(metaclass=SingletonType):
         """
         return max(1, int(self.default_worker_cap))
 
-    def get_disk_space_guard_enabled(self):
+    def get_disk_space_guard_enabled(self) -> bool:
         return _as_bool(self.disk_space_guard_enabled)
 
-    def get_minimum_free_space_gb(self):
+    def get_minimum_free_space_gb(self) -> float:
         try:
             return max(0.0, float(self.minimum_free_space_gb))
         except (TypeError, ValueError):
             return DEFAULT_MINIMUM_FREE_SPACE_GB
 
-    def get_disk_space_output_multiplier(self):
+    def get_disk_space_output_multiplier(self) -> float:
         try:
             return max(1.0, float(self.disk_space_output_multiplier))
         except (TypeError, ValueError):
             return DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER
 
-    def get_disk_space_retry_seconds(self):
+    def get_disk_space_retry_seconds(self) -> int:
         try:
             return max(5, int(self.disk_space_retry_seconds))
         except (TypeError, ValueError):
             return DEFAULT_DISK_SPACE_RETRY_SECONDS
 
-    def get_maximum_transfer_file_size_gb(self):
+    def get_maximum_transfer_file_size_gb(self) -> float:
         try:
             return max(0.001, float(self.maximum_transfer_file_size_gb))
         except (TypeError, ValueError):
             return DEFAULT_MAXIMUM_TRANSFER_FILE_SIZE_GB
 
-    def get_transfer_partial_retention_hours(self):
+    def get_transfer_partial_retention_hours(self) -> int:
         try:
             return max(1, int(self.transfer_partial_retention_hours))
         except (TypeError, ValueError):
             return DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS
 
-    def get_remote_artifact_retention_hours(self):
+    def get_remote_artifact_retention_hours(self) -> int:
         try:
             return max(1, int(self.remote_artifact_retention_hours))
         except (TypeError, ValueError):
             return DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS
 
-    def get_approval_required(self):
+    def get_approval_required(self) -> bool:
         return _as_bool(self.approval_required)
 
-    def get_api_auth_enabled(self):
+    def get_api_auth_enabled(self) -> bool:
         return _as_bool(self.api_auth_enabled)
 
-    def get_api_auth_token(self):
+    def get_api_auth_token(self) -> str:
         return str(self.api_auth_token or "")
 
-    def get_csrf_protection_enabled(self):
+    def get_csrf_protection_enabled(self) -> bool:
         return _as_bool(self.csrf_protection_enabled)
 
-    def get_allow_unauthenticated_network_access(self):
+    def get_allow_unauthenticated_network_access(self) -> bool:
         return _as_bool(self.allow_unauthenticated_network_access)
 
-    def get_browse_root_paths(self):
+    def get_browse_root_paths(self) -> list[str]:
         """
         Get setting - browse_root_paths
 
@@ -737,14 +754,14 @@ class Config(metaclass=SingletonType):
             value = value.split(separator)
         return [str(item).strip() for item in value if str(item).strip()]
 
-    def ui_listens_on_loopback(self):
+    def ui_listens_on_loopback(self) -> bool:
         """Whether the UI server binds only to a loopback interface."""
         return str(self.ui_address).strip() in ("127.0.0.1", "::1", "localhost")
 
-    def _network_exposure_requires_auth(self):
+    def _network_exposure_requires_auth(self) -> bool:
         return not self.ui_listens_on_loopback() and not self.get_allow_unauthenticated_network_access()
 
-    def get_api_auth_enforced(self):
+    def get_api_auth_enforced(self) -> bool:
         """
         Whether API authentication must be enforced for requests.
 
@@ -754,34 +771,34 @@ class Config(metaclass=SingletonType):
         """
         return self.get_api_auth_enabled() or self._network_exposure_requires_auth()
 
-    def get_csrf_protection_enforced(self):
+    def get_csrf_protection_enforced(self) -> bool:
         """Whether CSRF protection must be enforced for requests (see get_api_auth_enforced)."""
         return self.get_csrf_protection_enabled() or self._network_exposure_requires_auth()
 
-    def get_allow_lan_proxy_targets(self):
+    def get_allow_lan_proxy_targets(self) -> bool:
         return _as_bool(self.allow_lan_proxy_targets)
 
-    def get_staging_path(self):
+    def get_staging_path(self) -> str:
         return self.staging_path
 
-    def set_staging_path(self, staging_path):
+    def set_staging_path(self, staging_path: str) -> None:
         if staging_path == "":
             staging_path = os.path.join(common.get_home_dir(), _APP_DIR_NAME, "staging")
         self.staging_path = staging_path
 
-    def get_remote_installations(self):
+    def get_remote_installations(self) -> list[RemoteInstallation]:
         """
         Get setting - remote_installations
 
         :return:
         """
-        remote_installations = []
+        remote_installations: list[RemoteInstallation] = []
         for ri in self.remote_installations:
             ri["distributed_worker_count_target"] = self.distributed_worker_count_target
             remote_installations.append(ri)
         return remote_installations
 
-    def get_distributed_worker_count_target(self):
+    def get_distributed_worker_count_target(self) -> int:
         """
         Get setting - distributed_worker_count_target
 
@@ -789,7 +806,7 @@ class Config(metaclass=SingletonType):
         """
         return self.distributed_worker_count_target
 
-    def get_ssl_enabled(self):
+    def get_ssl_enabled(self) -> bool:
         """
         Get setting - ssl_enabled
 
@@ -800,7 +817,7 @@ class Config(metaclass=SingletonType):
             return self.ssl_enabled.lower() in ("true", "1", "yes", "on")
         return bool(self.ssl_enabled)
 
-    def get_ssl_certfilepath(self):
+    def get_ssl_certfilepath(self) -> str | None:
         """
         Get setting - ssl_certfilepath
 
@@ -808,7 +825,7 @@ class Config(metaclass=SingletonType):
         """
         return self.ssl_certfilepath
 
-    def get_ssl_keyfilepath(self):
+    def get_ssl_keyfilepath(self) -> str | None:
         """
         Get setting - ssl_keyfilepath
 
@@ -816,7 +833,7 @@ class Config(metaclass=SingletonType):
         """
         return self.ssl_keyfilepath
 
-    def get_default_max_retries(self):
+    def get_default_max_retries(self) -> int:
         """
         Get setting - default_max_retries
 
@@ -827,7 +844,7 @@ class Config(metaclass=SingletonType):
         except (TypeError, ValueError):
             return 3
 
-    def get_staging_expiry_days(self):
+    def get_staging_expiry_days(self) -> int:
         """
         Get setting - staging_expiry_days
         Returns 0 if disabled.
@@ -839,7 +856,7 @@ class Config(metaclass=SingletonType):
         except (TypeError, ValueError):
             return 7
 
-    def get_onboarding_completed(self):
+    def get_onboarding_completed(self) -> bool:
         """
         Get setting - onboarding_completed
 
@@ -849,7 +866,7 @@ class Config(metaclass=SingletonType):
             return self.onboarding_completed.lower() in ("true", "1", "yes", "on")
         return bool(self.onboarding_completed)
 
-    def set_onboarding_completed(self, value):
+    def set_onboarding_completed(self, value: object) -> None:
         """
         Set setting - onboarding_completed
 
@@ -860,7 +877,7 @@ class Config(metaclass=SingletonType):
         else:
             self.onboarding_completed = bool(value)
 
-    def get_notification_channels(self):
+    def get_notification_channels(self) -> list[NotificationChannel]:
         """
         Get setting - notification_channels
 
@@ -868,9 +885,13 @@ class Config(metaclass=SingletonType):
         """
         if not isinstance(self.notification_channels, list):
             return []
-        return list(self.notification_channels)
+        channels: list[NotificationChannel] = []
+        for value in self.notification_channels:
+            if isinstance(value, dict) and all(isinstance(key, str) for key in value):
+                channels.append(cast("NotificationChannel", value))
+        return channels
 
-    def set_notification_channels(self, value):
+    def set_notification_channels(self, value: object) -> None:
         """
         Set setting - notification_channels
 

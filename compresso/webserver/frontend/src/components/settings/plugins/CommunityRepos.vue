@@ -92,7 +92,7 @@
   </CompressoDialogMenu>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import axios from 'axios'
 import { date } from 'quasar'
@@ -100,17 +100,38 @@ import { useI18n } from 'vue-i18n'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
 import { createLogger } from 'src/composables/useLogger'
+import type { DialogController } from 'src/types/ui'
+import type { CommunityRepo } from 'src/types/plugins'
+
+interface CommunityRepoWire {
+  repo_id: string
+  repo_name: string
+  repo_author: string
+  repo_icon: string
+  repo_description?: string
+  repo_stars?: number
+  repo_pushed_at?: string
+  repo_html_url: string
+  repo_token?: string
+  repo_json_url?: string
+  repo_url: string
+}
+
+interface CommunityReposResponse { repos?: CommunityRepoWire[] }
 
 const log = createLogger('CommunityRepos')
 
-const emit = defineEmits(['hide', 'add-repo'])
+const emit = defineEmits<{
+  hide: []
+  'add-repo': [url: string]
+}>()
 
 const { t } = useI18n()
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const loading = ref(false)
-const error = ref(null)
-const repos = ref([])
+const error = ref<string | null>(null)
+const repos = ref<CommunityRepo[]>([])
 
 const fetchForks = async () => {
   loading.value = true
@@ -118,10 +139,10 @@ const fetchForks = async () => {
   repos.value = []
 
   try {
-    const response = await axios.get(getCompressoApiUrl('v2', 'plugins/repos/community'))
+    const response = await axios.get<CommunityReposResponse>(getCompressoApiUrl('v2', 'plugins/repos/community'))
     const items = response.data.repos || []
-    repos.value = items.map((repo) => {
-      const pushedDate = repo.pushed_at ? new Date(repo.pushed_at) : null
+    repos.value = items.map((repo: CommunityRepoWire) => {
+      const pushedDate = repo.repo_pushed_at ? new Date(repo.repo_pushed_at) : null
       const formattedDate = pushedDate ? date.formatDate(pushedDate, 'MMM D, YYYY') : ''
       return {
         id: repo.repo_id,
@@ -140,7 +161,7 @@ const fetchForks = async () => {
     })
   } catch (err) {
     log.error(err)
-    if (err.response && err.response.status === 429) {
+    if (axios.isAxiosError(err) && err.response?.status === 429) {
       error.value = t('components.plugins.rateLimitExceeded')
     } else {
       error.value = t('components.plugins.failedToLoadCommunityRepos')
@@ -151,19 +172,19 @@ const fetchForks = async () => {
 }
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
   fetchForks()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
   emit('hide')
 }
 
-const addRepo = (repo) => {
+const addRepo = (repo: CommunityRepo): void => {
   emit('add-repo', repo.repo_token || repo.repo_json_url)
   hide()
 }

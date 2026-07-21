@@ -108,6 +108,20 @@ def collect_cyclic_garbage():
 
 
 @pytest.fixture(autouse=True)
+def isolate_api_security_settings(monkeypatch, request):
+    """Prevent unit tests from inheriting a developer's real API security policy."""
+    import tornado.testing
+
+    if not isinstance(request.instance, tornado.testing.AsyncHTTPTestCase):
+        return
+
+    from compresso.config import Config
+
+    monkeypatch.setattr(Config, "get_api_auth_enforced", lambda _self: False)
+    monkeypatch.setattr(Config, "get_csrf_protection_enforced", lambda _self: False)
+
+
+@pytest.fixture(autouse=True)
 def cleanup_compresso_threads():
     """
     Ensure tests do not leak long-lived Compresso threads into later tests.

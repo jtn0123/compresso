@@ -30,21 +30,23 @@ Copyright:
 """
 
 import json
+from collections.abc import Mapping, Sequence
 
 import tornado.escape
 
 from compresso import config
 from compresso.libs import task
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import integer_list_value
 from compresso.webserver.helpers import pending_tasks
 
 
 class ApiPendingHandler(BaseApiHandler):
-    name = None
-    config = None
-    params = None
-    compresso_data_queues = None
+    name: str
+    config: config.Config
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -64,7 +66,7 @@ class ApiPendingHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.name = "pending_api"
         self.config = config.Config()
 
@@ -72,41 +74,45 @@ class ApiPendingHandler(BaseApiHandler):
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    def set_default_headers(self):
+    def set_default_headers(self) -> None:
         """Set the default response header to be JSON."""
         super().set_default_headers()
 
-    def get(self, path):
+    async def get(self, path: str) -> None:
         self.action_route()
 
-    def post(self, path):
+    async def post(self, path: str) -> None:
         self.action_route()
 
-    def manage_pending_tasks_list(self, *args, **kwargs):
+    def manage_pending_tasks_list(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
         try:
-            request_dict = json.loads(self.request.body)
+            request_value = json.loads(self.request.body)
         except (json.JSONDecodeError, ValueError):
             self.write(json.dumps({"success": False}))
             return
+        if not isinstance(request_value, Mapping):
+            self.write(json.dumps({"success": False}))
+            return
+        request_dict = {str(key): value for key, value in request_value.items()}
+        task_ids = integer_list_value(request_dict.get("id"))
 
         # Delete a list of tasks.
         #   (on success will continue to return the current list of tasks)
-        if request_dict.get("customActionName") == "remove-from-task-list" and not self.delete_pending_tasks(
-            request_dict.get("id")
-        ):
+        if request_dict.get("customActionName") == "remove-from-task-list" and not self.delete_pending_tasks(task_ids):
             self.write(json.dumps({"success": False}))
             return
 
         # Move a list of tasks to the top of the queue
         if request_dict.get("customActionName") == "move-to-top-of-task-list" and not pending_tasks.reorder_pending_tasks(
-            request_dict.get("id"), "top"
+            task_ids, "top"
         ):
             self.write(json.dumps({"success": False}))
             return
 
         # Move a list of tasks to the bottom of the queue
         if request_dict.get("customActionName") == "move-to-bottom-of-task-list" and not pending_tasks.reorder_pending_tasks(
-            request_dict.get("id"), "bottom"
+            task_ids, "bottom"
         ):
             self.write(json.dumps({"success": False}))
             return
@@ -115,7 +121,7 @@ class ApiPendingHandler(BaseApiHandler):
         results = pending_tasks.prepare_filtered_pending_tasks_for_table(request_dict)
         self.finish(tornado.escape.json_encode(results))
 
-    def trigger_library_rescan(self):
+    def trigger_library_rescan(self) -> None:
         """
         Adds a trigger ('library_scan') to the library_scanner_triggers
         data queue.
@@ -127,6 +133,9 @@ class ApiPendingHandler(BaseApiHandler):
         # Handle request to manually trigger a rescan of the library
         # Check if we are able to start up a worker for another encoding job
         library_scanner_triggers = self.compresso_data_queues.get("library_scanner_triggers")
+        if library_scanner_triggers is None:
+            self.write(json.dumps({"success": False}))
+            return
         if library_scanner_triggers.full():
             self.write(json.dumps({"success": False}))
             return
@@ -135,7 +144,7 @@ class ApiPendingHandler(BaseApiHandler):
             self.write(json.dumps({"success": True}))
             return
 
-    def delete_pending_tasks(self, pending_task_ids):
+    def delete_pending_tasks(self, pending_task_ids: Sequence[int] | None) -> bool:
         """
         Deletes a list of pending tasks
 
@@ -147,7 +156,7 @@ class ApiPendingHandler(BaseApiHandler):
         # Delete by ID
         return task_handler.delete_tasks_recursively(id_list=pending_task_ids)
 
-    def reorder_pending_tasks(self, pending_task_ids, direction="top"):
+    def reorder_pending_tasks(self, pending_task_ids: Sequence[int], direction: str = "top") -> int:
         """
         Moves a list of pending tasks to either the top of the
         list of bottom depending on the provided direction.
@@ -161,12 +170,13 @@ class ApiPendingHandler(BaseApiHandler):
 
         return task_handler.reorder_tasks(pending_task_ids, direction)
 
-    def create_task_from_path(self, *args, **kwargs):
+    def create_task_from_path(self, *args: object, **kwargs: object) -> None:
         """
         v1 endpoint kept for route-compatibility only. The implementation
         was never completed and the rewrite landed on the v2 API. Returns
         501 Not Implemented and points callers at the v2 equivalent.
         """
+        del args, kwargs
         self.set_status(501)
         self.write(
             json.dumps(

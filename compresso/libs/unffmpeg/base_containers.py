@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-compresso.base_containers.py
+"""compresso.base_containers.py
 
 Written by:               Josh.5 <jsunnex@gmail.com>
 Date:                     10 Sep 2019, (8:13 PM)
@@ -29,6 +28,14 @@ Copyright:
 
 """
 
+from typing import TypedDict
+
+
+class ContainerDescription(TypedDict):
+    extension: str
+    description: str
+    supports_subtitles: bool
+
 
 class Containers:
     """
@@ -37,7 +44,13 @@ class Containers:
     Generic configuration and methods used across all Containers classes
     """
 
-    def container_extension(self):
+    extension = ""
+    description = ""
+    supports_subtitles = False
+    subtitle_codecs: list[str] = []
+    unsubtitle_codecs: list[str] = []
+
+    def container_extension(self) -> str:
         """
         Return the container's extension string
 
@@ -45,7 +58,7 @@ class Containers:
         """
         return self.extension
 
-    def container_description(self):
+    def container_description(self) -> str:
         """
         Return the container's description string
 
@@ -53,7 +66,7 @@ class Containers:
         """
         return self.description
 
-    def container_supports_subtitles(self):
+    def container_supports_subtitles(self) -> bool:
         """
         Check if this Container supports subtitles
 
@@ -61,7 +74,7 @@ class Containers:
         """
         return bool(hasattr(self, "supports_subtitles") and self.supports_subtitles)
 
-    def supported_subtitles(self):
+    def supported_subtitles(self) -> list[str]:
         """
         Check if this Container supports subtitles
 
@@ -71,13 +84,13 @@ class Containers:
             return self.subtitle_codecs
         return []
 
-    def unsupported_subtitles(self):
+    def unsupported_subtitles(self) -> list[str]:
         """
         Check if this Container supports subtitles
 
         :return:
         """
-        if hasattr(self, "unsupports_codecs"):
+        if self.unsubtitle_codecs:
             return self.unsubtitle_codecs
         # HDMV streams cannot be written by FFMPEG
         return ["hdmv_pgs_subtitle"]

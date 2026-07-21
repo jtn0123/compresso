@@ -12,7 +12,15 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from pathlib import Path
+from typing import IO, cast
+
+
+def _json_object(value: object) -> dict[str, object]:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        raise RuntimeError("localhost drill returned a non-object JSON response")
+    return cast("dict[str, object]", value)
 
 
 def _checksum(data: bytes) -> str:
@@ -22,20 +30,28 @@ def _checksum(data: bytes) -> str:
 def _free_port() -> int:
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
-        return listener.getsockname()[1]
+        port = listener.getsockname()[1]
+        if not isinstance(port, int):
+            raise RuntimeError("localhost drill did not receive an IP socket port")
+        return port
 
 
-def _request_json(url: str, method: str = "GET", payload: dict | None = None, headers: dict | None = None):
+def _request_json(
+    url: str,
+    method: str = "GET",
+    payload: Mapping[str, object] | None = None,
+    headers: Mapping[str, str] | None = None,
+) -> tuple[int, dict[str, object]]:
     body = None if payload is None else json.dumps(payload).encode()
     request_headers = {"Accept": "application/json", **(headers or {})}
     if payload is not None:
         request_headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=body, headers=request_headers, method=method)  # noqa: S310
     with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - localhost URL is constructed internally
-        return response.status, json.loads(response.read())
+        return response.status, _json_object(json.loads(response.read()))
 
 
-def _post_chunk(url: str, data: bytes, offset: int):
+def _post_chunk(url: str, data: bytes, offset: int) -> tuple[int, dict[str, object]]:
     request = urllib.request.Request(  # noqa: S310
         url,
         data=data,
@@ -47,24 +63,24 @@ def _post_chunk(url: str, data: bytes, offset: int):
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - localhost URL is constructed internally
-        return response.status, json.loads(response.read())
+        return response.status, _json_object(json.loads(response.read()))
 
 
 class _CompressoProcess:
-    def __init__(self, name: str, home: Path, port: int, repository_root: Path):
+    def __init__(self, name: str, home: Path, port: int, repository_root: Path) -> None:
         self.name = name
         self.home = home
         self.port = port
         self.repository_root = repository_root
-        self.process = None
-        self.log_handle = None
+        self.process: subprocess.Popen[bytes] | None = None
+        self.log_handle: IO[bytes] | None = None
 
     @property
     def base_url(self) -> str:
         return f"http://127.0.0.1:{self.port}/compresso/api/v2"
 
-    def start(self, bind_attempts: int = 3):
-        last_error = None
+    def start(self, bind_attempts: int = 3) -> None:
+        last_error: Exception | None = None
         for attempt in range(bind_attempts):
             self.home.mkdir(parents=True, exist_ok=True)
             for directory in (self.home / "cache", self.home / "staging", self.home / "library"):
@@ -114,7 +130,7 @@ class _CompressoProcess:
                 self.port = _free_port()
         raise RuntimeError(f"{self.name} failed to bind after {bind_attempts} attempts: {last_error}")
 
-    def stop(self):
+    def stop(self) -> None:
         if self.process is not None and self.process.poll() is None:
             self.process.terminate()
             try:
@@ -127,19 +143,24 @@ class _CompressoProcess:
             self.log_handle.close()
             self.log_handle = None
 
-    def restart(self):
+    def restart(self) -> None:
         self.stop()
         self.port = _free_port()
         self.start()
 
 
-def _assert_single_remote_task(worker: _CompressoProcess, expected_task_id: int):
+def _assert_single_remote_task(worker: _CompressoProcess, expected_task_id: int) -> None:
     _status, task_status = _request_json(
         f"{worker.base_url}/pending/status/get",
         method="POST",
         payload={"id_list": [expected_task_id]},
     )
-    results = task_status.get("results", [])
+    raw_results = task_status.get("results")
+    results = (
+        [_json_object(item) for item in raw_results if isinstance(raw_results, list) and isinstance(item, dict)]
+        if isinstance(raw_results, list)
+        else []
+    )
     _status, tasks = _request_json(f"{worker.base_url}/pending/tasks", method="POST", payload={"start": 0, "length": 20})
     if tasks.get("recordsTotal") != 1 or len(results) != 1 or results[0].get("id") != expected_task_id:
         raise RuntimeError(f"remote task identity was not idempotent: status={task_status}, queue={tasks}")
@@ -174,7 +195,9 @@ def run_drill(size_mb: int = 3, chunk_mb: int = 1) -> dict[str, object]:
                 method="POST",
                 payload={"address": f"127.0.0.1:{worker_port}"},
             )
-            if not validation.get("installation", {}).get("session", {}).get("uuid"):
+            installation = _json_object(validation.get("installation"))
+            remote_session = _json_object(installation.get("session"))
+            if not remote_session.get("uuid"):
                 raise RuntimeError(f"master could not validate the worker over HTTP: {validation}")
 
             _status, session = _request_json(
@@ -189,7 +212,9 @@ def run_drill(size_mb: int = 3, chunk_mb: int = 1) -> dict[str, object]:
                     "origin_installation_uuid": "drill-master",
                 },
             )
-            transfer_id = session["transfer_id"]
+            transfer_id = session.get("transfer_id")
+            if not isinstance(transfer_id, str):
+                raise RuntimeError(f"worker returned an invalid transfer ID: {session}")
             transfer_url = f"{worker.base_url}/transfer/chunk/{transfer_id}"
             first_chunk = source[:chunk_size]
             _post_chunk(transfer_url, first_chunk, 0)
@@ -217,12 +242,15 @@ def run_drill(size_mb: int = 3, chunk_mb: int = 1) -> dict[str, object]:
             finalize_url = f"{worker.base_url}/transfer/finalize/{transfer_id}"
             _status, finalized = _request_json(finalize_url, method="POST", payload={})
             _status, finalized_again = _request_json(finalize_url, method="POST", payload={})
-            if finalized["id"] != finalized_again["id"] or finalized.get("checksum") != source_checksum:
+            task_id = finalized.get("id")
+            if not isinstance(task_id, int):
+                raise RuntimeError(f"worker returned an invalid finalized task ID: {finalized}")
+            if task_id != finalized_again.get("id") or finalized.get("checksum") != source_checksum:
                 raise RuntimeError("repeated finalization changed task identity or checksum")
-            _assert_single_remote_task(worker, finalized["id"])
+            _assert_single_remote_task(worker, task_id)
 
             worker.restart()
-            _assert_single_remote_task(worker, finalized["id"])
+            _assert_single_remote_task(worker, task_id)
 
             _status, master_tasks = _request_json(
                 f"{master.base_url}/pending/tasks",
@@ -239,7 +267,7 @@ def run_drill(size_mb: int = 3, chunk_mb: int = 1) -> dict[str, object]:
                 "restart_during_upload": "resumed",
                 "stale_offset": "rejected",
                 "final_checksum": source_checksum,
-                "task_id": finalized["id"],
+                "task_id": task_id,
                 "duplicate_finalization": "idempotent",
                 "restart_after_finalization": "preserved",
                 "database_isolation": "preserved",

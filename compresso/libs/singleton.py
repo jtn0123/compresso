@@ -30,6 +30,7 @@ Copyright:
 """
 
 import threading
+from typing import cast
 
 lock = threading.RLock()
 
@@ -37,14 +38,14 @@ lock = threading.RLock()
 class SingletonType(type):
     """Singleton metaclass"""
 
-    _instances: dict = {}
+    _instances: dict[type[object], object] = {}
 
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
+    def __call__[T](cls: type[T], *args: object, **kwargs: object) -> T:
+        if cls not in SingletonType._instances:
             with lock:
-                if cls not in cls._instances:
-                    cls._instances[cls] = super().__call__(*args, **kwargs)
-                    return cls._instances[cls]
+                if cls not in SingletonType._instances:
+                    SingletonType._instances[cls] = type.__call__(cls, *args, **kwargs)
+                    return cast("T", SingletonType._instances[cls])
         if args or kwargs:
             # Constructor arguments after the first instantiation would be
             # silently dropped (e.g. Config(port=...) after an earlier bare
@@ -55,4 +56,4 @@ class SingletonType(type):
                 "constructor arguments passed now would be ignored. "
                 "Construct it with arguments once, before any other use."
             )
-        return cls._instances[cls]
+        return cast("T", SingletonType._instances[cls])

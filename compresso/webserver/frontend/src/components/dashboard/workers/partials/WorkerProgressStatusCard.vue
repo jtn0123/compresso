@@ -129,7 +129,7 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 
@@ -198,7 +198,7 @@ export default {
         url: getCompressoApiUrl('v2', 'workers/worker/pause'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           this.$q.notify({
             color: 'positive',
             position: 'top',
@@ -227,7 +227,7 @@ export default {
         url: getCompressoApiUrl('v2', 'workers/worker/resume'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           this.$q.notify({
             color: 'positive',
             position: 'top',
@@ -256,7 +256,7 @@ export default {
         url: getCompressoApiUrl('v2', 'workers/worker/terminate'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           this.$q.notify({
             color: 'positive',
             position: 'top',

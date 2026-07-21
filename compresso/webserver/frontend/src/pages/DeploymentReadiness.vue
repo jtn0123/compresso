@@ -144,7 +144,7 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
@@ -152,8 +152,37 @@ import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 
+interface SafetyEvent {
+  id: string
+  message: string
+  code: string
+  first_seen_at: string
+  active: boolean
+  acknowledged_at?: string | null
+}
+interface SafetyState { pause_required: boolean; events: SafetyEvent[] }
+interface DoctorCheck {
+  id?: string
+  name: string
+  status: string
+  summary?: string
+  detail?: string
+}
+interface DoctorReport { overall_status: string; generated_at?: string; checks: DoctorCheck[] }
+interface ReadinessResponse {
+  ready: boolean
+  doctor_report: DoctorReport | null
+  doctor_report_expired: boolean | null
+  safety: SafetyState
+}
+
 const { t } = useI18n()
-const readiness = ref({ ready: false, doctor_report: null, doctor_report_expired: null, safety: { events: [] } })
+const readiness = ref<ReadinessResponse>({
+  ready: false,
+  doctor_report: null,
+  doctor_report_expired: null,
+  safety: { pause_required: false, events: [] },
+})
 const loading = ref(true)
 const error = ref('')
 const actionEventId = ref('')
@@ -174,32 +203,35 @@ const doctorTimestamp = computed(() => {
   return generated ? t('pages.deploymentReadiness.generatedAt', { date: formatDate(generated) }) : ''
 })
 
-function formatDate(value) {
+function formatDate(value: string | number | undefined): string {
   if (!value) return t('pages.deploymentReadiness.unknownTime')
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
-function checkColor(status) {
+function checkColor(status: string): string {
   return status === 'pass' ? 'positive' : status === 'warn' ? 'warning' : 'negative'
 }
 
-function checkIcon(status) {
+function checkIcon(status: string): string {
   return status === 'pass' ? 'check_circle' : status === 'warn' ? 'warning' : 'cancel'
 }
 
 async function refresh() {
   try {
     error.value = ''
-    const response = await axios.get(getCompressoApiUrl('v2', 'system/readiness'))
+    const response = await axios.get<ReadinessResponse>(getCompressoApiUrl('v2', 'system/readiness'))
     readiness.value = response.data
   } catch (requestError) {
-    error.value = requestError.response?.data?.error || t('pages.deploymentReadiness.loadFailedDetail')
+    const responseError = axios.isAxiosError<{ error?: string }>(requestError)
+      ? requestError.response?.data.error
+      : undefined
+    error.value = responseError || t('pages.deploymentReadiness.loadFailedDetail')
   } finally {
     loading.value = false
   }
 }
 
-async function acknowledge(eventId) {
+async function acknowledge(eventId: string): Promise<void> {
   actionEventId.value = eventId
   try {
     await axios.post(getCompressoApiUrl('v2', 'system/safety/acknowledge'), {
@@ -218,7 +250,10 @@ async function resumeWorkers() {
     await axios.post(getCompressoApiUrl('v2', 'system/safety/resume'), {})
     await refresh()
   } catch (requestError) {
-    error.value = requestError.response?.data?.error || t('pages.deploymentReadiness.resumeFailed')
+    const responseError = axios.isAxiosError<{ error?: string }>(requestError)
+      ? requestError.response?.data.error
+      : undefined
+    error.value = responseError || t('pages.deploymentReadiness.resumeFailed')
   } finally {
     resuming.value = false
   }

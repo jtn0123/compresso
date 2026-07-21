@@ -10,13 +10,13 @@ update_schema()'s auto-add logic.
 """
 
 
-def migrate(migrator, database, fake=False, **kwargs):
+def migrate(migrator: object, database: object, fake: bool = False, **kwargs: object) -> None:
     # Columns are auto-added by update_schema() since they have defaults.
     # This migration is a no-op marker for tracking purposes.
     pass
 
 
-def rollback(migrator, database, fake=False, **kwargs):
+def rollback(migrator: object, database: object, fake: bool = False, **kwargs: object) -> None:
     # Rollback would require removing columns, which SQLite doesn't support natively.
     # Use a table rebuild migration if removal is ever needed.
     pass

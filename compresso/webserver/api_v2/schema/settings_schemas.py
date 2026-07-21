@@ -296,10 +296,48 @@ class RequestLibraryByIdSchema(BaseSchema):
     )
 
 
+class SettingsLibraryConfigSchema(BaseSchema):
+    """Typed library settings accepted and returned by the settings API."""
+
+    id = fields.Int(required=False, allow_none=True, metadata={"example": 1})
+    locked = fields.Boolean(required=False, metadata={"example": False})
+    name = fields.Str(required=True, metadata={"example": "Default"})
+    path = fields.Str(required=True, metadata={"example": _EXAMPLE_LIBRARY_PATH})
+    enable_remote_only = fields.Boolean(required=False, metadata={"example": False})
+    enable_scanner = fields.Boolean(required=False, metadata={"example": False})
+    enable_inotify = fields.Boolean(required=False, metadata={"example": False})
+    priority_score = fields.Int(required=False, metadata={"example": 0})
+    tags = fields.List(fields.Str(), required=False, metadata={"example": ["GPU", "priority"]})
+    target_codecs = fields.List(fields.Str(), required=False, metadata={"example": ["h264"]})
+    skip_codecs = fields.List(fields.Str(), required=False, metadata={"example": ["hevc", "av1"]})
+    size_guardrail_enabled = fields.Boolean(required=False, metadata={"example": False})
+    size_guardrail_min_pct = fields.Int(required=False, metadata={"example": 20})
+    size_guardrail_max_pct = fields.Int(required=False, metadata={"example": 80})
+    replacement_policy = fields.Str(required=False, metadata={"example": "approval_required"})
+
+
+class SettingsLibraryEnabledPluginSchema(BaseSchema):
+    """Plugin fields exchanged by the per-library configuration UI."""
+
+    plugin_id = fields.Str(required=True, metadata={"example": "notify_plex"})
+    name = fields.Str(required=True, metadata={"example": "Notify Plex"})
+    description = fields.Str(required=False, allow_none=True, metadata={"example": "Notify Plex on completion."})
+    icon = fields.Str(required=False, allow_none=True, metadata={"example": "https://example.invalid/icon.png"})
+    has_config = fields.Boolean(required=False, metadata={"example": True})
+    author = fields.Str(required=False, metadata={"example": "Compresso"})
+    version = fields.Str(required=False, metadata={"example": "1.0.0"})
+    tags = fields.Str(required=False, metadata={"example": "notification,plex"})
+
+
+class SettingsLibraryPluginsSchema(BaseSchema):
+    enabled_plugins = fields.List(fields.Nested(SettingsLibraryEnabledPluginSchema), required=True)
+
+
 class SettingsLibraryConfigReadAndWriteSchema(BaseSchema):
     """Schema to display the data from the remote installation"""
 
-    library_config = fields.Dict(
+    library_config = fields.Nested(
+        SettingsLibraryConfigSchema,
         required=True,
         metadata={
             "description": "The library configuration",
@@ -315,7 +353,8 @@ class SettingsLibraryConfigReadAndWriteSchema(BaseSchema):
         },
     )
 
-    plugins = fields.Dict(
+    plugins = fields.Nested(
+        SettingsLibraryPluginsSchema,
         required=False,
         metadata={
             "description": "The library's enabled plugins",

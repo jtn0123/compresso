@@ -35,6 +35,10 @@ import queue
 import signal
 import threading
 import time
+from collections.abc import Callable, Mapping
+from multiprocessing.managers import SyncManager
+from types import FrameType
+from typing import Protocol, TypedDict, cast
 
 import psutil
 
@@ -47,17 +51,50 @@ from compresso.libs.logs import CompressoLogging
 from compresso.libs.postprocessor import PostProcessor
 from compresso.libs.safety_state import record_safety_event
 from compresso.libs.scheduler import ScheduledTasksManager
-from compresso.libs.taskhandler import TaskHandler
+from compresso.libs.taskhandler import QueuedPath, TaskHandler
 from compresso.libs.taskqueue import TaskQueue
-from compresso.libs.uiserver import UIServer
+from compresso.libs.uiserver import DataQueues, UIServer
+from compresso.libs.unmodels.lib.basemodel import DatabaseConfig
 
 
-def init_db(config_path):
+class DatabaseConnection(Protocol):
+    def stop(self) -> None: ...
+
+    def is_stopped(self) -> bool: ...
+
+
+class ManagedThread(Protocol):
+    def stop(self) -> None: ...
+
+    def join(self, timeout: float | None = None) -> None: ...
+
+    def is_alive(self) -> bool: ...
+
+
+class ThreadEntry(TypedDict):
+    name: str
+    thread: ManagedThread
+
+
+class ResourceLoggerThread(threading.Thread):
+    def __init__(self, target: Callable[[], None]) -> None:
+        super().__init__(target=target, name="RootServiceResourceLogger", daemon=True)
+        self.abort_flag = threading.Event()
+
+    def stop(self) -> None:
+        self.abort_flag.set()
+
+
+def init_db(config_path: str) -> DatabaseConnection:
     # Set paths
     app_dir = os.path.dirname(os.path.abspath(__file__))
 
     # Set database connection settings
-    database_settings = {
+    database_config = DatabaseConfig(
+        TYPE="SQLITE",
+        FILE=os.path.join(config_path, "compresso.db"),
+    )
+    migration_settings: dict[str, object] = {
         "TYPE": "SQLITE",
         "FILE": os.path.join(config_path, "compresso.db"),
         "MIGRATIONS_DIR": os.path.join(app_dir, "migrations_v1"),
@@ -71,10 +108,10 @@ def init_db(config_path):
     # Create database connection
     from compresso.libs.unmodels.lib import Database
 
-    db_connection = Database.select_database(database_settings)
+    db_connection = cast("DatabaseConnection", Database.select_database(database_config))
 
     # Run database migrations
-    migrations = Migrations(database_settings)
+    migrations = Migrations(migration_settings)
     migrations.update_schema()
 
     # Return the database connection
@@ -84,23 +121,23 @@ def init_db(config_path):
 class RootService:
     CRITICAL_THREAD_NAMES = frozenset({"PostProcessor", "ScheduledTasksManager", "TaskHandler", "Foreman"})
 
-    def __init__(self):
-        self.threads = []
+    def __init__(self) -> None:
+        self.threads: list[ThreadEntry] = []
         self.run_threads = True
-        self.db_connection = None
+        self.db_connection: DatabaseConnection | None = None
 
-        self.developer = None
-        self.dev_api = None
+        self.developer = False
+        self.dev_api: str | None = None
 
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         CompressoLogging.log_metric("root_service_started")
 
         self.event = threading.Event()
         self.startup_state = startup.StartupState()
 
-        self._mgr = None
+        self._mgr: SyncManager | None = None
 
-    def _verify_thread_started(self, name, thread, timeout=5):
+    def _verify_thread_started(self, name: str, thread: threading.Thread, timeout: float = 5) -> None:
         deadline = time.time() + timeout
         while time.time() < deadline:
             if thread.is_alive():
@@ -112,16 +149,17 @@ class RootService:
         self.startup_state.mark_error("threads_ready", message)
         raise RuntimeError(message)
 
-    def start_handler(self, data_queues, task_queue):
+    def start_handler(self, data_queues: DataQueues, task_queue: TaskQueue) -> TaskHandler:
         self.logger.info("Starting TaskHandler")
-        handler = TaskHandler(data_queues, task_queue, self.event)
+        queued_paths = cast("Mapping[str, queue.Queue[QueuedPath]]", data_queues)
+        handler = TaskHandler(queued_paths, task_queue, self.event)
         handler.daemon = True
         handler.start()
         self._verify_thread_started("TaskHandler", handler)
         self.threads.append({"name": "TaskHandler", "thread": handler})
         return handler
 
-    def start_post_processor(self, data_queues, task_queue):
+    def start_post_processor(self, data_queues: DataQueues, task_queue: TaskQueue) -> PostProcessor:
         self.logger.info("Starting PostProcessor")
         postprocessor = PostProcessor(data_queues, task_queue, self.event)
         postprocessor.daemon = True
@@ -130,7 +168,7 @@ class RootService:
         self.threads.append({"name": "PostProcessor", "thread": postprocessor})
         return postprocessor
 
-    def start_foreman(self, data_queues, settings, task_queue):
+    def start_foreman(self, data_queues: DataQueues, settings: config.Config, task_queue: TaskQueue) -> Foreman:
         self.logger.info("Starting Foreman")
         foreman = Foreman(data_queues, settings, task_queue, self.event)
         foreman.daemon = True
@@ -139,7 +177,7 @@ class RootService:
         self.threads.append({"name": "Foreman", "thread": foreman})
         return foreman
 
-    def start_library_scanner_manager(self, data_queues):
+    def start_library_scanner_manager(self, data_queues: DataQueues) -> libraryscanner.LibraryScannerManager:
         self.logger.info("Starting LibraryScannerManager")
         library_scanner_manager = libraryscanner.LibraryScannerManager(data_queues, self.event)
         library_scanner_manager.daemon = True
@@ -148,7 +186,9 @@ class RootService:
         self.threads.append({"name": "LibraryScannerManager", "thread": library_scanner_manager})
         return library_scanner_manager
 
-    def start_inotify_watch_manager(self, data_queues, settings):
+    def start_inotify_watch_manager(
+        self, data_queues: DataQueues, settings: config.Config
+    ) -> eventmonitor.EventMonitorManager | None:
         if eventmonitor.event_monitor_module:
             self.logger.info("Starting EventMonitorManager")
             event_monitor_manager = eventmonitor.EventMonitorManager(data_queues, self.event)
@@ -159,8 +199,9 @@ class RootService:
             return event_monitor_manager
         else:
             self.logger.error("EVENT_MONITOR_UNAVAILABLE no event monitor module was found")
+            return None
 
-    def start_ui_server(self, data_queues, foreman):
+    def start_ui_server(self, data_queues: DataQueues, foreman: Foreman) -> UIServer:
         self.logger.info("Starting UIServer")
         uiserver = UIServer(data_queues, foreman, self.developer)
         uiserver.daemon = True
@@ -168,7 +209,7 @@ class RootService:
         self.threads.append({"name": "UIServer", "thread": uiserver})
         return uiserver
 
-    def start_scheduled_tasks_manager(self):
+    def start_scheduled_tasks_manager(self) -> ScheduledTasksManager:
         self.logger.info("Starting ScheduledTasksManager")
         scheduled_tasks_manager = ScheduledTasksManager(self.event)
         scheduled_tasks_manager.daemon = True
@@ -177,16 +218,16 @@ class RootService:
         self.threads.append({"name": "ScheduledTasksManager", "thread": scheduled_tasks_manager})
         return scheduled_tasks_manager
 
-    def start_resource_logger(self):
-        abort_flag = threading.Event()
+    def start_resource_logger(self) -> ResourceLoggerThread:
+        thread: ResourceLoggerThread
 
-        def log_resources():
+        def log_resources() -> None:
             pid = os.getpid()
             proc = psutil.Process(pid)
-            cpu_count = psutil.cpu_count(logical=True)
+            cpu_count = psutil.cpu_count(logical=True) or 1
             start_time = time.time()
 
-            while not self.event.is_set() and not abort_flag.is_set():
+            while not self.event.is_set() and not thread.abort_flag.is_set():
                 try:
                     # Fetch CPU info
                     cpu_percent = proc.cpu_percent(interval=None)
@@ -220,21 +261,21 @@ class RootService:
 
                 time.sleep(5)  # Polling interval
 
-        thread = threading.Thread(target=log_resources, name="RootServiceResourceLogger", daemon=True)
-        thread.stop = abort_flag.set
+        thread = ResourceLoggerThread(target=log_resources)
         thread.start()
         self._verify_thread_started("RootServiceResourceLogger", thread)
         self.threads.append({"name": "RootServiceResourceLogger", "thread": thread})
+        return thread
 
-    def initial_register_compresso(self):
+    def initial_register_compresso(self) -> None:
         from compresso.libs import session
 
         s = session.Session(dev_api=self.dev_api)
-        s.register_compresso(s.get_installation_uuid())
+        s.register_compresso()
 
-    def start_threads(self, settings):
+    def start_threads(self, settings: config.Config) -> None:
         # Create our data queues
-        data_queues = {
+        data_queues: DataQueues = {
             "library_scanner_triggers": queue.Queue(maxsize=1),
             "scheduledtasks": queue.Queue(),
             "inotifytasks": queue.Queue(),
@@ -305,7 +346,7 @@ class RootService:
         thread_names = [thread["name"] for thread in self.threads if thread["name"] != "UIServer"]
         self.startup_state.mark_ready("threads_ready", detail=", ".join(thread_names))
 
-    def log_startup_summary(self, settings):
+    def log_startup_summary(self, settings: config.Config) -> None:
         summary = startup.build_startup_summary(settings, eventmonitor.event_monitor_module)
         self.logger.info("STARTUP_SUMMARY library_path=%s", summary["library_path"])
         self.logger.info("STARTUP_SUMMARY cache_path=%s", summary["cache_path"])
@@ -324,7 +365,7 @@ class RootService:
         )
         self.logger.info("STARTUP_SUMMARY ffmpeg_version=%s", summary.get("ffmpeg_version", "not found"))
 
-    def wait_for_startup_readiness(self, settings):
+    def wait_for_startup_readiness(self, settings: config.Config) -> dict[str, object]:
         deadline = time.time() + settings.get_startup_readiness_timeout_seconds()
         while time.time() < deadline:
             snapshot = self.startup_state.snapshot()
@@ -345,7 +386,7 @@ class RootService:
             )
         raise RuntimeError("Startup readiness check failed")
 
-    def stop_threads(self):
+    def stop_threads(self) -> None:
         self.logger.info("Stopping all threads")
         self.event.set()
         for thread in self.threads:
@@ -367,17 +408,17 @@ class RootService:
         except Exception:  # noqa: S110 — best-effort cleanup on shutdown
             pass
 
-    def sig_handle(self, signum, frame):
+    def sig_handle(self, signum: int, frame: FrameType | None) -> None:
         self.logger.info("Received %s", signum)
         self.stop()
 
-    def stop(self):
+    def stop(self) -> None:
         self.run_threads = False
         self.event.set()
 
-    def monitor_critical_threads(self):
+    def monitor_critical_threads(self) -> bool:
         """Publish runtime health and fail visibly if a critical service exits."""
-        health = {}
+        health: dict[str, object] = {}
         for entry in self.threads:
             name = entry["name"]
             if name not in self.CRITICAL_THREAD_NAMES:
@@ -391,11 +432,11 @@ class RootService:
                 self.event.set()
                 return False
             snapshot = getattr(thread, "get_health_snapshot", None)
-            health[name] = snapshot() if snapshot else {"alive": True}
+            health[name] = cast("Callable[[], object]", snapshot)() if callable(snapshot) else {"alive": True}
         self.startup_state.mark_ready("threads_ready", detail=health)
         return True
 
-    def run(self):
+    def run(self) -> None:
         # Init the TaskDataStore and PluginChildProcess
         import atexit
         from multiprocessing import Manager
@@ -406,18 +447,19 @@ class RootService:
         from compresso.libs.unplugins.child_process import kill_all_plugin_processes, set_shared_manager
 
         # Init a shared manager
-        self._mgr = Manager()
+        manager = Manager()
+        self._mgr = manager
         # Ensure Manager shuts down on process exit or tornado autoreload (dev mode)
-        atexit.register(self._mgr.shutdown)
-        tornado.autoreload.add_reload_hook(self._mgr.shutdown)
+        atexit.register(manager.shutdown)
+        tornado.autoreload.add_reload_hook(manager.shutdown)
         # Ensure any PluginChildProcess shuts down on process exit or tornado autoreload (dev mode)
         atexit.register(kill_all_plugin_processes)
         tornado.autoreload.add_reload_hook(kill_all_plugin_processes)
         # Replace the in-process dicts with manager proxies
-        TaskDataStore._runner_state = self._mgr.dict()
-        TaskDataStore._task_state = self._mgr.dict()
+        TaskDataStore._runner_state = manager.dict()
+        TaskDataStore._task_state = manager.dict()
         # Set the shared manager for PluginChildProcess
-        set_shared_manager(self._mgr)
+        set_shared_manager(manager)
 
         self.startup_state.reset()
 
@@ -490,14 +532,17 @@ class RootService:
 
         # Received term signal. Stop everything
         self.stop_threads()
-        self.db_connection.stop()
-        while not self.db_connection.is_stopped():
+        db_connection = self.db_connection
+        if db_connection is None:
+            raise RuntimeError("database connection was not initialized")
+        db_connection.stop()
+        while not db_connection.is_stopped():
             time.sleep(0.5)
             continue
         self.logger.info("Exit Compresso")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Compresso")
     parser.add_argument("--version", action="version", version=f"%(prog)s {metadata.read_version_string('long')}")
     parser.add_argument(

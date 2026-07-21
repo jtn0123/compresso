@@ -49,3 +49,26 @@ from .workergroups import WorkerGroups, WorkerGroupTags
 from .workerschedules import WorkerSchedules
 
 __author__ = "Josh.5 (jsunnex@gmail.com)"
+
+__all__ = (
+    "CompletedTasks",
+    "CompletedTasksCommandLogs",
+    "CompressionStats",
+    "EnabledPlugins",
+    "FileMetadata",
+    "FileMetadataPaths",
+    "HealthStatus",
+    "Installation",
+    "Libraries",
+    "LibraryAnalysisCache",
+    "LibraryPluginFlow",
+    "LibraryTags",
+    "PluginRepos",
+    "Plugins",
+    "Tags",
+    "TaskMetadata",
+    "Tasks",
+    "WorkerGroups",
+    "WorkerGroupTags",
+    "WorkerSchedules",
+)

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-compresso.subtitle_handle.py
+"""compresso.subtitle_handle.py
 
 Written by:               Josh.5 <jsunnex@gmail.com>
 Date:                     19 Sep 2019, (5:23 PM)
@@ -29,6 +28,11 @@ Copyright:
 
 """
 
+from collections.abc import Mapping
+
+from ._contracts import EncodingArguments, probe_streams, stream_int, stream_text
+from .base_containers import Containers
+
 
 class SubtitleHandle:
     """
@@ -37,10 +41,10 @@ class SubtitleHandle:
     Handle FFMPEG operations pertaining to subtitle streams
     """
 
-    def __init__(self, file_probe, container):
+    def __init__(self, file_probe: Mapping[str, object], container: Containers) -> None:
         self.file_probe = file_probe
         self.container = container
-        self.subtitle_args = {}
+        self.subtitle_args = EncodingArguments(streams_to_map=[], streams_to_encode=[])
 
         # Configurable settings
         self.remove_subtitle_streams = False
@@ -51,7 +55,7 @@ class SubtitleHandle:
             # Force them to be removed
             self.remove_subtitle_streams = True
 
-    def args(self):
+    def args(self) -> EncodingArguments:
         """
         Return a dictionary of streams to map and streams to encode
         :return:
@@ -60,9 +64,9 @@ class SubtitleHandle:
         self.subtitle_args["streams_to_map"] = []
         self.subtitle_args["streams_to_encode"] = []
         subtitle_tracks_count = 0
-        for stream in self.file_probe["streams"]:
+        for stream in probe_streams(self.file_probe):
             # If this is a subtitle stream, then process the args
-            if stream["codec_type"] == "subtitle":
+            if stream_text(stream, "codec_type") == "subtitle":
                 # Remove subtitles means add no args
                 if self.remove_subtitle_streams:
                     continue
@@ -73,12 +77,9 @@ class SubtitleHandle:
                 supported_subtitles = self.container.supported_subtitles()
                 # TODO: Select best/or configured subtitle codec, then fetch that codec class.
                 #       Use the subtitle class rather than this array
-                if stream["codec_name"] in supported_subtitles:
+                if stream_text(stream, "codec_name") in supported_subtitles:
                     # If dest container supports the current subtitle codec, just copy it
-                    self.subtitle_args["streams_to_encode"] = self.subtitle_args["streams_to_encode"] + [
-                        f"-c:s:{subtitle_tracks_count}",
-                        "copy",
-                    ]
+                    self.subtitle_args["streams_to_encode"].extend([f"-c:s:{subtitle_tracks_count}", "copy"])
                     subtitle_tracks_count += 1
                 else:
                     # The dest container does not support the current subtitle stream.
@@ -87,24 +88,20 @@ class SubtitleHandle:
                     # If dest container supports the current subtitle codec, just copy it
                     # unsupported subtitles will need to be removed, otherwise ffmpeg will not convert
                     unsupported_subtitles = self.container.unsupported_subtitles()
-                    if stream["codec_name"] in unsupported_subtitles:
+                    if stream_text(stream, "codec_name") in unsupported_subtitles or not supported_subtitles:
                         continue
                     else:
-                        self.subtitle_args["streams_to_encode"] = self.subtitle_args["streams_to_encode"] + [
-                            f"-c:s:{subtitle_tracks_count}",
-                            f"{supported_subtitles[0]}",
-                        ]
+                        self.subtitle_args["streams_to_encode"].extend(
+                            [f"-c:s:{subtitle_tracks_count}", supported_subtitles[0]]
+                        )
                         subtitle_tracks_count += 1
 
                 # Map this stream if it was marked above as compatible with the destination
-                self.subtitle_args["streams_to_map"] = self.subtitle_args["streams_to_map"] + [
-                    "-map",
-                    f"0:{stream['index']}",
-                ]
+                self.subtitle_args["streams_to_map"].extend(["-map", f"0:{stream_int(stream, 'index')}"])
 
         return self.subtitle_args
 
-    def remove_subtitles(self):
+    def remove_subtitles(self) -> None:
         """
         Remove the subtitles stream from result file
 

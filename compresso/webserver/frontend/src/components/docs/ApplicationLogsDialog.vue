@@ -77,7 +77,7 @@
   </CompressoDialogWindow>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
@@ -86,18 +86,22 @@ import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { sanitizeHtml } from 'src/js/sanitize'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
+import type { CompressoSocket } from 'src/js/compressoGlobals'
+import type { DialogController } from 'src/types/ui'
+
+interface SystemLogsData { system_logs?: unknown; logs_path?: unknown }
 
 const emit = defineEmits(['hide'])
 const { t: $t } = useI18n()
 const $q = useQuasar()
 
-const dialogRef = ref(null)
-const logContainerRef = ref(null)
-const currentLog = ref([])
-const currentRawLog = ref([])
+const dialogRef = ref<DialogController | null>(null)
+const logContainerRef = ref<HTMLElement | null>(null)
+const currentLog = ref<string[]>([])
+const currentRawLog = ref<string[]>([])
 const logsPath = ref('')
-const debugging = ref(null)
-const currentRetention = ref(null)
+const debugging = ref<boolean | null>(null)
+const currentRetention = ref<number | null>(null)
 
 const retentionOptions = {
   Disabled: 0,
@@ -110,8 +114,8 @@ const retentionOptions = {
 
 const MAX_LOG_LINES = 2000
 
-let ws = null
-let compressoWSHandler = null
+let ws: CompressoSocket | null = null
+let compressoWSHandler: ReturnType<typeof CompressoWebsocketHandler> | null = null
 
 const requestSystemLogs = () => {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -119,7 +123,7 @@ const requestSystemLogs = () => {
   }
 }
 
-const styleLogLine = (logLine) => {
+const styleLogLine = (logLine: string): string => {
   let styledLine = logLine
   styledLine = styledLine.replace(/\/[\/|.|\s|\w|-]+/, "<span style='color:var(--q-secondary);'>$&</span>")
   styledLine = styledLine.replace(
@@ -137,7 +141,7 @@ const styleLogLine = (logLine) => {
   return styledLine
 }
 
-const getOverlapCount = (existingLogs, incomingLogs) => {
+const getOverlapCount = (existingLogs: string[], incomingLogs: string[]): number => {
   const maxOverlap = Math.min(existingLogs.length, incomingLogs.length)
   for (let overlap = maxOverlap; overlap > 0; overlap--) {
     let isMatch = true
@@ -154,8 +158,10 @@ const getOverlapCount = (existingLogs, incomingLogs) => {
   return 0
 }
 
-const updateServerLogs = (data) => {
-  const incomingLogs = Array.isArray(data.system_logs) ? data.system_logs : []
+const updateServerLogs = (data: SystemLogsData): void => {
+  const incomingLogs = Array.isArray(data.system_logs)
+    ? data.system_logs.filter((line): line is string => typeof line === 'string')
+    : []
   const logContainer = logContainerRef.value
   const shouldTail =
     !logContainer || logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < 24
@@ -177,7 +183,7 @@ const updateServerLogs = (data) => {
     currentLog.value = currentLog.value.slice(-MAX_LOG_LINES)
   }
 
-  logsPath.value = data.logs_path
+  logsPath.value = typeof data.logs_path === 'string' ? data.logs_path : ''
   nextTick(() => {
     if (shouldTail && logContainerRef.value) {
       logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight
@@ -237,7 +243,7 @@ const fetchSettings = () => {
     })
 }
 
-const toggleDebugging = (value) => {
+const toggleDebugging = (value: boolean): void => {
   axios({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/write'),
@@ -268,8 +274,8 @@ const toggleDebugging = (value) => {
     })
 }
 
-const setLogRetention = (value) => {
-  const retention = parseInt(value, 10)
+const setLogRetention = (value: string | number): void => {
+  const retention = typeof value === 'number' ? value : parseInt(value, 10)
   if (Number.isNaN(retention)) {
     return
   }
@@ -337,17 +343,13 @@ const downloadLogs = () => {
 const show = () => {
   currentLog.value = []
   currentRawLog.value = []
-  if (dialogRef.value) {
-    dialogRef.value.show()
-  }
+  dialogRef.value?.show()
   fetchSettings()
   initCompressoWebsocket()
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

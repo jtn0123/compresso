@@ -7,9 +7,9 @@ is consistent if future migrations reference it.
 """
 
 
-def migrate(migrator, database, fake=False, **kwargs):
+def migrate(migrator: object, database: object, fake: bool = False, **kwargs: object) -> None:
     """No schema change required — status is a free-form TextField."""
 
 
-def rollback(migrator, database, fake=False, **kwargs):
+def rollback(migrator: object, database: object, fake: bool = False, **kwargs: object) -> None:
     """No schema change to reverse."""

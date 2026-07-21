@@ -7,7 +7,13 @@ API handler for compression statistics endpoints.
 
 """
 
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    integer_value,
+    optional_integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.schema.compression_schemas import (
     CodecDistributionSchema,
     CompressionStatsSchema,
@@ -23,6 +29,7 @@ from compresso.webserver.api_v2.schema.compression_schemas import (
     TimelineSchema,
 )
 from compresso.webserver.helpers import compression_stats
+from compresso.webserver.helpers.compression_stats import CompressionStatsParams
 from compresso.webserver.helpers.healthcheck import validate_library_exists
 
 
@@ -85,7 +92,7 @@ class ApiCompressionHandler(BaseApiHandler):
         },
     ]
 
-    async def get_compression_stats(self):
+    async def get_compression_stats(self) -> None:
         """
         Compression - per-file stats
         ---
@@ -108,16 +115,17 @@ class ApiCompressionHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestCompressionStatsSchema())
 
-            validate_library_exists(json_request.get("library_id"))
+            library_id = optional_integer_value(json_request.get("library_id"))
+            validate_library_exists(library_id)
 
-            params = {
-                "start": json_request.get("start", 0),
-                "length": json_request.get("length", 10),
-                "search_value": json_request.get("search_value", ""),
-                "library_id": json_request.get("library_id"),
+            params: CompressionStatsParams = {
+                "start": integer_value(json_request.get("start")),
+                "length": integer_value(json_request.get("length"), 10),
+                "search_value": string_value(json_request.get("search_value")),
+                "library_id": library_id,
                 "order": {
-                    "column": json_request.get("order_by", "finish_time"),
-                    "dir": json_request.get("order_direction", "desc"),
+                    "column": string_value(json_request.get("order_by"), "finish_time"),
+                    "dir": string_value(json_request.get("order_direction"), "desc"),
                 },
             }
             stats = compression_stats.get_compression_stats_paginated(params)
@@ -142,7 +150,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_compression_summary(self):
+    async def get_compression_summary(self) -> None:
         """
         Compression - summary
         ---
@@ -183,7 +191,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_pending_estimate(self):
+    async def get_pending_estimate(self) -> None:
         """
         Compression - pending estimate
         ---
@@ -218,7 +226,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    def _parse_library_id_arg(self):
+    def _parse_library_id_arg(self) -> int | None:
         """Parse optional library_id from query string."""
         library_id = self.get_argument("library_id", None)
         if library_id is not None:
@@ -228,7 +236,7 @@ class ApiCompressionHandler(BaseApiHandler):
                 return None
         return None
 
-    async def get_codec_distribution(self):
+    async def get_codec_distribution(self) -> None:
         """
         Compression - codec distribution
         ---
@@ -265,7 +273,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_resolution_distribution(self):
+    async def get_resolution_distribution(self) -> None:
         """
         Compression - resolution distribution
         ---
@@ -301,7 +309,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_container_distribution(self):
+    async def get_container_distribution(self) -> None:
         """
         Compression - container distribution
         ---
@@ -338,7 +346,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_timeline(self):
+    async def get_timeline(self) -> None:
         """
         Compression - space saved timeline
         ---
@@ -378,7 +386,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def start_library_analysis(self):
+    async def start_library_analysis(self) -> None:
         """
         Compression - start library analysis
         ---
@@ -399,7 +407,7 @@ class ApiCompressionHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(LibraryAnalysisRequestSchema())
-            library_id = json_request.get("library_id")
+            library_id = integer_value(json_request.get("library_id"))
             if not library_id:
                 raise ValueError("library_id is required")
 
@@ -430,7 +438,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_library_analysis_status(self):
+    async def get_library_analysis_status(self) -> None:
         """
         Compression - get library analysis status
         ---
@@ -451,7 +459,7 @@ class ApiCompressionHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(LibraryAnalysisRequestSchema())
-            library_id = json_request.get("library_id")
+            library_id = integer_value(json_request.get("library_id"))
             if not library_id:
                 raise ValueError("library_id is required")
 
@@ -480,7 +488,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_optimization_progress(self):
+    async def get_optimization_progress(self) -> None:
         """
         Compression - optimization progress
         ---
@@ -524,7 +532,7 @@ class ApiCompressionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_encoding_speed_timeline(self):
+    async def get_encoding_speed_timeline(self) -> None:
         """
         Compression - encoding speed timeline
         ---

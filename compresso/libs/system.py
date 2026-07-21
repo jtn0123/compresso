@@ -31,24 +31,44 @@ Copyright:
 
 import glob
 import os
+import platform
 import subprocess
 import sys
-from typing import Any
+from typing import TypedDict
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
 
+class GpuInfo(TypedDict):
+    type: str
+    hwaccel: str
+    index: int
+    name: str
+    memory_total_mb: int
+    driver_version: str
+
+
+class DevicesInfo(TypedDict):
+    cpu_info: object
+    gpu_info: list[GpuInfo]
+
+
+class SystemInfo(TypedDict):
+    devices: DevicesInfo
+    platform: platform.uname_result
+    python: str
+
+
 class System(metaclass=SingletonType):
-    devices: dict[str, Any] = {}
-    ffmpeg: dict[str, Any] = {}
-    platform: dict[str, Any] = {}
-    python_version: str = ""
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self.devices: DevicesInfo | None = None
+        self.ffmpeg: dict[str, object] = {}
+        self.platform: platform.uname_result | None = None
+        self.python_version = ""
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
-    def __init__(self, *args, **kwargs):
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
-
-    def __get_python_info(self):
+    def __get_python_info(self) -> str:
         """
         Return a string of the python version
 
@@ -60,14 +80,14 @@ class System(metaclass=SingletonType):
             self.python_version = "{}.{}.{}.{}.{}".format(*sys.version_info)
         return self.python_version
 
-    def __detect_gpus(self):
+    def __detect_gpus(self) -> list[GpuInfo]:
         """
         Detect available GPUs on the system.
         Returns a list of GPU info dicts.
 
         :return:
         """
-        gpus = []
+        gpus: list[GpuInfo] = []
 
         # NVIDIA detection via nvidia-smi
         try:
@@ -142,7 +162,7 @@ class System(metaclass=SingletonType):
 
         return gpus
 
-    def __get_devices_info(self):
+    def __get_devices_info(self) -> DevicesInfo:
         """
         Return a dictionary of device information
 
@@ -150,36 +170,34 @@ class System(metaclass=SingletonType):
         """
         import cpuinfo
 
-        if not self.devices:
+        if self.devices is None:
             self.devices = {
                 "cpu_info": cpuinfo.get_cpu_info(),
                 "gpu_info": self.__detect_gpus(),
             }
         return self.devices
 
-    def __get_platform_info(self):
+    def __get_platform_info(self) -> platform.uname_result:
         """
         Return a dictionary of device information
 
         :return:
         """
-        import platform
-
-        if not self.platform:
+        if self.platform is None:
             self.platform = platform.uname()
         return self.platform
 
-    def info(self):
+    def info(self) -> SystemInfo:
         """
         Returns a dictionary of system information
 
         :return:
         """
-        info = {
-            "devices": self.__get_devices_info(),
-            "platform": self.__get_platform_info(),
-            "python": self.__get_python_info(),
-        }
+        info = SystemInfo(
+            devices=self.__get_devices_info(),
+            platform=self.__get_platform_info(),
+            python=self.__get_python_info(),
+        )
         return info
 
 

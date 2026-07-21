@@ -10,25 +10,86 @@ import re
 import shutil
 import threading
 import time
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from types import TracebackType
+from typing import Protocol, TypedDict, cast
 
 from compresso.libs.json_state import atomic_json_write
 
 MANIFEST_GLOB = "*.json"
 
 
+class TransferManifest(TypedDict):
+    version: int
+    transfer_id: str
+    job_id: str
+    filename: str
+    total_size: int
+    expected_checksum: str
+    metadata: dict[str, object]
+    offset: int
+    state: str
+    final_path: str
+    updated_at: float
+
+
+class TransferStatus(TypedDict):
+    transfer_id: str
+    job_id: str
+    filename: str
+    offset: int
+    total_size: int
+    complete: bool
+    final_path: str | None
+
+
+class TransferSummary(TypedDict):
+    active: int
+    complete: int
+    corrupt: int
+    bytes_received: int
+    bytes_total: int
+
+
+class DiskUsageResult(Protocol):
+    @property
+    def free(self) -> int: ...
+
+
+class LockContext(Protocol):
+    def __enter__(self) -> object: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool | None: ...
+
+
+def _default_disk_usage(path: Path) -> DiskUsageResult:
+    return shutil.disk_usage(path)
+
+
 class TransferStorageError(OSError):
     """Raised before a transfer would consume reserved cache capacity."""
 
-    def __init__(self, message, *, free_bytes=None, required_bytes=None, reserved_bytes=None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        free_bytes: int | None = None,
+        required_bytes: int | None = None,
+        reserved_bytes: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.free_bytes = free_bytes
         self.required_bytes = required_bytes
         self.reserved_bytes = reserved_bytes
 
 
-def file_sha256(path):
+def file_sha256(path: str | os.PathLike[str]) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as source:  # NOSONAR - callers supply validated task or transfer-store paths
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
@@ -38,18 +99,18 @@ def file_sha256(path):
 
 class ResumableTransferStore:
     _locks_guard = threading.Lock()
-    _locks_by_root: dict[str, Any] = {}
+    _locks_by_root: dict[str, LockContext] = {}
 
     def __init__(
         self,
-        root_dir,
-        now=time.time,
-        fault_injector=None,
+        root_dir: str | os.PathLike[str],
+        now: Callable[[], float] = time.time,
+        fault_injector: Callable[[str, Path], None] | None = None,
         *,
-        maximum_file_size_bytes=None,
-        minimum_free_bytes=0,
-        disk_usage=shutil.disk_usage,
-    ):
+        maximum_file_size_bytes: int | None = None,
+        minimum_free_bytes: int = 0,
+        disk_usage: Callable[[Path], DiskUsageResult] | None = None,
+    ) -> None:
         self.root_dir = Path(root_dir).resolve()
         self.partial_dir = self.root_dir / "partial"
         self.completed_dir = self.root_dir / "completed"
@@ -58,54 +119,54 @@ class ResumableTransferStore:
         self._fault_injector = fault_injector
         self.maximum_file_size_bytes = None if maximum_file_size_bytes is None else max(0, int(maximum_file_size_bytes))
         self.minimum_free_bytes = max(0, int(minimum_free_bytes))
-        self._disk_usage = disk_usage
+        self._disk_usage: Callable[[Path], DiskUsageResult] = disk_usage or _default_disk_usage
         with self._locks_guard:
             self._lock = self._locks_by_root.setdefault(str(self.root_dir), threading.RLock())
         for directory in (self.partial_dir, self.completed_dir, self.manifest_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
-    def _inject_fault(self, operation, path):
+    def _inject_fault(self, operation: str, path: Path) -> None:
         if self._fault_injector is not None:
             self._fault_injector(operation, path)
 
     @staticmethod
-    def _checksum(data):
+    def _checksum(data: bytes) -> str:
         return f"sha256:{hashlib.sha256(data).hexdigest()}"
 
     @staticmethod
-    def _file_checksum(path):
+    def _file_checksum(path: str | os.PathLike[str]) -> str:
         return file_sha256(path)
 
     @staticmethod
-    def _transfer_id(job_id, filename, total_size):
+    def _transfer_id(job_id: str, filename: str, total_size: int) -> str:
         identity = f"{job_id}\0{filename}\0{int(total_size)}".encode()
         return hashlib.sha256(identity).hexdigest()[:32]
 
-    def _manifest_path(self, transfer_id):
+    def _manifest_path(self, transfer_id: str) -> Path:
         self._validate_transfer_id(transfer_id)
         return self.manifest_dir / f"{transfer_id}.json"
 
-    def _partial_path(self, transfer_id):
+    def _partial_path(self, transfer_id: str) -> Path:
         self._validate_transfer_id(transfer_id)
         return self.partial_dir / f"{transfer_id}.part"
 
     @staticmethod
-    def _validate_transfer_id(transfer_id):
+    def _validate_transfer_id(transfer_id: object) -> None:
         if not isinstance(transfer_id, str) or re.fullmatch(r"[a-f0-9]{32}", transfer_id) is None:
             raise ValueError("Invalid transfer ID")
 
-    def _final_path(self, manifest):
+    def _final_path(self, manifest: Mapping[str, object]) -> Path:
         transfer_id = manifest.get("transfer_id")
         self._validate_transfer_id(transfer_id)
         filename = manifest.get("filename")
         if not isinstance(filename, str) or filename != os.path.basename(filename) or filename in {"", ".", ".."}:
             raise ValueError("Invalid transfer filename")
-        final_path = (self.completed_dir / transfer_id / filename).resolve()  # NOSONAR - validated immediately below
+        final_path = (self.completed_dir / str(transfer_id) / filename).resolve()  # NOSONAR - validated below
         if not final_path.is_relative_to(self.completed_dir):
             raise ValueError("Transfer path escapes completed directory")
         return final_path
 
-    def _validate_manifest(self, manifest, transfer_id):
+    def _validate_manifest(self, manifest: object, transfer_id: str) -> TransferManifest:
         if not isinstance(manifest, dict):
             raise ValueError("Transfer manifest must be an object")
         if manifest.get("version") != 1 or manifest.get("transfer_id") != transfer_id:
@@ -145,17 +206,20 @@ class ResumableTransferStore:
             or updated_at < 0
         ):
             raise ValueError("Transfer manifest timestamp is invalid")
-        self._final_path(manifest)
-        return manifest
+        filename = manifest.get("filename")
+        if not isinstance(filename, str):
+            raise ValueError("Transfer manifest filename is invalid")
+        self._final_path(cast("dict[str, object]", manifest))
+        return cast("TransferManifest", manifest)
 
-    def _active_partial_size(self, manifest):
+    def _active_partial_size(self, manifest: TransferManifest) -> int:
         partial_path = self._partial_path(manifest["transfer_id"])
         size = partial_path.stat().st_size if partial_path.exists() else 0
         if size > manifest["total_size"]:
             raise ValueError("Transfer partial artifact exceeds its declared size")
         return size
 
-    def _active_reserved_bytes(self, *, exclude_transfer_id=None):
+    def _active_reserved_bytes(self, *, exclude_transfer_id: str | None = None) -> int:
         reserved = 0
         for manifest_path in self.manifest_dir.glob(MANIFEST_GLOB):
             transfer_id = manifest_path.stem
@@ -172,7 +236,7 @@ class ResumableTransferStore:
                 ) from exc
         return reserved
 
-    def _ensure_new_session_capacity(self, transfer_id, total_size):
+    def _ensure_new_session_capacity(self, transfer_id: str, total_size: int) -> None:
         if self.maximum_file_size_bytes is not None and total_size > self.maximum_file_size_bytes:
             raise ValueError("Transfer exceeds the configured maximum file size")
         try:
@@ -189,7 +253,7 @@ class ResumableTransferStore:
                 reserved_bytes=reserved_bytes,
             )
 
-    def _ensure_chunk_capacity(self, chunk_size):
+    def _ensure_chunk_capacity(self, chunk_size: int) -> None:
         try:
             free_bytes = int(self._disk_usage(self.root_dir).free)
         except OSError as exc:
@@ -203,7 +267,7 @@ class ResumableTransferStore:
             )
 
     @staticmethod
-    def _artifact_matches_manifest(path, manifest, *, checksum=False):
+    def _artifact_matches_manifest(path: Path, manifest: TransferManifest, *, checksum: bool = False) -> bool:
         try:
             if not path.is_file() or path.stat().st_size != int(manifest["total_size"]):
                 return False
@@ -211,10 +275,10 @@ class ResumableTransferStore:
         except OSError:
             return False
 
-    def _write_manifest(self, manifest):
+    def _write_manifest(self, manifest: TransferManifest) -> None:
         atomic_json_write(self._manifest_path(manifest["transfer_id"]), manifest, mode=0o600)
 
-    def _reset_partial(self, manifest):
+    def _reset_partial(self, manifest: TransferManifest) -> None:
         partial_path = self._partial_path(manifest["transfer_id"])
         if partial_path.exists():
             partial_path.unlink()
@@ -223,13 +287,13 @@ class ResumableTransferStore:
         manifest["updated_at"] = self._now()
         self._write_manifest(manifest)
 
-    def _load(self, transfer_id):
+    def _load(self, transfer_id: str) -> TransferManifest:
         manifest_path = self._manifest_path(transfer_id)
         if not manifest_path.exists():
             raise KeyError(f"Unknown transfer ID: {transfer_id}")
         with open(manifest_path) as source:
-            manifest = json.load(source)
-        self._validate_manifest(manifest, transfer_id)
+            raw_manifest: object = json.load(source)
+        manifest = self._validate_manifest(raw_manifest, transfer_id)
         final_path = self._final_path(manifest)
         manifest["final_path"] = str(final_path)
         if manifest.get("state") == "finalizing" and final_path.is_file():
@@ -244,7 +308,7 @@ class ResumableTransferStore:
         return manifest
 
     @staticmethod
-    def _public_status(manifest):
+    def _public_status(manifest: TransferManifest) -> TransferStatus:
         return {
             "transfer_id": manifest["transfer_id"],
             "job_id": manifest["job_id"],
@@ -255,7 +319,14 @@ class ResumableTransferStore:
             "final_path": manifest["final_path"] if manifest.get("state") == "complete" else None,
         }
 
-    def begin(self, job_id, filename, total_size, expected_checksum, metadata=None):
+    def begin(
+        self,
+        job_id: str,
+        filename: str,
+        total_size: int,
+        expected_checksum: str,
+        metadata: Mapping[str, object] | None = None,
+    ) -> TransferStatus:
         if not isinstance(job_id, str) or not job_id:
             raise ValueError("Invalid transfer job identity")
         filename = os.path.basename(filename)
@@ -286,34 +357,34 @@ class ResumableTransferStore:
 
             self._ensure_new_session_capacity(transfer_id, total_size)
             final_path = self.completed_dir / transfer_id / filename
-            manifest = {
-                "version": 1,
-                "transfer_id": transfer_id,
-                "job_id": job_id,
-                "filename": filename,
-                "total_size": total_size,
-                "expected_checksum": expected_checksum,
-                "metadata": dict(metadata or {}),
-                "offset": 0,
-                "state": "active",
-                "final_path": str(final_path),
-                "updated_at": self._now(),
-            }
+            manifest = TransferManifest(
+                version=1,
+                transfer_id=transfer_id,
+                job_id=job_id,
+                filename=filename,
+                total_size=total_size,
+                expected_checksum=expected_checksum,
+                metadata=dict(metadata or {}),
+                offset=0,
+                state="active",
+                final_path=str(final_path),
+                updated_at=self._now(),
+            )
             self._write_manifest(manifest)
             return self._public_status(manifest)
 
-    def get_manifest(self, transfer_id):
+    def get_manifest(self, transfer_id: str) -> dict[str, object]:
         with self._lock:
             return dict(self._load(transfer_id))
 
-    def status(self, transfer_id):
+    def status(self, transfer_id: str) -> TransferStatus:
         with self._lock:
             manifest = self._load(transfer_id)
             if manifest.get("state") == "active":
                 manifest["offset"] = self._active_partial_size(manifest)
             return self._public_status(manifest)
 
-    def append(self, transfer_id, offset, data, chunk_checksum):
+    def append(self, transfer_id: str, offset: int, data: bytes, chunk_checksum: str) -> TransferStatus:
         with self._lock:
             manifest = self._load(transfer_id)
             if manifest.get("state") != "active":
@@ -337,7 +408,7 @@ class ResumableTransferStore:
             self._write_manifest(manifest)
             return self._public_status(manifest)
 
-    def finalize(self, transfer_id):
+    def finalize(self, transfer_id: str) -> Path:
         with self._lock:
             manifest = self._load(transfer_id)
             if manifest.get("state") == "complete":
@@ -365,12 +436,12 @@ class ResumableTransferStore:
             self._write_manifest(manifest)
             return final_path
 
-    def _remove_artifacts(self, transfer_id):
+    def _remove_artifacts(self, transfer_id: str) -> None:
         self._partial_path(transfer_id).unlink(missing_ok=True)
         shutil.rmtree(self.completed_dir / transfer_id, ignore_errors=True)
         self._manifest_path(transfer_id).unlink(missing_ok=True)
 
-    def abandon(self, transfer_id):
+    def abandon(self, transfer_id: str) -> dict[str, str | bool]:
         """Intentionally discard one incomplete transfer and all owned artifacts."""
         with self._lock:
             manifest = self._load(transfer_id)
@@ -379,17 +450,17 @@ class ResumableTransferStore:
             self._remove_artifacts(transfer_id)
             return {"transfer_id": transfer_id, "abandoned": True}
 
-    def cleanup_stale(self, max_age_seconds):
+    def cleanup_stale(self, max_age_seconds: int | float) -> list[str]:
         cutoff = self._now() - max(0, int(max_age_seconds))
-        removed = []
+        removed: list[str] = []
         with self._lock:
             for manifest_path in self.manifest_dir.glob(MANIFEST_GLOB):
                 try:
                     transfer_id = manifest_path.stem
                     self._validate_transfer_id(transfer_id)
                     with open(manifest_path) as source:
-                        manifest = json.load(source)
-                    self._validate_manifest(manifest, transfer_id)
+                        raw_manifest: object = json.load(source)
+                    manifest = self._validate_manifest(raw_manifest, transfer_id)
                     updated_at = float(manifest.get("updated_at", 0))
                 except (KeyError, OSError, TypeError, ValueError, OverflowError):
                     transfer_id = manifest_path.stem
@@ -408,21 +479,24 @@ class ResumableTransferStore:
                 removed.append(transfer_id)
         return removed
 
-    def summary(self):
+    def summary(self) -> TransferSummary:
         """Return cheap transfer counters for the operations status API."""
-        result = {"active": 0, "complete": 0, "corrupt": 0, "bytes_received": 0, "bytes_total": 0}
+        result = TransferSummary(active=0, complete=0, corrupt=0, bytes_received=0, bytes_total=0)
         with self._lock:
             for manifest_path in self.manifest_dir.glob(MANIFEST_GLOB):
                 try:
                     with open(manifest_path) as source:
-                        manifest = json.load(source)
+                        raw_manifest: object = json.load(source)
                     transfer_id = manifest_path.stem
                     self._validate_transfer_id(transfer_id)
-                    self._validate_manifest(manifest, transfer_id)
+                    manifest = self._validate_manifest(raw_manifest, transfer_id)
                     state = "complete" if manifest.get("state") == "complete" else "active"
                     if state == "complete" and not self._artifact_matches_manifest(self._final_path(manifest), manifest):
                         raise ValueError("completed artifact is unavailable")
-                    result[state] += 1
+                    if state == "complete":
+                        result["complete"] += 1
+                    else:
+                        result["active"] += 1
                     offset = int(manifest.get("offset", 0))
                     if state == "active":
                         offset = self._active_partial_size(manifest)

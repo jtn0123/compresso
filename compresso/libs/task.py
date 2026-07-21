@@ -36,24 +36,53 @@ import shutil
 import threading
 import time
 import uuid
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from copy import deepcopy
+from json import JSONEncoder
 from operator import attrgetter
+from typing import NotRequired, TypedDict, Unpack, cast
 
-from playhouse.shortcuts import model_to_dict
+from peewee import DoesNotExist, IntegrityError
 
 from compresso import config
 from compresso.libs import common
 from compresso.libs.exceptions import TaskError
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.unmodels.tasks import IntegrityError, Tasks  # type: ignore[attr-defined]
+from compresso.libs.peewee_types import execute_count, model_as_dict
+from compresso.libs.unmodels.tasks import Tasks
 
 _ERR_NO_TASK_LIBRARY = "Unable to fetch task library ID. Task has not been set!"
 _ERR_NO_TASK_STATUS = "Unable to set status. Task has not been set!"
 _ERR_NO_TASK_ID = "Task ID not provided or bound"
 
 
-def prepare_file_destination_data(pathname, file_extension):
+type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
+
+
+class TaskPathData(TypedDict):
+    basename: str
+    abspath: str
+
+
+class TaskOrder(TypedDict):
+    column: str
+    dir: str
+
+
+class JSONDumpOptions(TypedDict):
+    skipkeys: NotRequired[bool]
+    ensure_ascii: NotRequired[bool]
+    check_circular: NotRequired[bool]
+    allow_nan: NotRequired[bool]
+    cls: NotRequired[type[JSONEncoder] | None]
+    indent: NotRequired[int | str | None]
+    separators: NotRequired[tuple[str, str] | None]
+    default: NotRequired[Callable[[object], object] | None]
+    sort_keys: NotRequired[bool]
+
+
+def prepare_file_destination_data(pathname: str, file_extension: str) -> TaskPathData:
     basename = os.path.basename(pathname)
     dirname = os.path.dirname(os.path.abspath(pathname))
     # Fetch the file's name without the file extension (this is going to be reset)
@@ -62,7 +91,7 @@ def prepare_file_destination_data(pathname, file_extension):
     # Set destination dict
     basename = f"{file_name_without_extension}.{file_extension}"
     abspath = os.path.join(dirname, basename)
-    file_data = {"basename": basename, "abspath": abspath}
+    file_data = TaskPathData(basename=basename, abspath=abspath)
 
     return file_data
 
@@ -75,17 +104,17 @@ class Task:
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Task"
-        self.task = None
-        self.task_dict = None
+        self.task: Tasks | None = None
+        self.task_dict: dict[str, object] | None = None
         self.settings = config.Config()
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
-        self.statistics = {}
-        self.errors = []
-        self._destination_path_override = None
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
+        self.statistics: dict[str, object] = {}
+        self.errors: list[str] = []
+        self._destination_path_override: str | None = None
 
-    def set_cache_path(self, cache_directory=None, file_extension=None):
+    def set_cache_path(self, cache_directory: str | None = None, file_extension: str | None = None) -> None:
         if not self.task:
             raise TaskError("Unable to set cache path. Task has not been set!")
         # Fetch the file's name without the file extension (this is going to be reset)
@@ -106,47 +135,47 @@ class Task:
         # Set cache path class attribute
         self.task.cache_path = os.path.join(cache_directory, out_file)
 
-    def get_cache_path(self):
+    def get_cache_path(self) -> str:
         if not self.task:
             raise TaskError("Unable to fetch cache path. Task has not been set!")
         if not self.task.cache_path:
             raise TaskError("Unable to fetch cache path. Task cache path has not been set!")
-        return self.task.cache_path
+        return str(self.task.cache_path)
 
-    def get_task_data(self):
+    def get_task_data(self) -> dict[str, object]:
         if not self.task:
             raise TaskError("Unable to fetch task dictionary. Task has not been set!")
-        self.task_dict = model_to_dict(self.task, backrefs=True)
+        self.task_dict = model_as_dict(self.task, backrefs=True)
         return self.task_dict
 
-    def get_task_id(self):
+    def get_task_id(self) -> int:
         if not self.task:
             raise TaskError("Unable to fetch task ID. Task has not been set!")
-        return self.task.id
+        return int(self.task.id)
 
-    def get_task_type(self):
+    def get_task_type(self) -> str:
         if not self.task:
             raise TaskError("Unable to fetch task type. Task has not been set!")
-        return self.task.type
+        return str(self.task.type)
 
-    def get_task_library_id(self):
+    def get_task_library_id(self) -> int:
         if not self.task:
             raise TaskError(_ERR_NO_TASK_LIBRARY)
-        return self.task.library_id
+        return int(self.task.library_id)
 
-    def get_task_library_name(self):
-        if not self.task:
-            raise TaskError(_ERR_NO_TASK_LIBRARY)
-        library = Library(self.task.library_id)
-        return library.get_name()
-
-    def get_task_library_priority_score(self):
+    def get_task_library_name(self) -> str:
         if not self.task:
             raise TaskError(_ERR_NO_TASK_LIBRARY)
         library = Library(self.task.library_id)
-        return library.get_priority_score()
+        return str(library.get_name())
 
-    def get_destination_data(self):
+    def get_task_library_priority_score(self) -> int:
+        if not self.task:
+            raise TaskError(_ERR_NO_TASK_LIBRARY)
+        library = Library(self.task.library_id)
+        return int(library.get_priority_score())
+
+    def get_destination_data(self) -> TaskPathData:
         if not self.task:
             raise TaskError("Unable to fetch destination data. Task has not been set!")
 
@@ -164,7 +193,7 @@ class Task:
 
         return prepare_file_destination_data(self.task.abspath, file_extension)
 
-    def set_destination_path(self, new_path):
+    def set_destination_path(self, new_path: str) -> None:
         """
         Override the destination path returned by get_destination_data().
 
@@ -181,7 +210,7 @@ class Task:
             raise TaskError("Unable to set destination path. No path provided!")
         self._destination_path_override = new_path
 
-    def get_source_data(self):
+    def get_source_data(self) -> TaskPathData:
         if not self.task:
             raise TaskError("Unable to fetch source absolute path. Task has not been set!")
         if not self.task.abspath:
@@ -191,30 +220,39 @@ class Task:
             "basename": os.path.basename(self.task.abspath),
         }
 
-    def get_source_basename(self):
-        return self.get_source_data().get("basename")
+    def get_source_basename(self) -> str:
+        return self.get_source_data()["basename"]
 
-    def get_source_abspath(self):
-        return self.get_source_data().get("abspath")
+    def get_source_abspath(self) -> str:
+        return self.get_source_data()["abspath"]
 
-    def get_task_success(self):
+    def get_task_success(self) -> bool | None:
         if not self.task:
             raise TaskError("Unable to fetch task success. Task has not been set!")
-        return self.task.success
+        return None if self.task.success is None else bool(self.task.success)
 
-    def get_start_time(self):
+    def get_start_time(self) -> datetime.datetime | float | None:
         if not self.task:
             raise TaskError("Unable to fetch task start time. Task has not been set!")
-        return self.task.start_time
+        start_time = self.task.start_time
+        if isinstance(start_time, datetime.datetime):
+            return start_time
+        return float(start_time) if isinstance(start_time, (int, float)) else None
 
-    def get_finish_time(self):
+    def get_finish_time(self) -> datetime.datetime | float | None:
         if not self.task:
             raise TaskError("Unable to fetch task finish time. Task has not been set!")
-        return self.task.finish_time
+        finish_time = self.task.finish_time
+        if isinstance(finish_time, datetime.datetime):
+            return finish_time
+        return float(finish_time) if isinstance(finish_time, (int, float)) else None
 
-    def task_dump(self):
+    def task_dump(self) -> dict[str, object]:
+        if not self.task:
+            raise TaskError("Unable to dump task. Task has not been set!")
         # Generate a copy of this class as a dict
-        encoding_speed = self.statistics.get("encoding_speed", {})
+        encoding_speed_value = self.statistics.get("encoding_speed", {})
+        encoding_speed = encoding_speed_value if isinstance(encoding_speed_value, Mapping) else {}
         task_dict = {
             "task_label": self.get_source_basename(),
             "abspath": self.get_source_abspath(),
@@ -232,7 +270,7 @@ class Task:
         }
         return task_dict
 
-    def read_and_set_task_by_absolute_path(self, abspath):
+    def read_and_set_task_by_absolute_path(self, abspath: str) -> None:
         """
         Sets the task by it's absolute path.
         If the task already exists in the list, then return that task.
@@ -244,7 +282,14 @@ class Task:
         # Get task matching the abspath
         self.task = Tasks.get(abspath=abspath)
 
-    def create_task_by_absolute_path(self, abspath, task_type="local", library_id=1, priority_score=0, job_id=None):
+    def create_task_by_absolute_path(
+        self,
+        abspath: str,
+        task_type: str = "local",
+        library_id: int = 1,
+        priority_score: int = 0,
+        job_id: str | None = None,
+    ) -> bool:
         """
         Creates the task by its absolute path.
         If the task already exists in the list, then this will throw an exception and return false
@@ -310,7 +355,7 @@ class Task:
             self.logger.info("Cancel creating new task for %s - %s", os.path.basename(abspath), e)
             return False
 
-    def set_status(self, status):
+    def set_status(self, status: str) -> None:
         """
         Sets the task status to either 'pending', 'in_progress', 'processed' or 'complete'
 
@@ -327,7 +372,7 @@ class Task:
         if status == "complete":
             TaskDataStore.clear_task(self.task.id)
 
-    def set_success(self, success):
+    def set_success(self, success: bool) -> None:
         """
         Sets the task success flag to either 'true' or 'false'
 
@@ -342,7 +387,7 @@ class Task:
             self.task.success = False
         self.save()
 
-    def modify_path(self, new_path):
+    def modify_path(self, new_path: str) -> None:
         """
         Modifies the abspath attribute of this task
 
@@ -354,7 +399,7 @@ class Task:
         self.task.abspath = new_path
         self.save()
 
-    def save_command_log(self, log):
+    def save_command_log(self, log: Iterable[str]) -> None:
         """
         Sets the task command log
 
@@ -366,7 +411,7 @@ class Task:
         self.task.log += "".join(log)
         self.save()
 
-    def save(self):
+    def save(self) -> None:
         """
         Save task model object
 
@@ -376,7 +421,7 @@ class Task:
             raise TaskError("Unable to save Task. Task has not been set!")
         self.task.save()
 
-    def delete(self):
+    def delete(self) -> None:
         """
         Delete a task model object
 
@@ -387,20 +432,28 @@ class Task:
         TaskDataStore.clear_task(self.task.id)
         self.task.delete_instance()
 
-    def get_total_task_list_count(self):
+    def get_total_task_list_count(self) -> int:
         task_query = Tasks.select().order_by(Tasks.id.desc())
-        return task_query.count()
+        return int(task_query.count())
 
-    def get_runnable_task_count(self):
+    def get_runnable_task_count(self) -> int:
         """Count work a worker could claim now, excluding approval and retry delays."""
         now = datetime.datetime.now()
         query = Tasks.select().where(Tasks.status == "pending")
         query = query.where((Tasks.deferred_until.is_null()) | (Tasks.deferred_until <= now))
-        return query.count()
+        return int(query.count())
 
     def get_task_list_filtered_and_sorted(
-        self, order=None, start=0, length=None, search_value=None, id_list=None, status=None, task_type=None, library_ids=None
-    ):
+        self,
+        order: TaskOrder | None = None,
+        start: int | None = 0,
+        length: int | None = None,
+        search_value: str | None = None,
+        id_list: Sequence[int] | None = None,
+        status: str | None = None,
+        task_type: str | None = None,
+        library_ids: Sequence[int] | None = None,
+    ) -> Iterable[dict[str, object]]:
         if start is None or int(start) < 0:
             raise TaskError("Task list start must be zero or greater.")
         if length is not None and not 0 <= int(length) <= 1000:
@@ -410,46 +463,38 @@ class Task:
 
         start = int(start)
         length = int(length) if length is not None else None
-        try:
-            query = Tasks.select()
+        query = Tasks.select()
 
-            if id_list:
-                query = query.where(Tasks.id.in_(id_list))
+        if id_list:
+            query = query.where(Tasks.id.in_(id_list))
 
-            if search_value:
-                query = query.where(Tasks.abspath.contains(search_value))
+        if search_value:
+            query = query.where(Tasks.abspath.contains(search_value))
 
-            if status:
-                query = query.where(Tasks.status.in_([status]))
+        if status:
+            query = query.where(Tasks.status.in_([status]))
 
-            if task_type:
-                query = query.where(Tasks.type.in_([task_type]))
+        if task_type:
+            query = query.where(Tasks.type.in_([task_type]))
 
-            if library_ids:
-                query = query.where(Tasks.library_id.in_(library_ids))
+        if library_ids:
+            query = query.where(Tasks.library_id.in_(library_ids))
 
-            # Get order by
-            order_by = None
-            if order:
-                if order.get("dir") == "asc":
-                    order_by = attrgetter(order.get("column"))(Tasks).asc()
-                else:
-                    order_by = attrgetter(order.get("column"))(Tasks).desc()
+        # Get order by
+        order_by = None
+        if order:
+            field = attrgetter(order.get("column"))(Tasks)
+            order_by = field.asc() if order.get("dir") == "asc" else field.desc()
 
-            if order_by:
-                query = query.order_by(order_by)
+        if order_by:
+            query = query.order_by(order_by)
 
-            if length:
-                query = query.limit(length).offset(start)
+        if length:
+            query = query.limit(length).offset(start)
 
-        except Tasks.DoesNotExist:
-            # No task entries exist yet
-            self.logger.warning("No tasks exist yet.")
-            query = []
+        return cast("Iterable[dict[str, object]]", query.dicts())
 
-        return query.dicts()
-
-    def delete_tasks_recursively(self, id_list):
+    def delete_tasks_recursively(self, id_list: Sequence[int] | None) -> bool:
         """
         Deletes a given list of tasks based on their IDs
 
@@ -484,13 +529,14 @@ class Task:
 
             return True
 
-        except Tasks.DoesNotExist:
+        except DoesNotExist:
             # No task entries exist yet
             self.logger.warning("No tasks currently exist.")
+            return False
 
-    def reorder_tasks(self, id_list, direction):
+    def reorder_tasks(self, id_list: Sequence[int], direction: str) -> int:
         # Get the task with the highest ID
-        order = {
+        order: TaskOrder = {
             "column": "priority",
             "dir": "desc",
         }
@@ -500,7 +546,8 @@ class Task:
 
         task_top_priority = 1
         for pending_task_result in pending_task_results:
-            task_top_priority = pending_task_result.get("priority")
+            priority = pending_task_result.get("priority")
+            task_top_priority = priority if isinstance(priority, int) else 1
             break
 
         # Add 500 to that number to offset it above all others.
@@ -511,10 +558,10 @@ class Task:
         query = Tasks.update(priority=Tasks.priority + new_priority_offset if (direction == "top") else 0).where(
             Tasks.id.in_(id_list)
         )
-        return query.execute()
+        return execute_count(query)
 
     @staticmethod
-    def set_tasks_status(id_list, status):
+    def set_tasks_status(id_list: Sequence[int], status: str) -> int:
         """
         Updates the task status for a given list of tasks by ID
 
@@ -523,14 +570,14 @@ class Task:
         :return:
         """
         query = Tasks.update(status=status).where(Tasks.id.in_(id_list))
-        result = query.execute()
+        result = execute_count(query)
         if status == "complete" and id_list:
             for task_id in id_list:
                 TaskDataStore.clear_task(task_id)
-        return result
+        return int(result)
 
     @staticmethod
-    def set_tasks_library_id(id_list, library_id):
+    def set_tasks_library_id(id_list: Sequence[int], library_id: int) -> int:
         """
         Updates the task library_id for a given list of tasks by ID
 
@@ -539,7 +586,7 @@ class Task:
         :return:
         """
         query = Tasks.update(library_id=library_id).where(Tasks.id.in_(id_list))
-        return query.execute()
+        return execute_count(query)
 
 
 class TaskDataStore:
@@ -598,13 +645,13 @@ class TaskDataStore:
            }
     """
 
-    _runner_state: dict = {}
-    _task_state: dict = {}
+    _runner_state: MutableMapping[int, dict[str, dict[str, dict[str, JsonValue]]]] = {}
+    _task_state: MutableMapping[int, dict[str, JsonValue]] = {}
     _lock = threading.RLock()
     _ctx = threading.local()
 
     @classmethod
-    def clear_task(cls, task_id):
+    def clear_task(cls, task_id: int) -> None:
         """
         Remove all cached state for the given task ID.
 
@@ -615,7 +662,7 @@ class TaskDataStore:
             cls._task_state.pop(task_id, None)
 
     @classmethod
-    def bind_runner_context(cls, task_id, plugin_id, runner):
+    def bind_runner_context(cls, task_id: int, plugin_id: str, runner: str) -> None:
         """
         Bind the current thread's runner context.
 
@@ -632,7 +679,7 @@ class TaskDataStore:
         cls._ctx.runner = runner
 
     @classmethod
-    def clear_context(cls):
+    def clear_context(cls) -> None:
         """
         Clear the current thread's runner context.
 
@@ -643,7 +690,7 @@ class TaskDataStore:
         cls._ctx.runner = None
 
     @classmethod
-    def set_runner_value(cls, key, value):
+    def set_runner_value(cls, key: str, value: JsonValue) -> bool:
         """
         Store an immutable value under the bound (task_id, plugin_id, runner).
 
@@ -655,7 +702,7 @@ class TaskDataStore:
         tid = getattr(cls._ctx, "task_id", None)
         pid = getattr(cls._ctx, "plugin_id", None)
         run = getattr(cls._ctx, "runner", None)
-        if None in (tid, pid, run):
+        if not isinstance(tid, int) or not isinstance(pid, str) or not isinstance(run, str):
             raise RuntimeError("Runner context not bound")
         with cls._lock:
             task_map = dict(cls._runner_state.get(tid, {}))
@@ -670,7 +717,14 @@ class TaskDataStore:
             return True
 
     @classmethod
-    def get_runner_value(cls, key, default=None, *, plugin_id=None, runner=None):
+    def get_runner_value(
+        cls,
+        key: str,
+        default: JsonValue = None,
+        *,
+        plugin_id: str | None = None,
+        runner: str | None = None,
+    ) -> JsonValue:
         """
         Retrieve an immutable runner value by key.
 
@@ -682,19 +736,19 @@ class TaskDataStore:
         :raises RuntimeError: if context not bound and no override provided.
         """
         tid = getattr(cls._ctx, "task_id", None)
-        if tid is None:
+        if not isinstance(tid, int):
             raise RuntimeError("Runner context not bound")
 
         pid = plugin_id if plugin_id is not None else getattr(cls._ctx, "plugin_id", None)
         run = runner if runner is not None else getattr(cls._ctx, "runner", None)
-        if None in (pid, run):
+        if not isinstance(pid, str) or not isinstance(run, str):
             raise RuntimeError("Runner context not fully bound and no override provided")
 
         with cls._lock:
             return cls._runner_state.get(tid, {}).get(pid, {}).get(run, {}).get(key, default)
 
     @classmethod
-    def set_task_state(cls, key, value, task_id=None):
+    def set_task_state(cls, key: str, value: JsonValue, task_id: int | None = None) -> None:
         """
         Store or overwrite a mutable value for a task.
 
@@ -704,7 +758,7 @@ class TaskDataStore:
         :raises: RuntimeError if no task_id provided and no context bound.
         """
         tid = task_id if task_id is not None else getattr(cls._ctx, "task_id", None)
-        if tid is None:
+        if not isinstance(tid, int):
             raise RuntimeError(_ERR_NO_TASK_ID)
         with cls._lock:
             existing = cls._task_state.get(tid, {})
@@ -713,7 +767,7 @@ class TaskDataStore:
             cls._task_state[tid] = new_t
 
     @classmethod
-    def get_task_state(cls, key, default=None, task_id=None):
+    def get_task_state(cls, key: str, default: JsonValue = None, task_id: int | None = None) -> JsonValue:
         """
         Retrieve a mutable task value by key.
 
@@ -724,13 +778,13 @@ class TaskDataStore:
         :return: Stored value or default.
         """
         tid = task_id if task_id is not None else getattr(cls._ctx, "task_id", None)
-        if tid is None:
+        if not isinstance(tid, int):
             raise RuntimeError(_ERR_NO_TASK_ID)
         with cls._lock:
             return cls._task_state.get(tid, {}).get(key, default)
 
     @classmethod
-    def delete_task_state(cls, key, task_id=None):
+    def delete_task_state(cls, key: str, task_id: int | None = None) -> None:
         """
         Delete a mutable key for a given task.
 
@@ -739,7 +793,7 @@ class TaskDataStore:
         :raises: RuntimeError if no task_id provided and no context bound.
         """
         tid = task_id if task_id is not None else getattr(cls._ctx, "task_id", None)
-        if tid is None:
+        if not isinstance(tid, int):
             raise RuntimeError(_ERR_NO_TASK_ID)
         with cls._lock:
             # Copy-then-reassign so the write propagates when _task_state is a
@@ -753,7 +807,7 @@ class TaskDataStore:
                 cls._task_state[tid] = t
 
     @classmethod
-    def export_task_state(cls, task_id):
+    def export_task_state(cls, task_id: int) -> dict[str, JsonValue]:
         """
         Export the mutable state for a specific task as a deep-copied dict.
 
@@ -764,7 +818,7 @@ class TaskDataStore:
             return deepcopy(cls._task_state.get(task_id, {}))
 
     @classmethod
-    def export_task_state_json(cls, task_id, **json_kwargs):
+    def export_task_state_json(class_: "type[TaskDataStore]", task_id: int, **json_kwargs: Unpack[JSONDumpOptions]) -> str:
         """
         Export the mutable state for a specific task as JSON.
 
@@ -772,11 +826,11 @@ class TaskDataStore:
         :param json_kwargs: Passed to json.dumps (e.g. indent=2).
         :return: JSON string.
         """
-        state = cls.export_task_state(task_id)
+        state = class_.export_task_state(task_id)
         return json.dumps(state, **json_kwargs)
 
     @classmethod
-    def import_task_state(cls, task_id, new_state):
+    def import_task_state(cls, task_id: int, new_state: Mapping[str, JsonValue]) -> None:
         """
         Merge a dict of new_state into existing task_state for a task.
 
@@ -794,7 +848,7 @@ class TaskDataStore:
             cls._task_state[task_id] = t
 
     @classmethod
-    def import_task_state_json(cls, task_id, json_data):
+    def import_task_state_json(cls, task_id: int, json_data: str) -> None:
         """
         Parse a JSON string and import it into task_state for a given task,
         merging keys as in import_task_state.
@@ -802,7 +856,19 @@ class TaskDataStore:
         :param task_id: Integer ID of the task.
         :param json_data: JSON string produced by export_task_state_json.
         """
-        parsed = json.loads(json_data)
+        parsed: object = json.loads(json_data)
         if not isinstance(parsed, dict):
             raise ValueError("Imported JSON must be an object/dict")
-        cls.import_task_state(task_id, parsed)
+        if not all(isinstance(key, str) and _is_json_value(value) for key, value in parsed.items()):
+            raise ValueError("Imported JSON contains unsupported values")
+        cls.import_task_state(task_id, cast("dict[str, JsonValue]", parsed))
+
+
+def _is_json_value(value: object) -> bool:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return True
+    if isinstance(value, list):
+        return all(_is_json_value(item) for item in value)
+    if isinstance(value, dict):
+        return all(isinstance(key, str) and _is_json_value(item) for key, item in value.items())
+    return False

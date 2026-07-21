@@ -12,22 +12,26 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import type { PropType } from 'vue'
+import type { Chart as ChartInstance } from 'chart.js'
 import { useQuasar } from 'quasar'
 import { useChartTheme } from 'src/composables/useChartTheme'
+
+interface ResolutionCount { resolution: string; count: number }
 
 export default {
   name: 'ResolutionDistributionChart',
   props: {
-    resolutions: { type: Array, default: () => [] },
+    resolutions: { type: Array as PropType<ResolutionCount[]>, default: () => [] },
     loading: { type: Boolean, default: false },
   },
   setup(props) {
     const $q = useQuasar()
     const { getChartColor } = useChartTheme()
-    const chartRef = ref(null)
-    let chart = null
+    const chartRef = ref<HTMLCanvasElement | null>(null)
+    let chart: ChartInstance<'bar'> | null = null
 
     async function renderChart() {
       const { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } = await import('chart.js')

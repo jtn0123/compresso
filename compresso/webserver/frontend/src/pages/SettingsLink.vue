@@ -282,7 +282,7 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -290,12 +290,33 @@ import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 import RemoteInstallLinkDialog from 'components/settings/link/RemoteInstallLinkDialog.vue'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
+import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav.vue'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import CompressoSettingsSubmitButton from 'components/ui/buttons/CompressoSettingsSubmitButton.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
+import type { DialogController } from 'src/types/ui'
+
+interface RemoteInstallationView {
+  address: string
+  auth?: string
+  username?: string | null
+  password?: string | null
+  api_token?: string | null
+  enableReceivingTasks: boolean
+  enableSendingTasks: boolean
+  enableTaskPreloading: boolean
+  enableChecksumValidation: boolean
+  enableConfigMissingLibraries: boolean
+  enableDistributedWorkers: boolean
+  name: string
+  version: string
+  uuid: string
+  available: boolean
+}
+
+const log = createLogger('SettingsLink')
 
 export default {
   name: 'SettingsLink',
@@ -310,19 +331,16 @@ export default {
   },
   setup() {
     const { t: $t } = useI18n()
-    const log = createLogger('SettingsLink')
-
-    const addRemoteDialogRef = ref(null)
+    const addRemoteDialogRef = ref<DialogController | null>(null)
 
     /**
      * Compresso WS handle
      * @type {null}
      */
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    const compressoWSHandler = CompressoWebsocketHandler($t)
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      compressoWSHandler.init()
     }
 
     function closeCompressoWebsocket() {
@@ -346,21 +364,21 @@ export default {
   },
   data() {
     return {
-      installationName: ref(null),
-      installationPublicAddress: ref(null),
-      remoteInstallations: ref(null),
-      newRemoteInstallation: ref(false),
-      newRemoteInstallationAddress: ref(''),
-      newRemoteInstallationAuthenticationType: ref('None'),
-      newRemoteInstallationAuthenticationOptions: ref(['None', 'Basic']),
-      newRemoteInstallationUsername: ref(null),
-      newRemoteInstallationPassword: ref(null),
-      newRemoteInstallationApiToken: ref(null),
-      activeRemoteInstallationUuid: ref(''),
+      installationName: null as string | null,
+      installationPublicAddress: null as string | null,
+      remoteInstallations: [] as RemoteInstallationView[],
+      newRemoteInstallation: false,
+      newRemoteInstallationAddress: '',
+      newRemoteInstallationAuthenticationType: 'None',
+      newRemoteInstallationAuthenticationOptions: ['None', 'Basic'],
+      newRemoteInstallationUsername: null as string | null,
+      newRemoteInstallationPassword: null as string | null,
+      newRemoteInstallationApiToken: null as string | null,
+      activeRemoteInstallationUuid: '',
     }
   },
   methods: {
-    validatePublicAddress(val) {
+    validatePublicAddress(val: string | null): boolean {
       if (!val) return true
       return val.toLowerCase().startsWith('http')
     },
@@ -375,10 +393,10 @@ export default {
           this.installationName = response.data.settings.installation_name
           this.installationPublicAddress = response.data.settings.installation_public_address
           // Set the list of remote installations
-          let remoteInstallationsList = []
+          const remoteInstallationsList: RemoteInstallationView[] = []
           for (let i = 0; i < response.data.settings.remote_installations.length; i++) {
-            let remoteInstallation = response.data.settings.remote_installations[i]
-            remoteInstallationsList[remoteInstallationsList.length] = {
+            const remoteInstallation = response.data.settings.remote_installations[i]
+            remoteInstallationsList.push({
               address: remoteInstallation.address,
               enableReceivingTasks: remoteInstallation.enable_receiving_tasks,
               enableSendingTasks: remoteInstallation.enable_sending_tasks,
@@ -390,7 +408,7 @@ export default {
               version: remoteInstallation.version,
               uuid: remoteInstallation.uuid,
               available: remoteInstallation.available,
-            }
+            })
           }
           this.remoteInstallations = remoteInstallationsList
         })
@@ -416,17 +434,19 @@ export default {
       }
 
       // Save settings
-      let remoteInstallationsList = []
+      const remoteInstallationsList: Array<Record<string, unknown>> = []
       for (let i = 0; i < this.remoteInstallations.length; i++) {
-        remoteInstallationsList[remoteInstallationsList.length] = {
-          address: this.remoteInstallations[i].address,
-          enable_receiving_tasks: this.remoteInstallations[i].enableReceivingTasks,
-          enable_sending_tasks: this.remoteInstallations[i].enableSendingTasks,
-          name: this.remoteInstallations[i].name,
-          version: this.remoteInstallations[i].version,
-          uuid: this.remoteInstallations[i].uuid,
-          available: this.remoteInstallations[i].available,
-        }
+        const installation = this.remoteInstallations[i]
+        if (!installation) continue
+        remoteInstallationsList.push({
+          address: installation.address,
+          enable_receiving_tasks: installation.enableReceivingTasks,
+          enable_sending_tasks: installation.enableSendingTasks,
+          name: installation.name,
+          version: installation.version,
+          uuid: installation.uuid,
+          available: installation.available,
+        })
       }
       let data = {
         settings: {
@@ -439,7 +459,7 @@ export default {
         url: getCompressoApiUrl('v2', 'settings/write'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           // Save success, show feedback
           this.fetchSettings()
           this.$q.notify({
@@ -471,7 +491,7 @@ export default {
     addNewRemoteInstallation: function () {
       // Ensure this remote installation is not already in the list
       for (let i = 0; i < this.remoteInstallations.length; i++) {
-        if (this.newRemoteInstallationAddress === this.remoteInstallations[i].address) {
+        if (this.newRemoteInstallationAddress === this.remoteInstallations[i]?.address) {
           this.$q.notify({
             color: 'negative',
             position: 'top',
@@ -512,19 +532,23 @@ export default {
             let version = response.data.installation.version
             let uuid = response.data.installation.session.uuid
             // Add to list
-            this.remoteInstallations[this.remoteInstallations.length] = {
+            this.remoteInstallations.push({
               address: this.newRemoteInstallationAddress,
               auth: this.newRemoteInstallationAuthenticationType,
               username: this.newRemoteInstallationUsername,
               password: this.newRemoteInstallationPassword,
               api_token: this.newRemoteInstallationApiToken,
-              enable_receiving_tasks: false,
-              enable_sending_tasks: false,
+              enableReceivingTasks: false,
+              enableSendingTasks: false,
+              enableTaskPreloading: false,
+              enableChecksumValidation: false,
+              enableConfigMissingLibraries: false,
+              enableDistributedWorkers: false,
               name: name,
               version: version,
               uuid: uuid,
               available: true,
-            }
+            })
             // Trigger a save event
             let data = {
               link_config: {
@@ -546,7 +570,7 @@ export default {
               url: getCompressoApiUrl('v2', 'settings/link/write'),
               data: data,
             })
-              .then((response) => {
+              .then(() => {
                 // Save success, show feedback
                 this.$q.notify({
                   color: 'positive',
@@ -556,7 +580,7 @@ export default {
                   timeout: 200,
                 })
                 // Close dialog
-                this.addRemoteDialogRef.hide()
+                this.addRemoteDialogRef?.hide()
               })
               .catch(() => {
                 this.$q.notify({
@@ -579,20 +603,22 @@ export default {
           })
         })
     },
-    deleteRemoteInstallation: function (index) {
-      let newList = []
+    deleteRemoteInstallation: function (index: number) {
+      const newList: RemoteInstallationView[] = []
       for (let i = 0; i < this.remoteInstallations.length; i++) {
         if (i === index) {
           // Request a DELETE from server
+          const installation = this.remoteInstallations[i]
+          if (!installation) continue
           let data = {
-            uuid: this.remoteInstallations[i].uuid,
+            uuid: installation.uuid,
           }
           axios({
             method: 'delete',
             url: getCompressoApiUrl('v2', 'settings/link/remove'),
             data: data,
           })
-            .then((response) => {
+            .then(() => {
               // Save success, show feedback
               this.$q.notify({
                 color: 'positive',
@@ -616,21 +642,23 @@ export default {
           // Remove item from the list by skipping it this loop
           continue
         }
-        newList[newList.length] = this.remoteInstallations[i]
+        const installation = this.remoteInstallations[i]
+        if (installation) newList.push(installation)
       }
       this.remoteInstallations = newList
     },
-    configureRemoteInstallation: function (index) {
-      let installation = this.remoteInstallations[index]
+    configureRemoteInstallation: function (index: number) {
+      const installation = this.remoteInstallations[index]
+      if (!installation) return
       this.activeRemoteInstallationUuid = installation.uuid
       this.$nextTick(() => {
         if (this.$refs.remoteInstallDialogRef) {
-          this.$refs.remoteInstallDialogRef.show()
+          ;(this.$refs.remoteInstallDialogRef as DialogController).show()
         }
       })
     },
     openNewRemoteInstallationDialog: function () {
-      this.addRemoteDialogRef.show()
+      this.addRemoteDialogRef?.show()
     },
     onRemoteInstallSaved: function () {
       this.fetchSettings()

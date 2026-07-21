@@ -1,6 +1,8 @@
 import base64
 import ipaddress
 import socket
+from collections.abc import Mapping, Sequence
+from typing import TypedDict
 from urllib.parse import urlparse
 
 import tornado.httpclient
@@ -47,23 +49,33 @@ TARGET_CREDENTIAL_HEADERS = ("Authorization", API_AUTH_HEADER_NAME)
 BLOCKED_REDIRECT_STATUSES = frozenset((301, 302, 303, 307, 308))
 
 
-def _allowed_headers(headers, allowlist):
+class ProxyTarget(TypedDict):
+    url_base: str
+    headers: dict[str, str]
+    config: dict[str, object]
+
+
+def _string(value: object, default: str = "") -> str:
+    return value if isinstance(value, str) else default
+
+
+def _allowed_headers(headers: Mapping[str, str], allowlist: Sequence[str]) -> dict[str, str]:
     return {name: value for name in allowlist if (value := headers.get(name)) is not None}
 
 
-def build_proxy_request_headers(inbound_headers, target_credentials):
+def build_proxy_request_headers(inbound_headers: Mapping[str, str], target_credentials: Mapping[str, str]) -> dict[str, str]:
     """Copy only protocol metadata, then apply credentials for the selected worker."""
     headers = _allowed_headers(inbound_headers, PROXY_REQUEST_HEADER_ALLOWLIST)
     headers.update(_allowed_headers(target_credentials, TARGET_CREDENTIAL_HEADERS))
     return headers
 
 
-def build_proxy_response_headers(upstream_headers):
+def build_proxy_response_headers(upstream_headers: Mapping[str, str]) -> dict[str, str]:
     """Return only response metadata safe to expose through the master."""
     return _allowed_headers(upstream_headers, PROXY_RESPONSE_HEADER_ALLOWLIST)
 
 
-def is_blocked_proxy_redirect(status_code):
+def is_blocked_proxy_redirect(status_code: int) -> bool:
     """Return whether an upstream response would redirect the proxy client."""
     return status_code in BLOCKED_REDIRECT_STATUSES
 
@@ -76,7 +88,7 @@ _BLOCKED_NETWORKS = [
 ]
 
 
-def _is_blocked_address(hostname):
+def _is_blocked_address(hostname: str) -> bool:
     """
     Check if a hostname resolves to a loopback, link-local, or cloud metadata IP.
     LAN addresses (10.x, 172.16-31.x, 192.168.x) are allowed since remote
@@ -90,6 +102,8 @@ def _is_blocked_address(hostname):
         return True
     for _family, _type, _proto, _canonname, sockaddr in addr_infos:
         ip_str = sockaddr[0]
+        if not isinstance(ip_str, str):
+            return True
         try:
             addr = ipaddress.ip_address(ip_str)
         except ValueError:
@@ -104,17 +118,17 @@ def _is_blocked_address(hostname):
     return False
 
 
-def resolve_proxy_target(target_id):
+def resolve_proxy_target(target_id: str | None) -> ProxyTarget | None:
     """
     Finds the remote installation config based on target_id (name, address, or uuid).
     Returns a dict with 'url', 'auth_header' (dict), or None.
     """
     links = Links()
     remotes = links.settings.get_remote_installations()
-    target_config = None
+    target_config: dict[str, object] | None = None
 
     # Helper to search remotes
-    def search_remotes(search_list):
+    def search_remotes(search_list: Sequence[dict[str, object]]) -> dict[str, object] | None:
         if not target_id:
             return None
         t_id = str(target_id).strip().lower()
@@ -147,7 +161,7 @@ def resolve_proxy_target(target_id):
         return None
 
     # Construct URL base
-    url_base = target_config.get("address", "").rstrip("/")
+    url_base = _string(target_config.get("address")).rstrip("/")
     if not url_base.startswith("http"):
         url_base = _HTTP_SCHEME + url_base
 
@@ -158,10 +172,11 @@ def resolve_proxy_target(target_id):
         return None
 
     # Auth
-    auth_headers = {}
-    if target_config.get("auth") and target_config.get("auth").lower() == "basic":
-        username = target_config.get("username", "")
-        password = target_config.get("password", "")
+    auth_headers: dict[str, str] = {}
+    auth_type = _string(target_config.get("auth"))
+    if auth_type.lower() == "basic":
+        username = _string(target_config.get("username"))
+        password = _string(target_config.get("password"))
         auth_str = f"{username}:{password}"
         auth_bytes = auth_str.encode("ascii")
         base64_bytes = base64.b64encode(auth_bytes)
@@ -176,14 +191,14 @@ def resolve_proxy_target(target_id):
 class ProxyHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
     SUPPORTED_METHODS = ("GET", "HEAD", "POST", "DELETE", "PATCH", "PUT", "OPTIONS")
 
-    def set_default_headers(self):
+    def set_default_headers(self) -> None:
         self.set_security_headers()
 
-    async def prepare(self):
+    async def prepare(self) -> None:
         if not authorize_request(self):
             return
 
-    async def _handle_request(self, method):
+    async def _handle_request(self, method: str) -> None:
         target_id = self.request.headers.get("X-Compresso-Target-Installation")
         target_info = resolve_proxy_target(target_id)
 
@@ -229,23 +244,23 @@ class ProxyHandler(SecurityHeadersMixin, tornado.web.RequestHandler):
             self.set_status(502)
             self.write({"error": "Proxy Error"})
 
-    async def get(self):
+    async def get(self) -> None:
         await self._handle_request("GET")
 
-    async def head(self):
+    async def head(self) -> None:
         await self._handle_request("HEAD")
 
-    async def post(self):
+    async def post(self) -> None:
         await self._handle_request("POST")
 
-    async def delete(self):
+    async def delete(self) -> None:
         await self._handle_request("DELETE")
 
-    async def patch(self):
+    async def patch(self) -> None:
         await self._handle_request("PATCH")
 
-    async def put(self):
+    async def put(self) -> None:
         await self._handle_request("PUT")
 
-    async def options(self):
+    async def options(self) -> None:
         await self._handle_request("OPTIONS")

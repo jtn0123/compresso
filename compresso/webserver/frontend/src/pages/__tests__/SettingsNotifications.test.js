@@ -97,7 +97,7 @@ const MOCK_CHANNELS = [
 function setupMocks(channels = MOCK_CHANNELS) {
   // Deep copy to prevent cross-test mutation of shared mock data
   const channelsCopy = JSON.parse(JSON.stringify(channels))
-  mockAxiosFn.mockImplementation(({ method, url }) => {
+  mockAxiosFn.mockImplementation(({ method: _method, url }) => {
     if (url && url.includes('notifications/channels/save')) {
       return Promise.resolve({ data: { success: true } })
     }

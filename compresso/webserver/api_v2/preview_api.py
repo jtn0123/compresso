@@ -7,10 +7,16 @@ API handler for A/B preview comparison endpoints.
 
 """
 
-import tornado.log
+from tornado.log import app_log
 
 from compresso.libs.preview import PreviewManager
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    float_value,
+    integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.schema.preview_schemas import (
     PreviewCreateResponseSchema,
     PreviewStatusResponseSchema,
@@ -39,7 +45,7 @@ class ApiPreviewHandler(BaseApiHandler):
         },
     ]
 
-    async def create_preview(self):
+    async def create_preview(self) -> None:
         """
         Preview - create
         ---
@@ -64,10 +70,11 @@ class ApiPreviewHandler(BaseApiHandler):
 
             from compresso.webserver.helpers.healthcheck import validate_library_exists
 
-            validate_library_exists(json_request.get("library_id"))
+            library_id = integer_value(json_request.get("library_id"), 1)
+            validate_library_exists(library_id)
 
             # Validate source_path is within an allowed directory
-            source_path = json_request.get("source_path")
+            source_path = string_value(json_request.get("source_path"))
             if source_path:
                 import os
 
@@ -80,7 +87,7 @@ class ApiPreviewHandler(BaseApiHandler):
                         if lib.path:
                             allowed_roots.add(os.path.realpath(lib.path))
                 except Exception as e:
-                    tornado.log.app_log.error("Failed to load library paths for path validation: %s", e)
+                    app_log.error("Failed to load library paths for path validation: %s", e)
                 try:
                     from compresso import config
 
@@ -88,7 +95,7 @@ class ApiPreviewHandler(BaseApiHandler):
                     if cache_path:
                         allowed_roots.add(os.path.realpath(cache_path))
                 except Exception as e:
-                    tornado.log.app_log.error("Failed to load cache path for path validation: %s", e)
+                    app_log.error("Failed to load cache path for path validation: %s", e)
                 if not allowed_roots or not any(
                     real_path.startswith(root + os.sep) or real_path == root for root in allowed_roots
                 ):
@@ -96,10 +103,10 @@ class ApiPreviewHandler(BaseApiHandler):
 
             preview_manager = PreviewManager()
             job_id = preview_manager.create_preview(
-                source_path=json_request.get("source_path"),
-                start_time=json_request.get("start_time", 0),
-                duration=json_request.get("duration", 10),
-                library_id=json_request.get("library_id", 1),
+                source_path=source_path,
+                start_time=float_value(json_request.get("start_time")),
+                duration=float_value(json_request.get("duration"), 10.0),
+                library_id=library_id,
             )
 
             response = self.build_response(
@@ -122,7 +129,7 @@ class ApiPreviewHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_preview_status(self):
+    async def get_preview_status(self) -> None:
         """
         Preview - status
         ---
@@ -146,7 +153,7 @@ class ApiPreviewHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestPreviewStatusSchema())
 
             preview_manager = PreviewManager()
-            status = preview_manager.get_job_status(json_request.get("job_id"))
+            status = preview_manager.get_job_status(string_value(json_request.get("job_id")))
 
             if status is None:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Preview job not found")
@@ -177,7 +184,7 @@ class ApiPreviewHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def cleanup_preview(self):
+    async def cleanup_preview(self) -> None:
         """
         Preview - cleanup
         ---
@@ -201,7 +208,7 @@ class ApiPreviewHandler(BaseApiHandler):
             json_request = self.read_json_request(RequestPreviewCleanupSchema())
 
             preview_manager = PreviewManager()
-            preview_manager.cleanup_job(json_request.get("job_id"))
+            preview_manager.cleanup_job(string_value(json_request.get("job_id")))
 
             self.write_success()
             return

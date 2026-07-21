@@ -151,22 +151,24 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { onMounted, onUnmounted, ref } from 'vue'
-import { useQuasar } from 'quasar'
+import { defineComponent, onMounted, onUnmounted } from 'vue'
+import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
+import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav.vue'
 import WorkerGroupConfigDialog from 'components/settings/workers/WorkerGroupConfigDialog.vue'
 import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
 import CompressoSettingsSubmitButton from 'components/ui/buttons/CompressoSettingsSubmitButton.vue'
 import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
 
 import { checkUnsavedChanges } from 'src/js/settingsUtils'
+import type { DialogController } from 'src/types/ui'
+import type { WorkerGroupConfig, WorkerGroupListItem } from 'src/types/workers'
 
-export default {
+export default defineComponent({
   name: 'SettingsWorkers',
   components: {
     MobileSettingsQuickNav,
@@ -176,18 +178,16 @@ export default {
     CompressoListAddButton,
   },
   setup() {
-    const $q = useQuasar()
     const { t: $t } = useI18n()
 
     /**
      * Compresso WS handle
      * @type {null}
      */
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    const compressoWSHandler = CompressoWebsocketHandler($t)
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      compressoWSHandler.init()
     }
 
     function closeCompressoWebsocket() {
@@ -205,7 +205,11 @@ export default {
       closeCompressoWebsocket()
     })
   },
-  beforeRouteLeave(to, from, next) {
+  beforeRouteLeave(
+    _to: RouteLocationNormalized,
+    _from: RouteLocationNormalized,
+    next: NavigationGuardNext,
+  ) {
     if (this.hasUnsavedChanges) {
       this.$q
         .dialog({
@@ -227,12 +231,12 @@ export default {
   },
   data() {
     return {
-      workerGroups: ref(null),
-      cachePath: ref(null),
-      originalCachePath: ref(null),
-      activeWorkerGroupId: ref(0),
-      selectDirectoryInitialPath: ref(''),
-      selectDirectoryListType: ref('directories'),
+      workerGroups: null as WorkerGroupListItem[] | null,
+      cachePath: null as string | null,
+      originalCachePath: null as string | null,
+      activeWorkerGroupId: 0,
+      selectDirectoryInitialPath: '',
+      selectDirectoryListType: 'directories',
     }
   },
   computed: {
@@ -242,22 +246,22 @@ export default {
   },
   methods: {
     updateCacheWithDirectoryBrowser: function () {
-      this.selectDirectoryInitialPath = this.cachePath
+      this.selectDirectoryInitialPath = this.cachePath ?? ''
       this.selectDirectoryListType = 'directories'
       this.$nextTick(() => {
         if (this.$refs.selectDirectoryDialogRef) {
-          this.$refs.selectDirectoryDialogRef.show()
+          ;(this.$refs.selectDirectoryDialogRef as DialogController).show()
         }
       })
     },
-    onDirectorySelected: function (payload) {
+    onDirectorySelected: function (payload: { selectedPath?: string }) {
       if (payload && payload.selectedPath) {
         this.cachePath = payload.selectedPath
       }
     },
     fetchSettings: function () {
       // Fetch current settings
-      axios({
+      axios<{ settings: { cache_path: string } }>({
         method: 'get',
         url: getCompressoApiUrl('v2', 'settings/read'),
       })
@@ -278,14 +282,15 @@ export default {
     },
     fetchWorkerGroupsList: function () {
       // Fetch current settings
-      axios({
+      axios<{ worker_groups: WorkerGroupConfig[] }>({
         method: 'get',
         url: getCompressoApiUrl('v2', 'settings/worker_groups'),
       })
         .then((response) => {
-          let workerGroupsList = []
+          const workerGroupsList: WorkerGroupListItem[] = []
           for (let i = 0; i < response.data.worker_groups.length; i++) {
-            let workerGroup = response.data.worker_groups[i]
+            const workerGroup = response.data.worker_groups[i]
+            if (!workerGroup || workerGroup.id === null) continue
             workerGroupsList[workerGroupsList.length] = {
               id: workerGroup.id,
               name: workerGroup.name,
@@ -307,12 +312,13 @@ export default {
           })
         })
     },
-    deleteWorkerGroup: function (index) {
+    deleteWorkerGroup: function (index: number) {
+      if (this.workerGroups === null) return
       // Fetch worker group ID
-      let workerGroupId
+      let workerGroupId: number | undefined
       for (let i = 0; i < this.workerGroups.length; i++) {
         if (i === index) {
-          workerGroupId = this.workerGroups[i].id
+          workerGroupId = this.workerGroups[i]?.id
           break
         }
       }
@@ -334,7 +340,7 @@ export default {
             url: getCompressoApiUrl('v2', 'settings/worker_group/remove'),
             data: data,
           })
-            .then((response) => {
+            .then(() => {
               // Save success, show feedback
               this.$q.notify({
                 color: 'positive',
@@ -369,7 +375,7 @@ export default {
         url: getCompressoApiUrl('v2', 'settings/write'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           // Save success, show feedback
           this.originalCachePath = this.cachePath
           this.fetchSettings()
@@ -391,15 +397,17 @@ export default {
           })
         })
     },
-    configureWorkerGroup: function (index) {
+    configureWorkerGroup: function (index: number | 'new') {
       if (index === 'new') {
         this.activeWorkerGroupId = 0
       } else {
-        this.activeWorkerGroupId = this.workerGroups[index].id
+        const workerGroup = this.workerGroups?.[index]
+        if (!workerGroup) return
+        this.activeWorkerGroupId = workerGroup.id
       }
       this.$nextTick(() => {
         if (this.$refs.workerGroupDialogRef) {
-          this.$refs.workerGroupDialogRef.show()
+          ;(this.$refs.workerGroupDialogRef as DialogController).show()
         }
       })
     },
@@ -415,7 +423,7 @@ export default {
     this.fetchSettings()
     this.fetchWorkerGroupsList()
   },
-}
+})
 </script>
 <style scoped>
 .settings-workers-panel {

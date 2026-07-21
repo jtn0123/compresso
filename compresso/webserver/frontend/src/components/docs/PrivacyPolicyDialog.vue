@@ -9,26 +9,24 @@
   </CompressoDialogWindow>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import compressoGlobals from 'src/js/compressoGlobals'
 import { markdownToHTML } from 'src/js/markupParser'
 import { sanitizeHtml } from 'src/js/sanitize'
+import type { DialogController } from 'src/types/ui'
 
 const emit = defineEmits(['hide'])
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const isLoading = ref(false)
 const privacyPolicyHtml = ref('')
 
 const show = () => {
-  if (!dialogRef.value) {
-    return
-  }
   isLoading.value = true
   privacyPolicyHtml.value = ''
-  dialogRef.value.show()
+  dialogRef.value?.show()
   compressoGlobals
     .getCompressoPrivacyPolicy()
     .then((privacyPolicy) => {
@@ -40,9 +38,7 @@ const show = () => {
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

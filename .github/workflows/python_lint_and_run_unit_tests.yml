@@ -74,7 +74,10 @@ jobs:
 
     - name: Type check with mypy
       run: |
-        mypy compresso/ --ignore-missing-imports --no-error-summary
+        mypy --strict compresso/ --no-error-summary
+
+    - name: Check OpenAPI contract drift
+      run: python scripts/openapi_contract.py --check
 
   py_unit_test:
     name: Unit Tests (${{ matrix.os }}, shard ${{ matrix.shard }}/3)

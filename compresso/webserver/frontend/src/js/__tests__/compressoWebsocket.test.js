@@ -14,7 +14,6 @@ vi.mock('../compressoGlobals', () => ({
   },
 }))
 
-import { Notify } from 'quasar'
 import $compressoMock from '../compressoGlobals'
 import { wsConnectionState, CompressoWebsocketHandler } from '../compressoWebsocket'
 

@@ -16,14 +16,15 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref } from 'vue'
 import compressoGlobals from 'src/js/compressoGlobals'
+import type { ApiSchema } from 'src/types/contracts'
 
 export default {
   name: 'DrawerUserProfileHeader',
   setup() {
-    const compressoSession = ref(null)
+    const compressoSession = ref<ApiSchema<'SessionStateSuccess'> | null>(null)
 
     compressoGlobals.getCompressoSession().then((session) => {
       compressoSession.value = session

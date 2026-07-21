@@ -35,7 +35,7 @@ import subprocess
 from tornado.ioloop import IOLoop
 
 from compresso.libs import session
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.docs_schemas import DocumentContentSuccessSchema
 from compresso.webserver.helpers import documents
@@ -44,7 +44,7 @@ GITHUB_RELEASES_URL = "https://github.com/jtn0123/compresso/releases"
 _GIT_LOG_FORMAT = "--pretty=format:- %s (%h)"
 
 
-def _generate_changelog_from_git():
+def _generate_changelog_from_git() -> list[str] | None:
     """
     Generate a changelog from git tags and commit messages.
     Returns a list of markdown lines, or None if git is unavailable.
@@ -75,13 +75,13 @@ def _generate_changelog_from_git():
             cwd=repo_root,
             timeout=10,
         )
-        tags = []
+        tags: list[tuple[str, str]] = []
         for line in tags_result.stdout.strip().split("\n"):
             if "|" in line:
                 name, date = line.split("|", 1)
                 tags.append((name.strip(), date.strip()))
 
-        lines = ["# Changelog\n", "\n"]
+        lines: list[str] = ["# Changelog\n", "\n"]
         lines.append("All notable changes to this project are documented here. ")
         lines.append(f"See [GitHub Releases]({GITHUB_RELEASES_URL}) for downloads.\n\n")
 
@@ -143,16 +143,15 @@ def _generate_changelog_from_git():
 
 
 class ApiDocsHandler(BaseApiHandler):
-    session = None
-    config = None
-    params = None
+    session: session.Session
+    params: object
 
     @staticmethod
-    def _read_file_lines(path):
+    def _read_file_lines(path: str) -> list[str]:
         with open(path) as f:
             return f.readlines()
 
-    compresso_data_queues = None
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -167,13 +166,13 @@ class ApiDocsHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    async def get_privacy_policy(self):
+    async def get_privacy_policy(self) -> None:
         """
         Docs - read privacy policy
         ---
@@ -240,7 +239,7 @@ class ApiDocsHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_logs_as_zip(self):
+    async def get_logs_as_zip(self) -> None:
         """
         Docs - get log files as zip
         ---

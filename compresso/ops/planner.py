@@ -14,8 +14,9 @@ import shutil
 import sqlite3
 import sys
 from collections import defaultdict
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import NotRequired, TypedDict
 
 from compresso.config import Config
 from compresso.libs import library_analysis
@@ -28,7 +29,38 @@ PLAN_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,126}\.json")
 CONFIDENCE_SPREAD = {"high": 5.0, "medium": 10.0, "low": 15.0, "optimal": 0.0}
 
 
-def _database_path(settings: Any) -> Path:
+class LibraryRecord(TypedDict):
+    id: int
+    name: str
+    path: str
+    skip_codecs: list[str]
+
+
+class LargestFile(TypedDict):
+    relative_path: str
+    size_bytes: int
+
+
+class Inventory(TypedDict):
+    mode: str
+    media_files: int
+    total_bytes: int
+    sampled_files: int
+    unreadable_files: int
+    largest_file: LargestFile | None
+    probe_failures: NotRequired[int]
+
+
+type PlanData = dict[str, object]
+type HistoricalSavings = library_analysis.HistoricalSavings
+type Probe = Callable[[str], Mapping[str, object]]
+
+
+def _integer(value: object, default: int = 0) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _database_path(settings: Config) -> Path:
     return Path(settings.get_config_path()).expanduser().resolve() / "compresso.db"
 
 
@@ -38,7 +70,7 @@ def _readonly_connection(path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True, timeout=5)
 
 
-def load_library_record(settings: Any, library_id: int) -> dict[str, Any]:
+def load_library_record(settings: Config, library_id: int) -> LibraryRecord:
     """Resolve one configured library through a read-only SQLite connection."""
     try:
         with contextlib.closing(_readonly_connection(_database_path(settings))) as connection:
@@ -58,7 +90,7 @@ def load_library_record(settings: Any, library_id: int) -> dict[str, Any]:
     return {"id": int(row[0]), "name": str(row[1]), "path": str(row[2]), "skip_codecs": skip_codecs}
 
 
-def load_historical_evidence(settings: Any, library_id: int | None) -> tuple[dict, list[float]]:
+def load_historical_evidence(settings: Config, library_id: int | None) -> tuple[HistoricalSavings, list[float]]:
     """Read savings and throughput evidence without initializing the ORM."""
     try:
         with contextlib.closing(_readonly_connection(_database_path(settings))) as connection:
@@ -66,7 +98,7 @@ def load_historical_evidence(settings: Any, library_id: int | None) -> tuple[dic
                 "SELECT source_size, destination_size, source_codec, source_resolution, encoding_duration_seconds "
                 "FROM compressionstats"
             )
-            parameters: tuple[Any, ...] = ()
+            parameters: tuple[object, ...] = ()
             if library_id is not None:
                 query += " WHERE library_id = ?"
                 parameters = (int(library_id),)
@@ -87,7 +119,7 @@ def load_historical_evidence(settings: Any, library_id: int | None) -> tuple[dic
             grouped[key]["count"] += 1
         if source > 0 and seconds > 0:
             throughput.append(source / seconds)
-    historical = {
+    historical: HistoricalSavings = {
         key: {
             "avg_savings_pct": (values["source"] - values["destination"]) / values["source"] * 100,
             "count": int(values["count"]),
@@ -98,7 +130,7 @@ def load_historical_evidence(settings: Any, library_id: int | None) -> tuple[dic
     return historical, throughput
 
 
-def validate_source_path(path: str | Path, settings: Any) -> Path:
+def validate_source_path(path: str | Path, settings: Config) -> Path:
     """Resolve a read-only scan root and reject application state paths."""
     source = Path(path).expanduser().resolve()
     if not source.is_dir():
@@ -111,14 +143,16 @@ def validate_source_path(path: str | Path, settings: Any) -> Path:
     return source
 
 
-def _select_inventory(source: Path, sample_size: int, full_inventory: bool, seed: int) -> tuple[dict, list[dict]]:
+def _select_inventory(
+    source: Path, sample_size: int, full_inventory: bool, seed: int
+) -> tuple[Inventory, list[dict[str, object]]]:
     sample_heap: list[tuple[int, str, int]] = []
     total_bytes = 0
     media_files = 0
     unreadable_files = 0
     traversal_errors: list[OSError] = []
     largest: tuple[int, str] = (0, "")
-    all_entries = []
+    all_entries: list[dict[str, object]] = []
     for path in library_analysis.iter_media_files(source, on_error=traversal_errors.append):
         try:
             size = path.stat().st_size
@@ -151,7 +185,7 @@ def _select_inventory(source: Path, sample_size: int, full_inventory: bool, seed
             {"path": str(source / relative), "relative_path": relative, "size_bytes": size}
             for _score, relative, size in sorted(sample_heap, key=lambda item: item[1])
         ]
-    inventory = {
+    inventory: Inventory = {
         "mode": "full-probe" if full_inventory else "sampled-probe",
         "media_files": media_files,
         "total_bytes": total_bytes,
@@ -164,19 +198,19 @@ def _select_inventory(source: Path, sample_size: int, full_inventory: bool, seed
 
 def _savings_summary(
     total_bytes: int,
-    samples: list[dict[str, Any]],
-    historical: dict,
+    samples: list[dict[str, object]],
+    historical: HistoricalSavings,
     skip_codecs: set[str],
-) -> dict[str, Any]:
+) -> PlanData:
     known_bytes = 0
     weighted_low = 0.0
     weighted_high = 0.0
     confidences = []
-    groups: dict[tuple[str, str], dict[str, Any]] = {}
+    groups: dict[tuple[str, str], dict[str, object]] = {}
     for sample in samples:
         codec = str(sample.get("codec") or "unknown").lower()
         resolution = str(sample.get("resolution") or "unknown")
-        size = int(sample.get("size_bytes") or 0)
+        size = _integer(sample.get("size_bytes"))
         if codec in skip_codecs:
             point, count, confidence = 0.0, 0, "optimal"
         else:
@@ -193,8 +227,8 @@ def _savings_summary(
                 "confidence": confidence if confidence != "none" else "unknown",
             },
         )
-        group["sample_files"] += 1
-        group["sample_bytes"] += size
+        group["sample_files"] = _integer(group.get("sample_files")) + 1
+        group["sample_bytes"] = _integer(group.get("sample_bytes")) + size
         if confidence == "none":
             continue
         spread = CONFIDENCE_SPREAD[confidence]
@@ -205,7 +239,7 @@ def _savings_summary(
         weighted_high += size * high
         confidences.append(confidence)
         group["range_pct"] = {"low": round(low, 1), "high": round(high, 1)}
-    sampled_bytes = sum(int(sample.get("size_bytes") or 0) for sample in samples)
+    sampled_bytes = sum(_integer(sample.get("size_bytes")) for sample in samples)
     if not known_bytes or not sampled_bytes:
         return {
             "status": "unknown",
@@ -235,7 +269,7 @@ def _savings_summary(
     }
 
 
-def _runtime_summary(total_bytes: int, throughput: list[float]) -> dict[str, Any]:
+def _runtime_summary(total_bytes: int, throughput: list[float]) -> PlanData:
     valid = sorted(float(value) for value in throughput if float(value) > 0)
     if len(valid) < 3:
         return {"status": "unknown", "historical_samples": len(valid), "single_slot_seconds": None}
@@ -254,15 +288,15 @@ def _runtime_summary(total_bytes: int, throughput: list[float]) -> dict[str, Any
     }
 
 
-def _allocation(settings: Any) -> dict[str, Any]:
-    workers = []
+def _allocation(settings: Config) -> PlanData:
+    workers: list[dict[str, object]] = []
     remotes = settings.get_remote_installations()
     if isinstance(remotes, list):
         for remote in remotes:
-            if not isinstance(remote, dict) or not remote.get("available"):
+            if not isinstance(remote, Mapping) or not remote.get("available"):
                 continue
             raw_capabilities = remote.get("capabilities")
-            capabilities: dict[str, Any] = raw_capabilities if isinstance(raw_capabilities, dict) else {}
+            capabilities: Mapping[str, object] = raw_capabilities if isinstance(raw_capabilities, Mapping) else {}
             workers.append(
                 {
                     "name": str(remote.get("name") or "linked-worker"),
@@ -279,7 +313,7 @@ def _allocation(settings: Any) -> dict[str, Any]:
 
 
 def build_capacity_plan(
-    settings: Any,
+    settings: Config,
     source_path: str | Path,
     *,
     library_id: int | None = None,
@@ -287,22 +321,25 @@ def build_capacity_plan(
     full_inventory: bool = False,
     seed: int = 20,
     skip_codecs: list[str] | None = None,
-    probe=None,
-    historical_savings: dict | None = None,
+    probe: Probe | None = None,
+    historical_savings: HistoricalSavings | None = None,
     throughput_bytes_per_second: list[float] | None = None,
-) -> dict[str, Any]:
+) -> PlanData:
     """Build a read-only plan from bounded metadata and probe evidence."""
     if sample_size < 1:
         raise ValueError("sample_size must be positive")
     source = validate_source_path(source_path, settings)
     inventory, selected = _select_inventory(source, sample_size, full_inventory, seed)
     probe_file = probe or library_analysis.probe_analysis_file
-    samples = []
+    samples: list[dict[str, object]] = []
     probe_failures = 0
     for entry in selected:
         try:
-            metadata = probe_file(entry["path"])
-            if not isinstance(metadata, dict):
+            entry_path = entry.get("path")
+            if not isinstance(entry_path, str):
+                raise ValueError("inventory entry has no path")
+            metadata = probe_file(entry_path)
+            if not isinstance(metadata, Mapping):
                 raise ValueError("probe returned no metadata")
             samples.append({**metadata, "size_bytes": entry["size_bytes"]})
         except (OSError, TypeError, ValueError):
@@ -345,7 +382,7 @@ def build_capacity_plan(
     }
 
 
-def _plan_destination(settings: Any, output_name: str) -> Path:
+def _plan_destination(settings: Config, output_name: str) -> Path:
     if Path(output_name).name != output_name or PLAN_NAME_PATTERN.fullmatch(output_name) is None:
         raise ValueError("plan output must be a JSON filename without directory components")
     root = (Path(settings.get_userdata_path()) / "planning").resolve()
@@ -355,7 +392,7 @@ def _plan_destination(settings: Any, output_name: str) -> Path:
     return destination
 
 
-def save_plan(settings: Any, output_name: str, payload: dict[str, Any]) -> Path:
+def save_plan(settings: Config, output_name: str, payload: PlanData) -> Path:
     destination = _plan_destination(settings, output_name)
     atomic_json_write(destination, payload, mode=0o600)
     return destination

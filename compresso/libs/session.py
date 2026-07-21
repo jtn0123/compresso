@@ -31,10 +31,15 @@ Copyright:
 
 import datetime
 import time
+from asyncio import Future
+from collections.abc import Mapping
+
+import requests
 
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.peewee_types import execute_write
 from compresso.libs.singleton import SingletonType
-from compresso.libs.unmodels import Installation
+from compresso.libs.unmodels.installation import Installation
 
 
 class Session(metaclass=SingletonType):
@@ -47,28 +52,30 @@ class Session(metaclass=SingletonType):
     """
 
     # All features unlocked
-    level = 100
+    level: int = 100
 
     # No limits on libraries or linked installations
-    library_count = 999999
-    link_count = 999999
+    library_count: int = 999999
+    link_count: int = 999999
 
-    picture_uri = ""
-    name = ""
-    email = ""
-    created = None
-    last_check = None
-    uuid = None
-    user_access_token = None
-    application_token = None
+    picture_uri: str = ""
+    name: str = ""
+    email: str = ""
+    created: float | None = None
+    last_check: float | None = None
+    uuid: str | None = None
+    user_access_token: str | None = None
+    application_token: str | None = None
+    token_poll_task: Future[bool] | None = None
 
-    def __init__(self, *args, **kwargs):
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
+        self.requests_session = requests.Session()
         self.logger.info("Initialising new session object (all features unlocked)")
         self.created = time.time()
         self.last_check = time.time()
 
-    def get_installation_uuid(self):
+    def get_installation_uuid(self) -> str:
         """
         Returns the installation UUID as a string.
         If it does not yet exist, it will create one.
@@ -77,9 +84,11 @@ class Session(metaclass=SingletonType):
         """
         if not self.uuid:
             self.__fetch_installation_data()
+        if self.uuid is None:
+            raise RuntimeError("Installation UUID could not be created")
         return self.uuid
 
-    def get_supporter_level(self):
+    def get_supporter_level(self) -> int:
         """
         Returns the supporter level (always 100 — all features unlocked).
 
@@ -87,7 +96,7 @@ class Session(metaclass=SingletonType):
         """
         return self.level
 
-    def register_compresso(self, force=False):
+    def register_compresso(self, force: bool = False) -> bool:
         """
         No-op. All features are unlocked without registration.
 
@@ -101,7 +110,7 @@ class Session(metaclass=SingletonType):
             self.created = time.time()
         return True
 
-    def sign_out(self, remote=True):
+    def sign_out(self, remote: bool = True) -> bool:
         """
         No-op — no remote session to sign out from.
 
@@ -109,62 +118,72 @@ class Session(metaclass=SingletonType):
         """
         return True
 
-    def auth_user_account(self, force_checkin=False):
+    def auth_user_account(self, force_checkin: bool = False) -> bool:
         """No-op — always authenticated."""
         return True
 
-    def auth_trial_account(self):
+    def auth_trial_account(self) -> bool:
         """No-op — all features unlocked."""
         return True
 
-    def verify_token(self):
+    def verify_token(self) -> bool:
         """No-op — no tokens needed."""
         return True
 
-    def get_access_token(self):
+    def get_access_token(self) -> bool:
         """No-op — no tokens needed."""
         return True
 
-    def fetch_user_data(self):
+    def fetch_user_data(self) -> None:
         """No-op — no remote user data."""
 
-    def init_device_auth_flow(self):
+    def init_device_auth_flow(self) -> dict[str, object] | bool:
         """No-op — no device auth needed."""
         return False
 
-    def poll_for_app_token(self, device_code, interval, expires_in):
+    def poll_for_app_token(self, device_code: str, interval: int, expires_in: int) -> bool:
         """No-op — no app token polling needed."""
         return True
 
-    def get_site_url(self):
+    def get_site_url(self) -> str:
         """Return empty string — no remote API."""
         return ""
 
-    def get_sign_out_url(self):
+    def get_sign_out_url(self) -> str:
         """Return empty string — no sign out URL needed."""
         return ""
 
-    def get_patreon_login_url(self):
+    def get_patreon_login_url(self) -> str:
         """Return empty string — no Patreon login needed."""
         return ""
 
-    def get_github_login_url(self):
+    def get_github_login_url(self) -> str:
         """Return empty string — no GitHub login needed."""
         return ""
 
-    def get_discord_login_url(self):
+    def get_discord_login_url(self) -> str:
         """Return empty string — no Discord login needed."""
         return ""
 
-    def get_patreon_sponsor_page(self):
+    def get_patreon_sponsor_page(self) -> bool:
         """No-op — no sponsor page needed."""
         return False
 
-    def get_credit_portal_funding_proposals(self):
+    def get_credit_portal_funding_proposals(self) -> tuple[None, int]:
         """No-op — no credit portal needed."""
         return None, 500
 
-    def __fetch_installation_data(self):
+    def api_get(self, service: str, version: int, path: str) -> tuple[dict[str, object], int]:
+        """Return a typed unavailable response for retired hosted-service APIs."""
+        self.logger.debug("Hosted API GET is unavailable: %s v%s %s", service, version, path)
+        return {}, 503
+
+    def api_post(self, service: str, version: int, path: str, data: Mapping[str, object]) -> tuple[dict[str, object], int]:
+        """Return a typed unavailable response for retired hosted-service APIs."""
+        self.logger.debug("Hosted API POST is unavailable: %s v%s %s", service, version, path)
+        return {}, 503
+
+    def __fetch_installation_data(self) -> None:
         """
         Fetch installation data from DB (UUID only).
 
@@ -175,12 +194,11 @@ class Session(metaclass=SingletonType):
             current_installation = db_installation.select().order_by(Installation.id.asc()).limit(1).get()
         except Exception:
             self.logger.debug("Compresso session does not yet exist... Creating.")
-            db_installation.delete().execute()
+            execute_write(db_installation.delete())
             current_installation = db_installation.create()
 
         self.uuid = str(current_installation.uuid)
         # Always keep level at 100
         self.level = 100
-        self.created = current_installation.created if current_installation.created else time.time()
-        if isinstance(self.created, datetime.datetime):
-            self.created = self.created.timestamp()
+        created = current_installation.created
+        self.created = created.timestamp() if isinstance(created, datetime.datetime) else time.time()

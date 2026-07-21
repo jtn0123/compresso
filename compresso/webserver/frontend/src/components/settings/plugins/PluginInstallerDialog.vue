@@ -216,41 +216,46 @@
   </CompressoDialogWindow>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
+import type { QTableColumn } from 'quasar'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
-import PluginInstallerManageRepos from 'components/settings/plugins/partials/PluginInstallerManageRepos'
+import PluginInstallerManageRepos from 'components/settings/plugins/partials/PluginInstallerManageRepos.vue'
 import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog.vue'
-import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+import {
+  normalizeInstallablePlugin,
+  type InstallablePlugin,
+} from 'src/types/plugins'
 
-const emit = defineEmits(['hide'])
+const emit = defineEmits<{ hide: [] }>()
 
 const { t } = useI18n()
 const $q = useQuasar()
 const { isMobile } = useMobile()
 
-const dialogRef = ref(null)
-const pluginInfoDialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
+const pluginInfoDialogRef = ref<DialogController | null>(null)
 const selectedPluginId = ref('')
-const pluginInfoTab = ref('info')
+const pluginInfoTab = ref<'info' | 'settings'>('info')
 
-const isOpen = ref(false)
 const filter = ref('')
-const rows = ref([])
+const rows = ref<InstallablePlugin[]>([])
 const pagination = ref({
   page: 1,
   rowsPerPage: 0,
 })
-const tags = ref([])
+const tags = ref<string[]>([])
 const tagFilter = ref(t('status.all'))
-const pluginInstalling = ref({})
+const pluginInstalling = ref<Record<string, boolean>>({})
 
-const columns = computed(() => [
+const columns = computed<QTableColumn<InstallablePlugin>[]>(() => [
   {
     name: 'icon',
     required: true,
@@ -284,19 +289,19 @@ const columns = computed(() => [
 ])
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
   loadInstallablePlugins()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
   emit('hide')
 }
 
-const installPlugin = (pluginId, repoId) => {
+const installPlugin = (pluginId: string, repoId: string): void => {
   const installKey = repoId + pluginId
   pluginInstalling.value[installKey] = true
 
@@ -321,6 +326,7 @@ const installPlugin = (pluginId, repoId) => {
 
       for (let i = 0; i < rows.value.length; i++) {
         const plugin = rows.value[i]
+        if (!plugin) continue
         if (plugin.plugin_id === pluginId) {
           plugin.installed = true
           plugin.update_available = false
@@ -343,21 +349,24 @@ const installPlugin = (pluginId, repoId) => {
 }
 
 const loadInstallablePlugins = () => {
-  axios({
+  axios<ApiSchema<'PluginsInstallableResults'>>({
     method: 'get',
     url: getCompressoApiUrl('v2', 'plugins/installable'),
   }).then((response) => {
     const allPluginsList = response.data.plugins
-    const pluginList = []
-    const allTagsList = []
+    const pluginList: InstallablePlugin[] = []
+    const allTagsList: string[] = []
     const allLabel = t('status.all')
 
     for (let i = 0; i < allPluginsList.length; i++) {
-      const plugin = allPluginsList[i]
+      const contract = allPluginsList[i]
+      if (!contract) continue
+      const plugin = normalizeInstallablePlugin(contract)
+      if (!plugin) continue
 
       const pluginTags = plugin.tags.split(',')
       for (let x = 0; x < pluginTags.length; x++) {
-        const tag = pluginTags[x].trim()
+        const tag = pluginTags[x]?.trim()
         if (!tag) {
           continue
         }
@@ -373,21 +382,7 @@ const loadInstallablePlugins = () => {
         }
       }
 
-      pluginList.push({
-        plugin_id: plugin.plugin_id,
-        name: plugin.name,
-        author: plugin.author,
-        description: plugin.description,
-        version: plugin.version,
-        icon: plugin.icon,
-        tags: plugin.tags,
-        installed: plugin.status.installed,
-        update_available: plugin.status.update_available,
-        package_url: plugin.package_url,
-        changelog_url: plugin.changelog_url,
-        repo_name: plugin.repo_name,
-        repo_id: plugin.repo_id,
-      })
+      pluginList.push(plugin)
     }
 
     if (tagFilter.value !== allLabel) {
@@ -404,7 +399,7 @@ const reloadPluginsPostRepoReloaded = () => {
   loadInstallablePlugins()
 }
 
-const openPluginInfo = (pluginId, tab) => {
+const openPluginInfo = (pluginId: string, tab: 'info' | 'settings'): void => {
   if (!pluginId) {
     $q.notify({
       color: 'negative',
@@ -418,9 +413,7 @@ const openPluginInfo = (pluginId, tab) => {
 
   selectedPluginId.value = pluginId
   pluginInfoTab.value = tab === 'settings' ? 'settings' : 'info'
-  if (pluginInfoDialogRef.value) {
-    pluginInfoDialogRef.value.show()
-  }
+  pluginInfoDialogRef.value?.show()
 }
 
 onMounted(() => {

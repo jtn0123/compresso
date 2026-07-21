@@ -32,7 +32,8 @@ Copyright:
 import json
 import time
 import uuid
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Required, TypedDict, cast
 
 import psutil
 import tornado.ioloop
@@ -43,8 +44,9 @@ from tornado import gen
 
 from compresso import config
 from compresso.libs import common, session
+from compresso.libs.foreman import Foreman
 from compresso.libs.frontend_push_messages import FrontendPushMessages
-from compresso.libs.gpu_monitor import GpuMonitor
+from compresso.libs.gpu_monitor import GpuMetrics, GpuMonitor
 from compresso.libs.installation_link import Links
 from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
 from compresso.webserver.helpers import completed_tasks, pending_tasks
@@ -52,6 +54,22 @@ from compresso.webserver.helpers.queue_eta import estimate_queue_eta
 from compresso.webserver.proxy import resolve_proxy_target
 from compresso.webserver.request_auth import authorize_request
 from compresso.webserver.security_headers import check_websocket_origin
+
+
+class StreamState(TypedDict):
+    last_payload: str | None
+    last_sent_at: float
+    sequence: int
+    skipped_duplicates: int
+
+
+class StreamDecision(TypedDict, total=False):
+    should_send: Required[bool]
+    normalized_payload: Required[object]
+    payload_bytes: Required[int]
+    sequence: int
+    sent_at: float
+    skipped_duplicates: int
 
 
 class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
@@ -93,17 +111,22 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         "system_status": 15,
     }
 
-    name = None
-    config = None
+    name: str
+    config: config.Config
     sending_frontend_message = False
     sending_system_logs = False
     sending_worker_info = False
     sending_pending_tasks_info = False
     sending_completed_tasks_info = False
     sending_system_status = False
-    close_event = None
+    close_event: tornado.locks.Event | None = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        application: tornado.web.Application,
+        request: tornado.httputil.HTTPServerRequest,
+        **kwargs: object,
+    ) -> None:
         self.name = "CompressoWebsocketHandler"
         self.config = config.Config()
         self.server_id = str(uuid.uuid4())
@@ -112,22 +135,25 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         self.data_queues = udq.get_compresso_data_queues()
         self.foreman = urt.get_compresso_running_thread("foreman")
         self.session = session.Session()
-        self._stream_state: dict[str, dict[str, Any]] = {}
+        self._stream_state: dict[str, StreamState] = {}
         self._gpu_history_tick = 0
-        super().__init__(*args, **kwargs)
+        self.is_proxy = False
+        self.remote_ws: tornado.websocket.WebSocketClientConnection | None = None
+        super().__init__(application, request, **kwargs)
 
-    def check_origin(self, origin):
+    def check_origin(self, origin: str) -> bool:
         return check_websocket_origin(self, origin)
 
-    def prepare(self):
+    def prepare(self) -> None:
         authorize_request(self, allow_websocket_protocol=True)
 
-    def select_subprotocol(self, subprotocols):
+    def select_subprotocol(self, subprotocols: list[str]) -> str | None:
         # Echo only the non-secret protocol. The credential is carried in a
         # separate offered protocol and validated during prepare().
         return "compresso" if "compresso" in subprotocols else None
 
-    async def open(self):
+    async def open(self, *args: str, **kwargs: str) -> None:
+        del args, kwargs
         tornado.log.app_log.info("WS Opened")
         self.close_event = tornado.locks.Event()
 
@@ -158,48 +184,53 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                     tornado.log.app_log.error(f"Failed to connect to remote WS: {e}")
                     self.close()
 
-    def on_message(self, message):
-        if getattr(self, "is_proxy", False):
-            if hasattr(self, "remote_ws") and self.remote_ws:
+    def on_message(self, message: str | bytes) -> None:
+        if self.is_proxy:
+            if self.remote_ws:
                 self.remote_ws.write_message(message)
             return
 
         try:
-            message_data = json.loads(message)
+            message_value = json.loads(message)
+            if not isinstance(message_value, Mapping):
+                raise ValueError("WebSocket command must be an object")
+            message_data = {str(key): value for key, value in message_value.items()}
             command = message_data.get("command")
-            if command:
+            if isinstance(command, str):
                 if command not in self.ALLOWED_COMMANDS:
                     tornado.log.app_log.warning("Rejected unknown WS command: %s", command)
                     self.write_message({"success": False, "error": "Unknown command"})
                     return
-                handler = getattr(self, command, None)
-                if handler is None:
+                handler_value = getattr(self, command, None)
+                if not callable(handler_value):
                     tornado.log.app_log.error("WS command method not found: %s", command)
                     self.write_message({"success": False, "error": "Command not available"})
                     return
+                handler = cast("Callable[..., object]", handler_value)
                 handler(params=message_data.get("params", {}))
-        except json.decoder.JSONDecodeError:
-            tornado.log.app_log.error(f"Received incorrectly formatted message - {message}", exc_info=False)
+        except (json.decoder.JSONDecodeError, ValueError):
+            tornado.log.app_log.error("Received incorrectly formatted message - %r", message, exc_info=False)
 
-    def on_close(self):
+    def on_close(self) -> None:
         tornado.log.app_log.info("WS Closed")
-        self.close_event.set()
+        if self.close_event is not None:
+            self.close_event.set()
 
-        if getattr(self, "is_proxy", False):
-            if hasattr(self, "remote_ws") and self.remote_ws:
+        if self.is_proxy:
+            if self.remote_ws:
                 self.remote_ws.close()
             return
 
         self._stop_all_senders()
 
-    def on_remote_message(self, message):
+    def on_remote_message(self, message: str | bytes | None) -> None:
         if message is None:
             # Remote closed
             self.close()
             return
         self.write_message(message)
 
-    def default_failure_response(self, params=None):
+    def default_failure_response(self, params: object = None) -> None:
         """
         WS Command - default_failure_response
         Returns a failure response
@@ -211,7 +242,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.write_message({"success": False})
 
-    def start_frontend_messages(self, params=None):
+    def start_frontend_messages(self, params: object = None) -> None:
         """
         WS Command - start_frontend_messages
         Start sending messages from the application to the frontend.
@@ -225,7 +256,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             self.sending_frontend_message = True
             tornado.ioloop.IOLoop.current().spawn_callback(self.async_frontend_message)
 
-    def stop_frontend_messages(self, params=None):
+    def stop_frontend_messages(self, params: object = None) -> None:
         """
         WS Command - stop_frontend_messages
         Stop sending messages from the application to the frontend.
@@ -237,7 +268,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.sending_frontend_message = False
 
-    def start_system_logs(self, params=None):
+    def start_system_logs(self, params: object = None) -> None:
         """
         WS Command - start_system_logs
         Start sending system logs from the application to the frontend.
@@ -251,7 +282,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             self.sending_system_logs = True
             tornado.ioloop.IOLoop.current().spawn_callback(self.async_system_logs)
 
-    def stop_system_logs(self, params=None):
+    def stop_system_logs(self, params: object = None) -> None:
         """
         WS Command - stop_system_logs
         Stop sending system logs from the application to the frontend.
@@ -263,7 +294,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.sending_system_logs = False
 
-    def start_workers_info(self, params=None):
+    def start_workers_info(self, params: object = None) -> None:
         """
         WS Command - start_workers_info
         Start sending information pertaining to the workers
@@ -277,7 +308,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             self.sending_worker_info = True
             tornado.ioloop.IOLoop.current().spawn_callback(self.async_workers_info)
 
-    def stop_workers_info(self, params=None):
+    def stop_workers_info(self, params: object = None) -> None:
         """
         WS Command - stop_workers_info
         Stop sending information pertaining to the workers
@@ -289,7 +320,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.sending_worker_info = False
 
-    def start_pending_tasks_info(self, params=None):
+    def start_pending_tasks_info(self, params: object = None) -> None:
         """
         WS Command - start_pending_tasks_info
         Start sending information pertaining to the pending tasks list
@@ -303,7 +334,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             self.sending_pending_tasks_info = True
             tornado.ioloop.IOLoop.current().spawn_callback(self.async_pending_tasks_info)
 
-    def stop_pending_tasks_info(self, params=None):
+    def stop_pending_tasks_info(self, params: object = None) -> None:
         """
         WS Command - stop_pending_tasks_info
         Stop sending information pertaining to the pending tasks list
@@ -315,7 +346,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.sending_pending_tasks_info = False
 
-    def start_completed_tasks_info(self, params=None):
+    def start_completed_tasks_info(self, params: object = None) -> None:
         """
         WS Command - start_completed_tasks_info
         Start sending information pertaining to the completed tasks list
@@ -329,7 +360,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             self.sending_completed_tasks_info = True
             tornado.ioloop.IOLoop.current().spawn_callback(self.async_completed_tasks_info)
 
-    def stop_completed_tasks_info(self, params=None):
+    def stop_completed_tasks_info(self, params: object = None) -> None:
         """
         WS Command - stop_completed_tasks_info
         Stop sending information pertaining to the completed tasks list
@@ -341,7 +372,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.sending_completed_tasks_info = False
 
-    def start_system_status(self, params=None):
+    def start_system_status(self, params: object = None) -> None:
         """
         WS Command - start_system_status
         Start sending system resource metrics (CPU, RAM, disk) to the frontend.
@@ -355,7 +386,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             self.sending_system_status = True
             tornado.ioloop.IOLoop.current().spawn_callback(self.async_system_status)
 
-    def stop_system_status(self, params=None):
+    def stop_system_status(self, params: object = None) -> None:
         """
         WS Command - stop_system_status
         Stop sending system resource metrics to the frontend.
@@ -367,7 +398,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.sending_system_status = False
 
-    def dismiss_message(self, params=None):
+    def dismiss_message(self, params: object = None) -> None:
         """
         WS Command - dismiss_message
         Dismiss a specified message by id.
@@ -381,9 +412,10 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         :rtype:
         """
         frontend_messages = FrontendPushMessages()
-        frontend_messages.remove_item(params.get("message_id", ""))
+        message_id = params.get("message_id", "") if isinstance(params, Mapping) else ""
+        frontend_messages.remove_item(message_id if isinstance(message_id, str) else "")
 
-    async def send(self, message):
+    async def send(self, message: str | bytes | dict[str, object]) -> bool:
         if self.ws_connection:
             try:
                 await self.write_message(message)
@@ -392,7 +424,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
                 self._stop_all_senders()
         return False
 
-    def _stop_all_senders(self):
+    def _stop_all_senders(self) -> None:
         self.stop_frontend_messages()
         self.stop_workers_info()
         self.stop_pending_tasks_info()
@@ -403,15 +435,26 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
     def _stream_is_active(self, enabled: bool) -> bool:
         return enabled and not (self.close_event and self.close_event.is_set())
 
+    def _foreman(self) -> Foreman:
+        if self.foreman is None:
+            raise RuntimeError("Foreman is unavailable")
+        return self.foreman
+
     @staticmethod
-    def _normalize_stream_data(stream_name: str, data: Any) -> Any:
+    def _normalize_stream_data(stream_name: str, data: object) -> object:
         if stream_name == "frontend_message" and isinstance(data, list):
-            return sorted(data, key=lambda item: str(item.get("id", "")))
+            return sorted(data, key=lambda item: str(item.get("id", "")) if isinstance(item, Mapping) else "")
         if stream_name == "workers_info" and isinstance(data, list):
-            return sorted(data, key=lambda item: (str(item.get("name", "")), str(item.get("id", ""))))
+            return sorted(
+                data,
+                key=lambda item: (
+                    str(item.get("name", "")) if isinstance(item, Mapping) else "",
+                    str(item.get("id", "")) if isinstance(item, Mapping) else "",
+                ),
+            )
         return data
 
-    def _should_send_stream(self, stream_name: str, payload: Any) -> dict[str, Any]:
+    def _should_send_stream(self, stream_name: str, payload: object) -> StreamDecision:
         normalized_payload = self._normalize_stream_data(stream_name, payload)
         serialized_payload = json.dumps(normalized_payload, sort_keys=True, default=str)
         payload_bytes = len(serialized_payload.encode("utf-8"))
@@ -452,7 +495,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             "skipped_duplicates": state["skipped_duplicates"],
         }
 
-    async def _send_stream_message(self, stream_name: str, payload: Any):
+    async def _send_stream_message(self, stream_name: str, payload: object) -> bool:
         stream_state = self._should_send_stream(stream_name, payload)
         if not stream_state["should_send"]:
             return False
@@ -473,7 +516,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
         )
         return True
 
-    async def async_frontend_message(self):
+    async def async_frontend_message(self) -> None:
         while self._stream_is_active(self.sending_frontend_message):
             frontend_messages = FrontendPushMessages()
             frontend_message_items = frontend_messages.read_all_items()
@@ -481,7 +524,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
             await gen.sleep(self.STREAM_POLL_INTERVALS["frontend_message"])
 
-    async def async_system_logs(self):
+    async def async_system_logs(self) -> None:
         while self._stream_is_active(self.sending_system_logs):
             system_logs = self.config.read_system_logs(lines=1000)
 
@@ -495,15 +538,15 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
             await gen.sleep(self.STREAM_POLL_INTERVALS["system_logs"])
 
-    async def async_workers_info(self):
+    async def async_workers_info(self) -> None:
         while self._stream_is_active(self.sending_worker_info):
-            workers_info = self.foreman.get_all_worker_status()
+            workers_info = self._foreman().get_all_worker_status()
             await self._send_stream_message("workers_info", workers_info)
             await gen.sleep(self.STREAM_POLL_INTERVALS["workers_info"])
 
-    async def async_pending_tasks_info(self):
+    async def async_pending_tasks_info(self) -> None:
         while self._stream_is_active(self.sending_pending_tasks_info):
-            results = []
+            results: list[dict[str, object]] = []
             params = {
                 "start": "0",
                 "length": "10",
@@ -515,9 +558,14 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             }
             task_list = pending_tasks.prepare_filtered_pending_tasks(params)
 
-            for task_result in task_list.get("results", []):
+            task_results_value = task_list.get("results", [])
+            task_results = task_results_value if isinstance(task_results_value, list) else []
+            for task_result_value in task_results:
+                if not isinstance(task_result_value, Mapping):
+                    continue
+                task_result = task_result_value
                 # Append the task to the results list
-                item = {
+                item: dict[str, object] = {
                     "id": task_result["id"],
                     "label": task_result["abspath"],
                     "priority": task_result["priority"],
@@ -532,7 +580,7 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
             # Estimate queue ETA and include in payload
             try:
-                queue_eta = estimate_queue_eta(self.foreman)
+                queue_eta = estimate_queue_eta(self._foreman())
             except Exception:
                 queue_eta = None
 
@@ -546,9 +594,9 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
             await gen.sleep(self.STREAM_POLL_INTERVALS["pending_tasks"])
 
-    async def async_completed_tasks_info(self):
+    async def async_completed_tasks_info(self) -> None:
         while self._stream_is_active(self.sending_completed_tasks_info):
-            results = []
+            results: list[dict[str, object]] = []
             params = {
                 "start": "0",
                 "length": "10",
@@ -560,12 +608,19 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
             }
             task_list = completed_tasks.prepare_filtered_completed_tasks(params)
 
-            for task_result in task_list.get("results", []):
+            task_results_value = task_list.get("results", [])
+            task_results = task_results_value if isinstance(task_results_value, list) else []
+            for task_result_value in task_results:
+                if not isinstance(task_result_value, Mapping):
+                    continue
+                task_result = task_result_value
                 # Set human-readable time
-                if (int(task_result["finish_time"]) + 60) > int(time.time()):
+                finish_time_value = task_result.get("finish_time")
+                finish_time = int(finish_time_value) if isinstance(finish_time_value, (int, float, str)) else 0
+                if (finish_time + 60) > int(time.time()):
                     human_readable_time = "Just Now"
                 else:
-                    human_readable_time = common.make_timestamp_human_readable(int(task_result["finish_time"]))
+                    human_readable_time = common.make_timestamp_human_readable(finish_time)
 
                 # Append the task to the results list
                 results.append(
@@ -585,11 +640,11 @@ class CompressoWebsocketHandler(tornado.websocket.WebSocketHandler):
 
             await gen.sleep(self.STREAM_POLL_INTERVALS["completed_tasks"])
 
-    def _get_gpu_utilization(self):
+    def _get_gpu_utilization(self) -> list[GpuMetrics]:
         """Deprecated: Use GpuMonitor().get_realtime_metrics() instead."""
         return GpuMonitor().get_realtime_metrics()
 
-    async def async_system_status(self):
+    async def async_system_status(self) -> None:
         while self._stream_is_active(self.sending_system_status):
             mem = psutil.virtual_memory()
             disk = psutil.disk_usage("/")

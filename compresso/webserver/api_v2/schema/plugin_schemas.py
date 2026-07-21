@@ -112,11 +112,10 @@ class PluginsTableResultsSchema(PluginsMetadataResultsSchema):
 class PluginsDataSchema(TableRecordsSuccessSchema):
     """Schema for returning a list of plugin table results"""
 
-    results = fields.Nested(  # type: ignore[assignment]
-        PluginsTableResultsSchema,
+    results = fields.List(
+        fields.Nested(PluginsTableResultsSchema),
         required=True,
         metadata={"description": "Results"},
-        many=True,
         validate=validate.Length(min=0),
     )
 

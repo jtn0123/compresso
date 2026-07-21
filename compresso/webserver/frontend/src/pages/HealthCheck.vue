@@ -342,8 +342,9 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import type { QTableColumn } from 'quasar'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -353,6 +354,54 @@ import { createLogger } from 'src/composables/useLogger'
 import FileInfoDialog from 'components/fileinfo/FileInfoDialog.vue'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
+import type { ApiSchema } from 'src/types/contracts'
+
+type ScanMode = 'quick' | 'thorough'
+interface ScanWorker { status: string; current_file: string }
+interface HealthProgressView extends Omit<ApiSchema<'HealthCheckProgress'>, 'workers'> {
+  workers: Record<string, ScanWorker>
+}
+interface HealthStatusRow {
+  abspath: string
+  status: string
+  check_mode?: string
+  error_detail?: string | null
+  last_checked?: string
+  error_count?: number
+  library_id?: number
+  _checking: boolean
+}
+interface LibraryOption { label: string; value: number }
+interface LibraryWire { id: number; name?: string }
+interface TableRequest {
+  pagination: { page: number; rowsPerPage: number; sortBy: string; descending: boolean }
+}
+interface FileInfoController { probeByPath(path: string): void }
+
+const normalizeProgress = (progress?: ApiSchema<'HealthCheckProgress'>): HealthProgressView => {
+  const workers: Record<string, ScanWorker> = {}
+  for (const [id, value] of Object.entries(progress?.workers ?? {})) {
+    if (typeof value !== 'object' || value === null) continue
+    const worker = value as Record<string, unknown>
+    workers[id] = {
+      status: typeof worker.status === 'string' ? worker.status : 'idle',
+      current_file: typeof worker.current_file === 'string' ? worker.current_file : '',
+    }
+  }
+  return { ...progress, workers }
+}
+
+const isHealthStatusRow = (value: unknown): value is Omit<HealthStatusRow, '_checking'> => {
+  if (typeof value !== 'object' || value === null) return false
+  const row = value as Record<string, unknown>
+  return typeof row.abspath === 'string' && typeof row.status === 'string'
+}
+
+const isLibraryWire = (value: unknown): value is LibraryWire => {
+  if (typeof value !== 'object' || value === null) return false
+  const library = value as Record<string, unknown>
+  return typeof library.id === 'number' && (library.name === undefined || typeof library.name === 'string')
+}
 
 export default {
   name: 'HealthCheck',
@@ -362,9 +411,17 @@ export default {
     const { t } = useI18n()
     const log = createLogger('HealthCheck')
     const loadingSummary = ref(true)
-    const summary = ref({ healthy: 0, warning: 0, corrupted: 0, unchecked: 0, checking: 0, total: 0 })
+    const summary = ref<ApiSchema<'HealthCheckSummaryResponse'>>({
+      success: true,
+      healthy: 0,
+      warning: 0,
+      corrupted: 0,
+      unchecked: 0,
+      checking: 0,
+      total: 0,
+    })
     const scanning = ref(false)
-    const scanProgress = ref({
+    const scanProgress = ref<HealthProgressView>({
       phase: 'idle',
       total: 0,
       discovered: 0,
@@ -379,16 +436,16 @@ export default {
     const workerCount = ref(1)
     const scanProgressPercent = ref(0)
     const selectedLibraryId = ref(1)
-    const scanMode = ref('quick')
-    const libraryOptions = ref([{ label: 'Default Library', value: 1 }])
+    const scanMode = ref<ScanMode>('quick')
+    const libraryOptions = ref<LibraryOption[]>([{ label: 'Default Library', value: 1 }])
     const singleFilePath = ref('')
-    const singleFileResult = ref(null)
+    const singleFileResult = ref<ApiSchema<'HealthCheckScanResponse'> | null>(null)
     const searchValue = ref('')
-    const statusFilter = ref(null)
-    const statusResults = ref([])
+    const statusFilter = ref<string | null>(null)
+    const statusResults = ref<HealthStatusRow[]>([])
     const loadingStatuses = ref(false)
-    const fileInfoDialogRef = ref(null)
-    let pollTimer = null
+    const fileInfoDialogRef = ref<FileInfoController | null>(null)
+    let pollTimer: ReturnType<typeof setTimeout> | null = null
 
     const pagination = ref({
       page: 1,
@@ -398,7 +455,7 @@ export default {
       descending: true,
     })
 
-    const statusColumns = computed(() => [
+    const statusColumns = computed<QTableColumn[]>(() => [
       {
         name: 'abspath',
         label: t('pages.healthCheck.columnFilePath'),
@@ -438,7 +495,7 @@ export default {
       () => scanning.value || ['complete', 'cancelled', 'failed'].includes(scanPhase.value),
     )
     const scanPhaseLabel = computed(() => {
-      const labels = {
+      const labels: Record<string, string> = {
         discovering: 'pages.healthCheck.phaseDiscovering',
         checking: 'pages.healthCheck.phaseChecking',
         cancelling: 'pages.healthCheck.phaseCancelling',
@@ -463,7 +520,7 @@ export default {
       return 'fact_check'
     })
 
-    function getStatusColor(status) {
+    function getStatusColor(status: string): string {
       if (status === 'healthy') return 'positive'
       if (status === 'warning') return 'warning'
       if (status === 'corrupted') return 'negative'
@@ -476,12 +533,12 @@ export default {
         const url = selectedLibraryId.value
           ? getCompressoApiUrl('v2', 'healthcheck/summary') + '?library_id=' + selectedLibraryId.value
           : getCompressoApiUrl('v2', 'healthcheck/summary')
-        const response = await axios.get(url)
+        const response = await axios.get<ApiSchema<'HealthCheckSummaryResponse'>>(url)
         if (response.data) {
           summary.value = response.data
           scanning.value = response.data.scanning || false
           if (response.data.scan_progress) {
-            scanProgress.value = response.data.scan_progress
+            scanProgress.value = normalizeProgress(response.data.scan_progress)
             const total = response.data.scan_progress.total || 0
             const checked = response.data.scan_progress.checked || 0
             scanProgressPercent.value = total > 0 ? checked / total : 0
@@ -497,11 +554,11 @@ export default {
 
     async function loadWorkerInfo() {
       try {
-        const response = await axios.get(getCompressoApiUrl('v2', 'healthcheck/workers'))
+        const response = await axios.get<ApiSchema<'HealthCheckWorkersResponse'>>(getCompressoApiUrl('v2', 'healthcheck/workers'))
         if (response.data) {
           workerCount.value = response.data.worker_count || 1
           if (response.data.scan_progress) {
-            scanProgress.value = response.data.scan_progress
+            scanProgress.value = normalizeProgress(response.data.scan_progress)
             const total = response.data.scan_progress.total || 0
             const checked = response.data.scan_progress.checked || 0
             scanProgressPercent.value = total > 0 ? checked / total : 0
@@ -513,7 +570,7 @@ export default {
       }
     }
 
-    async function changeWorkerCount(delta) {
+    async function changeWorkerCount(delta: number): Promise<void> {
       const newCount = workerCount.value + delta
       if (newCount < 1 || newCount > 16) return
       try {
@@ -529,7 +586,7 @@ export default {
       }
     }
 
-    function formatEta(seconds) {
+    function formatEta(seconds: number | undefined): string {
       if (!seconds || seconds <= 0) return '--'
       const h = Math.floor(seconds / 3600)
       const m = Math.floor((seconds % 3600) / 60)
@@ -539,7 +596,7 @@ export default {
       return s + 's'
     }
 
-    function truncateFilename(filepath) {
+    function truncateFilename(filepath: string): string {
       if (!filepath) return ''
       const name = displayBasename(filepath)
       return name.length > 50 ? name.substring(0, 47) + '...' : name
@@ -549,7 +606,7 @@ export default {
       loadingStatuses.value = true
       try {
         const start = (pagination.value.page - 1) * pagination.value.rowsPerPage
-        const response = await axios.post(getCompressoApiUrl('v2', 'healthcheck/status'), {
+        const response = await axios.post<ApiSchema<'HealthCheckStatusResponse'>>(getCompressoApiUrl('v2', 'healthcheck/status'), {
           start: start,
           length: pagination.value.rowsPerPage,
           search_value: searchValue.value,
@@ -559,7 +616,9 @@ export default {
           order_direction: pagination.value.descending ? 'desc' : 'asc',
         })
         if (response.data) {
-          statusResults.value = (response.data.results || []).map((r) => ({ ...r, _checking: false }))
+          statusResults.value = (response.data.results || [])
+            .filter(isHealthStatusRow)
+            .map((row) => ({ ...row, _checking: false }))
           pagination.value.rowsNumber = response.data.recordsFiltered || 0
         }
       } catch (error) {
@@ -578,12 +637,12 @@ export default {
         persistent: false,
       }).onOk(async () => {
         try {
-          const response = await axios.post(getCompressoApiUrl('v2', 'healthcheck/scan-library'), {
+          const response = await axios.post<ApiSchema<'HealthCheckLibraryScanResponse'>>(getCompressoApiUrl('v2', 'healthcheck/scan-library'), {
             library_id: selectedLibraryId.value,
             mode: scanMode.value,
           })
           if (response.data) {
-            scanning.value = response.data.started
+            scanning.value = response.data.started ?? false
             if (response.data.started) {
               startPolling()
               $q.notify({ type: 'positive', message: t('pages.healthCheck.scanStarted') })
@@ -615,7 +674,7 @@ export default {
     async function checkSingleFile() {
       singleFileResult.value = null
       try {
-        const response = await axios.post(getCompressoApiUrl('v2', 'healthcheck/scan'), {
+        const response = await axios.post<ApiSchema<'HealthCheckScanResponse'>>(getCompressoApiUrl('v2', 'healthcheck/scan'), {
           file_path: singleFilePath.value,
           library_id: selectedLibraryId.value,
           mode: scanMode.value,
@@ -631,7 +690,7 @@ export default {
       }
     }
 
-    async function recheckFile(row) {
+    async function recheckFile(row: HealthStatusRow): Promise<void> {
       row._checking = true
       try {
         await axios.post(getCompressoApiUrl('v2', 'healthcheck/scan'), {
@@ -649,13 +708,11 @@ export default {
       }
     }
 
-    function showFileInfo(filePath) {
-      if (fileInfoDialogRef.value) {
-        fileInfoDialogRef.value.probeByPath(filePath)
-      }
+    function showFileInfo(filePath: string): void {
+      fileInfoDialogRef.value?.probeByPath(filePath)
     }
 
-    function onTableRequest(props) {
+    function onTableRequest(props: TableRequest): void {
       const { page, rowsPerPage, sortBy, descending } = props.pagination
       pagination.value.page = page
       pagination.value.rowsPerPage = rowsPerPage
@@ -700,13 +757,15 @@ export default {
       try {
         const response = await axios.get(getCompressoApiUrl('v2', 'settings/read'))
         if (response.data && response.data.settings) {
-          const libs = response.data.settings.libraries || []
+          const rawLibraries: unknown = response.data.settings.libraries
+          const libs = Array.isArray(rawLibraries) ? rawLibraries.filter(isLibraryWire) : []
           if (libs.length > 0) {
             libraryOptions.value = libs.map((lib) => ({
               label: lib.name || `Library ${lib.id}`,
               value: lib.id,
             }))
-            selectedLibraryId.value = libs[0].id
+            const firstLibrary = libs[0]
+            if (firstLibrary) selectedLibraryId.value = firstLibrary.id
           }
         }
       } catch (error) {

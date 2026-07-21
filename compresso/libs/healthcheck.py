@@ -14,7 +14,9 @@ import queue
 import subprocess
 import threading
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Literal, Protocol, TypedDict, cast
 
 from compresso.config import Config
 from compresso.libs.ffprobe_utils import probe_file
@@ -22,8 +24,58 @@ from compresso.libs.library_analysis import iter_media_files
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.unmodels.healthstatus import HealthStatus
 
+type CheckOutcome = bool | Literal["warning"]
 
-def _initial_scan_progress(library_id=None, max_workers=1):
+
+class WorkerProgress(TypedDict, total=False):
+    status: str
+    current_file: str
+    retiring: bool
+
+
+class ScanProgress(TypedDict):
+    phase: str
+    total: int
+    discovered: int
+    discovery_complete: bool
+    checked: int
+    cancelled: bool
+    error: str | None
+    library_id: int | None
+    worker_count: int
+    max_workers: int
+    workers: dict[int, WorkerProgress]
+    start_time: float | None
+    files_per_second: float
+    eta_seconds: int
+
+
+class HealthOrder(TypedDict):
+    column: str
+    dir: str
+
+
+class HealthStatusGetOrCreate(Protocol):
+    def __call__(
+        self,
+        *,
+        abspath: str,
+        defaults: dict[str, object],
+    ) -> tuple[HealthStatus, bool]: ...
+
+
+class HealthCountRow(Protocol):
+    status: str
+    count: int
+
+
+def _object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        return {}
+    return cast("dict[str, object]", value)
+
+
+def _initial_scan_progress(library_id: int | None = None, max_workers: int = 1) -> ScanProgress:
     return {
         "phase": "idle" if library_id is None else "discovering",
         "total": 0,
@@ -50,18 +102,18 @@ class HealthCheckManager:
     _lock = threading.Lock()
     _scanning = False
     _cancel_event = threading.Event()
-    _scan_progress: dict = _initial_scan_progress()
+    _scan_progress: ScanProgress = _initial_scan_progress()
     _worker_count_requested = 1
     _retire_worker_ids: set[int] = set()
 
-    _file_locks: dict = {}
-    _file_lock_users: dict = {}
+    _file_locks: dict[str, threading.Lock] = {}
+    _file_lock_users: dict[str, int] = {}
     _file_locks_lock = threading.Lock()
 
-    def __init__(self):
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+    def __init__(self) -> None:
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
-    def quick_check(self, filepath):
+    def quick_check(self, filepath: str) -> tuple[bool, str]:
         """
         Quick check: validate file with ffprobe.
         Returns (is_healthy, error_detail).
@@ -80,9 +132,9 @@ class HealthCheckManager:
         if not streams:
             return False, "No streams found in file"
 
-        fmt = result.get("format", {})
+        fmt = _object_dict(result.get("format"))
         duration = fmt.get("duration")
-        if duration is not None:
+        if isinstance(duration, (bool, int, float, str, bytes, bytearray)):
             try:
                 dur = float(duration)
                 if not math.isfinite(dur) or dur <= 0:
@@ -92,7 +144,7 @@ class HealthCheckManager:
 
         return True, ""
 
-    def thorough_check(self, filepath):
+    def thorough_check(self, filepath: str) -> tuple[CheckOutcome, str]:
         """
         Thorough check: decode entire file with ffmpeg and count error lines.
         Returns (is_healthy, error_detail).
@@ -137,7 +189,7 @@ class HealthCheckManager:
         except Exception as e:
             return False, f"Check failed: {str(e)}"
 
-    def _get_file_lock(self, filepath):
+    def _get_file_lock(self, filepath: str) -> threading.Lock:
         """Get or create a lock for a specific file path."""
         with HealthCheckManager._file_locks_lock:
             if filepath not in HealthCheckManager._file_locks:
@@ -145,7 +197,7 @@ class HealthCheckManager:
             return HealthCheckManager._file_locks[filepath]
 
     @contextmanager
-    def _hold_file_lock(self, filepath):
+    def _hold_file_lock(self, filepath: str) -> Iterator[None]:
         with HealthCheckManager._file_locks_lock:
             file_lock = HealthCheckManager._file_locks.setdefault(filepath, threading.Lock())
             HealthCheckManager._file_lock_users[filepath] = HealthCheckManager._file_lock_users.get(filepath, 0) + 1
@@ -162,7 +214,7 @@ class HealthCheckManager:
                 else:
                     HealthCheckManager._file_lock_users[filepath] = remaining
 
-    def check_file(self, filepath, library_id=1, mode="quick"):
+    def check_file(self, filepath: str, library_id: int = 1, mode: str = "quick") -> dict[str, object]:
         """
         Check a single file and store the result.
 
@@ -173,7 +225,8 @@ class HealthCheckManager:
         """
         with self._hold_file_lock(filepath):
             # Mark as checking
-            health, _ = HealthStatus.get_or_create(
+            get_or_create = cast("HealthStatusGetOrCreate", HealthStatus.get_or_create)
+            health, _ = get_or_create(
                 abspath=filepath, defaults={"library_id": library_id, "status": "checking", "check_mode": mode}
             )
             health.status = "checking"
@@ -200,7 +253,7 @@ class HealthCheckManager:
                 health.error_count = health.error_count + 1
             health.save()
 
-            result = {
+            result: dict[str, object] = {
                 "abspath": filepath,
                 "status": health.status,
                 "check_mode": mode,
@@ -211,7 +264,7 @@ class HealthCheckManager:
 
         return result
 
-    def get_health_summary(self, library_id=None):
+    def get_health_summary(self, library_id: int | None = None) -> dict[str, int]:
         """
         Get aggregate health status counts.
 
@@ -230,7 +283,7 @@ class HealthCheckManager:
 
         query = query.group_by(HealthStatus.status)
 
-        result = {
+        result: dict[str, int] = {
             "healthy": 0,
             "corrupted": 0,
             "warning": 0,
@@ -239,7 +292,8 @@ class HealthCheckManager:
             "total": 0,
         }
 
-        for row in query:
+        for model_row in query:
+            row = cast("HealthCountRow", model_row)
             status = row.status
             count = row.count
             if status in result:
@@ -249,8 +303,14 @@ class HealthCheckManager:
         return result
 
     def get_health_statuses_paginated(
-        self, start=0, length=10, search_value=None, library_id=None, status_filter=None, order=None
-    ):
+        self,
+        start: int = 0,
+        length: int = 10,
+        search_value: str | None = None,
+        library_id: int | None = None,
+        status_filter: str | None = None,
+        order: HealthOrder | None = None,
+    ) -> dict[str, object]:
         """
         Get paginated health status records.
 
@@ -288,7 +348,7 @@ class HealthCheckManager:
         if length:
             query = query.limit(length).offset(start)
 
-        results = []
+        results: list[dict[str, object]] = []
         for row in query:
             results.append(
                 {
@@ -309,7 +369,7 @@ class HealthCheckManager:
             "results": results,
         }
 
-    def schedule_library_scan(self, library_id, mode="quick"):
+    def schedule_library_scan(self, library_id: int, mode: str = "quick") -> bool:
         """
         Start a background scan of all files in a library.
 
@@ -336,7 +396,14 @@ class HealthCheckManager:
         thread.start()
         return True
 
-    def _scan_worker(self, worker_id, file_queue, library_id, mode, discovery_done=None):
+    def _scan_worker(
+        self,
+        worker_id: int,
+        file_queue: queue.Queue[str],
+        library_id: int,
+        mode: str,
+        discovery_done: threading.Event | None = None,
+    ) -> None:
         """Worker thread that pulls files from the queue and checks them."""
         if discovery_done is None:
             discovery_done = threading.Event()
@@ -379,7 +446,7 @@ class HealthCheckManager:
             HealthCheckManager._retire_worker_ids.discard(worker_id)
 
     @staticmethod
-    def _record_checked_file():
+    def _record_checked_file() -> None:
         with HealthCheckManager._lock:
             progress = HealthCheckManager._scan_progress
             progress["checked"] += 1
@@ -397,7 +464,7 @@ class HealthCheckManager:
             progress["eta_seconds"] = int(remaining / fps) if fps > 0 else 0
 
     @staticmethod
-    def _drain_scan_queue(file_queue):
+    def _drain_scan_queue(file_queue: queue.Queue[str]) -> None:
         while True:
             try:
                 file_queue.get_nowait()
@@ -406,7 +473,13 @@ class HealthCheckManager:
             else:
                 file_queue.task_done()
 
-    def _discover_media(self, library_path, file_queue, discovery_done, discovery_errors):
+    def _discover_media(
+        self,
+        library_path: str,
+        file_queue: queue.Queue[str],
+        discovery_done: threading.Event,
+        discovery_errors: list[Exception],
+    ) -> None:
         completed = False
         try:
             for filepath in iter_media_files(library_path, cancel_event=HealthCheckManager._cancel_event):
@@ -434,7 +507,15 @@ class HealthCheckManager:
                     progress["phase"] = "checking"
             discovery_done.set()
 
-    def _start_scan_worker(self, worker_id, workers, file_queue, library_id, mode, discovery_done):
+    def _start_scan_worker(
+        self,
+        worker_id: int,
+        workers: dict[int, threading.Thread],
+        file_queue: queue.Queue[str],
+        library_id: int,
+        mode: str,
+        discovery_done: threading.Event,
+    ) -> None:
         worker = threading.Thread(
             target=self._scan_worker,
             args=(worker_id, file_queue, library_id, mode, discovery_done),
@@ -444,7 +525,15 @@ class HealthCheckManager:
         workers[worker_id] = worker
         worker.start()
 
-    def _sync_worker_pool(self, workers, next_worker_id, file_queue, library_id, mode, discovery_done):
+    def _sync_worker_pool(
+        self,
+        workers: dict[int, threading.Thread],
+        next_worker_id: int,
+        file_queue: queue.Queue[str],
+        library_id: int,
+        mode: str,
+        discovery_done: threading.Event,
+    ) -> int:
         live_ids = [worker_id for worker_id, worker in workers.items() if worker.is_alive()]
         with HealthCheckManager._lock:
             requested = HealthCheckManager._worker_count_requested
@@ -467,7 +556,7 @@ class HealthCheckManager:
         return next_worker_id
 
     @staticmethod
-    def _finish_scan(phase, error=None):
+    def _finish_scan(phase: str, error: str | None = None) -> None:
         with HealthCheckManager._lock:
             progress = HealthCheckManager._scan_progress
             progress["phase"] = phase
@@ -478,7 +567,7 @@ class HealthCheckManager:
             if phase == "complete":
                 progress["discovery_complete"] = True
 
-    def _run_library_scan(self, library_id, mode):
+    def _run_library_scan(self, library_id: int, mode: str) -> None:
         """Stream library discovery through a bounded, live-scalable worker pool."""
         with HealthCheckManager._lock:
             HealthCheckManager._scan_progress = _initial_scan_progress(
@@ -497,10 +586,10 @@ class HealthCheckManager:
                 self._finish_scan("failed", f"Library {library_id} not found: {error}")
                 return
 
-            file_queue = queue.Queue(maxsize=Config().get_library_scan_queue_limit())
+            file_queue: queue.Queue[str] = queue.Queue(maxsize=Config().get_library_scan_queue_limit())
             discovery_done = threading.Event()
-            discovery_errors = []
-            workers = {}
+            discovery_errors: list[Exception] = []
+            workers: dict[int, threading.Thread] = {}
             producer = threading.Thread(
                 target=self._discover_media,
                 args=(library_path, file_queue, discovery_done, discovery_errors),
@@ -545,24 +634,24 @@ class HealthCheckManager:
                 HealthCheckManager._file_lock_users.clear()
 
     @classmethod
-    def is_scanning(cls):
+    def is_scanning(cls) -> bool:
         return cls._scanning
 
     @classmethod
-    def get_scan_progress(cls):
+    def get_scan_progress(cls) -> ScanProgress:
         import copy
 
         with cls._lock:
             return copy.deepcopy(cls._scan_progress)
 
     @classmethod
-    def set_worker_count(cls, count):
+    def set_worker_count(cls, count: int) -> None:
         """Set target worker count (1-16)."""
         with cls._lock:
             cls._worker_count_requested = max(1, min(16, count))
 
     @classmethod
-    def cancel_scan(cls):
+    def cancel_scan(cls) -> bool:
         """Request cancellation of the current library scan."""
         with cls._lock:
             if cls._scanning:
@@ -572,6 +661,6 @@ class HealthCheckManager:
             return False
 
     @classmethod
-    def get_worker_count(cls):
+    def get_worker_count(cls) -> int:
         with cls._lock:
             return cls._worker_count_requested

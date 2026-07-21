@@ -43,10 +43,10 @@ from compresso.libs.singleton import SingletonType
 
 
 class DownloadsLinks(metaclass=SingletonType):
-    _download_links: dict = {}
+    _download_links: dict[str, dict[str, object]] = {}
     _lock = threading.RLock()
 
-    def __remove_expired(self):
+    def __remove_expired(self) -> None:
         """
         Find and remove expired links
 
@@ -56,11 +56,12 @@ class DownloadsLinks(metaclass=SingletonType):
         keys = [t for t in self._download_links]
         with self._lock:
             for k in keys:
-                if k in self._download_links and self._download_links[k].get("expires", 0) < time_now:
+                expires = self._download_links[k].get("expires", 0) if k in self._download_links else 0
+                if k in self._download_links and isinstance(expires, (int, float)) and expires < time_now:
                     # Item has expired. Remove this item
                     del self._download_links[k]
 
-    def generate_download_link(self, link_data):
+    def generate_download_link(self, link_data: dict[str, object]) -> str:
         link_id = str(uuid.uuid4())
         with self._lock:
             # Expire in 1 min
@@ -68,21 +69,23 @@ class DownloadsLinks(metaclass=SingletonType):
             self._download_links[link_id] = link_data
         return link_id
 
-    def get_download_link(self, link_id):
+    def get_download_link(self, link_id: str) -> dict[str, object]:
         # Find and remove expired links
         self.__remove_expired()
         return self._download_links.get(link_id, {})
 
 
 class DownloadsHandler(web.RequestHandler):
-    async def get(self, link_id):
+    async def get(self, link_id: str) -> None:
 
         # Fetch link from
         download_links = DownloadsLinks()
         link_data = download_links.get_download_link(link_id)
         # Set file details
-        abspath = link_data.get("abspath", "")
-        basename = link_data.get("basename", "")
+        abspath_value = link_data.get("abspath", "")
+        basename_value = link_data.get("basename", "")
+        abspath = abspath_value if isinstance(abspath_value, str) else ""
+        basename = basename_value if isinstance(basename_value, str) else ""
 
         # Validate path - resolve symlinks and ensure it's a real file path
         if abspath:

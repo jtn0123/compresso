@@ -31,16 +31,16 @@ Copyright:
 
 from compresso import config
 from compresso.libs import session
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.version_schemas import VersionReadSuccessSchema
 
 
 class ApiVersionHandler(BaseApiHandler):
-    session = None
-    config = None
-    params = None
-    compresso_data_queues = None
+    session: session.Session
+    config: config.Config
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -50,14 +50,14 @@ class ApiVersionHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
         self.config = config.Config()
 
-    async def get_compresso_version(self):
+    async def get_compresso_version(self) -> None:
         """
         Version - read
         ---

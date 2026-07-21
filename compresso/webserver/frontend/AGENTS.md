@@ -11,7 +11,7 @@ This document is designed to help AI agents understand the structure, technology
 - **Framework**: [Vue.js 3](https://v3.vuejs.org/)
 - **UI Component Library**: [Quasar Framework v2](https://quasar.dev/)
 - **Build System**: Quasar CLI (Vite)
-- **State Management**: No store library. Shared state lives in plain modules under `src/js/` — the mutable `$compresso` global (`src/js/compressoGlobals.js`), the WebSocket listener registry (`src/js/compressoWebsocket.js`), and small module-level stores such as `src/js/sharedLinksStore.js`.
+- **State Management**: No store library. Shared state lives in plain modules under `src/js/` — the mutable `$compresso` global (`src/js/compressoGlobals.ts`), the WebSocket listener registry (`src/js/compressoWebsocket.ts`), and small module-level stores such as `src/js/sharedLinksStore.ts`.
 - **Routing**: [Vue Router](https://router.vuejs.org/)
 - **HTTP Client**: [Axios](https://axios-http.com/)
 - **Internationalization**: [Vue-i18n](https://vue-i18n.intlify.dev/)
@@ -42,7 +42,7 @@ The project follows the standard Quasar directory structure:
   - **`composables/`**: Vue 3 Composition API composables (e.g., `useMobile`).
   - **`css/`**: Global styles (SCSS).
   - **`js/`**: Utility scripts and global logic.
-    - **`compressoGlobals.js`**: Core logic for API interaction, session management, and theming.
+    - **`compressoGlobals.ts`**: Core logic for API interaction, session management, and theming.
   - **`language/`**: Translation files (`.json`).
   - **`layouts/`**: Main layout templates (e.g., `MainLayout.vue`).
   - **`pages/`**: View components corresponding to routes.
@@ -52,9 +52,9 @@ The project follows the standard Quasar directory structure:
 
 ## Key Files & patterns
 
-- **`src/js/compressoGlobals.js`**: Contains the `$compresso` global object. This is the primary interface for communicating with the backend API. It handles URL resolution, authentication state, and theme management.
-- **`src/boot/global-event-bus.js`**: Initializes the global event bus available as `$global`. This is used for decoupled communication between components (e.g., triggering a refresh).
-- **`quasar.config.cjs`**: The main configuration file for the Quasar framework. It defines boot files, plugins, build settings, and the Vite development server proxy.
+- **`src/js/compressoGlobals.ts`**: Contains the `$compresso` global object. This is the primary interface for communicating with the backend API. It handles URL resolution, authentication state, and theme management.
+- **`src/boot/global-event-bus.ts`**: Initializes the global event bus available as `$global`. This is used for decoupled communication between components (e.g., triggering a refresh).
+- **`quasar.config.js`**: The main configuration file for the Quasar framework. It defines boot files, plugins, build settings, and the Vite development server proxy.
 - **`package.json`**: Dependency definitions and script commands.
 
 ## Validation Commands
@@ -98,7 +98,7 @@ The Playwright smoke tests mock backend API responses and do not require a runni
 
 ### `useMobile`
 
-- **Location**: `src/composables/useMobile.js`
+- **Location**: `src/composables/useMobile.ts`
 
 - **Purpose**: Provides a centralized, reactive `isMobile` property for switching to mobile-friendly layouts.
 
@@ -265,7 +265,7 @@ The Playwright smoke tests mock backend API responses and do not require a runni
 
 ## Common Tasks
 
-- **Adding a new Page**: Create a `.vue` file in `src/pages/` and add a route in `src/router/routes.js`.
+- **Adding a new Page**: Create a `.vue` file in `src/pages/` and add a route in `src/router/routes.ts`.
 - **Adding a new Component**: Create a `.vue` file in `src/components/`.
-- **API Interaction**: Use `this.$axios` or the helper methods in `src/js/compressoGlobals.js` (available as `this.$compresso` in components).
+- **API Interaction**: Use `this.$axios` or the helper methods in `src/js/compressoGlobals.ts` (available as `this.$compresso` in components).
 - **Translation**: Add new strings to `src/language/en.json` (and other languages as needed) and use `this.$t('key')` in components.

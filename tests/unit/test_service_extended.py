@@ -57,10 +57,11 @@ class TestInitDb:
 
         mock_select_db.return_value = MagicMock()
         init_db("/config/path")
-        call_args = mock_select_db.call_args[0][0]
-        assert call_args["TYPE"] == "SQLITE"
-        assert "compresso.db" in call_args["FILE"]
-        assert "migrations_v1" in call_args["MIGRATIONS_DIR"]
+        database_settings = mock_select_db.call_args[0][0]
+        migration_settings = mock_migrations.call_args[0][0]
+        assert database_settings["TYPE"] == "SQLITE"
+        assert "compresso.db" in database_settings["FILE"]
+        assert "migrations_v1" in migration_settings["MIGRATIONS_DIR"]
 
 
 @pytest.mark.unittest
@@ -76,7 +77,7 @@ class TestRootServiceInit:
         assert service.threads == []
         assert service.run_threads is True
         assert service.db_connection is None
-        assert service.developer is None
+        assert service.developer is False
         assert service.dev_api is None
 
 
@@ -642,7 +643,7 @@ class TestInitialRegisterCompresso:
         mock_session.get_installation_uuid.return_value = "uuid-123"
         mock_session_cls.return_value = mock_session
         service.initial_register_compresso()
-        mock_session.register_compresso.assert_called_once_with("uuid-123")
+        mock_session.register_compresso.assert_called_once_with()
 
 
 @pytest.mark.unittest

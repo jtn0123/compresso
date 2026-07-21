@@ -109,7 +109,7 @@
           <q-card-section :class="isMobile ? 'q-px-none' : ''">
             <h5 class="q-mb-none">{{ $t('components.settings.workers.schedule') }}</h5>
             <div class="q-gutter-sm">
-              <q-skeleton v-if="schedules === null" type="text" />
+              <q-skeleton v-if="!schedulesLoaded" type="text" />
 
               <q-list bordered separator class="rounded-borders">
                 <draggable
@@ -183,7 +183,7 @@
   </CompressoDialogMenu>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
 import draggable from 'vuedraggable'
@@ -194,33 +194,37 @@ import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogMenu from 'components/ui/dialogs/CompressoDialogMenu.vue'
 import WorkerEventCreateDialog from 'components/settings/workers/WorkerEventCreateDialog.vue'
 import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
+import type { DialogController } from 'src/types/ui'
+import type {
+  DetectedGpu,
+  WorkerEventSchedule,
+  WorkerGroupConfig,
+  WorkerScheduleDisplay,
+  WorkerScheduleEvent,
+} from 'src/types/workers'
 
-const props = defineProps({
-  workerGroupId: {
-    type: Number,
-    default: 0,
-  },
-})
+const props = withDefaults(defineProps<{ workerGroupId?: number }>(), { workerGroupId: 0 })
 
-const emit = defineEmits(['hide', 'saved'])
+const emit = defineEmits<{ hide: []; saved: [] }>()
 
 const $q = useQuasar()
 const { t } = useI18n()
 const { isMobile } = useMobile()
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const isOpen = ref(false)
-const originalSnapshot = ref(null)
+const originalSnapshot = ref<string | null>(null)
 
-const currentID = ref(null)
+const currentID = ref<number | null>(null)
 const locked = ref(false)
-const name = ref(null)
-const workerType = ref('cpu')
-const workerCount = ref(null)
+const name = ref<string | null>(null)
+const workerType = ref<'cpu' | 'gpu'>('cpu')
+const workerCount = ref<number | null>(null)
 const newTag = ref('')
-const tags = ref(null)
-const schedules = ref(null)
-const detectedGpus = ref([])
+const tags = ref<string[] | null>(null)
+const schedules = ref<WorkerScheduleDisplay[]>([])
+const schedulesLoaded = ref(false)
+const detectedGpus = ref<DetectedGpu[]>([])
 
 const saveAction = computed(() => {
   const hasChanges = isDirty.value
@@ -239,7 +243,7 @@ const saveAction = computed(() => {
 const saveActions = computed(() => [saveAction.value])
 
 const currentSnapshot = computed(() => {
-  if (name.value === null || workerCount.value === null || tags.value === null || schedules.value === null) {
+  if (name.value === null || workerCount.value === null || tags.value === null || !schedulesLoaded.value) {
     return null
   }
   const scheduleSnapshot = schedules.value.map((schedule) => ({
@@ -283,7 +287,8 @@ const resetState = () => {
   workerCount.value = null
   newTag.value = ''
   tags.value = null
-  schedules.value = null
+  schedules.value = []
+  schedulesLoaded.value = false
   originalSnapshot.value = null
 }
 
@@ -293,7 +298,7 @@ const updateSnapshot = () => {
   }
 }
 
-const fetchWorkerGroupConfig = (workerGroupId) => {
+const fetchWorkerGroupConfig = (workerGroupId: number): void => {
   if (workerGroupId === 0) {
     currentID.value = 0
     locked.value = false
@@ -302,11 +307,12 @@ const fetchWorkerGroupConfig = (workerGroupId) => {
     workerCount.value = 1
     tags.value = []
     schedules.value = []
+    schedulesLoaded.value = true
     updateSnapshot()
     return
   }
   const data = { id: workerGroupId }
-  axios({
+  axios<WorkerGroupConfig>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'settings/worker_group/read'),
     data: data,
@@ -317,15 +323,16 @@ const fetchWorkerGroupConfig = (workerGroupId) => {
     workerType.value = response.data.worker_type || 'cpu'
     workerCount.value = response.data.number_of_workers
     tags.value = response.data.tags
-    const workerEventSchedules = response.data.worker_event_schedules.map((schedule) => ({
+    const workerEventSchedules = response.data.worker_event_schedules.map((schedule: WorkerEventSchedule) => ({
       repetition: schedule.repetition,
       repetitionLabel: t(`components.settings.workers.scheduleLabels.${schedule.repetition}`),
       scheduleTime: schedule.schedule_time,
       scheduleTask: schedule.schedule_task,
       scheduleTaskLabel: t(`components.settings.workers.scheduleLabels.${schedule.schedule_task}`),
-      scheduleWorkerCount: schedule.schedule_worker_count,
+      scheduleWorkerCount: schedule.schedule_worker_count ?? 0,
     }))
     schedules.value = workerEventSchedules
+    schedulesLoaded.value = true
     updateSnapshot()
   })
 }
@@ -360,7 +367,7 @@ const saveWorkerGroupConfig = async () => {
       timeout: 200,
     })
     return true
-  } catch (error) {
+  } catch {
     $q.notify({
       color: 'negative',
       position: 'top',
@@ -382,13 +389,13 @@ const save = async () => {
 }
 
 const addTag = () => {
-  if (newTag.value) {
+  if (newTag.value && tags.value !== null) {
     tags.value = [...tags.value, newTag.value]
-    newTag.value = null
+    newTag.value = ''
   }
 }
 
-const workerEventCreateDialogRef = ref(null)
+const workerEventCreateDialogRef = ref<DialogController | null>(null)
 
 const addNewScheduledEvent = () => {
   if (workerEventCreateDialogRef.value) {
@@ -396,10 +403,7 @@ const addNewScheduledEvent = () => {
   }
 }
 
-const onWorkerEventCreated = (payload) => {
-  if (payload.repetition === null || payload.scheduleTask === null) {
-    return
-  }
+const onWorkerEventCreated = (payload: WorkerScheduleEvent): void => {
   schedules.value = [
     ...schedules.value,
     {
@@ -413,13 +417,15 @@ const onWorkerEventCreated = (payload) => {
   ]
 }
 
-const deleteSchedule = (index) => {
+const deleteSchedule = (index: number): void => {
   schedules.value = schedules.value.filter((_, scheduleIndex) => scheduleIndex !== index)
 }
 
 const fetchDetectedGpus = async () => {
   try {
-    const response = await axios.get(getCompressoApiUrl('v2', 'settings/configuration'))
+    const response = await axios.get<{ devices?: { gpu_info?: DetectedGpu[] } }>(
+      getCompressoApiUrl('v2', 'settings/configuration'),
+    )
     detectedGpus.value = response.data?.devices?.gpu_info || []
   } catch (_e) {
     detectedGpus.value = []

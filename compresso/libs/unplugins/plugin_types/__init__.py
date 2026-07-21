@@ -35,6 +35,7 @@ import pkgutil
 import sys
 from importlib import import_module
 from pathlib import Path
+from typing import cast
 
 from .plugin_type_base import PluginType
 
@@ -42,7 +43,7 @@ d = os.path.join(Path(__file__).parent)
 type_modules_paths = [os.path.join(d, o) for o in os.listdir(d) if os.path.isdir(os.path.join(d, o)) and not o.startswith("_")]
 
 
-def grab_module(module_name, *args, **kwargs):
+def grab_module(module_name: str, *args: object, **kwargs: object) -> PluginType:
     """
     Fetch a module by name and return the instance of that class
 
@@ -58,7 +59,7 @@ def grab_module(module_name, *args, **kwargs):
             class_name = module_name.capitalize()
 
         module = import_module("." + module_name, package=__name__)
-        module_class = getattr(module, class_name)
+        module_class = cast("type[PluginType]", getattr(module, class_name))
         instance = module_class(*args, **kwargs)
 
         return instance
@@ -67,14 +68,14 @@ def grab_module(module_name, *args, **kwargs):
         raise ImportError(f"{module_name} is not part of our supported plugin types!") from None
 
 
-def get_all_plugin_types():
+def get_all_plugin_types() -> dict[str, dict[str, str]]:
     """
     Fetch a list of supported plugin types and
     return a dictionary of their data
 
     :return:
     """
-    return_dic = {}
+    return_dic: dict[str, dict[str, str]] = {}
 
     for type_modules_path in type_modules_paths:
         plugin_type = os.path.basename(Path(type_modules_path))
@@ -96,7 +97,7 @@ Import all submodules for this package
 """
 for type_modules_path in type_modules_paths:
     plugin_type = os.path.basename(Path(type_modules_path))
-    for _, name, _ in pkgutil.iter_modules([type_modules_path]):  # type: ignore[assignment]
+    for _finder, name, _is_package in pkgutil.iter_modules([type_modules_path]):
         imported_module = import_module("." + plugin_type + "." + name, package=__name__)
 
         for i in dir(imported_module):

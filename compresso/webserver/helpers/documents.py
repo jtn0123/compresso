@@ -35,7 +35,7 @@ import zipfile
 from compresso import config
 
 
-def generate_log_files_zip():
+def generate_log_files_zip() -> str:
     settings = config.Config()
 
     cache_path = settings.get_cache_path()

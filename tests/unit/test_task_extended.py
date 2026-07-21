@@ -113,7 +113,7 @@ class TestTaskGetTaskData:
 
         t = Task()
         t.task = MagicMock()
-        with patch("compresso.libs.task.model_to_dict", return_value={"id": 1, "abspath": "/test"}):
+        with patch("compresso.libs.task.model_as_dict", return_value={"id": 1, "abspath": "/test"}):
             data = t.get_task_data()
         assert isinstance(data, dict)
 

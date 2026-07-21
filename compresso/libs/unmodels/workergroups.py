@@ -29,7 +29,10 @@ Copyright:
 
 """
 
-from peewee import BooleanField, IntegerField, ManyToManyField, TextField
+from collections.abc import Callable
+from typing import cast
+
+from peewee import BooleanField, IntegerField, ManyToManyField, Model, TextField
 
 from compresso.libs.unmodels.lib import BaseModel
 from compresso.libs.unmodels.tags import Tags
@@ -50,4 +53,4 @@ class WorkerGroups(BaseModel):
 
 # Generate linking table for the 'tags' field above
 # https://docs.peewee-orm.com/en/latest/peewee/relationships.html#manytomanyfield
-WorkerGroupTags = WorkerGroups.tags.get_through_model()
+WorkerGroupTags = cast("Callable[[], type[Model]]", WorkerGroups.tags.get_through_model)()

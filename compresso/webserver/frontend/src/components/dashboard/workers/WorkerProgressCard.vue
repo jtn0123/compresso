@@ -106,12 +106,15 @@
   </q-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { PropType } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import WorkerMoreDetailsDialog from 'components/dashboard/workers/WorkerMoreDetailsDialog.vue'
+import type { DialogController } from 'src/types/ui'
+import type { WorkerRunnerInfo, WorkerSubprocessInfo } from 'src/types/workers'
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
@@ -183,19 +186,19 @@ const props = defineProps({
     default: '',
   },
   currentTask: {
-    type: Number,
+    type: Number as PropType<number | null>,
     default: null,
   },
   runnersInfo: {
-    type: Object,
+    type: Object as PropType<Record<string, WorkerRunnerInfo>>,
     default: () => ({}),
   },
   subprocess: {
-    type: Object,
+    type: Object as PropType<WorkerSubprocessInfo>,
     default: () => ({}),
   },
   workerLog: {
-    type: Array,
+    type: Array as PropType<string[]>,
     default: () => [],
   },
   idle: {
@@ -212,7 +215,7 @@ const props = defineProps({
   },
 })
 
-const workerDetailsDialogRef = ref(null)
+const workerDetailsDialogRef = ref<DialogController | null>(null)
 
 const cpuValue = computed(() => clampPercent(Number(props.subprocess?.cpu_percent || 0)) / 100)
 const memValue = computed(() => clampPercent(Number(props.subprocess?.mem_percent || 0)) / 100)
@@ -229,7 +232,7 @@ const displayLabel = computed(() => {
 })
 
 const openDetails = () => {
-  workerDetailsDialogRef.value.show()
+  workerDetailsDialogRef.value?.show()
 }
 </script>
 

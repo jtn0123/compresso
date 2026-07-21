@@ -20,7 +20,6 @@ from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from compresso.config import Config
 from compresso.libs.json_state import atomic_json_write
@@ -56,7 +55,7 @@ def _deterministic_bytes(seed: int, length: int) -> bytes:
     return bytes(result[:length])
 
 
-def write_report(path: Path, payload: Mapping[str, Any]) -> None:
+def write_report(path: Path, payload: Mapping[str, object]) -> None:
     """Atomically persist a private JSON report."""
     atomic_json_write(path, payload, mode=0o600)
 
@@ -141,7 +140,7 @@ class FaultContext:
         return destination
 
 
-def run_transfer_restart(context: FaultContext) -> dict[str, Any]:
+def run_transfer_restart(context: FaultContext) -> dict[str, object]:
     root = context.fresh_directory("transfer-restart")
     payload = _deterministic_bytes(context.seed, 64 * 1024 + 37)
     store = ResumableTransferStore(root)
@@ -164,7 +163,7 @@ def run_transfer_restart(context: FaultContext) -> dict[str, Any]:
     return {"chunks": chunks, "final_checksum": "verified", "restart_resume": "verified"}
 
 
-def run_transfer_corruption(context: FaultContext) -> dict[str, Any]:
+def run_transfer_corruption(context: FaultContext) -> dict[str, object]:
     root = context.fresh_directory("transfer-corruption")
     payload = b"deterministic-corruption-probe"
     store = ResumableTransferStore(root / "chunks")
@@ -186,7 +185,7 @@ def run_transfer_corruption(context: FaultContext) -> dict[str, Any]:
     return {"corrupt_inputs": "rejected", "damaged_checkpoint": "quarantined"}
 
 
-def run_stale_offset(context: FaultContext) -> dict[str, Any]:
+def run_stale_offset(context: FaultContext) -> dict[str, object]:
     root = context.fresh_directory("stale-offset")
     payload = b"0123456789"
     store = ResumableTransferStore(root)
@@ -203,7 +202,7 @@ def run_stale_offset(context: FaultContext) -> dict[str, Any]:
     return {"durable_offset": 4, "stale_offset": "rejected"}
 
 
-def run_filesystem_faults(context: FaultContext) -> dict[str, Any]:
+def run_filesystem_faults(context: FaultContext) -> dict[str, object]:
     root = context.fresh_directory("filesystem-faults")
     failures = [errno.ENOSPC, errno.EROFS]
 
@@ -233,7 +232,7 @@ def run_filesystem_faults(context: FaultContext) -> dict[str, Any]:
     return {"faults": ["disk-full", "read-only"], "recovery": "verified"}
 
 
-def run_finalization_recovery(context: FaultContext) -> dict[str, Any]:
+def run_finalization_recovery(context: FaultContext) -> dict[str, object]:
     root = context.fresh_directory("finalization-recovery")
     fail_replace = [True]
 
@@ -258,15 +257,13 @@ def run_finalization_recovery(context: FaultContext) -> dict[str, Any]:
     return {"interruption": "survived", "retry": "verified"}
 
 
-def run_lease_contention(context: FaultContext) -> dict[str, Any]:
+def run_lease_contention(context: FaultContext) -> dict[str, object]:
     from compresso.libs.remote_task_lease import RemoteTaskLease
     from compresso.libs.unmodels.lib import Database
     from compresso.libs.unmodels.tasks import Tasks
 
     root = context.fresh_directory("lease-contention")
-    database = Database.select_database(
-        {"TYPE": "SQLITE", "FILE": str(root / "leases.db"), "MIGRATIONS_DIR": str(root / "migrations")}
-    )
+    database = Database.select_database({"TYPE": "SQLITE", "FILE": str(root / "leases.db")})
     try:
         database.create_tables([Tasks])
         task = Tasks.create(
@@ -287,10 +284,10 @@ def run_lease_contention(context: FaultContext) -> dict[str, Any]:
         database.close()
 
 
-def run_process_restart(_context: FaultContext) -> dict[str, Any]:
+def run_process_restart(_context: FaultContext) -> dict[str, object]:
     run_drill = importlib.import_module("compresso.libs.distributed_process_drill").run_drill
     result = run_drill(size_mb=1, chunk_mb=1)
-    required = {
+    required: dict[str, object] = {
         "restart_during_upload": "resumed",
         "stale_offset": "rejected",
         "duplicate_finalization": "idempotent",
@@ -302,22 +299,22 @@ def run_process_restart(_context: FaultContext) -> dict[str, Any]:
     return required
 
 
-def _run_queue_scale(entry_count: int) -> dict[str, Any]:
+def _run_queue_scale(entry_count: int) -> dict[str, object]:
     result = run_benchmark(entry_count, batch_size=1_000)
     if result.get("entry_count") != entry_count:
         raise InvariantViolation(f"synthetic queue did not retain all {entry_count} entries")
     return {"entries": entry_count, "inventory": "exact", "queries": "completed"}
 
 
-def run_queue_10k(_context: FaultContext) -> dict[str, Any]:
+def run_queue_10k(_context: FaultContext) -> dict[str, object]:
     return _run_queue_scale(10_000)
 
 
-def run_queue_100k(_context: FaultContext) -> dict[str, Any]:
+def run_queue_100k(_context: FaultContext) -> dict[str, object]:
     return _run_queue_scale(100_000)
 
 
-def run_media_fixture(context: FaultContext) -> dict[str, Any]:
+def run_media_fixture(context: FaultContext) -> dict[str, object]:
     from compresso.libs.ffprobe_utils import probe_file
 
     root = context.fresh_directory("media-fixture")
@@ -333,7 +330,7 @@ def run_media_fixture(context: FaultContext) -> dict[str, Any]:
     return {"fixture": "generated", "ffprobe": "verified"}
 
 
-ScenarioRunner = Callable[[FaultContext], dict[str, Any]]
+ScenarioRunner = Callable[[FaultContext], dict[str, object]]
 DEFAULT_SCENARIOS: OrderedDict[str, ScenarioRunner] = OrderedDict(
     (
         ("transfer-restart", run_transfer_restart),
@@ -365,7 +362,7 @@ class FaultLab:
         self.seed = int(seed)
         self.scenario_runners = OrderedDict(scenario_runners or DEFAULT_SCENARIOS)
 
-    def run(self, scenario: str = "all") -> dict[str, Any]:
+    def run(self, scenario: str = "all") -> dict[str, object]:
         if scenario == "all":
             selected = list(self.scenario_runners)
         elif scenario in self.scenario_runners:
@@ -373,13 +370,14 @@ class FaultLab:
         else:
             raise ValueError(f"unknown fault-lab scenario: {scenario}")
         identity = json.dumps({"seed": self.seed, "scenarios": selected}, sort_keys=True).encode()
-        report: dict[str, Any] = {
+        scenarios: list[dict[str, object]] = []
+        report: dict[str, object] = {
             "schema_version": SCHEMA_VERSION,
             "run_id": hashlib.sha256(identity).hexdigest()[:16],
             "seed": self.seed,
             "scenario_requested": scenario,
             "overall_status": "pass",
-            "scenarios": [],
+            "scenarios": scenarios,
         }
         context = FaultContext(self.workspace, self.seed)
         for name in selected:
@@ -387,15 +385,15 @@ class FaultLab:
                 evidence = self.scenario_runners[name](context)
                 if not isinstance(evidence, dict):
                     raise InvariantViolation("scenario evidence is not an object")
-                report["scenarios"].append({"scenario": name, "status": "pass", "evidence": evidence})
+                scenarios.append({"scenario": name, "status": "pass", "evidence": evidence})
             except Exception as error:
                 report["overall_status"] = "fail"
-                report["scenarios"].append({"scenario": name, "status": "fail", "error": str(error)})
+                scenarios.append({"scenario": name, "status": "fail", "error": str(error)})
                 break
         return report
 
 
-def _protected_paths(settings: Any) -> list[Path]:
+def _protected_paths(settings: Config) -> list[Path]:
     paths = [Path.cwd(), Path(__file__).resolve().parents[2]]
     for getter_name in ("get_config_path", "get_cache_path", "get_library_path", "get_userdata_path"):
         value = getattr(settings, getter_name)()

@@ -24,31 +24,35 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import type { ApiSchema } from 'src/types/contracts'
+
+interface DataPanelLink { id: string; label: string }
 
 export default {
   name: 'DrawerDataPanelsNav',
   methods: {
-    setPage(value) {
+    setPage(value: string) {
       this.$router.push('/ui/data-panels?pluginId=' + value)
     },
     fetchDataPanelList() {
-      axios({
+      axios<ApiSchema<'PluginsDataPanelTypesData'>>({
         method: 'get',
         url: getCompressoApiUrl('v2', 'plugins/panels/enabled'),
       })
         .then((response) => {
           // Success
-          let pluginIds = []
+          const pluginIds: DataPanelLink[] = []
           for (let i = 0; i < response.data.results.length; i++) {
-            let plugin = response.data.results[i]
-            pluginIds[pluginIds.length] = {
+            const plugin = response.data.results[i]
+            if (!plugin) continue
+            pluginIds.push({
               id: plugin.plugin_id,
               label: plugin.name,
-            }
+            })
           }
           this.availableDataPanels = pluginIds
         })
@@ -67,7 +71,7 @@ export default {
     this.fetchDataPanelList()
   },
   data: function () {
-    const availableDataPanels = ref(null)
+    const availableDataPanels = ref<DataPanelLink[]>([])
     return {
       availableDataPanels,
     }

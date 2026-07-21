@@ -11,28 +11,31 @@ Exposes system-level metrics (CPU, RAM, disk, GPU, platform) via REST.
 
 import shutil
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime
 
 import psutil
 
 from compresso import config
 from compresso.libs import session
+from compresso.libs.foreman import Foreman
 from compresso.libs.gpu_monitor import GpuMonitor
 from compresso.libs.operations_status import OperationsStatus
 from compresso.libs.safety_state import SafetyState
 from compresso.libs.system import System
-from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
+from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads, DataQueues
 from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.ops.doctor import load_latest_report
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler, string_value
 from compresso.webserver.api_v2.schema.system_schemas import SafetyAcknowledgeRequestSchema, SystemStatusSuccessSchema
 
 
 class ApiSystemHandler(BaseApiHandler):
-    session = None
-    config = None
-    params = None
-    compresso_data_queues = None
+    session: session.Session
+    config: config.Config
+    params: object
+    compresso_data_queues: DataQueues
+    foreman: Foreman | None
 
     routes = [
         {
@@ -77,7 +80,7 @@ class ApiSystemHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
@@ -85,7 +88,7 @@ class ApiSystemHandler(BaseApiHandler):
         self.foreman = CompressoRunningThreads().get_compresso_running_thread("foreman")
         self.config = config.Config()
 
-    async def get_system_status(self):
+    async def get_system_status(self) -> None:
         """
         System - status
         ---
@@ -128,13 +131,18 @@ class ApiSystemHandler(BaseApiHandler):
 
             cpu_percent = psutil.cpu_percent(interval=0.1)
             cpu_count = psutil.cpu_count()
-            cpu_brand = system_info.get("devices", {}).get("cpu_info", {}).get("brand_raw", "Unknown")
+            devices_value = system_info.get("devices", {})
+            devices = devices_value if isinstance(devices_value, Mapping) else {}
+            cpu_info_value = devices.get("cpu_info", {})
+            cpu_info = cpu_info_value if isinstance(cpu_info_value, Mapping) else {}
+            cpu_brand = string_value(cpu_info.get("brand_raw"), "Unknown")
 
             mem = psutil.virtual_memory()
 
             disk = psutil.disk_usage("/")
 
-            gpu_list = system_info.get("devices", {}).get("gpu_info", [])
+            gpu_value = devices.get("gpu_info", [])
+            gpu_list = gpu_value if isinstance(gpu_value, list) else []
 
             platform_info = system_info.get("platform", {})
             platform_data = {
@@ -179,7 +187,7 @@ class ApiSystemHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_gpu_metrics(self):
+    async def get_gpu_metrics(self) -> None:
         """
         System - gpu-metrics
         ---
@@ -227,15 +235,39 @@ class ApiSystemHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_worker_capabilities(self):
-        """Return hardware, encoder, and current-capacity data for scheduling."""
+    async def get_worker_capabilities(self) -> None:
+        """
+        System - worker capabilities
+        ---
+        description: Return hardware, encoder, and current-capacity data for scheduling.
+        responses:
+            200:
+                description: Current worker capabilities.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: true
+        """
         try:
             self.write_success(WorkerCapabilities().snapshot(self.config))
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_operations_status(self):
-        """Return queue, worker, transfer, checkpoint, and disk-pressure counters."""
+    async def get_operations_status(self) -> None:
+        """
+        System - operations
+        ---
+        description: Return queue, worker, transfer, checkpoint, and disk-pressure counters.
+        responses:
+            200:
+                description: Current operational counters.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: true
+        """
         try:
             self.write_success(
                 OperationsStatus().snapshot(
@@ -247,18 +279,42 @@ class ApiSystemHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    def _safety_store(self):
+    def _safety_store(self) -> SafetyState:
         return SafetyState(self.config.get_userdata_path())
 
-    async def get_safety(self):
-        """Return the persistent safety latch and its bounded event history."""
+    async def get_safety(self) -> None:
+        """
+        System - safety
+        ---
+        description: Return the persistent safety latch and its bounded event history.
+        responses:
+            200:
+                description: Current safety state.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: true
+        """
         try:
             self.write_success(self._safety_store().snapshot())
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_readiness(self):
-        """Combine the latest deployment-doctor evidence with the safety latch."""
+    async def get_readiness(self) -> None:
+        """
+        System - readiness
+        ---
+        description: Combine the latest deployment-doctor evidence with the safety latch.
+        responses:
+            200:
+                description: Current deployment readiness and safety evidence.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: true
+        """
         try:
             report = load_latest_report(self.config.get_userdata_path())
             expired = None
@@ -283,15 +339,33 @@ class ApiSystemHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def acknowledge_safety(self):
-        """Record that an operator investigated and resolved a safety event."""
+    async def acknowledge_safety(self) -> None:
+        """
+        System - acknowledge safety
+        ---
+        description: Record that an operator investigated and resolved a safety event.
+        requestBody:
+            required: true
+            content:
+                application/json:
+                    schema:
+                        SafetyAcknowledgeRequestSchema
+        responses:
+            200:
+                description: Updated safety state.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: true
+        """
         try:
             request = self.read_json_request(SafetyAcknowledgeRequestSchema())
-            actor = request.get("actor") or "operator"
+            actor = string_value(request.get("actor"), "operator")
             store = self._safety_store()
-            event = store.acknowledge(request["event_id"], actor=actor)
+            event = store.acknowledge(string_value(request["event_id"]), actor=actor)
             if event.get("active"):
-                store.clear(event["code"], resolution=f"Acknowledged as resolved by {actor}")
+                store.clear(string_value(event.get("code")), resolution=f"Acknowledged as resolved by {actor}")
             self.write_success(store.snapshot())
         except KeyError as exc:
             self.handle_base_api_error(BaseApiError("Unknown safety event", status_code=404, private_detail=str(exc)))
@@ -300,8 +374,20 @@ class ApiSystemHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def resume_safety(self):
-        """Recheck local capacity, release the latch, then resume local workers."""
+    async def resume_safety(self) -> None:
+        """
+        System - resume after safety pause
+        ---
+        description: Recheck local capacity, release the latch, then resume local workers.
+        responses:
+            200:
+                description: Updated safety state after the release attempt.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            additionalProperties: true
+        """
         try:
             store = self._safety_store()
             minimum_free = float(self.config.get_minimum_free_space_gb()) * 1024**3
@@ -323,9 +409,10 @@ class ApiSystemHandler(BaseApiHandler):
                 )
 
             snapshot = store.snapshot()
+            events_value = snapshot.get("events", [])
+            events = [event for event in events_value if isinstance(event, Mapping)] if isinstance(events_value, list) else []
             active_disk = next(
-                (event for event in snapshot.get("events", []) if event.get("code") == "disk-reserve" and event.get("active")),
-                None,
+                (event for event in events if event.get("code") == "disk-reserve" and event.get("active")), None
             )
             if active_disk and active_disk.get("acknowledged_at"):
                 store.clear("disk-reserve", resolution="Cache disk reserve recheck passed")

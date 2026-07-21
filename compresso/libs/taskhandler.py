@@ -29,18 +29,22 @@ Copyright:
 
 """
 
+import logging
 import os
 import queue
 import shutil
 import threading
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal, TypedDict
 
 from peewee import OperationalError
 
 from compresso import config
 from compresso.libs import common, task
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.peewee_types import execute_write
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.unmodels.tasks import Tasks
 
@@ -62,6 +66,12 @@ class StartupRecoveryTransition:
     reason: str | None = None
 
 
+class QueuedPath(TypedDict):
+    pathname: str
+    library_id: int
+    priority_score: int
+
+
 class TaskHandler(threading.Thread):
     """
     TaskHandler
@@ -69,26 +79,31 @@ class TaskHandler(threading.Thread):
     The TaskHandler reads all items in the queues and passes them to the appropriate locations in the application.
     """
 
-    def __init__(self, data_queues, task_queue, event):
+    def __init__(
+        self,
+        data_queues: Mapping[str, queue.Queue[QueuedPath]],
+        task_queue: object,
+        event: threading.Event,
+    ) -> None:
         super().__init__(name="TaskHandler")
         self.settings = config.Config()
         self.event = event
         self.data_queues = data_queues
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.task_queue = task_queue
         self.inotifytasks = data_queues["inotifytasks"]
         self.scheduledtasks = data_queues["scheduledtasks"]
         self.abort_flag = threading.Event()
         self.abort_flag.clear()
 
-    def _log(self, message, message2="", level="info"):
+    def _log(self, message: object, message2: object = "", level: str = "info") -> None:
         message = common.format_message(message, message2)
-        getattr(self.logger, level)(message)
+        self.logger.log(getattr(logging, level.upper(), logging.INFO), message)
 
-    def stop(self):
+    def stop(self) -> None:
         self.abort_flag.set()
 
-    def run(self):
+    def run(self) -> None:
         self._log("Starting TaskHandler Monitor loop")
         while not self.abort_flag.is_set():
             self.event.wait(2)
@@ -97,7 +112,7 @@ class TaskHandler(threading.Thread):
 
         self._log("Leaving TaskHandler Monitor loop...")
 
-    def process_scheduledtasks_queue(self):
+    def process_scheduledtasks_queue(self) -> None:
         while not self.abort_flag.is_set() and not self.scheduledtasks.empty():
             # Do not sleep at all here. Process this loop as quick as possible
             try:
@@ -114,7 +129,7 @@ class TaskHandler(threading.Thread):
             except Exception as e:
                 self._log("Exception in processing scheduledtasks", str(e), level="exception")
 
-    def process_inotifytasks_queue(self):
+    def process_inotifytasks_queue(self) -> None:
         while not self.abort_flag.is_set() and not self.inotifytasks.empty():
             # Do not sleep at all here. Process this loop as quick as possible
             try:
@@ -132,14 +147,16 @@ class TaskHandler(threading.Thread):
                 self._log("Exception in processing inotifytasks", str(e), level="exception")
 
     @staticmethod
-    def _file_is_usable(path):
+    def _file_is_usable(path: str | None) -> bool:
+        if not path:
+            return False
         try:
-            return bool(path) and os.path.isfile(path) and os.path.getsize(path) > 0
+            return os.path.isfile(path) and os.path.getsize(path) > 0
         except OSError:
             return False
 
     @classmethod
-    def _find_staged_output(cls, staging_path, task_id):
+    def _find_staged_output(cls, staging_path: str, task_id: int) -> str | None:
         task_staging_dir = os.path.join(staging_path, f"task_{task_id}")
         if not os.path.isdir(task_staging_dir):
             return None
@@ -152,7 +169,7 @@ class TaskHandler(threading.Thread):
         return None
 
     @staticmethod
-    def _reset_interrupted_task(task_obj):
+    def _reset_interrupted_task(task_obj: Tasks) -> None:
         task_obj.status = "pending"
         task_obj.success = None
         task_obj.processed_by_worker = None
@@ -162,22 +179,35 @@ class TaskHandler(threading.Thread):
         task_obj.save()
 
     @staticmethod
-    def _reconcile_finalization_override(task_obj, committed_task_ids, finalization_task_ids, protected_paths, logger):
+    def _reconcile_finalization_override(
+        task_obj: Tasks,
+        committed_task_ids: set[int],
+        finalization_task_ids: set[int],
+        protected_paths: set[str],
+        logger: logging.Logger,
+    ) -> bool:
         if task_obj.id in committed_task_ids:
             logger.warning("STARTUP_COMMITTED_TASK_FINALIZED id=%s", task_obj.id)
             task.TaskDataStore.clear_task(task_obj.id)
-            Tasks.delete().where(Tasks.id == task_obj.id).execute()
+            execute_write(Tasks.delete().where(Tasks.id == task_obj.id))
             return True
         if task_obj.id in finalization_task_ids:
-            if TaskHandler._file_is_usable(task_obj.cache_path):
-                protected_paths.add(os.path.realpath(task_obj.cache_path))
+            cache_path = task_obj.cache_path
+            if cache_path is not None and TaskHandler._file_is_usable(cache_path):
+                protected_paths.add(os.path.realpath(cache_path))
             logger.warning("STARTUP_TASK_FINALIZATION_RESUMED id=%s status=%s", task_obj.id, task_obj.status)
             return True
         return False
 
     @staticmethod
     def _startup_recovery_transition(
-        *, status, clear_pending, success, cache_usable, staged_usable, has_cache_path
+        *,
+        status: str,
+        clear_pending: bool,
+        success: bool | None,
+        cache_usable: bool,
+        staged_usable: bool,
+        has_cache_path: bool,
     ) -> StartupRecoveryTransition:
         """Return the existing startup action without mutating task state."""
         if clear_pending and status == "pending":
@@ -219,11 +249,19 @@ class TaskHandler(threading.Thread):
         return StartupRecoveryTransition(StartupRecoveryAction.NONE)
 
     @classmethod
-    def _apply_startup_recovery_transition(cls, transition, task_obj, cache_path, staged_path, protected_paths, logger):
+    def _apply_startup_recovery_transition(
+        cls,
+        transition: StartupRecoveryTransition,
+        task_obj: Tasks,
+        cache_path: str | None,
+        staged_path: str | None,
+        protected_paths: set[str],
+        logger: logging.Logger,
+    ) -> None:
         """Apply one tested startup transition while preserving persisted states."""
         if transition.action is StartupRecoveryAction.DELETE:
             task.TaskDataStore.clear_task(task_obj.id)
-            Tasks.delete().where(Tasks.id == task_obj.id).execute()
+            execute_write(Tasks.delete().where(Tasks.id == task_obj.id))
             return
         if transition.action is StartupRecoveryAction.REQUEUE:
             cls._reset_interrupted_task(task_obj)
@@ -234,6 +272,8 @@ class TaskHandler(threading.Thread):
             task_obj.save()
             logger.warning("STARTUP_APPROVAL_RESTAGE id=%s", task_obj.id)
         elif transition.action is StartupRecoveryAction.RESTORE_CACHE:
+            if not cache_path or not staged_path:
+                raise RuntimeError("Startup cache restoration requires staged and cache paths")
             os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
             try:
                 shutil.copy2(staged_path, cache_path)
@@ -261,7 +301,12 @@ class TaskHandler(threading.Thread):
             protected_paths.add(os.path.realpath(staged_path))
 
     @classmethod
-    def recover_tasks_on_startup(cls, settings, committed_task_ids=None, finalization_task_ids=None):
+    def recover_tasks_on_startup(
+        cls,
+        settings: config.Config,
+        committed_task_ids: Iterable[int] | None = None,
+        finalization_task_ids: Iterable[int] | None = None,
+    ) -> list[str]:
         """Reconcile persisted tasks before worker and postprocessor startup.
 
         Returns file paths that startup cache cleanup must preserve. Interrupted
@@ -269,7 +314,7 @@ class TaskHandler(threading.Thread):
         approval artifacts are retained when they are still usable.
         """
         logger = CompressoLogging.get_logger(name=cls.__name__)
-        protected_paths = set()
+        protected_paths: set[str] = set()
         staging_path = settings.get_staging_path()
         clear_pending = settings.get_clear_pending_tasks_on_restart()
         committed_task_ids = set(committed_task_ids or [])
@@ -322,12 +367,12 @@ class TaskHandler(threading.Thread):
 
         return sorted(protected_paths)
 
-    def clear_tasks_on_startup(self):
+    def clear_tasks_on_startup(self) -> list[str]:
         """Compatibility wrapper for callers that still invoke the old hook."""
         return self.recover_tasks_on_startup(self.settings)
 
     @staticmethod
-    def check_if_task_exists_matching_path(abspath):
+    def check_if_task_exists_matching_path(abspath: str) -> bool:
         """
         Check if a task already exists matching the given path
 
@@ -335,9 +380,9 @@ class TaskHandler(threading.Thread):
         :return:
         """
         existing_task_query = Tasks.select().where(Tasks.abspath == abspath).limit(1)
-        return existing_task_query.count() > 0
+        return bool(existing_task_query.count() > 0)
 
-    def add_path_to_task_queue(self, pathname, library_id, priority_score=0):
+    def add_path_to_task_queue(self, pathname: str, library_id: int, priority_score: int = 0) -> bool:
         """
         Add the path to the task queue ensuring that the path is only added once
 
@@ -368,7 +413,7 @@ class TaskHandler(threading.Thread):
 
         return True
 
-    def create_task_from_path(self, pathname, library_id, priority_score=0):
+    def create_task_from_path(self, pathname: str, library_id: int, priority_score: int = 0) -> task.Task | Literal[False]:
         """
         Generate a Task object from a pathname
 

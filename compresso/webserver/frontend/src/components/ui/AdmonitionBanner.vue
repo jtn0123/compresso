@@ -14,21 +14,15 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const props = defineProps({
-  type: {
-    type: String,
-    default: 'note',
-    validator: (value) => ['note', 'tip', 'warning', 'caution', 'important'].includes(value),
-  },
-  title: {
-    type: String,
-    required: false,
-    default: null,
-  },
+type AdmonitionType = 'note' | 'tip' | 'warning' | 'caution' | 'important'
+
+const props = withDefaults(defineProps<{ type?: AdmonitionType; title?: string | null }>(), {
+  type: 'note',
+  title: null,
 })
 
 const { t } = useI18n()

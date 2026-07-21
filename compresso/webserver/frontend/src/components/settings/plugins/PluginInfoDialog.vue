@@ -105,7 +105,6 @@
                         :class="item.sub_setting ? item.display + ' sub-setting' : item.display"
                         :key="item.key_id"
                         class="q-py-sm"
-                        v-bind="item"
                       >
                         <q-item-section v-if="item.input_type === 'text'">
                           <q-input
@@ -262,7 +261,7 @@
                         </q-item-section>
 
                         <q-item-section v-if="item.input_type === 'section_admonition'">
-                          <AdmonitionBanner :type="item.label.toLowerCase()" :title="item.label">
+                          <AdmonitionBanner :type="toAdmonitionType(item.label)" :title="item.label">
                             <span v-html="sanitizeHtml(item.description)"></span>
                           </AdmonitionBanner>
                         </q-item-section>
@@ -286,7 +285,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
@@ -303,6 +302,23 @@ import { useMobile } from 'src/composables/useMobile'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+import { normalizePluginSetting } from 'src/types/plugins'
+import type { PluginSetting, PluginStatus } from 'src/types/plugins'
+
+type AdmonitionType = 'note' | 'tip' | 'warning' | 'caution' | 'important'
+interface DirectorySelection { selectedPath: string }
+interface PluginInfoRequest {
+  plugin_id: string
+  prefer_local: boolean
+  library_id?: number
+}
+interface PluginSettingsRequest {
+  plugin_id: string
+  settings: PluginSetting[]
+  library_id?: number
+}
 
 const props = defineProps({
   pluginId: {
@@ -330,24 +346,24 @@ const { t } = useI18n()
 const { isMobile } = useMobile()
 const $q = useQuasar()
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const isOpen = ref(false)
 
 const tab = ref('info')
-const id = ref(null)
-const icon = ref(null)
-const name = ref(null)
-const description = ref(null)
-const tags = ref(null)
-const author = ref(null)
-const version = ref(null)
+const id = ref<string | null>(null)
+const icon = ref<string | null>(null)
+const name = ref<string | null>(null)
+const description = ref<string | null>(null)
+const tags = ref<string | null>(null)
+const author = ref<string | null>(null)
+const version = ref<string | null>(null)
 const changelog = ref('')
-const status = ref(null)
-const settings = ref([])
-const originalSettings = ref([])
+const status = ref<PluginStatus | null>(null)
+const settings = ref<PluginSetting[]>([])
+const originalSettings = ref<PluginSetting[]>([])
 const isHydratingSettings = ref(false)
 
-const directoryInputTarget = ref(null)
+const directoryInputTarget = ref<PluginSetting | null>(null)
 const selectDirectoryInitialPath = ref('')
 const selectDirectoryListType = ref('directories')
 
@@ -357,12 +373,13 @@ const settingsHaveBeenModified = () => {
   if (!originalSettings.value.length || !settings.value.length) {
     return false
   }
-  const newSettings = {}
+  const newSettings: Record<string, PluginSetting['value']> = {}
   settings.value.forEach((setting) => {
     newSettings[setting.key_id] = setting.value
   })
   for (let i = 0; i < originalSettings.value.length; i++) {
-    if (newSettings[originalSettings.value[i].key_id] !== originalSettings.value[i].value) {
+    const originalSetting = originalSettings.value[i]
+    if (originalSetting && newSettings[originalSetting.key_id] !== originalSetting.value) {
       return true
     }
   }
@@ -395,32 +412,32 @@ const headerActions = computed(() => {
 })
 
 const fetchPluginData = () => {
-  const postData = {
+  const postData: PluginInfoRequest = {
     plugin_id: props.pluginId,
     prefer_local: !props.viewingRemoteInfo,
   }
   if (props.libraryId) {
     postData.library_id = props.libraryId
   }
-  axios({
+  axios<ApiSchema<'PluginsInfoResults'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'plugins/info'),
     data: postData,
   }).then((response) => {
-    id.value = response.data.id
+    id.value = response.data.plugin_id
     icon.value = response.data.icon
     name.value = response.data.name
     tags.value = response.data.tags
     author.value = response.data.author
     version.value = response.data.version
     status.value = response.data.status
-    changelog.value = sanitizeHtml(markdownToHTML(response.data.changelog))
+    changelog.value = sanitizeHtml(markdownToHTML(response.data.changelog ?? ''))
     description.value = sanitizeHtml(markdownToHTML(response.data.description))
 
     if (!props.viewingRemoteInfo) {
       isHydratingSettings.value = true
-      settings.value = response.data.settings || []
-      originalSettings.value = JSON.parse(JSON.stringify(response.data.settings || []))
+      settings.value = (response.data.settings || []).map(normalizePluginSetting)
+      originalSettings.value = clonePluginSettings(settings.value)
       nextTick(() => {
         isHydratingSettings.value = false
       })
@@ -475,7 +492,7 @@ const settingsSaver = createSerializedSettingsSaver({
   snapshot: () => clonePluginSettings(settings.value),
   hasChanges: () => settings.value.length > 0 && settingsHaveBeenModified(),
   persist: (settingsSnapshot) => {
-    const data = {
+    const data: PluginSettingsRequest = {
       plugin_id: props.pluginId,
       settings: settingsSnapshot,
     }
@@ -506,39 +523,34 @@ const settingsSaver = createSerializedSettingsSaver({
 
 const savePluginSettings = () => settingsSaver.requestSave()
 
-const toggleCheckboxSetting = (item) => {
-  toggleEnabledCheckboxSetting(item)
-}
-
-const updateWithDirectoryBrowser = (input) => {
-  directoryInputTarget.value = input
-  selectDirectoryInitialPath.value = input.value
-  selectDirectoryListType.value = 'directories'
-  if (selectDirectoryDialogRef.value) {
-    selectDirectoryDialogRef.value.show()
+const toggleCheckboxSetting = (item: PluginSetting): void => {
+  if (typeof item.value === 'boolean') {
+    toggleEnabledCheckboxSetting(item as PluginSetting & { value: boolean })
   }
 }
 
-const onDirectorySelected = (payload) => {
+const updateWithDirectoryBrowser = (input: PluginSetting): void => {
+  directoryInputTarget.value = input
+  selectDirectoryInitialPath.value = typeof input.value === 'string' ? input.value : ''
+  selectDirectoryListType.value = 'directories'
+  selectDirectoryDialogRef.value?.show()
+}
+
+const onDirectorySelected = (payload: DirectorySelection): void => {
   if (directoryInputTarget.value && payload && payload.selectedPath) {
     directoryInputTarget.value.value = payload.selectedPath
   }
 }
 
 const show = () => {
-  if (!dialogRef.value) {
-    return
-  }
   isOpen.value = true
   tab.value = props.startTab
-  dialogRef.value.show()
+  dialogRef.value?.show()
   fetchPluginData()
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -580,7 +592,14 @@ watch(
   { deep: true },
 )
 
-const selectDirectoryDialogRef = ref(null)
+const selectDirectoryDialogRef = ref<DialogController | null>(null)
+
+const toAdmonitionType = (label: string): AdmonitionType => {
+  const normalized = label.toLowerCase()
+  return ['note', 'tip', 'warning', 'caution', 'important'].includes(normalized)
+    ? (normalized as AdmonitionType)
+    : 'note'
+}
 
 defineExpose({
   show,

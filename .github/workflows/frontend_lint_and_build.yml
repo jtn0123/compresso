@@ -54,6 +54,14 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Check generated API type drift
+      run: npm run contract:check
+
+    - name: Type check frontend
+      run: |
+        npm run typecheck
+        npm run typecheck:production
+
     - name: Install locked release tooling
       working-directory: .github/release
       run: npm ci
@@ -74,7 +82,7 @@ jobs:
         retention-days: 30
 
     - name: Check formatting with prettier
-      run: npx prettier --check "src/**/*.{js,vue}"
+      run: npx prettier --check "src/**/*.{js,ts,vue}"
 
     - name: Lint frontend
       run: npm run lint
@@ -87,7 +95,7 @@ jobs:
         test -f dist/spa/index.html
 
     - name: Install Playwright browsers
-      run: npx playwright install --with-deps chromium firefox webkit
+      run: npx playwright install --with-deps chrome webkit
 
     - name: Run mocked Playwright smoke tests
       run: npm run test:e2e:run

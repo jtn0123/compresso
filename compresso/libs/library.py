@@ -31,10 +31,13 @@ Copyright:
 
 import json
 import random
+from collections.abc import Iterable, Mapping, Sequence
+from typing import NotRequired, TypedDict, cast
 
 from compresso.config import Config
 from compresso.libs import common
 from compresso.libs.frontend_push_messages import FrontendPushMessages
+from compresso.libs.peewee_types import execute_count, execute_write
 from compresso.libs.unmodels import EnabledPlugins, Libraries, LibraryPluginFlow, Plugins, Tags, Tasks
 
 
@@ -42,7 +45,24 @@ class LibraryLookupError(ValueError):
     """Raised when a requested library identifier is invalid or missing."""
 
 
-def generate_random_library_name():
+class LibraryConfig(TypedDict):
+    id: int
+    name: str
+    path: str
+    locked: bool
+    enable_remote_only: bool
+    enable_scanner: bool
+    enable_inotify: bool
+    tags: list[str]
+    target_codecs: NotRequired[str]
+    skip_codecs: NotRequired[str]
+    size_guardrail_enabled: NotRequired[bool]
+    size_guardrail_min_pct: NotRequired[int]
+    size_guardrail_max_pct: NotRequired[int]
+    replacement_policy: NotRequired[str]
+
+
+def generate_random_library_name() -> str:
     names = [
         "Willes",
         "Here",
@@ -270,7 +290,7 @@ class Library:
 
     """
 
-    def __init__(self, library_id: int):
+    def __init__(self, library_id: int) -> None:
         # Ensure library ID is not 0
         if library_id < 1:
             raise LibraryLookupError("Library ID cannot be less than 1")
@@ -280,7 +300,7 @@ class Library:
         self.model = model
 
     @staticmethod
-    def get_all_libraries():
+    def get_all_libraries() -> list[LibraryConfig]:
         """
         Return a list of all libraries
 
@@ -299,7 +319,7 @@ class Library:
         # Ensure that at least the default path was added.
         # If the libraries path is empty, then we should add the default path
         if not configured_libraries:
-            default_library = {
+            seeded_default: LibraryConfig = {
                 "id": 1,
                 "name": generate_random_library_name(),
                 "path": default_library_path,
@@ -309,19 +329,19 @@ class Library:
                 "enable_inotify": False,
                 "tags": [],
             }
-            Libraries.create(**default_library)
-            return [default_library]
+            Libraries.create(**seeded_default)
+            return [seeded_default]
 
         # Loop over results
-        default_library = []
-        libraries = []
+        default_libraries: list[LibraryConfig] = []
+        libraries: list[LibraryConfig] = []
         for lib in configured_libraries:
             # Always update the default library path
             if lib.id == 1 and lib.path != default_library_path:
                 lib.path = default_library_path
                 lib.save()
             # Create library config dictionary
-            library_config = {
+            library_config: LibraryConfig = {
                 "id": lib.id,
                 "name": lib.name,
                 "path": lib.path,
@@ -343,22 +363,22 @@ class Library:
 
             # Keep the default library separate
             if lib.id == 1:
-                default_library.append(library_config)
+                default_libraries.append(library_config)
                 continue
             libraries.append(library_config)
 
         # Return the list of libraries sorted by name
-        return default_library + sorted(libraries, key=lambda d: d["name"])
+        return default_libraries + sorted(libraries, key=lambda d: d["name"])
 
     @staticmethod
-    def within_library_count_limits():
+    def within_library_count_limits() -> bool:
         # All features unlocked — no library count limits
         frontend_messages = FrontendPushMessages()
         frontend_messages.remove_item("libraryEnabledLimits")
         return True
 
     @staticmethod
-    def create(data: dict):
+    def create(data: dict[str, object]) -> "Library":
         """
         Create a new library
 
@@ -372,14 +392,14 @@ class Library:
         return Library(new_library.id)
 
     @staticmethod
-    def export(library_id):
+    def export(library_id: int) -> dict[str, object]:
         from compresso.libs.plugins import PluginsHandler
 
         # Read the library
         library_config = Library(library_id)
 
         # Get list of enabled plugins with their settings
-        enabled_plugins = []
+        enabled_plugins: list[dict[str, object]] = []
         for enabled_plugin in library_config.get_enabled_plugins(include_settings=True):
             enabled_plugins.append(
                 {
@@ -390,7 +410,7 @@ class Library:
             )
 
         # Create plugin flow
-        plugin_flow = {}
+        plugin_flow: dict[str, list[object]] = {}
 
         plugin_handler = PluginsHandler()
         for plugin_type in plugin_handler.get_plugin_types_with_flows():
@@ -414,7 +434,7 @@ class Library:
             },
         }
 
-    def __remove_enabled_plugins(self):
+    def __remove_enabled_plugins(self) -> int:
         """
         Remove all enabled plugins
 
@@ -422,9 +442,9 @@ class Library:
         """
         query = EnabledPlugins.delete()
         query = query.where(EnabledPlugins.library_id == self.model.id)
-        return query.execute()
+        return execute_count(query)
 
-    def __trim_plugin_flow(self, plugin_ids: list):
+    def __trim_plugin_flow(self, plugin_ids: Sequence[int]) -> int:
         """
         Trim the plugin flow removing entries not in the given plugin ids list
 
@@ -433,9 +453,9 @@ class Library:
         """
         query = LibraryPluginFlow.delete()
         query = query.where((LibraryPluginFlow.library_id == self.model.id) & (LibraryPluginFlow.plugin_id.not_in(plugin_ids)))
-        return query.execute()
+        return execute_count(query)
 
-    def __remove_associated_tasks(self):
+    def __remove_associated_tasks(self) -> None:
         """
         Remove all tasks associated with a library
 
@@ -448,65 +468,65 @@ class Library:
         for task_id in task_ids:
             task_module.TaskDataStore.clear_task(task_id)
 
-        Tasks.delete().where(Tasks.library_id == self.model.id).execute()
+        execute_write(Tasks.delete().where(Tasks.library_id == self.model.id))
 
-    def get_id(self):
-        return self.model.id
+    def get_id(self) -> int:
+        return int(self.model.id)
 
-    def get_name(self):
-        return self.model.name
+    def get_name(self) -> str:
+        return str(self.model.name)
 
-    def set_name(self, value):
+    def set_name(self, value: str) -> None:
         self.model.name = value
 
-    def get_path(self):
-        return self.model.path
+    def get_path(self) -> str:
+        return str(self.model.path)
 
-    def set_path(self, value):
+    def set_path(self, value: str) -> None:
         self.model.path = value
 
-    def get_locked(self):
-        return self.model.locked
+    def get_locked(self) -> bool:
+        return bool(self.model.locked)
 
-    def set_locked(self, value):
+    def set_locked(self, value: bool) -> None:
         self.model.locked = value
 
-    def get_enable_remote_only(self):
-        return self.model.enable_remote_only
+    def get_enable_remote_only(self) -> bool:
+        return bool(self.model.enable_remote_only)
 
-    def set_enable_remote_only(self, value):
+    def set_enable_remote_only(self, value: bool) -> None:
         self.model.enable_remote_only = value
 
-    def get_enable_scanner(self):
-        return self.model.enable_scanner
+    def get_enable_scanner(self) -> bool:
+        return bool(self.model.enable_scanner)
 
-    def set_enable_scanner(self, value):
+    def set_enable_scanner(self, value: bool) -> None:
         self.model.enable_scanner = value
 
-    def get_enable_inotify(self):
-        return self.model.enable_inotify
+    def get_enable_inotify(self) -> bool:
+        return bool(self.model.enable_inotify)
 
-    def set_enable_inotify(self, value):
+    def set_enable_inotify(self, value: bool) -> None:
         self.model.enable_inotify = value
 
-    def get_priority_score(self):
-        return self.model.priority_score
+    def get_priority_score(self) -> int:
+        return int(self.model.priority_score)
 
-    def set_priority_score(self, value):
+    def set_priority_score(self, value: int) -> None:
         self.model.priority_score = value
 
-    def get_tags(self):
-        return_tags = []
+    def get_tags(self) -> list[str]:
+        return_tags: list[str] = []
         for tag in self.model.tags.order_by(Tags.name):
             return_tags.append(tag.name)
         return return_tags
 
-    def set_tags(self, value):
+    def set_tags(self, value: Sequence[str]) -> None:
         # Create any missing tags
         for tag_name in value:
             # Do not update any current tags with on_conflict_replace() as this will also change their IDs
             # Instead, just ignore them
-            Tags.insert(name=tag_name).on_conflict_ignore().execute()
+            execute_write(Tags.insert(name=tag_name).on_conflict_ignore())
         # Create a SELECT query for all tags with the listed names
         tags_select_query = Tags.select().where(Tags.name.in_(value))
         # Clear out the current linking table of tags linked to this library
@@ -515,78 +535,85 @@ class Library:
 
     # --- Flow settings: Codec filtering ---
 
-    def get_target_codecs(self):
+    def get_target_codecs(self) -> list[str]:
         raw = self.model.target_codecs or ""
         if not raw:
             return []
         try:
-            return json.loads(raw)
+            parsed: object = json.loads(raw)
+            if isinstance(parsed, list) and all(isinstance(item, str) for item in parsed):
+                return cast("list[str]", parsed)
+            return []
         except (json.JSONDecodeError, TypeError):
             return []
 
-    def set_target_codecs(self, value):
-        if isinstance(value, list):
-            self.model.target_codecs = json.dumps(value)
+    def set_target_codecs(self, value: Sequence[str] | str | None) -> None:
+        if not isinstance(value, str) and value is not None:
+            self.model.target_codecs = json.dumps(list(value))
         else:
             self.model.target_codecs = value or ""
 
-    def get_skip_codecs(self):
+    def get_skip_codecs(self) -> list[str]:
         raw = self.model.skip_codecs or ""
         if not raw:
             return []
         try:
-            return json.loads(raw)
+            parsed: object = json.loads(raw)
+            if isinstance(parsed, list) and all(isinstance(item, str) for item in parsed):
+                return cast("list[str]", parsed)
+            return []
         except (json.JSONDecodeError, TypeError):
             return []
 
-    def set_skip_codecs(self, value):
-        if isinstance(value, list):
-            self.model.skip_codecs = json.dumps(value)
+    def set_skip_codecs(self, value: Sequence[str] | str | None) -> None:
+        if not isinstance(value, str) and value is not None:
+            self.model.skip_codecs = json.dumps(list(value))
         else:
             self.model.skip_codecs = value or ""
 
     # --- Flow settings: Size guardrails ---
 
-    def get_size_guardrail_enabled(self):
+    def get_size_guardrail_enabled(self) -> bool:
         return bool(self.model.size_guardrail_enabled)
 
-    def set_size_guardrail_enabled(self, value):
+    def set_size_guardrail_enabled(self, value: object) -> None:
         self.model.size_guardrail_enabled = bool(value)
 
-    def get_size_guardrail_min_pct(self):
-        return self.model.size_guardrail_min_pct
+    def get_size_guardrail_min_pct(self) -> int:
+        return int(self.model.size_guardrail_min_pct)
 
-    def set_size_guardrail_min_pct(self, value):
+    def set_size_guardrail_min_pct(self, value: int | str) -> None:
         val = max(5, min(95, int(value)))
         self.model.size_guardrail_min_pct = val
 
-    def get_size_guardrail_max_pct(self):
-        return self.model.size_guardrail_max_pct
+    def get_size_guardrail_max_pct(self) -> int:
+        return int(self.model.size_guardrail_max_pct)
 
-    def set_size_guardrail_max_pct(self, value):
+    def set_size_guardrail_max_pct(self, value: int | str) -> None:
         val = max(50, min(100, int(value)))
         self.model.size_guardrail_max_pct = val
 
     # --- Flow settings: Replacement policy ---
 
-    def get_replacement_policy(self):
+    def get_replacement_policy(self) -> str:
         return self.model.replacement_policy or ""
 
-    def set_replacement_policy(self, value):
+    def set_replacement_policy(self, value: str | None) -> None:
         valid_policies = ("", "replace", "approval_required", "keep_both")
         policy = value or ""
         if policy not in valid_policies:
             policy = ""
         self.model.replacement_policy = policy
 
-    def get_enabled_plugins(self, include_settings=False):
+    def get_enabled_plugins(self, include_settings: bool = False) -> list[dict[str, object]]:
         """
         Get all enabled plugins for this library
 
         :return:
         """
         # Fetch enabled plugins for this library
-        query = self.model.enabled_plugins.select(Plugins, EnabledPlugins.library_id)
+        query = EnabledPlugins.select(Plugins, EnabledPlugins.library_id)
+        query = query.where(EnabledPlugins.library_id == self.model.id)
         query = query.join(Plugins, join_type="LEFT OUTER JOIN", on=(EnabledPlugins.plugin_id == Plugins.id))
         query = query.order_by(Plugins.name)
 
@@ -595,12 +622,14 @@ class Library:
         plugin_executor = PluginExecutor()
 
         # Extract required data
-        enabled_plugins = []
-        for enabled_plugin in query.dicts():
+        enabled_plugins: list[dict[str, object]] = []
+        enabled_plugin_rows = cast("Iterable[dict[str, object]]", query.dicts())
+        for enabled_plugin in enabled_plugin_rows:
             # Check if plugin is able to be configured
             has_config = False
+            plugin_id = enabled_plugin.get("plugin_id")
             plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(
-                enabled_plugin.get("plugin_id"), library_id=self.model.id
+                plugin_id if isinstance(plugin_id, str) else "", library_id=self.model.id
             )
             if plugin_settings:
                 has_config = True
@@ -618,13 +647,13 @@ class Library:
 
         return enabled_plugins
 
-    def get_plugin_flow(self):
+    def get_plugin_flow(self) -> dict[str, list[dict[str, object]]]:
         """
         Fetch the plugin flow for a library
 
         :return:
         """
-        plugin_flow = {}
+        plugin_flow: dict[str, list[dict[str, object]]] = {}
         from compresso.libs.plugins import PluginsHandler
 
         plugin_handler = PluginsHandler()
@@ -636,11 +665,14 @@ class Library:
             if not plugin_type.get("has_flow"):
                 continue
 
+            plugin_type_id = plugin_type.get("id")
+            if not isinstance(plugin_type_id, str):
+                continue
             # Create list of plugins in this plugin type
-            plugin_flow[plugin_type.get("id")] = []
-            plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type(plugin_type.get("id"), library_id=self.model.id)
+            plugin_flow[plugin_type_id] = []
+            plugin_modules = plugin_handler.get_enabled_plugin_modules_by_type(plugin_type_id, library_id=self.model.id)
             for plugin_module in plugin_modules:
-                plugin_flow[plugin_type.get("id")].append(
+                plugin_flow[plugin_type_id].append(
                     {
                         "plugin_id": plugin_module.get("plugin_id"),
                         "name": plugin_module.get("name", ""),
@@ -653,7 +685,7 @@ class Library:
 
         return plugin_flow
 
-    def __set_default_plugin_flow_priority(self, plugin_list):
+    def __set_default_plugin_flow_priority(self, plugin_list: Sequence[Mapping[str, object]]) -> None:
         from compresso.libs.unplugins import PluginExecutor
 
         plugin_executor = PluginExecutor()
@@ -662,35 +694,43 @@ class Library:
         plugin_handler = PluginsHandler()
 
         # Fetch current items
-        configured_plugin_ids = []
+        configured_plugin_ids: list[str] = []
         query = LibraryPluginFlow.select().where(LibraryPluginFlow.library_id == self.model.id)
         for flow_item in query:
             configured_plugin_ids.append(flow_item.plugin_id.plugin_id)
 
         for plugin in plugin_list:
-            # Ignore already configured plugins
-            if plugin.get("plugin_id") in configured_plugin_ids:
+            plugin_id = plugin.get("plugin_id")
+            if not isinstance(plugin_id, str):
                 continue
-            plugin_info = plugin_handler.get_plugin_info(plugin.get("plugin_id"))
+            # Ignore already configured plugins
+            if plugin_id in configured_plugin_ids:
+                continue
+            plugin_info = plugin_handler.get_plugin_info(plugin_id)
+            if not isinstance(plugin_info, Mapping):
+                continue
             plugin_priorities = plugin_info.get("priorities")
-            if plugin_priorities:
+            if isinstance(plugin_priorities, Mapping):
                 # Fetch the plugin info back from the DB
-                plugin_info = Plugins.select().where(Plugins.plugin_id == plugin.get("plugin_id")).first()
+                plugin_model = Plugins.select().where(Plugins.plugin_id == plugin_id).first()
+                if plugin_model is None:
+                    continue
                 # Fetch all plugin types in this plugin
-                plugin_types_in_plugin = plugin_executor.get_all_plugin_types_in_plugin(plugin.get("plugin_id"))
+                plugin_types_in_plugin = plugin_executor.get_all_plugin_types_in_plugin(plugin_id)
                 # Loop over the plugin types in this plugin
                 for plugin_type in plugin_types_in_plugin:
                     # get the plugin runner function name for this runner
                     plugin_type_meta = plugin_executor.get_plugin_type_meta(plugin_type)
                     runner_string = plugin_type_meta.plugin_runner()
-                    if plugin_priorities.get(runner_string) and int(plugin_priorities.get(runner_string, 0)) > 0:
+                    priority = plugin_priorities.get(runner_string)
+                    if isinstance(priority, (int, str)) and int(priority) > 0:
                         # If the runner has a priority set and that value is greater than 0 (default that wont set anything),
                         # Save the priority
                         PluginsHandler.set_plugin_flow_position_for_single_plugin(
-                            plugin_info, plugin_type, self.model.id, plugin_priorities.get(runner_string)
+                            plugin_model, plugin_type, self.model.id, int(priority)
                         )
 
-    def set_enabled_plugins(self, plugin_list: list):
+    def set_enabled_plugins(self, plugin_list: Sequence[Mapping[str, object]]) -> None:
         """
         Update the list of enabled plugins
 
@@ -701,10 +741,13 @@ class Library:
         self.__remove_enabled_plugins()
 
         # Add new repos
-        data = []
-        plugin_ids = []
+        data: list[dict[str, object]] = []
+        plugin_ids: list[int] = []
         for plugin_info in plugin_list:
-            plugin = Plugins.get(plugin_id=plugin_info.get("plugin_id"))
+            plugin_id = plugin_info.get("plugin_id")
+            if not isinstance(plugin_id, str):
+                continue
+            plugin = Plugins.get(plugin_id=plugin_id)
             plugin_ids.append(plugin.id)
             if plugin:
                 data.append(
@@ -719,12 +762,12 @@ class Library:
         self.__trim_plugin_flow(plugin_ids)
 
         # Insert plugins
-        EnabledPlugins.insert_many(data).execute()
+        execute_write(EnabledPlugins.insert_many(data))
 
         # Add default flow for newly added plugins
         self.__set_default_plugin_flow_priority(plugin_list)
 
-    def save(self):
+    def save(self) -> int:
         """
         Save the data for this library
 
@@ -738,9 +781,9 @@ class Library:
             config = Config()
             config.set_config_item("library_path", self.get_path())
 
-        return save_result
+        return int(save_result)
 
-    def delete(self):
+    def delete(self) -> int:
         """
         Delete the current library
 
@@ -764,4 +807,4 @@ class Library:
         self.__remove_associated_tasks()
 
         # Remove the library entry
-        return self.model.delete_instance(recursive=True)
+        return int(self.model.delete_instance(recursive=True))

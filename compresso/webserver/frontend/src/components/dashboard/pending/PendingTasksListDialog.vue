@@ -147,7 +147,7 @@
         :columns="columns"
         :loading="loading"
         :all-loaded="allLoaded"
-        :error="error"
+        :error="displayError"
         :show-scroll-top="showScrollTop"
         :selection-visible="(allPageSelected || selectAllMatching) && actionsExpanded"
         :show-select-all-prompt="showSelectAllMatchingPrompt"
@@ -252,8 +252,9 @@
   </CompressoDialogWindow>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { QTableColumn } from 'quasar'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -265,26 +266,34 @@ import TaskListTableShell from 'components/dashboard/shared/TaskListTableShell.v
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+
+interface PendingRow { id: number; name: string; libraryName: string }
+interface LibraryOption { label: string; value: number }
+interface LibraryWire { id: number; name: string }
+interface TaskListShellController { tableWrapperRef: HTMLElement | null }
+interface PendingFilters { search_value: string; library_ids: number[] }
 
 const emit = defineEmits(['hide'])
 
 const { t } = useI18n()
 const $q = useQuasar()
-const dialogRef = ref(null)
-const taskListShellRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
+const taskListShellRef = ref<TaskListShellController | null>(null)
 const tableWrapperRef = computed(() => taskListShellRef.value?.tableWrapperRef ?? null)
 const showScrollTop = ref(false)
 
 const searchValue = ref('')
-const libraryFilters = ref([])
-const draftLibraryFilters = ref([])
-const libraryOptions = ref([])
+const libraryFilters = ref<number[]>([])
+const draftLibraryFilters = ref<number[]>([])
+const libraryOptions = ref<LibraryOption[]>([])
 const filterDialogOpen = ref(false)
 const actionsExpanded = ref(true)
 
-let reloadInterval = null
+let reloadInterval: ReturnType<typeof setInterval> | null = null
 
-const columns = computed(() => [
+const columns = computed<QTableColumn[]>(() => [
   {
     name: 'select',
     label: '',
@@ -330,7 +339,7 @@ const filterButtonColor = computed(() => (hasFilters.value ? filterSortActiveCol
 const filterButtonSize = computed(() => ($q.screen.width < 450 ? 'sm' : 'md'))
 
 const libraryNameById = computed(() =>
-  libraryOptions.value.reduce((acc, option) => {
+  libraryOptions.value.reduce<Record<number, string>>((acc, option) => {
     acc[option.value] = option.label
     return acc
   }, {}),
@@ -357,8 +366,8 @@ const buildFiltersPayload = () => ({
   library_ids: libraryFilters.value,
 })
 
-const fetchPendingPage = async ({ start, length }) => {
-  const response = await axios({
+const fetchPendingPage = async ({ start, length }: { start: number; length: number }) => {
+  const response = await axios<ApiSchema<'PendingTasks'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', 'pending/tasks'),
     data: {
@@ -371,10 +380,10 @@ const fetchPendingPage = async ({ start, length }) => {
   })
   return {
     total: response.data.recordsFiltered,
-    rows: response.data.results.map((result) => ({
+    rows: response.data.results.map((result: ApiSchema<'PendingTasksTableResults'>) => ({
       id: result.id,
       name: result.abspath,
-      libraryName: result.library_name,
+      libraryName: result.library_name ?? '',
     })),
   }
 }
@@ -410,10 +419,22 @@ const {
   getSelectionPayload,
   fetchTasks: fetchPendingTasks,
   loadMore,
-} = useTaskListController({
+} = useTaskListController<PendingRow, PendingFilters>({
   fetchPage: fetchPendingPage,
   buildFiltersPayload,
   onFetchError: notifyFetchError,
+})
+
+// These refs are intentionally public on the component instance for dialog
+// controllers and interaction tests, even though this template does not read them.
+void selectedIds
+void excludedIds
+
+const displayError = computed(() => {
+  if (!error.value) return ''
+  return error.value instanceof Error || typeof error.value === 'string'
+    ? error.value
+    : String(error.value)
 })
 
 const selectionBannerPageText = computed(() =>
@@ -441,12 +462,12 @@ const selectionBannerAllSelectedText = computed(() => {
 })
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
   showScrollTop.value = false
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -464,7 +485,7 @@ const fetchLibraryOptions = () => {
     url: getCompressoApiUrl('v2', 'settings/libraries'),
   })
     .then((response) => {
-      const options = response.data.libraries.map((library) => ({
+      const options = response.data.libraries.map((library: LibraryWire) => ({
         label: library.name,
         value: library.id,
       }))
@@ -550,7 +571,7 @@ const moveToBottom = () => {
   moveTo('bottom')
 }
 
-const moveTo = (position) => {
+const moveTo = (position: 'top' | 'bottom'): void => {
   const data = {
     position,
     ...getSelectionPayload(),

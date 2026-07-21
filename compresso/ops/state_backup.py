@@ -20,7 +20,7 @@ from collections.abc import Iterable
 from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import IO, TypedDict, cast
 from urllib.parse import quote
 
 from compresso.config import Config
@@ -58,6 +58,18 @@ class BackupError(RuntimeError):
     """A state backup or rehearsal failed a safety invariant."""
 
 
+class ManifestFile(TypedDict):
+    sha256: str
+    size_bytes: int
+
+
+class BackupManifest(TypedDict):
+    schema_version: int
+    kind: str
+    generated_at: str
+    files: dict[str, ManifestFile]
+
+
 def _timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
@@ -86,7 +98,7 @@ def _owned_directory(userdata_root: Path, name: str) -> Path:
     return destination
 
 
-def _private_exclusive_json(path: Path, payload: dict[str, Any]) -> None:
+def _private_exclusive_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     try:
         reservation = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -178,16 +190,16 @@ def _journal_files(config_root: Path) -> Iterable[tuple[str, Path]]:
             yield f"config/recovery/file_operations/{source.name}", source
 
 
-def _write_archive(destination: Path, files: list[tuple[str, Path]], generated_at: str) -> dict[str, Any]:
-    manifest_files = {
+def _write_archive(destination: Path, files: list[tuple[str, Path]], generated_at: str) -> BackupManifest:
+    manifest_files: dict[str, ManifestFile] = {
         logical_name: {"sha256": _sha256(source), "size_bytes": source.stat().st_size} for logical_name, source in files
     }
-    manifest = {
-        "schema_version": SCHEMA_VERSION,
-        "kind": BACKUP_KIND,
-        "generated_at": generated_at,
-        "files": manifest_files,
-    }
+    manifest = BackupManifest(
+        schema_version=SCHEMA_VERSION,
+        kind=BACKUP_KIND,
+        generated_at=generated_at,
+        files=manifest_files,
+    )
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = destination.with_suffix(f".{uuid.uuid4().hex}.tmp")
     reserved_destination = False
@@ -217,7 +229,7 @@ def _write_archive(destination: Path, files: list[tuple[str, Path]], generated_a
     return manifest
 
 
-def _read_json_object(path: Path, label: str) -> dict[str, Any]:
+def _read_json_object(path: Path, label: str) -> dict[str, object]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -254,7 +266,7 @@ def _stage_backup_files(files: list[tuple[str, Path]], staging_root: Path) -> li
     return staged
 
 
-def create_state_backup(settings: Any, output_name: str) -> dict[str, Any]:
+def create_state_backup(settings: Config, output_name: str) -> dict[str, object]:
     """Create an online SQLite snapshot plus small recovery evidence files."""
     config_root = Path(settings.get_config_path()).expanduser().resolve()
     userdata_root = Path(settings.get_userdata_path()).expanduser().resolve()
@@ -305,7 +317,7 @@ def _validate_entry(info: zipfile.ZipInfo) -> None:
         raise BackupError(f"unexpected archive entry: {info.filename}")
 
 
-def _copy_and_hash(source, destination: Path, *, maximum_bytes: int, logical_name: str) -> tuple[str, int]:
+def _copy_and_hash(source: IO[bytes], destination: Path, *, maximum_bytes: int, logical_name: str) -> tuple[str, int]:
     digest = hashlib.sha256()
     size = 0
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -342,7 +354,7 @@ def _validate_archive_inventory(
     return infos, names, declared_sizes, temporary_root
 
 
-def _read_manifest(bundle: zipfile.ZipFile) -> dict[str, Any]:
+def _read_manifest(bundle: zipfile.ZipFile) -> BackupManifest:
     manifest_info = bundle.getinfo(MANIFEST_ARCHIVE_PATH)
     if manifest_info.file_size > MAX_MANIFEST_BYTES:
         raise BackupError("archive manifest is too large")
@@ -357,10 +369,10 @@ def _read_manifest(bundle: zipfile.ZipFile) -> dict[str, Any]:
         or not isinstance(manifest.get("files"), dict)
     ):
         raise BackupError("archive manifest is invalid")
-    return manifest
+    return cast("BackupManifest", manifest)
 
 
-def _valid_manifest_metadata(logical_name: Any, metadata: Any) -> bool:
+def _valid_manifest_metadata(logical_name: object, metadata: object) -> bool:
     return (
         isinstance(logical_name, str)
         and isinstance(metadata, dict)
@@ -371,9 +383,9 @@ def _valid_manifest_metadata(logical_name: Any, metadata: Any) -> bool:
 
 
 def _validate_manifest_files(
-    manifest: dict[str, Any], names: list[str], declared_sizes: dict[str, int]
-) -> dict[str, dict[str, Any]]:
-    expected_files: dict[str, dict[str, Any]] = manifest["files"]
+    manifest: BackupManifest, names: list[str], declared_sizes: dict[str, int]
+) -> dict[str, dict[str, object]]:
+    expected_files = manifest["files"]
     if set(expected_files) != set(names) - {MANIFEST_ARCHIVE_PATH}:
         raise BackupError("archive entries do not match the manifest")
     for logical_name, metadata in expected_files.items():
@@ -381,14 +393,14 @@ def _validate_manifest_files(
             raise BackupError("archive manifest contains invalid file metadata")
         if declared_sizes[logical_name] != metadata["size_bytes"]:
             raise BackupError(f"declared size mismatch for {logical_name}")
-    return expected_files
+    return cast("dict[str, dict[str, object]]", expected_files)
 
 
 def _extract_entry(
     bundle: zipfile.ZipFile,
     info: zipfile.ZipInfo,
     rehearsal_root: Path,
-    expected: dict[str, Any],
+    expected: dict[str, object],
     declared_size: int,
 ) -> None:
     destination = rehearsal_root.joinpath(*PurePosixPath(info.filename).parts).resolve()
@@ -407,7 +419,7 @@ def _extract_entry(
         json.loads(destination.read_text(encoding="utf-8"))
 
 
-def _validate_journal_payload(logical_name: str, payload: Any) -> list[str]:
+def _validate_journal_payload(logical_name: str, payload: object) -> list[str]:
     if not isinstance(payload, dict) or payload.get("version") != 1:
         raise BackupError(f"file-operation journal is invalid: {logical_name}")
     operation_id = payload.get("operation_id")
@@ -435,7 +447,7 @@ def _validate_journal_payload(logical_name: str, payload: Any) -> list[str]:
     return paths
 
 
-def _validate_recovery_semantics(rehearsal_root: Path, settings: Any) -> None:
+def _validate_recovery_semantics(rehearsal_root: Path, settings: Config) -> None:
     _read_json_object(rehearsal_root / SETTINGS_ARCHIVE_PATH, "archived settings.json")
     allowed_roots = []
     for getter_name in ("get_config_path", "get_cache_path", "get_library_path", "get_userdata_path"):
@@ -468,7 +480,7 @@ def _extract_and_verify_database(
     bundle: zipfile.ZipFile,
     infos: list[zipfile.ZipInfo],
     rehearsal_root: Path,
-    expected_files: dict[str, dict[str, Any]],
+    expected_files: dict[str, dict[str, object]],
     declared_sizes: dict[str, int],
 ) -> str:
     for info in infos:
@@ -477,7 +489,7 @@ def _extract_and_verify_database(
     return _database_integrity(rehearsal_root / DATABASE_ARCHIVE_PATH)
 
 
-def verify_state_backup(settings: Any, archive_name: str, *, output_name: str | None = None) -> dict[str, Any]:
+def verify_state_backup(settings: Config, archive_name: str, *, output_name: str | None = None) -> dict[str, object]:
     """Extract into an isolated temporary directory and prove recovery invariants."""
     userdata_root = Path(settings.get_userdata_path()).expanduser().resolve()
     archive = _safe_owned_path(_owned_directory(userdata_root, "backups"), archive_name, ARCHIVE_NAME_PATTERN, "--archive")

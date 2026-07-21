@@ -26,25 +26,29 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import type { PropType } from 'vue'
+import type { Chart as ChartInstance } from 'chart.js'
 import { useQuasar } from 'quasar'
 import { formatBytes } from 'src/js/formatUtils'
 import { useChartTheme } from 'src/composables/useChartTheme'
 
+interface SpaceSavedPoint { date: string; space_saved: number }
+
 export default {
   name: 'SpaceSavedTimelineChart',
   props: {
-    data: { type: Array, default: () => [] },
+    data: { type: Array as PropType<SpaceSavedPoint[]>, default: () => [] },
     loading: { type: Boolean, default: false },
   },
   emits: ['interval-change'],
   setup(props) {
     const $q = useQuasar()
     const { getChartColor, chartBgColor } = useChartTheme()
-    const chartRef = ref(null)
+    const chartRef = ref<HTMLCanvasElement | null>(null)
     const interval = ref('day')
-    let chart = null
+    let chart: ChartInstance<'line'> | null = null
 
     async function renderChart() {
       const { Chart, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler } =
@@ -82,7 +86,7 @@ export default {
             plugins: {
               tooltip: {
                 callbacks: {
-                  label: (ctx) => 'Saved: ' + formatBytes(ctx.parsed.y),
+                  label: (ctx) => 'Saved: ' + formatBytes(ctx.parsed.y ?? 0),
                 },
               },
               legend: {
@@ -97,7 +101,7 @@ export default {
               y: {
                 beginAtZero: true,
                 ticks: {
-                  callback: (val) => formatBytes(val),
+                  callback: (val) => formatBytes(typeof val === 'number' ? val : Number(val)),
                   color: labelColor,
                 },
                 title: { display: false, color: titleColor },

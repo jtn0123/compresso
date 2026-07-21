@@ -360,21 +360,28 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
-import { onMounted, onUnmounted, ref, computed, getCurrentInstance } from 'vue'
-import { useQuasar } from 'quasar'
+import { defineComponent, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
+import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav.vue'
 import LibraryConfigDialog from 'components/settings/library/LibraryConfigDialog.vue'
 import SelectDirectoryDialog from 'components/ui/pickers/SelectDirectoryDialog.vue'
 import CompressoSettingsSubmitButton from 'components/ui/buttons/CompressoSettingsSubmitButton.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import CompressoListAddButton from 'components/ui/buttons/CompressoListAddButton.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+import {
+  parseLibraryPageSettings,
+  type LibraryConfigExchange,
+  type LibraryListItem,
+  type LibraryResult,
+} from 'src/types/libraries'
 
-export default {
+export default defineComponent({
   name: 'SettingsLibrary',
   components: {
     MobileSettingsQuickNav,
@@ -385,34 +392,16 @@ export default {
     CompressoListAddButton,
   },
   setup() {
-    const $q = useQuasar()
     const { t: $t } = useI18n()
-
-    const { proxy } = getCurrentInstance() // To get access to libraryPaths from data
-    const filter = ref('')
-
-    const filteredLibraryPaths = computed(() => {
-      if (!filter.value) return proxy.libraryPaths // Don't filter when search is empty
-
-      const search = filter.value.toLowerCase()
-      // Return filtered library paths
-      return proxy.libraryPaths?.filter(
-        (path) =>
-          path.name.toLowerCase().includes(search) ||
-          path.path.toLowerCase().includes(search) ||
-          path.tags.join(',').toLowerCase().includes(search),
-      )
-    })
 
     /**
      * Compresso WS handle
      * @type {null}
      */
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    const compressoWSHandler = CompressoWebsocketHandler($t)
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      compressoWSHandler.init()
     }
 
     function closeCompressoWebsocket() {
@@ -430,63 +419,73 @@ export default {
       closeCompressoWebsocket()
     })
 
-    return {
-      filter,
-      filteredLibraryPaths,
-    }
   },
   data() {
     return {
-      libraryPath: ref(null),
-      libraryPaths: ref(null),
-      newLibraryPath: ref(false),
-      libraryConfigLibraryId: ref(0),
-      selectDirectoryInitialPath: ref(''),
-      selectDirectoryListType: ref('directories'),
-      selectDirectoryMode: ref(''),
-      enableLibraryScanner: ref(null),
-      libraryScanSchedule: ref(null),
-      libraryScanFollowSymlinks: ref(null),
-      concurrentFileTesters: ref(null),
-      runLibraryScanOnStart: ref(null),
-      enableLibraryFileMonitor: ref(null),
-      clearPendingTasksOnStart: ref(null),
-      autoManageCompletedTasks: ref(null),
-      compressCompletedTasksLogs: ref(null),
-      maxAgeOfCompletedTasks: ref(null),
-      alwaysKeepFailedTasks: ref(null),
-      approvalRequired: ref(null),
-      stagingPath: ref(null),
+      filter: '',
+      libraryPath: null as string | null,
+      libraryPaths: null as LibraryListItem[] | null,
+      newLibraryPath: false,
+      libraryConfigLibraryId: 0,
+      selectDirectoryInitialPath: '',
+      selectDirectoryListType: 'directories',
+      selectDirectoryMode: '',
+      enableLibraryScanner: null as boolean | null,
+      libraryScanSchedule: null as number | null,
+      libraryScanFollowSymlinks: null as boolean | null,
+      concurrentFileTesters: null as number | null,
+      runLibraryScanOnStart: null as boolean | null,
+      enableLibraryFileMonitor: null as boolean | null,
+      clearPendingTasksOnStart: null as boolean | null,
+      autoManageCompletedTasks: null as boolean | null,
+      compressCompletedTasksLogs: null as boolean | null,
+      maxAgeOfCompletedTasks: null as number | null,
+      alwaysKeepFailedTasks: null as boolean | null,
+      approvalRequired: null as boolean | null,
+      stagingPath: null as string | null,
     }
+  },
+  computed: {
+    filteredLibraryPaths(): LibraryListItem[] {
+      const paths = this.libraryPaths ?? []
+      if (!this.filter) return paths
+      const search = this.filter.toLowerCase()
+      return paths.filter(
+        (path: LibraryListItem) =>
+          path.name.toLowerCase().includes(search) ||
+          path.path.toLowerCase().includes(search) ||
+          path.tags.join(',').toLowerCase().includes(search),
+      )
+    },
   },
   methods: {
     addNewLibraryWithDirectoryBrowser: function () {
       this.selectDirectoryMode = 'newLibrary'
-      this.selectDirectoryInitialPath = this.libraryPath
+      this.selectDirectoryInitialPath = this.libraryPath ?? ''
       this.selectDirectoryListType = 'directories'
       this.$nextTick(() => {
         if (this.$refs.selectDirectoryDialogRef) {
-          this.$refs.selectDirectoryDialogRef.show()
+          ;(this.$refs.selectDirectoryDialogRef as DialogController).show()
         }
       })
     },
-    onDirectorySelected: function (payload) {
+    onDirectorySelected: function (payload: { selectedPath?: string | null }) {
       if (!payload || typeof payload.selectedPath === 'undefined' || payload.selectedPath === null) {
         return
       }
       if (this.selectDirectoryMode === 'newLibrary') {
         // Name the library as a clone
-        let randomString = (Math.random() + 1).toString(36).substring(7)
-        let newName =
+        const randomString = (Math.random() + 1).toString(36).substring(7)
+        const newName =
           '| ' +
-          (this.libraryPaths.length + 1) +
+          ((this.libraryPaths?.length ?? 0) + 1) +
           ' | ' +
           this.$t('components.settings.library.newLibrary') +
           ' (' +
           randomString +
           ')'
         // Save this data
-        let data = {
+        const data: LibraryConfigExchange = {
           library_config: {
             name: newName,
             path: payload.selectedPath,
@@ -497,7 +496,7 @@ export default {
           url: getCompressoApiUrl('v2', 'settings/library/write'),
           data: data,
         })
-          .then((response) => {
+          .then(() => {
             // Save success, show feedback
             this.$q.notify({
               color: 'positive',
@@ -521,12 +520,13 @@ export default {
       }
       this.selectDirectoryMode = ''
     },
-    deleteLibrary: function (index) {
+    deleteLibrary: function (index: number) {
+      if (this.libraryPaths === null) return
       // Fetch library ID
-      let libraryId
+      let libraryId: number | undefined
       for (let i = 0; i < this.libraryPaths.length; i++) {
         if (i === index) {
-          libraryId = this.libraryPaths[i].id
+          libraryId = this.libraryPaths[i]?.id
           break
         }
       }
@@ -560,7 +560,7 @@ export default {
             url: getCompressoApiUrl('v2', 'settings/library/remove'),
             data: data,
           })
-            .then((response) => {
+            .then(() => {
               // Save success, show feedback
               this.$q.notify({
                 color: 'positive',
@@ -585,26 +585,14 @@ export default {
     },
     fetchSettings: function () {
       // Fetch current settings
-      axios({
+      axios<ApiSchema<'SettingsReadAndWrite'>>({
         method: 'get',
         url: getCompressoApiUrl('v2', 'settings/read'),
       })
         .then((response) => {
-          this.libraryPath = response.data.settings.library_path
-          this.enableLibraryScanner = response.data.settings.enable_library_scanner
-          this.libraryScanSchedule = response.data.settings.schedule_full_scan_minutes
-          this.libraryScanFollowSymlinks = response.data.settings.follow_symlinks
-          this.concurrentFileTesters = response.data.settings.concurrent_file_testers
-          this.runLibraryScanOnStart = response.data.settings.run_full_scan_on_start
-          this.enableLibraryFileMonitor = response.data.settings.enable_inotify
-          this.clearPendingTasksOnStart = response.data.settings.clear_pending_tasks_on_restart
-          this.autoManageCompletedTasks = response.data.settings.auto_manage_completed_tasks
-          this.compressCompletedTasksLogs = response.data.settings.compress_completed_tasks_logs
-          this.maxAgeOfCompletedTasks = response.data.settings.max_age_of_completed_tasks
-          this.alwaysKeepFailedTasks = response.data.settings.always_keep_failed_tasks
-          this.approvalRequired =
-            response.data.settings.approval_required === true || response.data.settings.approval_required === 'true'
-          this.stagingPath = response.data.settings.staging_path != null ? response.data.settings.staging_path : ''
+          const settings = parseLibraryPageSettings(response.data.settings)
+          if (!settings) throw new Error('Invalid library settings response')
+          Object.assign(this, settings)
         })
         .catch(() => {
           this.$q.notify({
@@ -636,12 +624,12 @@ export default {
           staging_path: this.stagingPath,
         },
       }
-      axios({
+      axios<ApiSchema<'SettingsLibrariesList'>>({
         method: 'post',
         url: getCompressoApiUrl('v2', 'settings/write'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           // Save success, show feedback
           this.fetchSettings()
           this.$q.notify({
@@ -669,11 +657,12 @@ export default {
         url: getCompressoApiUrl('v2', 'settings/libraries'),
       })
         .then((response) => {
-          let libraryPathsList = []
+          const libraryPathsList: LibraryListItem[] = []
           // TODO: Rename from library path
           for (let i = 0; i < response.data.libraries.length; i++) {
-            let libraryPath = response.data.libraries[i]
-            libraryPathsList[libraryPathsList.length] = {
+            const libraryPath: LibraryResult | undefined = response.data.libraries[i]
+            if (!libraryPath) continue
+            libraryPathsList.push({
               id: libraryPath.id,
               name: libraryPath.name,
               path: libraryPath.path,
@@ -682,7 +671,7 @@ export default {
               enableInotify: libraryPath.enable_inotify,
               tags: libraryPath.tags,
               locked: libraryPath.locked,
-            }
+            })
           }
           this.libraryPaths = libraryPathsList
         })
@@ -696,13 +685,14 @@ export default {
           })
         })
     },
-    configureLibraryPath: function (index) {
-      let library = this.libraryPaths[index]
+    configureLibraryPath: function (index: number) {
+      const library = this.libraryPaths?.[index]
+      if (!library) return
       this.libraryConfigLibraryId = 0
       this.$nextTick(() => {
         this.libraryConfigLibraryId = library.id
         this.$nextTick(() => {
-          this.$refs.libraryConfigDialog.show()
+          ;(this.$refs.libraryConfigDialog as DialogController).show()
         })
       })
     },
@@ -718,7 +708,7 @@ export default {
     this.fetchSettings()
     this.fetchLibraryList()
   },
-}
+})
 </script>
 
 <style>

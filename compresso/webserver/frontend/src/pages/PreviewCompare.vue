@@ -111,7 +111,7 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
@@ -121,6 +121,15 @@ import { createLogger } from 'src/composables/useLogger'
 import VideoCompare from 'components/preview/VideoCompare.vue'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
+import type { ApiSchema } from 'src/types/contracts'
+
+interface LibraryOption { label: string; value: number }
+interface LibraryWire { id: number; name?: string }
+const isLibraryWire = (value: unknown): value is LibraryWire => {
+  if (typeof value !== 'object' || value === null) return false
+  const library = value as Record<string, unknown>
+  return typeof library.id === 'number' && (library.name === undefined || typeof library.name === 'string')
+}
 
 export default {
   name: 'PreviewCompare',
@@ -133,9 +142,9 @@ export default {
     const startTime = ref(0)
     const duration = ref(10)
     const libraryId = ref(1)
-    const libraryOptions = ref([{ label: 'Default Library', value: 1 }])
+    const libraryOptions = ref<LibraryOption[]>([{ label: 'Default Library', value: 1 }])
     const generating = ref(false)
-    const jobId = ref(null)
+    const jobId = ref<string | null>(null)
     const jobStatus = ref('')
     const jobError = ref('')
     const previewReady = ref(false)
@@ -145,23 +154,25 @@ export default {
     const encodedSize = ref(0)
     const sourceCodec = ref('')
     const encodedCodec = ref('')
-    const vmafScore = ref(null)
-    const ssimScore = ref(null)
+    const vmafScore = ref<number | null>(null)
+    const ssimScore = ref<number | null>(null)
     const encodedByPipeline = ref(false)
-    let pollTimer = null
+    let pollTimer: ReturnType<typeof setInterval> | null = null
 
     // Load available libraries
     async function loadLibraries() {
       try {
         const response = await axios.get(getCompressoApiUrl('v2', 'settings/read'))
         if (response.data && response.data.settings) {
-          const libs = response.data.settings.libraries || []
+          const rawLibraries: unknown = response.data.settings.libraries
+          const libs = Array.isArray(rawLibraries) ? rawLibraries.filter(isLibraryWire) : []
           if (libs.length > 0) {
             libraryOptions.value = libs.map((lib) => ({
               label: lib.name || `Library ${lib.id}`,
               value: lib.id,
             }))
-            libraryId.value = libs[0].id
+            const firstLibrary = libs[0]
+            if (firstLibrary) libraryId.value = firstLibrary.id
           }
         }
       } catch (error) {
@@ -177,7 +188,7 @@ export default {
       previewReady.value = false
 
       try {
-        const response = await axios.post(getCompressoApiUrl('v2', 'preview/create'), {
+        const response = await axios.post<ApiSchema<'PreviewCreateResponse'>>(getCompressoApiUrl('v2', 'preview/create'), {
           source_path: sourcePath.value,
           start_time: startTime.value,
           duration: duration.value,
@@ -192,12 +203,15 @@ export default {
           jobStatus.value = 'failed'
           jobError.value = t('pages.previewCompare.noJobId')
         }
-      } catch (error) {
+      } catch (error: unknown) {
         jobStatus.value = 'failed'
-        jobError.value = error.response?.data?.error || error.message
+        const detail = axios.isAxiosError<{ error?: string }>(error)
+          ? error.response?.data.error || error.message
+          : error instanceof Error ? error.message : String(error)
+        jobError.value = detail
         $q.notify({
           type: 'negative',
-          message: t('pages.previewCompare.failedGenerate') + (error.response?.data?.error || error.message),
+          message: t('pages.previewCompare.failedGenerate') + detail,
         })
       } finally {
         generating.value = false
@@ -208,12 +222,13 @@ export default {
       stopPolling()
       pollTimer = setInterval(async () => {
         try {
-          const response = await axios.post(getCompressoApiUrl('v2', 'preview/status'), {
+          if (!jobId.value) return
+          const response = await axios.post<ApiSchema<'PreviewStatusResponse'>>(getCompressoApiUrl('v2', 'preview/status'), {
             job_id: jobId.value,
           })
 
           if (response.data) {
-            jobStatus.value = response.data.status
+            jobStatus.value = response.data.status ?? ''
             jobError.value = response.data.error || ''
 
             if (response.data.status === 'ready') {

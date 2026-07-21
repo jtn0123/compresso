@@ -51,7 +51,8 @@ echo "==> Auditing locked runtime and development graphs"
 echo "==> Running Python lint, format, and type gates"
 "${PYTHON_BIN}" -m ruff check compresso/ tests/
 "${PYTHON_BIN}" -m ruff format --check compresso/ tests/
-"${PYTHON_BIN}" -m mypy compresso/ --ignore-missing-imports --no-error-summary
+"${PYTHON_BIN}" -m mypy --strict compresso/ --no-error-summary
+"${PYTHON_BIN}" scripts/openapi_contract.py --check
 
 echo "==> Running Python unit tests"
 "${PYTHON_BIN}" -m pytest tests/unit -q --maxfail=1 --disable-warnings
@@ -77,6 +78,9 @@ echo "==> Installing and verifying frontend dependencies"
 cd "${FRONTEND_DIR}"
 npm ci
 rm -rf coverage
+npm run contract:check
+npm run typecheck
+npm run typecheck:production
 npm run lint
 npx vitest run --coverage
 npm run build:publish
@@ -127,9 +131,9 @@ if [[ "${MODE}" == "full" ]]; then
     cd "${FRONTEND_DIR}"
     echo "==> Installing Playwright browsers"
     if [[ "$(uname -s)" == "Linux" ]]; then
-      npx playwright install --with-deps chromium firefox webkit
+      npx playwright install --with-deps chrome webkit
     else
-      npx playwright install chromium firefox webkit
+      npx playwright install chrome webkit
     fi
     echo "==> Running mocked and packaged live-backend browser tests"
     npm run test:e2e:run

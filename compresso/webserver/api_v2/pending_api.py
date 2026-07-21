@@ -31,10 +31,17 @@ Copyright:
 
 import os.path
 
-from compresso.libs import session
 from compresso.libs.library import Library, LibraryLookupError
-from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.libs.session import Session
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    integer_list_value,
+    integer_value,
+    optional_integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.schema.pending_schemas import (
     PendingTasksSchema,
     PendingTasksTableResultsSchema,
@@ -53,10 +60,10 @@ from compresso.webserver.helpers import pending_tasks
 
 
 class ApiPendingHandler(BaseApiHandler):
-    session = None
-    config = None
-    params = None
-    compresso_data_queues = None
+    session: Session | None
+    config: object
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -116,13 +123,13 @@ class ApiPendingHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
-        self.session = session.Session()
+    def initialize(self, **kwargs: object) -> None:
+        self.session = Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    async def get_pending_tasks(self):
+    async def get_pending_tasks(self) -> None:
         """
         Pending - list tasks
         ---
@@ -198,7 +205,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def delete_pending_tasks(self):
+    async def delete_pending_tasks(self) -> None:
         """
         Pending - delete
         ---
@@ -244,16 +251,16 @@ class ApiPendingHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(RequestPendingTasksBulkActionSchema())
-            selection_mode = json_request.get("selection_mode", "explicit")
+            selection_mode = string_value(json_request.get("selection_mode"), "explicit")
             if selection_mode == "all_filtered":
-                filter_params = {
+                filter_params: dict[str, object] = {
                     "search_value": json_request.get("search_value"),
                     "library_ids": json_request.get("library_ids"),
                 }
-                exclude_ids = json_request.get("exclude_ids", [])
+                exclude_ids = integer_list_value(json_request.get("exclude_ids"))
                 id_list = pending_tasks.get_filtered_pending_task_ids(filter_params, exclude_ids=exclude_ids)
             else:
-                id_list = json_request.get("id_list", [])
+                id_list = integer_list_value(json_request.get("id_list"))
 
             if not id_list:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="No pending tasks selected")
@@ -273,7 +280,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def trigger_library_rescan(self):
+    async def trigger_library_rescan(self) -> None:
         """
         Pending - trigger a library scan
         ---
@@ -313,6 +320,10 @@ class ApiPendingHandler(BaseApiHandler):
         try:
             # Fetch library scan queue. If it is full, then a library scan has already been requested.
             library_scanner_triggers = self.compresso_data_queues.get("library_scanner_triggers")
+            if library_scanner_triggers is None:
+                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Library scan queue is unavailable")
+                self.write_error()
+                return
             if library_scanner_triggers.full():
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to queue library scan")
                 self.write_error()
@@ -329,7 +340,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def reorder_pending_tasks(self):
+    async def reorder_pending_tasks(self) -> None:
         """
         Pending - reorder
         ---
@@ -375,23 +386,23 @@ class ApiPendingHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(RequestPendingTasksReorderSchema())
-            selection_mode = json_request.get("selection_mode", "explicit")
+            selection_mode = string_value(json_request.get("selection_mode"), "explicit")
             if selection_mode == "all_filtered":
-                filter_params = {
+                filter_params: dict[str, object] = {
                     "search_value": json_request.get("search_value"),
                     "library_ids": json_request.get("library_ids"),
                 }
-                exclude_ids = json_request.get("exclude_ids", [])
+                exclude_ids = integer_list_value(json_request.get("exclude_ids"))
                 id_list = pending_tasks.get_filtered_pending_task_ids(filter_params, exclude_ids=exclude_ids)
             else:
-                id_list = json_request.get("id_list", [])
+                id_list = integer_list_value(json_request.get("id_list"))
 
             if not id_list:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="No pending tasks selected")
                 self.write_error()
                 return
 
-            if not pending_tasks.reorder_pending_tasks(id_list, json_request.get("position", "top")):
+            if not pending_tasks.reorder_pending_tasks(id_list, string_value(json_request.get("position"), "top")):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to save new order")
                 self.write_error()
                 return
@@ -404,7 +415,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def create_task_from_path(self):
+    async def create_task_from_path(self) -> None:
         """
         Pending - create
         ---
@@ -451,19 +462,24 @@ class ApiPendingHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPendingTaskCreateSchema())
 
-            abspath = os.path.abspath(json_request.get("path", ""))
-            library_id = json_request.get("library_id", 1)
-            library_name = json_request.get("library_name")
-            task_type = json_request.get("type", "local")
-            priority_score = json_request.get("priority_score", 0)
-            job_id = json_request.get("job_id")
-            lease_token = json_request.get("lease_token")
-            origin_installation_uuid = json_request.get("origin_installation_uuid")
+            abspath = os.path.abspath(string_value(json_request.get("path")))
+            library_id = integer_value(json_request.get("library_id"), 1)
+            library_name_value = json_request.get("library_name")
+            library_name = library_name_value if isinstance(library_name_value, str) else None
+            task_type = string_value(json_request.get("type"), "local")
+            priority_score = integer_value(json_request.get("priority_score"))
+            job_id_value = json_request.get("job_id")
+            job_id = job_id_value if isinstance(job_id_value, str) else None
+            lease_token_value = json_request.get("lease_token")
+            lease_token = lease_token_value if isinstance(lease_token_value, str) else None
+            origin_uuid_value = json_request.get("origin_installation_uuid")
+            origin_installation_uuid = origin_uuid_value if isinstance(origin_uuid_value, str) else None
 
             existing_task = pending_tasks.get_task_by_job_id(job_id)
             if existing_task:
+                existing_task_id = integer_value(existing_task.get("id"))
                 if not pending_tasks.bind_remote_task_identity(
-                    existing_task.get("id"),
+                    existing_task_id,
                     lease_token=lease_token,
                     origin_installation_uuid=origin_installation_uuid,
                 ):
@@ -481,7 +497,7 @@ class ApiPendingHandler(BaseApiHandler):
             if not os.path.exists(abspath):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Path does not exist: '{abspath}'")
                 self.write_error()
-                return False
+                return
 
             # Ensure a task does not already exist with this path
             if pending_tasks.check_if_task_exists_matching_path(abspath):
@@ -489,7 +505,7 @@ class ApiPendingHandler(BaseApiHandler):
                     self.STATUS_ERROR_EXTERNAL, reason=f"A task already exists with the provided path: '{abspath}'"
                 )
                 self.write_error()
-                return False
+                return
 
             task_info = pending_tasks.create_task(
                 abspath,
@@ -499,13 +515,13 @@ class ApiPendingHandler(BaseApiHandler):
                 priority_score=priority_score,
                 job_id=job_id,
             )
-            if not task_info:
+            if not isinstance(task_info, dict):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Failed to save new pending task for the provided path")
                 self.write_error()
                 return
 
             if not pending_tasks.bind_remote_task_identity(
-                task_info.get("id"),
+                integer_value(task_info.get("id")),
                 lease_token=lease_token,
                 origin_installation_uuid=origin_installation_uuid,
             ):
@@ -523,7 +539,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def test_task_from_path(self):
+    async def test_task_from_path(self) -> None:
         """
         Pending - test
         ---
@@ -570,9 +586,10 @@ class ApiPendingHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPendingTaskTestSchema())
 
-            path = json_request.get("path", "")
-            library_id = json_request.get("library_id")
-            library_name = json_request.get("library_name")
+            path = string_value(json_request.get("path"))
+            library_id = optional_integer_value(json_request.get("library_id"))
+            library_name_value = json_request.get("library_name")
+            library_name = library_name_value if isinstance(library_name_value, str) else None
 
             if not library_id and not library_name:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="You must provide either a library_id or library_name")
@@ -581,9 +598,9 @@ class ApiPendingHandler(BaseApiHandler):
 
             if library_id is None and library_name is not None:
                 library_id = None
-                for library in Library.get_all_libraries():
-                    if library_name == library.get("name"):
-                        library_id = library.get("id")
+                for library_record in Library.get_all_libraries():
+                    if library_name == library_record.get("name"):
+                        library_id = optional_integer_value(library_record.get("id"))
                         break
                 if library_id is None:
                     self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Library not found with name '{library_name}'")
@@ -591,7 +608,9 @@ class ApiPendingHandler(BaseApiHandler):
                     return
 
             try:
-                library = Library(library_id)
+                if library_id is None:
+                    raise LibraryLookupError("Library ID is unavailable")
+                selected_library = Library(library_id)
             except LibraryLookupError as exc:
                 self.handle_base_api_error(
                     BaseApiError("Invalid library selection", private_detail=f"{type(exc).__name__}: {exc}")
@@ -599,7 +618,7 @@ class ApiPendingHandler(BaseApiHandler):
                 return
 
             if not os.path.isabs(path):
-                abspath = os.path.abspath(os.path.join(library.get_path(), path))
+                abspath = os.path.abspath(os.path.join(selected_library.get_path(), path))
             else:
                 abspath = os.path.abspath(path)
 
@@ -608,12 +627,12 @@ class ApiPendingHandler(BaseApiHandler):
                 self.write_error()
                 return
 
-            test_result = pending_tasks.test_path_for_pending_task(abspath, library_id=library.get_id())
+            test_result = pending_tasks.test_path_for_pending_task(abspath, library_id=selected_library.get_id())
 
             response_data = {
                 "path": abspath,
-                "library_id": library.get_id(),
-                "library_name": library.get_name(),
+                "library_id": selected_library.get_id(),
+                "library_name": selected_library.get_name(),
                 "add_file_to_pending_tasks": test_result.get("add_file_to_pending_tasks"),
                 "issues": test_result.get("issues", []),
                 "decision_plugin": test_result.get("decision_plugin"),
@@ -628,7 +647,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_pending_status_of_tasks(self):
+    async def get_pending_status_of_tasks(self) -> None:
         """
         Pending - get status of tasks
         ---
@@ -675,7 +694,7 @@ class ApiPendingHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestTableUpdateByIdList())
 
-            status_results = pending_tasks.fetch_tasks_status(json_request.get("id_list", []))
+            status_results = pending_tasks.fetch_tasks_status(integer_list_value(json_request.get("id_list")))
             if not status_results:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to fetch pending tasks status")
                 self.write_error()
@@ -695,7 +714,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def set_pending_status_as_ready(self):
+    async def set_pending_status_as_ready(self) -> None:
         """
         Pending - set status as ready
         ---
@@ -742,7 +761,9 @@ class ApiPendingHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestTableUpdateByIdList())
 
-            if not pending_tasks.update_pending_tasks_status(json_request.get("id_list", []), status="pending"):
+            if not pending_tasks.update_pending_tasks_status(
+                integer_list_value(json_request.get("id_list")), status="pending"
+            ):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to update pending tasks status")
                 self.write_error()
                 return
@@ -755,7 +776,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def set_pending_library_by_name(self):
+    async def set_pending_library_by_name(self) -> None:
         """
         Pending - set the library of a list of given tasks
         ---
@@ -802,8 +823,8 @@ class ApiPendingHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPendingTasksLibraryUpdateSchema())
 
-            id_list = json_request.get("id_list", [])
-            library_name = json_request.get("library_name")
+            id_list = integer_list_value(json_request.get("id_list"))
+            library_name = string_value(json_request.get("library_name"))
 
             if not pending_tasks.update_pending_tasks_library(id_list, library_name):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to update pending tasks library")
@@ -818,7 +839,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def gen_download_link_pending_task_file(self, task_id=None):
+    async def gen_download_link_pending_task_file(self, task_id: str | None = None) -> None:
         """
         Pending - request a link for downloading a task file
         ---
@@ -856,18 +877,19 @@ class ApiPendingHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            status_results = pending_tasks.fetch_tasks_status([task_id])
+            parsed_task_id = int(task_id) if task_id is not None else 0
+            status_results = pending_tasks.fetch_tasks_status([parsed_task_id])
             if not status_results:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to fetch pending tasks status for download link")
                 self.write_error()
                 return
 
             # Set file details
-            abspath = status_results[0].get("abspath", "")
+            abspath = string_value(status_results[0].get("abspath"))
             basename = os.path.basename(abspath)
 
             # Generate download link
-            link_data = {
+            link_data: dict[str, object] = {
                 "abspath": abspath,
                 "basename": basename,
             }
@@ -888,7 +910,7 @@ class ApiPendingHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def gen_download_link_pending_task_data(self, task_id=None):
+    async def gen_download_link_pending_task_data(self, task_id: str | None = None) -> None:
         """
         Pending - request a link for downloading a task data
         ---
@@ -926,7 +948,8 @@ class ApiPendingHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            status_results = pending_tasks.fetch_tasks_status([task_id])
+            parsed_task_id = int(task_id) if task_id is not None else 0
+            status_results = pending_tasks.fetch_tasks_status([parsed_task_id])
             if not status_results:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to fetch pending tasks status for task data")
                 self.write_error()
@@ -938,12 +961,12 @@ class ApiPendingHandler(BaseApiHandler):
                 return
 
             # Set file details
-            abspath = status_results[0].get("abspath", "")
+            abspath = string_value(status_results[0].get("abspath"))
             basename = "data.json"
             data_file = os.path.join(os.path.dirname(abspath), basename)
 
             # Generate download link
-            link_data = {
+            link_data: dict[str, object] = {
                 "abspath": data_file,
                 "basename": basename,
             }

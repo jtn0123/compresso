@@ -28,7 +28,7 @@
               </div>
               <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="60px" />
-                <template v-else>{{ formatBytes(summary.space_saved) }}</template>
+                <template v-else>{{ formatBytes(summary.space_saved ?? 0) }}</template>
               </div>
             </q-card-section>
           </q-card>
@@ -53,7 +53,7 @@
               </div>
               <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="50px" />
-                <template v-else>{{ (summary.avg_ratio * 100).toFixed(1) }}%</template>
+                <template v-else>{{ ((summary.avg_ratio ?? 0) * 100).toFixed(1) }}%</template>
               </div>
             </q-card-section>
           </q-card>
@@ -67,7 +67,7 @@
               </div>
               <div class="stat-value">
                 <q-skeleton v-if="loadingSummary" type="text" width="60px" />
-                <template v-else>{{ formatBytes(pendingEstimate.estimated_savings) }}</template>
+                <template v-else>{{ formatBytes(pendingEstimate.estimated_savings ?? 0) }}</template>
               </div>
               <div class="stat-sublabel">
                 <template v-if="!loadingSummary">{{
@@ -294,8 +294,9 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, onMounted } from 'vue'
+import type { QTableColumn } from 'quasar'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -307,6 +308,58 @@ import ResolutionDistributionChart from 'components/charts/ResolutionDistributio
 import SpaceSavedTimelineChart from 'components/charts/SpaceSavedTimelineChart.vue'
 import EncodingSpeedChart from 'components/charts/EncodingSpeedChart.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
+import type { ApiSchema } from 'src/types/contracts'
+
+interface LibraryOption { label: string; value: number | null }
+interface LibraryWire { id: number; name?: string }
+interface CodecCount { codec: string; count: number }
+interface ResolutionCount { resolution: string; count: number }
+interface TimelinePoint { date: string; space_saved: number }
+interface EncodingSpeedPoint { date: string; avg_fps: number; avg_speed_ratio: number; count: number }
+interface AnalysisProgress { checked: number; total: number }
+interface AnalysisGroup {
+  codec: string
+  resolution: string
+  count: number
+  total_size_bytes: number
+  avg_bitrate_mbps: number
+  estimated_savings_pct: number
+  estimated_savings_bytes: number
+  confidence: string
+  historical_sample_count: number
+}
+interface AnalysisResults {
+  groups: AnalysisGroup[]
+  total_files: number
+  total_size_bytes: number
+  total_estimated_savings_bytes: number
+  last_run?: string
+}
+interface TableRequest {
+  pagination: { page: number; rowsPerPage: number; sortBy: string; descending: boolean }
+}
+
+const isLibraryWire = (value: unknown): value is LibraryWire => {
+  if (typeof value !== 'object' || value === null) return false
+  const library = value as Record<string, unknown>
+  return typeof library.id === 'number' && (library.name === undefined || typeof library.name === 'string')
+}
+
+const isAnalysisResults = (value: unknown): value is AnalysisResults => {
+  if (typeof value !== 'object' || value === null) return false
+  const result = value as Record<string, unknown>
+  return Array.isArray(result.groups) && typeof result.total_files === 'number' &&
+    typeof result.total_size_bytes === 'number' && typeof result.total_estimated_savings_bytes === 'number'
+}
+
+const toAnalysisProgress = (value: unknown): AnalysisProgress => {
+  if (typeof value !== 'object' || value === null) return { checked: 0, total: 0 }
+  const progress = value as Record<string, unknown>
+  return {
+    checked: typeof progress.checked === 'number' ? progress.checked : 0,
+    total: typeof progress.total === 'number' ? progress.total : 0,
+  }
+}
 
 export default {
   name: 'CompressionDashboard',
@@ -322,10 +375,11 @@ export default {
     const { t } = useI18n()
     const log = createLogger('Compression')
     const loadingSummary = ref(true)
-    const selectedLibraryId = ref(null)
-    const libraryOptions = ref([{ label: t('pages.compressionDashboard.allLibraries'), value: null }])
+    const selectedLibraryId = ref<number | null>(null)
+    const libraryOptions = ref<LibraryOption[]>([{ label: t('pages.compressionDashboard.allLibraries'), value: null }])
 
-    const summary = ref({
+    const summary = ref<ApiSchema<'CompressionSummary'>>({
+      success: true,
       total_source_size: 0,
       total_destination_size: 0,
       file_count: 0,
@@ -334,7 +388,8 @@ export default {
       per_library: [],
     })
 
-    const pendingEstimate = ref({
+    const pendingEstimate = ref<ApiSchema<'PendingEstimate'>>({
+      success: true,
       pending_count: 0,
       total_pending_size: 0,
       estimated_output_size: 0,
@@ -342,20 +397,20 @@ export default {
       avg_ratio_used: 1.0,
     })
 
-    const codecData = ref({ source_codecs: [], destination_codecs: [] })
-    const resolutionData = ref([])
-    const timelineData = ref([])
+    const codecData = ref<{ source_codecs: CodecCount[]; destination_codecs: CodecCount[] }>({ source_codecs: [], destination_codecs: [] })
+    const resolutionData = ref<ResolutionCount[]>([])
+    const timelineData = ref<TimelinePoint[]>([])
     const timelineInterval = ref('day')
     const chartsLoading = ref(false)
-    const encodingSpeedData = ref([])
+    const encodingSpeedData = ref<EncodingSpeedPoint[]>([])
 
     const analysisStatus = ref('none')
-    const analysisProgress = ref({ checked: 0, total: 0 })
-    const analysisResults = ref(null)
+    const analysisProgress = ref<AnalysisProgress>({ checked: 0, total: 0 })
+    const analysisResults = ref<AnalysisResults | null>(null)
     const analysisVersion = ref(0)
-    let analysisPollTimer = null
+    let analysisPollTimer: ReturnType<typeof setTimeout> | null = null
 
-    const analysisColumns = [
+    const analysisColumns: QTableColumn[] = [
       { name: 'codec', label: t('flow.analysisCodec'), field: 'codec', align: 'left' },
       { name: 'resolution', label: t('flow.analysisResolution'), field: 'resolution', align: 'left' },
       { name: 'count', label: t('flow.analysisCount'), field: 'count', align: 'right', sortable: true },
@@ -364,14 +419,14 @@ export default {
         label: t('flow.analysisTotalSize'),
         field: 'total_size_bytes',
         align: 'right',
-        format: (v) => formatBytes(v),
+        format: (v: number) => formatBytes(v),
       },
       {
         name: 'avg_bitrate_mbps',
         label: t('flow.analysisAvgBitrate'),
         field: 'avg_bitrate_mbps',
         align: 'right',
-        format: (v) => (v > 0 ? v.toFixed(1) + ' Mbps' : '-'),
+        format: (v: number) => (v > 0 ? v.toFixed(1) + ' Mbps' : '-'),
       },
       {
         name: 'estimated_savings',
@@ -382,12 +437,12 @@ export default {
       { name: 'confidence', label: t('flow.analysisConfidence'), field: 'confidence', align: 'center' },
     ]
 
-    function confidenceColor(level) {
-      const map = { high: 'positive', medium: 'warning', low: 'grey', none: 'grey-4', optimal: 'grey-4' }
+    function confidenceColor(level: string): string {
+      const map: Record<string, string> = { high: 'positive', medium: 'warning', low: 'grey', none: 'grey-4', optimal: 'grey-4' }
       return map[level] || 'grey'
     }
-    function confidenceLabel(level) {
-      const map = {
+    function confidenceLabel(level: string): string {
+      const map: Record<string, string> = {
         high: t('flow.confidenceHigh'),
         medium: t('flow.confidenceMedium'),
         low: t('flow.confidenceLow'),
@@ -413,13 +468,13 @@ export default {
     async function pollAnalysisStatus() {
       if (!selectedLibraryId.value) return
       try {
-        const response = await axios.post(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
+        const response = await axios.post<ApiSchema<'LibraryAnalysisStatus'>>(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
           library_id: selectedLibraryId.value,
         })
         if (response.data) {
           analysisStatus.value = response.data.status || 'none'
-          analysisProgress.value = response.data.progress || { checked: 0, total: 0 }
-          if (response.data.results) {
+          analysisProgress.value = toAnalysisProgress(response.data.progress)
+          if (isAnalysisResults(response.data.results)) {
             analysisResults.value = response.data.results
             analysisVersion.value = response.data.version || 0
           }
@@ -436,13 +491,13 @@ export default {
     async function loadAnalysisIfAvailable() {
       if (!selectedLibraryId.value) return
       try {
-        const response = await axios.post(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
+        const response = await axios.post<ApiSchema<'LibraryAnalysisStatus'>>(getCompressoApiUrl('v2', 'compression/library-analysis/status'), {
           library_id: selectedLibraryId.value,
         })
         if (response.data) {
           analysisStatus.value = response.data.status || 'none'
-          analysisProgress.value = response.data.progress || { checked: 0, total: 0 }
-          if (response.data.results) {
+          analysisProgress.value = toAnalysisProgress(response.data.progress)
+          if (isAnalysisResults(response.data.results)) {
             analysisResults.value = response.data.results
             analysisVersion.value = response.data.version || 0
           }
@@ -450,12 +505,12 @@ export default {
             analysisPollTimer = setTimeout(pollAnalysisStatus, 2000)
           }
         }
-      } catch (error) {
+      } catch {
         // No analysis available — that's fine
       }
     }
 
-    const statsResults = ref([])
+    const statsResults = ref<unknown[]>([])
     const searchValue = ref('')
     const loading = ref(false)
     const pagination = ref({
@@ -466,7 +521,7 @@ export default {
       descending: true,
     })
 
-    const libraryColumns = [
+    const libraryColumns: QTableColumn[] = [
       {
         name: 'library_id',
         label: t('pages.compressionDashboard.columnLibraryId'),
@@ -486,32 +541,32 @@ export default {
         label: t('pages.compressionDashboard.columnOriginalSize'),
         field: 'total_source_size',
         align: 'right',
-        format: (v) => formatBytes(v),
+        format: (v: number) => formatBytes(v),
       },
       {
         name: 'total_destination_size',
         label: t('pages.compressionDashboard.columnNewSize'),
         field: 'total_destination_size',
         align: 'right',
-        format: (v) => formatBytes(v),
+        format: (v: number) => formatBytes(v),
       },
       {
         name: 'space_saved',
         label: t('pages.compressionDashboard.columnSpaceSaved'),
         field: 'space_saved',
         align: 'right',
-        format: (v) => formatBytes(v),
+        format: (v: number) => formatBytes(v),
       },
       {
         name: 'avg_ratio',
         label: t('pages.compressionDashboard.columnAvgRatio'),
         field: 'avg_ratio',
         align: 'right',
-        format: (v) => (v * 100).toFixed(1) + '%',
+        format: (v: number) => (v * 100).toFixed(1) + '%',
       },
     ]
 
-    const fileColumns = [
+    const fileColumns: QTableColumn[] = [
       {
         name: 'task_label',
         label: t('pages.compressionDashboard.columnFile'),
@@ -525,7 +580,7 @@ export default {
         field: 'source_size',
         align: 'right',
         sortable: true,
-        format: (v) => formatBytes(v),
+        format: (v: number) => formatBytes(v),
       },
       {
         name: 'destination_size',
@@ -533,7 +588,7 @@ export default {
         field: 'destination_size',
         align: 'right',
         sortable: true,
-        format: (v) => formatBytes(v),
+        format: (v: number) => formatBytes(v),
       },
       {
         name: 'ratio',
@@ -582,7 +637,7 @@ export default {
 
     async function loadSummary() {
       try {
-        const response = await axios.get(getCompressoApiUrl('v2', 'compression/summary') + buildLibraryParam())
+        const response = await axios.get<ApiSchema<'CompressionSummary'>>(getCompressoApiUrl('v2', 'compression/summary') + buildLibraryParam())
         if (response.data) {
           summary.value = response.data
         }
@@ -596,7 +651,7 @@ export default {
 
     async function loadPendingEstimate() {
       try {
-        const response = await axios.get(getCompressoApiUrl('v2', 'compression/pending-estimate'))
+        const response = await axios.get<ApiSchema<'PendingEstimate'>>(getCompressoApiUrl('v2', 'compression/pending-estimate'))
         if (response.data) {
           pendingEstimate.value = response.data
         }
@@ -660,7 +715,7 @@ export default {
       }
     }
 
-    function onTableRequest(props) {
+    function onTableRequest(props: TableRequest): void {
       const { page, rowsPerPage, sortBy, descending } = props.pagination
       pagination.value.page = page
       pagination.value.rowsPerPage = rowsPerPage
@@ -677,7 +732,7 @@ export default {
       await Promise.all([loadSummary(), loadCharts(), loadStats(), loadAnalysisIfAvailable()])
     }
 
-    function onIntervalChange(newInterval) {
+    function onIntervalChange(newInterval: string): void {
       timelineInterval.value = newInterval
       loadCharts()
     }
@@ -686,9 +741,10 @@ export default {
       try {
         const response = await axios.get(getCompressoApiUrl('v2', 'settings/read'))
         if (response.data && response.data.settings) {
-          const libs = response.data.settings.libraries || []
+          const rawLibraries: unknown = response.data.settings.libraries
+          const libs = Array.isArray(rawLibraries) ? rawLibraries.filter(isLibraryWire) : []
           libraryOptions.value = [{ label: t('pages.compressionDashboard.allLibraries'), value: null }]
-          libs.forEach((lib) => {
+          libs.forEach((lib: LibraryWire) => {
             libraryOptions.value.push({
               label: lib.name || `Library ${lib.id}`,
               value: lib.id,

@@ -17,9 +17,42 @@ import subprocess
 import threading
 import time
 import uuid
+from typing import TypedDict
 
 from compresso import config
 from compresso.libs.logs import CompressoLogging
+
+
+class PreviewJob(TypedDict):
+    job_id: str
+    source_path: str
+    start_time: float
+    duration: float
+    library_id: int
+    status: str
+    error: str | None
+    created_at: float
+    job_dir: str
+    segment_path: str
+    source_web_path: str
+    encoded_path: str
+    source_size: int
+    encoded_size: int
+    source_codec: str
+    encoded_codec: str
+    vmaf_score: float | None
+    ssim_score: float | None
+    encoded_by_pipeline: bool
+
+
+def _string(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _command(value: object) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return []
+    return value
 
 
 class PreviewManager:
@@ -29,18 +62,18 @@ class PreviewManager:
     """
 
     _lock = threading.Lock()
-    _current_job = None
-    _jobs: dict = {}
+    _current_job: str | None = None
+    _jobs: dict[str, PreviewJob] = {}
 
     MAX_DURATION = 30  # seconds
     MAX_JOB_TIMEOUT = 600  # 10 minutes max per preview job
     CLEANUP_AGE = 86400  # 24 hours in seconds
 
-    def __init__(self):
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+    def __init__(self) -> None:
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.settings = config.Config()
 
-    def _run_plugin_pipeline(self, segment_path, encoded_path, library_id):
+    def _run_plugin_pipeline(self, segment_path: str, encoded_path: str, library_id: int) -> bool:
         """
         Run the library's plugin pipeline on a segment to produce an encoded file.
 
@@ -67,7 +100,7 @@ class PreviewManager:
         if not plugin_modules:
             return False
 
-        data = {
+        data: dict[str, object] = {
             "worker_log": [],
             "library_id": library_id,
             "exec_command": [],
@@ -80,26 +113,33 @@ class PreviewManager:
         }
 
         job_dir = os.path.dirname(encoded_path)
-        intermediate_files = []
+        intermediate_files: list[str] = []
+        current_input = segment_path
 
         try:
             for i, plugin_module in enumerate(plugin_modules):
-                _, ext = os.path.splitext(data["file_in"])
+                plugin_id = plugin_module.get("plugin_id")
+                if not isinstance(plugin_id, str):
+                    self.logger.warning("Skipping preview plugin with an invalid plugin ID")
+                    return False
+                _, ext = os.path.splitext(current_input)
                 plugin_out = os.path.join(job_dir, f"plugin_{i}{ext}")
+                data["file_in"] = current_input
                 data["file_out"] = plugin_out
                 data["exec_command"] = []
                 data["repeat"] = False
 
                 try:
-                    plugin_handler.exec_plugin_runner(data, plugin_module.get("plugin_id"), "worker.process")
+                    plugin_handler.exec_plugin_runner(data, plugin_id, "worker.process")
                 except Exception as e:
                     self.logger.warning("Plugin %s runner failed: %s", plugin_module.get("plugin_id"), str(e))
                     return False
 
-                if data["exec_command"]:
+                exec_command = _command(data.get("exec_command"))
+                if exec_command:
                     try:
                         result = subprocess.run(  # noqa: S603 - trusted plugin exec_command from internal pipeline
-                            data["exec_command"], capture_output=True, text=True, timeout=300
+                            exec_command, capture_output=True, text=True, timeout=300
                         )
                         if result.returncode != 0:
                             self.logger.warning(
@@ -113,14 +153,15 @@ class PreviewManager:
                         return False
 
                     # Chain: set next input to this output if it exists
-                    if os.path.exists(data["file_out"]):
+                    plugin_output = _string(data.get("file_out")) or plugin_out
+                    if os.path.exists(plugin_output):
                         # Track old file_in for cleanup (but not the original segment)
-                        if data["file_in"] != segment_path:
-                            intermediate_files.append(data["file_in"])
-                        data["file_in"] = data["file_out"]
+                        if current_input != segment_path:
+                            intermediate_files.append(current_input)
+                        current_input = plugin_output
 
             # Determine the final pipeline output
-            pipeline_output = data["file_in"]
+            pipeline_output = current_input
 
             # If not already mp4, remux to mp4 for browser playability
             _, final_ext = os.path.splitext(pipeline_output)
@@ -177,14 +218,20 @@ class PreviewManager:
                 except OSError:
                     pass
 
-    def get_preview_cache_dir(self):
+    def get_preview_cache_dir(self) -> str:
         """Get the base directory for preview cache files."""
         cache_path = self.settings.get_cache_path()
         preview_dir = os.path.join(cache_path, "preview")
         os.makedirs(preview_dir, exist_ok=True)
         return preview_dir
 
-    def create_preview(self, source_path, start_time, duration, library_id):
+    def create_preview(
+        self,
+        source_path: str,
+        start_time: float,
+        duration: float,
+        library_id: int,
+    ) -> str:
         """
         Create a new preview job.
 
@@ -209,14 +256,15 @@ class PreviewManager:
 
         # Check if a job is already running
         with self._lock:
-            if self._current_job and self._jobs.get(self._current_job, {}).get("status") == "running":
+            current_job = self._jobs.get(self._current_job) if self._current_job else None
+            if current_job is not None and current_job["status"] == "running":
                 raise RuntimeError("A preview job is already running. Please wait for it to complete.")
 
         job_id = str(uuid.uuid4())[:8]
         job_dir = os.path.join(self.get_preview_cache_dir(), job_id)
         os.makedirs(job_dir, exist_ok=True)
 
-        job = {
+        job: PreviewJob = {
             "job_id": job_id,
             "source_path": source_path,
             "start_time": start_time,
@@ -248,7 +296,7 @@ class PreviewManager:
 
         return job_id
 
-    def _check_timeout(self, job_id):
+    def _check_timeout(self, job_id: str) -> None:
         """Check if a preview job has exceeded MAX_JOB_TIMEOUT and raise if so."""
         job = self._jobs.get(job_id)
         if not job:
@@ -257,7 +305,7 @@ class PreviewManager:
         if elapsed > self.MAX_JOB_TIMEOUT:
             raise RuntimeError(f"Preview job {job_id} timed out after {elapsed:.0f}s (limit {self.MAX_JOB_TIMEOUT}s)")
 
-    def _generate_preview(self, job_id):
+    def _generate_preview(self, job_id: str) -> None:
         """Generate preview clips in a background thread."""
         job = self._jobs.get(job_id)
         if not job:
@@ -378,7 +426,7 @@ class PreviewManager:
                 if self._current_job == job_id:
                     self._current_job = None
 
-    def _get_video_codec(self, filepath):
+    def _get_video_codec(self, filepath: str) -> str:
         """Get the video codec of a file using ffprobe."""
         try:
             cmd = [
@@ -400,7 +448,7 @@ class PreviewManager:
             self.logger.debug("Codec detection failed for %s: %s", filepath, str(e))
         return ""
 
-    def compute_quality_metrics(self, source_path, encoded_path):
+    def compute_quality_metrics(self, source_path: str, encoded_path: str) -> tuple[float | None, float | None]:
         """
         Compute VMAF and SSIM quality metrics between source and encoded.
         Returns (vmaf_score, ssim_score) — either can be None if unavailable.
@@ -409,8 +457,8 @@ class PreviewManager:
         :param encoded_path: Path to the encoded/distorted video
         :return: tuple (float or None, float or None)
         """
-        vmaf_score = None
-        ssim_score = None
+        vmaf_score: float | None = None
+        ssim_score: float | None = None
 
         # Try SSIM first (more widely available)
         try:
@@ -462,7 +510,7 @@ class PreviewManager:
 
         return vmaf_score, ssim_score
 
-    def get_job_status(self, job_id):
+    def get_job_status(self, job_id: str) -> dict[str, object] | None:
         """
         Get the status of a preview job.
 
@@ -473,7 +521,7 @@ class PreviewManager:
         if not job:
             return None
 
-        result = {
+        result: dict[str, object] = {
             "job_id": job["job_id"],
             "status": job["status"],
             "error": job["error"],
@@ -492,7 +540,7 @@ class PreviewManager:
 
         return result
 
-    def cleanup_job(self, job_id):
+    def cleanup_job(self, job_id: str) -> None:
         """
         Clean up a specific preview job's files.
 
@@ -501,17 +549,17 @@ class PreviewManager:
         job = self._jobs.pop(job_id, None)
         if job:
             job_dir = job.get("job_dir")
-            if job_dir and os.path.exists(job_dir):
+            if isinstance(job_dir, str) and job_dir and os.path.exists(job_dir):
                 shutil.rmtree(job_dir, ignore_errors=True)
                 self.logger.info("Preview [%s]: Cleaned up", job_id)
 
-    def cleanup_old_previews(self):
+    def cleanup_old_previews(self) -> None:
         """
         Remove preview jobs older than CLEANUP_AGE.
         Called periodically by the scheduler.
         """
         now = time.time()
-        expired_ids = []
+        expired_ids: list[str] = []
 
         for job_id, job in list(self._jobs.items()):
             if (now - job.get("created_at", 0)) > self.CLEANUP_AGE:
