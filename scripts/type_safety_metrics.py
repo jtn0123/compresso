@@ -135,7 +135,7 @@ def _is_test_script(path: Path) -> bool:
 
 
 def _vue_script_loc(source: str) -> int:
-    script_blocks = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", source, flags=re.DOTALL | re.IGNORECASE)
+    script_blocks = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script\s*>", source, flags=re.DOTALL | re.IGNORECASE)
     return sum(_nonblank_count(block.splitlines()) + 2 for block in script_blocks)
 
 
