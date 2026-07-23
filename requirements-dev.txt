@@ -14,10 +14,10 @@ build==1.5.1
 colorama==0.4.6
 yappi==1.7.6            # Thread-aware profiler for dev profiling
 mypy==2.3.0             # Gradual type checking
-types-peewee==4.0.8.20260712
+types-peewee==4.2.6.20260723
 types-psutil==7.2.2.20260518
 pip-audit==2.10.1       # Dependency vulnerability auditing
-pip-tools==7.5.3       # Reproducible hash-locked dependency compilation
+pip-tools==7.6.0       # Reproducible hash-locked dependency compilation
 
 # API schema exporting
 apispec==6.10.0
