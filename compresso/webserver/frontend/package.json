@@ -61,7 +61,7 @@
     "jsdom": "^30.0.1",
     "openapi-typescript": "7.13.0",
     "prettier": "^3.9.6",
-    "typescript": "7.0.2",
+    "typescript": "5.9.3",
     "typescript-eslint": "8.65.0",
     "vitest": "^4.1.0",
     "vue-eslint-parser": "^10.4.0",
@@ -85,6 +85,7 @@
   },
   "overrides": {
     "esbuild": "^0.28.1",
+    "postcss": "^8.5.19",
     "serialize-javascript": "^7.0.7",
     "vite": "7.3.6"
   }
