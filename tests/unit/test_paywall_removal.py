@@ -97,7 +97,7 @@ class TestPaywallRemoval:
     @pytest.mark.unittest
     def test_links_within_enabled_link_limits_returns_true(self):
         """Links.within_enabled_link_limits() must always return True."""
-        from compresso.libs.installation_link import Links
+        from compresso.libs.remote.installation_link import Links
 
         # Clear any singleton cache so we get a fresh Links instance
         from compresso.libs.singleton import SingletonType

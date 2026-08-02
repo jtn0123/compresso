@@ -49,9 +49,15 @@ const quasarMock = {
  */
 export function mountWithQuasar(component: Component, options: HelperMountOptions = {}) {
   const globalOpts = options.global ?? {}
+  // `plugins`, `mocks`, and `stubs` are merged below, so they must be pulled out
+  // of the passthrough spread. Spreading the whole object afterwards replaced
+  // the merged `stubs` wholesale, silently dropping every q-* default for any
+  // caller that passed `global.stubs`.
+  const { plugins: _plugins, mocks: _mocks, stubs: _stubs, ...passthroughGlobal } = globalOpts
   return mount(component, {
     ...options,
     global: {
+      ...passthroughGlobal,
       plugins: [i18n, ...(globalOpts.plugins || [])],
       mocks: {
         $q: quasarMock,
@@ -99,16 +105,17 @@ export function mountWithQuasar(component: Component, options: HelperMountOption
         ...stubsAsRecord(globalOpts.stubs),
         ...(options.stubs ?? {}),
       },
-      ...globalOpts,
     },
   })
 }
 
 export function shallowMountWithQuasar(component: Component, options: HelperMountOptions = {}) {
   const globalOpts = options.global ?? {}
+  const { plugins: _plugins, mocks: _mocks, stubs: _stubs, ...passthroughGlobal } = globalOpts
   return shallowMount(component, {
     ...options,
     global: {
+      ...passthroughGlobal,
       plugins: [i18n, ...(globalOpts.plugins || [])],
       mocks: {
         $q: quasarMock,
@@ -119,7 +126,6 @@ export function shallowMountWithQuasar(component: Component, options: HelperMoun
         ...stubsAsRecord(globalOpts.stubs),
         ...(options.stubs ?? {}),
       },
-      ...globalOpts,
     },
   })
 }

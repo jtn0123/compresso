@@ -27,6 +27,7 @@ from compresso.bundled_plugins import (
     _version_newer,
     install_bundled_plugins,
 )
+from tests.support_.symlinks import requires_symlinks
 
 # ------------------------------------------------------------------
 # _version_newer
@@ -220,6 +221,7 @@ class TestCopyPlugin:
             shutil.rmtree(source, ignore_errors=True)
             shutil.rmtree(target, ignore_errors=True)
 
+    @requires_symlinks
     def test_does_not_follow_settings_symlinks(self, tmp_path: Path) -> None:
         source = tmp_path / "source"
         target = tmp_path / "target"

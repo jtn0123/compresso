@@ -20,17 +20,24 @@
         icon="push_pin"
         :color="pinned ? 'primary' : 'grey-6'"
         :style="{ transform: pinned ? 'none' : 'rotate(45deg)' }"
+        :aria-label="pinned ? $t('a11y.unpinSidebar') : $t('a11y.pinSidebar')"
         @click="$emit('update:pinned', !pinned)"
       >
-        <q-tooltip>{{ pinned ? 'Unpin sidebar' : 'Pin sidebar' }}</q-tooltip>
+        <q-tooltip>{{ pinned ? $t('a11y.unpinSidebar') : $t('a11y.pinSidebar') }}</q-tooltip>
       </q-btn>
     </div>
 
     <!-- Scrollable Navigation -->
     <q-scroll-area class="col">
-      <q-list dense>
+      <q-list dense role="none">
         <!-- Dashboard -->
-        <q-item clickable to="/ui/dashboard" v-ripple :class="{ 'nav-active': $route.path === '/ui/dashboard' }">
+        <q-item
+          role="link"
+          clickable
+          to="/ui/dashboard"
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/dashboard' }"
+        >
           <q-item-section avatar>
             <q-icon name="dashboard" size="20px" />
           </q-item-section>
@@ -44,13 +51,25 @@
         <q-item-label v-if="!mini" class="nav-section-label">{{ $t('navigation.tools') }}</q-item-label>
         <q-separator v-else class="q-my-xs q-mx-sm" />
 
-        <q-item clickable to="/ui/compression" v-ripple :class="{ 'nav-active': $route.path === '/ui/compression' }">
+        <q-item
+          role="link"
+          clickable
+          to="/ui/compression"
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/compression' }"
+        >
           <q-item-section avatar><q-icon name="compress" size="20px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.compression') }}</q-item-section>
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.compression') }}</q-tooltip>
         </q-item>
 
-        <q-item clickable to="/ui/approval" v-ripple :class="{ 'nav-active': $route.path === '/ui/approval' }">
+        <q-item
+          role="link"
+          clickable
+          to="/ui/approval"
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/approval' }"
+        >
           <q-item-section avatar><q-icon name="fact_check" size="20px" /></q-item-section>
           <q-item-section v-if="!mini">
             {{ $t('navigation.approvalQueue') }}
@@ -64,7 +83,13 @@
           }}</q-tooltip>
         </q-item>
 
-        <q-item clickable to="/ui/preview" v-ripple :class="{ 'nav-active': $route.path === '/ui/preview' }">
+        <q-item
+          role="link"
+          clickable
+          to="/ui/preview"
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/preview' }"
+        >
           <q-item-section avatar><q-icon name="compare" size="20px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.abPreview') }}</q-item-section>
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.abPreview') }}</q-tooltip>
@@ -76,13 +101,19 @@
         }}</q-item-label>
         <q-separator v-else class="q-my-xs q-mx-sm" />
 
-        <q-item clickable to="/ui/health" v-ripple :class="{ 'nav-active': $route.path === '/ui/health' }">
+        <q-item role="link" clickable to="/ui/health" v-ripple :class="{ 'nav-active': $route.path === '/ui/health' }">
           <q-item-section avatar><q-icon name="health_and_safety" size="20px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.healthCheck') }}</q-item-section>
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.healthCheck') }}</q-tooltip>
         </q-item>
 
-        <q-item clickable to="/ui/readiness" v-ripple :class="{ 'nav-active': $route.path === '/ui/readiness' }">
+        <q-item
+          role="link"
+          clickable
+          to="/ui/readiness"
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/readiness' }"
+        >
           <q-item-section avatar><q-icon name="verified_user" size="20px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.deploymentReadiness') }}</q-item-section>
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{
@@ -90,22 +121,29 @@
           }}</q-tooltip>
         </q-item>
 
-        <q-item clickable to="/ui/history" v-ripple :class="{ 'nav-active': $route.path === '/ui/history' }">
+        <q-item
+          role="link"
+          clickable
+          to="/ui/history"
+          v-ripple
+          :class="{ 'nav-active': $route.path === '/ui/history' }"
+        >
           <q-item-section avatar><q-icon name="history" size="20px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.history') }}</q-item-section>
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{ $t('navigation.history') }}</q-tooltip>
         </q-item>
 
         <!-- Data Panels: expandable when not mini, popup menu when mini -->
-        <q-item v-if="mini" clickable v-ripple :class="{ 'nav-active': $route.path === '/ui/data-panels' }">
+        <q-item role="link" v-if="mini" clickable v-ripple :class="{ 'nav-active': $route.path === '/ui/data-panels' }">
           <q-item-section avatar><q-icon name="insights" size="20px" /></q-item-section>
           <q-tooltip anchor="center right" self="center left">{{ $t('navigation.dataPanels') }}</q-tooltip>
           <q-menu anchor="top right" self="top left" :offset="[4, 0]">
-            <q-list dense style="min-width: 150px">
-              <q-item clickable to="/ui/data-panels" v-close-popup v-ripple>
+            <q-list dense role="none" style="min-width: 150px">
+              <q-item role="link" clickable to="/ui/data-panels" v-close-popup v-ripple>
                 <q-item-section>{{ $t('navigation.dataPanels') }}</q-item-section>
               </q-item>
               <q-item
+                role="link"
                 v-for="panel in availableDataPanels"
                 :key="panel.id"
                 clickable
@@ -128,6 +166,7 @@
           dense
         >
           <q-item
+            role="link"
             clickable
             to="/ui/data-panels"
             v-ripple
@@ -139,6 +178,7 @@
             <q-item-section>{{ $t('navigation.dataPanels') }}</q-item-section>
           </q-item>
           <q-item
+            role="link"
             v-for="panel in availableDataPanels"
             :key="panel.id"
             clickable
@@ -158,6 +198,7 @@
         <q-separator v-else class="q-my-xs q-mx-sm" />
 
         <q-item
+          role="link"
           clickable
           to="/ui/settings-library"
           v-ripple
@@ -169,6 +210,7 @@
         </q-item>
 
         <q-item
+          role="link"
           clickable
           to="/ui/settings-workers"
           v-ripple
@@ -180,6 +222,7 @@
         </q-item>
 
         <q-item
+          role="link"
           clickable
           to="/ui/settings-plugins"
           v-ripple
@@ -191,6 +234,7 @@
         </q-item>
 
         <q-item
+          role="link"
           clickable
           to="/ui/settings-link"
           v-ripple
@@ -202,6 +246,7 @@
         </q-item>
 
         <q-item
+          role="link"
           clickable
           to="/ui/settings-notifications"
           v-ripple
@@ -221,8 +266,8 @@
       <q-separator class="q-mb-xs" />
 
       <!-- Help/Docs items -->
-      <q-list dense>
-        <q-item clickable @click="showHelpSupportDialog" v-ripple>
+      <q-list dense role="none">
+        <q-item role="link" clickable @click="showHelpSupportDialog" v-ripple>
           <q-item-section avatar><q-icon name="fa-regular fa-life-ring" size="18px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.helpAndSupport') }}</q-item-section>
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{
@@ -230,7 +275,7 @@
           }}</q-tooltip>
         </q-item>
 
-        <q-item clickable @click="showApplicationLogsDialog" v-ripple>
+        <q-item role="link" clickable @click="showApplicationLogsDialog" v-ripple>
           <q-item-section avatar><q-icon name="article" size="18px" /></q-item-section>
           <q-item-section v-if="!mini">{{ $t('navigation.applicationLogs') }}</q-item-section>
           <q-tooltip v-if="mini" anchor="center right" self="center left">{{
@@ -240,7 +285,7 @@
 
         <!-- Mobile-only theme/palette controls -->
         <template v-if="$q.screen.lt.sm && !mini">
-          <q-item>
+          <q-item role="link">
             <q-item-section avatar><q-icon name="palette" size="18px" /></q-item-section>
             <q-item-section>
               <div class="row items-center q-gutter-xs">

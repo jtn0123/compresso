@@ -285,7 +285,10 @@ class TestDownloadPlugin:
             "package_url": "https://example.com/plugin.zip",
             "package_sha256": hashlib.sha256(payload).hexdigest(),
         }
-        expected_dest = str(plugins_dir / "my_plugin-1.0.zip")
+        # download_plugin returns a resolved path, so compare resolved paths:
+        # the constructed tmp_path and the directory on disk can differ in case
+        # (Windows) or through a symlink (/tmp on macOS).
+        expected_dest = os.path.realpath(str(plugins_dir / "my_plugin-1.0.zip"))
 
         mock_response = MagicMock()
         mock_response.__enter__ = MagicMock(return_value=mock_response)
@@ -299,7 +302,7 @@ class TestDownloadPlugin:
         with patch("compresso.libs.plugins.Session", return_value=mock_session):
             dest = handler.download_plugin(plugin)
 
-        assert dest == expected_dest
+        assert os.path.realpath(dest) == expected_dest
         assert os.path.exists(expected_dest)
 
 

@@ -1,6 +1,5 @@
 import logging
 
-
 class JSONFormatter(logging.Formatter):
     def json_record(
         self,
@@ -8,5 +7,4 @@ class JSONFormatter(logging.Formatter):
         extra: dict[str, object],
         record: logging.LogRecord,
     ) -> dict[str, object]: ...
-
     def format(self, record: logging.LogRecord) -> str: ...

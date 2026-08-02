@@ -1,5 +1,5 @@
 <template>
-  <q-list padding>
+  <q-list padding role="none">
     <q-item>
       <q-space />
       <q-item-section class="on-right" style="padding-right: 0" top side>
@@ -34,7 +34,13 @@
 
       <q-item-section top side>
         <div class="text-grey-8 q-gutter-xs">
-          <CompressoListActionButton class="gt-xs" icon="close" color="grey-8" @click="dismissNotification(index)" />
+          <CompressoListActionButton
+            class="gt-xs"
+            icon="close"
+            color="grey-8"
+            :aria-label="$t('a11y.dismissNotification')"
+            @click="dismissNotification(index)"
+          />
         </div>
       </q-item-section>
     </q-item>

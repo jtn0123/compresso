@@ -3,6 +3,7 @@
 """Adversarial contracts for transactional plugin installation."""
 
 import json
+import os
 import stat
 import threading
 import time
@@ -217,7 +218,9 @@ class TestTransactionalPluginInstall:
         assert dependency_paths
         assert all(Path(path).name.startswith(".safe_plugin.staging-") for path in dependency_paths)
         assert json.loads((live / "info.json").read_text())["bundled"] is False
-        assert write.call_args.args[1] == str(live)
+        # The installer records a resolved path; the constructed tmp_path and the
+        # directory on disk can differ in case (Windows) or via a symlink (macOS).
+        assert os.path.realpath(write.call_args.args[1]) == os.path.realpath(str(live))
         executor.reload_plugin_module.assert_called_once_with("safe_plugin")
         assert not list((tmp_path / "plugins").glob(".safe_plugin.*-*"))
 

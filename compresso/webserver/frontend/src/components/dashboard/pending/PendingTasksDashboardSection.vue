@@ -24,6 +24,7 @@
         <div class="col-auto">
           <q-btn
             data-testid="pending-tasks-open"
+            :aria-label="$t('headers.pendingTasks') + ': ' + $t('navigation.showMore')"
             @click="openDetails"
             color="secondary"
             dense

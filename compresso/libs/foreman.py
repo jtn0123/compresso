@@ -43,11 +43,12 @@ from typing import TYPE_CHECKING, TypedDict, cast
 import peewee
 
 from compresso import config
-from compresso.libs import installation_link, narrowing
+from compresso.libs import narrowing
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
+from compresso.libs.remote import installation_link
 from compresso.libs.safety_state import SafetyForeman, SafetyState, record_safety_event
 from compresso.libs.task import Task
 from compresso.libs.taskqueue import TaskQueue
@@ -56,7 +57,7 @@ from compresso.libs.worker_group import WorkerGroup
 from compresso.libs.workers import Worker
 
 if TYPE_CHECKING:
-    from compresso.libs.remote_task_manager import RemoteTaskManager
+    from compresso.libs.remote.remote_task_manager import RemoteTaskManager
 
 
 type LibrarySettings = dict[str, object]

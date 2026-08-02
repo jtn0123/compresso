@@ -19,7 +19,7 @@ import psutil
 from compresso import config
 from compresso.libs import session
 from compresso.libs.foreman import Foreman
-from compresso.libs.gpu_monitor import GpuMonitor
+from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 from compresso.libs.operations_status import OperationsStatus
 from compresso.libs.safety_state import SafetyState
 from compresso.libs.system import System

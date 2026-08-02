@@ -47,7 +47,7 @@ from compresso import config
 from compresso.libs import common, narrowing, session, task
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.resumable_transfer import file_sha256
+from compresso.libs.remote.resumable_transfer import file_sha256
 from compresso.libs.singleton import SingletonType
 from compresso.libs.worker_capabilities import WorkerCapabilities
 
@@ -1533,7 +1533,7 @@ from compresso.libs.request_handler import RequestHandler  # noqa: E402, F401
 
 def __getattr__(name: str) -> object:
     if name == "RemoteTaskManager":
-        from compresso.libs.remote_task_manager import RemoteTaskManager
+        from compresso.libs.remote.remote_task_manager import RemoteTaskManager
 
         return RemoteTaskManager
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

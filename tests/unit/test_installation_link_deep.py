@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, mock_open, patch
 import pytest
 import requests
 
-from compresso.libs.installation_link import Links, RemoteTaskManager
+from compresso.libs.remote.installation_link import Links, RemoteTaskManager
 from compresso.libs.singleton import SingletonType
 
 
@@ -29,9 +29,9 @@ def reset_singletons():
 
 def _create_links():
     with (
-        patch("compresso.libs.installation_link.config.Config"),
-        patch("compresso.libs.installation_link.session.Session"),
-        patch("compresso.libs.installation_link.CompressoLogging.get_logger"),
+        patch("compresso.libs.remote.installation_link.config.Config"),
+        patch("compresso.libs.remote.installation_link.session.Session"),
+        patch("compresso.libs.remote.installation_link.CompressoLogging.get_logger"),
     ):
         return Links()
 
@@ -91,14 +91,14 @@ class TestLinksLog:
     def test_log_calls_logger(self):
         links = _create_links()
         links.logger = MagicMock()
-        with patch("compresso.libs.installation_link.common.format_message", return_value="formatted"):
+        with patch("compresso.libs.remote.installation_link.common.format_message", return_value="formatted"):
             links._log("test message", level="warning")
         links.logger.warning.assert_called_once_with("formatted")
 
     def test_log_defaults_to_info(self):
         links = _create_links()
         links.logger = MagicMock()
-        with patch("compresso.libs.installation_link.common.format_message", return_value="msg"):
+        with patch("compresso.libs.remote.installation_link.common.format_message", return_value="msg"):
             links._log("test")
         links.logger.info.assert_called_once()
 
@@ -215,7 +215,7 @@ class TestFetchRemoteInstallationLinkConfigForThis:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"link_config": {"uuid": "local-uuid"}}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.fetch_remote_installation_link_config_for_this(config)
             assert result == {"link_config": {"uuid": "local-uuid"}}
@@ -227,7 +227,7 @@ class TestFetchRemoteInstallationLinkConfigForThis:
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         mock_resp.json.return_value = {"error": "fail", "traceback": []}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.fetch_remote_installation_link_config_for_this(config)
             assert result == {}
@@ -251,8 +251,8 @@ class TestPushRemoteInstallationLinkConfig:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         with (
-            patch("compresso.libs.installation_link.requests.post", return_value=mock_resp),
-            patch("compresso.libs.installation_link.task.Task") as mock_task_cls,
+            patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp),
+            patch("compresso.libs.remote.installation_link.task.Task") as mock_task_cls,
         ):
             mock_task_cls.return_value.get_total_task_list_count.return_value = 5
             config = {
@@ -278,8 +278,8 @@ class TestPushRemoteInstallationLinkConfig:
         mock_resp.status_code = 500
         mock_resp.json.return_value = {"error": "fail", "traceback": []}
         with (
-            patch("compresso.libs.installation_link.requests.post", return_value=mock_resp),
-            patch("compresso.libs.installation_link.task.Task") as mock_task_cls,
+            patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp),
+            patch("compresso.libs.remote.installation_link.task.Task") as mock_task_cls,
         ):
             mock_task_cls.return_value.get_total_task_list_count.return_value = 0
             config = {
@@ -305,7 +305,7 @@ class TestNewPendingTaskCreate:
         links = _create_links()
         mock_resp = MagicMock(status_code=200)
         mock_resp.json.return_value = {"id": 42}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp) as post:
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp) as post:
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             links.new_pending_task_create_on_remote_installation(
                 config,
@@ -325,7 +325,7 @@ class TestNewPendingTaskCreate:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"id": 42}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.new_pending_task_create_on_remote_installation(config, "/path/to/file", 1)
             assert result == {"id": 42}
@@ -335,21 +335,21 @@ class TestNewPendingTaskCreate:
         mock_resp = MagicMock()
         mock_resp.status_code = 404
         mock_resp.json.return_value = {"error": "not found", "traceback": []}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.new_pending_task_create_on_remote_installation(config, "/path", 1)
             assert result == {}
 
     def test_returns_none_on_timeout(self):
         links = _create_links()
-        with patch("compresso.libs.installation_link.requests.post", side_effect=requests.exceptions.Timeout):
+        with patch("compresso.libs.remote.installation_link.requests.post", side_effect=requests.exceptions.Timeout):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.new_pending_task_create_on_remote_installation(config, "/path", 1)
             assert result is None
 
     def test_returns_none_on_request_exception(self):
         links = _create_links()
-        with patch("compresso.libs.installation_link.requests.post", side_effect=requests.exceptions.ConnectionError):
+        with patch("compresso.libs.remote.installation_link.requests.post", side_effect=requests.exceptions.ConnectionError):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.new_pending_task_create_on_remote_installation(config, "/path", 1)
             assert result is None
@@ -359,7 +359,7 @@ class TestNewPendingTaskCreate:
         mock_resp = MagicMock()
         mock_resp.status_code = 400
         mock_resp.json.return_value = {"error": "task already exists"}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.new_pending_task_create_on_remote_installation(config, "/path", 1)
             assert result == {"error": "task already exists"}
@@ -429,7 +429,7 @@ class TestSendFileToRemoteInstallation:
         request_handler = MagicMock()
         request_handler.get.side_effect = responses
 
-        with patch("compresso.libs.installation_link.RequestHandler", return_value=request_handler):
+        with patch("compresso.libs.remote.installation_link.RequestHandler", return_value=request_handler):
             success = links.fetch_remote_task_completed_file_resumable({}, 7, str(destination), chunk_size=3)
 
         assert success is True
@@ -452,7 +452,7 @@ class TestSendFileToRemoteInstallation:
         request_handler = MagicMock()
         request_handler.get.return_value = response
 
-        with patch("compresso.libs.installation_link.RequestHandler", return_value=request_handler):
+        with patch("compresso.libs.remote.installation_link.RequestHandler", return_value=request_handler):
             success = links.fetch_remote_task_completed_file_resumable(
                 {}, 7, str(destination), chunk_size=3, progress_callback=lambda: False
             )
@@ -516,7 +516,7 @@ class TestSendFileToRemoteInstallation:
         request_handler = MagicMock()
         request_handler.get.return_value = response
 
-        with patch("compresso.libs.installation_link.RequestHandler", return_value=request_handler):
+        with patch("compresso.libs.remote.installation_link.RequestHandler", return_value=request_handler):
             assert links.fetch_remote_task_completed_file_resumable({}, 7, str(destination)) is False
 
         assert not destination.exists()
@@ -975,8 +975,8 @@ class TestRemoteTaskManagerInit:
         event = MagicMock()
         info = {"address": "10.0.0.1", "uuid": "uuid-1"}
         with (
-            patch("compresso.libs.remote_task_manager.Links"),
-            patch("compresso.libs.remote_task_manager.CompressoLogging.get_logger"),
+            patch("compresso.libs.remote.remote_task_manager.Links"),
+            patch("compresso.libs.remote.remote_task_manager.CompressoLogging.get_logger"),
         ):
             mgr = RemoteTaskManager("thread-1", "RTM-1", info, pending_q, complete_q, event)
         assert mgr.thread_id == "thread-1"
@@ -991,8 +991,8 @@ class TestRemoteTaskManagerInit:
         event = MagicMock()
         info = {"address": "10.0.0.1", "uuid": "uuid-1"}
         with (
-            patch("compresso.libs.remote_task_manager.Links"),
-            patch("compresso.libs.remote_task_manager.CompressoLogging.get_logger"),
+            patch("compresso.libs.remote.remote_task_manager.Links"),
+            patch("compresso.libs.remote.remote_task_manager.CompressoLogging.get_logger"),
         ):
             mgr = RemoteTaskManager("thread-1", "RTM-1", info, pending_q, complete_q, event)
         result = mgr.get_info()
@@ -1013,8 +1013,8 @@ class TestRemoteTaskManagerRun:
         event = MagicMock()
         info = {"address": "10.0.0.1", "uuid": "uuid-1"}
         with (
-            patch("compresso.libs.remote_task_manager.Links"),
-            patch("compresso.libs.remote_task_manager.CompressoLogging.get_logger"),
+            patch("compresso.libs.remote.remote_task_manager.Links"),
+            patch("compresso.libs.remote.remote_task_manager.CompressoLogging.get_logger"),
         ):
             mgr = RemoteTaskManager("t-1", "RTM-1", info, pending_q, complete_q, event)
             mgr._log = MagicMock()
@@ -1037,9 +1037,9 @@ class TestRemoteTaskManagerTaskManagement:
         event = MagicMock()
         info = {"address": "10.0.0.1", "uuid": "uuid-1"}
         with (
-            patch("compresso.libs.remote_task_manager.Links"),
-            patch("compresso.libs.remote_task_manager.CompressoLogging.get_logger"),
-            patch("compresso.libs.remote_task_manager.PluginsHandler"),
+            patch("compresso.libs.remote.remote_task_manager.Links"),
+            patch("compresso.libs.remote.remote_task_manager.CompressoLogging.get_logger"),
+            patch("compresso.libs.remote.remote_task_manager.PluginsHandler"),
         ):
             mgr = RemoteTaskManager("t-1", "RTM-1", info, pending_q, complete_q, event)
         return mgr
@@ -1051,7 +1051,7 @@ class TestRemoteTaskManagerTaskManagement:
         mock_task.get_task_id.return_value = 42
         mock_task.get_task_type.return_value = "local"
         mock_task.get_source_data.return_value = {}
-        with patch("compresso.libs.remote_task_manager.PluginsHandler"):
+        with patch("compresso.libs.remote.remote_task_manager.PluginsHandler"):
             mgr._RemoteTaskManager__set_current_task(mock_task)
         assert mgr.current_task is mock_task
         assert len(mgr.worker_log) == 0
@@ -1080,8 +1080,8 @@ class TestRemoteTaskManagerStats:
         event = MagicMock()
         info = {"address": "10.0.0.1"}
         with (
-            patch("compresso.libs.remote_task_manager.Links"),
-            patch("compresso.libs.remote_task_manager.CompressoLogging.get_logger"),
+            patch("compresso.libs.remote.remote_task_manager.Links"),
+            patch("compresso.libs.remote.remote_task_manager.CompressoLogging.get_logger"),
         ):
             mgr = RemoteTaskManager("t-1", "RTM-1", info, pending_q, complete_q, event)
         return mgr
@@ -1114,8 +1114,8 @@ class TestRemoteTaskManagerWriteFailure:
         event = MagicMock()
         info = {"address": "10.0.0.1"}
         with (
-            patch("compresso.libs.remote_task_manager.Links"),
-            patch("compresso.libs.remote_task_manager.CompressoLogging.get_logger"),
+            patch("compresso.libs.remote.remote_task_manager.Links"),
+            patch("compresso.libs.remote.remote_task_manager.CompressoLogging.get_logger"),
         ):
             mgr = RemoteTaskManager("t-1", "RTM-1", info, pending_q, complete_q, event)
         mgr.worker_log = []
@@ -1196,8 +1196,8 @@ class TestRemoteApiPostFileHandleLeak:
         mock_fh = MagicMock()
 
         with (
-            patch("compresso.libs.installation_link.RequestHandler") as MockRH,
-            patch("compresso.libs.installation_link.MultipartEncoder"),
+            patch("compresso.libs.remote.installation_link.RequestHandler") as MockRH,
+            patch("compresso.libs.remote.installation_link.MultipartEncoder"),
             patch("builtins.open", return_value=mock_fh),
         ):
             MockRH.return_value.post.return_value = mock_response
@@ -1213,8 +1213,8 @@ class TestRemoteApiPostFileHandleLeak:
         mock_fh = MagicMock()
 
         with (
-            patch("compresso.libs.installation_link.RequestHandler") as MockRH,
-            patch("compresso.libs.installation_link.MultipartEncoder"),
+            patch("compresso.libs.remote.installation_link.RequestHandler") as MockRH,
+            patch("compresso.libs.remote.installation_link.MultipartEncoder"),
             patch("builtins.open", return_value=mock_fh),
         ):
             MockRH.return_value.post.side_effect = Exception("connection error")

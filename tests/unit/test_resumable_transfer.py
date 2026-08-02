@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from compresso.libs.resumable_transfer import ResumableTransferStore, TransferStorageError
+from compresso.libs.remote.resumable_transfer import ResumableTransferStore, TransferStorageError
 
 
 def _sha256(data):

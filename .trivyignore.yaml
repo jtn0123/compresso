@@ -1,0 +1,573 @@
+# Trivy vulnerability suppressions.
+#
+# Every entry MUST carry a `statement` explaining why the finding is not
+# reachable and an `expired_at` date by which it should have been resolved.
+# Trivy stops applying a suppression once `expired_at` passes, so a stale
+# entry turns the image scan red instead of hiding a real finding forever.
+# `scripts/check-trivyignore.py` enforces both fields in CI.
+
+vulnerabilities:
+  - id: CVE-2026-26996
+    statement: >-
+      npm-internal minimatch: DoS via crafted glob patterns. Reachable only inside npm's own
+      node_modules during package installation, never at application runtime. Clears when
+      Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-27903
+    statement: >-
+      npm-internal minimatch: DoS via crafted glob patterns. Reachable only inside npm's own
+      node_modules during package installation, never at application runtime. Clears when
+      Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-27904
+    statement: >-
+      npm-internal minimatch: DoS via crafted glob patterns. Reachable only inside npm's own
+      node_modules during package installation, never at application runtime. Clears when
+      Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-26960
+    statement: >-
+      npm-internal tar: file overwrite via malicious archive. Reachable only inside npm's own
+      node_modules during package installation, never at application runtime. Clears when
+      Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-29786
+    statement: >-
+      npm-internal tar: file overwrite via malicious archive. Reachable only inside npm's own
+      node_modules during package installation, never at application runtime. Clears when
+      Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-31802
+    statement: >-
+      npm-internal tar: file overwrite via malicious archive. Reachable only inside npm's own
+      node_modules during package installation, never at application runtime. Clears when
+      Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-59873
+    statement: >-
+      npm-internal tar: DoS via crafted gzip bomb or malformed archive header. Reachable only
+      inside npm's own node_modules during package installation, never at application runtime.
+      Clears when Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-59874
+    statement: >-
+      npm-internal tar: DoS via crafted gzip bomb or malformed archive header. Reachable only
+      inside npm's own node_modules during package installation, never at application runtime.
+      Clears when Node.js ships a release with an updated npm.
+    expired_at: 2026-10-30
+  - id: CVE-2026-23111
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23112
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23231
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-68263
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-22984
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23172
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31431
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43284
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43500
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46300
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46323
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46333
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-47331
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-47333
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-71068
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23216
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31402
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31637
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43011
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43037
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43038
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43304
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43501
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-45988
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46043
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46135
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-37926
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-40149
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-68817
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-71082
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-71089
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-71123
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2025-71162
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23001
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23025
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23074
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23105
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23169
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23191
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23209
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23222
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23273
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23351
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23392
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23428
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23450
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-23455
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31419
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31436
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31478
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31504
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31607
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31657
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31659
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31669
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-31693
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43033
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43078
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43128
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43153
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43185
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43186
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43206
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43214
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43215
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43222
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43236
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43278
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43341
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43378
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43406
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43407
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43493
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43494
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-43503
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-45852
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-45864
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-45878
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-45891
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-45972
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46119
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46185
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46195
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-46259
+    statement: >-
+      linux-libc-dev: Linux kernel HEADER files shipped by the pinned ubuntu:24.04 base image.
+      The container shares the host kernel, so these are not reachable from inside the image.
+      Clears on the next `Docker Base Image` workflow rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-45447
+    statement: >-
+      openssl / libssl3t64: heap use-after-free in PKCS7_verify(). Compresso never invokes PKCS7
+      verification at runtime. Fixed in 3.0.13-0ubuntu3.11, which lands via a base-image
+      rebuild.
+    expired_at: 2026-09-30
+  - id: CVE-2026-41651
+    statement: >-
+      packagekit / gir1.2-packagekitglib-1.0: system package-management daemon pulled in
+      transitively by base image packages and never invoked by the Compresso server. Fixed in
+      1.2.8-2ubuntu1.5, which lands via a base-image rebuild.
+    expired_at: 2026-09-30

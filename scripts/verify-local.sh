@@ -40,6 +40,9 @@ bash scripts/check-action-pins.sh
 echo "==> Checking license metadata and retained notices"
 bash scripts/check-license-consistency.sh
 
+echo "==> Checking Trivy suppressions are justified and unexpired"
+"${PYTHON_BIN}" scripts/check-trivyignore.py
+
 echo "==> Checking Python environment and lock drift"
 "${PYTHON_BIN}" -m pip check
 PYTHON_BIN="${PYTHON_BIN}" bash scripts/check-requirements-locks.sh
@@ -49,8 +52,8 @@ echo "==> Auditing locked runtime and development graphs"
 "${PYTHON_BIN}" -m pip_audit -r requirements-dev.lock
 
 echo "==> Running Python lint, format, and type gates"
-"${PYTHON_BIN}" -m ruff check compresso/ tests/
-"${PYTHON_BIN}" -m ruff format --check compresso/ tests/
+"${PYTHON_BIN}" -m ruff check .
+"${PYTHON_BIN}" -m ruff format --check .
 "${PYTHON_BIN}" -m mypy --strict compresso/ --no-error-summary
 "${PYTHON_BIN}" -m mypy --strict scripts/type_safety_metrics.py scripts/openapi_contract.py --no-error-summary
 "${PYTHON_BIN}" scripts/type_safety_metrics.py --check-document docs/TYPE_SAFETY.md

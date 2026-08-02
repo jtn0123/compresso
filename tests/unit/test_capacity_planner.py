@@ -14,6 +14,7 @@ import pytest
 
 from compresso.libs import library_analysis
 from compresso.ops import planner
+from tests.support_.symlinks import requires_symlinks
 
 
 class FakeSettings:
@@ -70,6 +71,7 @@ def test_library_analysis_iterator_is_bounded_sorted_and_media_only(tmp_path):
     assert relative == ["a/clip.mp4", "b/movie.mkv"]
 
 
+@requires_symlinks
 def test_library_analysis_iterator_rejects_symlinked_media(tmp_path):
     outside = _write_media(tmp_path.parent, "outside.mkv", 5)
     (tmp_path / "linked.mkv").symlink_to(outside)

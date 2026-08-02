@@ -17,7 +17,7 @@ import pytest
 import requests
 from requests.auth import HTTPBasicAuth
 
-from compresso.libs.installation_link import Links, RequestHandler
+from compresso.libs.remote.installation_link import Links, RequestHandler
 from compresso.libs.singleton import SingletonType
 
 
@@ -44,9 +44,9 @@ class TestLinks:
 
     def _create_links(self):
         with (
-            patch("compresso.libs.installation_link.config.Config"),
-            patch("compresso.libs.installation_link.session.Session"),
-            patch("compresso.libs.installation_link.CompressoLogging.get_logger"),
+            patch("compresso.libs.remote.installation_link.config.Config"),
+            patch("compresso.libs.remote.installation_link.session.Session"),
+            patch("compresso.libs.remote.installation_link.CompressoLogging.get_logger"),
         ):
             return Links()
 
@@ -125,9 +125,9 @@ class TestLinks:
     def test_network_transfer_lock_refresh_extends_slow_transfer_lease(self):
         links = self._create_links()
         links._network_transfer_lock = {}
-        with patch("compresso.libs.installation_link.time.time", return_value=100.0):
+        with patch("compresso.libs.remote.installation_link.time.time", return_value=100.0):
             lock_key = links.acquire_network_transfer_lock("http://slow-nas", transfer_limit=1)
-        with patch("compresso.libs.installation_link.time.time", return_value=200.0):
+        with patch("compresso.libs.remote.installation_link.time.time", return_value=200.0):
             assert links.refresh_network_transfer_lock(lock_key) is True
 
         assert links._network_transfer_lock[lock_key]["expires"] == 200.0 + links.NETWORK_TRANSFER_LOCK_TTL_SECONDS
@@ -139,7 +139,7 @@ class TestLinks:
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": "test"}
 
-        with patch("compresso.libs.installation_link.requests.get", return_value=mock_response) as mock_get:
+        with patch("compresso.libs.remote.installation_link.requests.get", return_value=mock_response) as mock_get:
             config = {"address": "192.168.1.5:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_get(config, "/api/v2/test")
             called_url = mock_get.call_args[0][0]
@@ -153,7 +153,7 @@ class TestLinks:
         mock_response.status_code = 200
         mock_response.json.return_value = {}
 
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_response) as mock_post:
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_response) as mock_post:
             config = {"address": "192.168.1.5:8888", "auth": "", "username": "", "password": ""}
             data = {"key": "value"}
             links.remote_api_post(config, "/api/v2/test", data)

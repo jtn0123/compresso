@@ -2,6 +2,15 @@
 
 Compresso is a Python/Tornado service with a Vue/Quasar frontend served from the same process. SQLite stores configuration, queue state, task history, compression stats, health data, and file-scoped metadata.
 
+## Code Layout
+
+`compresso/libs/` holds the task pipeline (scanners, queues, workers, foreman, postprocessor) as flat modules. Two cohesive concerns are grouped into subpackages:
+
+- `compresso/libs/remote/` — multi-machine links: the link registry and credentials, remote task leases, remote task execution, and resumable chunked transfers.
+- `compresso/libs/monitoring/` — runtime health of the process and machine: worker thread liveness, encoder subprocess supervision, and GPU polling. Media-file integrity checking is a separate concern and stays in `compresso/libs/healthcheck.py`.
+
+Neither package re-exports its modules, so each caller's dependency stays visible at the import site. The plugin-facing surface (`compresso.libs.unplugins.*`, `task`, `metadata`, `narrowing`, `logs`, `peewee_types`) is unaffected.
+
 ## Runtime Flow
 
 1. Libraries produce pending tasks through scanners, manual actions, uploads, or linked installations.
@@ -44,7 +53,9 @@ Optional API protection can be enabled with:
 - `api_auth_token=<token>` (generated into owner-only `settings.json` when omitted)
 - `csrf_protection_enabled=true`
 
-When token auth is enabled, every dynamic API, proxy, plugin API, and WebSocket request requires the token. This includes deprecated API v1 routes; v1 responses carry deprecation headers and v1 will be removed in the next major release. The readiness endpoint remains public for container health checks. The browser asks for the token once per tab and keeps it in session storage.
+When token auth is enabled, every dynamic API, proxy, plugin API, and WebSocket request requires the token. The readiness endpoint remains public for container health checks. The browser asks for the token once per tab and keeps it in session storage.
+
+API v1 has been removed. `/compresso/api/v1/*` answers `410 Gone` with a pointer to v2 so an un-migrated client can distinguish a removed version from a mistyped URL. The router serves only the versions in `SUPPORTED_API_VERSIONS` (`api_request_router.py`); the version segment is matched against that allowlist instead of being interpolated into a module import.
 
 When CSRF protection is enabled, mutating browser-originating requests must echo the `compresso_csrf_token` cookie in `X-Compresso-CSRF-Token`. A request carrying the installation's valid API token is treated as non-cookie service authentication and does not also need a browser CSRF cookie.
 

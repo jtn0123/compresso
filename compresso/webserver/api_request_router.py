@@ -39,6 +39,16 @@ from tornado.web import Application, RequestHandler
 
 from compresso import config
 
+# API versions this build serves. The version segment comes straight off the
+# request path, so it is matched against this set rather than being interpolated
+# into an import: without the allowlist, a crafted version segment selects any
+# importable `compresso.webserver.api_*` module.
+SUPPORTED_API_VERSIONS = frozenset({"v2"})
+
+# Versions that this build deliberately no longer serves. They answer 410 rather
+# than 404 so an un-migrated client can tell "removed" from "wrong URL".
+REMOVED_API_VERSIONS = frozenset({"v1"})
+
 
 def endpoint_handler_name(api_version: str, endpoint: str, path: str) -> str:
     """Select the one split upload handler while preserving legacy routing."""
@@ -54,6 +64,23 @@ class Handle404(tornado.web.RequestHandler):
     def get(self, *args: str, **kwargs: str) -> None:
         self.set_status(404)
         self.write("404 Not Found")
+
+
+class HandleRemovedApiVersion(tornado.web.RequestHandler):
+    """Answer any request for an API version this build has removed."""
+
+    def initialize(self, **kwargs: object) -> None:
+        """No-op — the response does not depend on route parameters."""
+
+    def prepare(self) -> None:
+        self.set_status(410, reason="Gone")
+        self.set_header("Content-Type", "application/json")
+        self.finish(
+            {
+                "error": "410: API v1 has been removed",
+                "messages": {"api": "Use the v2 API at /compresso/api/v2/. See docs/ARCHITECTURE.md."},
+            }
+        )
 
 
 class APIRequestRouter(tornado.routing.Router):
@@ -79,6 +106,11 @@ class APIRequestRouter(tornado.routing.Router):
         api_version = path_parts[3]  # Set API version
         endpoint = path_parts[4]  # Set the endpoint
         params = list(filter(None, path_parts[4:]))  # Set the request params
+
+        if api_version in REMOVED_API_VERSIONS:
+            return self.app.get_handler_delegate(request, HandleRemovedApiVersion)
+        if api_version not in SUPPORTED_API_VERSIONS:
+            return self.app.get_handler_delegate(request, Handle404)
 
         endpoint_handler = endpoint_handler_name(api_version, endpoint, request.path)
 

@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, mock_open, patch
 import pytest
 from requests.auth import HTTPBasicAuth
 
-from compresso.libs.installation_link import Links, RequestHandler
+from compresso.libs.remote.installation_link import Links, RequestHandler
 from compresso.libs.singleton import SingletonType
 
 
@@ -42,9 +42,9 @@ def reset_singletons():
 
 def _create_links():
     with (
-        patch("compresso.libs.installation_link.config.Config"),
-        patch("compresso.libs.installation_link.session.Session"),
-        patch("compresso.libs.installation_link.CompressoLogging.get_logger"),
+        patch("compresso.libs.remote.installation_link.config.Config"),
+        patch("compresso.libs.remote.installation_link.session.Session"),
+        patch("compresso.libs.remote.installation_link.CompressoLogging.get_logger"),
     ):
         return Links()
 
@@ -105,7 +105,7 @@ class TestRequestHandlerAuth:
 
 @pytest.mark.unittest
 class TestRequestHandlerMethods:
-    @patch("compresso.libs.installation_link.requests.get")
+    @patch("compresso.libs.remote.installation_link.requests.get")
     def test_get_passes_auth_and_kwargs(self, mock_get):
         handler = RequestHandler(auth="basic", username="u", password="p")  # noqa: S106 — test fixture
         handler.get("http://example.com", timeout=5)
@@ -115,7 +115,7 @@ class TestRequestHandlerMethods:
         assert isinstance(kwargs["auth"], HTTPBasicAuth)
         assert kwargs["timeout"] == 5
 
-    @patch("compresso.libs.installation_link.requests.post")
+    @patch("compresso.libs.remote.installation_link.requests.post")
     def test_post_passes_auth(self, mock_post):
         handler = RequestHandler(auth="")
         handler.post("http://example.com", json={"key": "val"})
@@ -124,7 +124,7 @@ class TestRequestHandlerMethods:
         assert kwargs["auth"] is None
         assert kwargs["json"] == {"key": "val"}
 
-    @patch("compresso.libs.installation_link.requests.delete")
+    @patch("compresso.libs.remote.installation_link.requests.delete")
     def test_delete_passes_auth(self, mock_delete):
         handler = RequestHandler(auth="basic", username="a", password="b")  # noqa: S106 — test fixture
         handler.delete("http://example.com/item")
@@ -132,7 +132,7 @@ class TestRequestHandlerMethods:
         args, kwargs = mock_delete.call_args
         assert isinstance(kwargs["auth"], HTTPBasicAuth)
 
-    @patch("compresso.libs.installation_link.requests.get")
+    @patch("compresso.libs.remote.installation_link.requests.get")
     def test_worker_api_token_is_added_without_overwriting_other_headers(self, mock_get):
         handler = RequestHandler(
             auth="basic",
@@ -286,7 +286,7 @@ class TestRemoteApiGetExtended:
         links = _create_links()
         mock_resp = MagicMock()
         mock_resp.status_code = 302
-        with patch("compresso.libs.installation_link.requests.get", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.get", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_get(config, "/api/test")
             assert result == {}
@@ -296,7 +296,7 @@ class TestRemoteApiGetExtended:
         mock_resp = MagicMock()
         mock_resp.status_code = 400
         mock_resp.json.return_value = {"error": "bad request", "traceback": []}
-        with patch("compresso.libs.installation_link.requests.get", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.get", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_get(config, "/api/test")
             assert result == {}
@@ -306,7 +306,7 @@ class TestRemoteApiGetExtended:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"result": "ok"}
-        with patch("compresso.libs.installation_link.requests.get", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.get", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_get(config, "/api/test")
             assert result == {"result": "ok"}
@@ -319,7 +319,7 @@ class TestRemoteApiPostExtended:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"created": True}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_post(config, "/api/create", {"name": "test"})
             assert result == {"created": True}
@@ -329,7 +329,7 @@ class TestRemoteApiPostExtended:
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         mock_resp.json.return_value = {"error": "internal", "traceback": []}
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_post(config, "/api/create", {})
             assert result == {"error": "internal", "traceback": []}
@@ -338,7 +338,7 @@ class TestRemoteApiPostExtended:
         links = _create_links()
         mock_resp = MagicMock()
         mock_resp.status_code = 301
-        with patch("compresso.libs.installation_link.requests.post", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.post", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_post(config, "/api/test", {})
             assert result == {}
@@ -351,7 +351,7 @@ class TestRemoteApiDeleteExtended:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"deleted": True}
-        with patch("compresso.libs.installation_link.requests.delete", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.delete", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_delete(config, "/api/item", {"id": 1})
             assert result == {"deleted": True}
@@ -361,7 +361,7 @@ class TestRemoteApiDeleteExtended:
         mock_resp = MagicMock()
         mock_resp.status_code = 404
         mock_resp.json.return_value = {"error": "not found", "traceback": []}
-        with patch("compresso.libs.installation_link.requests.delete", return_value=mock_resp):
+        with patch("compresso.libs.remote.installation_link.requests.delete", return_value=mock_resp):
             config = {"address": "host:8888", "auth": "", "username": "", "password": ""}
             result = links.remote_api_delete(config, "/api/item", {"id": 1})
             assert result == {}
@@ -374,8 +374,8 @@ class TestRemoteApiDeleteExtended:
 
 @pytest.mark.unittest
 class TestRemoteApiPostFile:
-    @patch("compresso.libs.installation_link.MultipartEncoder")
-    @patch("compresso.libs.installation_link.requests.post")
+    @patch("compresso.libs.remote.installation_link.MultipartEncoder")
+    @patch("compresso.libs.remote.installation_link.requests.post")
     @patch("builtins.open", mock_open(read_data=b"filedata"))
     def test_returns_json_on_success(self, mock_post, mock_encoder):
         links = _create_links()
@@ -390,8 +390,8 @@ class TestRemoteApiPostFile:
         result = links.remote_api_post_file(config, "/api/upload", "/tmp/file.dat")
         assert result == {"uploaded": True}
 
-    @patch("compresso.libs.installation_link.MultipartEncoder")
-    @patch("compresso.libs.installation_link.requests.post")
+    @patch("compresso.libs.remote.installation_link.MultipartEncoder")
+    @patch("compresso.libs.remote.installation_link.requests.post")
     @patch("builtins.open", mock_open(read_data=b"filedata"))
     def test_returns_empty_dict_on_failure(self, mock_post, mock_encoder):
         links = _create_links()
@@ -415,7 +415,7 @@ class TestRemoteApiPostFile:
 @pytest.mark.unittest
 class TestRemoteApiGetDownload:
     @patch("builtins.open", mock_open())
-    @patch("compresso.libs.installation_link.requests.get")
+    @patch("compresso.libs.remote.installation_link.requests.get")
     def test_downloads_file_to_path(self, mock_get):
         links = _create_links()
         mock_resp = MagicMock()

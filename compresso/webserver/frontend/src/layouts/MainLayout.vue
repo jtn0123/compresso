@@ -9,12 +9,22 @@
           flat
           round
           :icon="leftDrawerOpen ? 'menu_open' : 'menu'"
+          :aria-label="$t('a11y.toggleNavigation')"
           size="sm"
           @click="toggleDrawer"
         />
 
         <!-- Logo (mobile only — desktop shows it in the sidebar) -->
-        <q-btn v-if="$q.screen.lt.md" flat round dense size="sm" @click="$router.push('/ui/dashboard')" class="q-mr-xs">
+        <q-btn
+          v-if="$q.screen.lt.md"
+          flat
+          round
+          dense
+          size="sm"
+          :aria-label="$t('a11y.goToDashboard')"
+          class="q-mr-xs"
+          @click="$router.push('/ui/dashboard')"
+        >
           <q-avatar rounded size="22px">
             <img src="~assets/compresso-logo-white.png" :alt="$t('a11y.logoAlt')" />
           </q-avatar>

@@ -100,6 +100,10 @@ npm run test:e2e
 
 The built assets are output to `compresso/webserver/public/`.
 
+`npm run test:e2e` includes the axe accessibility sweep. It fails on any critical
+violation and on any serious violation whose rule is not already tracked; see
+[Accessibility](ACCESSIBILITY.md) for what is enforced and what is still open.
+
 ## Profiling and testing
 
 ### Profiling (Docker)

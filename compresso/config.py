@@ -77,6 +77,36 @@ def _as_bool(value: object) -> bool:
     return bool(value)
 
 
+def _clamped_int(value: object, *, minimum: int, default: int) -> int:
+    """Read a numeric setting as an int no smaller than ``minimum``.
+
+    Settings reach this class from ``settings.json`` and the settings API, so a
+    value can legitimately arrive as a numeric string. Anything that cannot be
+    converted falls back to the packaged default instead of raising during
+    startup. Booleans are rejected rather than counted as 0/1, matching the
+    boundary rules in :mod:`compresso.libs.narrowing`.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return default
+    try:
+        return max(minimum, int(value))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _clamped_float(value: object, *, minimum: float, default: float) -> float:
+    """Read a numeric setting as a float no smaller than ``minimum``.
+
+    Same boundary rules as :func:`_clamped_int`.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return default
+    try:
+        return max(minimum, float(value))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
 class Config(metaclass=SingletonType):
     app_version = ""
 
@@ -614,10 +644,7 @@ class Config(metaclass=SingletonType):
 
     def get_library_scan_queue_limit(self) -> int:
         """Maximum number of discovered files awaiting scan tests."""
-        try:
-            return max(1, int(self.library_scan_queue_limit))
-        except (TypeError, ValueError):
-            return DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT
+        return _clamped_int(self.library_scan_queue_limit, minimum=1, default=DEFAULT_LIBRARY_SCAN_QUEUE_LIMIT)
 
     def get_concurrent_file_testers(self) -> int:
         """
@@ -673,7 +700,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return max(1, int(self.startup_readiness_timeout_seconds))
+        return _clamped_int(self.startup_readiness_timeout_seconds, minimum=1, default=DEFAULT_READINESS_TIMEOUT_SECONDS)
 
     def get_default_worker_cap(self) -> int:
         """
@@ -681,46 +708,28 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        return max(1, int(self.default_worker_cap))
+        return _clamped_int(self.default_worker_cap, minimum=1, default=DEFAULT_WORKER_CAP)
 
     def get_disk_space_guard_enabled(self) -> bool:
         return _as_bool(self.disk_space_guard_enabled)
 
     def get_minimum_free_space_gb(self) -> float:
-        try:
-            return max(0.0, float(self.minimum_free_space_gb))
-        except (TypeError, ValueError):
-            return DEFAULT_MINIMUM_FREE_SPACE_GB
+        return _clamped_float(self.minimum_free_space_gb, minimum=0.0, default=DEFAULT_MINIMUM_FREE_SPACE_GB)
 
     def get_disk_space_output_multiplier(self) -> float:
-        try:
-            return max(1.0, float(self.disk_space_output_multiplier))
-        except (TypeError, ValueError):
-            return DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER
+        return _clamped_float(self.disk_space_output_multiplier, minimum=1.0, default=DEFAULT_DISK_SPACE_OUTPUT_MULTIPLIER)
 
     def get_disk_space_retry_seconds(self) -> int:
-        try:
-            return max(5, int(self.disk_space_retry_seconds))
-        except (TypeError, ValueError):
-            return DEFAULT_DISK_SPACE_RETRY_SECONDS
+        return _clamped_int(self.disk_space_retry_seconds, minimum=5, default=DEFAULT_DISK_SPACE_RETRY_SECONDS)
 
     def get_maximum_transfer_file_size_gb(self) -> float:
-        try:
-            return max(0.001, float(self.maximum_transfer_file_size_gb))
-        except (TypeError, ValueError):
-            return DEFAULT_MAXIMUM_TRANSFER_FILE_SIZE_GB
+        return _clamped_float(self.maximum_transfer_file_size_gb, minimum=0.001, default=DEFAULT_MAXIMUM_TRANSFER_FILE_SIZE_GB)
 
     def get_transfer_partial_retention_hours(self) -> int:
-        try:
-            return max(1, int(self.transfer_partial_retention_hours))
-        except (TypeError, ValueError):
-            return DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS
+        return _clamped_int(self.transfer_partial_retention_hours, minimum=1, default=DEFAULT_TRANSFER_PARTIAL_RETENTION_HOURS)
 
     def get_remote_artifact_retention_hours(self) -> int:
-        try:
-            return max(1, int(self.remote_artifact_retention_hours))
-        except (TypeError, ValueError):
-            return DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS
+        return _clamped_int(self.remote_artifact_retention_hours, minimum=1, default=DEFAULT_REMOTE_ARTIFACT_RETENTION_HOURS)
 
     def get_approval_required(self) -> bool:
         return _as_bool(self.approval_required)
@@ -839,10 +848,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        try:
-            return max(0, int(self.default_max_retries))
-        except (TypeError, ValueError):
-            return 3
+        return _clamped_int(self.default_max_retries, minimum=0, default=3)
 
     def get_staging_expiry_days(self) -> int:
         """
@@ -851,10 +857,7 @@ class Config(metaclass=SingletonType):
 
         :return:
         """
-        try:
-            return max(0, int(self.staging_expiry_days))
-        except (TypeError, ValueError):
-            return 7
+        return _clamped_int(self.staging_expiry_days, minimum=0, default=7)
 
     def get_onboarding_completed(self) -> bool:
         """

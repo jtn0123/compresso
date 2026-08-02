@@ -31,7 +31,7 @@ CI today runs **Ubuntu-only** for all unit tests, integration tests, and linting
 
 ### What Needs to Change
 
-#### GPU Monitoring (`compresso/libs/gpu_monitor.py`)
+#### GPU Monitoring (`compresso/libs/monitoring/gpu_monitor.py`)
 
 The biggest blocker. Intel and AMD GPU detection are hardcoded to Linux sysfs paths.
 

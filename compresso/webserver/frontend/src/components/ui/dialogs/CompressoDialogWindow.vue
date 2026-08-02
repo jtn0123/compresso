@@ -1,6 +1,7 @@
 <template>
   <q-dialog
     ref="dialogRef"
+    :aria-label="title"
     backdrop-filter="grayscale(80%) blur(1px)"
     :position="isMobile ? 'left' : 'right'"
     :maximized="isMobile"
@@ -9,6 +10,7 @@
     full-height
     :persistent="persistent"
     @shake="onShake"
+    @show="onDialogShow"
     @hide="onDialogHide"
   >
     <q-card
@@ -27,6 +29,7 @@
               dense
               round
               icon="arrow_back"
+              :aria-label="$t('a11y.back')"
               color="grey-7"
               :class="{ 'dialog-attention': attentionActive }"
               @click="hide"
@@ -147,6 +150,7 @@
               dense
               round
               icon="arrow_forward"
+              :aria-label="$t('a11y.forward')"
               color="grey-7"
               :class="{ 'dialog-attention': attentionActive }"
               @click="hide"
@@ -171,6 +175,7 @@
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useMobile } from 'src/composables/useMobile'
+import { useEscapeDismiss } from 'src/composables/useEscapeDismiss'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
 import type { DialogAction, DialogController } from 'src/types/ui'
 
@@ -210,7 +215,17 @@ const hide = () => {
   dialogRef.value?.hide()
 }
 
+// Quasar only wires Escape on desktop platforms, so supply it elsewhere.
+const { activate: activateEscapeDismiss, deactivate: deactivateEscapeDismiss } = useEscapeDismiss(() => {
+  if (!props.persistent) hide()
+})
+
+const onDialogShow = () => {
+  activateEscapeDismiss()
+}
+
 const onDialogHide = () => {
+  deactivateEscapeDismiss()
   emit('hide')
 }
 

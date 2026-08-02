@@ -3,7 +3,7 @@
 """
 tests.unit.test_gpu_monitor.py
 
-Unit tests for compresso.libs.gpu_monitor.GpuMonitor.
+Unit tests for compresso.libs.monitoring.gpu_monitor.GpuMonitor.
 """
 
 import logging
@@ -15,7 +15,7 @@ import pytest
 
 from compresso.libs.singleton import SingletonType
 
-GPU_MONITOR = "compresso.libs.gpu_monitor"
+GPU_MONITOR = "compresso.libs.monitoring.gpu_monitor"
 
 
 @pytest.fixture(autouse=True)
@@ -76,14 +76,14 @@ def _make_nvidia_csv(*rows):
 @pytest.mark.unittest
 class TestGpuMonitorSingleton:
     def test_returns_same_instance(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         m1 = GpuMonitor()
         m2 = GpuMonitor()
         assert m1 is m2
 
     def test_creates_instance(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         assert monitor is not None
@@ -95,7 +95,7 @@ class TestGpuMonitorSingleton:
 @pytest.mark.unittest
 class TestProbeCapabilities:
     def test_no_backends_detected(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         assert monitor._capabilities["nvidia"] is False
@@ -103,7 +103,7 @@ class TestProbeCapabilities:
         assert monitor._capabilities["amd"] is False
 
     def test_nvidia_detected_when_on_path(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         assert monitor._capabilities["nvidia"] is True
@@ -132,7 +132,7 @@ class TestProbeCapabilities:
             mock_drm.glob.side_effect = glob_side_effect
             mock_path_cls.return_value = mock_drm
 
-            from compresso.libs.gpu_monitor import GpuMonitor
+            from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
             monitor = GpuMonitor()
             assert monitor._capabilities["intel"] is True
@@ -157,7 +157,7 @@ class TestProbeCapabilities:
             mock_drm.glob.side_effect = glob_side_effect
             mock_path_cls.return_value = mock_drm
 
-            from compresso.libs.gpu_monitor import GpuMonitor
+            from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
             monitor = GpuMonitor()
             assert monitor._capabilities["amd"] is True
@@ -169,13 +169,13 @@ class TestProbeCapabilities:
 @pytest.mark.unittest
 class TestPollNvidia:
     def test_returns_empty_when_not_available(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         assert monitor._poll_nvidia() == []
 
     def test_parses_single_gpu(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -195,7 +195,7 @@ class TestPollNvidia:
         assert gpu["temperature_c"] == 72
 
     def test_parses_multiple_gpus(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -212,7 +212,7 @@ class TestPollNvidia:
         assert result[1]["index"] == 1
 
     def test_handles_nonzero_returncode(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -223,7 +223,7 @@ class TestPollNvidia:
         assert result == []
 
     def test_handles_timeout(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -234,7 +234,7 @@ class TestPollNvidia:
         assert result == []
 
     def test_handles_file_not_found(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -247,7 +247,7 @@ class TestPollNvidia:
         assert monitor._capabilities["nvidia"] is False
 
     def test_handles_empty_output(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -258,7 +258,7 @@ class TestPollNvidia:
         assert result == []
 
     def test_skips_malformed_lines(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -278,13 +278,13 @@ class TestPollNvidia:
 @pytest.mark.unittest
 class TestPollIntel:
     def test_returns_empty_when_not_available(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         assert monitor._poll_intel() == []
 
     def test_reads_sysfs_metrics(self):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         with patch(GPU_MONITOR + ".shutil.which", return_value=None), patch(GPU_MONITOR + ".Path") as mock_path_cls:
             # Build mock sysfs tree
@@ -364,13 +364,13 @@ class TestPollIntel:
 @pytest.mark.unittest
 class TestPollAmd:
     def test_returns_empty_when_not_available(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         assert monitor._poll_amd() == []
 
     def test_reads_sysfs_metrics(self):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         with patch(GPU_MONITOR + ".shutil.which", return_value=None), patch(GPU_MONITOR + ".Path") as mock_path_cls:
             mock_vendor_file = MagicMock()
@@ -457,7 +457,7 @@ class TestPollAmd:
 @pytest.mark.unittest
 class TestGetRealtimeMetrics:
     def test_aggregates_all_backends(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         monitor._capabilities = {"nvidia": True, "intel": False, "amd": False, "videotoolbox": False}
@@ -471,14 +471,14 @@ class TestGetRealtimeMetrics:
         assert result[0]["type"] == "nvidia"
 
     def test_returns_empty_when_no_gpus(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         result = monitor.get_realtime_metrics()
         assert result == []
 
     def test_records_history_after_poll(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         monitor._capabilities = {"nvidia": True, "intel": False, "amd": False, "videotoolbox": False}
@@ -500,7 +500,7 @@ class TestGetRealtimeMetrics:
 @pytest.mark.unittest
 class TestHistory:
     def test_record_and_retrieve(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -532,7 +532,7 @@ class TestHistory:
         assert all_history["nvidia:1"][0]["temperature_c"] == 45
 
     def test_get_history_single_gpu(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -552,14 +552,14 @@ class TestHistory:
         assert len(history) == 1
 
     def test_get_history_missing_gpu_returns_empty(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         history = monitor.get_history(gpu_index="nvidia:99")
         assert history == {"nvidia:99": []}
 
     def test_history_respects_max_samples(self, no_backends):
-        from compresso.libs.gpu_monitor import HISTORY_MAX_SAMPLES, GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import HISTORY_MAX_SAMPLES, GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -583,7 +583,7 @@ class TestHistory:
         assert history["nvidia:0"][-1]["utilization_percent"] == float(HISTORY_MAX_SAMPLES + 19)
 
     def test_history_includes_timestamps(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -613,7 +613,7 @@ class TestHistory:
 @pytest.mark.unittest
 class TestErrorResilience:
     def test_nvidia_unexpected_exception(self, nvidia_only):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
 
@@ -624,7 +624,7 @@ class TestErrorResilience:
         assert result == []
 
     def test_get_realtime_metrics_never_raises(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         # Force capability on, but make subprocess blow up
@@ -654,7 +654,7 @@ class TestMacOsGpuDetection:
             mock_drm.glob.return_value = []
             mock_path_cls.return_value = mock_drm
 
-            from compresso.libs.gpu_monitor import GpuMonitor
+            from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
             monitor = GpuMonitor()
             assert monitor._capabilities["videotoolbox"] is True
@@ -672,7 +672,7 @@ class TestMacOsGpuDetection:
             mock_drm.glob.return_value = []
             mock_path_cls.return_value = mock_drm
 
-            from compresso.libs.gpu_monitor import GpuMonitor
+            from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
             monitor = GpuMonitor()
             assert monitor._capabilities["videotoolbox"] is False
@@ -690,7 +690,7 @@ class TestMacOsGpuDetection:
                 ]
             }
         )
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         monitor._capabilities["videotoolbox"] = True
@@ -709,7 +709,7 @@ class TestMacOsGpuDetection:
         assert result[0]["utilization_percent"] is None
 
     def test_poll_macos_gpu_returns_empty_when_not_macos(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         # videotoolbox not set (default)
@@ -717,7 +717,7 @@ class TestMacOsGpuDetection:
         assert result == []
 
     def test_poll_macos_gpu_handles_failure(self, no_backends):
-        from compresso.libs.gpu_monitor import GpuMonitor
+        from compresso.libs.monitoring.gpu_monitor import GpuMonitor
 
         monitor = GpuMonitor()
         monitor._capabilities["videotoolbox"] = True

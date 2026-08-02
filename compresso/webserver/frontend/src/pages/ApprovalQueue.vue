@@ -340,7 +340,7 @@
               </q-btn>
             </template>
             <template v-else>
-              <q-btn flat dense icon="more_vert" size="sm">
+              <q-btn flat dense icon="more_vert" size="sm" :aria-label="$t('a11y.taskActions')">
                 <q-menu>
                   <q-list dense>
                     <q-item clickable v-close-popup @click="approveSingle(props.row.id)">

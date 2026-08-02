@@ -2,10 +2,10 @@
   <div class="column fit">
     <div :class="{ 'q-mt-xl': !$q.screen.gt.sm }"></div>
     <q-scroll-area class="col">
-      <q-list padding>
+      <q-list padding role="none">
         <q-item-label header>{{ $t('navigation.settings') }}:</q-item-label>
         <!--START LIBRARY SELECT-->
-        <q-item clickable to="/ui/settings-library" v-ripple>
+        <q-item role="link" clickable to="/ui/settings-library" v-ripple>
           <q-item-section avatar>
             <q-icon name="account_tree" />
           </q-item-section>
@@ -16,7 +16,7 @@
         <!--END LIBRARY SELECT-->
 
         <!--START WORKERS SELECT-->
-        <q-item clickable to="/ui/settings-workers" v-ripple>
+        <q-item role="link" clickable to="/ui/settings-workers" v-ripple>
           <q-item-section avatar>
             <q-icon name="engineering" />
           </q-item-section>
@@ -27,7 +27,7 @@
         <!--END WORKERS SELECT-->
 
         <!--START PLUGINS SELECT-->
-        <q-item clickable to="/ui/settings-plugins" v-ripple>
+        <q-item role="link" clickable to="/ui/settings-plugins" v-ripple>
           <q-item-section avatar>
             <q-icon name="extension" />
           </q-item-section>
@@ -38,7 +38,7 @@
         <!--END PLUGINS SELECT-->
 
         <!--START LINK SELECT-->
-        <q-item clickable to="/ui/settings-link" v-ripple>
+        <q-item role="link" clickable to="/ui/settings-link" v-ripple>
           <q-item-section avatar>
             <q-icon name="link" />
           </q-item-section>
@@ -49,7 +49,7 @@
         <!--END LINK SELECT-->
 
         <!--START NOTIFICATIONS SELECT-->
-        <q-item clickable to="/ui/settings-notifications" v-ripple>
+        <q-item role="link" clickable to="/ui/settings-notifications" v-ripple>
           <q-item-section avatar>
             <q-icon name="notifications_active" />
           </q-item-section>
@@ -63,7 +63,7 @@
 
         <q-item-label header>{{ $t('navigation.documentation') }}:</q-item-label>
         <!--START SUPPORT SELECT-->
-        <q-item clickable @click="showHelpSupportDialog" v-ripple>
+        <q-item role="link" clickable @click="showHelpSupportDialog" v-ripple>
           <q-item-section avatar>
             <q-icon name="fa-regular fa-life-ring" />
           </q-item-section>
@@ -74,7 +74,7 @@
         <!--END SUPPORT SELECT-->
 
         <!--START APPLICATION LOGS-->
-        <q-item clickable @click="showApplicationLogsDialog" v-ripple>
+        <q-item role="link" clickable @click="showApplicationLogsDialog" v-ripple>
           <q-item-section avatar>
             <q-icon name="article" />
           </q-item-section>
@@ -85,7 +85,7 @@
         <!--END APPLICATION LOGS-->
 
         <!--START PRIVACY POLICY-->
-        <q-item clickable @click="showPrivacyPolicyDialog" v-ripple>
+        <q-item role="link" clickable @click="showPrivacyPolicyDialog" v-ripple>
           <q-item-section avatar>
             <q-icon name="o_shield" />
           </q-item-section>

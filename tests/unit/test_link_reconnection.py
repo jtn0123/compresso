@@ -22,7 +22,7 @@ import pytest
 
 from compresso.libs.singleton import SingletonType
 
-LINK_MOD = "compresso.libs.installation_link"
+LINK_MOD = "compresso.libs.remote.installation_link"
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +42,7 @@ def _make_links():
         mock_logger = MagicMock()
         mock_logging.get_logger.return_value = mock_logger
 
-        from compresso.libs.installation_link import Links
+        from compresso.libs.remote.installation_link import Links
 
         links = Links()
         return links

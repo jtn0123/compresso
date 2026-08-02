@@ -46,6 +46,13 @@ ignore = [
 "tests/**" = ["S101", "S108", "S311"]
 "tests/unit/test_unffmpeg_types.py" = ["E402"]
 "compresso/libs/unplugins/pluginscli.py" = ["T201"]
+# Build and release tooling runs from a developer shell or CI runner, not from
+# the server process. Printing is the interface (`setup.py fullversion` is read
+# by the release workflow), and `git`/`npm` are deliberately resolved from PATH
+# because the build must use whichever toolchain the runner provides.
+"setup.py" = ["S603", "S607", "T201"]
+"versioninfo.py" = ["S603", "S607"]
+"scripts/**" = ["S603", "S607", "T201"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18

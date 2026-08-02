@@ -1,53 +1,61 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
-    compresso.setup.py
- 
-    Written by:               Josh.5 <jsunnex@gmail.com>
-    Date:                     04 May 2020, (10:47 AM)
- 
-    Copyright:
-           Copyright (C) Josh Sunnex - All Rights Reserved
- 
-           Permission is hereby granted, free of charge, to any person obtaining a copy
-           of this software and associated documentation files (the "Software"), to deal
-           in the Software without restriction, including without limitation the rights
-           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-           copies of the Software, and to permit persons to whom the Software is
-           furnished to do so, subject to the following conditions:
-  
-           The above copyright notice and this permission notice shall be included in all
-           copies or substantial portions of the Software.
-  
-           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-           EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-           MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-           IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-           DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-           OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
-           OR OTHER DEALINGS IN THE SOFTWARE.
+compresso.setup.py
+
+Written by:               Josh.5 <jsunnex@gmail.com>
+Date:                     04 May 2020, (10:47 AM)
+
+Copyright:
+       Copyright (C) Josh Sunnex - All Rights Reserved
+
+       Permission is hereby granted, free of charge, to any person obtaining a copy
+       of this software and associated documentation files (the "Software"), to deal
+       in the Software without restriction, including without limitation the rights
+       to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+       copies of the Software, and to permit persons to whom the Software is
+       furnished to do so, subject to the following conditions:
+
+       The above copyright notice and this permission notice shall be included in all
+       copies or substantial portions of the Software.
+
+       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+       IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+       DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+       OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+       OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
+
+import contextlib
+import glob
 import json
 import os
 import shutil
 import subprocess
 import sys
-import glob
 import tempfile
-from setuptools import setup, find_packages, Command, find_namespace_packages
-import setuptools.command.build_py
 
-if sys.version_info[0] < 3:
-    print("This module version requires Python 3.")
+import setuptools.command.build_py
+from setuptools import Command, find_packages, setup
+
+# setup.cfg already declares `python_requires = >=3.13`; this guard only exists
+# so an interpreter old enough to reject the rest of the file fails with a clear
+# message instead of a SyntaxError.
+# ruff assumes the configured target version is what runs, so it reads this as
+# dead code; it is not, because setup.py is the first thing an older interpreter
+# executes.
+if sys.version_info < (3, 13):  # noqa: UP036
+    sys.stderr.write("This module version requires Python 3.13 or newer.\n")
     sys.exit(1)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 import versioninfo
 
 project_root_dir = os.path.dirname(os.path.realpath(__file__))
-src_dir = 'compresso'
+src_dir = "compresso"
 
 module_name = versioninfo.name()
 module_version = versioninfo.version()
@@ -57,13 +65,13 @@ module_email = versioninfo.email()
 module_url = versioninfo.url()
 module_classifiers = [
     versioninfo.dev_status(),
-    'Intended Audience :: End Users/Desktop',
-    'Intended Audience :: Developers',
-    'Programming Language :: Python :: 3.13',
-    'Operating System :: POSIX :: Linux',
-    'Operating System :: Unix',
-    'Topic :: Multimedia :: Video :: Conversion',
-    'Topic :: Internet :: WWW/HTTP',
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Unix",
+    "Topic :: Multimedia :: Video :: Conversion",
+    "Topic :: Internet :: WWW/HTTP",
 ]
 
 
@@ -72,8 +80,8 @@ class BuildPyCommand(setuptools.command.build_py.build_py):
 
     def run(self):
         setuptools.command.build_py.build_py.run(self)
-        self.run_command('write-build-version')
-        self.run_command('build-frontend')
+        self.run_command("write-build-version")
+        self.run_command("build-frontend")
 
 
 class WriteVersionCommand(Command):
@@ -87,12 +95,12 @@ class WriteVersionCommand(Command):
 
     @staticmethod
     def run():
-        version_file = os.path.join('.', 'build', 'lib', src_dir, 'version')
+        version_file = os.path.join(".", "build", "lib", src_dir, "version")
         data = {
-            'short': versioninfo.version(),
-            'long':  versioninfo.full_version(),
+            "short": versioninfo.version(),
+            "long": versioninfo.full_version(),
         }
-        with open(version_file, 'w') as f:
+        with open(version_file, "w") as f:
             json.dump(data, f)
 
 
@@ -102,14 +110,14 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
     def run(self):
         setuptools.command.build_py.build_py.run(self)
 
-        public_asset_path = os.path.abspath(os.path.join('.', 'build', 'lib', src_dir, 'webserver', 'public'))
-        frontend_path = os.path.abspath(os.path.join('.', 'build', 'lib', src_dir, 'webserver', 'frontend'))
-        source_frontend_path = os.path.abspath(os.path.join(project_root_dir, src_dir, 'webserver', 'frontend'))
+        public_asset_path = os.path.abspath(os.path.join(".", "build", "lib", src_dir, "webserver", "public"))
+        frontend_path = os.path.abspath(os.path.join(".", "build", "lib", src_dir, "webserver", "frontend"))
+        source_frontend_path = os.path.abspath(os.path.join(project_root_dir, src_dir, "webserver", "frontend"))
 
         npm_bin = shutil.which("npm")
         if not npm_bin:
             raise RuntimeError("npm is required to build the vendored frontend. Install Node.js 24 and retry.")
-        if not os.path.exists(os.path.join(source_frontend_path, 'package-lock.json')):
+        if not os.path.exists(os.path.join(source_frontend_path, "package-lock.json")):
             raise RuntimeError("Frontend package-lock.json is missing. Restore the vendored frontend lockfile.")
 
         # Build the frontend from a clean staged copy so local source-tree artifacts
@@ -117,14 +125,19 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
         shutil.rmtree(public_asset_path, ignore_errors=True)
         shutil.rmtree(frontend_path, ignore_errors=True)
 
-        with tempfile.TemporaryDirectory(prefix='compresso-frontend-build-') as temp_dir:
-            staged_frontend_path = os.path.join(temp_dir, 'frontend')
+        with tempfile.TemporaryDirectory(prefix="compresso-frontend-build-") as temp_dir:
+            staged_frontend_path = os.path.join(temp_dir, "frontend")
             shutil.copytree(
                 source_frontend_path,
                 staged_frontend_path,
                 ignore=shutil.ignore_patterns(
-                    'node_modules', 'dist', '.quasar', '.idea',
-                    'src-cordova', 'src-capacitor', 'src-bex',
+                    "node_modules",
+                    "dist",
+                    ".quasar",
+                    ".idea",
+                    "src-cordova",
+                    "src-capacitor",
+                    "src-bex",
                 ),
             )
 
@@ -140,7 +153,7 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
             )
 
             os.makedirs(os.path.dirname(public_asset_path), exist_ok=True)
-            shutil.move(os.path.join(staged_frontend_path, 'dist', 'spa'), public_asset_path)
+            shutil.move(os.path.join(staged_frontend_path, "dist", "spa"), public_asset_path)
 
         # Remove the frontend source from the package (we will not distribute these)
         shutil.rmtree(frontend_path, ignore_errors=True)
@@ -148,6 +161,7 @@ class BuildFrontendCommand(setuptools.command.build_py.build_py):
 
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
+
     user_options = []
 
     def initialize_options(self):
@@ -158,19 +172,19 @@ class CleanCommand(Command):
 
     @staticmethod
     def run():
-        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'build')), ignore_errors=True)
-        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'dist')), ignore_errors=True)
-        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), 'compresso.egg-info')), ignore_errors=True)
-        for pyc_file in glob.glob(os.path.join(os.path.dirname(__file__), '*.pyc')):
-            try:
+        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), "build")), ignore_errors=True)
+        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), "dist")), ignore_errors=True)
+        shutil.rmtree(os.path.abspath(os.path.join(os.path.dirname(__file__), "compresso.egg-info")), ignore_errors=True)
+        for pyc_file in glob.glob(os.path.join(os.path.dirname(__file__), "*.pyc")):
+            with contextlib.suppress(FileNotFoundError):
                 os.remove(pyc_file)
-            except FileNotFoundError:
-                pass
-        [shutil.rmtree(f) for f in glob.glob(src_dir + "/**/__pycache__", recursive=True)]
+        for cache_dir in glob.glob(src_dir + "/**/__pycache__", recursive=True):
+            shutil.rmtree(cache_dir)
 
 
 class FullVersionCommand(Command):
     """Custom clean command to tidy up the project root."""
+
     user_options = []
 
     def initialize_options(self):
@@ -185,39 +199,38 @@ class FullVersionCommand(Command):
 
 
 cmd_class = {
-    'build_py':            BuildPyCommand,
-    'write-build-version': WriteVersionCommand,
-    'build-frontend':      BuildFrontendCommand,
-    'clean':               CleanCommand,
-    'fullversion':         FullVersionCommand,
+    "build_py": BuildPyCommand,
+    "write-build-version": WriteVersionCommand,
+    "build-frontend": BuildFrontendCommand,
+    "clean": CleanCommand,
+    "fullversion": FullVersionCommand,
 }
 
 
 def requirements():
-    with open(os.path.abspath(os.path.join(os.path.dirname(__file__), 'requirements.txt'))) as f:
+    with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "requirements.txt"))) as f:
         return f.read().splitlines()
 
 
 def requirements_dev():
-    with open(os.path.abspath(os.path.join(os.path.dirname(__file__), 'requirements-dev.txt'))) as f:
-        return [line for line in f.read().splitlines()
-                if line.strip() and not line.strip().startswith(('-r', '#'))]
+    with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "requirements-dev.txt"))) as f:
+        return [line for line in f.read().splitlines() if line.strip() and not line.strip().startswith(("-r", "#"))]
 
 
 def collect_runtime_package_data():
     package_root = os.path.join(project_root_dir, src_dir)
     runtime_roots = [
-        'migrations_v1',
-        os.path.join('webserver', 'docs'),
-        os.path.join('webserver', 'templates'),
+        "migrations_v1",
+        os.path.join("webserver", "docs"),
+        os.path.join("webserver", "templates"),
     ]
-    package_files = ['version']
+    package_files = ["version"]
     for runtime_root in runtime_roots:
         absolute_root = os.path.join(package_root, runtime_root)
         for current_root, dirnames, filenames in os.walk(absolute_root):
-            dirnames[:] = [dirname for dirname in dirnames if dirname != '__pycache__']
+            dirnames[:] = [dirname for dirname in dirnames if dirname != "__pycache__"]
             for filename in filenames:
-                if filename.endswith(('.pyc', '.pyo')):
+                if filename.endswith((".pyc", ".pyo")):
                     continue
                 absolute_path = os.path.join(current_root, filename)
                 package_files.append(os.path.relpath(absolute_path, package_root))
@@ -237,18 +250,12 @@ setup(
     url=module_url,
     classifiers=module_classifiers,
     install_requires=requirements(),
-    extras_require={
-        'dev': requirements_dev()
-    },
+    extras_require={"dev": requirements_dev()},
     packages=find_packages(include=[f"{src_dir}*"]),
     include_package_data=False,
     package_data={
         src_dir: collect_runtime_package_data(),
     },
-    entry_points={
-        'console_scripts': [
-            '%s=%s.cli:main' % (module_name, module_name)
-        ]
-    },
+    entry_points={"console_scripts": [f"{module_name}={module_name}.cli:main"]},
     cmdclass=cmd_class,
 )

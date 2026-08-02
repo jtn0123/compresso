@@ -43,12 +43,12 @@ from functools import partial
 from typing import Literal, Protocol, cast
 
 from compresso.libs import common, narrowing
-from compresso.libs.installation_link import Links
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging, log_at_level
 from compresso.libs.plugins import PluginsHandler
-from compresso.libs.remote_task_lease import RemoteTaskLease
-from compresso.libs.resumable_transfer import file_sha256
+from compresso.libs.remote.installation_link import Links
+from compresso.libs.remote.remote_task_lease import RemoteTaskLease
+from compresso.libs.remote.resumable_transfer import file_sha256
 from compresso.libs.task import JsonValue, Task, TaskDataStore
 from compresso.libs.unmodels.tasks import Tasks
 

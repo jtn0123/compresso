@@ -44,12 +44,12 @@ from peewee import DoesNotExist
 
 from compresso import config
 from compresso.libs import task
-from compresso.libs.installation_link import Links
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.monitoring.thread_health import ThreadHealthMixin
 from compresso.libs.plugins import PluginsHandler
-from compresso.libs.resumable_transfer import ResumableTransferStore
+from compresso.libs.remote.installation_link import Links
+from compresso.libs.remote.resumable_transfer import ResumableTransferStore
 from compresso.libs.session import Session
-from compresso.libs.thread_health import ThreadHealthMixin
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.libs.worker_capabilities import WorkerCapabilities
 from compresso.libs.worker_group import WorkerGroup

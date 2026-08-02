@@ -146,9 +146,7 @@ def _vue_script_blocks(source: str) -> list[tuple[str, str]]:
         if opening_start < 0:
             return blocks
         opening_name_end = opening_start + len("<script")
-        if opening_name_end < len(folded) and not (
-            folded[opening_name_end].isspace() or folded[opening_name_end] == ">"
-        ):
+        if opening_name_end < len(folded) and not (folded[opening_name_end].isspace() or folded[opening_name_end] == ">"):
             cursor = opening_name_end
             continue
         opening_end = folded.find(">", opening_name_end)
@@ -159,9 +157,7 @@ def _vue_script_blocks(source: str) -> list[tuple[str, str]]:
         if closing_start < 0:
             return blocks
         closing_name_end = closing_start + len("</script")
-        if closing_name_end < len(folded) and not (
-            folded[closing_name_end].isspace() or folded[closing_name_end] == ">"
-        ):
+        if closing_name_end < len(folded) and not (folded[closing_name_end].isspace() or folded[closing_name_end] == ">"):
             cursor = closing_name_end
             continue
         closing_end = folded.find(">", closing_name_end)

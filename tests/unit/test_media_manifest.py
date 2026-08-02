@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from compresso.libs.media_manifest import compare_media_summaries, create_manifest, verify_manifest
+from tests.support_.symlinks import requires_symlinks
 
 
 @pytest.mark.unittest
@@ -166,6 +167,7 @@ def test_create_manifest_rejects_empty_media_root(tmp_path):
 
 
 @pytest.mark.unittest
+@requires_symlinks
 def test_create_manifest_rejects_symlinked_media(tmp_path):
     root = tmp_path / "media"
     root.mkdir()
@@ -178,6 +180,7 @@ def test_create_manifest_rejects_symlinked_media(tmp_path):
 
 
 @pytest.mark.unittest
+@requires_symlinks
 def test_create_manifest_rejects_symlinked_directory(tmp_path):
     root = tmp_path / "media"
     root.mkdir()

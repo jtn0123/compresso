@@ -5,6 +5,7 @@
     dense
     :icon="compressoDarkMode ? 'dark_mode' : 'light_mode'"
     :color="compressoDarkMode ? 'amber-4' : 'grey-7'"
+    :aria-label="compressoDarkMode ? $t('components.themeSwitch.lightMode') : $t('components.themeSwitch.darkMode')"
     @click="toggleMode"
   >
     <q-tooltip>{{

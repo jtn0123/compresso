@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-compresso.libs.gpu_monitor
+compresso.libs.monitoring.gpu_monitor
 
 Singleton GPU monitor that polls NVIDIA, Intel, and AMD GPUs
 for real-time utilization metrics and maintains a rolling history.

@@ -28,7 +28,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from compresso.libs.installation_link import Links, RequestHandler
+from compresso.libs.remote.installation_link import Links, RequestHandler
 from compresso.libs.singleton import SingletonType
 
 # ---------------------------------------------------------------------------
@@ -45,9 +45,9 @@ def reset_singletons():
 
 def _make_links():
     with (
-        patch("compresso.libs.installation_link.config.Config"),
-        patch("compresso.libs.installation_link.session.Session"),
-        patch("compresso.libs.installation_link.CompressoLogging.get_logger"),
+        patch("compresso.libs.remote.installation_link.config.Config"),
+        patch("compresso.libs.remote.installation_link.session.Session"),
+        patch("compresso.libs.remote.installation_link.CompressoLogging.get_logger"),
     ):
         return Links()
 
@@ -495,8 +495,8 @@ class TestUpdateAllSuccessPath:
             patch.object(links, "validate_remote_installation", return_value=inst_data),
             patch.object(links, "fetch_remote_installation_link_config_for_this", return_value=remote_cfg),
             patch.object(links, "push_remote_installation_link_config", return_value=True),
-            patch("compresso.libs.installation_link.Library.get_all_libraries", return_value=[local_library]),
-            patch("compresso.libs.installation_link.Library.export", return_value=import_data),
+            patch("compresso.libs.remote.installation_link.Library.get_all_libraries", return_value=[local_library]),
+            patch("compresso.libs.remote.installation_link.Library.export", return_value=import_data),
             patch.object(links, "remote_api_get", return_value={"libraries": []}),
             patch.object(links, "import_remote_library_config", return_value={"success": True}),
         ):
@@ -526,7 +526,7 @@ class TestUpdateAllSuccessPath:
             patch.object(links, "validate_remote_installation", return_value=inst_data),
             patch.object(links, "fetch_remote_installation_link_config_for_this", return_value=remote_cfg),
             patch.object(links, "push_remote_installation_link_config", return_value=True),
-            patch("compresso.libs.installation_link.Library.get_all_libraries", return_value=[remote_only_library]),
+            patch("compresso.libs.remote.installation_link.Library.get_all_libraries", return_value=[remote_only_library]),
             patch.object(links, "remote_api_get", return_value={"libraries": []}),
             patch.object(links, "import_remote_library_config", import_mock),
         ):
@@ -558,10 +558,10 @@ class TestUpdateAllSuccessPath:
             patch.object(links, "fetch_remote_installation_link_config_for_this", return_value=remote_cfg),
             patch.object(links, "push_remote_installation_link_config", return_value=True),
             patch(
-                "compresso.libs.installation_link.Library.get_all_libraries",
+                "compresso.libs.remote.installation_link.Library.get_all_libraries",
                 return_value=[{"id": 1, "name": "Movies", "enable_remote_only": False}],
             ),
-            patch("compresso.libs.installation_link.Library.export", return_value=import_data),
+            patch("compresso.libs.remote.installation_link.Library.export", return_value=import_data),
             patch.object(links, "remote_api_get", return_value={"libraries": []}),
             patch.object(links, "import_remote_library_config", return_value=None),
         ):
@@ -745,7 +745,7 @@ class TestCheckRemoteWorkersInternals:
 class TestNewPendingTaskGenericException:
     def test_returns_empty_dict_on_generic_exception(self):
         links = _make_links()
-        with patch("compresso.libs.installation_link.requests.post", side_effect=ValueError("unexpected")):
+        with patch("compresso.libs.remote.installation_link.requests.post", side_effect=ValueError("unexpected")):
             result = links.new_pending_task_create_on_remote_installation(_BASE_CONFIG, "/some/path", 1)
         assert result == {}
 

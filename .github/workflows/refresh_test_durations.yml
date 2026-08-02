@@ -42,9 +42,11 @@ jobs:
     - name: Open PR when durations changed
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       run: |
         if git diff --quiet -- .test_durations; then
           echo "No change to .test_durations; nothing to do."
+          echo "No change to \`.test_durations\`." >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
         branch="chore/refresh-test-durations-$(date -u +%Y%m%d)"
@@ -54,8 +56,31 @@ jobs:
         git add .test_durations
         git commit -m "chore(ci): refresh .test_durations for pytest-split shard balance"
         git push -u origin "$branch" --force
-        if ! gh pr list --head "$branch" --state open --json number --jq '.[0].number' | grep -q .; then
-          gh pr create \
-            --title "chore(ci): refresh .test_durations" \
-            --body "Automated monthly refresh of \`.test_durations\` so pytest-split keeps the 3-way unit test shards balanced. See workflow \`refresh_test_durations.yml\`."
+
+        if gh pr list --head "$branch" --state open --json number --jq '.[0].number' | grep -q .; then
+          echo "A PR for $branch is already open; refreshed branch in place."
+          exit 0
         fi
+
+        # The refreshed durations are already pushed at this point, so a failure
+        # to open the PR must not fail the job. Repositories that disable
+        # "Allow GitHub Actions to create and approve pull requests" reject
+        # createPullRequest; surface a one-click compare link instead of a red
+        # workflow that hides an otherwise successful refresh.
+        if gh pr create \
+            --title "chore(ci): refresh .test_durations" \
+            --body "Automated monthly refresh of \`.test_durations\` so pytest-split keeps the 3-way unit test shards balanced. See workflow \`refresh_test_durations.yml\`."; then
+          exit 0
+        fi
+
+        echo "::warning::Could not open a pull request automatically. Branch $branch is pushed and ready."
+        {
+          echo "### Test durations refreshed"
+          echo
+          echo "Automatic PR creation failed (most often because **Settings → Actions → General →"
+          echo "\"Allow GitHub Actions to create and approve pull requests\"** is disabled)."
+          echo
+          echo "The refreshed branch is pushed. Open the PR here:"
+          echo
+          echo "${REPO_URL}/compare/${branch}?expand=1"
+        } >> "$GITHUB_STEP_SUMMARY"

@@ -8,7 +8,7 @@ Mixin providing remote installation link endpoints for ApiSettingsHandler.
 
 from collections.abc import Mapping
 
-from compresso.libs.installation_link import Links
+from compresso.libs.remote.installation_link import Links
 from compresso.webserver.api_v2.base_api_handler import (
     BaseApiError,
     BaseApiHandler,

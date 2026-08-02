@@ -17,12 +17,15 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: './coverage',
       thresholds: {
-        // Honest all-source baseline (2026-07-12). Ratchet upward as tests are
-        // added; never remove files from `include` to satisfy this gate.
-        lines: 24,
-        functions: 16,
-        branches: 17,
-        statements: 24,
+        // Honest all-source baseline (2026-07-12), ratcheted 2026-08-01 after
+        // component tests were added for the destructive-action paths (confirm
+        // dialog, safety banner, task log sanitisation boundary, library config
+        // import). Ratchet upward as tests are added; never remove files from
+        // `include` to satisfy this gate.
+        lines: 27,
+        functions: 20,
+        branches: 22,
+        statements: 27,
       },
     },
   },

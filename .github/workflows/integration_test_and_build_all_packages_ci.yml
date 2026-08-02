@@ -514,7 +514,10 @@ jobs:
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          trivyignores: .trivyignore
+          # Every suppression here carries an `expired_at` date, so Trivy stops
+          # applying it once the review date passes rather than hiding the
+          # finding forever. scripts/check-trivyignore.py enforces the fields.
+          trivyignores: .trivyignore.yaml
 
   build_docker_arm64:
     name: Build Docker (arm64)

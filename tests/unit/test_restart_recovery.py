@@ -60,6 +60,20 @@ def _task(tmp_path, status, *, cache_exists=False, task_type="local", success=Tr
     )
 
 
+def _canonical(path):
+    """Resolve a path the way ``recover_tasks_on_startup`` does.
+
+    The protection set is built with ``os.path.realpath`` so it can be compared
+    against real filesystem entries. Comparing a raw ``tmp_path`` string against
+    it is wrong on any platform where the constructed path and the on-disk path
+    differ in case or through a symlink — on Windows pytest builds its basetemp
+    from the username (``pytest-of-Justin``) while the directory on disk is
+    ``pytest-of-justin``, and on macOS ``/tmp`` is a symlink to ``/private/tmp``.
+    Without this, the ``not in protected`` assertions also pass vacuously.
+    """
+    return os.path.realpath(str(path))
+
+
 @pytest.mark.unittest
 def test_interrupted_task_is_requeued_without_protecting_partial_cache(recovery_db, tmp_path):
     task = _task(tmp_path, "in_progress", cache_exists=True)
@@ -70,7 +84,7 @@ def test_interrupted_task_is_requeued_without_protecting_partial_cache(recovery_
     assert task.status == "pending"
     assert task.success is None
     assert task.processed_by_worker is None
-    assert str(task.cache_path) not in protected
+    assert _canonical(task.cache_path) not in protected
 
 
 @pytest.mark.unittest
@@ -80,7 +94,7 @@ def test_completed_encode_with_cache_stays_processed(recovery_db, tmp_path):
     protected = TaskHandler.recover_tasks_on_startup(_settings(tmp_path))
 
     assert Tasks.get_by_id(task.id).status == "processed"
-    assert str(task.cache_path) in protected
+    assert _canonical(task.cache_path) in protected
 
 
 @pytest.mark.unittest
@@ -92,7 +106,7 @@ def test_completed_encode_without_cache_is_requeued(recovery_db, tmp_path):
     task = Tasks.get_by_id(task.id)
     assert task.status == "pending"
     assert task.success is None
-    assert str(task.cache_path) not in protected
+    assert _canonical(task.cache_path) not in protected
 
 
 @pytest.mark.unittest
@@ -105,8 +119,8 @@ def test_awaiting_approval_with_staged_output_survives(recovery_db, tmp_path):
     protected = TaskHandler.recover_tasks_on_startup(_settings(tmp_path))
 
     assert Tasks.get_by_id(task.id).status == "awaiting_approval"
-    assert str(task.cache_path) in protected
-    assert str(staged) in protected
+    assert _canonical(task.cache_path) in protected
+    assert _canonical(staged) in protected
 
 
 @pytest.mark.unittest
@@ -132,7 +146,7 @@ def test_approved_task_restores_missing_cache_from_staging(recovery_db, tmp_path
     assert os.path.exists(task.cache_path)
     with open(task.cache_path, "rb") as restored_cache:
         assert restored_cache.read() == b"staged-output"
-    assert str(task.cache_path) in protected
+    assert _canonical(task.cache_path) in protected
 
 
 @pytest.mark.unittest
@@ -147,8 +161,8 @@ def test_approved_cache_restore_failure_does_not_abort_other_recovery(recovery_d
     protected = TaskHandler.recover_tasks_on_startup(_settings(tmp_path))
 
     assert Tasks.get_by_id(approved.id).status == "approved"
-    assert str(staged) in protected
-    assert str(processed.cache_path) in protected
+    assert _canonical(staged) in protected
+    assert _canonical(processed.cache_path) in protected
 
 
 @pytest.mark.unittest
@@ -172,8 +186,8 @@ def test_remote_completed_task_and_result_are_preserved(recovery_db, tmp_path):
     protected = TaskHandler.recover_tasks_on_startup(_settings(tmp_path))
 
     assert Tasks.get_by_id(task.id).status == "complete"
-    assert str(task.abspath) in protected
-    assert str(task.cache_path) in protected
+    assert _canonical(task.abspath) in protected
+    assert _canonical(task.cache_path) in protected
 
 
 @pytest.mark.unittest

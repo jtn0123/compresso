@@ -55,13 +55,13 @@ from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.metadata import CompressoFileMetadata
+from compresso.libs.monitoring.thread_health import ThreadHealthMixin
 from compresso.libs.notifications import Notifications
 from compresso.libs.plugins import PluginsHandler
-from compresso.libs.resumable_transfer import file_sha256
+from compresso.libs.remote.resumable_transfer import file_sha256
 from compresso.libs.safety_state import SafetyForeman, record_safety_event
 from compresso.libs.task import Task, TaskDataStore, TaskPathData
 from compresso.libs.taskqueue import TaskQueue
-from compresso.libs.thread_health import ThreadHealthMixin
 from compresso.libs.unmodels.tasks import Tasks
 
 
@@ -1190,6 +1190,14 @@ class PostProcessor(ThreadHealthMixin, threading.Thread):
         if not os.path.exists(file_in):
             self._log(f"The file_in path does not exist! '{file_in}'", level="warning")
             self.event.wait(1)
+        if os.path.exists(file_in) and not os.path.isfile(file_in):
+            # A plugin that leaves a directory (or any non-regular file) at the
+            # cache path must never have it published into the library: the move
+            # would succeed, put a directory where the user's media was, and then
+            # delete the original as part of a "successful" replacement.
+            self.logger.error("POSTPROCESS_CACHE_PATH_NOT_A_FILE path=%s", file_in)
+            self._log(f"The file_in path is not a regular file. Refusing to publish it! '{file_in}'", level="error")
+            return False
         if move:
             self._log(f"Moving file '{file_in}' --> '{part_file_out}'.", level="debug")
             if os.path.exists(part_file_out):

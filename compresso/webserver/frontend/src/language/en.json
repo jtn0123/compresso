@@ -21,7 +21,15 @@
     "showMore": "Show more",
     "addRepository": "Add repository",
     "togglePasswordVisibility": "Toggle password visibility",
-    "copyCode": "Copy code"
+    "copyCode": "Copy code",
+    "toggleNavigation": "Toggle navigation menu",
+    "goToDashboard": "Go to dashboard",
+    "pinSidebar": "Pin sidebar",
+    "unpinSidebar": "Unpin sidebar",
+    "dismissNotification": "Dismiss notification",
+    "back": "Back",
+    "forward": "Forward",
+    "taskActions": "Task actions"
   },
   "systemStatus": {
     "title": "System",

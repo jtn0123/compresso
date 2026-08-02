@@ -30,6 +30,17 @@ class RateLimiter:
     spoof their IP via X-Real-Ip / X-Forwarded-For headers unless a trusted
     proxy configuration is also in place. Do not enable xheaders without
     configuring trusted proxy validation.
+
+    PROCESS MODEL: counters live in this process's memory, so the configured
+    limits are exact only while the UI runs as a single process. ``UIServer``
+    starts one ``tornado.httpserver.HTTPServer`` and calls ``listen()``
+    directly — it never calls ``bind_sockets``/``fork_processes`` and never
+    passes ``num_processes``, so today one counter set covers the whole
+    deployment. Introducing a pre-forked or multi-instance server would
+    silently multiply every limit by the number of processes; that change must
+    move this state into a shared store (or hash clients onto a single
+    accepting process) first. ``tests/unit/test_rate_limiter_process_model.py``
+    fails if the server ever gains a multi-process start path.
     """
 
     DEFAULT_LIMIT = 300

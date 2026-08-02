@@ -2,10 +2,11 @@
   <div class="column fit">
     <div :class="{ 'q-mt-xl': !$q.screen.gt.sm }"></div>
     <q-scroll-area class="col">
-      <q-list padding>
+      <q-list padding role="none">
         <q-item-label header>{{ $t('navigation.dataPanels') }}:</q-item-label>
 
         <q-item
+          role="link"
           v-for="(item, index) in availableDataPanels"
           :key="index"
           clickable

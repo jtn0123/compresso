@@ -58,6 +58,9 @@ jobs:
     - name: Verify dependency locks match source inputs
       run: bash scripts/check-requirements-locks.sh
 
+    - name: Verify Trivy suppressions are justified and unexpired
+      run: python scripts/check-trivyignore.py
+
     - name: Clean local build artifacts
       run: |
         rm -rf build dist
@@ -65,13 +68,16 @@ jobs:
     - name: Lint with ruff
       run: |
         # Fatal: syntax errors and undefined names (blocking)
-        ruff check --select E9,F63,F7,F82 compresso/ tests/
-        # Full lint (blocking — all rules enforced)
-        ruff check compresso/ tests/
+        ruff check --select E9,F63,F7,F82 .
+        # Full lint (blocking — all rules enforced). Scoped to the whole repo so
+        # build and release tooling (setup.py, versioninfo.py, scripts/) is held
+        # to the same rules as the application; ruff's own `exclude` in
+        # pyproject.toml keeps the frontend and build artifacts out.
+        ruff check .
 
     - name: Check formatting with ruff
       run: |
-        ruff format --check compresso/ tests/
+        ruff format --check .
 
     - name: Type check with mypy
       run: |

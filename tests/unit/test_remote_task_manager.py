@@ -3,7 +3,7 @@
 """
 tests.unit.test_remote_task_manager.py
 
-Unit tests for compresso.libs.remote_task_manager.RemoteTaskManager.
+Unit tests for compresso.libs.remote.remote_task_manager.RemoteTaskManager.
 Covers __init__, get_info, _log, run, and all private runtime methods
 via name-mangling access (_RemoteTaskManager__method_name).
 """
@@ -56,10 +56,10 @@ def _make_manager(installation_info=None, pending_queue=None, complete_queue=Non
         event = threading.Event()
 
     with (
-        patch("compresso.libs.remote_task_manager.Links"),
-        patch("compresso.libs.remote_task_manager.CompressoLogging"),
+        patch("compresso.libs.remote.remote_task_manager.Links"),
+        patch("compresso.libs.remote.remote_task_manager.CompressoLogging"),
     ):
-        from compresso.libs.remote_task_manager import RemoteTaskManager
+        from compresso.libs.remote.remote_task_manager import RemoteTaskManager
 
         mgr = RemoteTaskManager(
             thread_id=1,
@@ -88,7 +88,7 @@ def _make_task(abspath="/data/library/video.mkv", library_id=1, task_id=42, task
 
 @pytest.mark.unittest
 def test_remote_task_execution_uses_typed_phases_in_order():
-    from compresso.libs.remote_task_manager import (
+    from compresso.libs.remote.remote_task_manager import (
         CleanupPhaseResult,
         DownloadPhaseResult,
         FinalizationPhaseResult,
@@ -138,7 +138,7 @@ def test_remote_task_execution_uses_typed_phases_in_order():
 
 @pytest.mark.unittest
 def test_library_assignment_failure_requests_remote_cleanup():
-    from compresso.libs.remote_task_manager import RemoteTaskContext, UploadPhaseResult
+    from compresso.libs.remote.remote_task_manager import RemoteTaskContext, UploadPhaseResult
 
     mgr = _make_manager()
     mgr.current_task = _make_task()
@@ -157,7 +157,7 @@ def test_library_assignment_failure_requests_remote_cleanup():
 
 @pytest.mark.unittest
 def test_cleanup_phase_reports_remote_delete_failure():
-    from compresso.libs.remote_task_manager import RemoteTaskContext
+    from compresso.libs.remote.remote_task_manager import RemoteTaskContext
 
     mgr = _make_manager()
     mgr.links.remove_task_from_remote_installation.return_value = None
@@ -270,7 +270,7 @@ class TestLog:
     def test_log_info_calls_logger_info(self):
         mgr = _make_manager()
         mgr.logger = MagicMock()
-        with patch("compresso.libs.remote_task_manager.common") as mock_common:
+        with patch("compresso.libs.remote.remote_task_manager.common") as mock_common:
             mock_common.format_message.return_value = "formatted"
             mgr._log("hello")
         mgr.logger.info.assert_called_once_with("formatted")
@@ -278,7 +278,7 @@ class TestLog:
     def test_log_warning_calls_logger_warning(self):
         mgr = _make_manager()
         mgr.logger = MagicMock()
-        with patch("compresso.libs.remote_task_manager.common") as mock_common:
+        with patch("compresso.libs.remote.remote_task_manager.common") as mock_common:
             mock_common.format_message.return_value = "warn msg"
             mgr._log("warn", level="warning")
         mgr.logger.warning.assert_called_once_with("warn msg")
@@ -286,7 +286,7 @@ class TestLog:
     def test_log_passes_message2_to_format_message(self):
         mgr = _make_manager()
         mgr.logger = MagicMock()
-        with patch("compresso.libs.remote_task_manager.common") as mock_common:
+        with patch("compresso.libs.remote.remote_task_manager.common") as mock_common:
             mock_common.format_message.return_value = "combined"
             mgr._log("msg", "detail")
         mock_common.format_message.assert_called_once_with("msg", "detail")
@@ -383,7 +383,7 @@ class TestSetCurrentTask:
     def test_sets_current_task(self):
         mgr = _make_manager()
         task = _make_task()
-        with patch("compresso.libs.remote_task_manager.PluginsHandler") as mock_ph_cls:
+        with patch("compresso.libs.remote.remote_task_manager.PluginsHandler") as mock_ph_cls:
             mock_ph_cls.return_value = MagicMock()
             mgr._RemoteTaskManager__set_current_task(task)
         assert mgr.current_task is task
@@ -391,14 +391,14 @@ class TestSetCurrentTask:
     def test_initialises_worker_log_to_empty_list(self):
         mgr = _make_manager()
         task = _make_task()
-        with patch("compresso.libs.remote_task_manager.PluginsHandler"):
+        with patch("compresso.libs.remote.remote_task_manager.PluginsHandler"):
             mgr._RemoteTaskManager__set_current_task(task)
         assert mgr.worker_log == []
 
     def test_calls_event_plugin_runner(self):
         mgr = _make_manager()
         task = _make_task()
-        with patch("compresso.libs.remote_task_manager.PluginsHandler") as mock_ph_cls:
+        with patch("compresso.libs.remote.remote_task_manager.PluginsHandler") as mock_ph_cls:
             mock_handler = MagicMock()
             mock_ph_cls.return_value = mock_handler
             mgr._RemoteTaskManager__set_current_task(task)
@@ -410,7 +410,7 @@ class TestSetCurrentTask:
         mgr = _make_manager()
         task = _make_task()
         captured = {}
-        with patch("compresso.libs.remote_task_manager.PluginsHandler") as mock_ph_cls:
+        with patch("compresso.libs.remote.remote_task_manager.PluginsHandler") as mock_ph_cls:
             mock_handler = MagicMock()
             mock_ph_cls.return_value = mock_handler
             mock_handler.run_event_plugins_for_plugin_type.side_effect = lambda ptype, data: captured.update(data)
@@ -474,7 +474,7 @@ class TestProcessTaskQueueItem:
         task.set_success.assert_not_called()
         assert cq.empty()
 
-    @patch("compresso.libs.remote_task_manager.RemoteTaskLease")
+    @patch("compresso.libs.remote.remote_task_manager.RemoteTaskLease")
     def test_acquires_persisted_lease_for_selected_installation(self, lease_class):
         mgr = _make_manager()
         task = _make_task()
@@ -485,7 +485,7 @@ class TestProcessTaskQueueItem:
         assert mgr.lease_token == "lease-token"  # noqa: S105 - synthetic lease fixture
         lease_class.acquire.assert_called_once_with(task.task, "test-uuid-1234")
 
-    @patch("compresso.libs.remote_task_manager.RemoteTaskLease")
+    @patch("compresso.libs.remote.remote_task_manager.RemoteTaskLease")
     def test_lease_conflict_records_hard_safety_event(self, lease_class):
         mgr = _make_manager()
         task = _make_task()
@@ -663,7 +663,7 @@ class TestSendTaskFileGuards:
         mgr.worker_log = []
         mgr._RemoteTaskManager__write_failure_to_worker_log = MagicMock()
 
-        with patch("compresso.libs.remote_task_manager.Library", side_effect=Exception("db gone")):
+        with patch("compresso.libs.remote.remote_task_manager.Library", side_effect=Exception("db gone")):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -703,7 +703,7 @@ class TestSendTaskRemotePathCreation:
         }
         mgr.links.new_pending_task_create_on_remote_installation.return_value = {"error": "Task already exists for this path"}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -719,7 +719,7 @@ class TestSendTaskRemotePathCreation:
         mgr.links.new_pending_task_create_on_remote_installation.return_value = {"error": "Path does not exist on remote host"}
         mgr.links.send_file_to_remote_installation.return_value = None  # fail to send
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -734,7 +734,7 @@ class TestSendTaskRemotePathCreation:
         mgr.links.new_pending_task_create_on_remote_installation.return_value = None
         mgr.links.send_file_to_remote_installation.return_value = None  # fail to send
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -744,7 +744,7 @@ class TestSendTaskRemotePathCreation:
         mgr.links.get_the_remote_library_config_by_name.return_value = None
         mgr.links.send_file_to_remote_installation.return_value = None
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -759,7 +759,7 @@ class TestSendTaskRemotePathCreation:
         }
         mgr.links.send_file_to_remote_installation.return_value = None  # fail immediately
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         mgr.links.new_pending_task_create_on_remote_installation.assert_not_called()
@@ -800,7 +800,7 @@ class TestSendTaskFileUpload:
         mgr, task, mock_library = self._base_setup(tmp_path)
         mgr.links.send_file_to_remote_installation.return_value = None
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -815,12 +815,12 @@ class TestSendTaskFileUpload:
         mgr.links.send_file_to_remote_installation.return_value = {"id": 99, "checksum": "BAD_CHECKSUM"}
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.common") as mock_common,
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.common") as mock_common,
         ):
             mock_common.format_message.side_effect = lambda m, m2="": f"{m} {m2}".strip()
             mock_common.get_file_checksum.return_value = "CORRECT_CHECKSUM"
-            with patch("compresso.libs.remote_task_manager.file_sha256", return_value="CORRECT_CHECKSUM"):
+            with patch("compresso.libs.remote.remote_task_manager.file_sha256", return_value="CORRECT_CHECKSUM"):
                 result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -839,7 +839,7 @@ class TestSendTaskFileUpload:
         # Set redundant flag so loop exits
         mgr.redundant_flag.set()
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         # Loop exits without error because redundant_flag terminates it before upload
@@ -853,7 +853,7 @@ class TestSendTaskFileUpload:
         mgr.links.acquire_network_transfer_lock.return_value = lock_key
         mgr.links.send_file_to_remote_installation.return_value = None  # fail after lock
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         mgr.links.acquire_network_transfer_lock.assert_called()
@@ -870,7 +870,7 @@ class TestSendTaskFileUpload:
 
         mgr.links.send_file_to_remote_installation.side_effect = interrupted_upload
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -888,7 +888,7 @@ class TestSendTaskFileUpload:
 
         mgr.links.send_file_to_remote_installation.side_effect = interrupted_upload
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -913,8 +913,8 @@ class TestSendTaskFileUpload:
         mgr.links.acquire_network_transfer_lock.return_value = None  # never acquires lock
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.time.monotonic", side_effect=fake_monotonic),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.time.monotonic", side_effect=fake_monotonic),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -960,7 +960,7 @@ class TestSetRemoteLibraryAndStartTask:
         # Start task fails → triggers return False
         mgr.links.start_the_remote_task_by_id.return_value = {"success": False}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         # Warning logged, but execution continues to start task
@@ -980,7 +980,7 @@ class TestSetRemoteLibraryAndStartTask:
         mgr.links.set_the_remote_task_library.side_effect = set_lib_side_effect
         mgr.links.start_the_remote_task_by_id.return_value = {"success": False}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert call_count >= 2
@@ -990,7 +990,7 @@ class TestSetRemoteLibraryAndStartTask:
         mgr.links.set_the_remote_task_library.return_value = {"success": True}
         mgr.links.start_the_remote_task_by_id.return_value = {"success": False}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1010,7 +1010,7 @@ class TestSetRemoteLibraryAndStartTask:
 
         mgr.links.start_the_remote_task_by_id.side_effect = start_side_effect
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert call_count >= 2
@@ -1056,7 +1056,7 @@ class TestPollingLoop:
         # Download path: task_success=False so no file download needed
         mgr.links.fetch_remote_task_data.return_value = {"log": "done", "task_success": False, "task_state": None}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False  # task_success=False → write failure → False
@@ -1068,7 +1068,7 @@ class TestPollingLoop:
         mgr.redundant_flag.set()
         mgr.links.get_remote_pending_task_state.return_value = {"results": []}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1079,7 +1079,7 @@ class TestPollingLoop:
         # First response: task not in list (removed)
         mgr.links.get_remote_pending_task_state.return_value = {"results": [{"id": 999, "status": "in_progress"}]}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1101,7 +1101,7 @@ class TestPollingLoop:
         mgr.links.get_remote_pending_task_state.side_effect = fake_get_state
         mgr.worker_log = []
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1126,8 +1126,8 @@ class TestPollingLoop:
         mgr.links.get_remote_pending_task_state.return_value = None  # always fail
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.time.time", side_effect=fake_time),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.time.time", side_effect=fake_time),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1138,7 +1138,7 @@ class TestPollingLoop:
 
         mgr.links.get_remote_pending_task_state.return_value = {"results": []}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1149,7 +1149,7 @@ class TestPollingLoop:
         mgr._heartbeat_remote_lease = MagicMock(return_value=False)
         mgr.links.get_remote_pending_task_state.return_value = {"results": [{"id": 5, "status": "complete"}]}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1160,7 +1160,7 @@ class TestPollingLoop:
         mgr, mock_library = self._setup_polling(tmp_path)
         mgr.links.get_remote_pending_task_state.return_value = {"results": "not-a-list"}
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1226,8 +1226,8 @@ class TestDownloadPhaseLocalPath:
         mgr, mock_library, cache_dir = self._setup_download(tmp_path, abspath_exists=True)
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1247,8 +1247,8 @@ class TestDownloadPhaseLocalPath:
         mgr.current_task.get_cache_path.return_value = str(bad_cache_dir / "video.mkv")
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1258,9 +1258,9 @@ class TestDownloadPhaseLocalPath:
         mgr, mock_library, cache_dir = self._setup_download(tmp_path, abspath_exists=True)
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
-            patch("compresso.libs.remote_task_manager.shutil.copy", side_effect=FileNotFoundError("gone")),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.shutil.copy", side_effect=FileNotFoundError("gone")),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1287,9 +1287,9 @@ class TestDownloadPhaseLocalPath:
         mgr.links.fetch_remote_task_completed_file.side_effect = complete_download
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
-            patch("compresso.libs.remote_task_manager.shutil.copy", wraps=shutil.copy) as copy_file,
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.shutil.copy", wraps=shutil.copy) as copy_file,
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1301,7 +1301,7 @@ class TestDownloadPhaseLocalPath:
         mgr, mock_library, _cache_dir = self._setup_download(tmp_path, abspath_exists=True)
         mgr.links.fetch_remote_task_data.return_value["task_state"] = "not-an-object"
 
-        with patch("compresso.libs.remote_task_manager.Library", return_value=mock_library):
+        with patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1363,9 +1363,9 @@ class TestDownloadPhaseNetworkDownload:
         mgr.links.fetch_remote_task_completed_file.return_value = True
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
-            patch("compresso.libs.remote_task_manager.file_sha256", return_value="correcthash"),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.file_sha256", return_value="correcthash"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1388,10 +1388,10 @@ class TestDownloadPhaseNetworkDownload:
         mgr.links.fetch_remote_task_completed_file_resumable.side_effect = complete_download
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
-            patch("compresso.libs.remote_task_manager.file_sha256", return_value="correcthash"),
-            patch("compresso.libs.remote_task_manager.RemoteTaskLease.complete", return_value=True),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.file_sha256", return_value="correcthash"),
+            patch("compresso.libs.remote.remote_task_manager.RemoteTaskLease.complete", return_value=True),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1414,8 +1414,8 @@ class TestDownloadPhaseNetworkDownload:
         mgr.links.fetch_remote_task_completed_file_resumable.side_effect = interrupted_download
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1430,8 +1430,8 @@ class TestDownloadPhaseNetworkDownload:
         mgr.links.fetch_remote_task_completed_file.return_value = False
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1449,13 +1449,13 @@ class TestDownloadPhaseNetworkDownload:
         mgr.links.fetch_remote_task_completed_file.return_value = True
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
-            patch("compresso.libs.remote_task_manager.common") as mock_common,
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.common") as mock_common,
         ):
             mock_common.format_message.side_effect = lambda m, m2="": f"{m} {m2}".strip()
             mock_common.get_file_checksum.return_value = "WRONG_HASH"
-            with patch("compresso.libs.remote_task_manager.file_sha256", return_value="WRONG_HASH"):
+            with patch("compresso.libs.remote.remote_task_manager.file_sha256", return_value="WRONG_HASH"):
                 result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
         assert result is False
@@ -1474,8 +1474,8 @@ class TestDownloadPhaseNetworkDownload:
         mgr.redundant_flag.set()
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 
@@ -1511,8 +1511,8 @@ class TestDownloadPhaseNetworkDownload:
         mgr.links.fetch_remote_task_data.return_value = None  # fetch fails
 
         with (
-            patch("compresso.libs.remote_task_manager.Library", return_value=mock_library),
-            patch("compresso.libs.remote_task_manager.TaskDataStore"),
+            patch("compresso.libs.remote.remote_task_manager.Library", return_value=mock_library),
+            patch("compresso.libs.remote.remote_task_manager.TaskDataStore"),
         ):
             result = mgr._RemoteTaskManager__send_task_to_remote_worker_and_monitor()
 

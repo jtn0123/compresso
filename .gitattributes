@@ -1,2 +1,26 @@
+# Check every text file out with LF, whatever `core.autocrlf` is set to.
+#
+# The index already stores LF for every text file, so this changes nothing about
+# what is committed. It fixes the working tree: on a Windows clone with
+# `core.autocrlf=true` (the default from Git for Windows) every file arrives as
+# CRLF, and then `prettier --check` and `openapi-typescript --check` fail on
+# files that are byte-identical to what CI verifies. Shell scripts under
+# scripts/ and docker/root/ must also be LF to run at all.
+* text=auto eol=lf
+
+# Binary formats must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf
+*.pdf binary
+*.zip binary
+*.gz binary
+*.whl binary
+*.mkv binary
+*.mp4 binary
+
 compresso/webserver/docs/api_schema_v2.json linguist-generated=true
 compresso/webserver/frontend/src/types/generated/api.ts linguist-generated=true

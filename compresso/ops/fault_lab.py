@@ -24,7 +24,7 @@ from pathlib import Path
 from compresso.config import Config
 from compresso.libs.json_state import atomic_json_write
 from compresso.libs.library_scale_benchmark import run_benchmark
-from compresso.libs.resumable_transfer import ResumableTransferStore, file_sha256
+from compresso.libs.remote.resumable_transfer import ResumableTransferStore, file_sha256
 
 ENABLE_ENV = "COMPRESSO_FAULT_LAB"
 MARKER_NAME = ".compresso-fault-lab.json"
@@ -258,7 +258,7 @@ def run_finalization_recovery(context: FaultContext) -> dict[str, object]:
 
 
 def run_lease_contention(context: FaultContext) -> dict[str, object]:
-    from compresso.libs.remote_task_lease import RemoteTaskLease
+    from compresso.libs.remote.remote_task_lease import RemoteTaskLease
     from compresso.libs.unmodels.lib import Database
     from compresso.libs.unmodels.tasks import Tasks
 

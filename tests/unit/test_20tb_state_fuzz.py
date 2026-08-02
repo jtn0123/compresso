@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from compresso.libs.file_operation_tracker import FileOperationTracker
-from compresso.libs.resumable_transfer import ResumableTransferStore
+from compresso.libs.remote.resumable_transfer import ResumableTransferStore
 from compresso.libs.safety_state import SafetyState
 from compresso.libs.scan_checkpoint import ScanCheckpointStore
 

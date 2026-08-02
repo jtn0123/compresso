@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from peewee import fn
 
-from compresso.libs.resumable_transfer import ResumableTransferStore
+from compresso.libs.remote.resumable_transfer import ResumableTransferStore
 from compresso.libs.unmodels.tasks import Tasks
 
 if TYPE_CHECKING:

@@ -6,10 +6,10 @@ checklists or metrics.
 
 | Field | Value |
 |---|---|
-| Status | Complete; PR #218 awaiting review |
+| Status | Complete; merged in PR #218 (`c3b56e71`) |
 | Baseline | `f3f566a8` (`v1.17.0`) |
 | Started | 2026-07-20 |
-| Last verified | 2026-07-21 |
+| Last verified | 2026-08-01 |
 | Target | Strict production Python and direct production frontend TypeScript |
 | Tests | Legacy tests may remain untyped; shared helpers and new or touched tests are typed |
 
@@ -31,16 +31,16 @@ changes. CI runs the corresponding `--check-document` command and rejects stale 
 <!-- BEGIN GENERATED TYPE SAFETY METRICS -->
 | Metric | Baseline | Current | Target |
 |---|---:|---:|---:|
-| Production Python files | 245 | 250 | All checked |
-| Production Python nonblank LOC | 44,273 | 47,541 | All checked |
-| Fully annotated Python functions | 137 / 1,707 | 2,055 / 2,055 | 100% |
+| Production Python files | 245 | 245 | All checked |
+| Production Python nonblank LOC | 44,273 | 46,652 | All checked |
+| Fully annotated Python functions | 137 / 1,707 | 2,008 / 2,008 | 100% |
 | Incomplete Python function LOC | 29,894 | 0 | 0 |
 | Unchecked Python function LOC | 28,370 | 0 | 0 |
 | Production frontend JavaScript files | 33 | 0 | 0 |
 | Production frontend JavaScript LOC | 2,451 | 0 | 0 |
-| Production frontend TypeScript files | 0 | 48 | All production modules |
+| Production frontend TypeScript files | 0 | 49 | All production modules |
 | Typed Vue components | 0 / 88 | 88 / 88 | 100% |
-| Vue script LOC | 12,182 | 12,765 | All checked |
+| Vue script LOC | 12,182 | 12,801 | All checked |
 <!-- END GENERATED TYPE SAFETY METRICS -->
 
 ## Work Ledger
@@ -50,13 +50,13 @@ required gates and evidence are recorded here.
 
 | ID | Deliverable | Status | Required evidence | PR / commit |
 |---|---|---|---|---|
-| TS-00 | Ledger, reproducible metrics, and roadmap pointer | Complete | Focused unit tests, Ruff, metrics output | — |
-| TS-10 | OpenAPI output-path support, complete schema generation, generated REST declarations, drift gate | Complete | Schema tests, generation check, frontend type generation | — |
-| TS-20 | Direct strict TypeScript conversion of all production frontend code | Complete | `vue-tsc`, lint, coverage, build, Chrome, WebKit, and live-backend evidence | — |
-| PY-10 | Strict foundations: configuration, common/file helpers, requests, system/GPU, FFmpeg | Complete | Strict mypy on migrated modules and focused unit tests | — |
-| PY-20 | Strict task/media lifecycle: models, metadata, queues, workers, links, post-processing | Complete | Strict mypy and lifecycle regression suites | — |
-| PY-30 | Strict service/web boundaries: helpers, APIs, WebSocket, proxy/auth, plugins, migrations | Complete | Strict mypy, API suites, packaged live backend, and clean wheel | — |
-| TS-90 | Global strict ratchet, exception cleanup, and final verification | Complete | All completion-contract gates | — |
+| TS-00 | Ledger, reproducible metrics, and roadmap pointer | Complete | Focused unit tests, Ruff, metrics output | PR #218 (`c3b56e71`) |
+| TS-10 | OpenAPI output-path support, complete schema generation, generated REST declarations, drift gate | Complete | Schema tests, generation check, frontend type generation | PR #218 (`c3b56e71`) |
+| TS-20 | Direct strict TypeScript conversion of all production frontend code | Complete | `vue-tsc`, lint, coverage, build, Chrome, WebKit, and live-backend evidence | PR #218 (`c3b56e71`) |
+| PY-10 | Strict foundations: configuration, common/file helpers, requests, system/GPU, FFmpeg | Complete | Strict mypy on migrated modules and focused unit tests | PR #218 (`c3b56e71`) |
+| PY-20 | Strict task/media lifecycle: models, metadata, queues, workers, links, post-processing | Complete | Strict mypy and lifecycle regression suites | PR #218 (`c3b56e71`) |
+| PY-30 | Strict service/web boundaries: helpers, APIs, WebSocket, proxy/auth, plugins, migrations | Complete | Strict mypy, API suites, packaged live backend, and clean wheel | PR #218 (`c3b56e71`) |
+| TS-90 | Global strict ratchet, exception cleanup, and final verification | Complete | All completion-contract gates | PR #218 (`c3b56e71`) |
 
 ### Simplification Follow-up
 
@@ -77,7 +77,7 @@ boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit r
 
 ## Verification Evidence
 
-| ID | Evidence recorded through 2026-07-21 |
+| ID | Evidence recorded through 2026-08-01 |
 |---|---|
 | TS-00 | `pytest tests/unit/test_type_safety_metrics.py -q` (2 passed); focused Ruff check and format check; reporter ignores installed frontend dependencies |
 | TS-10 | OpenAPI generator reports zero undocumented routes; schema and contract tests (24 passed); backend `--check`, frontend `contract:check`, Prettier, and ESLint pass; drift gates added to local verification and CI |
@@ -89,6 +89,7 @@ boundaries, OpenAPI drift protection, Google Chrome, mobile Chrome, and WebKit r
 | SIM-01–07 | Integer, pagination, settings, helper, WebSocket, Library Settings, notification-preservation, and metrics regressions pass. Strict mypy, Ruff, frontend contract/type/lint/test/build gates, the complete isolated unit suite, installed Chrome/mobile Chrome, WebKit, and packaged live-backend Chrome all pass. |
 | SIM-08 | Final review regressions pass; 4,083 isolated backend unit tests and 500 frontend tests pass. OpenAPI and metrics drift, Ruff, strict mypy, TypeScript, ESLint, Prettier, coverage, and the production build pass; the two changed workflows pass actionlint. Installed Chrome/mobile Chrome/WebKit mocked E2E passes 9 tests; packaged live-backend Chrome passes 3. |
 | SIM-09 | The first live analysis confirmed the original 124 findings were cleared and identified 12 follow-on findings from the refactor; the second reduced that list to two false return-type inferences from Peewee's abstract database stubs, handled through a typed concrete-backend adapter. The final live SonarCloud analysis reports zero unresolved issues. The combined changes pass 506 focused regressions plus all 15 migration tests. All 86 originally reported complex functions and their extracted helpers are at or below the configured threshold. Ruff, formatting, strict mypy, metrics/OpenAPI drift, and 4,084 backend unit tests pass. |
+| Post-merge | Re-verified on merged `master` (`c3b56e71`) on 2026-08-01: `ruff check compresso/ tests/` and `ruff format --check compresso/ tests/` are clean across 444 files, and `scripts/type_safety_metrics.py --check-document docs/TYPE_SAFETY.md` reports the generated metrics current. |
 
 ## Defects Prevented or Fixed
 

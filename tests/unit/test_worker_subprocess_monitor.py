@@ -3,7 +3,7 @@
 """
 tests.unit.test_worker_subprocess_monitor.py
 
-Unit tests for compresso.libs.worker_subprocess_monitor.WorkerSubprocessMonitor.
+Unit tests for compresso.libs.monitoring.worker_subprocess_monitor.WorkerSubprocessMonitor.
 """
 
 import logging
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import psutil
 import pytest
 
-MODULE = "compresso.libs.worker_subprocess_monitor"
+MODULE = "compresso.libs.monitoring.worker_subprocess_monitor"
 
 
 # ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ def mock_logger():
 @pytest.fixture
 def monitor(parent_worker, mock_logger):
     """Build a WorkerSubprocessMonitor without starting its thread."""
-    from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
+    from compresso.libs.monitoring.worker_subprocess_monitor import WorkerSubprocessMonitor
 
     return WorkerSubprocessMonitor(parent_worker)
 
@@ -58,7 +58,7 @@ def monitor(parent_worker, mock_logger):
 @pytest.mark.unittest
 class TestInit:
     def test_attributes_from_parent_worker(self, parent_worker, mock_logger):
-        from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
+        from compresso.libs.monitoring.worker_subprocess_monitor import WorkerSubprocessMonitor
 
         m = WorkerSubprocessMonitor(parent_worker)
 
@@ -812,7 +812,7 @@ class TestRunLoop:
         parent.event.wait = MagicMock()
         logger = logging.getLogger("compresso_test_wsm_run")
         with patch("compresso.libs.logs.CompressoLogging.get_logger", return_value=logger):
-            from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
+            from compresso.libs.monitoring.worker_subprocess_monitor import WorkerSubprocessMonitor
 
             m = WorkerSubprocessMonitor(parent)
         m.event.wait = MagicMock()

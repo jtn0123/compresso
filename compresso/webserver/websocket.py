@@ -46,8 +46,8 @@ from compresso import config
 from compresso.libs import common, narrowing, session
 from compresso.libs.foreman import Foreman
 from compresso.libs.frontend_push_messages import FrontendPushMessages
-from compresso.libs.gpu_monitor import GpuMetrics, GpuMonitor
-from compresso.libs.installation_link import Links
+from compresso.libs.monitoring.gpu_monitor import GpuMetrics, GpuMonitor
+from compresso.libs.remote.installation_link import Links
 from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
 from compresso.webserver.helpers import completed_tasks, pending_tasks
 from compresso.webserver.helpers.queue_eta import estimate_queue_eta

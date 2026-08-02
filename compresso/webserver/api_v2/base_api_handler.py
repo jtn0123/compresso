@@ -34,6 +34,7 @@ import inspect
 import json
 import secrets
 import sys
+import threading
 import traceback
 from collections.abc import Awaitable, Callable, Mapping
 from json import JSONDecodeError
@@ -89,12 +90,43 @@ type ResponseChunk = str | bytes | Mapping[str, object] | None
 
 
 class ApiRoute(TypedDict):
-    """Runtime routing contract shared by every v1 and v2 endpoint."""
+    """Runtime routing contract shared by every v2 endpoint."""
 
     path_pattern: str
     supported_methods: list[str]
     call_method: str
     run_on_ioloop: NotRequired[bool]
+
+
+_offload_thread_state = threading.local()
+
+
+def worker_event_loop() -> asyncio.AbstractEventLoop:
+    """Return the calling worker thread's reusable event loop.
+
+    Route bodies are declared ``async def`` but their work is synchronous DB and
+    file access, so they need *an* event loop to be driven on while almost never
+    suspending. ``asyncio.run()`` would construct and tear down a loop for every
+    single API request. ``asyncio.to_thread`` reuses its pool threads, so
+    keeping one loop per thread amortises that cost to nothing while preserving
+    the isolation the offload provides: each body still runs on its own thread,
+    and ``IOLoop.current()`` inside a body still resolves to that thread's loop
+    rather than the server's.
+
+    Route bodies must not schedule background tasks on this loop. They do not
+    today (no ``create_task``/``ensure_future`` in any handler), and because the
+    loop outlives the request, an orphaned task would resume during an unrelated
+    later request instead of being cancelled.
+    """
+    loop: asyncio.AbstractEventLoop | None = getattr(_offload_thread_state, "loop", None)
+    if loop is None or loop.is_closed():
+        loop = asyncio.new_event_loop()
+        # Bind it as this thread's current loop so body code reaching for
+        # asyncio.get_event_loop()/IOLoop.current() outside a running context
+        # finds the same loop it will be driven on.
+        asyncio.set_event_loop(loop)
+        _offload_thread_state.loop = loop
+    return loop
 
 
 def string_value(value: object, default: str = "") -> str:
@@ -150,9 +182,13 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
     _finish_deferred = False
     _deferred_finish_chunk: ResponseChunk = None
     _deferred_finish_future: asyncio.Future[None]
-    # Route handler bodies are synchronous DB/file work; run them in a worker
-    # thread by default so they cannot stall the IOLoop. Individual routes can
-    # opt out with {"run_on_ioloop": True}; subclasses can disable per-handler.
+    # Route bodies are declared `async def` but their work is synchronous DB and
+    # file access, so awaiting them on the IOLoop would stall every other
+    # client. Run them in a worker thread by default. A route whose body needs
+    # the server's own loop (to schedule work that must outlive the request, or
+    # to touch IOLoop-bound objects such as the WebSocket handlers) must opt out
+    # with {"run_on_ioloop": True} and keep its blocking calls behind
+    # `asyncio.to_thread`; subclasses can disable offloading per-handler.
     offload_route_bodies = True
 
     """
@@ -516,6 +552,10 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         only buffered on the handler (safe — the awaiting coroutine is
         suspended until the worker completes), and the actual connection write
         happens back on the IOLoop in ``_apply_deferred_finish``.
+
+        Bodies that are coroutines are driven on the worker thread's reusable
+        loop from :func:`worker_event_loop` rather than a per-request
+        ``asyncio.run()``.
         """
         self._finish_deferred = False
         self._defer_finish = True
@@ -524,7 +564,8 @@ class BaseApiHandler(SecurityHeadersMixin, RequestHandler):
         def invoke() -> object:
             result = method(*args, **kwargs)
             if inspect.isawaitable(result):
-                return asyncio.run(self._await_route_result(cast(Awaitable[object], result)))
+                loop = worker_event_loop()
+                return loop.run_until_complete(self._await_route_result(cast(Awaitable[object], result)))
             return result
 
         try:

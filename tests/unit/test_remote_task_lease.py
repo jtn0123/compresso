@@ -4,7 +4,7 @@ import datetime
 
 import pytest
 
-from compresso.libs.remote_task_lease import RemoteTaskLease
+from compresso.libs.remote.remote_task_lease import RemoteTaskLease
 from compresso.libs.unmodels.lib import Database
 from compresso.libs.unmodels.tasks import Tasks
 

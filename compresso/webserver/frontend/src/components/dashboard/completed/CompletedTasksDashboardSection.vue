@@ -12,6 +12,7 @@
         <div class="col-auto">
           <q-btn
             data-testid="completed-tasks-open"
+            :aria-label="$t('headers.completedTasks') + ': ' + $t('navigation.showMore')"
             @click="openDetails"
             color="secondary"
             dense

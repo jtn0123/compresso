@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from tornado.log import app_log
 
 from compresso import config
-from compresso.libs.resumable_transfer import ResumableTransferStore, TransferStorageError, file_sha256
+from compresso.libs.remote.resumable_transfer import ResumableTransferStore, TransferStorageError, file_sha256
 from compresso.libs.safety_state import record_safety_event
 from compresso.libs.unmodels.tasks import Tasks
 from compresso.webserver.api_v2.base_api_handler import (

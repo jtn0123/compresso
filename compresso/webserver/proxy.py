@@ -10,7 +10,7 @@ import tornado.web
 
 from compresso import config
 from compresso.libs import narrowing
-from compresso.libs.installation_link import Links
+from compresso.libs.remote.installation_link import Links
 from compresso.webserver.request_auth import API_AUTH_HEADER_NAME, authorize_request
 from compresso.webserver.security_headers import SecurityHeadersMixin
 

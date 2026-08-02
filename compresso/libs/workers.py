@@ -47,11 +47,11 @@ from compresso import config
 from compresso.libs import common
 from compresso.libs.disk_space_guard import DiskSpaceCheck, DiskSpaceGuard
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.monitoring.worker_subprocess_monitor import WorkerSubprocessMonitor
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.safety_state import SafetyForeman, record_safety_event
 from compresso.libs.task import Task
 from compresso.libs.unmodels.tasks import Tasks
-from compresso.libs.worker_subprocess_monitor import WorkerSubprocessMonitor
 
 type WorkerLog = deque[str] | list[str]
 type RunnerInfo = dict[str, dict[str, object]]
@@ -974,8 +974,9 @@ class Worker(threading.Thread):
         self.monitor.unset_proc()
 
 
-# Backward-compatible imports
-from compresso.libs.worker_subprocess_monitor import WorkerCommandError as WorkerCommandError  # noqa: E402, F811, F401
-from compresso.libs.worker_subprocess_monitor import (  # noqa: E402, F811, F401
+# Backward-compatible re-exports for callers that historically imported these
+# names from `compresso.libs.workers`; they now live in `compresso.libs.monitoring`.
+from compresso.libs.monitoring.worker_subprocess_monitor import (  # noqa: E402, F401, F811, I001
+    WorkerCommandError as WorkerCommandError,
     WorkerSubprocessMonitor as WorkerSubprocessMonitor,
 )
