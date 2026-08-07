@@ -25,6 +25,12 @@ coverage.xml
 venv/**
 .venv/**
 
+# Local environment configuration. `.env.example` is the committed template;
+# a filled-in `.env` holds real values and must never be committed.
+.env
+.env.local
+.env.*.local
+
 # Files created during the build process
 .eggs/**
 build/**
