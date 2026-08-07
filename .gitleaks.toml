@@ -7,6 +7,12 @@
 # abbreviate the variable name, so the rules have to cover that too.
 
 title = "Compresso gitleaks config"
+# The upstream default ruleset (AWS keys, GitHub PATs, Slack/Stripe tokens,
+# private keys, ...) runs in addition to the project rules below. Without this,
+# a custom config REPLACES the built-in ruleset entirely, so every well-known
+# provider credential format goes unscanned while the report still says "clean".
+[extend]
+useDefault = true
 
 [allowlist]
 description = "Allowlisted files and patterns"
@@ -19,6 +25,14 @@ paths = [
     # Pinned dependency manifests. Hashes and long version pins in these are
     # not credentials, and they churn on every dependency bump.
     '''requirements.*\.(txt|lock)$''',
+
+    # Vendored FullCalendar demo page, present only in history (the whole
+    # webserver/assets/global/plugins/ tree is gone at HEAD). It ships upstream
+    # with FullCalendar's own throwaway Google Calendar key and the adjacent
+    # comment "THIS KEY WON'T WORK IN PRODUCTION!!!"; it was never ours and was
+    # never live. Scoped to this one file rather than the vendored tree so any
+    # other credential shape under plugins/ still reports.
+    '''(^|/)webserver/assets/global/plugins/fullcalendar/demos/gcal\.html$''',
 ]
 
 # Placeholder values, not real credentials.
