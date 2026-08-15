@@ -1,23 +1,23 @@
 -r requirements.txt
 
-ruff==0.16.0
+ruff==0.16.2
 pytest==9.1.1
 pytest-cov==7.1.0
 pytest-benchmark==5.2.3
 pytest-asyncio==1.4.0
 pytest-split==0.11.0
-wheel==0.47.0
-setuptools==83.0.0
+wheel==0.48.0
+setuptools==84.0.0
 build==1.5.1
 # build and pytest only declare this dependency on Windows. Pin it explicitly
 # so locks compiled on another OS retain its hash.
 colorama==0.4.6
 yappi==1.7.6            # Thread-aware profiler for dev profiling
 mypy==2.3.0             # Gradual type checking
-types-peewee==4.2.6.20260723
+types-peewee==4.3.0.20260807
 types-psutil==7.2.2.20260518
 pip-audit==2.10.1       # Dependency vulnerability auditing
-pip-tools==7.6.0       # Reproducible hash-locked dependency compilation
+pip-tools==7.6.1       # Reproducible hash-locked dependency compilation
 
 # API schema exporting
 apispec==6.10.0
