@@ -42,6 +42,16 @@ RUN \
             && rm -f sigstore-*.tgz \
             && cd /; \
         fi \
+    && \
+    echo "**** Patch ip-address CVE-2026-69192 in bundled npm ****" \
+        && IPADDR_DIR="/usr/lib/node_modules/npm/node_modules/ip-address" \
+        && if [ -d "$IPADDR_DIR" ]; then \
+            cd "$IPADDR_DIR" \
+            && npm pack ip-address@10.3.1 2>/dev/null \
+            && tar -xzf ip-address-*.tgz --strip-components=1 \
+            && rm -f ip-address-*.tgz \
+            && cd /; \
+        fi \
         && \
         echo "**** Make default paths for compresso library ****" \
             && mkdir -p /library
