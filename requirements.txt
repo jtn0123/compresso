@@ -13,8 +13,8 @@ requests_toolbelt==1.0.0
 urllib3==2.7.0
 py-cpuinfo==9.0.0
 JSON-log-formatter==1.2.1
-xxhash==4.0.0
-filelock==3.32.2
+xxhash==4.0.1
+filelock==3.32.3
 
 # Optional requirements
 watchdog==6.0.0
