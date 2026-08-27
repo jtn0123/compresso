@@ -2,8 +2,8 @@
 schedule==1.2.2
 tornado==6.5.8
 marshmallow==4.3.1
-peewee==4.3.0
-peewee_migrate==1.15.0
+peewee==4.4.0
+peewee_migrate==2.3.0
 psutil==7.2.2
 requests==2.34.2
 requests_toolbelt==1.0.0
@@ -13,8 +13,8 @@ requests_toolbelt==1.0.0
 urllib3==2.7.0
 py-cpuinfo==9.0.0
 JSON-log-formatter==1.2.1
-xxhash==4.0.0
-filelock==3.32.2
+xxhash==4.0.1
+filelock==3.32.4
 
 # Optional requirements
 watchdog==6.0.0
