@@ -36,10 +36,16 @@ class _Settings:
     def get_api_auth_enabled(self):
         return self.api_auth_enabled
 
+    def get_api_auth_enforced(self):
+        return self.api_auth_enabled
+
     def get_api_auth_token(self):
         return self.api_auth_token
 
     def get_csrf_protection_enabled(self):
+        return self.csrf_protection_enabled
+
+    def get_csrf_protection_enforced(self):
         return self.csrf_protection_enabled
 
 

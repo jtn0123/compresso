@@ -67,6 +67,7 @@ vi.mock('quasar', () => ({
 }))
 
 import { shallowMountWithQuasar } from 'src/test-utils'
+import { serializeNotificationChannel } from 'src/types/notifications'
 import SettingsNotifications from '../SettingsNotifications.vue'
 
 // ---------------------------------------------------------------------------
@@ -97,7 +98,7 @@ const MOCK_CHANNELS = [
 function setupMocks(channels = MOCK_CHANNELS) {
   // Deep copy to prevent cross-test mutation of shared mock data
   const channelsCopy = JSON.parse(JSON.stringify(channels))
-  mockAxiosFn.mockImplementation(({ method, url }) => {
+  mockAxiosFn.mockImplementation(({ method: _method, url }) => {
     if (url && url.includes('notifications/channels/save')) {
       return Promise.resolve({ data: { success: true } })
     }
@@ -325,7 +326,7 @@ describe('SettingsNotifications.vue', () => {
         ([config]) => config.url && config.url.includes('notifications/channels/test'),
       )
       expect(testCalls.length).toBe(1)
-      expect(testCalls[0][0].data.channel).toEqual(channel)
+      expect(testCalls[0][0].data.channel).toEqual(serializeNotificationChannel(channel))
       expect(val(wrapper.vm.testingId)).toBeNull()
     })
   })
@@ -452,6 +453,38 @@ describe('SettingsNotifications.vue', () => {
 
       expect(val(wrapper.vm.loading)).toBe(false)
       expect(val(wrapper.vm.channels)).toEqual([])
+    })
+
+    it('does not overwrite hidden channels after the initial fetch fails', async () => {
+      mockAxiosFn.mockImplementation(({ method, url }) => {
+        if (method === 'get' && url.includes('notifications/channels')) {
+          return Promise.reject(new Error('Network error'))
+        }
+        return Promise.resolve({ data: { success: true } })
+      })
+
+      const wrapper = shallowMountWithQuasar(SettingsNotifications)
+      await flushPromises()
+      wrapper.vm.saveChannels()
+
+      const saveCalls = mockAxiosFn.mock.calls.filter(
+        ([config]) => config.method === 'post' && config.url.includes('notifications/channels/save'),
+      )
+      expect(saveCalls).toHaveLength(0)
+    })
+
+    it('does not treat a malformed channel response as safe to overwrite', async () => {
+      mockAxiosFn.mockImplementation(() => Promise.resolve({ data: { channels: null } }))
+
+      const wrapper = shallowMountWithQuasar(SettingsNotifications)
+      await flushPromises()
+      wrapper.vm.saveChannels()
+
+      expect(val(wrapper.vm.channelsLoaded)).toBe(false)
+      const saveCalls = mockAxiosFn.mock.calls.filter(
+        ([config]) => config.method === 'post' && config.url.includes('notifications/channels/save'),
+      )
+      expect(saveCalls).toHaveLength(0)
     })
   })
 })

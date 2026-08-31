@@ -6,8 +6,15 @@ compresso.settings_link_mixin.py
 Mixin providing remote installation link endpoints for ApiSettingsHandler.
 """
 
+from collections.abc import Mapping
+
 from compresso.libs.installation_link import Links
-from compresso.webserver.api_v2.base_api_handler import BaseApiError
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.schema.settings_schemas import (
     RequestRemoteInstallationLinkConfigSchema,
     RequestSettingsRemoteInstallationAddressValidationSchema,
@@ -18,10 +25,10 @@ from compresso.webserver.api_v2.schema.settings_schemas import (
 MASKED_SECRET_SENTINEL = "********"  # noqa: S105
 
 
-class LinkSettingsMixin:
+class LinkSettingsMixin(BaseApiHandler):
     """Mixin for remote installation link CRUD endpoints."""
 
-    async def validate_remote_installation(self):
+    async def validate_remote_installation(self) -> None:
         """
         Settings - validate a remote installation address
         ---
@@ -72,7 +79,7 @@ class LinkSettingsMixin:
             # Throws exception if the provided address is invalid
             links = Links()
             data = links.validate_remote_installation(
-                json_request.get("address"),
+                string_value(json_request.get("address")),
                 auth=json_request.get("auth"),
                 username=json_request.get("username"),
                 password=json_request.get("password"),
@@ -93,7 +100,7 @@ class LinkSettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def read_link_config(self):
+    async def read_link_config(self) -> None:
         """
         Settings - read the configuration of a remote installation link
         ---
@@ -143,7 +150,7 @@ class LinkSettingsMixin:
             # Fetch all data from the remote installation
             # Throws exception if the provided address is invalid
             links = Links()
-            data = links.read_remote_installation_link_config(json_request.get("uuid"))
+            data = links.read_remote_installation_link_config(string_value(json_request.get("uuid")))
 
             response = self.build_response(
                 SettingsRemoteInstallationLinkConfigSchema(),
@@ -177,7 +184,7 @@ class LinkSettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def write_link_config(self):
+    async def write_link_config(self) -> None:
         """
         Settings - write the configuration of a remote installation link
         ---
@@ -226,14 +233,17 @@ class LinkSettingsMixin:
 
             # Update a single remote installation config by matching the UUID
             links = Links()
-            link_config = json_request.get("link_config")
+            link_config_value = json_request.get("link_config")
+            if not isinstance(link_config_value, Mapping) or not all(isinstance(key, str) for key in link_config_value):
+                raise BaseApiError("Link configuration must be an object")
+            link_config = {str(key): value for key, value in link_config_value.items()}
             masked_fields = [field for field in ("password", "api_token") if link_config.get(field) == MASKED_SECRET_SENTINEL]
             if masked_fields:
-                existing = links.read_remote_installation_link_config(link_config.get("uuid"))
+                existing = links.read_remote_installation_link_config(string_value(link_config.get("uuid")))
                 for field in masked_fields:
                     link_config[field] = existing.get(field, "")
             links.update_single_remote_installation_link_config(
-                link_config, json_request.get("distributed_worker_count_target", 0)
+                link_config, integer_value(json_request.get("distributed_worker_count_target"))
             )
 
             self.write_success()
@@ -244,7 +254,7 @@ class LinkSettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def remove_link_config(self):
+    async def remove_link_config(self) -> None:
         """
         Settings - remove a configuration for a remote installation link
         ---
@@ -293,7 +303,7 @@ class LinkSettingsMixin:
 
             # Delete the remote installation using the given uuid
             links = Links()
-            if not links.delete_remote_installation_link_config(json_request.get("uuid")):
+            if not links.delete_remote_installation_link_config(string_value(json_request.get("uuid"))):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to remove link by its uuid")
                 self.write_error()
                 return

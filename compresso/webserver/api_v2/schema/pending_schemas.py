@@ -135,11 +135,10 @@ class PendingTasksSchema(TableRecordsSuccessSchema):
         metadata={"description": "Pending tasks that are not deferred and can be claimed now"},
     )
 
-    results = fields.Nested(  # type: ignore[assignment]
-        PendingTasksTableResultsSchema,
+    results = fields.List(
+        fields.Nested(PendingTasksTableResultsSchema),
         required=True,
         metadata={"description": "Results"},
-        many=True,
         validate=validate.Length(min=0),
     )
 

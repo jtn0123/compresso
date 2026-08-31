@@ -212,3 +212,20 @@ class TestFfmpegAvailableHwAccelMethods:
         assert result == raw
         call_args = mock_cmd.call_args[0][0]
         assert "-hwaccels" in call_args
+
+
+@pytest.mark.unittest
+class TestFfprobeFileNarrowing:
+    @patch("compresso.libs.unffmpeg.lib.cli.ffprobe_cmd")
+    def test_non_object_json_document_raises_ffprobe_error(self, mock_cmd):
+        """Regression: a valid-JSON non-object probe result reached callers."""
+        for document in ("[1, 2]", '"text"', "5"):
+            mock_cmd.return_value = document
+            with pytest.raises(FFProbeError):
+                cli.ffprobe_file("/tmp/video.mkv")
+
+    @patch("compresso.libs.unffmpeg.lib.cli.ffprobe_cmd")
+    def test_object_json_document_is_returned(self, mock_cmd):
+        mock_cmd.return_value = json.dumps({"format": {"duration": "1.0"}})
+        result = cli.ffprobe_file("/tmp/video.mkv")
+        assert result == {"format": {"duration": "1.0"}}

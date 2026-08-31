@@ -5,26 +5,36 @@
 import asyncio
 import hashlib
 import os
+from collections.abc import Mapping
 
-import tornado.log
+from tornado.log import app_log
 
 from compresso import config
 from compresso.libs.resumable_transfer import ResumableTransferStore, TransferStorageError, file_sha256
 from compresso.libs.safety_state import record_safety_event
 from compresso.libs.unmodels.tasks import Tasks
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.schema.transfer_schemas import RequestTransferSessionSchema
 from compresso.webserver.helpers import pending_tasks
 
 MAX_CHUNK_SIZE = 8 * 1024 * 1024
 
 
-def _decode_path_parameter(value):
+def _decode_path_parameter(value: str | bytes | None) -> str:
     """Tornado's PathMatches may supply captured route values as bytes."""
-    return value.decode("ascii") if isinstance(value, bytes) else value
+    if isinstance(value, bytes):
+        return value.decode("ascii")
+    if isinstance(value, str):
+        return value
+    raise ValueError("Missing route parameter")
 
 
-def _read_file_chunk(path, offset, limit):
+def _read_file_chunk(path: str, offset: int, limit: int) -> bytes:
     with open(path, "rb") as source:
         source.seek(offset)
         return source.read(limit)
@@ -69,7 +79,7 @@ class ApiTransferHandler(BaseApiHandler):
         },
     ]
 
-    def _store(self):
+    def _store(self) -> ResumableTransferStore:
         settings = config.Config()
         root = os.path.join(settings.get_cache_path(), "remote_transfers")
         minimum_free_bytes = 0
@@ -82,7 +92,7 @@ class ApiTransferHandler(BaseApiHandler):
             minimum_free_bytes=minimum_free_bytes,
         )
 
-    def _handle_transfer_error(self, error):
+    def _handle_transfer_error(self, error: Exception) -> None:
         """Map transfer failures to structured client-facing API errors."""
         if isinstance(error, TransferStorageError):
             settings = config.Config()
@@ -101,7 +111,7 @@ class ApiTransferHandler(BaseApiHandler):
             except Exception:
                 # Preserve the storage response even if the secondary safety recorder
                 # cannot be reached, while recording the secondary failure.
-                tornado.log.app_log.exception("Failed to persist the transfer disk-reserve safety latch")
+                app_log.exception("Failed to persist the transfer disk-reserve safety latch")
             status_code = 507
             public_message = "Transfer storage reserve exhausted"
         else:
@@ -115,7 +125,7 @@ class ApiTransferHandler(BaseApiHandler):
             )
         )
 
-    async def begin_transfer(self):
+    async def begin_transfer(self) -> None:
         """Create or resume a bounded checksummed media transfer.
         ---
         description: Create or resume a media transfer using a stable job ID.
@@ -142,10 +152,10 @@ class ApiTransferHandler(BaseApiHandler):
             store = self._store()
             status = await asyncio.to_thread(
                 store.begin,
-                request["job_id"],
-                request["filename"],
-                request["total_size"],
-                request["expected_checksum"],
+                string_value(request["job_id"]),
+                string_value(request["filename"]),
+                integer_value(request["total_size"]),
+                string_value(request["expected_checksum"]),
                 metadata=metadata,
             )
             self.write_success(status)
@@ -154,7 +164,7 @@ class ApiTransferHandler(BaseApiHandler):
         except (OSError, TypeError, ValueError) as error:
             self._handle_transfer_error(error)
 
-    async def get_transfer_status(self, transfer_id=None):
+    async def get_transfer_status(self, transfer_id: str | bytes | None = None) -> None:
         """Read the durable offset for a resumable transfer.
         ---
         description: Return the current offset and completion state for a transfer.
@@ -171,7 +181,7 @@ class ApiTransferHandler(BaseApiHandler):
         except (KeyError, OSError, ValueError) as error:
             self._handle_transfer_error(error)
 
-    async def abandon_transfer(self, transfer_id=None):
+    async def abandon_transfer(self, transfer_id: str | bytes | None = None) -> None:
         """Delete an intentionally abandoned incomplete transfer session.
         ---
         description: Delete an incomplete transfer manifest, partial file, and owned completed directory.
@@ -190,7 +200,7 @@ class ApiTransferHandler(BaseApiHandler):
         except (KeyError, OSError, ValueError) as error:
             self._handle_transfer_error(error)
 
-    async def append_transfer_chunk(self, transfer_id=None):
+    async def append_transfer_chunk(self, transfer_id: str | bytes | None = None) -> None:
         """Append one checksummed chunk at the declared offset.
         ---
         description: Append at most 8 MiB after validating offset, chunk checksum, and disk reserve.
@@ -221,7 +231,7 @@ class ApiTransferHandler(BaseApiHandler):
         except (KeyError, OSError, TypeError, ValueError) as error:
             self._handle_transfer_error(error)
 
-    async def finalize_transfer(self, transfer_id=None):
+    async def finalize_transfer(self, transfer_id: str | bytes | None = None) -> None:
         """Verify and publish a complete transferred file.
         ---
         description: Verify the complete SHA-256 checksum and create the worker task exactly once.
@@ -240,30 +250,35 @@ class ApiTransferHandler(BaseApiHandler):
         except (KeyError, OSError, TypeError, ValueError) as error:
             self._handle_transfer_error(error)
 
-    def _finalize_transfer_sync(self, transfer_id):
+    def _finalize_transfer_sync(self, transfer_id: str) -> dict[str, object]:
         store = self._store()
         completed_path = store.finalize(transfer_id)
         manifest = store.get_manifest(transfer_id)
-        task_info = pending_tasks.add_remote_tasks(str(completed_path), job_id=manifest["job_id"])
-        metadata = manifest.get("metadata", {})
+        task_info = pending_tasks.add_remote_tasks(str(completed_path), job_id=string_value(manifest["job_id"]) or None)
+        if not isinstance(task_info, dict):
+            raise ValueError("Transferred task could not be created")
+        task_id = integer_value(task_info.get("id"))
+        task_status = string_value(task_info.get("status"))
+        metadata_value = manifest.get("metadata", {})
+        metadata = metadata_value if isinstance(metadata_value, Mapping) else {}
         if not pending_tasks.bind_remote_task_identity(
-            task_info["id"],
-            lease_token=metadata.get("lease_token"),
-            origin_installation_uuid=metadata.get("origin_installation_uuid"),
+            task_id,
+            lease_token=string_value(metadata.get("lease_token")) or None,
+            origin_installation_uuid=string_value(metadata.get("origin_installation_uuid")) or None,
         ):
             raise ValueError("Remote task identity conflicts with the existing job")
-        response = store.status(transfer_id)
-        response.update({"id": task_info["id"], "status": task_info["status"], "checksum": manifest["expected_checksum"]})
+        response: dict[str, object] = dict(store.status(transfer_id))
+        response.update({"id": task_id, "status": task_status, "checksum": manifest["expected_checksum"]})
         return response
 
     @staticmethod
-    def _completed_source(task_id):
+    def _completed_source(task_id: str) -> Tasks:
         task = Tasks.get_or_none(Tasks.id == int(task_id))
         if task is None or task.status != "complete" or not os.path.isfile(task.abspath):
             raise ValueError("Completed task output is unavailable")
         return task
 
-    async def get_source_manifest(self, task_id=None):
+    async def get_source_manifest(self, task_id: str | bytes | None = None) -> None:
         """Return metadata for resumable result download.
         ---
         description: Return size and SHA-256 metadata for a completed worker task.
@@ -279,7 +294,7 @@ class ApiTransferHandler(BaseApiHandler):
         except (OSError, TypeError, ValueError) as error:
             self._handle_transfer_error(error)
 
-    def _source_manifest_sync(self, task_id):
+    def _source_manifest_sync(self, task_id: str) -> dict[str, object]:
         task = self._completed_source(task_id)
         return {
             "task_id": task.id,
@@ -289,7 +304,7 @@ class ApiTransferHandler(BaseApiHandler):
             "checksum": file_sha256(task.abspath),
         }
 
-    async def get_source_chunk(self, task_id=None):
+    async def get_source_chunk(self, task_id: str | bytes | None = None) -> None:
         """Download one checksummed result chunk.
         ---
         description: Return at most 8 MiB from a completed worker task with offset and checksum headers.

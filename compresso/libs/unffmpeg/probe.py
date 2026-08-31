@@ -15,13 +15,10 @@ class Probe:
     """Wrap ffprobe so callers don't reach into ``cli`` directly."""
 
     @staticmethod
-    def file(path: str):
+    def file(path: str) -> dict[str, object]:
         """Probe ``path`` with ffprobe and return the parsed result.
 
-        Return type is whatever ``cli.ffprobe_file`` returns — typically
-        a dict from the parsed JSON output, but typed as ``Any`` here so
-        callers don't get a misleadingly-narrow annotation while the
-        underlying helper remains untyped.
+        The CLI boundary validates that ffprobe returned a JSON object.
 
         :param path: filesystem path of the media file to probe.
         """

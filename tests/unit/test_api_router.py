@@ -143,3 +143,9 @@ class TestApiRouter(ApiRouterTestBase):
     def test_unknown_route_returns_404(self):
         response = self.fetch("/compresso/api/v2/does-not-exist/foo", method="GET")
         assert response.code == 404
+
+    def test_short_api_path_returns_404(self):
+        """Regression: paths with fewer than five segments used to IndexError -> 500."""
+        for path in ("/compresso/api/", "/compresso/api/v2"):
+            response = self.fetch(path, method="GET")
+            assert response.code == 404, path

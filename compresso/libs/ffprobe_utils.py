@@ -10,15 +10,43 @@ Used by File Info, Health Check, and other features.
 
 import contextlib
 import json
+import os
 import re
 import subprocess
+from typing import TypedDict
 
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 
 logger = CompressoLogging.get_logger("ffprobe_utils")
 
 
-def probe_file(filepath, timeout=30):
+class MediaMetadata(TypedDict):
+    codec: str
+    resolution: str
+    container: str
+    duration: float
+    bitrate_mbps: float
+
+
+class QualityScores(TypedDict):
+    vmaf_score: float | None
+    ssim_score: float | None
+
+
+def _to_float(value: object) -> float:
+    if isinstance(value, (str, bytes, int, float)):
+        return float(value or 0)
+    return 0.0
+
+
+def _to_int(value: object) -> int:
+    if isinstance(value, (str, bytes, int, float)):
+        return int(value or 0)
+    return 0
+
+
+def probe_file(filepath: str | os.PathLike[str], timeout: float = 30) -> dict[str, object] | None:
     """
     Run ffprobe on a file and return parsed JSON output.
 
@@ -42,7 +70,7 @@ def probe_file(filepath, timeout=30):
         if result.returncode != 0:
             logger.warning("ffprobe failed for %s: %s", filepath, result.stderr[:500] if result.stderr else "")
             return None
-        return json.loads(result.stdout)
+        return narrowing.string_keyed_dict_or_none(json.loads(result.stdout))
     except subprocess.TimeoutExpired:
         logger.warning("ffprobe timed out for %s", filepath)
         return None
@@ -63,22 +91,14 @@ CONTAINER_CODEC_HINTS = {
 }
 
 
-def extract_media_metadata(filepath):
+def extract_media_metadata(filepath: str | os.PathLike[str]) -> MediaMetadata:
     """
     Extract codec, resolution, and container metadata from a media file.
 
     :param filepath: Absolute path to the media file
     :return: dict with 'codec', 'resolution', 'container' keys
     """
-    import os
-
-    result = {
-        "codec": "",
-        "resolution": "",
-        "container": "",
-        "duration": 0,
-        "bitrate_mbps": 0,
-    }
+    result = MediaMetadata(codec="", resolution="", container="", duration=0.0, bitrate_mbps=0.0)
 
     # Container from file extension
     ext = os.path.splitext(filepath)[1].lower().lstrip(".")
@@ -94,34 +114,42 @@ def extract_media_metadata(filepath):
         return result
 
     # Extract duration from format level
+    format_info = narrowing.string_keyed_dict_or_none(probe_data.get("format")) or {}
     with contextlib.suppress(TypeError, ValueError):
-        result["duration"] = float(probe_data.get("format", {}).get("duration", 0) or 0)
+        result["duration"] = _to_float(format_info.get("duration"))
     with contextlib.suppress(TypeError, ValueError):
-        result["bitrate_mbps"] = float(probe_data.get("format", {}).get("bit_rate", 0) or 0) / 1000000
+        result["bitrate_mbps"] = _to_float(format_info.get("bit_rate")) / 1000000
 
-    # Find the first video stream
-    for stream in probe_data.get("streams", []):
-        if stream.get("codec_type") == "video":
-            result["codec"] = stream.get("codec_name", "")
-            height = int(stream.get("height", 0) or 0)
-            if height >= 2160:
-                result["resolution"] = "4K"
-            elif height >= 1440:
-                result["resolution"] = "1440p"
-            elif height >= 1080:
-                result["resolution"] = "1080p"
-            elif height >= 720:
-                result["resolution"] = "720p"
-            elif height >= 480:
-                result["resolution"] = "480p"
-            elif height > 0:
-                result["resolution"] = f"{height}p"
-            break
+    raw_streams = probe_data.get("streams")
+    streams = raw_streams if isinstance(raw_streams, list) else []
+    video_stream = next(
+        (
+            stream
+            for raw_stream in streams
+            if (stream := narrowing.string_keyed_dict_or_none(raw_stream)) is not None and stream.get("codec_type") == "video"
+        ),
+        None,
+    )
+    if video_stream is not None:
+        codec_name = video_stream.get("codec_name")
+        result["codec"] = codec_name if isinstance(codec_name, str) else ""
+        result["resolution"] = _resolution_from_height(_to_int(video_stream.get("height")))
 
     return result
 
 
-def compute_quality_scores(source_path, encoded_path, duration_limit=30):
+def _resolution_from_height(height: int) -> str:
+    for threshold, label in ((2160, "4K"), (1440, "1440p"), (1080, "1080p"), (720, "720p"), (480, "480p")):
+        if height >= threshold:
+            return label
+    return f"{height}p" if height > 0 else ""
+
+
+def compute_quality_scores(
+    source_path: str | os.PathLike[str],
+    encoded_path: str | os.PathLike[str],
+    duration_limit: float = 30,
+) -> QualityScores:
     """
     Compare source and encoded files using SSIM and VMAF quality metrics.
     Limits comparison to the first `duration_limit` seconds for performance.
@@ -131,7 +159,7 @@ def compute_quality_scores(source_path, encoded_path, duration_limit=30):
     :param duration_limit: Max seconds to compare (0 = full file)
     :return: dict with 'vmaf_score' (float|None) and 'ssim_score' (float|None)
     """
-    scores = {"vmaf_score": None, "ssim_score": None}
+    scores = QualityScores(vmaf_score=None, ssim_score=None)
 
     time_limit_args = ["-t", str(duration_limit)] if duration_limit > 0 else []
 

@@ -61,9 +61,13 @@
               <div class="col-auto">
                 <q-badge
                   :color="
-                    gpu.utilization_percent > 80 ? 'negative' : gpu.utilization_percent > 50 ? 'warning' : 'positive'
+                    (gpu.utilization_percent ?? 0) > 80
+                      ? 'negative'
+                      : (gpu.utilization_percent ?? 0) > 50
+                        ? 'warning'
+                        : 'positive'
                   "
-                  :label="Math.round(gpu.utilization_percent) + '%'"
+                  :label="Math.round(gpu.utilization_percent ?? 0) + '%'"
                 />
               </div>
               <div class="col q-px-sm">
@@ -110,7 +114,7 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import LibraryDonutChart from 'components/charts/LibraryDonutChart.vue'
 import CompactStatsGrid from 'components/dashboard/CompactStatsGrid.vue'
 import WorkersPanel from 'components/dashboard/workers/WorkersPanel.vue'
@@ -119,19 +123,30 @@ import HealthCheckPanel from 'components/dashboard/HealthCheckPanel.vue'
 import PendingTasks from 'components/dashboard/pending/PendingTasksDashboardSection.vue'
 import CompletedTasks from 'components/dashboard/completed/CompletedTasksDashboardSection.vue'
 import dateTools from 'src/js/dateTools'
-import { useQuasar } from 'quasar'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import type { CompressoSocket } from 'src/js/compressoGlobals'
 import ReleaseNotesDialog from 'components/docs/ReleaseNotesDialog.vue'
 import GpuUtilizationChart from 'components/charts/GpuUtilizationChart.vue'
 import { useWorkerGauges } from 'src/composables/useWorkerGauges'
 import { useSystemStatus } from 'src/composables/useSystemStatus'
 import { createLogger } from 'src/composables/useLogger'
+import type { ApiSchema } from 'src/types/contracts'
+import {
+  parseDashboardEnvelope,
+  type CompletedTaskSummary,
+  type CompletedTasksMessage,
+  type PendingTaskSummary,
+  type PendingTasksMessage,
+  type QueueEta,
+} from 'src/types/dashboard'
+import type { WorkerInfoMessage, WorkerProgressEntry } from 'src/types/workers'
+import { parseMessageEnvelope } from 'src/types/envelope'
 
-export default {
+export default defineComponent({
   name: 'MainDashboard',
   components: {
     ReleaseNotesDialog,
@@ -146,7 +161,6 @@ export default {
   },
   setup() {
     const { t: $t } = useI18n()
-    const $q = useQuasar()
     const log = createLogger('Dashboard')
     const { generateGroupColour } = useWorkerGauges()
     const {
@@ -158,13 +172,13 @@ export default {
       stopLiveMetrics,
       updateLiveMetrics,
     } = useSystemStatus()
-    const lastWorkersUpdate = ref(null)
+    const lastWorkersUpdate = ref<number | null>(null)
     const workersStale = ref(false)
-    const workerProgressList = ref([])
-    const pendingTasksData = ref({
+    const workerProgressList = ref<Record<string, WorkerProgressEntry>>({})
+    const pendingTasksData = ref<{ taskList: PendingTaskSummary[] }>({
       taskList: [],
     })
-    const completedTasksData = ref({
+    const completedTasksData = ref<{ taskList: CompletedTaskSummary[] }>({
       taskList: [],
     })
     const optimizationData = ref({
@@ -173,9 +187,9 @@ export default {
       percent: 0,
       loading: true,
     })
-    const queueEta = ref(null)
+    const queueEta = ref<QueueEta | null>(null)
 
-    function formatDuration(seconds) {
+    function formatDuration(seconds: number | null | undefined): string | null {
       if (seconds == null || seconds <= 0) return null
       if (seconds < 60) return '< 1m'
       const hours = Math.floor(seconds / 3600)
@@ -184,31 +198,31 @@ export default {
       return minutes + 'm'
     }
 
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
-    let queuedWorkersPayload = null
+    let ws: CompressoSocket | null = null
+    const compressoWSHandler = CompressoWebsocketHandler($t)
+    let queuedWorkersPayload: WorkerInfoMessage[] | null = null
     let queuedWorkerUpdate = false
 
-    let workerGroupColours = {}
+    const workerGroupColours: Record<string, string> = {}
 
-    function getWorkerGroupColour(workerName) {
-      if (workerName in workerGroupColours) {
-        return workerGroupColours[workerName]
-      }
-      workerGroupColours[workerName] = generateGroupColour(workerName)
-      return workerGroupColours[workerName]
+    function getWorkerGroupColour(workerName: string): string {
+      const current = workerGroupColours[workerName]
+      if (current) return current
+      const generated = generateGroupColour(workerName)
+      workerGroupColours[workerName] = generated
+      return generated
     }
 
-    function buildWorkerProgressEntry(worker) {
-      function calculateEtc(percent_completed, time_elapsed) {
-        const percentToGo = 100 - parseInt(percent_completed)
-        return (parseInt(time_elapsed) / parseInt(percent_completed)) * percentToGo
+    function buildWorkerProgressEntry(worker: WorkerInfoMessage): WorkerProgressEntry {
+      function calculateEtc(percentCompleted: number, timeElapsed: number): number {
+        const percentToGo = 100 - percentCompleted
+        return (timeElapsed / percentCompleted) * percentToGo
       }
 
       const workerGroupColour = getWorkerGroupColour(worker.name)
-      const workerEntry = {
+      const workerEntry: WorkerProgressEntry = {
         indeterminate: false,
-        id: worker.id,
+        id: String(worker.id),
         label: worker.name,
         name: worker.name,
         color: 'warning',
@@ -230,6 +244,8 @@ export default {
         currentTask: worker.current_task ?? null,
         runnersInfo: worker.runners_info || {},
         subprocess: worker.subprocess || {},
+        encodingFps: null,
+        encodingSpeed: null,
       }
 
       if (worker.paused) {
@@ -247,13 +263,13 @@ export default {
         if (typeof worker.runners_info === 'object' && worker.runners_info !== null) {
           for (const runnerValue of Object.values(worker.runners_info)) {
             if (runnerValue.status === 'in_progress') {
-              currentRunner = runnerValue.name
+              currentRunner = runnerValue.name ?? currentRunner
             }
           }
         }
         workerEntry.currentRunner = currentRunner
 
-        const processingDuration = worker.start_time ? (new Date() - new Date(worker.start_time * 1000)) / 1000 : 0
+        const processingDuration = worker.start_time ? (Date.now() - worker.start_time * 1000) / 1000 : 0
         workerEntry.startTime = worker.start_time ? dateTools.printDateTimeString(worker.start_time) : ''
         workerEntry.timeSinceStart = processingDuration > 0 ? dateTools.printSecondsAsDuration(processingDuration) : ''
         workerEntry.currentCommand = worker.current_command || ''
@@ -278,7 +294,7 @@ export default {
           // Prefer backend ETA when available, fall back to frontend calculation
           const backendEta = Number(worker.subprocess?.eta_seconds)
           if (Number.isFinite(backendEta) && backendEta > 0) {
-            workerEntry.etc = formatDuration(backendEta)
+            workerEntry.etc = formatDuration(backendEta) ?? '...'
           } else {
             workerEntry.etc = dateTools.printSecondsAsDuration(calculateEtc(percentValue, elapsedValue))
           }
@@ -301,16 +317,18 @@ export default {
       return workerEntry
     }
 
-    function updateWorkerProgressCharts(data) {
-      const nextWorkerKeys = new Set()
+    function updateWorkerProgressCharts(data: WorkerInfoMessage[]): void {
+      const nextWorkerKeys = new Set<string>()
       for (let i = 0; i < data.length; i++) {
         const worker = data[i]
+        if (!worker) continue
         const workerKey = 'worker-' + worker.id
         nextWorkerKeys.add(workerKey)
 
         const nextWorkerState = buildWorkerProgressEntry(worker)
-        if (workerProgressList.value[workerKey]) {
-          Object.assign(workerProgressList.value[workerKey], nextWorkerState)
+        const existingWorker = workerProgressList.value[workerKey]
+        if (existingWorker) {
+          Object.assign(existingWorker, nextWorkerState)
         } else {
           workerProgressList.value[workerKey] = nextWorkerState
         }
@@ -323,7 +341,7 @@ export default {
       })
     }
 
-    function queueWorkerProgressUpdate(data) {
+    function queueWorkerProgressUpdate(data: WorkerInfoMessage[]): void {
       queuedWorkersPayload = data
       if (queuedWorkerUpdate) {
         return
@@ -347,18 +365,13 @@ export default {
       }
     }
 
-    function updatePendingTasksList(data) {
-      let result
-      let results = []
-      for (let i = 0; i < data.results.length; i++) {
-        result = data.results[i]
-        results[i] = {
-          id: data.results[i].id,
-          priority: data.results[i].priority,
-          label: data.results[i].label,
-          status: data.results[i].status,
-        }
-      }
+    function updatePendingTasksList(data: PendingTasksMessage): void {
+      const results: PendingTaskSummary[] = data.results.map((result) => ({
+        id: result.id,
+        priority: result.priority,
+        label: result.label,
+        status: result.status,
+      }))
       pendingTasksData.value.taskList = results
       if (data.queue_eta) {
         queueEta.value = {
@@ -371,28 +384,24 @@ export default {
       }
     }
 
-    function updateCompletedTasksList(data) {
-      let result
-      let results = []
-      for (let i = 0; i < data.results.length; i++) {
-        result = data.results[i]
-        results[i] = {
-          id: data.results[i].id,
-          label: data.results[i].label,
-          dateTimeCompleted: dateTools.printDateTimeString(data.results[i].finish_time),
-          dateTimeSinceCompleted: data.results[i].human_readable_time,
-          success: data.results[i].success,
-        }
-      }
+    function updateCompletedTasksList(data: CompletedTasksMessage): void {
+      const results: CompletedTaskSummary[] = data.results.map((result) => ({
+        id: result.id,
+        label: result.label,
+        dateTimeCompleted: dateTools.printDateTimeString(result.finish_time),
+        dateTimeSinceCompleted: result.human_readable_time,
+        success: result.success,
+      }))
       completedTasksData.value.taskList = results
     }
 
     function initDashboardWebsocket() {
       ws = compressoWSHandler.init()
-      let activeServerId = null
+      let activeServerId: string | null = null
 
       compressoWSHandler.addEventListener('open', 'start_dashboard_messages', function (evt) {
-        const activeSocket = evt?.target || ws
+        const activeSocket = evt.target instanceof WebSocket ? evt.target : ws
+        if (!activeSocket) return
         activeSocket.send(JSON.stringify({ command: 'start_workers_info', params: {} }))
         activeSocket.send(JSON.stringify({ command: 'start_pending_tasks_info', params: {} }))
         activeSocket.send(JSON.stringify({ command: 'start_completed_tasks_info', params: {} }))
@@ -400,9 +409,10 @@ export default {
       })
 
       compressoWSHandler.addEventListener('message', 'handle_dashboard_messages', function (evt) {
-        if (typeof evt.data === 'string') {
-          let jsonData = JSON.parse(evt.data)
-          if (jsonData.success) {
+        const envelope = parseMessageEnvelope(evt)
+        if (envelope) {
+          const jsonData = parseDashboardEnvelope(envelope)
+          if (jsonData?.success) {
             if (activeServerId === null) {
               activeServerId = jsonData.server_id
             } else {
@@ -425,8 +435,10 @@ export default {
                 updateLiveMetrics(jsonData.data)
                 break
             }
-          } else {
+          } else if (jsonData?.success === false) {
             log.error('WebSocket Error: Received contained errors - ' + evt.data)
+          } else {
+            log.error('WebSocket Error: Received an invalid dashboard message')
           }
         } else {
           log.error('WebSocket Error: Received data was not JSON - ' + evt.data)
@@ -446,10 +458,12 @@ export default {
 
     async function fetchOptimizationProgress() {
       try {
-        const response = await axios.get(getCompressoApiUrl('v2', 'compression/optimization-progress'))
+        const response = await axios.get<ApiSchema<'OptimizationProgress'>>(
+          getCompressoApiUrl('v2', 'compression/optimization-progress'),
+        )
         optimizationData.value = {
-          totalFiles: response.data.total || 0,
-          processedFiles: response.data.processed || 0,
+          totalFiles: response.data.total_files || 0,
+          processedFiles: response.data.processed_files || 0,
           percent: response.data.percent || 0,
           loading: false,
         }
@@ -458,7 +472,7 @@ export default {
       }
     }
 
-    let staleCheckInterval = null
+    let staleCheckInterval: ReturnType<typeof setInterval> | null = null
 
     onMounted(() => {
       initDashboardWebsocket()
@@ -495,7 +509,7 @@ export default {
         url: getCompressoApiUrl('v2', 'workers/worker/pause/all'),
         data: {},
       })
-        .then((response) => {
+        .then(() => {
           this.$q.notify({
             color: 'positive',
             position: 'top',
@@ -520,7 +534,7 @@ export default {
         url: getCompressoApiUrl('v2', 'workers/worker/resume/all'),
         data: {},
       })
-        .then((response) => {
+        .then(() => {
           this.$q.notify({
             color: 'positive',
             position: 'top',
@@ -539,8 +553,8 @@ export default {
           })
         })
     },
-    terminateWorker: function (workerId) {
-      let data = {
+    terminateWorker: function (workerId: string) {
+      const data: ApiSchema<'RequestWorkerById'> = {
         worker_id: workerId,
       }
       axios({
@@ -548,7 +562,7 @@ export default {
         url: getCompressoApiUrl('v2', 'workers/worker/terminate'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           this.$q.notify({
             color: 'positive',
             position: 'top',
@@ -569,7 +583,8 @@ export default {
     },
     terminateAllWorkers: function () {
       for (let key in this.workerProgressList) {
-        let workerData = this.workerProgressList[key]
+        const workerData = this.workerProgressList[key]
+        if (!workerData) continue
         if (workerData.idle) {
           this.terminateWorker(workerData.id)
         } else {
@@ -587,5 +602,5 @@ export default {
       }
     },
   },
-}
+})
 </script>

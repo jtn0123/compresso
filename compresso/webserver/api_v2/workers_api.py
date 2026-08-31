@@ -29,16 +29,17 @@ Copyright:
 
 """
 
-from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.libs.foreman import Foreman
+from compresso.libs.uiserver import CompressoDataQueues, CompressoRunningThreads, DataQueues
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler, string_value
 from compresso.webserver.api_v2.schema.worker_schemas import RequestWorkerByIdSchema, WorkerStatusSuccessSchema
 from compresso.webserver.helpers import workers
 
 
 class ApiWorkersHandler(BaseApiHandler):
-    config = None
-    params = None
-    compresso_data_queues = None
+    params: object
+    compresso_data_queues: DataQueues
+    foreman: Foreman | None
 
     routes = [
         {
@@ -78,14 +79,14 @@ class ApiWorkersHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         urt = CompressoRunningThreads()
         self.compresso_data_queues = udq.get_compresso_data_queues()
         self.foreman = urt.get_compresso_running_thread("foreman")
 
-    async def pause_worker(self):
+    async def pause_worker(self) -> None:
         """
         Workers - Pause worker by ID
         ---
@@ -132,7 +133,7 @@ class ApiWorkersHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestWorkerByIdSchema())
 
-            if not workers.pause_worker_by_id(json_request.get("worker_id")):
+            if not workers.pause_worker_by_id(string_value(json_request.get("worker_id"))):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to pause worker")
                 self.write_error()
                 return
@@ -145,7 +146,7 @@ class ApiWorkersHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def pause_all_workers(self):
+    async def pause_all_workers(self) -> None:
         """
         Workers - Pause all workers
         ---
@@ -196,7 +197,7 @@ class ApiWorkersHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def resume_worker(self):
+    async def resume_worker(self) -> None:
         """
         Workers - Resume worker by ID
         ---
@@ -243,7 +244,7 @@ class ApiWorkersHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestWorkerByIdSchema())
 
-            if not workers.resume_worker_by_id(json_request.get("worker_id")):
+            if not workers.resume_worker_by_id(string_value(json_request.get("worker_id"))):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to resume worker")
                 self.write_error()
                 return
@@ -256,7 +257,7 @@ class ApiWorkersHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def resume_all_workers(self):
+    async def resume_all_workers(self) -> None:
         """
         Workers - Resume all workers
         ---
@@ -307,7 +308,7 @@ class ApiWorkersHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def terminate_worker(self):
+    async def terminate_worker(self) -> None:
         """
         Workers - Terminate worker by ID
         ---
@@ -354,7 +355,7 @@ class ApiWorkersHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestWorkerByIdSchema())
 
-            if not workers.terminate_worker_by_id(json_request.get("worker_id")):
+            if not workers.terminate_worker_by_id(string_value(json_request.get("worker_id"))):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to resume worker")
                 self.write_error()
                 return
@@ -367,7 +368,7 @@ class ApiWorkersHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def terminate_all_workers(self):
+    async def terminate_all_workers(self) -> None:
         """
         Workers - Terminate all workers
         ---
@@ -418,7 +419,7 @@ class ApiWorkersHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def workers_status(self):
+    async def workers_status(self) -> None:
         """
         Workers - Return the status of all workers
         ---
@@ -456,6 +457,8 @@ class ApiWorkersHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
+            if self.foreman is None:
+                raise BaseApiError("Foreman thread is unavailable", status_code=503)
             workers_status = self.foreman.get_all_worker_status()
 
             response = self.build_response(

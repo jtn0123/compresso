@@ -52,11 +52,8 @@ max-complexity = 18
 
 [tool.mypy]
 python_version = "3.13"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true
-disable_error_code = ["import-untyped"]
-warn_redundant_casts = true
+mypy_path = ["typings"]
+strict = true
 exclude = [
     "compresso/webserver/frontend",
     "venv",
@@ -64,8 +61,3 @@ exclude = [
     "dist",
     "build",
 ]
-
-# ORM models use peewee wildcard imports — no type stubs available
-[[tool.mypy.overrides]]
-module = "compresso.libs.unmodels.*"
-disable_error_code = ["name-defined"]

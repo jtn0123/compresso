@@ -229,7 +229,7 @@ describe('MainDashboard.vue', () => {
 
     it('fetches optimization progress on mount', async () => {
       axios.get.mockResolvedValue({
-        data: { total: 100, processed: 42, percent: 42 },
+        data: { total_files: 100, processed_files: 42, percent: 42 },
       })
       const wrapper = shallowMountWithQuasar(MainDashboard)
       await flushPromises()

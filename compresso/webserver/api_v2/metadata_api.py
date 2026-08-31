@@ -31,11 +31,11 @@ Copyright:
 
 from datetime import datetime
 
-from peewee import fn
+from peewee import DoesNotExist, fn
 
 from compresso.libs.metadata import CompressoFileMetadata
 from compresso.libs.unmodels import CompletedTasks, FileMetadata, FileMetadataPaths
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler, integer_value, string_value
 from compresso.webserver.api_v2.schema.history_schemas import (
     MetadataSearchResultsSchema,
     RequestMetadataByFingerprintSchema,
@@ -48,7 +48,7 @@ from compresso.webserver.api_v2.schema.schemas import BaseSuccessSchema
 
 
 class ApiMetadataHandler(BaseApiHandler):
-    params = None
+    params: object
     routes = [
         {
             "path_pattern": r"/metadata/search",
@@ -66,7 +66,7 @@ class ApiMetadataHandler(BaseApiHandler):
             "call_method": "get_metadata_by_fingerprint",
         },
         {
-            "path_pattern": r"/metadata/by-task/([0-9]+)",
+            "path_pattern": r"/metadata/by-task/(?P<task_id>[0-9]+)",
             "supported_methods": ["GET"],
             "call_method": "get_metadata_by_task_id",
         },
@@ -82,29 +82,48 @@ class ApiMetadataHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.params = kwargs.get("params")
 
-    async def search_metadata(self):
+    async def search_metadata(self) -> None:
+        """
+        Metadata - search
+        ---
+        description: Search file metadata by path, with pagination.
+        requestBody:
+            required: false
+            content:
+                application/json:
+                    schema:
+                        RequestMetadataSearchSchema
+        responses:
+            200:
+                description: Matching metadata records.
+                content:
+                    application/json:
+                        schema:
+                            MetadataSearchResultsSchema
+        """
         try:
             if self.request.method == "GET":
-                path = self.get_argument("path", None)
-                offset = self.get_argument("offset", None)
-                limit = self.get_argument("limit", None)
+                path_value: object = self.get_argument("path", None)
+                offset_value: object = self.get_argument("offset", None)
+                limit_value: object = self.get_argument("limit", None)
             else:
                 json_request = self.read_json_request(RequestMetadataSearchSchema())
-                path = json_request.get("path")
-                offset = json_request.get("offset")
-                limit = json_request.get("limit")
+                path_value = json_request.get("path")
+                offset_value = json_request.get("offset")
+                limit_value = json_request.get("limit")
 
             try:
-                offset = int(offset) if offset is not None else 0
-            except Exception:
+                offset = int(offset_value) if isinstance(offset_value, (int, str)) else 0
+            except ValueError:
                 offset = 0
             try:
-                limit = int(limit) if limit is not None else 50
-            except Exception:
+                limit = int(limit_value) if isinstance(limit_value, (int, str)) else 50
+            except ValueError:
                 limit = 50
+            path = string_value(path_value)
 
             if limit < 1:
                 limit = 1
@@ -114,7 +133,7 @@ class ApiMetadataHandler(BaseApiHandler):
             if offset < 0:
                 offset = 0
 
-            results = []
+            results: list[dict[str, object]] = []
             total_count = 0
 
             if not path:
@@ -133,23 +152,25 @@ class ApiMetadataHandler(BaseApiHandler):
                 page_ids = [row.id for row in base.order_by(FileMetadata.updated_at.desc()).limit(limit).offset(offset)]
 
             if page_ids:
-                path_map = {}
-                for row in FileMetadataPaths.select().where(FileMetadataPaths.file_metadata.in_(page_ids)):
-                    path_map.setdefault(row.file_metadata.id, []).append(
+                path_map: dict[int, list[dict[str, object]]] = {}
+                for path_row in FileMetadataPaths.select().where(FileMetadataPaths.file_metadata.in_(page_ids)):
+                    path_map.setdefault(path_row.file_metadata.id, []).append(
                         {
-                            "path": row.path,
-                            "path_type": row.path_type,
+                            "path": path_row.path,
+                            "path_type": path_row.path_type,
                         }
                     )
 
-                for row in FileMetadata.select().where(FileMetadata.id.in_(page_ids)).order_by(FileMetadata.updated_at.desc()):
+                for metadata_row in (
+                    FileMetadata.select().where(FileMetadata.id.in_(page_ids)).order_by(FileMetadata.updated_at.desc())
+                ):
                     results.append(
                         {
-                            "fingerprint": row.fingerprint,
-                            "fingerprint_algo": row.fingerprint_algo,
-                            "metadata_json": CompressoFileMetadata._load_json_dict(row.metadata_json),
-                            "last_task_id": row.last_task_id,
-                            "paths": path_map.get(row.id, []),
+                            "fingerprint": metadata_row.fingerprint,
+                            "fingerprint_algo": metadata_row.fingerprint_algo,
+                            "metadata_json": CompressoFileMetadata._load_json_dict(metadata_row.metadata_json),
+                            "last_task_id": metadata_row.last_task_id,
+                            "paths": path_map.get(metadata_row.id, []),
                         }
                     )
             response = self.build_response(
@@ -167,10 +188,28 @@ class ApiMetadataHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_metadata_by_task(self):
+    async def get_metadata_by_task(self) -> None:
+        """
+        Metadata - by task
+        ---
+        description: Return metadata associated with a completed task.
+        requestBody:
+            required: true
+            content:
+                application/json:
+                    schema:
+                        RequestMetadataByTaskSchema
+        responses:
+            200:
+                description: Metadata associated with the task.
+                content:
+                    application/json:
+                        schema:
+                            MetadataSearchResultsSchema
+        """
         try:
             json_request = self.read_json_request(RequestMetadataByTaskSchema())
-            task_id = json_request.get("task_id")
+            task_id = integer_value(json_request.get("task_id"))
             await self._get_metadata_by_task_id(task_id)
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -178,7 +217,19 @@ class ApiMetadataHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_metadata_by_task_id(self, task_id):
+    async def get_metadata_by_task_id(self, task_id: str) -> None:
+        """
+        Metadata - by task ID
+        ---
+        description: Return metadata associated with the task ID in the path.
+        responses:
+            200:
+                description: Metadata associated with the task.
+                content:
+                    application/json:
+                        schema:
+                            MetadataSearchResultsSchema
+        """
         try:
             await self._get_metadata_by_task_id(int(task_id))
         except BaseApiError as bae:
@@ -187,42 +238,42 @@ class ApiMetadataHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def _get_metadata_by_task_id(self, task_id):
+    async def _get_metadata_by_task_id(self, task_id: int) -> None:
         try:
             completed_task = CompletedTasks.get_by_id(task_id)
-        except CompletedTasks.DoesNotExist:
+        except DoesNotExist:
             self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Completed task not found")
             self.write_error()
             return
 
         path = completed_task.abspath
-        metadata_ids = set()
+        metadata_ids: set[int] = set()
 
-        for row in FileMetadata.select(FileMetadata.id).where(FileMetadata.last_task_id == task_id):
-            metadata_ids.add(row.id)
+        for metadata_row in FileMetadata.select(FileMetadata.id).where(FileMetadata.last_task_id == task_id):
+            metadata_ids.add(metadata_row.id)
 
-        for row in FileMetadataPaths.select(FileMetadataPaths.file_metadata).where(FileMetadataPaths.path == path):
-            metadata_ids.add(row.file_metadata.id)
+        for path_row in FileMetadataPaths.select(FileMetadataPaths.file_metadata).where(FileMetadataPaths.path == path):
+            metadata_ids.add(path_row.file_metadata.id)
 
-        results = []
+        results: list[dict[str, object]] = []
         if metadata_ids:
-            path_map = {}
-            for row in FileMetadataPaths.select().where(FileMetadataPaths.file_metadata.in_(metadata_ids)):
-                path_map.setdefault(row.file_metadata.id, []).append(
+            path_map: dict[int, list[dict[str, object]]] = {}
+            for path_row in FileMetadataPaths.select().where(FileMetadataPaths.file_metadata.in_(metadata_ids)):
+                path_map.setdefault(path_row.file_metadata.id, []).append(
                     {
-                        "path": row.path,
-                        "path_type": row.path_type,
+                        "path": path_row.path,
+                        "path_type": path_row.path_type,
                     }
                 )
 
-            for row in FileMetadata.select().where(FileMetadata.id.in_(metadata_ids)):
+            for metadata_row in FileMetadata.select().where(FileMetadata.id.in_(metadata_ids)):
                 results.append(
                     {
-                        "fingerprint": row.fingerprint,
-                        "fingerprint_algo": row.fingerprint_algo,
-                        "metadata_json": CompressoFileMetadata._load_json_dict(row.metadata_json),
-                        "last_task_id": row.last_task_id,
-                        "paths": path_map.get(row.id, []),
+                        "fingerprint": metadata_row.fingerprint,
+                        "fingerprint_algo": metadata_row.fingerprint_algo,
+                        "metadata_json": CompressoFileMetadata._load_json_dict(metadata_row.metadata_json),
+                        "last_task_id": metadata_row.last_task_id,
+                        "paths": path_map.get(metadata_row.id, []),
                     }
                 )
 
@@ -235,14 +286,32 @@ class ApiMetadataHandler(BaseApiHandler):
         )
         self.write_success(response)
 
-    async def update_metadata(self):
+    async def update_metadata(self) -> None:
+        """
+        Metadata - update
+        ---
+        description: Replace one plugin's metadata for a fingerprint.
+        requestBody:
+            required: true
+            content:
+                application/json:
+                    schema:
+                        RequestMetadataUpdateSchema
+        responses:
+            200:
+                description: Metadata was updated.
+                content:
+                    application/json:
+                        schema:
+                            BaseSuccessSchema
+        """
         try:
             json_request = self.read_json_request(RequestMetadataUpdateSchema())
-            fingerprint = json_request.get("fingerprint")
-            plugin_id = json_request.get("plugin_id")
+            fingerprint = string_value(json_request.get("fingerprint"))
+            plugin_id = string_value(json_request.get("plugin_id"))
             json_blob = json_request.get("json_blob")
 
-            if not isinstance(json_blob, dict):
+            if not isinstance(json_blob, dict) or not all(isinstance(key, str) for key in json_blob):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Metadata update requires a dict payload")
                 self.write_error()
                 return
@@ -261,7 +330,7 @@ class ApiMetadataHandler(BaseApiHandler):
                 return
 
             data = CompressoFileMetadata._load_json_dict(row.metadata_json)
-            data[plugin_id] = json_blob
+            data[plugin_id] = {str(key): value for key, value in json_blob.items()}
             row.metadata_json = CompressoFileMetadata._dump_json_dict(data)
             row.updated_at = datetime.now()
             row.save()
@@ -274,11 +343,31 @@ class ApiMetadataHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def delete_metadata(self):
+    async def delete_metadata(self) -> None:
+        """
+        Metadata - delete
+        ---
+        description: Delete all metadata or one plugin's metadata for a fingerprint.
+        requestBody:
+            required: true
+            content:
+                application/json:
+                    schema:
+                        RequestMetadataDeleteSchema
+        responses:
+            200:
+                description: Metadata was deleted.
+                content:
+                    application/json:
+                        schema:
+                            BaseSuccessSchema
+        """
         try:
             json_request = self.read_json_request(RequestMetadataDeleteSchema())
-            fingerprint = json_request.get("fingerprint")
-            plugin_id = json_request.get("plugin_id")
+            fingerprint_value = json_request.get("fingerprint")
+            plugin_id_value = json_request.get("plugin_id")
+            fingerprint = fingerprint_value if isinstance(fingerprint_value, str) else None
+            plugin_id = plugin_id_value if isinstance(plugin_id_value, str) else None
 
             result = CompressoFileMetadata.delete_for_plugin(fingerprint, plugin_id=plugin_id)
             if not result:
@@ -294,19 +383,37 @@ class ApiMetadataHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_metadata_by_fingerprint(self):
+    async def get_metadata_by_fingerprint(self) -> None:
+        """
+        Metadata - by fingerprint
+        ---
+        description: Return metadata associated with a file fingerprint.
+        requestBody:
+            required: true
+            content:
+                application/json:
+                    schema:
+                        RequestMetadataByFingerprintSchema
+        responses:
+            200:
+                description: Metadata associated with the fingerprint.
+                content:
+                    application/json:
+                        schema:
+                            MetadataSearchResultsSchema
+        """
         try:
             json_request = self.read_json_request(RequestMetadataByFingerprintSchema())
-            fingerprint = json_request.get("fingerprint")
+            fingerprint = string_value(json_request.get("fingerprint"))
             if not fingerprint:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason="Fingerprint not provided")
                 self.write_error()
                 return
 
             row = FileMetadata.get_or_none(FileMetadata.fingerprint == fingerprint)
-            results = []
+            results: list[dict[str, object]] = []
             if row:
-                path_map = []
+                path_map: list[dict[str, object]] = []
                 for path_row in FileMetadataPaths.select().where(FileMetadataPaths.file_metadata == row.id):
                     path_map.append(
                         {

@@ -29,9 +29,11 @@ Copyright:
 
 """
 
+from collections.abc import Mapping
+
 from compresso import config
-from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
+from compresso.webserver.api_v2.base_api_handler import BaseApiError
 from compresso.webserver.api_v2.schema.settings_schemas import (
     SettingsReadAndWriteSchema,
     SettingsSystemConfigSchema,
@@ -62,27 +64,27 @@ PUBLIC_REMOTE_INSTALLATION_FIELDS = (
 )
 
 
-def serialize_public_settings(raw_settings):
+def serialize_public_settings(raw_settings: Mapping[str, object]) -> dict[str, object]:
     """Return settings safe for browser clients and logs."""
     settings = dict(raw_settings)
     settings.pop("api_auth_token", None)
     settings.pop("notification_channels", None)
 
-    public_remotes = []
+    public_remotes: list[dict[str, object]] = []
     remote_installations = settings.get("remote_installations", [])
     if isinstance(remote_installations, list):
         for remote in remote_installations:
-            if not isinstance(remote, dict):
+            if not isinstance(remote, Mapping):
                 continue
             public_remotes.append({field: remote[field] for field in PUBLIC_REMOTE_INSTALLATION_FIELDS if field in remote})
     settings["remote_installations"] = public_remotes
     return settings
 
 
-class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMixin, BaseApiHandler):
-    config = None
-    params = None
-    compresso_data_queues = None
+class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMixin):
+    config: config.Config
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -172,13 +174,13 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
         self.config = config.Config()
 
-    async def get_all_settings(self):
+    async def get_all_settings(self) -> None:
         """
         Settings - read
         ---
@@ -231,7 +233,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def write_settings(self):
+    async def write_settings(self) -> None:
         """
         Settings - save a dictionary of settings
         ---
@@ -279,7 +281,10 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
             json_request = self.read_json_request(SettingsReadAndWriteSchema())
 
             # Get settings dict from request
-            settings_dict = json_request.get("settings", {})
+            settings_value = json_request.get("settings", {})
+            if not isinstance(settings_value, Mapping) or not all(isinstance(key, str) for key in settings_value):
+                raise BaseApiError("Settings must be an object")
+            settings_dict = {str(key): value for key, value in settings_value.items()}
 
             protected_keys = sorted(PROTECTED_SETTINGS.intersection(settings_dict))
             if protected_keys:
@@ -301,7 +306,7 @@ class ApiSettingsHandler(WorkerGroupsMixin, LinkSettingsMixin, LibrarySettingsMi
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_system_configuration(self):
+    async def get_system_configuration(self) -> None:
         """
         Settings - read the system configuration
         ---

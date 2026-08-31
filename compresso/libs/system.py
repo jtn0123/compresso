@@ -31,24 +31,44 @@ Copyright:
 
 import glob
 import os
+import platform
 import subprocess
 import sys
-from typing import Any
+from typing import TypedDict
 
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 
 
+class GpuInfo(TypedDict):
+    type: str
+    hwaccel: str
+    index: int
+    name: str
+    memory_total_mb: int
+    driver_version: str
+
+
+class DevicesInfo(TypedDict):
+    cpu_info: object
+    gpu_info: list[GpuInfo]
+
+
+class SystemInfo(TypedDict):
+    devices: DevicesInfo
+    platform: platform.uname_result
+    python: str
+
+
 class System(metaclass=SingletonType):
-    devices: dict[str, Any] = {}
-    ffmpeg: dict[str, Any] = {}
-    platform: dict[str, Any] = {}
-    python_version: str = ""
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self.devices: DevicesInfo | None = None
+        self.ffmpeg: dict[str, object] = {}
+        self.platform: platform.uname_result | None = None
+        self.python_version = ""
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
-    def __init__(self, *args, **kwargs):
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
-
-    def __get_python_info(self):
+    def __get_python_info(self) -> str:
         """
         Return a string of the python version
 
@@ -60,16 +80,8 @@ class System(metaclass=SingletonType):
             self.python_version = "{}.{}.{}.{}.{}".format(*sys.version_info)
         return self.python_version
 
-    def __detect_gpus(self):
-        """
-        Detect available GPUs on the system.
-        Returns a list of GPU info dicts.
-
-        :return:
-        """
-        gpus = []
-
-        # NVIDIA detection via nvidia-smi
+    def _detect_nvidia_gpus(self) -> list[GpuInfo]:
+        gpus: list[GpuInfo] = []
         try:
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=index,name,memory.total,driver_version", "--format=csv,noheader,nounits"],  # noqa: S607 - nvidia-smi resolved from PATH intentionally
@@ -95,24 +107,30 @@ class System(metaclass=SingletonType):
                         )
         except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
             self.logger.debug("NVIDIA GPU detection skipped: %s", str(e))
+        return gpus
 
-        # VAAPI detection via /dev/dri/render* devices (Linux only)
+    def _detect_vaapi_gpus(self) -> list[GpuInfo]:
+        try:
+            return [
+                {
+                    "type": "vaapi",
+                    "hwaccel": "vaapi",
+                    "index": index,
+                    "name": device_path,
+                    "memory_total_mb": 0,
+                    "driver_version": "",
+                }
+                for index, device_path in enumerate(sorted(glob.glob("/dev/dri/render*")))
+            ]
+        except Exception as e:
+            self.logger.debug("VAAPI GPU detection skipped: %s", str(e))
+            return []
+
+    def __detect_gpus(self) -> list[GpuInfo]:
+        """Detect the GPUs and platform hardware accelerators available on this host."""
+        gpus = self._detect_nvidia_gpus()
         if sys.platform == "linux":
-            try:
-                render_devices = sorted(glob.glob("/dev/dri/render*"))
-                for i, device_path in enumerate(render_devices):
-                    gpus.append(
-                        {
-                            "type": "vaapi",
-                            "hwaccel": "vaapi",
-                            "index": i,
-                            "name": device_path,
-                            "memory_total_mb": 0,
-                            "driver_version": "",
-                        }
-                    )
-            except Exception as e:
-                self.logger.debug("VAAPI GPU detection skipped: %s", str(e))
+            gpus.extend(self._detect_vaapi_gpus())
 
         # VideoToolbox is always available on macOS
         if sys.platform == "darwin":
@@ -142,7 +160,7 @@ class System(metaclass=SingletonType):
 
         return gpus
 
-    def __get_devices_info(self):
+    def __get_devices_info(self) -> DevicesInfo:
         """
         Return a dictionary of device information
 
@@ -150,36 +168,34 @@ class System(metaclass=SingletonType):
         """
         import cpuinfo
 
-        if not self.devices:
+        if self.devices is None:
             self.devices = {
                 "cpu_info": cpuinfo.get_cpu_info(),
                 "gpu_info": self.__detect_gpus(),
             }
         return self.devices
 
-    def __get_platform_info(self):
+    def __get_platform_info(self) -> platform.uname_result:
         """
         Return a dictionary of device information
 
         :return:
         """
-        import platform
-
-        if not self.platform:
+        if self.platform is None:
             self.platform = platform.uname()
         return self.platform
 
-    def info(self):
+    def info(self) -> SystemInfo:
         """
         Returns a dictionary of system information
 
         :return:
         """
-        info = {
-            "devices": self.__get_devices_info(),
-            "platform": self.__get_platform_info(),
-            "python": self.__get_python_info(),
-        }
+        info = SystemInfo(
+            devices=self.__get_devices_info(),
+            platform=self.__get_platform_info(),
+            python=self.__get_python_info(),
+        )
         return info
 
 

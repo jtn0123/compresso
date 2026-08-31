@@ -16,12 +16,54 @@ from contextlib import suppress
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import NotRequired, Protocol, TypedDict, TypeGuard, cast
 
 from compresso.libs.json_state import atomic_json_write
 
 _LOCKS_GUARD = threading.Lock()
 _LOCKS: dict[str, threading.RLock] = {}
+
+
+class SafetySettings(Protocol):
+    def get_userdata_path(self) -> str: ...
+
+
+class SafetyForeman(Protocol):
+    safety_latched: bool
+
+    def pause_all_worker_threads(
+        self,
+        worker_group_id: int | str | None = None,
+        record_paused: bool = False,
+    ) -> bool: ...
+
+
+class RunningThreads(Protocol):
+    def get_compresso_running_thread(self, thread_name: str) -> SafetyForeman | None: ...
+
+
+class SafetyEvent(TypedDict):
+    id: str
+    code: str
+    message: str
+    severity: NotRequired[str]
+    details: NotRequired[dict[str, object]]
+    active: bool
+    occurrences: int
+    first_seen_at: NotRequired[str | None]
+    last_seen_at: NotRequired[str | None]
+    acknowledged_at: str | None
+    acknowledged_by: NotRequired[str | None]
+    cleared_at: NotRequired[str | None]
+    resolution: NotRequired[str | None]
+
+
+class SafetyStateData(TypedDict):
+    schema_version: int
+    pause_required: bool
+    updated_at: str | None
+    released_at: str | None
+    events: list[SafetyEvent]
 
 
 def _lock_for(path: Path) -> threading.RLock:
@@ -52,7 +94,7 @@ class SafetyState:
         return self._now().astimezone(UTC).isoformat().replace("+00:00", "Z")
 
     @classmethod
-    def _empty(cls) -> dict[str, Any]:
+    def _empty(cls) -> SafetyStateData:
         return {
             "schema_version": cls.SCHEMA_VERSION,
             "pause_required": False,
@@ -61,14 +103,14 @@ class SafetyState:
             "events": [],
         }
 
-    def _read(self) -> dict[str, Any]:
+    def _read(self) -> SafetyStateData:
         if not self.path.exists():
             return self._empty()
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             if not isinstance(raw, dict):
                 raise ValueError("invalid safety state")
-            data: dict[str, Any] = raw
+            data = cast("dict[str, object]", raw)
             events = data.get("events")
             if (
                 data.get("schema_version") != self.SCHEMA_VERSION
@@ -78,12 +120,12 @@ class SafetyState:
                 or (any(event["active"] for event in events) and not data["pause_required"])
             ):
                 raise ValueError("unsupported safety state schema")
-            return data
+            return cast("SafetyStateData", data)
         except (OSError, ValueError, TypeError) as exc:
             return self._recover_corrupt_state(exc)
 
     @staticmethod
-    def _valid_event(event: Any) -> bool:
+    def _valid_event(event: object) -> TypeGuard[SafetyEvent]:
         return (
             isinstance(event, dict)
             and isinstance(event.get("id"), str)
@@ -99,7 +141,7 @@ class SafetyState:
             and (event.get("acknowledged_at") is None or isinstance(event.get("acknowledged_at"), str))
         )
 
-    def _recover_corrupt_state(self, exc: Exception) -> dict[str, Any]:
+    def _recover_corrupt_state(self, exc: Exception) -> SafetyStateData:
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         timestamp = self._timestamp().replace(":", "-")
         evidence_path = self.root / f"state.corrupt-{timestamp}.json"
@@ -129,19 +171,21 @@ class SafetyState:
         self._write(state)
         return state
 
-    def _write(self, state: dict[str, Any]) -> None:
+    def _write(self, state: SafetyStateData) -> None:
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         atomic_json_write(self.path, state, mode=0o600)
 
     @staticmethod
-    def _public(state: dict[str, Any]) -> dict[str, Any]:
+    def _public(state: SafetyStateData) -> dict[str, object]:
         snapshot = deepcopy(state)
-        snapshot["status"] = "paused" if snapshot["pause_required"] else "ready"
-        snapshot["active_count"] = sum(bool(event.get("active")) for event in snapshot["events"])
-        snapshot["unacknowledged_count"] = sum(event.get("acknowledged_at") is None for event in snapshot["events"])
-        return snapshot
+        return {
+            **snapshot,
+            "status": "paused" if snapshot["pause_required"] else "ready",
+            "active_count": sum(event["active"] for event in snapshot["events"]),
+            "unacknowledged_count": sum(event.get("acknowledged_at") is None for event in snapshot["events"]),
+        }
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self) -> dict[str, object]:
         with self._lock:
             return self._public(self._read())
 
@@ -151,13 +195,13 @@ class SafetyState:
         message: str,
         *,
         severity: str = "critical",
-        details: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        details: dict[str, object] | None = None,
+    ) -> dict[str, object]:
         if not code.strip() or not message.strip():
             raise ValueError("Safety event code and message are required")
         with self._lock:
             state = self._read()
-            events: list[dict[str, Any]] = state["events"]
+            events = state["events"]
             timestamp = self._timestamp()
             event = next(
                 (item for item in events if item.get("code") == code and item.get("active")),
@@ -187,19 +231,19 @@ class SafetyState:
                         "severity": severity,
                         "details": details or {},
                         "last_seen_at": timestamp,
-                        "occurrences": int(event.get("occurrences", 1)) + 1,
+                        "occurrences": event["occurrences"] + 1,
                     }
                 )
             state["pause_required"] = True
             state["updated_at"] = timestamp
             self._trim(state)
             self._write(state)
-            return deepcopy(event)
+            return dict(deepcopy(event))
 
-    def acknowledge(self, event_id: str, *, actor: str = "operator") -> dict[str, Any]:
+    def acknowledge(self, event_id: str, *, actor: str = "operator") -> dict[str, object]:
         with self._lock:
             state = self._read()
-            events: list[dict[str, Any]] = state["events"]
+            events = state["events"]
             event = next((item for item in events if item.get("id") == event_id), None)
             if event is None:
                 raise KeyError(f"Unknown safety event: {event_id}")
@@ -208,12 +252,12 @@ class SafetyState:
                 event["acknowledged_by"] = actor.strip() or "operator"
                 state["updated_at"] = event["acknowledged_at"]
                 self._write(state)
-            return deepcopy(event)
+            return dict(deepcopy(event))
 
-    def clear(self, code: str, *, resolution: str = "Condition rechecked and cleared") -> dict[str, Any]:
+    def clear(self, code: str, *, resolution: str = "Condition rechecked and cleared") -> dict[str, object]:
         with self._lock:
             state = self._read()
-            events: list[dict[str, Any]] = state["events"]
+            events = state["events"]
             event = next(
                 (item for item in events if item.get("code") == code and item.get("active")),
                 None,
@@ -225,12 +269,12 @@ class SafetyState:
             event["resolution"] = resolution
             state["updated_at"] = event["cleared_at"]
             self._write(state)
-            return deepcopy(event)
+            return dict(deepcopy(event))
 
     def can_release(self) -> tuple[bool, list[str]]:
         with self._lock:
             state = self._read()
-            reasons = []
+            reasons: list[str] = []
             active = [event for event in state["events"] if event.get("active")]
             unacknowledged = [event for event in state["events"] if event.get("acknowledged_at") is None]
             if active:
@@ -239,7 +283,7 @@ class SafetyState:
                 reasons.append(f"{len(unacknowledged)} event(s) still require acknowledgement")
             return not reasons, reasons
 
-    def release_pause(self) -> dict[str, Any]:
+    def release_pause(self) -> dict[str, object]:
         with self._lock:
             allowed, reasons = self.can_release()
             if not allowed:
@@ -251,7 +295,7 @@ class SafetyState:
             self._write(state)
             return self._public(state)
 
-    def _trim(self, state: dict[str, Any]) -> None:
+    def _trim(self, state: SafetyStateData) -> None:
         if len(state["events"]) <= self.max_events:
             return
         active = [event for event in state["events"] if event.get("active")]
@@ -262,7 +306,13 @@ class SafetyState:
         state["events"] = inactive[-(self.max_events - len(active)) :] + active
 
 
-def record_safety_event(settings, foreman, code: str, message: str, **details: Any) -> dict[str, Any]:
+def record_safety_event(
+    settings: SafetySettings,
+    foreman: SafetyForeman | None,
+    code: str,
+    message: str,
+    **details: object,
+) -> dict[str, object]:
     """Persist a safety event and idempotently pause every local worker."""
 
     userdata_path = settings.get_userdata_path()
@@ -273,7 +323,8 @@ def record_safety_event(settings, foreman, code: str, message: str, **details: A
         try:
             from compresso.libs.uiserver import CompressoRunningThreads
 
-            foreman = CompressoRunningThreads().get_compresso_running_thread("foreman")
+            running_threads_factory = cast("Callable[[], RunningThreads]", CompressoRunningThreads)
+            foreman = running_threads_factory().get_compresso_running_thread("foreman")
         except (AttributeError, KeyError, TypeError):
             foreman = None
     if foreman is not None:

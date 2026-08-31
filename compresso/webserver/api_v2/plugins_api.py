@@ -29,9 +29,17 @@ Copyright:
 
 """
 
+from collections.abc import Mapping
+
 from compresso.libs import session
 from compresso.libs.uiserver import CompressoDataQueues
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    boolean_value,
+    integer_list_value,
+    optional_integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.plugin_flow_mixin import PluginFlowMixin
 from compresso.webserver.api_v2.plugin_repos_mixin import PluginReposMixin
 from compresso.webserver.api_v2.schema.plugin_schemas import (
@@ -49,7 +57,7 @@ from compresso.webserver.api_v2.schema.schemas import RequestTableUpdateByIdList
 from compresso.webserver.helpers import plugins
 
 
-class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
+class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin):
     session = None
     config = None
     params = None
@@ -148,13 +156,13 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    async def get_installed_plugins(self):
+    async def get_installed_plugins(self) -> None:
         """
         Plugins - list installed plugins
         ---
@@ -228,7 +236,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def enable_plugins(self):
+    async def enable_plugins(self) -> None:
         """
         Plugins - enable
         ---
@@ -276,7 +284,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         self.write_error()
         return
 
-    async def disable_plugins(self):
+    async def disable_plugins(self) -> None:
         """
         Plugins - disable
         ---
@@ -300,7 +308,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         self.write_error()
         return
 
-    async def update_plugins(self):
+    async def update_plugins(self) -> None:
         """
         Plugins - update
         ---
@@ -347,7 +355,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestTableUpdateByIdList())
 
-            if not plugins.update_plugins(json_request.get("id_list", [])):
+            if not plugins.update_plugins(integer_list_value(json_request.get("id_list"))):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to update the plugins by their IDs")
                 self.write_error()
                 return
@@ -360,7 +368,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def remove_plugins(self):
+    async def remove_plugins(self) -> None:
         """
         Plugins - remove
         ---
@@ -407,7 +415,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestTableUpdateByIdList())
 
-            if not plugins.remove_plugins(json_request.get("id_list", [])):
+            if not plugins.remove_plugins(integer_list_value(json_request.get("id_list"))):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to remove the plugins by their IDs")
                 self.write_error()
                 return
@@ -420,7 +428,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_plugin_info(self):
+    async def get_plugin_info(self) -> None:
         """
         Plugins - return a requested plugin's metadata and settings
         ---
@@ -467,9 +475,9 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsInfoSchema())
 
-            plugin_id = json_request.get("plugin_id")
-            prefer_local = json_request.get("prefer_local")
-            library_id = json_request.get("library_id")
+            plugin_id = string_value(json_request.get("plugin_id"))
+            prefer_local = boolean_value(json_request.get("prefer_local"), True)
+            library_id = optional_integer_value(json_request.get("library_id"))
 
             plugins_info = plugins.prepare_plugin_info_and_settings(
                 plugin_id, prefer_local=prefer_local, library_id=library_id
@@ -498,7 +506,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def update_plugin_settings(self):
+    async def update_plugin_settings(self) -> None:
         """
         Plugins - Save the settings of a single plugin
         ---
@@ -545,9 +553,12 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsSettingsSaveSchema())
 
-            plugin_id = json_request.get("plugin_id")
-            settings = json_request.get("settings")
-            library_id = json_request.get("library_id")
+            plugin_id = string_value(json_request.get("plugin_id"))
+            settings_value = json_request.get("settings")
+            settings = (
+                [item for item in settings_value if isinstance(item, Mapping)] if isinstance(settings_value, list) else []
+            )
+            library_id = optional_integer_value(json_request.get("library_id"))
 
             if not plugins.update_plugin_settings(plugin_id, settings, library_id=library_id):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to save plugins settings")
@@ -562,7 +573,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def reset_plugin_settings(self):
+    async def reset_plugin_settings(self) -> None:
         """
         Plugins - Reset the settings of a single plugin
         ---
@@ -609,8 +620,8 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsSettingsResetSchema())
 
-            plugin_id = json_request.get("plugin_id")
-            library_id = json_request.get("library_id")
+            plugin_id = string_value(json_request.get("plugin_id"))
+            library_id = optional_integer_value(json_request.get("library_id"))
 
             if not plugins.reset_plugin_settings(plugin_id, library_id=library_id):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to reset plugins settings")
@@ -625,7 +636,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_installable_plugin_list(self):
+    async def get_installable_plugin_list(self) -> None:
         """
         Plugins - Read all installable plugins
         ---
@@ -674,7 +685,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def install_plugin_by_id(self):
+    async def install_plugin_by_id(self) -> None:
         """
         Plugins - Install a single plugin by its Plugin ID
         ---
@@ -721,7 +732,9 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestPluginsByIdSchema())
 
-            if not plugins.install_plugin_by_id(json_request.get("plugin_id"), json_request.get("repo_id")):
+            repo_id_value = json_request.get("repo_id")
+            repo_id = repo_id_value if isinstance(repo_id_value, (int, str)) and not isinstance(repo_id_value, bool) else None
+            if not plugins.install_plugin_by_id(string_value(json_request.get("plugin_id")), repo_id):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to install/update plugin")
                 self.write_error()
                 return
@@ -734,7 +747,7 @@ class ApiPluginsHandler(PluginFlowMixin, PluginReposMixin, BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_enabled_panel_plugins_list(self):
+    async def get_enabled_panel_plugins_list(self) -> None:
         """
         Plugins - Read all enabled "data panel" type plugins
         ---

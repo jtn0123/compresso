@@ -162,6 +162,11 @@ class TestFilebrowserFetchPathData:
 
 @pytest.mark.unittest
 class TestHistoryHandler:
+    def test_integer_list_never_turns_boolean_into_destructive_task_id(self):
+        from compresso.webserver.api_v1.history_api import ApiHistoryHandler
+
+        assert ApiHistoryHandler._integer_list([True, 1, "2", 2.5, b"3"]) == [1, 2]
+
     def test_delete_historic_tasks(self):
         from compresso.webserver.api_v1.history_api import ApiHistoryHandler
 

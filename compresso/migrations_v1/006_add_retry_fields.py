@@ -1,12 +1,14 @@
-"""
-Migration 006: Add retry and deferred scheduling fields to Tasks table.
+"""Migration 006: Add retry and deferred scheduling fields to Tasks table.
 
 Adds retry_count, max_retries, and deferred_until nullable fields to support
 automatic task retry with exponential backoff on transient failures.
 """
 
+from compresso.migrations_v1._types import MigrationDatabase
 
-def migrate(migrator, database, fake=False, **kwargs):
+
+def migrate(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
+    del migrator
     if fake:
         return
 
@@ -28,5 +30,6 @@ def migrate(migrator, database, fake=False, **kwargs):
     database.execute_sql("UPDATE tasks SET max_retries = 3 WHERE max_retries IS NULL")
 
 
-def rollback(migrator, database, fake=False, **kwargs):
+def rollback(migrator: object, database: MigrationDatabase, fake: bool = False, **kwargs: object) -> None:
     """Rollback not required — added columns with defaults can remain unused."""
+    del migrator, database, fake, kwargs

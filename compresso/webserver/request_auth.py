@@ -3,13 +3,22 @@
 import base64
 import hmac
 
+from tornado.httputil import HTTPServerRequest
+from tornado.web import RequestHandler
+
 from compresso import config
+from compresso.libs.constants import API_AUTH_HEADER_NAME, WEBSOCKET_AUTH_PROTOCOL_PREFIX
 
-API_AUTH_HEADER_NAME = "X-Compresso-Api-Token"
-WEBSOCKET_AUTH_PROTOCOL_PREFIX = "compresso-auth."
+__all__ = [
+    "API_AUTH_HEADER_NAME",
+    "WEBSOCKET_AUTH_PROTOCOL_PREFIX",
+    "authorize_request",
+    "encode_websocket_token",
+    "request_has_valid_api_token",
+]
 
 
-def _explicit_bool(value):
+def _explicit_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -19,12 +28,12 @@ def _explicit_bool(value):
     return False
 
 
-def encode_websocket_token(token):
+def encode_websocket_token(token: object) -> str:
     """Encode a token using characters allowed in a WebSocket subprotocol."""
     return base64.urlsafe_b64encode(str(token).encode("utf-8")).decode("ascii").rstrip("=")
 
 
-def _decode_websocket_token(encoded_token):
+def _decode_websocket_token(encoded_token: str) -> str:
     try:
         padding = "=" * (-len(encoded_token) % 4)
         return base64.urlsafe_b64decode(encoded_token + padding).decode("utf-8")
@@ -32,7 +41,7 @@ def _decode_websocket_token(encoded_token):
         return ""
 
 
-def _websocket_token(request):
+def _websocket_token(request: HTTPServerRequest) -> str:
     offered = request.headers.get("Sec-WebSocket-Protocol", "")
     for protocol in (item.strip() for item in offered.split(",")):
         if protocol.startswith(WEBSOCKET_AUTH_PROTOCOL_PREFIX):
@@ -40,7 +49,12 @@ def _websocket_token(request):
     return ""
 
 
-def request_has_valid_api_token(request, expected_token, *, allow_websocket_protocol=False):
+def request_has_valid_api_token(
+    request: HTTPServerRequest,
+    expected_token: str | None,
+    *,
+    allow_websocket_protocol: bool = False,
+) -> bool:
     """Return whether a request carries the configured API token."""
     if not expected_token:
         return False
@@ -60,10 +74,15 @@ def request_has_valid_api_token(request, expected_token, *, allow_websocket_prot
     return False
 
 
-def authorize_request(handler, *, allow_websocket_protocol=False, allow_options=True):
+def authorize_request(
+    handler: RequestHandler,
+    *,
+    allow_websocket_protocol: bool = False,
+    allow_options: bool = True,
+) -> bool:
     """Enforce optional API auth on any Tornado request handler."""
     settings = config.Config()
-    if not _explicit_bool(settings.get_api_auth_enabled()):
+    if not _explicit_bool(settings.get_api_auth_enforced()):
         return True
     if allow_options and handler.request.method == "OPTIONS":
         return True

@@ -9,6 +9,8 @@ API handler for file info endpoints.
 
 import os
 
+from peewee import DoesNotExist
+
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.fileinfo_schemas import (
     FileInfoResponseSchema,
@@ -32,7 +34,7 @@ class ApiFileinfoHandler(BaseApiHandler):
         },
     ]
 
-    async def probe_file(self):
+    async def probe_file(self) -> None:
         """
         FileInfo - probe file
         ---
@@ -54,7 +56,8 @@ class ApiFileinfoHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(RequestFileInfoProbeSchema())
-            file_path = json_request.get("file_path", "")
+            file_path_value = json_request.get("file_path", "")
+            file_path = file_path_value if isinstance(file_path_value, str) else ""
 
             if not os.path.exists(file_path):
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"File not found: {file_path}")
@@ -85,7 +88,7 @@ class ApiFileinfoHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def probe_task_file(self):
+    async def probe_task_file(self) -> None:
         """
         FileInfo - probe task file
         ---
@@ -107,13 +110,16 @@ class ApiFileinfoHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(RequestFileInfoTaskSchema())
-            task_id = json_request.get("task_id")
+            task_id_value = json_request.get("task_id")
+            if not isinstance(task_id_value, int):
+                raise BaseApiError("Task ID must be an integer")
+            task_id = task_id_value
 
             from compresso.libs.unmodels import CompletedTasks
 
             try:
                 task = CompletedTasks.get_by_id(task_id)
-            except CompletedTasks.DoesNotExist:
+            except DoesNotExist:
                 self.set_status(self.STATUS_ERROR_EXTERNAL, reason=f"Task not found: {task_id}")
                 self.write_error()
                 return

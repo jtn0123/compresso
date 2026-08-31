@@ -20,15 +20,16 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { ref } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { LocalStorage } from 'quasar'
+import type { ApiSchema } from 'src/types/contracts'
 
 export default {
   data() {
-    const iframeSrc = ref(null)
+    const iframeSrc = ref<string | null>(null)
     return {
       page: '',
       iframeSrc,
@@ -44,22 +45,23 @@ export default {
     }
   },
   methods: {
-    setPageFromParams(pluginId) {
-      if (typeof pluginId !== 'undefined') {
+    setPageFromParams(pluginId: unknown) {
+      const normalizedPluginId = Array.isArray(pluginId) ? pluginId[0] : pluginId
+      if (typeof normalizedPluginId === 'string') {
         let theme = LocalStorage.getItem('theme')
-        this.iframeSrc = '/compresso/panel/' + pluginId + '/?theme=' + theme
+        this.iframeSrc = '/compresso/panel/' + normalizedPluginId + '/?theme=' + theme
       }
     },
     setPageAsFirstEnabledPanel() {
-      axios({
+      axios<ApiSchema<'PluginsDataPanelTypesData'>>({
         method: 'get',
         url: getCompressoApiUrl('v2', 'plugins/panels/enabled'),
       })
         .then((response) => {
           // Success
           if (response.data.results.length > 0) {
-            let first = response.data.results[0]
-            this.setPageFromParams(first.plugin_id)
+            const first = response.data.results[0]
+            if (first) this.setPageFromParams(first.plugin_id)
           }
         })
         .catch(() => {
@@ -74,7 +76,7 @@ export default {
     },
   },
   watch: {
-    $route(to, from) {
+    $route(to, _from) {
       if (typeof to.query !== 'undefined') {
         this.setPageFromParams(to.query.pluginId)
       }

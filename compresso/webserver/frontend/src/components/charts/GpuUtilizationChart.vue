@@ -13,11 +13,14 @@
   </q-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
 import { useChartTheme } from 'src/composables/useChartTheme'
+import type { Chart as ChartInstance, ChartDataset } from 'chart.js'
+import type { GpuHistory } from 'src/types/contracts'
 
 const { getChartColor, chartBgColor } = useChartTheme()
 
@@ -33,15 +36,21 @@ const TEMP_COLORS = {
   amd: '#f1948a',
 }
 
-function getGpuColor(type) {
-  return GPU_COLORS[type] || { border: getChartColor(3), bg: chartBgColor(3, 0.1) }
+type GpuVendor = keyof typeof GPU_COLORS
+
+function isGpuVendor(type: string): type is GpuVendor {
+  return type in GPU_COLORS
 }
 
-function getTempColor(type) {
-  return TEMP_COLORS[type] || getChartColor(4)
+function getGpuColor(type: string): { border: string; bg: string } {
+  return isGpuVendor(type) ? GPU_COLORS[type] : { border: getChartColor(3), bg: chartBgColor(3, 0.1) }
 }
 
-function gpuTypeColor(gpuName) {
+function getTempColor(type: string): string {
+  return isGpuVendor(type) ? TEMP_COLORS[type] : getChartColor(4)
+}
+
+function gpuTypeColor(gpuName: string): GpuVendor | 'default' {
   const lower = (gpuName || '').toLowerCase()
   if (lower.includes('nvidia') || lower.includes('geforce') || lower.includes('rtx') || lower.includes('gtx'))
     return 'nvidia'
@@ -52,20 +61,20 @@ function gpuTypeColor(gpuName) {
 }
 
 const props = defineProps({
-  gpuHistory: { type: Object, default: () => ({}) },
+  gpuHistory: { type: Object as PropType<GpuHistory>, default: () => ({}) },
 })
 
 const { t } = useI18n()
 const $q = useQuasar()
-const chartRef = ref(null)
-let chart = null
+const chartRef = ref<HTMLCanvasElement | null>(null)
+let chart: ChartInstance<'line'> | null = null
 
 const hasData = computed(() => {
   if (!props.gpuHistory || typeof props.gpuHistory !== 'object') return false
   return Object.values(props.gpuHistory).some((arr) => Array.isArray(arr) && arr.length > 0)
 })
 
-function formatTime(timestamp) {
+function formatTime(timestamp: number): string {
   const d = new Date(timestamp * 1000)
   return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0')
 }
@@ -85,8 +94,8 @@ async function renderChart() {
   const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
   const labelColor = isDark ? '#aaa' : '#666'
 
-  const datasets = []
-  let allLabels = []
+  const datasets: ChartDataset<'line', (number | null)[]>[] = []
+  let allLabels: string[] = []
 
   for (const [gpuIndex, points] of Object.entries(props.gpuHistory)) {
     if (!Array.isArray(points) || points.length === 0) continue
@@ -153,7 +162,7 @@ async function renderChart() {
                   (ctx.parsed.y != null ? ctx.parsed.y.toFixed(0) + '\u00B0C' : t('gpu.notAvailable'))
                 )
               }
-              return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '%'
+              return ctx.dataset.label + ': ' + (ctx.parsed.y ?? 0).toFixed(1) + '%'
             },
           },
         },

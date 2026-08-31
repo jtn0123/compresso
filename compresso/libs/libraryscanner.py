@@ -35,19 +35,31 @@ import os
 import queue
 import threading
 import time
+from collections.abc import Iterable, Iterator, Mapping
+from typing import cast
 
 import schedule
 
 from compresso import config
+from compresso.libs import narrowing
 from compresso.libs.filetest import FileTesterThread
 from compresso.libs.frontend_push_messages import FrontendPushMessages
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.scan_checkpoint import CHECKPOINT_MTIME_SLOP_NS, ScanCheckpointStore
+from compresso.libs.taskhandler import QueuedPath
 
 
-def iter_sorted_library_directories(walk_entries):
+def _queue(value: object) -> queue.Queue[object]:
+    if not isinstance(value, queue.Queue):
+        raise TypeError("library scanner data queue is missing")
+    return cast("queue.Queue[object]", value)
+
+
+def iter_sorted_library_directories(
+    walk_entries: Iterable[tuple[str, list[str], list[str]]],
+) -> Iterator[tuple[str, list[str]]]:
     """Yield deterministic, directory-sized scan batches from an os.walk iterable."""
     for root, subfolders, files in walk_entries:
         subfolders.sort()
@@ -56,30 +68,30 @@ def iter_sorted_library_directories(walk_entries):
 
 
 class LibraryScannerManager(threading.Thread):
-    def __init__(self, data_queues, event):
+    def __init__(self, data_queues: Mapping[str, object], event: threading.Event) -> None:
         super().__init__(name="LibraryScannerManager")
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.interval = 0
         self.firstrun = True
         self.data_queues = data_queues
         self.settings = config.Config()
         self.event = event
-        self.scheduledtasks = data_queues["scheduledtasks"]
-        self.library_scanner_triggers = data_queues["library_scanner_triggers"]
+        self.scheduledtasks = cast("queue.Queue[QueuedPath]", _queue(data_queues["scheduledtasks"]))
+        self.library_scanner_triggers = cast("queue.Queue[str]", _queue(data_queues["library_scanner_triggers"]))
         self.abort_flag = threading.Event()
         self.abort_flag.clear()
         self.scheduler = schedule.Scheduler()
 
-        self.file_test_managers = {}
-        self.files_to_test = queue.Queue()
-        self.files_to_process = queue.Queue()
+        self.file_test_managers: dict[int, FileTesterThread] = {}
+        self.files_to_test: queue.Queue[str] = queue.Queue()
+        self.files_to_process: queue.Queue[dict[str, object]] = queue.Queue()
 
-    def stop(self):
+    def stop(self) -> None:
         self.abort_flag.set()
         # Stop all child threads
         self.stop_all_file_test_managers()
 
-    def abort_is_set(self):
+    def abort_is_set(self) -> bool:
         # Check if the abort flag is set
         if self.abort_flag.is_set():
             # Return True straight away if it is
@@ -89,7 +101,7 @@ class LibraryScannerManager(threading.Thread):
         # Return False
         return False
 
-    def run(self):
+    def run(self) -> None:
         self.logger.info("Starting LibraryScanner Monitor loop")
         while not self.abort_is_set():
             self.event.wait(1)
@@ -110,42 +122,33 @@ class LibraryScannerManager(threading.Thread):
                     self.scheduled_job()
                 self.firstrun = False
 
-                # Then loop and wait for the schedule
-                while not self.abort_is_set():
-                    # Delay for 1 second before checking again.
-                    self.event.wait(1)
-
-                    # Check if a manual library scan was triggered
-                    try:
-                        if not self.library_scanner_triggers.empty():
-                            trigger = self.library_scanner_triggers.get_nowait()
-                            if trigger == "library_scan":
-                                self.scheduled_job()
-                                break
-                    except queue.Empty:
-                        continue
-                    except Exception as e:
-                        self.logger.exception("Exception in retrieving library scanner trigger %s: %s", self.name, e)
-
-                    # Check if library scanner is enabled
-                    if not self.settings.get_enable_library_scanner():
-                        # The library scanner is not enabled. Dont run anything
-                        self.event.wait(20)
-                        continue
-
-                    # Check if scheduled task is due
-                    self.scheduler.run_pending()
-
-                    # If the settings have changed, then break this loop and clear
-                    # the scheduled job resetting to the new interval
-                    if int(self.settings.get_schedule_full_scan_minutes()) != self.interval:
-                        self.logger.info("Resetting LibraryScanner schedule")
-                        break
+                self._run_scheduled_scan_loop()
                 self.scheduler.clear()
 
         self.logger.info("Leaving LibraryScanner Monitor loop...")
 
-    def scheduled_job(self):
+    def _run_scheduled_scan_loop(self) -> None:
+        while not self.abort_is_set():
+            self.event.wait(1)
+            try:
+                trigger = self.library_scanner_triggers.get_nowait()
+            except queue.Empty:
+                trigger = None
+            except Exception as error:
+                self.logger.exception("Exception retrieving library scanner trigger %s: %s", self.name, error)
+                trigger = None
+            if trigger == "library_scan":
+                self.scheduled_job()
+                return
+            if not self.settings.get_enable_library_scanner():
+                self.event.wait(20)
+                continue
+            self.scheduler.run_pending()
+            if int(self.settings.get_schedule_full_scan_minutes()) != self.interval:
+                self.logger.info("Resetting LibraryScanner schedule")
+                return
+
+    def scheduled_job(self) -> None:
         """
         Function called by the scheduled task
 
@@ -177,7 +180,7 @@ class LibraryScannerManager(threading.Thread):
         if no_libraries_configured:
             self.logger.info("No libraries are configured to run a library scan")
 
-    def system_configuration_is_valid(self):
+    def system_configuration_is_valid(self) -> bool:
         """
         Check and ensure the system configuration is correct for running
 
@@ -186,7 +189,7 @@ class LibraryScannerManager(threading.Thread):
         plugin_handler = PluginsHandler()
         return not plugin_handler.get_incompatible_enabled_plugins()
 
-    def add_path_to_queue(self, pathname, library_id, priority_score):
+    def add_path_to_queue(self, pathname: str, library_id: int, priority_score: int) -> None:
         self.scheduledtasks.put(
             {
                 "pathname": pathname,
@@ -195,7 +198,12 @@ class LibraryScannerManager(threading.Thread):
             }
         )
 
-    def start_results_manager_thread(self, manager_id, status_updates, library_id):
+    def start_results_manager_thread(
+        self,
+        manager_id: int,
+        status_updates: queue.Queue[str],
+        library_id: int,
+    ) -> None:
         manager = FileTesterThread(
             f"FileTesterThread-{manager_id}", self.files_to_test, self.files_to_process, status_updates, library_id, self.event
         )
@@ -203,38 +211,39 @@ class LibraryScannerManager(threading.Thread):
         manager.start()
         self.file_test_managers[manager_id] = manager
 
-    def stop_all_file_test_managers(self):
+    def stop_all_file_test_managers(self) -> None:
         for manager_id in self.file_test_managers:
             self.file_test_managers[manager_id].abort_flag.set()
 
     @staticmethod
-    def update_scan_progress(frontend_messages, message):
+    def update_scan_progress(frontend_messages: FrontendPushMessages, message: str) -> None:
         frontend_messages.update(
             {"id": "libraryScanProgress", "type": "status", "code": "libraryScanProgress", "message": message, "timeout": 0}
         )
 
-    def file_tests_in_progress(self):
+    def file_tests_in_progress(self) -> bool:
         """
         Check if any file tester threads are still processing a file.
 
         :return: bool
         """
         for manager in self.file_test_managers.values():
-            if getattr(manager, "is_testing_file", None) and manager.is_testing_file():
+            testing_check = getattr(manager, "is_testing_file", None)
+            if callable(testing_check) and bool(testing_check()):
                 return True
         return False
 
-    def scan_work_is_pending(self):
+    def scan_work_is_pending(self) -> bool:
         """Include dequeued work that a tester has not acknowledged yet."""
         return bool(self.files_to_test.unfinished_tasks) or self.file_tests_in_progress()
 
-    def get_scan_queue_limit(self):
+    def get_scan_queue_limit(self) -> int:
         try:
             return max(1, int(self.settings.get_library_scan_queue_limit()))
         except (AttributeError, TypeError, ValueError):
             return 500
 
-    def get_scan_checkpoint_store(self):
+    def get_scan_checkpoint_store(self) -> ScanCheckpointStore | None:
         try:
             userdata_path = self.settings.get_userdata_path()
         except (AttributeError, TypeError):
@@ -244,13 +253,19 @@ class LibraryScannerManager(threading.Thread):
         return ScanCheckpointStore(userdata_path)
 
     @staticmethod
-    def root_was_completed(root, library_path, completed_root):
+    def root_was_completed(root: str, library_path: str, completed_root: str | None) -> bool:
         if not completed_root:
             return False
         relative_root = os.path.relpath(root, library_path)
         return relative_root == completed_root
 
-    def drain_scan_outputs(self, status_updates, frontend_messages, current_file, library_id):
+    def drain_scan_outputs(
+        self,
+        status_updates: queue.Queue[str],
+        frontend_messages: FrontendPushMessages,
+        current_file: str,
+        library_id: int,
+    ) -> str:
         while True:
             try:
                 current_file = status_updates.get_nowait()
@@ -261,12 +276,21 @@ class LibraryScannerManager(threading.Thread):
                 item = self.files_to_process.get_nowait()
             except queue.Empty:
                 break
-            self.add_path_to_queue(item.get("path"), library_id, item.get("priority_score"))
+            path = item.get("path")
+            if not isinstance(path, str):
+                self.logger.warning("Ignoring malformed library scan output without a path")
+                continue
+            self.add_path_to_queue(path, library_id, narrowing.coerce_int(item.get("priority_score")))
         if current_file:
             self.update_scan_progress(frontend_messages, f"Testing: {current_file}")
         return current_file
 
-    def scan_library_path(self, library_name, library_path, library_id):  # noqa: C901 — recursive scan with multiple filter stages
+    def scan_library_path(
+        self,
+        library_name: str,
+        library_path: str,
+        library_id: int,
+    ) -> None:
         """
         Run a scan of the given library path
 
@@ -286,7 +310,7 @@ class LibraryScannerManager(threading.Thread):
 
         # Start X number of FileTesterThread threads
         concurrent_file_testers = self.settings.get_concurrent_file_testers()
-        status_updates = queue.Queue()
+        status_updates: queue.Queue[str] = queue.Queue()
         self.file_test_managers = {}
         for results_manager_id in range(int(concurrent_file_testers)):
             self.start_results_manager_thread(results_manager_id, status_updates, library_id)
@@ -303,113 +327,26 @@ class LibraryScannerManager(threading.Thread):
             }
         )
 
-        follow_symlinks = self.settings.get_follow_symlinks()
         queue_limit = self.get_scan_queue_limit()
         checkpoint_store = self.get_scan_checkpoint_store()
         checkpoint = checkpoint_store.load_record(library_id, library_path) if checkpoint_store else None
         completed_root = checkpoint["completed_root"] if checkpoint else None
         checkpoint_updated_at_ns = checkpoint["updated_at_ns"] if checkpoint else None
         if completed_root and not os.path.isdir(os.path.join(library_path, completed_root)):
-            checkpoint_store.clear(library_id)
+            if checkpoint_store:
+                checkpoint_store.clear(library_id)
             completed_root = None
-        resume_checkpoint_reached = completed_root is None
-        total_file_count = 0
-        current_file = ""
-        percent_completed_string = ""
-        walk_entries = os.walk(library_path, followlinks=follow_symlinks)
-        for root, files in iter_sorted_library_directories(walk_entries):
-            if self.abort_flag.is_set():
-                break
-            if not resume_checkpoint_reached:
-                try:
-                    changed_since_checkpoint = os.stat(root).st_mtime_ns >= checkpoint_updated_at_ns - CHECKPOINT_MTIME_SLOP_NS
-                except OSError:
-                    changed_since_checkpoint = True
-                if changed_since_checkpoint:
-                    checkpoint_store.clear(library_id)
-                    completed_root = None
-                    resume_checkpoint_reached = True
-                else:
-                    resume_checkpoint_reached = self.root_was_completed(root, library_path, completed_root)
-                    continue
-            if self.settings.get_debugging():
-                self.logger.debug(json.dumps(files, indent=2))
-            # Add all files in this path that match our container filter
-            for file_path in files:
-                if self.abort_flag.is_set():
-                    break
-
-                while self.files_to_test.qsize() >= queue_limit and not self.abort_flag.is_set():
-                    current_file = self.drain_scan_outputs(status_updates, frontend_messages, current_file, library_id)
-                    self.event.wait(0.1)
-                if self.abort_flag.is_set():
-                    break
-
-                # Place file's full path in queue to be tested
-                self.files_to_test.put(os.path.join(root, file_path))
-                total_file_count += 1
-
-                # Update status messages while fetching file list
-                if not status_updates.empty():
-                    current_file = status_updates.get()
-                    percent_completed_string = f"Testing: {current_file}"
-                    self.update_scan_progress(frontend_messages, percent_completed_string)
-
-            # A checkpoint is committed only after this directory's files are fully tested.
-            if self.file_test_managers and not self.abort_flag.is_set():
-                while not self.abort_flag.is_set() and self.scan_work_is_pending():
-                    current_file = self.drain_scan_outputs(status_updates, frontend_messages, current_file, library_id)
-                    self.event.wait(0.1)
-                current_file = self.drain_scan_outputs(status_updates, frontend_messages, current_file, library_id)
-                if checkpoint_store and not self.abort_flag.is_set():
-                    completed_root = os.path.relpath(root, library_path)
-                    checkpoint_store.save(library_id, library_path, completed_root)
-
-        # Loop while waiting for all threads to finish
-        double_check = 0
-        while not self.abort_flag.is_set():
-            self.update_scan_progress(frontend_messages, percent_completed_string)
-            # Check if all files have been tested
-            if self.files_to_test.empty() and self.files_to_process.empty() and status_updates.empty():
-                # Do not exit this loop until all tester threads report idle
-                if self.file_tests_in_progress():
-                    double_check = 0
-                    self.event.wait(0.5)
-                    continue
-                percent_completed_string = "100%"
-                # Add a "double check" section.
-                # This is used to ensure that the loop does not prematurely exit when the last file tests still
-                # progressing that have not yet made it to the "files_to_process" queue.
-                double_check += 1
-                if double_check > 5:
-                    # There are not more files to test. Mark manager threads as completed
-                    self.stop_all_file_test_managers()
-                    break
-                self.event.wait(1)
-                continue
-
-            # Calculate percent of files tested
-            if not self.files_to_test.empty():
-                current_queue_size = self.files_to_test.qsize()
-                if int(total_file_count) > 0 and int(current_queue_size) > 0:
-                    percent_remaining = int((int(current_queue_size) / int(total_file_count)) * 100)
-                    percent_completed = int(100 - percent_remaining)
-                    percent_completed_string = f"{percent_completed}% - Testing: {current_file}"
-                elif current_file:
-                    percent_completed_string = f"???% - Testing: {current_file}"
-
-            # Fetch frontend messages from queue
-            if not status_updates.empty():
-                current_file = status_updates.get()
-                percent_completed_string = f"Testing: {current_file}"
-                self.update_scan_progress(frontend_messages, percent_completed_string)
-                continue
-            elif not self.files_to_process.empty():
-                item = self.files_to_process.get()
-                self.add_path_to_queue(item.get("path"), library_id, item.get("priority_score"))
-                continue
-            else:
-                self.event.wait(0.1)
+        total_file_count, current_file = self._scan_directories(
+            library_path,
+            library_id,
+            queue_limit,
+            status_updates,
+            frontend_messages,
+            checkpoint_store,
+            completed_root,
+            checkpoint_updated_at_ns,
+        )
+        self._wait_for_scan_completion(status_updates, frontend_messages, current_file, library_id, total_file_count)
 
         # Wait for threads to finish
         for manager_id in self.file_test_managers:
@@ -435,7 +372,7 @@ class LibraryScannerManager(threading.Thread):
         )
         CompressoLogging.log_data(
             "last_library_scan",
-            data_search_key=library_id,  # Key this metric by the library_id
+            data_search_key=str(library_id),  # Key this metric by the library_id
             library_name=library_name,
             library_path=library_path,
             library_id=library_id,
@@ -467,7 +404,128 @@ class LibraryScannerManager(threading.Thread):
         # Remove frontend status message
         frontend_messages.remove_item("libraryScanProgress")
 
-    def register_compresso(self):
+    def _scan_directories(
+        self,
+        library_path: str,
+        library_id: int,
+        queue_limit: int,
+        status_updates: queue.Queue[str],
+        messages: FrontendPushMessages,
+        checkpoint_store: ScanCheckpointStore | None,
+        completed_root: str | None,
+        checkpoint_updated_at_ns: int | None,
+    ) -> tuple[int, str]:
+        resume_reached = completed_root is None
+        total, current_file = 0, ""
+        walk_entries = os.walk(library_path, followlinks=self.settings.get_follow_symlinks())
+        for root, files in iter_sorted_library_directories(walk_entries):
+            if self.abort_flag.is_set():
+                break
+            skip, resume_reached = self._should_skip_checkpoint_root(
+                root, library_path, library_id, checkpoint_store, completed_root, checkpoint_updated_at_ns, resume_reached
+            )
+            if skip:
+                continue
+            added, current_file = self._queue_scan_directory(
+                root, files, library_id, queue_limit, status_updates, messages, current_file
+            )
+            total += added
+            current_file = self._checkpoint_scanned_directory(
+                root, library_path, library_id, checkpoint_store, status_updates, messages, current_file
+            )
+        return total, current_file
+
+    def _should_skip_checkpoint_root(
+        self,
+        root: str,
+        library_path: str,
+        library_id: int,
+        store: ScanCheckpointStore | None,
+        completed_root: str | None,
+        updated_at_ns: int | None,
+        resume_reached: bool,
+    ) -> tuple[bool, bool]:
+        if resume_reached or updated_at_ns is None:
+            return False, resume_reached
+        try:
+            changed = os.stat(root).st_mtime_ns >= updated_at_ns - CHECKPOINT_MTIME_SLOP_NS
+        except OSError:
+            changed = True
+        if changed:
+            if store:
+                store.clear(library_id)
+            return False, True
+        reached = self.root_was_completed(root, library_path, completed_root)
+        return True, reached
+
+    def _queue_scan_directory(
+        self,
+        root: str,
+        files: list[str],
+        library_id: int,
+        queue_limit: int,
+        status_updates: queue.Queue[str],
+        messages: FrontendPushMessages,
+        current_file: str,
+    ) -> tuple[int, str]:
+        if self.settings.get_debugging():
+            self.logger.debug(json.dumps(files, indent=2))
+        added = 0
+        for file_path in files:
+            while self.files_to_test.qsize() >= queue_limit and not self.abort_flag.is_set():
+                current_file = self.drain_scan_outputs(status_updates, messages, current_file, library_id)
+                self.event.wait(0.1)
+            if self.abort_flag.is_set():
+                break
+            self.files_to_test.put(os.path.join(root, file_path))
+            added += 1
+            if not status_updates.empty():
+                current_file = status_updates.get()
+                self.update_scan_progress(messages, f"Testing: {current_file}")
+        return added, current_file
+
+    def _checkpoint_scanned_directory(
+        self,
+        root: str,
+        library_path: str,
+        library_id: int,
+        store: ScanCheckpointStore | None,
+        status_updates: queue.Queue[str],
+        messages: FrontendPushMessages,
+        current_file: str,
+    ) -> str:
+        if not self.file_test_managers or self.abort_flag.is_set():
+            return current_file
+        while not self.abort_flag.is_set() and self.scan_work_is_pending():
+            current_file = self.drain_scan_outputs(status_updates, messages, current_file, library_id)
+            self.event.wait(0.1)
+        current_file = self.drain_scan_outputs(status_updates, messages, current_file, library_id)
+        if store and not self.abort_flag.is_set():
+            store.save(library_id, library_path, os.path.relpath(root, library_path))
+        return current_file
+
+    def _wait_for_scan_completion(
+        self, status_updates: queue.Queue[str], messages: FrontendPushMessages, current_file: str, library_id: int, total: int
+    ) -> None:
+        idle_checks = 0
+        while not self.abort_flag.is_set():
+            if self.files_to_test.empty() and self.files_to_process.empty() and status_updates.empty():
+                if self.file_tests_in_progress():
+                    idle_checks = 0
+                else:
+                    idle_checks += 1
+                    if idle_checks > 5:
+                        self.stop_all_file_test_managers()
+                        return
+                self.event.wait(0.5)
+                continue
+            current_file = self.drain_scan_outputs(status_updates, messages, current_file, library_id)
+            remaining = self.files_to_test.qsize()
+            percent = int(100 - (remaining / total * 100)) if total and remaining else 100
+            self.update_scan_progress(messages, f"{percent}% - Testing: {current_file}")
+            self.event.wait(0.1)
+
+    def register_compresso(self) -> None:
         from compresso.libs import session
 
         s = session.Session()

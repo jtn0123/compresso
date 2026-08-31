@@ -32,12 +32,14 @@ Copyright:
 import importlib
 import json
 import os
+from typing import cast
 
 from apispec import APISpec
 from apispec.exceptions import APISpecError
 from apispec.ext.marshmallow import MarshmallowPlugin
 
 from compresso.webserver.api_v2 import list_all_handlers
+from compresso.webserver.api_v2.base_api_handler import BaseApiHandler
 from compresso.webserver.api_v2.schema.compresso import CompressoSpecPlugin
 
 API_VERSION = "2"
@@ -66,12 +68,16 @@ OPENAPI_SPEC_SECURITY = {
 }
 
 
-def find_all_handlers():
-    return_list = []
+def find_all_handlers() -> list[tuple[str, type[BaseApiHandler]]]:
+    return_list: list[tuple[str, type[BaseApiHandler]]] = []
     for handler in list_all_handlers():
-        endpoint_handler = getattr(importlib.import_module("compresso.webserver.api_v2"), handler)
+        endpoint_handler = cast(
+            "type[BaseApiHandler]", getattr(importlib.import_module("compresso.webserver.api_v2"), handler)
+        )
         for route in endpoint_handler.routes:
             path_pattern = route.get("path_pattern")
+            if not isinstance(path_pattern, str):
+                continue
             return_list.append(
                 (
                     path_pattern,
@@ -81,13 +87,26 @@ def find_all_handlers():
     return return_list
 
 
-def generate_swagger_file():
+def generate_swagger_file(output_path: str | os.PathLike[str] | None = None) -> list[str]:
     """Automatically generates Swagger spec file based on RequestHandler
-    docstrings and saves it to the specified file_location.
-    """
-    errors = []
+    docstrings and saves it to ``output_path``.
 
-    file_location = os.path.join(os.path.dirname(__file__), "..", "..", "docs", f"api_schema_v{API_VERSION}")
+    The default remains the runtime documentation path.  Tooling can pass an
+    explicit path to generate a contract in a temporary directory without
+    modifying the checked-in schema.
+    """
+    errors: list[str] = []
+
+    if output_path is None:
+        output_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "docs",
+            f"api_schema_v{API_VERSION}.json",
+        )
+    output_path = os.path.abspath(output_path)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     # Starting to generate Swagger spec file. All the relevant
     # information can be found from here https://apispec.readthedocs.io/
@@ -118,7 +137,7 @@ def generate_swagger_file():
     # Write the Swagger file into specified location. JSON is the only
     # consumed format — tornado_api_doc reads `.json`, so the previous
     # `.yaml` sidecar was unused and has been removed.
-    with open(f"{file_location}.json", "w", encoding="utf-8") as file:
+    with open(output_path, "w", encoding="utf-8") as file:
         json.dump(spec.to_dict(), file, ensure_ascii=False, indent=4)
 
     return errors

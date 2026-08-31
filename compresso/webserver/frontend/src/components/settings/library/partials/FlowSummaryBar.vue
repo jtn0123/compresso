@@ -45,7 +45,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -60,11 +60,14 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
+type ReplacementPolicy = 'replace' | 'approval_required' | 'keep_both'
 
 const hasCodecFilter = computed(() => props.targetCodecs.length > 0 || props.skipCodecs.length > 0)
 
-const effectivePolicy = computed(() => {
-  if (props.replacementPolicy) return props.replacementPolicy
+const effectivePolicy = computed<ReplacementPolicy>(() => {
+  if (props.replacementPolicy === 'approval_required' || props.replacementPolicy === 'keep_both') {
+    return props.replacementPolicy
+  }
   return props.globalApprovalRequired ? 'approval_required' : 'replace'
 })
 

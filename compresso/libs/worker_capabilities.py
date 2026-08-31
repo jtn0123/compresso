@@ -8,7 +8,9 @@ import platform
 import shutil
 import threading
 from collections import defaultdict
+from collections.abc import Callable, Mapping, Sequence
 from time import monotonic
+from typing import Protocol, TypedDict, cast
 
 import psutil
 
@@ -16,19 +18,44 @@ from compresso.libs.unffmpeg.info import Info
 from compresso.libs.unmodels.completedtasks import CompletedTasks
 from compresso.libs.unmodels.compressionstats import CompressionStats
 
+ObjectDict = dict[str, object]
+
+
+def _finite_number(value: object, default: float) -> float:
+    if not isinstance(value, (int, float, str)):
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
+class CacheSettings(Protocol):
+    def get_cache_path(self) -> str: ...
+
+
+class TemperatureEntry(Protocol):
+    current: float
+
+
+class PerformanceSample(TypedDict):
+    tasks_per_hour: float
+    media_speed_ratio: float
+
 
 class WorkerCapabilities:
     _DYNAMIC_CACHE_TTL_SECONDS = 30
 
-    def __init__(self, ffmpeg_info=None):
+    def __init__(self, ffmpeg_info: Info | None = None) -> None:
         self.ffmpeg_info = ffmpeg_info or Info()
-        self._static_capabilities = None
-        self._dynamic_capabilities = None
+        self._static_capabilities: dict[str, object] | None = None
+        self._dynamic_capabilities: dict[str, object] | None = None
         self._dynamic_cached_at = 0.0
         self._lock = threading.Lock()
 
     @staticmethod
-    def _existing_path(path):
+    def _existing_path(path: str | os.PathLike[str]) -> str:
         candidate = os.path.abspath(path)
         while not os.path.exists(candidate):
             parent = os.path.dirname(candidate)
@@ -37,7 +64,7 @@ class WorkerCapabilities:
             candidate = parent
         return candidate
 
-    def _static_snapshot(self):
+    def _static_snapshot(self) -> dict[str, object]:
         with self._lock:
             if self._static_capabilities is None:
                 try:
@@ -58,7 +85,7 @@ class WorkerCapabilities:
                 }
             return dict(self._static_capabilities)
 
-    def snapshot(self, settings):
+    def snapshot(self, settings: CacheSettings) -> dict[str, object]:
         capabilities = self._static_snapshot()
         memory = psutil.virtual_memory()
         cache_path = self._existing_path(settings.get_cache_path())
@@ -84,7 +111,7 @@ class WorkerCapabilities:
         )
         return capabilities
 
-    def _dynamic_snapshot(self):
+    def _dynamic_snapshot(self) -> dict[str, object]:
         """Cache sensor and historical-throughput reads for a short polling window."""
         now = monotonic()
         with self._lock:
@@ -97,9 +124,14 @@ class WorkerCapabilities:
             return dict(self._dynamic_capabilities)
 
     @staticmethod
-    def _thermal_snapshot():
+    def _thermal_snapshot() -> dict[str, object]:
         try:
-            sensors = psutil.sensors_temperatures()
+            reader_name = "sensors_temperatures"
+            temperature_reader = cast(
+                "Callable[[], Mapping[str, Sequence[TemperatureEntry]]]",
+                getattr(psutil, reader_name),
+            )
+            sensors = temperature_reader()
         except (AttributeError, OSError, RuntimeError):
             sensors = {}
         temperatures = [
@@ -122,7 +154,7 @@ class WorkerCapabilities:
         return {"state": state, "max_celsius": max_celsius}
 
     @staticmethod
-    def _performance_snapshot(limit=100):
+    def _performance_snapshot(limit: int = 100) -> dict[str, object]:
         """Summarize persisted recent encode throughput overall and by output codec."""
         try:
             rows = (
@@ -132,22 +164,22 @@ class WorkerCapabilities:
                 .order_by(CompletedTasks.finish_time.desc())
                 .limit(limit)
             )
-            buckets = defaultdict(list)
-            all_samples = []
+            buckets: defaultdict[str, list[PerformanceSample]] = defaultdict(list)
+            all_samples: list[PerformanceSample] = []
             for row in rows:
                 duration = float(row.encoding_duration_seconds or 0)
                 if duration <= 0:
                     continue
-                sample = {
-                    "tasks_per_hour": 3600 / duration,
-                    "media_speed_ratio": max(0.0, float(row.source_duration_seconds or 0)) / duration,
-                }
+                sample = PerformanceSample(
+                    tasks_per_hour=3600 / duration,
+                    media_speed_ratio=max(0.0, float(row.source_duration_seconds or 0)) / duration,
+                )
                 all_samples.append(sample)
                 buckets[row.destination_codec or "unknown"].append(sample)
         except Exception:
             return {"sample_count": 0, "tasks_per_hour": 0.0, "media_speed_ratio": 0.0, "by_codec": {}}
 
-        def summarize(samples):
+        def summarize(samples: list[PerformanceSample]) -> dict[str, int | float]:
             count = len(samples)
             if not count:
                 return {"sample_count": 0, "tasks_per_hour": 0.0, "media_speed_ratio": 0.0}
@@ -157,12 +189,13 @@ class WorkerCapabilities:
                 "media_speed_ratio": round(sum(sample["media_speed_ratio"] for sample in samples) / count, 3),
             }
 
-        result = summarize(all_samples)
+        result: dict[str, object] = {}
+        result.update(summarize(all_samples))
         result["by_codec"] = {codec: summarize(samples) for codec, samples in sorted(buckets.items())}
         return result
 
     @staticmethod
-    def scheduling_score(capabilities, required_encoder=None):
+    def scheduling_score(capabilities: object, required_encoder: str | None = None) -> float | None:
         if not isinstance(capabilities, dict):
             return None if required_encoder else 0.0
         encoders = capabilities.get("video_encoders", [])
@@ -170,27 +203,28 @@ class WorkerCapabilities:
             encoders = []
         if required_encoder and required_encoder not in encoders:
             return None
-        cpu = capabilities.get("cpu") if isinstance(capabilities.get("cpu"), dict) else {}
-        memory = capabilities.get("memory") if isinstance(capabilities.get("memory"), dict) else {}
-        cache_disk = capabilities.get("cache_disk") if isinstance(capabilities.get("cache_disk"), dict) else {}
-        thermal = capabilities.get("thermal") if isinstance(capabilities.get("thermal"), dict) else {}
-        performance = capabilities.get("performance") if isinstance(capabilities.get("performance"), dict) else {}
+        cpu_value = capabilities.get("cpu")
+        memory_value = capabilities.get("memory")
+        cache_disk_value = capabilities.get("cache_disk")
+        thermal_value = capabilities.get("thermal")
+        performance_value = capabilities.get("performance")
+        cpu = cast(ObjectDict, cpu_value) if isinstance(cpu_value, dict) else {}
+        memory = cast(ObjectDict, memory_value) if isinstance(memory_value, dict) else {}
+        cache_disk = cast(ObjectDict, cache_disk_value) if isinstance(cache_disk_value, dict) else {}
+        thermal = cast(ObjectDict, thermal_value) if isinstance(thermal_value, dict) else {}
+        performance = cast(ObjectDict, performance_value) if isinstance(performance_value, dict) else {}
 
-        def finite_number(value, default):
-            try:
-                number = float(value)
-            except (TypeError, ValueError):
-                return default
-            return number if math.isfinite(number) else default
-
-        cpu_percent = min(100.0, max(0.0, finite_number(cpu.get("percent"), 100.0)))
-        memory_percent = min(100.0, max(0.0, finite_number(memory.get("percent"), 100.0)))
-        free_disk_bytes = max(0.0, finite_number(cache_disk.get("free_bytes"), 0.0))
+        cpu_percent = min(100.0, max(0.0, _finite_number(cpu.get("percent"), 100.0)))
+        memory_percent = min(100.0, max(0.0, _finite_number(memory.get("percent"), 100.0)))
+        free_disk_bytes = max(0.0, _finite_number(cache_disk.get("free_bytes"), 0.0))
         cpu_headroom = 100 - cpu_percent
         memory_headroom = 100 - memory_percent
         free_disk_gb = free_disk_bytes / (1024**3)
         base_score = (cpu_headroom * 0.5) + (memory_headroom * 0.3) + (min(free_disk_gb, 500) * 0.04)
-        tasks_per_hour = max(0.0, finite_number(performance.get("tasks_per_hour"), 0.0))
+        tasks_per_hour = max(0.0, _finite_number(performance.get("tasks_per_hour"), 0.0))
         throughput_bonus = min(30.0, math.log1p(tasks_per_hour) * 6)
-        thermal_factor = {"critical": 0.05, "hot": 0.35, "warm": 0.75}.get(thermal.get("state"), 1.0)
+        thermal_state = thermal.get("state")
+        thermal_factor = {"critical": 0.05, "hot": 0.35, "warm": 0.75}.get(
+            thermal_state if isinstance(thermal_state, str) else "unknown", 1.0
+        )
         return round((base_score + throughput_bonus) * thermal_factor, 3)

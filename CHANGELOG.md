@@ -1,3 +1,16 @@
+# [1.17.0](https://github.com/jtn0123/compresso/compare/v1.16.2...v1.17.0) (2026-07-20)
+
+
+### Bug Fixes
+
+* resolve audit findings B1-B7 — data loss, debug mode, race conditions ([3ba000a](https://github.com/jtn0123/compresso/commit/3ba000a9849f6c992614a9f70cc3200e44c637e7))
+* **security:** buffer deferred finish chunk instead of calling write() off-path ([009ca9b](https://github.com/jtn0123/compresso/commit/009ca9b5e3bd4d32891deec4e3b090b873696e6c))
+
+
+### Features
+
+* **security:** enforce auth/CSRF on network deployments, contain file browser, gate startup.sh ([f0226c2](https://github.com/jtn0123/compresso/commit/f0226c26d7f37166d92cfce82430dc517a44575b))
+
 ## [1.16.2](https://github.com/jtn0123/compresso/compare/v1.16.1...v1.16.2) (2026-07-20)
 
 

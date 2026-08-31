@@ -36,17 +36,35 @@ import inspect
 import json
 import os
 import sys
+from collections.abc import Callable, Iterable, Mapping
+from types import ModuleType
+from typing import Protocol, cast
 
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.metadata import CompressoFileMetadata
 
 from ..logs import CompressoLogging
 from ..task import TaskDataStore
 from . import plugin_types
+from .plugin_types.plugin_type_base import PluginType
+
+
+class _PluginSettings(Protocol):
+    def get_form_settings(self) -> object: ...
+
+    def get_setting(self, key: str | None = None) -> object: ...
+
+    def set_setting(self, key: str, value: object) -> bool: ...
+
+    def reset_settings_to_defaults(self) -> bool: ...
+
+
+class _PluginSettingsFactory(Protocol):
+    def __call__(self, *, library_id: int | None = None) -> _PluginSettings: ...
 
 
 class PluginExecutor:
-    def __init__(self, plugins_directory=None):
+    def __init__(self, plugins_directory: str | None = None) -> None:
         # Set plugins directory
         if not plugins_directory:
             home_directory = common.get_home_dir()
@@ -54,7 +72,7 @@ class PluginExecutor:
         self.plugins_directory = plugins_directory
         # NOTE: List plugin types in order that they are run against a library
         #       This is listing them in order helps the frontend. Don't order alphabetically
-        self.plugin_types = [
+        self.plugin_types: list[dict[str, object]] = [
             {
                 "id": "frontend.panel",
                 "has_flow": False,
@@ -112,9 +130,9 @@ class PluginExecutor:
                 "has_flow": False,
             },
         ]
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
-    def __get_plugin_directory(self, plugin_id):
+    def __get_plugin_directory(self, plugin_id: str) -> str | None:
         """
         Return a contained plugin path for a plugin ID, or ``None`` when unsafe.
 
@@ -133,17 +151,17 @@ class PluginExecutor:
         return plugin_directory
 
     @staticmethod
-    def __include_plugin_site_packages(path):
+    def __include_plugin_site_packages(path: str) -> None:
         plugin_site_packages_dir = os.path.join(path, "site-packages")
         if os.path.exists(plugin_site_packages_dir) and plugin_site_packages_dir not in sys.path:
             sys.path.append(plugin_site_packages_dir)
 
     @staticmethod
-    def __include_plugin_directory(path):
+    def __include_plugin_directory(path: str) -> None:
         if os.path.exists(path) and path not in sys.path:
             sys.path.append(path)
 
-    def __load_plugin_module(self, plugin_id, path):
+    def __load_plugin_module(self, plugin_id: str, path: str) -> ModuleType | None:
         """
         Loads and returns the python module from a given plugin path.
             All plugins should have a file called "plugin.py".
@@ -183,6 +201,9 @@ class PluginExecutor:
 
             # Import the module for this plugin
             module_spec = importlib.util.spec_from_file_location(module_name, plugin_module_path)
+            if module_spec is None or module_spec.loader is None:
+                self.logger.error("Unable to build an import specification for plugin '%s'", plugin_id)
+                return None
             plugin_import = importlib.util.module_from_spec(module_spec)
 
             # Adding the module to sys.modules is optional but it gives us visibility if we need it elsewhere.
@@ -196,11 +217,11 @@ class PluginExecutor:
             return None
 
     @staticmethod
-    def __is_plugin_trusted(plugin_id, path):
+    def __is_plugin_trusted(plugin_id: str, path: str) -> bool:
         info_path = os.path.join(path, "info.json")
         try:
             with open(info_path, encoding="utf-8") as info_file:
-                plugin_info = json.load(info_file)
+                plugin_info = narrowing.mapping_dict(json.load(info_file))
         except (OSError, ValueError, TypeError):
             return False
 
@@ -210,7 +231,7 @@ class PluginExecutor:
         trusted_ids = {item.strip() for item in os.environ.get("COMPRESSO_TRUSTED_PLUGIN_IDS", "").split(",") if item.strip()}
         return plugin_id in trusted_ids
 
-    def reload_plugin_module(self, plugin_id):
+    def reload_plugin_module(self, plugin_id: str) -> None:
         """
         Reload a plugin module
 
@@ -240,7 +261,7 @@ class PluginExecutor:
                     del sys.modules[module_name]
 
     @staticmethod
-    def unload_plugin_module(plugin_id):
+    def unload_plugin_module(plugin_id: str) -> None:
         """
         Remove plugin module from sys.modules
 
@@ -257,34 +278,39 @@ class PluginExecutor:
             del sys.modules[module_name]
 
     @staticmethod
-    def get_plugin_type_meta(plugin_type):
+    def get_plugin_type_meta(plugin_type: str) -> PluginType:
         return plugin_types.grab_module(plugin_type)
 
-    def get_all_plugin_types(self):
+    def get_all_plugin_types(self) -> list[dict[str, object]]:
         return self.plugin_types
 
-    def get_all_plugin_types_in_plugin(self, plugin_id):
-        return_plugin_types = []
+    def get_all_plugin_types_in_plugin(self, plugin_id: str) -> list[str]:
+        return_plugin_types: list[str] = []
 
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
+        if plugin_path is None:
+            return return_plugin_types
 
         # Load this plugin module
         plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
 
         for plugin_type in self.get_all_plugin_types():
             # Get the called runner function for the given plugin type
-            plugin_type_meta = self.get_plugin_type_meta(plugin_type.get("id"))
+            plugin_type_id = plugin_type.get("id")
+            if not isinstance(plugin_type_id, str):
+                continue
+            plugin_type_meta = self.get_plugin_type_meta(plugin_type_id)
             plugin_runner = plugin_type_meta.plugin_runner()
 
             # Check if this module contains the given plugin type runner function
-            if hasattr(plugin_module, plugin_runner):
+            if plugin_module is not None and hasattr(plugin_module, plugin_runner):
                 # If it does, add it to the plugin_modules list
-                return_plugin_types.append(plugin_type.get("id"))
+                return_plugin_types.append(plugin_type_id)
 
         return return_plugin_types
 
-    def execute_plugin_runner(self, data, plugin_id, plugin_type):
+    def execute_plugin_runner(self, data: dict[str, object], plugin_id: str, plugin_type: str) -> bool:
         """
         Given a data, a plugin ID, and a plugin type
         Load that plugin module and execute the runner
@@ -297,6 +323,8 @@ class PluginExecutor:
         """
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
+        if plugin_path is None:
+            return False
 
         # Load this plugin module
         plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
@@ -309,18 +337,20 @@ class PluginExecutor:
         plugin_runner = plugin_type_meta.plugin_runner()
 
         # Check if this module contains the given plugin type runner
-        runner = getattr(plugin_module, plugin_runner, None)
-        if not runner:
+        runner_value = getattr(plugin_module, plugin_runner, None)
+        if not callable(runner_value):
             # Plugin does not contain this runner, return false
             return False
 
+        runner = cast("Callable[..., object]", runner_value)
         run_successfully = False
         task_id = data.get("task_id")
+        typed_task_id = task_id if isinstance(task_id, int) and not isinstance(task_id, bool) else None
         try:
             # if we have a task_id, bind context for store-based calls
-            if task_id is not None:
+            if typed_task_id is not None:
                 TaskDataStore.bind_runner_context(
-                    task_id=task_id,
+                    task_id=typed_task_id,
                     plugin_id=plugin_id,
                     runner=plugin_runner,
                 )
@@ -328,14 +358,14 @@ class PluginExecutor:
             metadata_path = data.get("path") or data.get("file_path")
             CompressoFileMetadata.bind_runner_context(
                 plugin_id=plugin_id,
-                task_id=task_id,
-                path=metadata_path,
+                task_id=typed_task_id,
+                path=metadata_path if isinstance(metadata_path, str) else None,
             )
 
             sig = inspect.signature(runner)
             params = sig.parameters
 
-            def supports_kwarg(name):
+            def supports_kwarg(name: str) -> bool:
                 if name in params:
                     return True
                 return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values())
@@ -346,7 +376,7 @@ class PluginExecutor:
             # removed; any plugin still using positional helpers will now
             # raise TypeError, which surfaces as a clean run failure via
             # the broad except below.
-            kwargs = {}
+            kwargs: dict[str, object] = {}
             if supports_kwarg("task_data_store"):
                 kwargs["task_data_store"] = TaskDataStore
             if supports_kwarg("file_metadata"):
@@ -362,7 +392,9 @@ class PluginExecutor:
 
         return run_successfully
 
-    def build_plugin_data_from_plugin_list_filtered_by_plugin_type(self, plugins_list, plugin_type):
+    def build_plugin_data_from_plugin_list_filtered_by_plugin_type(
+        self, plugins_list: Iterable[Mapping[str, object]], plugin_type: str
+    ) -> list[dict[str, object]]:
         """
         Given a list of plugins and a plugin type,
         Return a filtered list of dictionaries containing:
@@ -374,7 +406,7 @@ class PluginExecutor:
         :param plugin_type:
         :return:
         """
-        plugin_modules = []
+        plugin_modules: list[dict[str, object]] = []
 
         # Ensure called runner type exists
         if plugin_type not in plugin_types.get_all_plugin_types():
@@ -388,6 +420,8 @@ class PluginExecutor:
         for plugin_data in plugins_list:
             # Get plugin ID
             plugin_id = plugin_data.get("plugin_id")
+            if not isinstance(plugin_id, str):
+                continue
 
             # Get plugin metadata
             plugin_name = plugin_data.get("name")
@@ -398,12 +432,14 @@ class PluginExecutor:
 
             # Get the path for this plugin
             plugin_path = self.__get_plugin_directory(plugin_id)
+            if plugin_path is None:
+                continue
 
             # Load this plugin module
             plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
 
             # Check if this module contains the given plugin type runner function
-            if hasattr(plugin_module, plugin_runner):
+            if plugin_module is not None and hasattr(plugin_module, plugin_runner):
                 # If it does, add it to the plugin_modules list
                 plugin_runner_data = {
                     "plugin_id": plugin_id,
@@ -419,7 +455,9 @@ class PluginExecutor:
 
         return plugin_modules
 
-    def get_plugin_data_by_type(self, enabled_plugins, plugin_type):
+    def get_plugin_data_by_type(
+        self, enabled_plugins: Iterable[Mapping[str, object]], plugin_type: str
+    ) -> list[dict[str, object]]:
         """
         Given a list of enabled plugins and a plugin type
         Returns a list of dictionaries containing plugin data including
@@ -437,7 +475,9 @@ class PluginExecutor:
         # Return runners
         return plugin_data
 
-    def get_plugin_settings(self, plugin_id, library_id=None):
+    def get_plugin_settings(
+        self, plugin_id: str, library_id: int | None = None
+    ) -> tuple[dict[str, object], dict[str, object]]:
         """
         Returns a dictionary of a given plugin's settings
 
@@ -447,21 +487,24 @@ class PluginExecutor:
         """
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
+        if plugin_path is None:
+            return {}, {}
 
         # Load this plugin module
         plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
 
-        if not hasattr(plugin_module, "Settings"):
+        if plugin_module is None or not hasattr(plugin_module, "Settings"):
             # This plugin does not have a settings class
             return {}, {}
 
         try:
             # Settings plugin_settings
-            plugin_settings = plugin_module.Settings(library_id=library_id)
+            settings_factory = cast("_PluginSettingsFactory", plugin_module.Settings)
+            plugin_settings = settings_factory(library_id=library_id)
 
             # Build form first so any in-memory defaults are applied without persisting
-            plugin_form_settings = copy.deepcopy(plugin_settings.get_form_settings())
-            all_plugin_settings = copy.deepcopy(plugin_settings.get_setting())
+            plugin_form_settings = narrowing.mapping_dict(copy.deepcopy(plugin_settings.get_form_settings()))
+            all_plugin_settings = narrowing.mapping_dict(copy.deepcopy(plugin_settings.get_setting()))
         except Exception as e:
             self.logger.exception("Exception while fetching settings for plugin '%s' %s", plugin_id, e)
             all_plugin_settings = {}
@@ -469,7 +512,7 @@ class PluginExecutor:
 
         return all_plugin_settings, plugin_form_settings
 
-    def save_plugin_settings(self, plugin_id, settings, library_id=None):
+    def save_plugin_settings(self, plugin_id: str, settings: Mapping[str, object], library_id: int | None = None) -> bool:
         """
         Saves a collection of a given plugin's settings.
         Returns a boolean result for the overall success
@@ -482,12 +525,17 @@ class PluginExecutor:
         """
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
+        if plugin_path is None:
+            return False
 
         # Load this plugin module
         plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
 
         try:
-            plugin_settings = plugin_module.Settings(library_id=library_id)
+            if plugin_module is None:
+                return False
+            settings_factory = cast("_PluginSettingsFactory", plugin_module.Settings)
+            plugin_settings = settings_factory(library_id=library_id)
             save_result = True
             for key in settings:
                 value = settings.get(key)
@@ -505,7 +553,7 @@ class PluginExecutor:
             self.logger.exception("Exception while saving settings for plugin '%s' %s", plugin_id, e)
             return False
 
-    def reset_plugin_settings(self, plugin_id, library_id=None):
+    def reset_plugin_settings(self, plugin_id: str, library_id: int | None = None) -> bool:
         """
         Reset a plugin settings by removing the config file
 
@@ -515,27 +563,34 @@ class PluginExecutor:
         """
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
+        if plugin_path is None:
+            return False
 
         # Load this plugin module
         plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
 
         try:
-            plugin_settings = plugin_module.Settings(library_id=library_id)
+            if plugin_module is None:
+                return False
+            settings_factory = cast("_PluginSettingsFactory", plugin_module.Settings)
+            plugin_settings = settings_factory(library_id=library_id)
             return plugin_settings.reset_settings_to_defaults()
         except Exception as e:
             self.logger.exception("Exception while resetting settings for plugin '%s' %s", plugin_id, e)
             return False
 
-    def get_plugin_changelog(self, plugin_id):
+    def get_plugin_changelog(self, plugin_id: str) -> list[str]:
         """
         Returns a list of lines from the plugin's changelog
 
         :param plugin_id:
         :return:
         """
-        changelog = []
+        changelog: list[str] = []
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
+        if plugin_path is None:
+            return changelog
         plugin_changelog = os.path.join(plugin_path, "changelog.md")
         if os.path.exists(plugin_changelog):
             with open(plugin_changelog) as f:
@@ -543,16 +598,18 @@ class PluginExecutor:
 
         return changelog
 
-    def get_plugin_long_description(self, plugin_id):
+    def get_plugin_long_description(self, plugin_id: str) -> list[str]:
         """
         Returns a list of lines from the plugin's additional description file
 
         :param plugin_id:
         :return:
         """
-        description = []
+        description: list[str] = []
         # Get the path for this plugin
         plugin_path = self.__get_plugin_directory(plugin_id)
+        if plugin_path is None:
+            return description
         plugin_description = os.path.join(plugin_path, "description.md")
         if os.path.exists(plugin_description):
             with open(plugin_description) as f:
@@ -560,7 +617,13 @@ class PluginExecutor:
 
         return description
 
-    def test_plugin_runner(self, plugin_id, plugin_type, test_data=None, test_data_modifiers=None):
+    def test_plugin_runner(
+        self,
+        plugin_id: str,
+        plugin_type: str,
+        test_data: Mapping[str, object] | None = None,
+        test_data_modifiers: Mapping[str, str] | None = None,
+    ) -> list[str]:
         if test_data is None:
             test_data = {}
         if test_data_modifiers is None:
@@ -568,9 +631,13 @@ class PluginExecutor:
         try:
             # Get the path for this plugin
             plugin_path = self.__get_plugin_directory(plugin_id)
+            if plugin_path is None:
+                return [f"Plugin '{plugin_id}' has an unsafe path."]
 
             # Load this plugin module
             plugin_module = self.__load_plugin_module(plugin_id, plugin_path)
+            if plugin_module is None:
+                return [f"Plugin '{plugin_id}' could not be loaded."]
 
             # Get the called runner function for the given plugin type
             plugin_type_meta = self.get_plugin_type_meta(plugin_type)
@@ -584,11 +651,11 @@ class PluginExecutor:
 
         return errors
 
-    def test_plugin_settings(self, plugin_id):
-        errors = []
+    def test_plugin_settings(self, plugin_id: str) -> tuple[list[str], dict[str, object]]:
+        errors: list[str] = []
 
         # Get the called runner function for the given plugin type
-        plugin_settings = {}
+        plugin_settings: dict[str, object] = {}
         try:
             plugin_settings, plugin_settings_meta = self.get_plugin_settings(plugin_id, library_id=1)
         except Exception as e:

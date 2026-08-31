@@ -27,6 +27,7 @@ include compresso/webserver/frontend/AGENTS.md
 include compresso/webserver/frontend/eslint.config.mjs
 include compresso/webserver/frontend/index.html
 include compresso/webserver/frontend/jsconfig.json
+include compresso/webserver/frontend/tsconfig.json
 include compresso/webserver/frontend/package-lock.json
 include compresso/webserver/frontend/package.json
 include compresso/webserver/frontend/playwright.config.js

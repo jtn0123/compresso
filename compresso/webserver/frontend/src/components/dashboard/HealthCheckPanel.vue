@@ -66,13 +66,13 @@
         <div v-else class="row q-gutter-sm">
           <q-badge color="positive" :label="$t('healthCheckPanel.healthyCount', { count: summary.healthy || 0 })" />
           <q-badge
-            v-if="summary.warning > 0"
+            v-if="(summary.warning || 0) > 0"
             color="warning"
             text-color="dark"
             :label="$t('healthCheckPanel.warningCount', { count: summary.warning })"
           />
           <q-badge
-            v-if="summary.corrupted > 0"
+            v-if="(summary.corrupted || 0) > 0"
             color="negative"
             :label="$t('healthCheckPanel.corruptedCount', { count: summary.corrupted })"
           />
@@ -88,36 +88,37 @@
   </q-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useRelativeTime } from 'src/composables/useRelativeTime'
+import type { ApiSchema } from 'src/types/contracts'
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
 
-const lastUpdated = ref(null)
+const lastUpdated = ref<number | null>(null)
 const { relativeTime } = useRelativeTime(lastUpdated)
 
-const summary = ref({})
+const summary = ref<ApiSchema<'HealthCheckSummaryResponse'>>({ success: true })
 const workerCount = ref(0)
 const isScanning = ref(false)
-const scanProgress = ref({})
+const scanProgress = ref<Pick<ApiSchema<'HealthCheckProgress'>, 'checked' | 'total'>>({})
 const fetchError = ref(false)
 
 const scanPercent = computed(() => {
   if (!scanProgress.value.total || scanProgress.value.total === 0) return 0
-  return Math.round((scanProgress.value.checked / scanProgress.value.total) * 100)
+  return Math.round(((scanProgress.value.checked ?? 0) / scanProgress.value.total) * 100)
 })
 
 async function fetchData() {
   try {
     const [summaryRes, workersRes] = await Promise.all([
-      axios.get(getCompressoApiUrl('v2', 'healthcheck/summary')),
-      axios.get(getCompressoApiUrl('v2', 'healthcheck/workers')),
+      axios.get<ApiSchema<'HealthCheckSummaryResponse'>>(getCompressoApiUrl('v2', 'healthcheck/summary')),
+      axios.get<ApiSchema<'HealthCheckWorkersResponse'>>(getCompressoApiUrl('v2', 'healthcheck/workers')),
     ])
     summary.value = summaryRes.data
     isScanning.value = summaryRes.data.scanning || false
@@ -133,7 +134,7 @@ async function fetchData() {
   }
 }
 
-async function changeWorkerCount(delta) {
+async function changeWorkerCount(delta: number): Promise<void> {
   const newCount = Math.max(0, workerCount.value + delta)
   try {
     await axios.post(getCompressoApiUrl('v2', 'healthcheck/workers'), { worker_count: newCount })
@@ -149,7 +150,7 @@ async function changeWorkerCount(delta) {
   }
 }
 
-let pollInterval = null
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   fetchData()

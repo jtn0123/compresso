@@ -33,14 +33,13 @@ import inspect
 import os
 import pkgutil
 import sys
-import warnings
 from importlib import import_module
 from pathlib import Path
 
-from ..base_codecs import Codecs
+from ..base_codecs import CodecDescription, Codecs
 
 
-def grab_module(module_name, *args, **kwargs):
+def grab_module(module_name: str) -> Codecs:
     """
     Fetch a module by name and return the instance of that class
 
@@ -57,31 +56,31 @@ def grab_module(module_name, *args, **kwargs):
 
         module = import_module("." + module_name, package=__name__)
         module_class = getattr(module, class_name)
-        instance = module_class(*args, **kwargs)
-
-        return instance
+        if not isinstance(module_class, type) or not issubclass(module_class, Codecs):
+            raise AttributeError(class_name)
+        return module_class()
 
     except (AttributeError, AssertionError, ModuleNotFoundError):
         raise ImportError(f"{module_name} is not part of our supported subtitle codecs!") from None
 
 
-def get_all_subtitle_codecs():
+def get_all_subtitle_codecs() -> dict[str, CodecDescription]:
     """
     Fetch a list of supported subtitles and
     return a dictionary of their data
 
     :return:
     """
-    return_dic = {}
+    return_dic: dict[str, CodecDescription] = {}
 
-    for _, module_name, _ in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
+    for _finder, module_name, _is_package in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
         instance = grab_module(module_name)
-        return_data = {
-            "name": instance.codec_name(),
-            "encoders": instance.codec_encoders(),
-            "default_encoder": instance.codec_default_encoder(),
-            "description": instance.codec_description(),
-        }
+        return_data = CodecDescription(
+            name=instance.codec_name(),
+            encoders=instance.codec_encoders(),
+            default_encoder=instance.codec_default_encoder(),
+            description=instance.codec_description(),
+        )
         return_dic[module_name] = return_data
 
     return return_dic
@@ -91,14 +90,14 @@ def get_all_subtitle_codecs():
 Import all submodules for this package
 
 """
-for _, name, _ in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):  # type: ignore[assignment]
-    imported_module = import_module("." + name, package=__name__)
+for _finder, discovered_name, _is_package in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
+    imported_module = import_module("." + discovered_name, package=__name__)
 
     for i in dir(imported_module):
         attribute = getattr(imported_module, i)
 
         if inspect.isclass(attribute) and issubclass(attribute, Codecs):
-            setattr(sys.modules[__name__], name, attribute)
+            setattr(sys.modules[__name__], discovered_name, attribute)
 
 __author__ = "Josh.5 (jsunnex@gmail.com)"
 

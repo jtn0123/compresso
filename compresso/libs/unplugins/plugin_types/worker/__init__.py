@@ -42,7 +42,7 @@ from ..plugin_type_base import PluginType
 Import all submodules for this package
 
 """
-for _, name, _ in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):  # type: ignore[assignment]
+for _finder, name, _is_package in pkgutil.iter_modules([os.path.join(Path(__file__).parent)]):
     imported_module = import_module("." + name, package=__name__)
 
     for i in dir(imported_module):
