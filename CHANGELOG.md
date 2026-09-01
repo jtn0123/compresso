@@ -1,3 +1,27 @@
+## [1.17.1](https://github.com/jtn0123/compresso/compare/v1.17.0...v1.17.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **api:** restore permissive settings/library write contract ([0da1695](https://github.com/jtn0123/compresso/commit/0da1695d4bf015909c86d855f68a39121e6ce90c))
+* bump quasar past prototype-pollution advisory (unblocks all PRs) ([#240](https://github.com/jtn0123/compresso/issues/240)) ([a8ace87](https://github.com/jtn0123/compresso/commit/a8ace8732c5e29aff2664fec1f3e955ac5774497))
+* **ci:** format frontend and package TypeScript config ([8edb0d3](https://github.com/jtn0123/compresso/commit/8edb0d30e35fc0c7fae9338f7c78052d5deeee42))
+* clear release-tooling lockfile advisories (js-yaml, undici) ([#238](https://github.com/jtn0123/compresso/issues/238)) ([8d2d60b](https://github.com/jtn0123/compresso/commit/8d2d60b01bf3b9120b0fd73ea55c4dfd15dc84d1))
+* close type-safety merge-readiness findings ([5e6e8ca](https://github.com/jtn0123/compresso/commit/5e6e8ca86a722df5d4fcc660b7f709344890e027))
+* **deps:** bump pinned pip to 26.2.1, clearing PYSEC-2026-3721 ([#257](https://github.com/jtn0123/compresso/issues/257)) ([1fa1240](https://github.com/jtn0123/compresso/commit/1fa1240e87ff088bf16bf8ecbee1c4a5519a5047))
+* **docker:** patch npm-bundled ip-address for CVE-2026-69192 ([#246](https://github.com/jtn0123/compresso/issues/246)) ([56e49f0](https://github.com/jtn0123/compresso/commit/56e49f0e17069e97d96216755dacab6fe7aaa54a))
+* override js-yaml to ^4.3.1 in the frontend (2 high advisories) ([#242](https://github.com/jtn0123/compresso/issues/242)) ([1f78dd4](https://github.com/jtn0123/compresso/commit/1f78dd4eade39e62392edc6a20ef85fff67daaa2))
+* repair frontend runtime regressions from the TypeScript migration ([a456cca](https://github.com/jtn0123/compresso/commit/a456cca7869a35d56f6003f973ee3cb6d23bc730))
+* repair runtime regressions from the strict-typing migration (backend) ([2aa6edb](https://github.com/jtn0123/compresso/commit/2aa6edbc437a13a1df1177b1a546d0c1927ee90d))
+* resolve Sonar reliability findings failing the quality gate ([af17830](https://github.com/jtn0123/compresso/commit/af178300c5f19470a07636d4f7e8fa737149162f))
+* **security:** clarify trusted file path boundaries ([2afb067](https://github.com/jtn0123/compresso/commit/2afb06722d8895bc4a9da3a08955f54664b048b8))
+* **security:** clear all 5 advisories in the release tooling lockfile ([#259](https://github.com/jtn0123/compresso/issues/259)) ([f597b93](https://github.com/jtn0123/compresso/commit/f597b939dae0cb3acfb5ddda5e707938c4dc2244))
+* **security:** confine bundled plugin paths ([2c5a350](https://github.com/jtn0123/compresso/commit/2c5a3503cb1ac7ecb9bd8014c032f8ff5551a1c3))
+* **security:** patch pacote and tar CVEs in the image's bundled npm ([#260](https://github.com/jtn0123/compresso/issues/260)) ([2c99468](https://github.com/jtn0123/compresso/commit/2c9946843708409bf122b41c87d18cd2273c4ece)), closes [#258](https://github.com/jtn0123/compresso/issues/258)
+* **security:** recognize spaced Vue closing tags ([126baff](https://github.com/jtn0123/compresso/commit/126baff9a6b56a3c3ac2d424738bf7d7acb07160))
+* **security:** scan Vue script boundaries without regex ([d167d62](https://github.com/jtn0123/compresso/commit/d167d623704d90f7c4e2ea920bf3a6c21e2b5ba3))
+* type Peewee column metadata access ([a034255](https://github.com/jtn0123/compresso/commit/a0342554cad316059e274774c56a6aacb517de50))
+
 # [1.17.0](https://github.com/jtn0123/compresso/compare/v1.16.2...v1.17.0) (2026-07-20)
 
 
