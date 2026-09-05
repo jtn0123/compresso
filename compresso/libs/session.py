@@ -189,13 +189,12 @@ class Session(metaclass=SingletonType):
 
         :return:
         """
-        db_installation = Installation()
         try:
-            current_installation = db_installation.select().order_by(Installation.id.asc()).limit(1).get()
+            current_installation = Installation.select().order_by(Installation.id.asc()).limit(1).get()
         except Exception:
             self.logger.debug("Compresso session does not yet exist... Creating.")
-            execute_write(db_installation.delete())
-            current_installation = db_installation.create()
+            execute_write(Installation.delete())
+            current_installation = Installation.create()
 
         self.uuid = str(current_installation.uuid)
         # Always keep level at 100
