@@ -3,6 +3,7 @@
 """API endpoints for persistent sample bake-off comparisons."""
 
 from compresso.libs.comparison import ComparisonManager
+from compresso.libs.narrowing import strict_bool, strict_float, strict_int, strict_str, string_list
 from compresso.libs.preview import validate_preview_source_path
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.comparison_schemas import (
@@ -45,7 +46,7 @@ class ApiComparisonHandler(BaseApiHandler):
         },
     ]
 
-    async def get_profiles(self):
+    async def get_profiles(self) -> None:
         """
         Comparison - profiles
         ---
@@ -67,7 +68,7 @@ class ApiComparisonHandler(BaseApiHandler):
         except Exception as exc:
             self.handle_unhandled_error(exc)
 
-    async def create_comparison(self):
+    async def create_comparison(self) -> None:
         """
         Comparison - create
         ---
@@ -90,18 +91,18 @@ class ApiComparisonHandler(BaseApiHandler):
             request = self.read_json_request(RequestComparisonCreateSchema())
             from compresso.webserver.helpers.healthcheck import validate_library_exists
 
-            validate_library_exists(request["library_id"])
+            validate_library_exists(strict_int(request["library_id"]))
             source_path = validate_preview_source_path(
-                request["source_path"],
-                library_id=request["library_id"],
+                strict_str(request["source_path"]),
+                library_id=strict_int(request["library_id"]),
                 allow_cache=False,
             )
             batch_uuid = ComparisonManager().create_batch(
                 source_path=source_path,
-                start_time=request["start_time"],
-                duration=request["duration"],
-                library_id=request["library_id"],
-                profile_keys=request["profile_keys"],
+                start_time=strict_float(request["start_time"]),
+                duration=strict_float(request["duration"]),
+                library_id=strict_int(request["library_id"]),
+                profile_keys=string_list(request["profile_keys"]),
             )
             response = self.build_response(
                 ComparisonCreateResponseSchema(),
@@ -117,7 +118,7 @@ class ApiComparisonHandler(BaseApiHandler):
         except Exception as exc:
             self.handle_unhandled_error(exc)
 
-    async def get_comparison_status(self):
+    async def get_comparison_status(self) -> None:
         """
         Comparison - status
         ---
@@ -138,7 +139,7 @@ class ApiComparisonHandler(BaseApiHandler):
         """
         try:
             request = self.read_json_request(RequestComparisonStatusSchema())
-            status = ComparisonManager().get_batch_status(request["batch_uuid"])
+            status = ComparisonManager().get_batch_status(strict_str(request["batch_uuid"]))
             if status is None:
                 raise ValueError("Comparison batch not found")
             status["success"] = True
@@ -151,7 +152,7 @@ class ApiComparisonHandler(BaseApiHandler):
         except Exception as exc:
             self.handle_unhandled_error(exc)
 
-    async def select_winner(self):
+    async def select_winner(self) -> None:
         """
         Comparison - winner
         ---
@@ -173,9 +174,9 @@ class ApiComparisonHandler(BaseApiHandler):
         try:
             request = self.read_json_request(RequestComparisonWinnerSchema())
             status = ComparisonManager().select_winner(
-                request["batch_uuid"],
-                request["candidate_uuid"],
-                queue_full_encode=request["queue_full_encode"],
+                strict_str(request["batch_uuid"]),
+                strict_str(request["candidate_uuid"]),
+                queue_full_encode=strict_bool(request["queue_full_encode"]),
             )
             status["success"] = True
             response = self.build_response(ComparisonStatusResponseSchema(), status)
@@ -189,7 +190,7 @@ class ApiComparisonHandler(BaseApiHandler):
         except Exception as exc:
             self.handle_unhandled_error(exc)
 
-    async def cleanup_comparison(self):
+    async def cleanup_comparison(self) -> None:
         """
         Comparison - cleanup
         ---
@@ -206,7 +207,7 @@ class ApiComparisonHandler(BaseApiHandler):
         """
         try:
             request = self.read_json_request(RequestComparisonCleanupSchema())
-            ComparisonManager().cleanup_batch(request["batch_uuid"])
+            ComparisonManager().cleanup_batch(strict_str(request["batch_uuid"]))
             self.write_success()
         except RuntimeError as exc:
             self.handle_base_api_error(BaseApiError("Comparison is still running", private_detail=str(exc)))

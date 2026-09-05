@@ -34,23 +34,29 @@
   </q-btn>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { LocalStorage, useQuasar } from 'quasar'
 import { applyTheme, getPaletteNames, getPalettePreview } from 'src/js/compressoTheme'
+import type { PaletteName } from 'src/js/compressoTheme'
 
 const $q = useQuasar()
 const paletteNames = getPaletteNames()
-const currentPalette = ref(LocalStorage.getItem('palette') || 'forest')
+const storedPalette = LocalStorage.getItem('palette')
+const currentPalette = ref<PaletteName>(
+  typeof storedPalette === 'string' && paletteNames.includes(storedPalette as PaletteName)
+    ? (storedPalette as PaletteName)
+    : 'forest',
+)
 
-function getSwatchColor(paletteName, key) {
+function getSwatchColor(paletteName: PaletteName, key: 'primary' | 'secondary'): string {
   const preview = getPalettePreview(paletteName)
   if (!preview) return '#888'
   const mode = $q.dark.isActive ? 'dark' : 'light'
   return preview[mode][key]
 }
 
-function selectPalette(name) {
+function selectPalette(name: PaletteName): void {
   currentPalette.value = name
   LocalStorage.set('palette', name)
   const mode = $q.dark.isActive ? 'dark' : 'light'

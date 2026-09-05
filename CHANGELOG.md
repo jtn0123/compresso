@@ -1,3 +1,25 @@
+# [1.17.0](https://github.com/jtn0123/compresso/compare/v1.16.2...v1.17.0) (2026-07-20)
+
+
+### Bug Fixes
+
+* resolve audit findings B1-B7 — data loss, debug mode, race conditions ([3ba000a](https://github.com/jtn0123/compresso/commit/3ba000a9849f6c992614a9f70cc3200e44c637e7))
+* **security:** buffer deferred finish chunk instead of calling write() off-path ([009ca9b](https://github.com/jtn0123/compresso/commit/009ca9b5e3bd4d32891deec4e3b090b873696e6c))
+
+
+### Features
+
+* **security:** enforce auth/CSRF on network deployments, contain file browser, gate startup.sh ([f0226c2](https://github.com/jtn0123/compresso/commit/f0226c26d7f37166d92cfce82430dc517a44575b))
+
+## [1.16.2](https://github.com/jtn0123/compresso/compare/v1.16.1...v1.16.2) (2026-07-20)
+
+
+### Bug Fixes
+
+* **frontend:** migrate breaking changes for frontend-dependencies group bump ([6e3220a](https://github.com/jtn0123/compresso/commit/6e3220ad79afe3b30ad7c9ea788e1d9845742307)), closes [#q-app](https://github.com/jtn0123/compresso/issues/q-app)
+* list software encoders first and repair encoder availability filter ([ed021fd](https://github.com/jtn0123/compresso/commit/ed021fd83259942e384dd15d4b901d1448acc72c))
+* patch linux-libc-dev CVE-2026-43185 in app image ([c391269](https://github.com/jtn0123/compresso/commit/c391269e3ccba68723c2ecaa269d2b4c5ce49c87))
+
 ## [1.16.1](https://github.com/jtn0123/compresso/compare/v1.16.0...v1.16.1) (2026-07-15)
 
 

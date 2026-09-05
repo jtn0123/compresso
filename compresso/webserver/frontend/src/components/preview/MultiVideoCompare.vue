@@ -164,27 +164,29 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { ComponentPublicInstance, PropType } from 'vue'
+import type { ComparisonCandidate } from 'src/types/comparison'
 import { useI18n } from 'vue-i18n'
 import { formatBytes, formatTime } from 'src/js/formatUtils'
 import { useMultiVideoSync } from 'src/composables/useMultiVideoSync'
 
 const props = defineProps({
-  candidates: { type: Array, required: true },
+  candidates: { type: Array as PropType<ComparisonCandidate[]>, required: true },
   selectedCandidateUuid: { type: String, default: '' },
   winnerEnabled: { type: Boolean, default: true },
   frameRate: { type: Number, default: 24 },
 })
 defineEmits(['winner-selected'])
 const { t } = useI18n()
-const videoRefs = ref([])
+const videoRefs = ref<(HTMLVideoElement | null)[]>([])
 const zoom = ref(1)
 const panX = ref(0)
 const panY = ref(0)
 const freezeAnalysis = ref(false)
 let panning = false
-let pointerId = null
+let pointerId: number | null = null
 let pointerStartX = 0
 let pointerStartY = 0
 let panStartX = 0
@@ -200,34 +202,34 @@ const videoTransform = computed(() => ({
   transform: `translate(${panX.value}px, ${panY.value}px) scale(${zoom.value})`,
 }))
 
-function setVideoRef(element, index) {
-  videoRefs.value[index] = element
+function setVideoRef(element: Element | ComponentPublicInstance | null, index: number) {
+  videoRefs.value[index] = element instanceof HTMLVideoElement ? element : null
 }
 
-function statusLabel(status) {
+function statusLabel(status: string) {
   return status === 'running' ? t('pages.sampleComparison.encoding') : t('pages.sampleComparison.queued')
 }
 
-function formatMetric(value, digits) {
+function formatMetric(value: number | null | undefined, digits: number) {
   return value == null ? '—' : Number(value).toFixed(digits)
 }
 
-function formatPercent(value) {
+function formatPercent(value: number | undefined) {
   const number = Number(value) || 0
   return `${number > 0 ? '+' : ''}${number.toFixed(1)}%`
 }
 
-function savingsClass(candidate) {
+function savingsClass(candidate: ComparisonCandidate) {
   if (candidate.status !== 'completed') return ''
-  return candidate.size_saved_percent >= 0 ? 'text-positive' : 'text-negative'
+  return Number(candidate.size_saved_percent) >= 0 ? 'text-positive' : 'text-negative'
 }
 
-function step(direction) {
+function step(direction: number) {
   freezeAnalysis.value = true
   frameStep(direction)
 }
 
-function onVideoReady(index) {
+function onVideoReady(index: number) {
   updateDuration()
   const video = videoRefs.value[index]
   if (!video) return
@@ -245,8 +247,8 @@ function toggleFreeze() {
   if (freezeAnalysis.value) pause()
 }
 
-function onKeydown(event) {
-  if (event.target?.closest?.('button, input, [role="slider"]')) return
+function onKeydown(event: KeyboardEvent) {
+  if (event.target instanceof Element && event.target.closest('button, input, [role="slider"]')) return
   if (event.code === 'Space') {
     event.preventDefault()
     togglePlayback()
@@ -259,7 +261,7 @@ function onKeydown(event) {
   }
 }
 
-function onZoom(event) {
+function onZoom(event: WheelEvent) {
   zoom.value = Math.min(6, Math.max(1, zoom.value + (event.deltaY > 0 ? -0.25 : 0.25)))
   if (zoom.value === 1) resetZoom()
 }
@@ -270,7 +272,7 @@ function resetZoom() {
   panY.value = 0
 }
 
-function startPan(event) {
+function startPan(event: PointerEvent) {
   if (zoom.value <= 1) return
   panning = true
   pointerId = event.pointerId
@@ -278,282 +280,20 @@ function startPan(event) {
   pointerStartY = event.clientY
   panStartX = panX.value
   panStartY = panY.value
-  event.currentTarget.setPointerCapture?.(pointerId)
+  if (event.currentTarget instanceof Element) event.currentTarget.setPointerCapture(pointerId)
 }
 
-function movePan(event) {
+function movePan(event: PointerEvent) {
   if (!panning || event.pointerId !== pointerId) return
   panX.value = panStartX + event.clientX - pointerStartX
   panY.value = panStartY + event.clientY - pointerStartY
 }
 
-function endPan(event) {
+function endPan(event: PointerEvent) {
   if (event.pointerId !== pointerId) return
   panning = false
   pointerId = null
 }
 </script>
 
-<style scoped>
-.comparison-stage {
-  --stage-ink: #080b0d;
-  --stage-panel: #111619;
-  --stage-line: rgba(255, 255, 255, 0.14);
-  --stage-amber: #f3b33d;
-  overflow: hidden;
-  color: #f5f0e6;
-  background: var(--stage-ink);
-  border: 1px solid var(--stage-line);
-  border-radius: 8px;
-}
-
-.comparison-stage:focus-visible {
-  outline: 2px solid var(--stage-amber);
-  outline-offset: 3px;
-}
-
-.stage-header,
-.transport-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 14px 16px;
-  background: #0d1113;
-}
-
-.stage-header {
-  border-bottom: 1px solid var(--stage-line);
-}
-
-.stage-kicker,
-.candidate-codec,
-.metric-strip span,
-.timecode {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.stage-kicker {
-  color: var(--stage-amber);
-  font-size: 10px;
-}
-
-.stage-title {
-  margin-top: 2px;
-  font-size: 18px;
-  font-weight: 650;
-}
-
-.candidate-grid {
-  display: grid;
-  gap: 1px;
-  background: var(--stage-line);
-}
-
-.candidate-grid--2,
-.candidate-grid--4 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.candidate-grid--3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.candidate-cell {
-  position: relative;
-  min-width: 0;
-  background: var(--stage-panel);
-}
-
-.candidate-cell--winner::after {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  border: 2px solid var(--stage-amber);
-  content: '';
-  pointer-events: none;
-}
-
-.video-viewport {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-  background:
-    linear-gradient(90deg, transparent 49.8%, rgba(255, 255, 255, 0.035) 50%, transparent 50.2%),
-    linear-gradient(0deg, transparent 49.8%, rgba(255, 255, 255, 0.035) 50%, transparent 50.2%), #050607;
-  cursor: crosshair;
-  touch-action: none;
-}
-
-.video-viewport video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  transform-origin: center;
-  transition: transform 60ms linear;
-}
-
-.cell-state {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 22px;
-  color: #d3d7d8;
-  text-align: center;
-}
-
-.cell-state--failed {
-  color: #ff887d;
-}
-
-.cell-state--failed .text-caption {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.cell-progress {
-  width: min(240px, 74%);
-}
-
-.cell-index {
-  position: absolute;
-  top: 9px;
-  left: 10px;
-  padding: 3px 6px;
-  color: var(--stage-amber);
-  background: rgba(0, 0, 0, 0.72);
-  border: 1px solid rgba(243, 179, 61, 0.5);
-  border-radius: 3px;
-  font:
-    600 11px/1 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    monospace;
-}
-
-.analysis-grid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(243, 179, 61, 0.2) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(243, 179, 61, 0.2) 1px, transparent 1px);
-  background-size: 33.333% 33.333%;
-}
-
-.candidate-meta {
-  padding: 12px 14px 14px;
-}
-
-.candidate-name {
-  font-size: 15px;
-  font-weight: 650;
-}
-
-.candidate-codec {
-  margin-top: 2px;
-  color: #8f9a9e;
-  font-size: 10px;
-}
-
-.metric-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 13px;
-}
-
-.metric-strip div {
-  min-width: 0;
-  padding-top: 8px;
-  border-top: 1px solid var(--stage-line);
-}
-
-.metric-strip span,
-.metric-strip strong {
-  display: block;
-}
-
-.metric-strip span {
-  color: #7e898d;
-  font-size: 9px;
-}
-
-.metric-strip strong {
-  margin-top: 3px;
-  overflow: hidden;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.transport-bar {
-  border-top: 1px solid var(--stage-line);
-}
-
-.transport-buttons {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-}
-
-.transport-slider {
-  min-width: 120px;
-}
-
-.timecode {
-  flex: 0 0 auto;
-  color: #aeb7ba;
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-@media (max-width: 980px) {
-  .candidate-grid--3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .candidate-grid--3 .candidate-cell:last-child {
-    grid-column: 1 / -1;
-  }
-
-  .comparison-stage--3 .metric-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 760px) {
-  .candidate-grid--2,
-  .candidate-grid--3,
-  .candidate-grid--4 {
-    grid-template-columns: 1fr;
-  }
-
-  .candidate-grid--3 .candidate-cell:last-child {
-    grid-column: auto;
-  }
-
-  .stage-header,
-  .transport-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .transport-buttons {
-    justify-content: center;
-  }
-
-  .timecode {
-    text-align: center;
-  }
-}
-</style>
+<style scoped src="./MultiVideoCompare.css"></style>

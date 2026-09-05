@@ -35,26 +35,57 @@ import string
 from compresso.libs import common
 
 
-def fetch_windows_drives():
+def fetch_windows_drives() -> list[str]:
     # Credit: https://stackoverflow.com/a/37761506
     return [f"{d}:" for d in string.ascii_uppercase if os.path.exists(f"{d}:")]
 
 
-def _validate_browsable_path(user_path):
+def _configured_browse_roots() -> list[str]:
+    """Return the canonical, existing browse containment roots (may be empty)."""
+    from compresso import config
+
+    roots: list[str] = []
+    for root in config.Config().get_browse_root_paths():
+        resolved = os.path.realpath(root)
+        if os.path.isdir(resolved):
+            roots.append(resolved)
+    return roots
+
+
+def _clamp_to_browse_roots(resolved: str) -> str:
+    """Contain a resolved path within the configured browse roots.
+
+    When browse roots are configured, any path outside of them (including
+    symlink escapes, which realpath already resolved) is redirected to the
+    first configured root. Without configured roots, browsing is unrestricted
+    (the API route itself still sits behind the standard request auth).
+    """
+    roots = _configured_browse_roots()
+    if not roots:
+        return resolved
+    for root in roots:
+        # Component-wise containment: exact root or a child path of it
+        if resolved == root or resolved.startswith(root.rstrip(os.sep) + os.sep):
+            return resolved
+    return roots[0]
+
+
+def _validate_browsable_path(user_path: str) -> str:
     """Resolve and validate a user-provided filesystem path for browsing.
 
     Returns a canonical absolute path with traversal sequences resolved.
-    Rejects null bytes and paths outside a valid filesystem root.
+    Rejects null bytes and paths outside a valid filesystem root, and
+    contains the result within the configured browse roots (if any).
     """
     if not user_path or "\x00" in str(user_path):
-        return os.sep
+        return _clamp_to_browse_roots(os.sep)
     resolved = os.path.realpath(user_path)
     # Build the filesystem root for this path (handles drive letters on Windows)
     drive, _ = os.path.splitdrive(resolved)
     fs_root = drive + os.sep if drive else os.sep
     if not resolved.startswith(fs_root):
-        return os.sep
-    return resolved
+        return _clamp_to_browse_roots(os.sep)
+    return _clamp_to_browse_roots(resolved)
 
 
 class DirectoryListing:
@@ -64,12 +95,12 @@ class DirectoryListing:
     Handle directory listing on the host running Compresso
     """
 
-    def __init__(self, list_type=None):
+    def __init__(self, list_type: str | None = None) -> None:
         self.list_type = "all"
         if list_type:
             self.list_type = list_type
 
-    def fetch_path_data(self, path):
+    def fetch_path_data(self, path: str) -> dict[str, object]:
         """
         Returns an object filled with data pertaining to a particular path
 
@@ -78,13 +109,13 @@ class DirectoryListing:
         :return:
         """
         safe_path = _validate_browsable_path(path)
-        directories = []
-        files = []
+        directories: list[dict[str, str]] = []
+        files: list[dict[str, str]] = []
         if self.list_type == "directories" or self.list_type == "all":
             directories = self.fetch_directories(safe_path)
         if self.list_type == "files" or self.list_type == "all":
             files = self.fetch_files(safe_path)
-        path_data = {
+        path_data: dict[str, object] = {
             "current_path": safe_path,
             "list_type": self.list_type,
             "directories": directories,
@@ -93,7 +124,7 @@ class DirectoryListing:
         return path_data
 
     @staticmethod
-    def fetch_directories(path):
+    def fetch_directories(path: str) -> list[dict[str, str]]:
         """
         Fetch a list of directory objects based on a given path
 
@@ -101,7 +132,7 @@ class DirectoryListing:
         :return:
         """
         safe_path = _validate_browsable_path(path)
-        results = []
+        results: list[dict[str, str]] = []
         if os.path.exists(safe_path):
             # check if this is a root path or if it has a parent
             parent_path = os.path.join(safe_path, "..")
@@ -156,7 +187,7 @@ class DirectoryListing:
         return results
 
     @staticmethod
-    def fetch_files(path):
+    def fetch_files(path: str) -> list[dict[str, str]]:
         """
         Fetch a list of file objects based on a given path
 
@@ -164,7 +195,7 @@ class DirectoryListing:
         :return:
         """
         safe_path = _validate_browsable_path(path)
-        results = []
+        results: list[dict[str, str]] = []
         if os.path.exists(safe_path):
             for item in sorted(os.listdir(safe_path)):
                 abspath = _validate_browsable_path(os.path.join(safe_path, item))

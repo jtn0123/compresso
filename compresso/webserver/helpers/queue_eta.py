@@ -7,12 +7,49 @@ Helper functions for estimating encoding queue ETA.
 
 """
 
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
+
 from compresso.libs.logs import CompressoLogging
+
+if TYPE_CHECKING:
+    from compresso.libs.foreman import Foreman
+    from compresso.libs.unmodels import CompletedTasks
 
 logger = CompressoLogging.get_logger(name=__name__)
 
 
-def estimate_queue_eta(foreman, completed_tasks_model=None):
+def _worker_eta_summary(workers_status: Sequence[Mapping[str, object]]) -> tuple[int, int, int, float]:
+    active_etas: list[float] = []
+    busy = 0
+    paused = 0
+    for worker in workers_status:
+        if worker.get("paused"):
+            paused += 1
+            continue
+        if worker.get("idle"):
+            continue
+        busy += 1
+        subprocess_value = worker.get("subprocess")
+        subprocess_stats = subprocess_value if isinstance(subprocess_value, Mapping) else {}
+        eta = subprocess_stats.get("eta_seconds")
+        if isinstance(eta, (int, float)):
+            active_etas.append(float(eta))
+    return len(workers_status), busy, paused, max(active_etas) if active_etas else 0
+
+
+def _eta_confidence(history_count: int) -> str:
+    if history_count >= 10:
+        return "high"
+    if history_count >= 3:
+        return "medium"
+    return "low"
+
+
+def estimate_queue_eta(
+    foreman: "Foreman",
+    completed_tasks_model: type["CompletedTasks"] | None = None,
+) -> dict[str, object]:
     """
     Estimate total time to process all pending tasks.
 
@@ -33,25 +70,7 @@ def estimate_queue_eta(foreman, completed_tasks_model=None):
         logger.exception("Failed to get worker status for queue ETA")
         workers_status = []
 
-    # Count total workers and collect ETAs from active (non-idle) workers
-    total_workers = len(workers_status)
-    active_etas = []
-    num_busy_workers = 0
-    num_paused_workers = 0
-
-    for worker in workers_status:
-        if worker.get("paused"):
-            num_paused_workers += 1
-            continue
-        if not worker.get("idle"):
-            num_busy_workers += 1
-            subprocess_stats = worker.get("subprocess") or {}
-            eta = subprocess_stats.get("eta_seconds")
-            if eta is not None:
-                active_etas.append(eta)
-
-    # The active workers run in parallel, so the bottleneck is the max ETA
-    active_workers_eta_seconds = max(active_etas) if active_etas else 0
+    total_workers, num_busy_workers, num_paused_workers, active_workers_eta_seconds = _worker_eta_summary(workers_status)
 
     # Query recent completed tasks for average processing time
     estimated_per_task_seconds, history_count = _get_avg_task_duration(completed_tasks_model)
@@ -75,13 +94,7 @@ def estimate_queue_eta(foreman, completed_tasks_model=None):
 
     total_queue_eta_seconds = active_workers_eta_seconds + pending_eta
 
-    # Confidence level based on historical data
-    if history_count >= 10:
-        eta_confidence = "high"
-    elif history_count >= 3:
-        eta_confidence = "medium"
-    else:
-        eta_confidence = "low"
+    eta_confidence = _eta_confidence(history_count)
 
     return {
         "active_workers_eta_seconds": active_workers_eta_seconds,
@@ -95,7 +108,9 @@ def estimate_queue_eta(foreman, completed_tasks_model=None):
     }
 
 
-def _get_avg_task_duration(completed_tasks_model=None):
+def _get_avg_task_duration(
+    completed_tasks_model: type["CompletedTasks"] | None = None,
+) -> tuple[float, int]:
     """
     Query the last 50 completed tasks and compute average processing duration.
 
@@ -104,18 +119,20 @@ def _get_avg_task_duration(completed_tasks_model=None):
     """
     try:
         if completed_tasks_model is not None:
-            CompletedTasks = completed_tasks_model
+            completed_model = completed_tasks_model
         else:
             from compresso.libs.unmodels import CompletedTasks
 
+            completed_model = CompletedTasks
+
         recent_tasks = (
-            CompletedTasks.select(CompletedTasks.start_time, CompletedTasks.finish_time)
-            .where(CompletedTasks.task_success == True)  # noqa: E712 — peewee ORM requires == for SQL generation
-            .order_by(CompletedTasks.finish_time.desc())
+            completed_model.select(completed_model.start_time, completed_model.finish_time)
+            .where(completed_model.task_success == True)  # noqa: E712 — peewee ORM requires == for SQL generation
+            .order_by(completed_model.finish_time.desc())
             .limit(50)
         )
 
-        durations = []
+        durations: list[float] = []
         for task in recent_tasks:
             start = task.start_time
             finish = task.finish_time
@@ -134,7 +151,7 @@ def _get_avg_task_duration(completed_tasks_model=None):
         return 0, 0
 
 
-def _get_pending_tasks_count():
+def _get_pending_tasks_count() -> int:
     """
     Get the count of pending tasks in the queue.
 
@@ -143,7 +160,7 @@ def _get_pending_tasks_count():
     try:
         from compresso.libs.unmodels import Tasks
 
-        return Tasks.select().where(Tasks.status == "pending").count()
+        return int(Tasks.select().where(Tasks.status == "pending").count())
     except Exception:
         logger.exception("Failed to query pending tasks count")
         return 0

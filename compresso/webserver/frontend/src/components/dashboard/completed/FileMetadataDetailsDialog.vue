@@ -112,7 +112,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
@@ -121,6 +121,20 @@ import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import CompressoDialogWindow from 'components/ui/dialogs/CompressoDialogWindow.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import CompressoDialogConfirm from 'components/ui/dialogs/CompressoDialogConfirm.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+import { normalizeMetadataEntry } from 'src/types/metadata'
+import type { MetadataEntryView } from 'src/types/metadata'
+
+interface EditorEntry {
+  pluginId: string
+  jsonText: string
+  error: string
+}
+interface ConfirmState {
+  type: '' | 'plugin' | 'all'
+  pluginId: string | null
+}
 
 const props = defineProps({
   completedTaskId: {
@@ -135,16 +149,16 @@ const props = defineProps({
 
 const emit = defineEmits(['hide'])
 
-const dialogRef = ref(null)
-const confirmDialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
+const confirmDialogRef = ref<DialogController | null>(null)
 const loading = ref(false)
 const saving = ref(false)
-const metadataResults = ref([])
-const selectedFingerprint = ref(null)
-const editorEntries = ref([])
+const metadataResults = ref<MetadataEntryView[]>([])
+const selectedFingerprint = ref<string | null>(null)
+const editorEntries = ref<EditorEntry[]>([])
 const isDirty = ref(false)
 
-const confirmState = ref({ type: '', pluginId: null })
+const confirmState = ref<ConfirmState>({ type: '', pluginId: null })
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
@@ -198,12 +212,12 @@ const dialogActions = computed(() => {
 })
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
   fetchMetadata()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -226,7 +240,7 @@ const fetchMetadata = () => {
   }
 
   loading.value = true
-  const payload = {}
+  const payload: { fingerprint?: string; task_id?: number } = {}
   let endpoint = 'metadata/by-task'
   if (props.fingerprint) {
     endpoint = 'metadata/by-fingerprint'
@@ -235,13 +249,13 @@ const fetchMetadata = () => {
     payload.task_id = Number(props.completedTaskId)
   }
 
-  axios({
+  axios<ApiSchema<'MetadataSearchResults'>>({
     method: 'post',
     url: getCompressoApiUrl('v2', endpoint),
     data: payload,
   })
     .then((response) => {
-      metadataResults.value = response.data.results || []
+      metadataResults.value = (response.data.results || []).map(normalizeMetadataEntry)
       selectedFingerprint.value = metadataResults.value[0]?.fingerprint || null
       buildEditorEntries()
       isDirty.value = false
@@ -275,16 +289,16 @@ const buildEditorEntries = () => {
     }))
 }
 
-const validateEntry = (entry) => {
+const validateEntry = (entry: EditorEntry): Record<string, unknown> | null => {
   try {
-    const parsed = JSON.parse(entry.jsonText || '{}')
+    const parsed: unknown = JSON.parse(entry.jsonText || '{}')
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       entry.error = $t('components.completedTasks.metadataInvalidJson')
       return null
     }
     entry.error = ''
-    return parsed
-  } catch (err) {
+    return parsed as Record<string, unknown>
+  } catch {
     entry.error = $t('components.completedTasks.metadataInvalidJson')
     return null
   }
@@ -341,7 +355,7 @@ const saveAll = () => {
     })
 }
 
-const confirmDeletePlugin = (pluginId) => {
+const confirmDeletePlugin = (pluginId: string): void => {
   if (!selectedEntry.value) {
     return
   }
@@ -372,17 +386,17 @@ const confirmDeleteAction = () => {
 }
 
 const showConfirmDialog = () => {
-  if (confirmDialogRef.value) {
-    confirmDialogRef.value.show()
-  }
+  confirmDialogRef.value?.show()
 }
 
-const deleteMetadata = (pluginId) => {
+const deleteMetadata = (pluginId: string | null): void => {
+  const entry = selectedEntry.value
+  if (!entry) return
   axios({
     method: 'delete',
     url: getCompressoApiUrl('v2', 'metadata'),
     data: {
-      fingerprint: selectedEntry.value.fingerprint,
+      fingerprint: entry.fingerprint,
       plugin_id: pluginId,
     },
   })

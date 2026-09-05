@@ -6,8 +6,10 @@ tests.unit.test_websocket.py
 Unit tests for compresso.webserver.websocket.CompressoWebsocketHandler.
 """
 
+import asyncio
 import json
 import time
+from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -692,3 +694,75 @@ class TestAsyncLoops:
 
 if __name__ == "__main__":
     pytest.main(["-s", "--log-cli-level=INFO", __file__])
+
+
+# ------------------------------------------------------------------
+# Regression tests: message narrowing and stream row limits
+# ------------------------------------------------------------------
+
+
+@pytest.mark.unittest
+class TestMessageNarrowing:
+    def test_non_object_json_frame_does_not_raise(self):
+        handler = _make_handler()
+        handler.write_message = MagicMock()
+        # Valid JSON documents that are not objects must be treated as
+        # malformed frames, not crash the handler with AttributeError.
+        handler.on_message("[1, 2, 3]")
+        handler.on_message('"hello"')
+        handler.on_message("5")
+
+    def test_non_string_truthy_command_gets_error_reply(self):
+        handler = _make_handler()
+        handler.write_message = MagicMock()
+        handler.on_message(json.dumps({"command": 123}))
+        handler.write_message.assert_called_once_with({"success": False, "error": "Unknown command"})
+
+    def test_on_close_before_open_does_not_raise(self):
+        handler = _make_handler()
+        assert handler.close_event is None
+        handler.on_close()
+
+
+@pytest.mark.unittest
+class TestStreamRowLimits:
+    """The pending/completed streams must request bounded pages (10 rows)."""
+
+    def _capture_stream_params(self, flag_attr, prepare_target, extra_patches=()):
+        """Run one stream iteration and capture the params it requested."""
+        handler = _make_handler()
+        setattr(handler, flag_attr, True)
+        handler._send_stream_message = AsyncMock()
+        seen_params = []
+
+        def fake_prepare(params):
+            seen_params.append(params)
+            setattr(handler, flag_attr, False)
+            return {"results": []}
+
+        with ExitStack() as stack:
+            stack.enter_context(patch(prepare_target, side_effect=fake_prepare))
+            stack.enter_context(patch(f"{WS_MOD}.gen.sleep", new=AsyncMock()))
+            for extra in extra_patches:
+                stack.enter_context(extra)
+            if flag_attr == "sending_pending_tasks_info":
+                asyncio.run(handler.async_pending_tasks_info())
+            else:
+                asyncio.run(handler.async_completed_tasks_info())
+
+        assert seen_params and seen_params[0]["start"] == 0
+        assert seen_params[0]["length"] == 10
+        assert isinstance(seen_params[0]["length"], int)
+
+    def test_pending_stream_requests_bounded_page(self):
+        self._capture_stream_params(
+            "sending_pending_tasks_info",
+            f"{WS_MOD}.pending_tasks.prepare_filtered_pending_tasks",
+            extra_patches=(patch(f"{WS_MOD}.estimate_queue_eta", return_value=None),),
+        )
+
+    def test_completed_stream_requests_bounded_page(self):
+        self._capture_stream_params(
+            "sending_completed_tasks_info",
+            f"{WS_MOD}.completed_tasks.prepare_filtered_completed_tasks",
+        )

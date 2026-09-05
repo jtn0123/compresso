@@ -185,3 +185,23 @@ def test_create_task_from_path_returns_new_task_on_success(task_handler):
 
         assert task_handler.create_task_from_path("/tmp/video.mkv", 3, priority_score=77) is mock_task
         mock_task.create_task_by_absolute_path.assert_called_once()
+
+
+@pytest.mark.unittest
+def test_log_exception_level_preserves_traceback(task_handler):
+    """Regression: level="exception" must use logger.exception, not INFO."""
+    task_handler._log("boom", level="exception")
+
+    task_handler.logger.exception.assert_called_once()
+    task_handler.logger.log.assert_not_called()
+
+
+@pytest.mark.unittest
+def test_log_unknown_level_falls_back_to_error(task_handler):
+    import logging
+
+    # A spec'd mock rejects unknown attributes the way a real Logger does
+    task_handler.logger = MagicMock(spec=logging.Logger)
+    task_handler._log("odd", level="not_a_level")
+
+    task_handler.logger.error.assert_called_once()

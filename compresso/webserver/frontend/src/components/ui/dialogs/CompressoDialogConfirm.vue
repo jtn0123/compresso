@@ -19,9 +19,10 @@
   </q-dialog>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { DialogController } from 'src/types/ui'
 
 const props = defineProps({
   title: {
@@ -57,7 +58,7 @@ const props = defineProps({
 const emit = defineEmits(['confirm', 'cancel', 'hide'])
 
 const { t } = useI18n()
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 
 const resolvedTitle = computed(() => props.title || t('headers.confirm'))
 
@@ -68,15 +69,11 @@ const resolvedOkLabel = computed(() => props.okLabel || t('navigation.yes'))
 const resolvedCancelLabel = computed(() => props.cancelLabel || t('navigation.cancel'))
 
 const show = () => {
-  if (dialogRef.value) {
-    dialogRef.value.show()
-  }
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onConfirm = () => {

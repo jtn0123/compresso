@@ -32,18 +32,19 @@ Copyright:
 import configparser
 import json
 import os
+from typing import cast
 
 from compresso.libs.json_state import atomic_json_write
 
 
 class CompressoDirectoryInfoException(Exception):
-    def __init__(self, message, path):
+    def __init__(self, message: str, path: str | os.PathLike[str]) -> None:
         errmsg = f"{message}: file {path}"
         Exception.__init__(self, errmsg)
         self.message = message
         self.path = path
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.message
 
     __str__ = __repr__
@@ -64,10 +65,10 @@ class CompressoDirectoryInfo:
 
     """
 
-    def __init__(self, directory):
+    def __init__(self, directory: str | os.PathLike[str]) -> None:
         self.path = os.path.join(directory, ".compresso")
-        self.json_data = None
-        self.config_parser = None
+        self.json_data: dict[str, dict[str, object]] | None = None
+        self.config_parser: configparser.ConfigParser | None = None
         # If the path does not exist, do not try to read it
         if not os.path.exists(self.path):
             self.json_data = {}
@@ -75,9 +76,10 @@ class CompressoDirectoryInfo:
         # First read JSON data
         try:
             with open(self.path) as infile:
-                self.json_data = json.load(infile)
+                self.json_data = self.__parse_json_data(json.load(infile))
             # Migrate JSON to latest formatting
-            self.__migrate_json_formatting()
+            if self.json_data is not None:
+                self.__migrate_json_formatting()
         except json.decoder.JSONDecodeError:
             pass
         # If we were unable to import the JSON data, attempt to read as INI
@@ -97,22 +99,36 @@ class CompressoDirectoryInfo:
         if self.json_data is None:
             raise CompressoDirectoryInfoException("Failed to read directory info", self.path)
 
-    def __migrate_to_json(self):
+    @staticmethod
+    def __parse_json_data(value: object) -> dict[str, dict[str, object]] | None:
+        if not isinstance(value, dict) or not all(isinstance(section, str) for section in value):
+            return None
+
+        parsed: dict[str, dict[str, object]] = {}
+        for section, raw_options in cast("dict[str, object]", value).items():
+            if not isinstance(raw_options, dict) or not all(isinstance(key, str) for key in raw_options):
+                return None
+            parsed[section] = cast("dict[str, object]", raw_options)
+        return parsed
+
+    def __migrate_to_json(self) -> None:
         """
         Migrate data from INI to JSON
 
         :return:
         """
+        if self.config_parser is None:
+            raise CompressoDirectoryInfoException("Failed to migrate directory info", self.path)
         sections = self.config_parser.sections()
-        json_data = {}
+        json_data: dict[str, dict[str, object]] = {}
         for section in sections:
-            section_data = {}
+            section_data: dict[str, object] = {}
             for key in self.config_parser[section]:
                 section_data[key.lower()] = self.config_parser.get(section, key)
             json_data[section] = section_data
         self.json_data = json_data
 
-    def __migrate_json_formatting(self):
+    def __migrate_json_formatting(self) -> None:
         """
         Migrate JSON to latest format
 
@@ -123,7 +139,9 @@ class CompressoDirectoryInfo:
         :return:
         """
         # Ensure all keys are lower case
-        sections = [s for s in self.json_data]
+        if self.json_data is None:
+            return
+        sections = list(self.json_data)
         for section in sections:
             # Sections remain case sensitive, but keys must be lowercase
             keys = [k for k in self.json_data[section]]
@@ -132,7 +150,7 @@ class CompressoDirectoryInfo:
                     self.json_data[section][key.lower()] = self.json_data[section][key]
                     del self.json_data[section][key]
 
-    def set(self, section, option, value=None):
+    def set(self, section: str, option: str, value: object | None = None) -> None:
         """
         Set an option.
 
@@ -151,13 +169,14 @@ class CompressoDirectoryInfo:
         elif self.config_parser:
             if not self.config_parser.has_section(section):
                 self.config_parser.add_section(section)
-            self.config_parser.set(section, option, value)
+            config_value = value if isinstance(value, str) or value is None else str(value)
+            self.config_parser.set(section, option, config_value)
             return
         raise CompressoDirectoryInfoException(
             f"Failed to set section '{section}' option '{option}' value '{value}'", self.path
         )
 
-    def get(self, section, option):
+    def get(self, section: str, option: str) -> object | None:
         """
         Get an option
 
@@ -172,7 +191,7 @@ class CompressoDirectoryInfo:
             return self.config_parser.get(section, option)
         raise CompressoDirectoryInfoException(f"Failed to get section '{section}' option '{option}'", self.path)
 
-    def save(self):
+    def save(self) -> None:
         """
         Saves the data to file.
 

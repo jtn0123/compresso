@@ -19,11 +19,12 @@
   </CompressoDialogPopup>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { copyToClipboard, useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
+import type { DialogController } from 'src/types/ui'
 
 const props = defineProps({
   dialogHeader: {
@@ -48,7 +49,7 @@ const emit = defineEmits(['ok', 'hide'])
 const $q = useQuasar()
 const { t } = useI18n()
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const importString = ref('')
 
 const isDirty = computed(() => {
@@ -88,11 +89,11 @@ const dialogActions = computed(() => {
 })
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -127,7 +128,7 @@ const submit = () => {
     JSON.parse(importString.value)
     emit('ok', { importString: importString.value })
     hide()
-  } catch (e) {
+  } catch {
     $q.notify({
       color: 'negative',
       position: 'top',

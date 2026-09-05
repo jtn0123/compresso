@@ -9,69 +9,19 @@ import os
 import shutil
 import subprocess
 import threading
-import time
 import uuid
 
 from compresso import config
+from compresso.libs.comparison_encoder import run_encode_with_progress
+from compresso.libs.comparison_profiles import PROFILE_CATALOG as PROFILE_CATALOG
+from compresso.libs.comparison_profiles import ComparisonProfile
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.preview import PreviewManager
-from compresso.libs.unmodels import ComparisonBatches, ComparisonCandidates
+from compresso.libs.unmodels.comparisonbatches import ComparisonBatches
+from compresso.libs.unmodels.comparisoncandidates import ComparisonCandidates
 
 VIDEO_STREAM_MAP = "0:v:0"
 MOVFLAGS_FASTSTART = "+faststart"
-
-PROFILE_CATALOG = {
-    "x265_crf_22": {
-        "label": "x265 CRF 22",
-        "description": "High-quality HEVC software encode",
-        "encoder": "libx265",
-        "codec": "hevc",
-        "crf": 22,
-        "preset": "medium",
-        "hardware": False,
-        "ffmpeg_args": ["-c:v", "libx265", "-crf", "22", "-preset", "medium"],
-    },
-    "x265_crf_26": {
-        "label": "x265 CRF 26",
-        "description": "Smaller HEVC software encode",
-        "encoder": "libx265",
-        "codec": "hevc",
-        "crf": 26,
-        "preset": "slow",
-        "hardware": False,
-        "ffmpeg_args": ["-c:v", "libx265", "-crf", "26", "-preset", "slow"],
-    },
-    "svt_av1_crf_30": {
-        "label": "SVT-AV1 CRF 30",
-        "description": "Efficient AV1 software encode",
-        "encoder": "libsvtav1",
-        "codec": "av1",
-        "crf": 30,
-        "preset": "8",
-        "hardware": False,
-        "ffmpeg_args": ["-c:v", "libsvtav1", "-crf", "30", "-preset", "8"],
-    },
-    "amd_amf_hevc_quality": {
-        "label": "AMD AMF HEVC Quality",
-        "description": "Fast HEVC encode on supported AMD GPUs",
-        "encoder": "hevc_amf",
-        "codec": "hevc",
-        "crf": 24,
-        "preset": "quality",
-        "hardware": True,
-        "ffmpeg_args": ["-c:v", "hevc_amf", "-quality", "quality", "-rc", "cqp", "-qp_i", "24", "-qp_p", "24"],
-    },
-    "x264_crf_23": {
-        "label": "x264 CRF 23",
-        "description": "Compatible H.264 software baseline",
-        "encoder": "libx264",
-        "codec": "h264",
-        "crf": 23,
-        "preset": "medium",
-        "hardware": False,
-        "ffmpeg_args": ["-c:v", "libx264", "-crf", "23", "-preset", "medium"],
-    },
-}
 
 
 class ComparisonManager:
@@ -81,20 +31,20 @@ class ComparisonManager:
     MAX_CANDIDATES = 4
     MIN_CANDIDATES = 2
     ENCODE_TIMEOUT = 600
-    _encoder_cache = None
+    _encoder_cache: set[str] | None = None
     _encoder_lock = threading.Lock()
     _batch_semaphore = threading.Semaphore(1)
     _recovery_lock = threading.Lock()
     _recovered = False
 
-    def __init__(self):
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+    def __init__(self) -> None:
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.settings = config.Config()
         self.preview_manager = PreviewManager()
         self._recover_interrupted_batches_once()
 
     @classmethod
-    def _detect_encoders(cls):
+    def _detect_encoders(cls) -> set[str]:
         with cls._encoder_lock:
             if cls._encoder_cache is not None:
                 return cls._encoder_cache
@@ -114,7 +64,7 @@ class ComparisonManager:
             return cls._encoder_cache
 
     @classmethod
-    def get_profiles(cls):
+    def get_profiles(cls) -> list[dict[str, object]]:
         available_encoders = cls._detect_encoders()
         return [
             {
@@ -132,7 +82,7 @@ class ComparisonManager:
         ]
 
     @classmethod
-    def _recover_interrupted_batches_once(cls):
+    def _recover_interrupted_batches_once(cls) -> None:
         with cls._recovery_lock:
             if cls._recovered:
                 return
@@ -154,12 +104,14 @@ class ComparisonManager:
                 return
             cls._recovered = True
 
-    def get_comparison_cache_dir(self):
+    def get_comparison_cache_dir(self) -> str:
         comparison_dir = os.path.join(self.settings.get_cache_path(), "preview", "bakeoff")
         os.makedirs(comparison_dir, exist_ok=True)
         return comparison_dir
 
-    def create_batch(self, source_path, start_time, duration, library_id, profile_keys):
+    def create_batch(
+        self, source_path: str, start_time: float, duration: float, library_id: int, profile_keys: list[str]
+    ) -> str:
         source_path = os.path.realpath(source_path)
         if not os.path.isfile(source_path):
             raise ValueError("Source file does not exist or is not a file")
@@ -211,13 +163,13 @@ class ComparisonManager:
         thread.start()
         return batch_uuid
 
-    def _run_batch_guarded(self, batch_uuid):
+    def _run_batch_guarded(self, batch_uuid: str) -> None:
         """Keep comparison workloads queued so only one batch encodes at a time."""
         with self._batch_semaphore:
             self._run_batch(batch_uuid)
 
     @staticmethod
-    def _task_profile(profile):
+    def _task_profile(profile: ComparisonProfile) -> dict[str, object]:
         return {
             "video_codec": profile["codec"],
             "video_encoder": profile["encoder"],
@@ -226,12 +178,12 @@ class ComparisonManager:
         }
 
     @staticmethod
-    def _run_command(command, timeout):
+    def _run_command(command: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
         return subprocess.run(  # noqa: S603 - commands use validated paths and the static profile catalog
             command, capture_output=True, text=True, timeout=timeout
         )
 
-    def _prepare_reference(self, batch, batch_dir):
+    def _prepare_reference(self, batch: ComparisonBatches, batch_dir: str) -> tuple[str, str]:
         segment_path = os.path.join(batch_dir, "source_segment.mkv")
         source_web_path = os.path.join(batch_dir, "source_reference.mp4")
         extract = self._run_command(
@@ -293,7 +245,7 @@ class ComparisonManager:
         batch.save()
         return segment_path, source_web_path
 
-    def _run_batch(self, batch_uuid):
+    def _run_batch(self, batch_uuid: str) -> None:
         batch = ComparisonBatches.get_or_none(ComparisonBatches.batch_uuid == batch_uuid)
         if batch is None:
             return
@@ -334,7 +286,14 @@ class ComparisonManager:
             batch.updated_at = datetime.datetime.now()
             batch.save()
 
-    def _run_candidate(self, batch, candidate, segment_path, source_web_path, batch_dir):
+    def _run_candidate(
+        self,
+        batch: ComparisonBatches,
+        candidate: ComparisonCandidates,
+        segment_path: str,
+        source_web_path: str,
+        batch_dir: str,
+    ) -> None:
         profile = PROFILE_CATALOG[candidate.profile_key]
         output_path = os.path.join(batch_dir, f"{candidate.candidate_uuid}.mp4")
         preview_path = os.path.join(batch_dir, f"{candidate.candidate_uuid}-preview.mp4")
@@ -426,47 +385,18 @@ class ComparisonManager:
             candidate.completed_at = datetime.datetime.now()
             candidate.save()
 
-    def _run_encode_with_progress(self, command, candidate, duration):
-        started = time.monotonic()
-        process = subprocess.Popen(  # noqa: S603 - command is assembled only from the static profile catalog
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        output_lines = []
-        try:
-            for raw_line in iter(process.stdout.readline, ""):
-                line = raw_line.strip()
-                output_lines.append(line)
-                if line.startswith("out_time_ms="):
-                    try:
-                        encoded_seconds = int(line.split("=", 1)[1]) / 1_000_000
-                        progress = min(75, max(1, int((encoded_seconds / duration) * 75)))
-                        if progress > candidate.progress:
-                            candidate.progress = progress
-                            candidate.save()
-                    except (TypeError, ValueError, ZeroDivisionError):
-                        pass
-                if (time.monotonic() - started) > self.ENCODE_TIMEOUT:
-                    process.kill()
-                    raise RuntimeError("Sample encode timed out")
-            return_code = process.wait(timeout=10)
-        finally:
-            if process.stdout:
-                process.stdout.close()
-        if return_code != 0:
-            raise RuntimeError(f"Sample encode failed: {' '.join(output_lines[-10:])[-500:]}")
+    def _run_encode_with_progress(self, command: list[str], candidate: ComparisonCandidates, duration: float) -> None:
+        run_encode_with_progress(command, candidate, duration, self.ENCODE_TIMEOUT)
 
     @staticmethod
-    def _update_batch_progress(batch):
+    def _update_batch_progress(batch: ComparisonBatches) -> None:
         candidates = ComparisonCandidates.select(ComparisonCandidates.progress).where(ComparisonCandidates.batch == batch.id)
         progress_values = [row.progress for row in candidates]
         batch.progress = round(sum(progress_values) / len(progress_values), 2) if progress_values else 0
         batch.updated_at = datetime.datetime.now()
         batch.save()
 
-    def get_batch_status(self, batch_uuid):
+    def get_batch_status(self, batch_uuid: str) -> dict[str, object] | None:
         batch = ComparisonBatches.get_or_none(ComparisonBatches.batch_uuid == batch_uuid)
         if batch is None:
             return None
@@ -490,7 +420,7 @@ class ComparisonManager:
         }
 
     @staticmethod
-    def _serialize_candidate(candidate):
+    def _serialize_candidate(candidate: ComparisonCandidates) -> dict[str, object]:
         return {
             "id": candidate.id,
             "candidate_uuid": candidate.candidate_uuid,
@@ -511,7 +441,7 @@ class ComparisonManager:
             "error": candidate.error,
         }
 
-    def select_winner(self, batch_uuid, candidate_uuid, queue_full_encode=False):
+    def select_winner(self, batch_uuid: str, candidate_uuid: str, queue_full_encode: bool = False) -> dict[str, object]:
         batch = ComparisonBatches.get_or_none(ComparisonBatches.batch_uuid == batch_uuid)
         if batch is None:
             raise ValueError("Comparison batch not found")
@@ -528,7 +458,7 @@ class ComparisonManager:
         if queue_full_encode and batch.full_encode_task_id is None:
             from compresso.webserver.helpers import pending_tasks
 
-            task_metadata = {
+            task_metadata: dict[str, object] = {
                 "__meta__": {
                     "comparison_profile": json.loads(candidate.options_json),
                     "comparison_batch_uuid": batch.batch_uuid,
@@ -541,13 +471,19 @@ class ComparisonManager:
                 task_metadata=task_metadata,
                 force_local=True,
             )
-            if not task_info:
+            if not isinstance(task_info, dict):
                 raise RuntimeError("This source file is already queued or being processed")
-            batch.full_encode_task_id = task_info["id"]
+            task_id = task_info.get("id")
+            if not isinstance(task_id, int):
+                raise RuntimeError("Queued task did not return an integer ID")
+            batch.full_encode_task_id = task_id
         batch.save()
-        return self.get_batch_status(batch_uuid)
+        status = self.get_batch_status(batch_uuid)
+        if status is None:
+            raise RuntimeError("Comparison disappeared while selecting its winner")
+        return status
 
-    def cleanup_batch(self, batch_uuid):
+    def cleanup_batch(self, batch_uuid: str) -> bool:
         batch = ComparisonBatches.get_or_none(ComparisonBatches.batch_uuid == batch_uuid)
         if batch is None:
             return False

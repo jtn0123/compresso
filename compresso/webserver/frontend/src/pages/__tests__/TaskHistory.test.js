@@ -24,7 +24,7 @@ vi.mock('src/composables/useLogger', () => ({
 vi.mock('src/js/dateTools', () => ({
   default: {
     printSecondsAsDuration: vi.fn((s) => `${s}s`),
-    printDateTimeString: vi.fn((ts) => `2025-01-01 00:00:00`),
+    printDateTimeString: vi.fn((_ts) => `2025-01-01 00:00:00`),
   },
 }))
 
@@ -103,7 +103,7 @@ function mockFetchSuccess(tasks = MOCK_TASKS) {
       })
     }
     if (url.includes('history/task/log')) {
-      return Promise.resolve({ data: { log: 'Processing started\nProcessing complete' } })
+      return Promise.resolve({ data: { command_log: 'Processing started\nProcessing complete' } })
     }
     if (url.includes('history/reprocess')) {
       return Promise.resolve({ data: { success: true } })

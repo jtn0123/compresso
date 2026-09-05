@@ -31,7 +31,7 @@ Copyright:
 
 
 class FFProbeError(Exception):
-    def __init__(self, path, info):
+    def __init__(self, path: str | list[str], info: object) -> None:
         Exception.__init__(self, f"Unable to fetch data from file {path}. {info}")
         self.path = path
         self.info = info

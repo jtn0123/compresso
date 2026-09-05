@@ -294,7 +294,7 @@ class TestSettingsApiImportError(ApiTestBase):
     __test__ = True
     handler_class = ApiSettingsHandler
 
-    @patch("compresso.webserver.helpers.settings.save_library_config")
+    @patch("compresso.webserver.helpers.settings.save_library_request")
     def test_import_library_exception(self, mock_save):
         mock_save.side_effect = Exception("import error")
         resp = self.post_json(

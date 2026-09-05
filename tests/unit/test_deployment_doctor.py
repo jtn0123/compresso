@@ -54,11 +54,17 @@ class FakeSettings:
     def get_api_auth_enabled(self):
         return True
 
+    def get_api_auth_enforced(self):
+        return self.get_api_auth_enabled()
+
     def get_api_auth_token(self):
         return "do-not-export"
 
     def get_csrf_protection_enabled(self):
         return True
+
+    def get_csrf_protection_enforced(self):
+        return self.get_csrf_protection_enabled()
 
     def get_ui_address(self):
         return self.address

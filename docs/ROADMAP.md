@@ -2,6 +2,8 @@
 
 Large production deployments should follow the supported [20 TB media compression runbook](20TB_MEDIA_COMPRESSION_RUNBOOK.md) before enabling destructive processing.
 
+The production typing migration is tracked exclusively in the [type-safety program](TYPE_SAFETY.md).
+
 Last updated: 2026-03-25
 
 This document tracks planned work for Compresso, organized by priority. Each item includes

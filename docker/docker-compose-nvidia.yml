@@ -3,6 +3,14 @@
 #
 # Use this template when enabling NVENC Hardware accelerated encoding
 #
+# WARNING — hardware encoding is a LAST RESORT if your goal is smaller files.
+# NVENC encoders are faster but produce LARGER files at the same visual
+# quality than the default software encoders (libx265 / libsvtav1), which run
+# on any CPU (Intel, AMD, Apple Silicon). Use this template only when encode
+# speed matters more than storage savings. Hardware *decoding* is
+# quality-neutral and unaffected by this caution.
+# See docs/ENCODING_GUIDE.md for encoder recommendations.
+#
 # Variables that will need to be changed:
 #     <PUID>                            -  User id for folder/file permissions
 #     <PGID>                            -  Group id for folder/file permissions

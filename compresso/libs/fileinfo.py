@@ -52,14 +52,14 @@ class FileInfo:
         entries (array of Entry): Filename history
     """
 
-    def __init__(self, path):
+    def __init__(self, path: str | os.PathLike[str]) -> None:
         self.path = path
-        self.entries = []
+        self.entries: list[Entry] = []
 
-    def append(self, newname, originalname):
+    def append(self, newname: str, originalname: str) -> None:
         self.entries.append(Entry(newname, self._find_oldest_name(originalname)))
 
-    def load(self):
+    def load(self) -> None:
         if os.path.exists(self.path):
             try:
                 with open(self.path) as f:
@@ -71,7 +71,7 @@ class FileInfo:
             except OSError:
                 logger.warning("File not accessible: %s", self.path)
 
-    def save(self):
+    def save(self) -> None:
         try:
             with open(self.path, "w") as f:
                 for entry in self.entries:
@@ -79,7 +79,7 @@ class FileInfo:
         except OSError:
             logger.warning("File not accessible: %s", self.path)
 
-    def _find_oldest_name(self, filename):
+    def _find_oldest_name(self, filename: str) -> str:
         for entry in self.entries:
             if entry.newname == filename:
                 return entry.originalname
@@ -102,6 +102,6 @@ class Entry:
         originalname (string): Old name of file
     """
 
-    def __init__(self, newname, originalname):
+    def __init__(self, newname: str, originalname: str) -> None:
         self.newname = newname
         self.originalname = originalname

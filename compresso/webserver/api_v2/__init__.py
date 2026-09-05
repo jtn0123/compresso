@@ -79,5 +79,5 @@ __all__ = (
 )
 
 
-def list_all_handlers():
+def list_all_handlers() -> tuple[str, ...]:
     return __all__

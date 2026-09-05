@@ -338,7 +338,7 @@ class TestRunLibraryScan:
 
         with (
             patch("compresso.libs.unmodels.Libraries") as mock_lib_cls,
-            patch("compresso.webserver.helpers.library_analysis.os.walk", side_effect=unreadable_walk),
+            patch("compresso.libs.library_analysis.os.walk", side_effect=unreadable_walk),
         ):
             mock_lib_cls.get_by_id.return_value = mock_library
             HealthCheckManager._scanning = True
@@ -362,7 +362,7 @@ class TestRunLibraryScan:
 
         with (
             patch("compresso.libs.unmodels.Libraries") as mock_lib_cls,
-            patch("compresso.webserver.helpers.library_analysis.os.walk", side_effect=cancelling_walk),
+            patch("compresso.libs.library_analysis.os.walk", side_effect=cancelling_walk),
             patch.object(mgr, "check_file"),
         ):
             mock_lib_cls.get_by_id.return_value = mock_library

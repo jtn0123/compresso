@@ -86,14 +86,11 @@ class TestBaseContainers:
         c = Containers()
         assert c.unsupported_subtitles() == ["hdmv_pgs_subtitle"]
 
-    def test_unsupported_subtitles_bug_attribute_mismatch(self):
-        """Bug: unsupported_subtitles() checks 'unsupports_codecs' but reads 'unsubtitle_codecs'.
-        Setting 'unsupports_codecs' without 'unsubtitle_codecs' should raise AttributeError.
-        """
+    def test_unsupported_subtitles_ignores_legacy_misspelled_flag(self):
+        """The legacy misspelled flag must not make subtitle lookup crash."""
         c = Containers()
         c.unsupports_codecs = True
-        with pytest.raises(AttributeError):
-            c.unsupported_subtitles()
+        assert c.unsupported_subtitles() == ["hdmv_pgs_subtitle"]
 
     def test_unsupported_subtitles_with_both_attrs(self):
         """When both attributes are set, returns unsubtitle_codecs."""
@@ -154,10 +151,10 @@ VIDEO_CODECS = [
         H264,
         "h264",
         "libx264",
-        ["h264_nvenc", "h264_vaapi", "libx264", "libx264rgb"],
+        ["libx264", "libx264rgb", "h264_nvenc", "h264_vaapi"],
         "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
     ),
-    (Hevc, "hevc", "libx265", ["hevc_nvenc", "hevc_vaapi", "libx265"], "HEVC (High Efficiency Video Coding)"),
+    (Hevc, "hevc", "libx265", ["libx265", "hevc_nvenc", "hevc_vaapi"], "HEVC (High Efficiency Video Coding)"),
 ]
 
 

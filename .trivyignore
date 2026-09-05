@@ -13,6 +13,10 @@ CVE-2026-26960
 CVE-2026-29786
 CVE-2026-31802
 
+# tar: DoS via crafted gzip bomb / malformed archive header (npm-internal)
+CVE-2026-59873
+CVE-2026-59874
+
 # Ubuntu base-image findings. These are in packages shipped by the
 # ubuntu:24.04 base image (pinned by SHA in docker/Dockerfile.base) and
 # get refreshed when the base image is rebuilt by the
@@ -81,6 +85,7 @@ CVE-2026-43033
 CVE-2026-43078
 CVE-2026-43128
 CVE-2026-43153
+CVE-2026-43185
 CVE-2026-43186
 CVE-2026-43206
 CVE-2026-43214
@@ -104,6 +109,7 @@ CVE-2026-46119
 CVE-2026-46185
 CVE-2026-46195
 CVE-2026-46259
+CVE-2026-43185
 
 # openssl / libssl3t64: Heap use-after-free in PKCS7_verify(). Shipped
 # by the ubuntu:24.04 base image; fix is in 3.0.13-0ubuntu3.11, which

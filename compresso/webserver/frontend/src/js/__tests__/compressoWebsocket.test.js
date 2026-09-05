@@ -14,9 +14,9 @@ vi.mock('../compressoGlobals', () => ({
   },
 }))
 
-import { Notify } from 'quasar'
 import $compressoMock from '../compressoGlobals'
-import { wsConnectionState, CompressoWebsocketHandler } from '../compressoWebsocket'
+import { wsConnectionState, CompressoWebsocketHandler, parseIncomingEnvelope } from '../compressoWebsocket'
+import { parseRawEnvelope } from '../../types/envelope'
 
 // ---------------------------------------------------------------------------
 // WebSocket mock
@@ -289,5 +289,37 @@ describe('init() — basic', () => {
     expect(MockWebSocket._lastInstance).not.toBeNull()
     expect(MockWebSocket._lastInstance.url).toMatch(/^wss:\/\//)
     expect(MockWebSocket._lastInstance.url).toBe('wss://example.com/compresso/websocket')
+  })
+})
+
+describe('parseIncomingEnvelope', () => {
+  const parse = (raw) => parseIncomingEnvelope(parseRawEnvelope(raw))
+
+  it('passes through known stream types this handler does not model', () => {
+    for (const type of ['workers_info', 'pending_tasks', 'system_status', 'system_logs']) {
+      const parsed = parse(JSON.stringify({ success: true, server_id: 's1', type, data: [] }))
+      expect(parsed).toEqual({ success: true, server_id: 's1', type: 'unhandled' })
+    }
+  })
+
+  it('rejects unknown stream types', () => {
+    expect(parse(JSON.stringify({ success: true, server_id: 's1', type: 'nope', data: [] }))).toBeNull()
+  })
+
+  it('parses the completed_tasks stream payload the backend actually sends', () => {
+    const parsed = parse(
+      JSON.stringify({
+        success: true,
+        server_id: 's1',
+        type: 'completed_tasks',
+        data: {
+          results: [{ id: 3, label: 'movie.mkv', finish_time: 1712, human_readable_time: 'now', success: true }],
+        },
+      }),
+    )
+    expect(parsed?.success).toBe(true)
+    if (parsed?.success && parsed.type === 'completed_tasks') {
+      expect(parsed.data.results[0]?.label).toBe('movie.mkv')
+    }
   })
 })

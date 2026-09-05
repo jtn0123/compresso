@@ -5,6 +5,16 @@
 ARG BASE_IMAGE=ghcr.io/jtn0123/compresso-base@sha256:342429cf3cae1a6955db4b84856b48ae08ec468e7235eb26b3ef7479083bd03c
 FROM ${BASE_IMAGE}
 
+# Patch OS packages that have security fixes newer than the pinned base image.
+# Drop entries here once the base image is rebuilt with the fix included.
+RUN \
+    echo "**** Patch linux-libc-dev CVE-2026-43185 (fixed in 6.8.0-134.134) ****" \
+        && apt-get update \
+        && apt-get install -y --only-upgrade linux-libc-dev \
+        && apt-get clean autoclean -y \
+        && apt-get autoremove -y \
+        && rm -rf /var/lib/apt/lists/*
+
 # Install pre-built Compresso wheel
 COPY /dist/ /src/
 RUN \
@@ -30,6 +40,36 @@ RUN \
             && npm pack sigstore@4.1.1 2>/dev/null \
             && tar -xzf sigstore-*.tgz --strip-components=1 \
             && rm -f sigstore-*.tgz \
+            && cd /; \
+        fi \
+    && \
+    echo "**** Patch ip-address CVE-2026-69192 in bundled npm ****" \
+        && IPADDR_DIR="/usr/lib/node_modules/npm/node_modules/ip-address" \
+        && if [ -d "$IPADDR_DIR" ]; then \
+            cd "$IPADDR_DIR" \
+            && npm pack ip-address@10.3.1 2>/dev/null \
+            && tar -xzf ip-address-*.tgz --strip-components=1 \
+            && rm -f ip-address-*.tgz \
+            && cd /; \
+        fi \
+    && \
+    echo "**** Patch tar CVE-2026-73566 in bundled npm ****" \
+        && TAR_DIR="/usr/lib/node_modules/npm/node_modules/tar" \
+        && if [ -d "$TAR_DIR" ]; then \
+            cd "$TAR_DIR" \
+            && npm pack tar@7.5.22 2>/dev/null \
+            && tar -xzf tar-*.tgz --strip-components=1 \
+            && rm -f tar-*.tgz \
+            && cd /; \
+        fi \
+    && \
+    echo "**** Patch pacote CVE-2026-9496 in bundled npm (last: npm pack needs pacote) ****" \
+        && PACOTE_DIR="/usr/lib/node_modules/npm/node_modules/pacote" \
+        && if [ -d "$PACOTE_DIR" ]; then \
+            cd "$PACOTE_DIR" \
+            && npm pack pacote@21.5.1 2>/dev/null \
+            && tar -xzf pacote-*.tgz --strip-components=1 \
+            && rm -f pacote-*.tgz \
             && cd /; \
         fi \
         && \

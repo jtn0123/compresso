@@ -11,7 +11,6 @@ import stat
 import tempfile
 from contextlib import suppress
 from pathlib import Path
-from typing import Any
 
 _UNSUPPORTED_DIRECTORY_SYNC_ERRORS = {
     errno.EACCES,
@@ -39,7 +38,7 @@ def _fsync_parent_directory(parent: Path) -> None:
         os.close(descriptor)
 
 
-def atomic_json_write(path: str | os.PathLike[str], payload: Any, mode: int | None = None) -> None:
+def atomic_json_write(path: str | os.PathLike[str], payload: object, mode: int | None = None) -> None:
     """Durably replace one JSON document without exposing a partial write."""
     destination = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
     destination.parent.mkdir(parents=True, exist_ok=True)

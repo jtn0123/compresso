@@ -27,7 +27,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import compressoGlobals from 'src/js/compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 import { onMounted, ref } from 'vue'

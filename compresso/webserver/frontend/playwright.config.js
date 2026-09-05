@@ -23,20 +23,18 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'mobile-chromium',
-      grep: /@(mobile|accessibility)/,
-      use: { ...devices['Pixel 7'] },
-    },
-    {
-      name: 'firefox-smoke',
-      grep: /@cross-browser/,
+      name: 'chrome',
       use: {
-        ...devices['Desktop Firefox'],
-        launchOptions: { timeout: 30_000 },
+        ...devices['Desktop Chrome'],
+        channel: 'chrome',
+      },
+    },
+    {
+      name: 'mobile-chrome',
+      grep: /@(mobile|accessibility)/,
+      use: {
+        ...devices['Pixel 7'],
+        channel: 'chrome',
       },
     },
     {

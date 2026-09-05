@@ -31,14 +31,16 @@ Copyright:
 
 import importlib
 
-import tornado.log
 import tornado.routing
 import tornado.web
+from tornado.httputil import HTTPMessageDelegate, HTTPServerRequest
+from tornado.log import app_log
+from tornado.web import Application, RequestHandler
 
 from compresso import config
 
 
-def endpoint_handler_name(api_version, endpoint, path):
+def endpoint_handler_name(api_version: str, endpoint: str, path: str) -> str:
     """Select the one split upload handler while preserving legacy routing."""
     if endpoint == "upload" and path == f"/compresso/api/{api_version}/upload/plugin/file":
         return "ApiPluginUploadHandler"
@@ -46,23 +48,23 @@ def endpoint_handler_name(api_version, endpoint, path):
 
 
 class Handle404(tornado.web.RequestHandler):
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         """No-op — 404 handler requires no initialization."""
 
-    def get(self, *args, **kwargs):
+    def get(self, *args: str, **kwargs: str) -> None:
         self.set_status(404)
         self.write("404 Not Found")
 
 
 class APIRequestRouter(tornado.routing.Router):
-    app = None
-    config = None
+    app: Application
+    config: config.Config
 
-    def __init__(self, app, **kwargs):
+    def __init__(self, app: Application, **kwargs: object) -> None:
         self.app = app
         self.config = config.Config()
 
-    def find_handler(self, request, **kwargs):
+    def find_handler(self, request: HTTPServerRequest, **kwargs: object) -> HTTPMessageDelegate | None:
         # Check for proxy header
         target_id = request.headers.get("X-Compresso-Target-Installation")
         if target_id and target_id.lower() != "local":
@@ -71,18 +73,24 @@ class APIRequestRouter(tornado.routing.Router):
 
             return self.app.get_handler_delegate(request, ProxyHandler)
 
-        api_version = request.path.split("/")[3]  # Set API version
-        endpoint = request.path.split("/")[4]  # Set the endpoint
-        params = list(filter(None, request.path.split("/")[4:]))  # Set the request params
+        path_parts = request.path.split("/")
+        if len(path_parts) < 5:
+            return self.app.get_handler_delegate(request, Handle404)
+        api_version = path_parts[3]  # Set API version
+        endpoint = path_parts[4]  # Set the endpoint
+        params = list(filter(None, path_parts[4:]))  # Set the request params
 
         endpoint_handler = endpoint_handler_name(api_version, endpoint, request.path)
 
         # Check if the handler exists - Otherwise set it to 404
         try:
             # Fetch handler class from api module matching api version
-            handler = getattr(importlib.import_module(f"compresso.webserver.api_{api_version}"), endpoint_handler)
+            candidate = getattr(importlib.import_module(f"compresso.webserver.api_{api_version}"), endpoint_handler)
+            if not isinstance(candidate, type) or not issubclass(candidate, RequestHandler):
+                raise AttributeError(endpoint_handler)
+            handler: type[RequestHandler] = candidate
         except (AttributeError, KeyError, ModuleNotFoundError):
-            tornado.log.app_log.warning(f"Unable to find handler for path: {endpoint_handler}", exc_info=True)
+            app_log.warning(f"Unable to find handler for path: {endpoint_handler}", exc_info=True)
             handler = Handle404
 
         # Return handler
@@ -92,5 +100,5 @@ class APIRequestRouter(tornado.routing.Router):
             target_kwargs=dict(
                 params=params,
             ),
-            path_args=[request.path],
+            path_args=[request.path.encode("utf-8")],
         )

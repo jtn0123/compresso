@@ -4,7 +4,7 @@
   </q-page>
 </template>
 
-<script>
+<script lang="ts">
 import { onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'

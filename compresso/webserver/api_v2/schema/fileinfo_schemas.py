@@ -94,7 +94,7 @@ class FormatInfoSchema(BaseSchema):
 class FileInfoResponseSchema(BaseSuccessSchema):
     """Schema for file info probe response"""
 
-    video_streams = fields.List(fields.Raw())
-    audio_streams = fields.List(fields.Raw())
-    subtitle_streams = fields.List(fields.Raw())
-    format = fields.Raw()
+    video_streams = fields.List(fields.Nested(VideoStreamSchema))
+    audio_streams = fields.List(fields.Nested(AudioStreamSchema))
+    subtitle_streams = fields.List(fields.Nested(SubtitleStreamSchema))
+    format = fields.Nested(FormatInfoSchema)

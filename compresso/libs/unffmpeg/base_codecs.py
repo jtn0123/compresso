@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-compresso.base_codecs.py
+"""compresso.base_codecs.py
 
 Written by:               Josh.5 <jsunnex@gmail.com>
 Date:                     20 Sep 2019, (5:38 PM)
@@ -29,6 +28,15 @@ Copyright:
 
 """
 
+from typing import TypedDict
+
+
+class CodecDescription(TypedDict):
+    name: str
+    encoders: list[str]
+    default_encoder: str
+    description: str
+
 
 class Codecs:
     """
@@ -38,11 +46,11 @@ class Codecs:
     """
 
     name = ""
-    encoders: list = []
+    encoders: list[str] = []
     default_encoder = ""
     codec_long_name = ""
 
-    def codec_name(self):
+    def codec_name(self) -> str:
         """
         Return the codec name string
 
@@ -50,7 +58,7 @@ class Codecs:
         """
         return self.name
 
-    def codec_encoders(self):
+    def codec_encoders(self) -> list[str]:
         """
         Return the codec encoders list
 
@@ -58,7 +66,7 @@ class Codecs:
         """
         return self.encoders
 
-    def codec_default_encoder(self):
+    def codec_default_encoder(self) -> str:
         """
         Return the codec encoders list
 
@@ -66,7 +74,7 @@ class Codecs:
         """
         return self.default_encoder
 
-    def codec_description(self):
+    def codec_description(self) -> str:
         """
         Return the codec description string
 

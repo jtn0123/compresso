@@ -35,9 +35,10 @@
   </CompressoDialogPopup>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import axios from 'axios'
+import type { MediaEntry } from 'src/types/comparison'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
@@ -49,11 +50,11 @@ const props = defineProps({
 const emit = defineEmits(['selected', 'hide'])
 const $q = useQuasar()
 const { t } = useI18n()
-const dialogRef = ref(null)
+const dialogRef = ref<InstanceType<typeof CompressoDialogPopup> | null>(null)
 const currentPath = ref('/')
 const rootPath = ref('/')
-const directories = ref([])
-const files = ref([])
+const directories = ref<MediaEntry[]>([])
+const files = ref<MediaEntry[]>([])
 const loading = ref(false)
 const mediaExtensions = new Set(['.avi', '.m2ts', '.m4v', '.mkv', '.mov', '.mp4', '.mpeg', '.mpg', '.ts', '.webm'])
 
@@ -65,20 +66,20 @@ const mediaFiles = computed(() =>
 )
 const visibleDirectories = computed(() => directories.value.filter((directory) => isWithinRoot(directory.full_path)))
 
-function normalizePath(path) {
+function normalizePath(path: string) {
   const normalized = String(path || '/')
     .replaceAll('\\', '/')
     .replace(/\/+$/, '')
   return normalized || '/'
 }
 
-function isWithinRoot(path) {
+function isWithinRoot(path: string) {
   const root = normalizePath(rootPath.value)
   const candidate = normalizePath(path)
   return root === '/' || candidate === root || candidate.startsWith(`${root}/`)
 }
 
-async function fetchDirectory(path) {
+async function fetchDirectory(path: string) {
   if (!isWithinRoot(path)) return
   loading.value = true
   currentPath.value = path || '/'
@@ -96,11 +97,11 @@ async function fetchDirectory(path) {
   }
 }
 
-function openDirectory(directory) {
+function openDirectory(directory: MediaEntry) {
   fetchDirectory(directory.full_path)
 }
 
-function selectFile(file) {
+function selectFile(file: MediaEntry) {
   emit('selected', { selectedPath: file.full_path })
   dialogRef.value?.hide()
 }

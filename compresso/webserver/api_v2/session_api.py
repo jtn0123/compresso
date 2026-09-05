@@ -29,21 +29,24 @@ Copyright:
 
 """
 
+import logging
+
 from tornado.ioloop import IOLoop
 
 from compresso.libs import session
 from compresso.libs.logs import CompressoLogging
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.session import Session as SessionType
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
 from compresso.webserver.api_v2.schema.session_schemas import SessionAuthCodeSchema, SessionStateSuccessSchema
 
 
 class ApiSessionHandler(BaseApiHandler):
-    session = None
-    config = None
-    logger = None
-    params = None
-    compresso_data_queues = None
+    session: SessionType | None
+    config: object
+    logger: logging.Logger
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -73,14 +76,19 @@ class ApiSessionHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.session = session.Session()
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    async def get_session_state(self):
+    def _session(self) -> SessionType:
+        if self.session is None:
+            raise RuntimeError("Session is unavailable")
+        return self.session
+
+    async def get_session_state(self) -> None:
         """
         Session - state
         ---
@@ -118,7 +126,8 @@ class ApiSessionHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            if not self.session.created:
+            active_session = self._session()
+            if not active_session.created:
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Session has not yet been created.")
                 self.write_error()
                 return
@@ -126,12 +135,12 @@ class ApiSessionHandler(BaseApiHandler):
                 response = self.build_response(
                     SessionStateSuccessSchema(),
                     {
-                        "level": self.session.level,
-                        "picture_uri": self.session.picture_uri,
-                        "name": self.session.name,
-                        "email": self.session.email,
-                        "created": self.session.created,
-                        "uuid": self.session.uuid,
+                        "level": active_session.level,
+                        "picture_uri": active_session.picture_uri,
+                        "name": active_session.name,
+                        "email": active_session.email,
+                        "created": active_session.created,
+                        "uuid": active_session.uuid,
                     },
                 )
                 self.write_success(response)
@@ -142,7 +151,7 @@ class ApiSessionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def session_reload(self):
+    async def session_reload(self) -> None:
         """
         Session - reload
         ---
@@ -180,7 +189,7 @@ class ApiSessionHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            if not self.session.register_compresso(force=True):
+            if not self._session().register_compresso(force=True):
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to reload session")
                 self.write_error()
                 return
@@ -193,7 +202,7 @@ class ApiSessionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def session_logout(self):
+    async def session_logout(self) -> None:
         """
         Session - log out of session
         ---
@@ -231,7 +240,7 @@ class ApiSessionHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            if not self.session.sign_out():
+            if not self._session().sign_out():
                 self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to log out of session")
                 self.write_error()
                 return
@@ -244,7 +253,7 @@ class ApiSessionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_app_auth_code(self):
+    async def get_app_auth_code(self) -> None:
         """
         Session - state
         ---
@@ -283,25 +292,31 @@ class ApiSessionHandler(BaseApiHandler):
         """
         try:
             current_loop = IOLoop.current()
+            active_session = self._session()
 
             # Run the synchronous init_device_auth_flow in a thread so we don't block the IOLoop.
-            device_auth_data = await current_loop.run_in_executor(None, self.session.init_device_auth_flow)
-            if not device_auth_data:
+            device_auth_data = await current_loop.run_in_executor(None, active_session.init_device_auth_flow)
+            if not isinstance(device_auth_data, dict):
                 raise Exception("Failed to initiate device authentication flow.")
 
             user_code = device_auth_data.get("user_code")
-            device_code = device_auth_data.get("device_code")
+            device_code_value = device_auth_data.get("device_code")
+            device_code = device_code_value if isinstance(device_code_value, str) else ""
             verification_uri = device_auth_data.get("verification_uri")
             verification_uri_complete = device_auth_data.get("verification_uri_complete")
-            interval = device_auth_data.get("interval")
-            expires_in = device_auth_data.get("expires_in")
+            interval_value = device_auth_data.get("interval")
+            interval = interval_value if isinstance(interval_value, int) and not isinstance(interval_value, bool) else 5
+            expires_in_value = device_auth_data.get("expires_in")
+            expires_in = (
+                expires_in_value if isinstance(expires_in_value, int) and not isinstance(expires_in_value, bool) else 0
+            )
 
             # Use the existing Tornado loop to run the blocking polling function in the background.
-            if self.session.token_poll_task is not None and not self.session.token_poll_task.done():
+            if active_session.token_poll_task is not None and not active_session.token_poll_task.done():
                 self.logger.info("Cancelling the running poll task and starting a new one.")
-                self.session.token_poll_task.cancel()
-            self.session.token_poll_task = current_loop.run_in_executor(
-                None, self.session.poll_for_app_token, device_code, interval, expires_in
+                active_session.token_poll_task.cancel()
+            active_session.token_poll_task = current_loop.run_in_executor(
+                None, active_session.poll_for_app_token, device_code, interval, expires_in
             )
 
             response = self.build_response(
@@ -323,7 +338,7 @@ class ApiSessionHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_funding_proposals(self):
+    async def get_funding_proposals(self) -> None:
         """
         Session - funding proposals
         ---
@@ -361,7 +376,7 @@ class ApiSessionHandler(BaseApiHandler):
                             InternalErrorSchema
         """
         try:
-            response, status_code = self.session.get_credit_portal_funding_proposals()
+            response, status_code = self._session().get_credit_portal_funding_proposals()
             if status_code in [200, 201, 202] and response:
                 self.write_success(response)
                 return

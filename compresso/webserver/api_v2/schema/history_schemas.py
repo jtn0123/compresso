@@ -58,11 +58,10 @@ class CompletedTasksSchema(TableRecordsSuccessSchema):
         required=True,
         metadata={"description": "Total count of times with a failed status in the results list", "example": 2},
     )
-    results = fields.Nested(  # type: ignore[assignment]
-        CompletedTasksTableResultsSchema,
+    results = fields.List(
+        fields.Nested(CompletedTasksTableResultsSchema),
         required=True,
         metadata={"description": "Results"},
-        many=True,
         validate=validate.Length(min=0),
     )
 

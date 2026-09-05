@@ -6,8 +6,10 @@ compresso.settings_library_mixin.py
 Mixin providing library configuration endpoints for ApiSettingsHandler.
 """
 
+from collections.abc import Mapping
+
 from compresso.libs.library import Library
-from compresso.webserver.api_v2.base_api_handler import BaseApiError
+from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler, integer_value
 from compresso.webserver.api_v2.schema.settings_schemas import (
     RequestLibraryByIdSchema,
     SettingsLibrariesListSchema,
@@ -17,10 +19,35 @@ from compresso.webserver.api_v2.schema.settings_schemas import (
 )
 
 
-class LibrarySettingsMixin:
+class LibrarySettingsMixin(BaseApiHandler):
     """Mixin for library configuration CRUD endpoints."""
 
-    async def get_all_libraries(self):
+    def _save_library_payload(
+        self,
+        json_request: Mapping[str, object],
+        *,
+        library_id: object,
+        invalid_reason: str,
+        failure_reason: str,
+    ) -> bool:
+        """Parse and save the shared library write/import payload shape."""
+        from compresso.webserver.helpers import settings
+
+        try:
+            request = settings.parse_library_save_request(
+                library_id,
+                json_request.get("library_config"),
+                json_request.get("plugins", {}),
+            )
+        except ValueError as error:
+            raise BaseApiError(invalid_reason) from error
+        if settings.save_library_request(request):
+            return True
+        self.set_status(self.STATUS_ERROR_INTERNAL, reason=failure_reason)
+        self.write_error()
+        return False
+
+    async def get_all_libraries(self) -> None:
         """
         Settings - get list of all libraries
         ---
@@ -73,7 +100,7 @@ class LibrarySettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def read_library_config(self):
+    async def read_library_config(self) -> None:
         """
         Settings - read the configuration of one library
         ---
@@ -136,7 +163,7 @@ class LibrarySettingsMixin:
             }
             if json_request.get("id"):
                 # Read the library
-                library_config = Library(json_request.get("id"))
+                library_config = Library(integer_value(json_request.get("id")))
                 library_settings = {
                     "library_config": {
                         "id": library_config.get_id(),
@@ -170,7 +197,7 @@ class LibrarySettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def write_library_config(self):
+    async def write_library_config(self) -> None:
         """
         Settings - write the configuration of one library
         ---
@@ -217,15 +244,14 @@ class LibrarySettingsMixin:
         try:
             json_request = self.read_json_request(SettingsLibraryConfigReadAndWriteSchema())
 
-            # Save settings
-            from compresso.webserver.helpers import settings
-
-            library_config = json_request["library_config"]
-            plugin_config = json_request.get("plugins", {})
-            library_id = library_config.get("id", 0)
-            if not settings.save_library_config(library_id, library_config=library_config, plugin_config=plugin_config):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to write library config")
-                self.write_error()
+            library_config = json_request.get("library_config")
+            library_id = library_config.get("id") if isinstance(library_config, Mapping) else None
+            if not self._save_library_payload(
+                json_request,
+                library_id=library_id,
+                invalid_reason="Library configuration must contain objects",
+                failure_reason="Failed to write library config",
+            ):
                 return
 
             self.write_success()
@@ -236,7 +262,7 @@ class LibrarySettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def remove_library(self):
+    async def remove_library(self) -> None:
         """
         Settings - remove a library
         ---
@@ -284,7 +310,7 @@ class LibrarySettingsMixin:
             json_request = self.read_json_request(RequestLibraryByIdSchema())
 
             # Fetch existing library by ID
-            library = Library(json_request.get("id"))
+            library = Library(integer_value(json_request.get("id")))
 
             # Delete the library
             if not library.delete():
@@ -300,7 +326,7 @@ class LibrarySettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def export_library_plugin_config(self):
+    async def export_library_plugin_config(self) -> None:
         """
         Settings - export the plugin configuration of one library
         ---
@@ -348,7 +374,7 @@ class LibrarySettingsMixin:
             json_request = self.read_json_request(RequestLibraryByIdSchema())
 
             # Fetch library config
-            library_config = Library.export(json_request.get("id"))
+            library_config = Library.export(integer_value(json_request.get("id")))
 
             response = self.build_response(SettingsLibraryPluginConfigExportSchema(), library_config)
 
@@ -360,7 +386,7 @@ class LibrarySettingsMixin:
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def import_library_plugin_config(self):
+    async def import_library_plugin_config(self) -> None:
         """
         Settings - import the plugin configuration of one library
         ---
@@ -407,15 +433,12 @@ class LibrarySettingsMixin:
         try:
             json_request = self.read_json_request(SettingsLibraryPluginConfigImportSchema())
 
-            # Save settings
-            from compresso.webserver.helpers import settings
-
-            library_config = json_request.get("library_config")
-            plugin_config = json_request.get("plugins", {})
-            library_id = json_request.get("library_id")
-            if not settings.save_library_config(library_id, library_config=library_config, plugin_config=plugin_config):
-                self.set_status(self.STATUS_ERROR_INTERNAL, reason="Failed to import library config")
-                self.write_error()
+            if not self._save_library_payload(
+                json_request,
+                library_id=json_request.get("library_id"),
+                invalid_reason="Imported library configuration must contain objects",
+                failure_reason="Failed to import library config",
+            ):
                 return
 
             self.write_success()

@@ -24,12 +24,12 @@
   </q-page>
 </template>
 
-<script>
-import PluginsInstalledTable from 'components/settings/plugins/partials/PluginsInstalledTable'
+<script lang="ts">
+import PluginsInstalledTable from 'components/settings/plugins/partials/PluginsInstalledTable.vue'
 import { CompressoWebsocketHandler } from 'src/js/compressoWebsocket'
 import { onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav'
+import MobileSettingsQuickNav from 'components/MobileSettingsQuickNav.vue'
 
 export default {
   components: { MobileSettingsQuickNav, PluginsInstalledTable },
@@ -40,11 +40,10 @@ export default {
      * Compresso WS handle
      * @type {null}
      */
-    let ws = null
-    let compressoWSHandler = CompressoWebsocketHandler($t)
+    const compressoWSHandler = CompressoWebsocketHandler($t)
 
     function initCompressoWebsocket() {
-      ws = compressoWSHandler.init()
+      compressoWSHandler.init()
     }
 
     function closeCompressoWebsocket() {

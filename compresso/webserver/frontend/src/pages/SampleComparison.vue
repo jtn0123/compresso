@@ -207,9 +207,10 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import axios from 'axios'
+import type { ComparisonBatch, ComparisonCandidate, ComparisonProfile, LibraryOption } from 'src/types/comparison'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
@@ -226,17 +227,17 @@ const sourcePath = ref('')
 const startTime = ref(0)
 const sampleDuration = ref(10)
 const libraryId = ref(1)
-const libraryOptions = ref([])
-const profiles = ref([])
-const selectedProfileKeys = ref([])
+const libraryOptions = ref<LibraryOption[]>([])
+const profiles = ref<ComparisonProfile[]>([])
+const selectedProfileKeys = ref<string[]>([])
 const profilesLoading = ref(true)
 const creating = ref(false)
 const queueingWinner = ref(false)
 const batchUuid = ref('')
-const batch = ref(null)
+const batch = ref<ComparisonBatch | null>(null)
 const selectedWinnerUuid = ref('')
-const filePickerRef = ref(null)
-let pollTimer = null
+const filePickerRef = ref<InstanceType<typeof SelectMediaFileDialog> | null>(null)
+let pollTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectionValid = computed(() => selectedProfileKeys.value.length >= 2 && selectedProfileKeys.value.length <= 4)
 const selectedLibrary = computed(() => libraryOptions.value.find((option) => option.value === libraryId.value))
@@ -250,7 +251,7 @@ const canCreate = computed(
     !profilesLoading.value &&
     !creating.value,
 )
-const isTerminal = computed(() => ['completed', 'failed'].includes(batch.value?.status))
+const isTerminal = computed(() => ['completed', 'failed'].includes(batch.value?.status || ''))
 const sourceName = computed(() => {
   const path = batch.value?.source_path || sourcePath.value
   return path.split(/[\\/]/).pop() || path
@@ -291,12 +292,13 @@ async function loadSetupData() {
     profiles.value = profileResponse.data.profiles || []
     chooseDefaults()
     const libraries = settingsResponse.data?.settings?.libraries || []
-    libraryOptions.value = libraries.map((library) => ({
+    libraryOptions.value = libraries.map((library: { name?: string; id: number; path: string }) => ({
       label: library.name || t('pages.sampleComparison.libraryFallback', { id: library.id }),
       value: library.id,
       path: library.path,
     }))
-    if (libraryOptions.value.length) libraryId.value = libraryOptions.value[0].value
+    const firstLibrary = libraryOptions.value[0]
+    if (firstLibrary) libraryId.value = firstLibrary.value
   } catch (error) {
     log.error('Failed to load comparison setup: ' + error)
     $q.notify({ type: 'negative', message: t('pages.sampleComparison.failedLoadSetup') })
@@ -305,7 +307,7 @@ async function loadSetupData() {
   }
 }
 
-function toggleProfile(profileKey) {
+function toggleProfile(profileKey: string) {
   const selected = selectedProfileKeys.value.includes(profileKey)
   if (selected) {
     selectedProfileKeys.value = selectedProfileKeys.value.filter((key) => key !== profileKey)
@@ -314,7 +316,7 @@ function toggleProfile(profileKey) {
   }
 }
 
-function placeholderCandidates() {
+function placeholderCandidates(): ComparisonCandidate[] {
   return selectedProfileKeys.value.map((profileKey) => {
     const profile = profiles.value.find((item) => item.key === profileKey)
     return {
@@ -365,7 +367,7 @@ async function refreshStatus() {
     batch.value = response.data
     if (response.data.winner_candidate_id && !selectedWinnerUuid.value) {
       const savedWinner = response.data.candidates.find(
-        (candidate) => candidate.id === response.data.winner_candidate_id,
+        (candidate: ComparisonCandidate) => candidate.id === response.data.winner_candidate_id,
       )
       selectedWinnerUuid.value = savedWinner?.candidate_uuid || ''
     }
@@ -382,7 +384,7 @@ function stopPolling() {
   pollTimer = null
 }
 
-async function selectWinner(candidateUuid) {
+async function selectWinner(candidateUuid: string) {
   const previous = selectedWinnerUuid.value
   selectedWinnerUuid.value = candidateUuid
   try {
@@ -440,7 +442,7 @@ function onLibraryChanged() {
   sourcePath.value = ''
 }
 
-function onFileSelected({ selectedPath }) {
+function onFileSelected({ selectedPath }: { selectedPath: string }) {
   sourcePath.value = selectedPath
 }
 
@@ -448,129 +450,4 @@ onMounted(loadSetupData)
 onBeforeUnmount(stopPolling)
 </script>
 
-<style scoped>
-.comparison-page {
-  max-width: 1540px;
-  margin: 0 auto;
-}
-
-.setup-card {
-  overflow: hidden;
-}
-
-.setup-heading,
-.profile-heading,
-.batch-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.setup-heading {
-  padding: 24px;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--q-secondary) 10%, transparent), transparent 55%), var(--q-card-head);
-}
-
-.selection-badge {
-  flex: 0 0 auto;
-  padding: 6px 9px;
-}
-
-.profile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.profile-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  cursor: pointer;
-  transition:
-    border-color 140ms ease,
-    background-color 140ms ease;
-}
-
-.profile-option:hover,
-.profile-option--selected {
-  background: color-mix(in srgb, var(--q-secondary) 7%, transparent);
-  border-color: color-mix(in srgb, var(--q-secondary) 62%, transparent);
-}
-
-.profile-option--disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.source-input :deep(.q-field__control) {
-  cursor: pointer;
-}
-
-.profile-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.profile-copy span,
-.profile-copy small {
-  color: var(--compresso-grey-7);
-}
-
-.profile-copy small {
-  margin-top: 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.batch-toolbar {
-  min-height: 48px;
-}
-
-.batch-source {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.batch-source span {
-  color: var(--compresso-grey-7);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.batch-source strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.winner-handoff {
-  border-color: color-mix(in srgb, var(--q-secondary) 55%, var(--border-subtle));
-}
-
-@media (max-width: 760px) {
-  .profile-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .setup-heading,
-  .profile-heading,
-  .batch-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .selection-badge {
-    align-self: flex-start;
-  }
-}
-</style>
+<style scoped src="./SampleComparison.css"></style>

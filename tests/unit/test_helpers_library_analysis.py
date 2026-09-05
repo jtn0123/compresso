@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-ANALYSIS_MODULE = "compresso.webserver.helpers.library_analysis"
+ANALYSIS_MODULE = "compresso.libs.library_analysis"
 
 
 @pytest.mark.unittest
@@ -20,7 +20,7 @@ class TestGetAnalysisStatus:
     @patch(ANALYSIS_MODULE + "._active_analyses", {})
     @patch(ANALYSIS_MODULE + ".LibraryAnalysisCache")
     def test_status_none_when_no_cache(self, mock_cache_model):
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         mock_cache_model.get_or_none.return_value = None
         result = get_analysis_status(99)
@@ -35,7 +35,7 @@ class TestGetAnalysisStatus:
         },
     )
     def test_status_running(self):
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         result = get_analysis_status(1)
         assert result["status"] == "running"
@@ -44,7 +44,7 @@ class TestGetAnalysisStatus:
     @patch(ANALYSIS_MODULE + "._active_analyses", {})
     @patch(ANALYSIS_MODULE + ".LibraryAnalysisCache")
     def test_status_complete_from_cache(self, mock_cache_model):
-        from compresso.webserver.helpers.library_analysis import get_analysis_status
+        from compresso.libs.library_analysis import get_analysis_status
 
         mock_cache = MagicMock()
         mock_cache.analysis_json = json.dumps({"groups": [], "total_files": 50})
@@ -65,7 +65,7 @@ class TestStartAnalysis:
     @patch(ANALYSIS_MODULE + ".Library")
     @patch(ANALYSIS_MODULE + "._active_analyses", {})
     def test_start_analysis_creates_thread(self, mock_library_cls, mock_threading):
-        from compresso.webserver.helpers.library_analysis import start_analysis
+        from compresso.libs.library_analysis import start_analysis
 
         mock_lib = MagicMock()
         mock_lib.get_path.return_value = "/media/movies"
@@ -84,7 +84,7 @@ class TestStartAnalysis:
         },
     )
     def test_start_analysis_already_running(self):
-        from compresso.webserver.helpers.library_analysis import start_analysis
+        from compresso.libs.library_analysis import start_analysis
 
         result = start_analysis(1)
         assert result["status"] == "running"
@@ -94,7 +94,7 @@ class TestStartAnalysis:
     @patch(ANALYSIS_MODULE + ".Library")
     @patch(ANALYSIS_MODULE + "._active_analyses", {})
     def test_analysis_registered_during_validation_is_not_overwritten(self, mock_library_cls, mock_threading):
-        from compresso.webserver.helpers import library_analysis
+        from compresso.libs import library_analysis
 
         existing_progress = {"checked": 7, "total": 20}
 
@@ -113,7 +113,7 @@ class TestStartAnalysis:
 @pytest.mark.unittest
 class TestLookupSavings:
     def test_exact_match_high_confidence(self):
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {
             ("h264", "1920x1080"): {"avg_savings_pct": 45.0, "count": 25},
@@ -124,7 +124,7 @@ class TestLookupSavings:
         assert confidence == "high"
 
     def test_exact_match_medium_confidence(self):
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {
             ("hevc", "3840x2160"): {"avg_savings_pct": 30.0, "count": 10},
@@ -133,7 +133,7 @@ class TestLookupSavings:
         assert confidence == "medium"
 
     def test_exact_match_low_confidence(self):
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {
             ("mpeg2", "720x480"): {"avg_savings_pct": 60.0, "count": 3},
@@ -142,7 +142,7 @@ class TestLookupSavings:
         assert confidence == "low"
 
     def test_fallback_codec_only(self):
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         historical = {
             ("h264", "1920x1080"): {"avg_savings_pct": 40.0, "count": 10},
@@ -154,7 +154,7 @@ class TestLookupSavings:
         assert confidence == "medium"
 
     def test_no_data_returns_zeros(self):
-        from compresso.webserver.helpers.library_analysis import _lookup_savings
+        from compresso.libs.library_analysis import _lookup_savings
 
         pct, count, confidence = _lookup_savings({}, "vp9", "1920x1080")
         assert pct == 0

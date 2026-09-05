@@ -29,7 +29,10 @@ Copyright:
 
 """
 
-from peewee import BigIntegerField, BooleanField, IntegerField, ManyToManyField, TextField
+from collections.abc import Callable
+from typing import cast
+
+from peewee import BigIntegerField, BooleanField, IntegerField, ManyToManyField, Model, TextField
 
 from compresso.libs.unmodels.lib import BaseModel
 from compresso.libs.unmodels.tags import Tags
@@ -62,4 +65,4 @@ class Libraries(BaseModel):
 
 # Generate linking table for the 'tags' field above
 # https://docs.peewee-orm.com/en/latest/peewee/relationships.html#manytomanyfield
-LibraryTags = Libraries.tags.get_through_model()
+LibraryTags = cast("Callable[[], type[Model]]", Libraries.tags.get_through_model)()

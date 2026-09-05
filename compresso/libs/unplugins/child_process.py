@@ -30,10 +30,13 @@ Copyright:
 """
 
 import contextlib
+import multiprocessing
 import queue
 import signal
 import threading
 import time
+from collections.abc import Callable
+from typing import Protocol, cast
 
 import psutil
 
@@ -41,24 +44,37 @@ from compresso.libs.logs import CompressoLogging
 
 logger = CompressoLogging.get_logger(__name__)
 
+ParserCallback = Callable[..., object]
+
+
+class _SharedQueue(Protocol):
+    def put(self, value: object) -> None: ...
+
+    def get_nowait(self) -> object: ...
+
+
+class _SharedManager(Protocol):
+    def Queue(self) -> _SharedQueue: ...
+
+
 # Configure a global shared manager
-_shared_manager = None
+_shared_manager: _SharedManager | None = None
 
 _active_plugin_pids: set[int] = set()
 _active_lock = threading.Lock()
 
 
-def _register_pid(pid: int):
+def _register_pid(pid: int) -> None:
     with _active_lock:
         _active_plugin_pids.add(pid)
 
 
-def _unregister_pid(pid: int):
+def _unregister_pid(pid: int) -> None:
     with _active_lock:
         _active_plugin_pids.discard(pid)
 
 
-def kill_all_plugin_processes():
+def kill_all_plugin_processes() -> None:
     """
     Terminate every plugin-spawned process (and its children)
     that’s still registered. Intended for use in atexit
@@ -103,44 +119,44 @@ def kill_all_plugin_processes():
         psutil.wait_procs(alive, timeout=3)
 
 
-def set_shared_manager(mgr):
+def set_shared_manager(mgr: _SharedManager | None) -> None:
     """Called once at service startup to inject the shared Manager."""
     global _shared_manager
     _shared_manager = mgr
 
 
 class PluginChildProcess:
-    def __init__(self, plugin_id, data):
+    def __init__(self, plugin_id: str, data: dict[str, object]) -> None:
         """
         data must include:
           - data['worker_log']              : list to which your child functions logs go
           - data['command_progress_parser'] : callable(line_text, pid=None, proc_start_time=None, unset=False)
           - data['current_command']         : list used to share a "current command" string with the UI
         """
-        self.logger = CompressoLogging.get_logger(name=f"Plugin.{plugin_id}.{__class__.__name__}")
+        self.logger = CompressoLogging.get_logger(name=f"Plugin.{plugin_id}.{type(self).__name__}")
         self.data = data
         if _shared_manager is None:
             raise RuntimeError("PluginChildProcess must be initialized after shared Manager is set")
         self.manager = _shared_manager
         self._log_q = self.manager.Queue()
         self._prog_q = self.manager.Queue()
-        self._proc = None
+        self._proc: multiprocessing.Process | None = None
         self._term_lock = threading.Lock()
 
-    def _set_current_command(self, command):
+    def _set_current_command(self, command: str) -> None:
         current_command = self.data.get("current_command")
         if not isinstance(current_command, list):
             return
         current_command.clear()
         current_command.append(command)
 
-    def _clear_current_command(self):
+    def _clear_current_command(self) -> None:
         current_command = self.data.get("current_command")
         if not isinstance(current_command, list):
             return
         current_command.clear()
 
-    def run(self, target, *args, **kwargs):
+    def run(self, target: Callable[..., object], *args: object, **kwargs: object) -> bool:
         """
         Launch `target(*args, **kwargs, log_queue, prog_queue)` in its own process.
         Your `target` should accept two extra keyword args:
@@ -148,23 +164,24 @@ class PluginChildProcess:
           prog_queue –> use prog_queue.put(percentage:float) to emit progress
         """
         if isinstance(self.data.get("current_command"), list):
-            current_command = self.data.get("current_command")
+            current_command = cast("list[object]", self.data.get("current_command"))
             if not current_command or not current_command[-1]:
                 target_name = getattr(target, "__name__", "child_process")
                 self._set_current_command(f"PluginChildProcess: {target_name}")
         # Start child as before
-        from multiprocessing import Process
-
-        self._proc = Process(target=self._child_entry, args=(target, args, kwargs), daemon=True)
+        self._proc = multiprocessing.Process(target=self._child_entry, args=(target, args, kwargs), daemon=True)
         self._proc.start()
-        _register_pid(self._proc.pid)
-        self.logger.info("Started child PID %s", self._proc.pid)
+        child_pid = self._proc.pid
+        if child_pid is None:
+            raise RuntimeError("Plugin child process started without a PID")
+        _register_pid(child_pid)
+        self.logger.info("Started child PID %s", child_pid)
 
         # Register PID & start time with WorkerSubprocessMonitor
         parser = self.data.get("command_progress_parser")
         if callable(parser):
             try:
-                parser(None, pid=self._proc.pid, proc_start_time=time.time())
+                cast(ParserCallback, parser)(None, pid=child_pid, proc_start_time=time.time())
             except Exception:
                 self.logger.exception("Failed to register progress parser")
 
@@ -172,13 +189,13 @@ class PluginChildProcess:
         success = self._monitor()
 
         # When the child process is done, unregister
-        _unregister_pid(self._proc.pid)
+        _unregister_pid(child_pid)
         self._clear_current_command()
 
         # Return success status
         return success
 
-    def _child_entry(self, target, args, kwargs):
+    def _child_entry(self, target: Callable[..., object], args: tuple[object, ...], kwargs: dict[str, object]) -> None:
         """
         Runs inside the child process.
         Injects our two required queues into the call.
@@ -190,41 +207,49 @@ class PluginChildProcess:
         except Exception:
             self.logger.exception("Exception in child target")
 
-    def _monitor(self):
+    def _monitor(self) -> bool:
         """
         Parent loop: pull from log_q -> data['worker_log'],
                      pull from prog_q -> call parser(...)
         """
         exit_ok = False
         parser = self.data.get("command_progress_parser")
+        process = self._proc
+        if process is None:
+            raise RuntimeError("Plugin child process has not been started")
 
         while True:
-            # 1) drain logs
-            try:
-                while True:
-                    msg = self._log_q.get_nowait()
-                    self.data["worker_log"].append(f"{msg}\n")
-            except queue.Empty:
-                pass
-
-            # 2) drain progress updates
-            try:
-                while True:
-                    pct = self._prog_q.get_nowait()
-                    if callable(parser):
-                        parser(str(pct))
-            except queue.Empty:
-                pass
+            self._drain_child_logs()
+            self._drain_progress(parser)
 
             # 3) if the child exited, we’re done. Unset parser PID
-            if not self._proc.is_alive():
-                exit_ok = self._proc.exitcode == 0
+            if not process.is_alive():
+                exit_ok = process.exitcode == 0
                 if callable(parser):
                     # tell parser to unset its internal proc state
-                    parser(None, unset=True)
+                    cast(ParserCallback, parser)(None, unset=True)
                 break
 
             # Add a short wait here to prevent CPU pinning
             time.sleep(0.1)
 
         return exit_ok
+
+    def _drain_child_logs(self) -> None:
+        try:
+            while True:
+                message = self._log_q.get_nowait()
+                worker_log = self.data.get("worker_log")
+                if isinstance(worker_log, list):
+                    cast("list[object]", worker_log).append(f"{message}\n")
+        except queue.Empty:
+            pass
+
+    def _drain_progress(self, parser: object) -> None:
+        try:
+            while True:
+                progress = self._prog_q.get_nowait()
+                if callable(parser):
+                    cast(ParserCallback, parser)(str(progress))
+        except queue.Empty:
+            pass

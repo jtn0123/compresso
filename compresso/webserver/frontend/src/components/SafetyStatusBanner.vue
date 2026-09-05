@@ -8,13 +8,13 @@
   </q-banner>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 
 const pauseRequired = ref(false)
-let intervalId
+let intervalId: ReturnType<typeof setInterval> | undefined
 
 async function refresh() {
   try {
@@ -29,5 +29,7 @@ onMounted(() => {
   refresh()
   intervalId = globalThis.setInterval(refresh, 15000)
 })
-onUnmounted(() => globalThis.clearInterval(intervalId))
+onUnmounted(() => {
+  if (intervalId !== undefined) globalThis.clearInterval(intervalId)
+})
 </script>

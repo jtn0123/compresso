@@ -167,49 +167,47 @@
   </q-dialog>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { useMobile } from 'src/composables/useMobile'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
+import type { DialogAction, DialogController } from 'src/types/ui'
 
-const props = defineProps({
-  title: {
-    type: String,
-    default: '',
+const props = withDefaults(
+  defineProps<{
+    title?: string
+    width?: string
+    closeTooltip?: string
+    persistent?: boolean
+    actions?: DialogAction[]
+  }>(),
+  {
+    title: '',
+    width: '95vw',
+    closeTooltip: '',
+    persistent: false,
+    actions: () => [],
   },
-  width: {
-    type: String,
-    default: '95vw',
-  },
-  closeTooltip: {
-    type: String,
-    default: '',
-  },
-  persistent: {
-    type: Boolean,
-    default: false,
-  },
-  actions: {
-    type: Array,
-    default: () => [],
-  },
-})
+)
 
-const emit = defineEmits(['ok', 'hide', 'action', 'save', 'reset'])
+const emit = defineEmits<{
+  (event: 'hide'): void
+  (event: string): void
+}>()
 
 const $q = useQuasar()
 const { isMobile } = useMobile()
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 const attentionActive = ref(false)
-let attentionTimer = null
+let attentionTimer: ReturnType<typeof setTimeout> | null = null
 
 const show = () => {
-  dialogRef.value.show()
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  dialogRef.value.hide()
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {
@@ -236,7 +234,7 @@ const onShake = () => {
   }, 2400)
 }
 
-const triggerAction = (action) => {
+const triggerAction = (action: DialogAction): void => {
   if (action) {
     const eventName = action.emit || 'action'
     emit(eventName)
