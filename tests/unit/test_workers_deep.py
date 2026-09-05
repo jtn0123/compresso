@@ -555,6 +555,36 @@ class TestWorkerExecCommandSubprocess:
     @patch("compresso.libs.workers.psutil.Process")
     @patch("compresso.libs.workers.subprocess.Popen")
     @patch("compresso.libs.workers.common.ensure_dir")
+    def test_oserror_mid_loop_still_reaps_subprocess(self, mock_ensure, mock_popen, mock_psutil_proc):
+        # Regression: an OSError raised while reading subprocess output must
+        # not leave the encoder running orphaned - the monitor must terminate
+        # the process, release its state, and the stdout pipe must be closed.
+        worker = _make_worker()
+        worker.worker_subprocess_monitor = MagicMock()
+        worker.worker_log = []
+
+        mock_sub = MagicMock()
+        mock_sub.pid = 123
+        mock_sub.stdout.readline.side_effect = OSError("I/O error reading pipe")
+        mock_popen.return_value = mock_sub
+
+        current_command = ["ffmpeg"]
+        data = {
+            "exec_command": ["ffmpeg", "-i", "test.mp4"],
+            "command_progress_parser": MagicMock(return_value={"percent": 0}),
+            "file_out": "/tmp/out.mp4",
+            "file_in": "/tmp/in.mp4",
+            "current_command": current_command,
+        }
+        result = worker._Worker__exec_command_subprocess(data)
+        assert result is False
+        worker.worker_subprocess_monitor.terminate_proc.assert_called()
+        worker.worker_subprocess_monitor.unset_proc.assert_called()
+        mock_sub.stdout.close.assert_called_once()
+
+    @patch("compresso.libs.workers.psutil.Process")
+    @patch("compresso.libs.workers.subprocess.Popen")
+    @patch("compresso.libs.workers.common.ensure_dir")
     def test_string_command_is_rejected_without_shell(self, mock_ensure, mock_popen, mock_psutil_proc):
         worker = _make_worker()
         worker.worker_subprocess_monitor = _make_monitor()

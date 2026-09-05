@@ -1,449 +1,554 @@
 # Codebase Grade Report
 
-**Project:** Compresso — media library optimizer (Python 3.13 / Tornado / Peewee-SQLite backend, Vue 3 / Quasar / Vite frontend)
+**Project:** Compresso
 
 **Audited:** 2026-07-20
 
-**Baseline:** `master` at `51cbec1` (post-v1.16.2)
+**Baseline:** `master` at `f3f566a` (`v1.17.0`), audited on branch `claude/codebase-audit-grading-15a5em`
 
-**Method:** Nine-category audit performed by parallel deep-inspection passes over the full tree (~51.4k LOC Python across 439 files, ~34k LOC frontend across 162 JS/Vue files), with every grade-driving claim independently re-verified against source at the cited line numbers. All findings below were confirmed in the current tree; no category was graded without direct inspection. Line numbers reference this revision.
+**Stack:** Python 3.13, Tornado, Peewee/SQLite, Vue 3.5, Quasar 2.21/Vite 7, pytest, Vitest, Playwright, GitHub Actions
 
-**Grading policy:** Security (E) and Testing & Reliability (D) are double-weighted in the overall grade, per audit charter.
+**Method:** Nine parallel category audits, followed by manual verification of the highest-impact claims — each Major *code* finding was re-read at the cited lines before inclusion. Code findings cite file:line evidence; module-level findings (e.g. A4) cite the files/packages concerned, and repo-wide metrics (B3's type-hint coverage, H4's docstring coverage) are AST-computed aggregates reproducible from the stated scope rather than single line ranges. Security was reviewed directly against `request_auth.py`, `security_headers.py`, `downloads.py`, `proxy.py`, `websocket.py`, the plugin install/execution chain, rate limiting, and `.trivyignore`. No source code was modified. Grades are calibrated (A = exemplary, C = average working code) with Security and Testing weighted double in the overall grade.
 
----
+**Prior audit:** 2026-07-12 against `v1.13.2` graded the repo **B-** overall; 33 of its 37 items were completed. This audit confirms the improvement is real: Testing rose B → A-, Security C+ → B+, Performance C+ → B+, Dependencies B → A-, Docs C+ → B+, Tooling B → A. Of the prior audit's four open items, **A3** (split large orchestration modules) and **E4** (plugin isolation) remain partially open and are folded into A6/C1 and the Security strengths below; the prior report's **I2/I3** (release-convention enforcement, duplicate master-push validation) were not re-examined in depth; they remain open but are excluded from section I's grading. Note that all finding IDs in this report are issued fresh for the 2026-07-20 baseline — the I2/I3 findings in section I below are new items, unrelated to the prior report's I2/I3.
 
 ## Summary
 
-| ID | Category | Grade | Findings |
-|----|----------|-------|----------|
-| A | Architecture & Design | **B-** | 5 |
-| B | Backend Quality | **C+** | 9 |
-| C | Frontend Quality | **C+** | 7 |
-| D | Testing & Reliability | **B** | 6 |
-| E | Security | **C+** | 4 (+ cross-ref B2) |
-| F | Dependencies & Tech Currency | **A-** | 5 |
-| G | Performance & Scalability | **C+** | 7 |
-| H | Documentation & Onboarding | **B+** | 4 |
-| I | Developer Experience & Tooling | **A-** | 4 |
-| **Overall** (E, D ×2) | | **B-** | **41** |
+| ID | Category | Grade | Prior (07-12) | Items |
+|----|----------|-------|----------------|-------|
+| A | Architecture & Design | **B-** | B- | 7 |
+| B | Backend Quality | **B+** | B | 7 |
+| C | Frontend Quality | **B-** | C | 8 |
+| D | Testing & Reliability | **A-** | B | 6 |
+| E | Security | **B+** | C+ | 5 |
+| F | Dependencies & Tech Currency | **A-** | B | 5 |
+| G | Performance & Scalability | **B+** | C+ | 7 |
+| H | Documentation & Onboarding | **B+** | C+ | 6 |
+| I | Developer Experience & Tooling | **A** | B | 3 |
+| **Overall** (D & E double-weighted) | | **B+** | B- | **54** |
 
-The headline: this codebase has *elite process hygiene* (hash-locked dependencies, SHA-pinned CI, CI-parity local verification, semantic-release, real OpenAPI docs, crash-journaled finalization) wrapped around a core that still carries real product-level defects — a verified user-data-loss bug, security-off-by-default posture, and a web layer that blocks its single event loop. The gap between the tooling grade (A-) and the code grades (C+) is itself the diagnosis: the mock-heavy test suite (145 of 172 unit files use mocks) green-lights bugs that only exist at real integration boundaries (see B1, B3).
-
-### Top 5 highest-leverage improvements
-
-1. **E1 — Enable API auth + CSRF by default** (Major, Effort S–M, lifts E from C+ toward B+). Everything else in the security posture is already built; the defaults just don't turn it on.
-2. **B1 — Fix the `keep_both` data-loss bug** (Major, Effort S–M, lifts B from C+ toward B-). `postprocessor.py:749` calls a method that doesn't exist; the error is swallowed and the user's original file is replaced despite them choosing "keep both."
-3. **B2 — Turn off Tornado `debug=True` in production** (Major, Effort S, lifts B and E). One line; currently every unhandled API error serves a full traceback to the client.
-4. **D1 — Run the 75% coverage gate on `pull_request` events** (Major, Effort S, lifts D from B toward B+). The only enforcement point is skipped for fork PRs — the main OSS contribution path is un-gated.
-5. **G1 — Move blocking DB/file work off the Tornado IOLoop** (Major, Effort M, lifts G from C+ toward B). A single decorator on `_invoke_route` covers most routes; today one slow write freezes every client.
+**Top 5 highest-leverage improvements:** B1, G2, G1, E1, C1 (details at the end).
 
 ---
 
 ## A — Architecture & Design — B-
 
-**Why this grade:** The macro-architecture is deliberate and unusually defensive: named supervised threads with startup verification and a fail-fast critical-thread watchdog (`compresso/service.py:84-497`), a crash-safe file-operation journal with phased finalization (`compresso/libs/postprocessor.py:60-74, 553-725`), a sound `unffmpeg` codec/container abstraction, and a correct answer to threads-vs-SQLite (`SqliteQueueDatabase` + WAL, `compresso/libs/unmodels/lib/basemodel.py:138-153`). What holds it to B- is structural: singleton wiring everywhere, an inverted dependency edge from `libs/` back into `webserver/`, and 1,200–1,500-line god modules at the highest-churn points.
+A mature, deliberately-hardened Unmanic fork with genuinely good bones — a startup readiness state machine, crash-recovery journal, schema-validated v2 API, and cleanly deprecated v1 — but it still carries the ancestor's structural debt: a service-locator built on ~14 singletons, a libs↔webserver layering inversion held together by deferred imports, a reflection-based API router, an 883-line god-object `Config`, and a ~2,900-line dead abstraction (`unffmpeg`). Above "average working code" on engineering rigor; held back from B+ by coupling and global state.
 
-### Findings
+### A1 — Service-locator singletons hand live `threading.Thread` objects to HTTP handlers
 
-**A1. Pervasive mutable singleton state as the wiring mechanism — Major**
-- **Where:** `compresso/libs/singleton.py:37-47`; used by 13 classes incl. `Config` (`compresso/config.py:73`), `PluginsHandler` (`compresso/libs/plugins.py:77`), `Links` (`compresso/libs/installation_link.py:53`), `CompressoDataQueues`/`CompressoRunningThreads` (`compresso/libs/uiserver.py:66-89`); module-level singletons at `compresso/webserver/api_v2/rate_limiter.py:112-124`, `compresso/webserver/helpers/library_analysis.py:29-30`.
-- **What's wrong:** Components reach sideways into singletons instead of receiving dependencies. `SingletonType.__call__` silently ignores constructor args after first instantiation — `config.Config(port=args.port)` in `service.py:536` only works because it happens to be first; any earlier `Config()` construction silently drops the CLI port. Initialization order is load-bearing and invisible.
-- **Impact:** Major · **Fix:** Introduce an application context object created in `service.py` and passed down; minimally, make `SingletonType.__call__` raise when called with args after the instance exists. · **Effort:** L (M for the guard alone) · **Grade lift:** A → B with A2.
+- **Where:** `compresso/libs/uiserver.py:69-92` (`CompressoDataQueues` / `CompressoRunningThreads` singletons, populated at `uiserver.py:116-119`); consumers at `compresso/webserver/api_v2/workers_api.py:84-86`, `compresso/webserver/websocket.py:111-113`, `compresso/webserver/helpers/workers.py:42-43` (pattern repeated six times); 14 classes use `SingletonType` (`config.py:73`, `libs/plugins.py:77`, `libs/session.py:40`, `libs/installation_link.py:53`, `libs/startup.py:23`, `webserver/downloads.py:45`, …)
+- **What's wrong:** API handlers call methods directly on the live `Foreman` thread fetched from an untyped global dict (`foreman.pause_worker_thread(...)`). There is no interface between HTTP and the orchestrator; handlers are coupled to Foreman's internal registry/locking discipline, and tests must construct half-initialized `Foreman` objects (acknowledged at `foreman.py:55-57`). This is the central coupling mechanism of the whole app.
+- **Impact:** Major
+- **Fix:** Define a narrow `WorkerControl`/`SystemStatus` facade owned by `service.py`, inject it via Tornado `Application` settings, and have handlers use `self.application.settings` instead of `CompressoRunningThreads()`. Retire the two registry singletons.
+- **Effort:** M
+- **Grade lift:** B- → B+ (largest single architecture lever)
 
-**A2. Layering inversion: `libs/` and `ops/` import from `webserver/` — Major**
-- **Where:** `compresso/libs/request_handler.py:35`, `compresso/libs/healthcheck.py:23`, `compresso/libs/uiserver.py:48,248,260,270,298,315` (an entire Tornado server living in `libs/`), `compresso/ops/doctor.py:33`, `compresso/ops/planner.py:22`.
-- **What's wrong:** The intended direction is `webserver → libs`; these back-edges create a de facto circular package dependency (`webserver.websocket` → `libs.uiserver` → `webserver.*`) kept alive only by deferred in-function imports. The root cause is business logic (551-line `library_analysis.py`, zero Tornado imports) living under `webserver/helpers/`.
-- **Impact:** Major · **Fix:** Move `library_analysis.py` into `libs/`, move `API_AUTH_HEADER_NAME` to a libs-level constants module, relocate `uiserver.py` into `webserver/`. · **Effort:** M · **Grade lift:** A → B with A1.
+### A2 — Layering inversion: `libs/uiserver.py` is a webserver component living in `libs`
 
-**A3. God modules at the highest-risk points — Moderate**
-- **Where:** `compresso/libs/installation_link.py` (1,459 lines — HTTP client + link registry + transfer locks + config sync + resumable transfers + remote-task API in one singleton), `compresso/libs/postprocessor.py` (1,394), `compresso/libs/plugins.py` (1,208), `compresso/libs/foreman.py` (928).
-- **Impact:** Moderate · **Fix:** Split `Links` into transport / registry / transfer manager; extract Foreman's remote-manager pool. · **Effort:** L · **Grade lift:** part of A → B.
+- **Where:** `compresso/libs/uiserver.py:48` (top-level `from compresso.webserver.downloads import DownloadsHandler`); deferred imports of five webserver modules inside `make_web_app()` (`uiserver.py:252,264,274,302,319`); reverse imports at `compresso/webserver/helpers/workers.py:32`, `webserver/websocket.py:49`, `webserver/api_v2/workers_api.py:32`, `webserver/api_v2/system_api.py:24`
+- **What's wrong:** `libs` imports the presentation layer at module import time while five webserver modules import back into `libs.uiserver`. The cycle only avoids `ImportError` because most webserver imports are deferred — import order is load-bearing and invisible.
+- **Impact:** Moderate
+- **Fix:** Move `UIServer` and the registry classes into `compresso/webserver/` (`service.py` already owns construction, so only import paths change). Enforce direction with an import-linter contract (`libs` must not import `webserver`).
+- **Effort:** S
+- **Grade lift:** B- → B
 
-**A4. Plugin executor mutates process-global `sys.path`/`sys.modules`; substring-based module reload — Moderate**
-- **Where:** `compresso/libs/unplugins/executor.py:135-144` (plugin dirs + site-packages appended to `sys.path`, never removed), `:224-240` (`reload_plugin_module` matches `if plugin_id in m` — plugin `foo` matches `foobar.plugin`).
-- **What's wrong:** All plugins share one flat interpreter namespace; two plugins vendoring different versions of a dependency shadow each other by load order. Reload can unload the wrong plugin's modules. (Credit: path containment at `:117-133`, trust gating at `:198-211`, and child-process execution with PID reaping in `child_process.py:47-103` are well designed.)
-- **Impact:** Moderate · **Fix:** Prefix-match module names (`m == pid or m.startswith(pid + ".")`); import plugin modules under isolated names. · **Effort:** M · **Grade lift:** minor.
+### A3 — `Config` is an 883-line god-object that persists its own live `__dict__`
 
-**A5. Hand-rolled second routing layer inside API handlers — Minor**
-- **Where:** `compresso/webserver/api_v2/base_api_handler.py:405-461` — `action_route` loops over route dicts compiling `PathMatches` per request.
-- **Impact:** Minor · **Fix:** Precompile per class at import time (S) or migrate to Tornado URLSpecs (L). · **Effort:** S–L · **Grade lift:** minor.
+- **Where:** `compresso/config.py:223-229` (`get_config_as_dict()` returns the *live* `self.__dict__`), `config.py:300-302` (every instance attribute serialized to `settings.json`), `config.py:396-883` (~490 lines of hand-written getter/setter boilerplate); duplicated bool parsing at `config.py:799-801` and `config.py:848-850` despite `_as_bool` existing at `config.py:67`
+- **What's wrong:** No settings schema. Any transient attribute assigned to the singleton leaks into `settings.json`; callers of `get_config_as_dict()` can mutate config state without persistence; every new setting requires editing four places.
+- **Impact:** Moderate
+- **Fix:** Introduce a declarative settings table (dataclass fields or a registry of `Setting(default, type, persist)`); serialize only registered keys; return a copy from `get_config_as_dict()`; route all bool getters through `_as_bool`.
+- **Effort:** M
+- **Grade lift:** B- → B
 
-### Positives
-- Supervised thread topology with staged `StartupState` readiness and `monitor_critical_threads` fail-fast (`compresso/service.py:103-114, 327-346, 378-396`).
-- Idempotent, resumable finalization journal (`file_committed → history_committed → metadata_committed → task_deleted`, `postprocessor.py:68-74, 432-451`) — a design most media servers don't attempt.
-- `unffmpeg` and `unmodels` layers are clean, documented abstractions; two-phase schema strategy is unusually well documented (`compresso/libs/unmodels/lib/db_migrate.py:166-201`).
-- Near-zero TODO/FIXME density (4 in the backend); zero bare `except:` clauses.
+### A4 — `unffmpeg` is a ~2,900-line abstraction with exactly one live consumer
 
----
+- **Where:** `compresso/libs/unffmpeg/` (2,944 lines across 12 container classes, 4 video-codec classes, audio/subtitle codecs, handles); sole product import verified at `compresso/libs/worker_capabilities.py:15` (uses only `Info.get_ffmpeg_video_encoders()` / hw-accel detection, `worker_capabilities.py:42-48`)
+- **What's wrong:** Transcode command construction moved to the plugin system (`bundled_plugins/encoding_presets`), but the whole codec/container hierarchy remains, inflating the maintenance surface and misleading readers about where encoding decisions live. It also harbors the B1 correctness bug.
+- **Impact:** Moderate
+- **Fix:** Extract `Info`/`probe.py`/`lib/cli.py` into a small `libs/ffmpeg_info.py`; delete the container/codec class hierarchy (or move it into the encoding-presets plugin).
+- **Effort:** S
+- **Grade lift:** B- → B (cleanliness, not behavior)
 
-## B — Backend Quality — C+
+### A5 — Reflection-based API routing recompiles regexes and dispatches stringly-typed per request
 
-**Why this grade:** The craftsmanship floor is high — atomic JSON writes, `.part`-suffix copy-then-rename with rollback (`postprocessor.py:1110-1179`), poisoned-task containment (`workers.py:217-236`), grep-able structured log tokens. But the audit verified **three Major functional defects in the current tree**, one of which loses user data, and all three share a signature: broad `except` arms plus mock-based tests that can't see them. That combination caps the grade at C+ despite the strong surrounding engineering.
+- **Where:** `compresso/webserver/api_request_router.py:74-83` (URL segments select modules via `importlib.import_module` + `getattr`); `compresso/webserver/api_v1/base_api_handler.py:59-97` (`action_route()` compiles `tornado.routing.PathMatches(...)` on every request at line 79, dispatches via `getattr(self, route.get("call_method"))()`); per-handler route dicts, e.g. `compresso/webserver/api_v2/pending_api.py:61-117`
+- **What's wrong:** Tornado's native routing is bypassed twice; a `call_method` typo becomes a runtime `AttributeError`; regexes are recompiled per request; `ModuleNotFoundError` is used as control flow.
+- **Impact:** Moderate
+- **Fix:** At app build time, walk each handler's `routes` list once and register real Tornado URLSpecs with precompiled matchers; keep the dict format as the declaration source so Swagger tooling is untouched.
+- **Effort:** M
+- **Grade lift:** B- → B
 
-### Findings
+### A6 — `Foreman` remains a 961-line multi-responsibility orchestrator
 
-**B1. "keep_both" replacement policy calls a method that doesn't exist → original file silently replaced — Major**
-- **Where:** `compresso/libs/postprocessor.py:749` calls `self.current_task.set_destination_path(new_path)`. No such method exists on `Task` (`compresso/libs/task.py` defines `modify_path`, `set_cache_path`, … but not this). Verified: repo-wide grep finds the name only at the call site and in Mock-based tests (`tests/unit/test_postprocessor_extended.py:296,312,325`, `tests/unit/test_flow_features.py:692-758`).
-- **What's wrong:** At runtime the `AttributeError` is swallowed by `except (OSError, AttributeError, KeyError, TypeError)` at `postprocessor.py:750-751` (logged as a warning), then finalization proceeds with the *unmodified* destination — the default move that replaces the original file. A user who chose "keep both" loses their original. Unit tests pass because `Mock` accepts any attribute.
-- **Impact:** Major (user data loss) · **Fix:** Implement `Task.set_destination_path` (persist a destination override consumed by `get_destination_data`) and add a non-mock integration test that asserts both files exist afterward. · **Effort:** S (method) + M (test) · **Grade lift:** B1+B3+B7 together lift B from C+ to ~B.
+- **Where:** `compresso/libs/foreman.py:52-90` (constructor wires safety latch, dual pending queues, remote link managers, schedule state, config-hash tracking); `foreman.py:211-224` (minute-resolution string-compare scheduler: `if time_now == self.last_schedule_run: return` silently skips events if an iteration stalls past the minute); `foreman.py:728-751` (remote heartbeat), `foreman.py:826-916` (assignment algorithm)
+- **What's wrong:** Local worker lifecycle, distributed dispatch, event scheduling, metrics, and queue-idle notifications all live in one class with one lock — which is why the API layer needs the raw object (A1). Successor to prior-audit item A3, still open.
+- **Impact:** Moderate
+- **Fix:** Extract `RemoteDispatcher` (heartbeat + link managers + remote queues) and `WorkerScheduler` (event schedules) as owned sub-objects; Foreman keeps local worker registry + assignment. Shrinks the facade needed for A1.
+- **Effort:** L
+- **Grade lift:** B → B+ (after A1)
 
-**B2. Production Tornado app runs with `debug=True` → tracebacks served to API clients — Major**
-- **Where:** `compresso/libs/uiserver.py:54-63` — `"debug": True, "autoreload": False` unconditionally. Tornado sets `serve_traceback=True` whenever `debug` is truthy; `compresso/webserver/api_v2/base_api_handler.py:323-328` then embeds `traceback.format_exception(...)` in every 500 response.
-- **What's wrong:** Internal paths, code, and exception detail leak to any API client in normal deployments — defeating the careful error-ID design in `handle_unhandled_error` (`base_api_handler.py:288-306`). Also disables template/static caching.
-- **Impact:** Major (information disclosure; counts against E too) · **Fix:** Default `"debug": False`; set `debug`/`serve_traceback` only in `update_tornado_settings` when dev mode is requested (that hook already exists at `uiserver.py:167-171`). · **Effort:** S · **Grade lift:** contributes to both B and E lifts.
+### A7 — Pure polling threading model; the global shutdown `Event` doubles as a sleep timer
 
-**B3. `TaskDataStore.import_task_state`/`delete_task_state` silently lose data under the multiprocessing Manager — Major**
-- **Where:** `compresso/service.py:417-418` swaps `TaskDataStore._runner_state`/`_task_state` for `Manager().dict()` proxies. `compresso/libs/task.py:750-762` (`import_task_state`) does `t = cls._task_state.setdefault(task_id, {})` then mutates `t` in place; `task.py:709-724` (`delete_task_state`) mutates the dict returned by `.get()`. On a `DictProxy` those return *copies*; mutations never propagate.
-- **What's wrong:** In the real service, remote task state imported at `compresso/libs/remote_task_manager.py:875` is discarded, and `delete_task_state` never deletes. The sibling methods `set_runner_value`/`set_task_state` (`task.py:636-645, 685-689`) were correctly written copy-then-reassign — this is an inconsistency, invisible to unit tests that run with plain dicts.
-- **Impact:** Major · **Fix:** Rewrite both methods copy-then-reassign. · **Effort:** S · **Grade lift:** see B1.
+- **Where:** `compresso/libs/foreman.py:926-927` (`self.event.wait(2)` main tick), `compresso/libs/workers.py:104-120` (`event.wait(1)`/`wait(5)`/`wait(0.5)` pacing), `foreman.py:753-756` (0.5s wait per drained completed task), `compresso/service.py:486-489` (`time.sleep(1)` main loop)
+- **What's wrong:** The process-wide shutdown event is reused everywhere as "sleep unless shutting down" — a *set* event turns every loop into a busy-spin until each thread notices its own flag — and task hand-off latency stacks poll intervals (2s + 1s) despite `queue.Queue` objects already existing (`foreman.py:72-74`).
+- **Impact:** Minor–Moderate
+- **Fix:** Blocking hand-off (`Queue.get(timeout=...)` or per-worker `Event`), per-concern events for pacing, drop the per-item drain wait.
+- **Effort:** M
+- **Grade lift:** B- → B-/B
 
-**B4. Pending-task claim is not atomic — duplicate-assignment window — Moderate**
-- **Where:** `compresso/libs/taskqueue.py:247-266` returns the task still in status `pending`; `mark_item_in_progress` (`:318-328`) is never called on this path; status flips only when the worker reaches `compresso/libs/workers.py:282`, up to ~1.5 s after `Foreman.hand_task_to_workers` (`compresso/libs/foreman.py:665-700`).
-- **What's wrong:** The next Foreman iteration (~2 s) can fetch the same still-`pending` row and hand it to another idle worker — two workers encoding the same file under slow DB writes or a paused worker holding an unstarted task (`workers.py:108-112`).
-- **Impact:** Moderate · **Fix:** Claim atomically at fetch (`UPDATE … SET status='in_progress' WHERE id=? AND status='pending'`). · **Effort:** S–M · **Grade lift:** part of concurrency-correctness lift.
-
-**B5. Foreman worker registry mutated from two threads without locks — Moderate**
-- **Where:** `compresso/libs/foreman.py` — `worker_threads`/`paused_worker_threads` mutated by the Foreman loop (`:254-294`, `:739-756`) and by Tornado API handlers (`:563-657` via `compresso/webserver/api_v2/workers_api.py:86-190`).
-- **What's wrong:** Compound sequences race: API `resume_worker_thread` can `list.remove` concurrently with the Foreman clearing the paused list (lost pause records or `ValueError`); `get_tags_configured_for_worker` (`:525-529`) can `KeyError` between check and access.
-- **Impact:** Moderate · **Fix:** One `threading.Lock` around registry mutations, or route API commands through a queue consumed by the Foreman loop. · **Effort:** M.
-
-**B6. Environment-variable booleans are truthy strings — `enable_library_scanner=false` *enables* the scanner — Moderate**
-- **Where:** `compresso/config.py:237-246` assigns raw env strings; getters returning raw values: `get_enable_library_scanner` (`:556-562`), `get_run_full_scan_on_start` (`:564-570`), `get_follow_symlinks` (`:580-586`), `get_first_run` (`:476-482`), `get_auto_manage_completed_tasks` (`:516-522`), `get_always_keep_failed_tasks` (`:540-546`), `get_clear_pending_tasks_on_restart` (`:508-514`). Verified: `_as_bool` (`:67-70`) is applied to a dozen *other* getters (e.g. `:641, :660, :699, :702`) but not these.
-- **What's wrong:** In Docker deployments, `enable_library_scanner=false` or `follow_symlinks=0` do the opposite of what the operator asked; `clear_pending_tasks_on_restart="false"` would wipe queues.
-- **Impact:** Moderate (deployment foot-gun) · **Fix:** Apply `_as_bool` in the remaining boolean getters. · **Effort:** S · **Grade lift:** cheap, visible correctness win.
-
-**B7. Failed worker runner reported as successful to the frontend — Moderate**
-- **Where:** `compresso/libs/workers.py:573-574` — after the per-runner loop, `success = True; status = "complete"` runs unconditionally, overwriting `success = False` recorded at `:484-494`, `:546-547`, `:475-477`.
-- **Impact:** Moderate (misleads incident triage; overall task failure is tracked separately) · **Fix:** Only set `True` if not already marked failed. · **Effort:** S.
-
-**B8. Mislabeled catch-alls, dead code, slow drain loop — Minor**
-- **Where:** `compresso/libs/postprocessor.py:209-210, 219-221, 461, 741-743` — generic `except Exception` arms log invented labels (`GuardrailRejectionError`, `PolicyResolutionError`, …) for any exception type (the B1 swallow is the concrete cost). `compresso/libs/task.py:389-426` — dead `Tasks.DoesNotExist` branch whose `query = []` fallback would crash at `:426`. `compresso/libs/foreman.py:727-737` — `event.wait(0.5)` before every `get_nowait` adds 0.5 s per completed task.
-- **Impact:** Minor · **Fix:** Log `type(e).__name__`; delete the dead branch; move the wait out of the loop. · **Effort:** S.
-
-**B9. Substring-based path guards gate recursive deletes — Minor**
-- **Where:** `compresso/libs/workers.py:661`, `compresso/libs/postprocessor.py:1103` (`if "compresso_file_conversion" not in path` gating `shutil.rmtree`), `compresso/libs/task.py:450-452`.
-- **What's wrong:** The marker is matched anywhere in the full path, so a user directory containing the marker string becomes delete-eligible. Correct component-wise checks already exist in the same codebase (`compresso/libs/common.py:183-218`, `postprocessor.py:1082-1091`).
-- **Impact:** Minor (low likelihood, high blast radius) · **Fix:** Check the basename component and verify containment under the configured cache path. · **Effort:** S.
-
-### Positives
-- Robust failure containment: catch-log-continue guards with heartbeat health snapshots (`ThreadHealthMixin` in `postprocessor.py:88-129`, `scheduler.py:55-113`); subprocess handling with `start_new_session`, psutil-based terminate, communicate timeouts (`workers.py:777-850`).
-- Resource cleanup above average: atomic JSON writes throughout, plugin child-process reaping incl. SIGCONT-before-terminate (`unplugins/child_process.py:61-103`).
-- DB layer: WAL + FK pragmas on runtime and migration connections (`db_migrate.py:120-126`); defensive idempotent migrations (`migrations_v1/006, 008`); deliberate performance indexes (007, 009).
+**Strengths:** Startup lifecycle and crash recovery are well above hobby-fork grade — `service.py:103-113` verifies threads stay alive, `service.py:378-396` turns a dead critical thread into visible shutdown, `service.py:247-272` replays the file-operation journal before any worker claims work. The v2 API layer is genuinely well-structured (Marshmallow schemas per endpoint, auth/CSRF/rate-limit guards and offloaded route bodies in `api_v2/base_api_handler.py:53-135`, v1 as a clean deprecation shim stamping `Deprecation` headers). Plugin execution is process-isolated with real cleanup discipline (`libs/unplugins/child_process.py:44-80` locked PID registry; `service.py:409-420` atexit/autoreload wiring).
 
 ---
 
-## C — Frontend Quality — C+
+## B — Backend Quality — B+
 
-**Why this grade:** Security-relevant discipline is genuinely good (every `v-html` sink traced through DOMPurify, zero raw `console.*`, solid CSRF/token plumbing) and the tooling is modern. The grade is held down by structural debt: eight 700–1,250-line monolith components, a hand-rolled global-singleton state layer that the repo's own docs misdescribe, no static typing, and a 24% coverage floor.
+A disciplined, defensively engineered backend: **zero** bare `except:` clauses in 245 files, narrow typed exception tuples, journaled crash-safe file operations, ruff with security/bugbear/complexity rules, and 64.7k lines of tests for 51.8k lines of code. Kept out of the A range by near-absent type hints (12.3% of functions), god functions behind `noqa: C901` waivers, an inherited correctness bug in `unffmpeg`, and the `Config` singleton (graded under A3).
 
-### Findings
+**Metrics:** bare `except:`: 0; `except Exception`: 320 (top: `installation_link.py` 18, `postprocessor.py` 15); functions with any annotation: 210/1,707 (12.3%), files with any: 28/245; functions >100 lines: 22; largest files: `installation_link.py` 1,459, `postprocessor.py` 1,403, `plugins.py` 1,208; logger style: 200 lazy `%s` calls, 0 f-string calls; TODO/FIXME: 4.
 
-**C1. Eight monolithic components over 700 lines with duplicated template logic — Major**
-- **Where:** `compresso/webserver/frontend/src/components/dashboard/completed/CompletedTasksListDialog.vue` (1,251), `src/pages/ApprovalQueue.vue` (1,159 — table fetch + approval settings + preview-job poller at `:979-1045` + filter debounce `:780-790` + refresh interval `:1071` in one `setup()`), `src/components/preview/VideoCompare.vue` (1,001), `src/components/settings/library/LibraryConfigDialog.vue` (855), `src/pages/HealthCheck.vue` (777), `src/pages/TaskHistory.vue` (769), `src/pages/SettingsLibrary.vue` (768), `src/components/dashboard/pending/PendingTasksListDialog.vue` (765). Completed/Pending dialogs duplicate ~600 lines of near-identical toolbar markup despite logic already being shared via `useTaskListController`.
-- **Impact:** Major (maintainability, test cost) · **Fix:** Extract a shared `TaskListToolbar`; pull the preview-job poller into a `usePreviewJob()` composable. · **Effort:** M–L · **Grade lift:** C1+C2 lift C from C+ to ~B-.
+### B1 — Wrong subprocess success check in unffmpeg CLI wrappers (false failures *and* missed failures)
 
-**C2. Ad-hoc global-singleton state; declared Vuex dependency never used; AGENTS.md documents a store that doesn't exist — Major**
-- **Where:** `src/js/compressoGlobals.js` (mutable `$compresso` object), `src/js/compressoWebsocket.js:47-99` (listener registry as expando properties on the raw socket), `src/js/sharedLinksStore.js:8-30`; `package.json:37` declares `vuex: ^4.1.0` with zero imports anywhere; `quasar.config.js:76-84`, `vitest.config.js:30-38`, `jsconfig.json` alias a nonexistent `stores/` dir; `AGENTS.md` claims "State Management: Vuex".
-- **Impact:** Major (misleads contributors and AI agents; untestable state) · **Fix:** Remove `vuex`, correct AGENTS.md, migrate `$compresso` caches to Pinia or one documented reactive store module. · **Effort:** M.
+- **Where:** `compresso/libs/unffmpeg/lib/cli.py:56` and `cli.py:81` — `if pipe.returncode == 1 or "error" in raw_output:` (verified; duplicated in both `ffmpeg_cmd` and `ffprobe_cmd`, with stdout+stderr merged at `cli.py:48`)
+- **What's wrong:** Two bugs in one line: (a) only exit code `1` is treated as failure — ffmpeg/ffprobe exit codes 8, 69, 234, and negative signal-death codes are silently treated as success; (b) the substring test raises a false failure whenever "error" appears anywhere in legitimate output (e.g. a file path or encoder description containing the word). Probe results feed the whole pipeline.
+- **Impact:** Major
+- **Fix:** `if pipe.returncode != 0:` and drop the substring heuristic (or restrict it to ffprobe's `-show_error` JSON field). Add regression tests for non-1 exit codes and "error"-containing paths.
+- **Effort:** S
+- **Grade lift:** B+ → A- (with B2)
 
-**C3. Unguarded `JSON.parse` in the WebSocket message handler — Moderate**
-- **Where:** `src/js/compressoWebsocket.js:335` — no try/catch; one malformed frame throws in the `message` listener. Dead code nearby: unused `icon` (`:218`), unused `timeout` param (`:191`), `serverId` returned by value (`:468`) so `handler.serverId` stays `null`.
-- **Impact:** Moderate · **Fix:** try/catch + `log.error`; delete dead code. · **Effort:** S.
+### B2 — Subprocess/pipe leak on exception path in worker command execution
 
-**C4. Placeholder axios instance pointing at `https://api.example.com` registered app-wide as `$api` — Moderate**
-- **Where:** `src/boot/axios.js:86` (`axios.create({ baseURL: 'https://api.example.com' })`), registered at `:95`, exported at `:101`.
-- **What's wrong:** Quasar scaffolding leftover; unused today, but the first future use silently sends requests (without the CSRF/token interceptors, which are attached to the default instance) to a third-party domain.
-- **Impact:** Moderate (latent) · **Fix:** Delete it, or point at `getCompressoServerUrl()` and move interceptors onto it. · **Effort:** S.
+- **Where:** `compresso/libs/workers.py:777-883` (`__exec_command_subprocess`): `Popen` at line 787; `terminate_proc()`/`unset_proc()` reached only on the normal path (lines 860-863); the handler at 879-883 logs and returns `False` with **no `finally`**
+- **What's wrong:** If `sub_proc.stdout.readline()` (line 830) or `psutil.Process(...)` raises `OSError` mid-loop, the running ffmpeg is never terminated and the stdout pipe never closed; the orphaned encoder keeps consuming CPU/disk while the worker moves on. (The *outer* crash path `_fail_current_task_after_unexpected_error`, lines 217-236, does terminate — but exceptions here are caught locally and never reach it.)
+- **Impact:** Moderate
+- **Fix:** Wrap the post-Popen body in `try/finally` calling `terminate_proc()` + `unset_proc()` and closing `sub_proc.stdout`.
+- **Effort:** S
+- **Grade lift:** B+ → A- (with B1)
 
-**C5. Silent error swallowing; argument-less `reject()` — Moderate**
-- **Where:** `src/pages/ApprovalQueue.vue:831-833` (`catch { // ignore }` on approval-settings fetch), `:1022-1026` (preview poll failure clears state with no notification); `src/js/compressoGlobals.js` — `getCompressoSession`/`getCompressoPrivacyPolicy` call bare `reject()`, losing the error.
-- **Impact:** Moderate · **Fix:** Log ignored catches; `reject(err)`. · **Effort:** S.
+### B3 — Type hints essentially absent
 
-**C6. Dead legacy templates with third-party branding shipped in the package — Minor**
-- **Where:** `compresso/webserver/templates/global/insufficient-permissions.html`, `login-popup.html`, `support-future-development.html` — Patreon/Unmanic-era modals, zero references anywhere in `compresso/`.
-- **Impact:** Minor · **Fix:** Delete `templates/global/`; verify MANIFEST.in. · **Effort:** S.
+- **Where:** AST-measured: 210 of 1,707 functions annotated (12.3%); 28 of 245 files contain any annotation. Zero annotations in `compresso/libs/postprocessor.py` (47 defs), `libs/task.py` (46 defs), `libs/metadata.py`, `libs/history.py`. mypy is configured (`pyproject.toml:53-67`) but has almost nothing to check.
+- **What's wrong:** Dict-shaped payloads (`data`, `manager_info`, `task_data`) flow through dozens of functions with no contracts; several defensive `except (AttributeError, TypeError)` blocks exist precisely to paper over this.
+- **Impact:** Moderate
+- **Fix:** Annotate public interfaces of the ~15 central modules first (task, taskqueue, foreman, workers, postprocessor); introduce TypedDicts/dataclasses for the payload shapes.
+- **Effort:** L
+- **Grade lift:** B+ → A- over time
 
-**C7. Single-locale i18n with stray hardcoded strings — Minor**
-- **Where:** Only `src/language/en.json` exists; hardcoded `<q-tooltip>Notifications</q-tooltip>` at `src/layouts/MainLayout.vue:89` (line 77 correctly uses `$t()` for the same button's aria-label); literal `'CPU'/'MEM'/'GPU'` at `:245-249`.
-- **Impact:** Minor · **Fix:** Route strays through `$t()`. · **Effort:** S.
+### B4 — God functions waived with `noqa: C901`
 
-### Positives
-- XSS discipline: every `v-html` sink traced goes through DOMPurify (`src/js/sanitize.js`; e.g. `PluginInfoDialog.vue:417-418`, `ApplicationLogsDialog.vue:165-171`); websocket-delivered strings escaped (`compressoWebsocket.js:10-18`).
-- Auth plumbing: CSRF cookie header + API token + origin check before attaching credentials (`src/boot/axios.js:24-30`), retry-once-on-401; websocket auth via base64url subprotocol (`src/js/apiAuth.js`).
-- `useTaskListController.js` is a well-designed shared composable with a thorough unit test.
-- Zero raw `console.*` in `src/` — all logging via `createLogger` (`src/composables/useLogger.js`).
-- Playwright e2e includes axe-core accessibility scans and mobile/Firefox/WebKit projects (`playwright.config.js:24-46`).
+- **Where:** `compresso/libs/workers.py:347` (`__exec_worker_runners_on_set_task`, **281 lines**, nested closure thread launcher at line 457); `compresso/libs/libraryscanner.py:269` (`scan_library_path`, 200 lines, incl. the `double_check` polling hack at 369-389); `compresso/libs/postprocessor.py:851` (`post_process_file`, 173 lines); `compresso/libs/installation_link.py:505` (197 lines); 22 functions exceed 100 lines
+- **What's wrong:** The most failure-prone paths in the system are the hardest to test in isolation.
+- **Impact:** Moderate
+- **Fix:** Extract the runner-pass loop into `_run_single_runner_pass()` (the file already demonstrates this style); replace the scan `double_check` poll with condition-based completion.
+- **Effort:** M
+- **Grade lift:** +⅓ grade
 
----
+### B5 — Dead `DoesNotExist` handlers on lazy peewee selects, and a lost return value
 
-## D — Testing & Reliability — B
+- **Where:** `compresso/libs/history.py:76-79`, `compresso/libs/task.py:445-448` and `task.py:487-489` — `except Tasks.DoesNotExist:` around `.select()` chains that are lazy and never raise it (only `.get()` does); `delete_tasks_recursively` (task.py:452-489) falls through with an implicit `None` where the contract returns `True`/`False`
+- **Impact:** Minor
+- **Fix:** Delete the unreachable handlers; make the return explicit.
+- **Effort:** S
+- **Grade lift:** marginal
 
-**Why this grade:** By volume and infrastructure this is an A-tier suite: 3,784 backend test functions across 177 files, a 3-OS matrix with 3-way pytest-split sharding, ~453 frontend unit cases, mocked + live Playwright lanes, `asyncio_mode = "strict"`, and exceptional conftest hygiene (leaked-thread reaper, singleton resets — `tests/conftest.py:110-202`). The app's own reliability engineering (journaled crash recovery, watchdog, staged startup) is verified and tested. It doesn't grade higher because the gates have holes exactly where it matters: the coverage gate never runs on PRs, and the suite's mock-heaviness (145/172 unit files) is precisely why B1 and B3 — both invisible to Mocks — shipped.
+### B6 — Unlocked reads of `worker_threads` despite a documented lock protocol
 
-### Findings
+- **Where:** `compresso/libs/foreman.py:53-58` documents `worker_registry_lock`; mutation sites honor it, but read paths iterate without it: `get_all_worker_status` (948-952), `get_worker_status` (954-961), `fetch_available_worker_ids` (508-514), `check_for_idle_workers` (516-521), `_check_queue_idle_transition` (812-814). Concurrent `del` at `foreman.py:270` can raise `RuntimeError: dictionary changed size during iteration` in an API thread.
+- **Impact:** Minor
+- **Fix:** Snapshot under the lock: `with self.worker_registry_lock: threads = list(self.worker_threads.values())`.
+- **Effort:** S
+- **Grade lift:** marginal
 
-**D1. The 75% coverage gate never runs on `pull_request` events — Major**
-- **Where:** `.github/workflows/python_lint_and_run_unit_tests.yml:140` — the `coverage_report` combine job has `if: github.event_name == 'push'`; each shard runs `--cov-fail-under=0` (`:118-119`). `fail_under = 75` lives in `pyproject.toml:25`.
-- **What's wrong:** Same-repo branches get gated via the parallel push run, but fork PRs — the normal OSS contribution path — are never coverage-gated, and the PR check list never contains the coverage result.
-- **Impact:** Major · **Fix:** Run the combine job on both events. · **Effort:** S · **Grade lift:** D1+D3 lift D from B toward B+.
+### B7 — Copy-paste duplication in `unffmpeg`
 
-**D2. Integration coverage is thin and unit tests are mock-heavy — Moderate**
-- **Where:** `tests/integration/` — 5 files, 21 tests vs 3,763 unit tests (0.6%); 145/172 unit files import `unittest.mock`; even integration tests patch internals (`tests/integration/test_taskhandler.py:137` patches `PluginsHandler`; `test_file_pipeline.py:174` patches `shutil.move`).
-- **What's wrong:** Much of the suite verifies mock interactions, not behavior. B1 (`set_destination_path` on a Mock) and B3 (plain dicts vs Manager proxies) are the proof: both pass unit tests and fail in reality.
-- **Impact:** Moderate (weighted heavily here) · **Fix:** Grow integration tests around the highest-risk flows: full task lifecycle with a real small video (fixture exists), crash-mid-encode recovery, approval → postprocess → file replacement with `keep_both`. · **Effort:** L · **Grade lift:** with D1, D → B+/A-.
+- **Where:** `compresso/libs/unffmpeg/info.py:66-106` vs `108-148` (~40 lines duplicated except "encoder"/"decoder"); `info.py:244-263` duplicates `get_all_supported_codecs_of_type("video")` (216-242); `lib/cli.py:39-61` vs `64-86` twins (unused `err` at 49/74)
+- **What's wrong:** Bug-fix divergence risk — B1's bug already exists in two places.
+- **Impact:** Minor
+- **Fix:** One `_parse_codec_table(raw, kind)` helper; one `_media_tool_cmd(binary, params, exc_class)`. (Or resolve via A4 deletion.)
+- **Effort:** S
+- **Grade lift:** marginal
 
-**D3. `.test_durations` is stale — shard balance degrading — Moderate**
-- **Where:** `.test_durations` last regenerated 2026-04-07; contains 2,483 entries vs 3,763 current unit tests (>34% unknown to pytest-split), used by `--splits 3 --group N` (`python_lint_and_run_unit_tests.yml:120`).
-- **Impact:** Moderate (CI wall time) · **Fix:** Scheduled workflow running `pytest --store-durations` monthly. · **Effort:** S.
-
-**D4. Sleep-based synchronization and class-shared state in integration tests — Moderate**
-- **Where:** `tests/integration/test_taskhandler.py:86, 134, 149, 158, 180, 189, 209, 219, 238, 248, 269, 278, 298` — fixed `time.sleep(0.2/0.5/2)` then a single assertion; `setup_class` shares one DB connection and one long-lived task-handler thread across all 7 tests (order-dependent).
-- **Impact:** Moderate (flakiness by design; ~6 s dead time/run) · **Fix:** `wait_for(predicate, timeout)` helper; per-test fixtures. · **Effort:** S–M.
-
-**D5. Frontend coverage floor is 24/16/17/24 — Moderate**
-- **Where:** `compresso/webserver/frontend/vitest.config.js:17-24`. Tests concentrate in `src/js/` and composables; only ~6 page and ~4 component tests for a many-page SPA. Credit: the config comment documents an honest all-source baseline and forbids shrinking `include` to game the gate.
-- **Impact:** Moderate · **Fix:** Enforce the promised ratchet (+2%/month); target the largest untested pages first. · **Effort:** M.
-
-**D6. No per-test timeout, no clock control — Minor**
-- **Where:** No `pytest-timeout`/`pytest-rerunfailures` in `requirements-dev.txt`; zero freezegun/fake-clock use against 93 raw `datetime.now()`/`time.time()` reads in tests (e.g. `tests/unit/test_link_reconnection.py:72,97`). In a thread-heavy suite, one deadlock hangs a shard until the runner's job timeout.
-- **Impact:** Minor · **Fix:** `pytest-timeout` default ~120 s; a monkeypatched-clock fixture for timestamp tests. · **Effort:** S.
-
-### Positives
-- 3,784 tests, 3-OS matrix (ubuntu/macos/windows), sharded with per-shard `.coverage` properly combined; `asyncio_mode = "strict"` (`pyproject.toml:8`).
-- `tests/conftest.py` hygiene is exceptional: autouse leaked-thread reaper (`:110-131`), atexit/reload-hook cleanup (`:134-161`), singleton/shared-state resets (`:164-202`).
-- App reliability verified in code: journal-based crash recovery before workers start (`compresso/service.py:246-272`, tested by `tests/unit/test_restart_recovery.py` et al.), critical-thread watchdog paired with Docker `HEALTHCHECK` (`service.py:378-396`, `docker/Dockerfile:57-58`), graceful shutdown with join timeouts (`:348-361`). One nit: the DB shutdown wait at `service.py:494-496` has no deadline.
-- Playwright setup above average: CI retries with trace/video on failure, tag-scoped mobile/Firefox/WebKit, mocked + live-backend lanes run on every push/PR.
+**Strengths:** Crash-safe journaled finalization (`postprocessor.py:60-74` explicit `FINALIZATION_PHASE_ORDER` state machine; `_postprocess_local_file_safely` at 616-643 resumes from a persisted journal; `service.py:246-272` replays on startup). Exception and subprocess hygiene enforced by tooling (ruff `S`, `B`, `SIM`, `T20`, `C90` enabled in `pyproject.toml:36`; the 54 swallow sites are nearly all narrow with justified `noqa` waivers, e.g. `gpu_monitor.py:51`). Thoughtful async web layer (`api_v2/base_api_handler.py:382-442` offloads sync bodies from the IOLoop; `handle_unhandled_error` at 295-315 gives clients opaque correlated error IDs).
 
 ---
 
-## E — Security — C+
+## C — Frontend Quality — B-
 
-**Why this grade:** The *mechanics* are near-exemplary for this class of app — and were each verified: constant-time token comparison (`compresso/webserver/request_auth.py:43-60`), CSRF double-submit support, a strict CSP with no inline/eval script (`compresso/webserver/security_headers.py:50-64`), websocket origin checks + command allowlist (`compresso/webserver/websocket.py:57-105,119-123`), sha256-required remote plugin packages (`compresso/libs/plugins.py:487-498`), zip extraction with member validation, 64 MiB cap, staged install/rollback and permission sanitization (`plugins.py:600-680`), no `shell=True`/`os.system` anywhere in source, SHA-pinned CI actions enforced by `scripts/check-action-pins.sh`. What drags the grade to C+ is that the *defaults leave it all switched off*, plus the debug-traceback leak (B2) and an uncontained file browser. Ship-state, not capability, is what an operator experiences.
+A genuinely disciplined codebase for its class — modern pinned stack (Vue 3.5, Quasar 2.21, Vite 7, vitest 4, Playwright 1.61), real unit + e2e + accessibility testing, complete i18n coverage (~1,730 `t()` call sites, no hardcoded strings in the sampled 1,000-line components), and a proper composables layer. Held back by several 750–1,250-line monolith components, a plain-JS codebase with no TypeScript, a self-admitted ~24% coverage baseline, mixed Options/`<script setup>` styles, and ad-hoc global-singleton state.
 
-### Findings
+**Metrics:** 88 Vue SFCs (25,245 lines); largest: `CompletedTasksListDialog.vue` 1,251 / `ApprovalQueue.vue` 1,095 / `VideoCompare.vue` 1,001 / `LibraryConfigDialog.vue` 855; 36 vitest unit files (6,160 lines) + 2 Playwright specs; 49 files `<script setup>` vs 34 Options-wrapper; no Pinia/Vuex — module-level `reactive()` singletons.
 
-**E1. API auth and CSRF protection are disabled by default; no login layer exists — Major**
-- **Where:** `compresso/config.py:156-158` (`api_auth_enabled = False`, `api_auth_token = ""`, `csrf_protection_enabled = False`); enforcement is opt-in in `compresso/webserver/request_auth.py:63-79` and `compresso/webserver/api_v2/base_api_handler.py:170-193`.
-- **What's wrong:** There is no user/password login at all — only an optional bearer token. With defaults, every endpoint (settings write, library config, plugin install, file browse, proxy) is open and CSRF-unprotected. In typical NAS deployments users remap the port LAN-wide; any LAN device (or a DNS-rebinding page) then has full admin — and plugin installation is arbitrary code execution in the server process by design.
-- **Impact:** Major · **Fix:** Auto-enable API auth on first run (the token generator at `config.py:197` already exists — flip the default and surface the token in log/UI), or force-enable auth whenever `ui_address` is non-loopback (the condition is already detected and warned at `uiserver.py:183-184`). Enable CSRF by default. · **Effort:** S–M · **Grade lift:** E C+ → B+ with E2.
+### C1 — Monolithic components (1,000+ lines, dialogs-within-dialogs)
 
-**E2. File browser exposes the entire filesystem with no containment — Major**
-- **Where:** `compresso/webserver/helpers/filebrowser.py:43-57` — `_validate_browsable_path` normalizes and rejects null bytes but accepts any path under `/`; used by `POST /filebrowser/list` (`compresso/webserver/api_v2/filebrowser_api.py:105-118`).
-- **What's wrong:** `current_path: "/etc"` or `/root/.ssh` enumerates any readable directory in the container and all mounted host paths. Combined with E1, an unauthenticated LAN client can map the NAS filesystem. Containment patterns already exist in `compresso/webserver/downloads.py:102-123` and `preview_api.py:69-95` — this endpoint just doesn't use them.
-- **Impact:** Major · **Fix:** Constrain to configured library roots plus an explicit browse-root setting, reusing the existing containment helpers; at minimum require auth for this route. · **Effort:** M.
+- **Where:** `compresso/webserver/frontend/src/components/dashboard/completed/CompletedTasksListDialog.vue` (1,251 lines; nests four additional `q-dialog`s at lines 356, 419, 459); `src/pages/ApprovalQueue.vue` (1,095); `src/components/preview/VideoCompare.vue` (1,001); `LibraryConfigDialog.vue` (855)
+- **What's wrong:** Single files own toolbar UI, sub-dialogs, selection logic, and API calls; these giants are exactly the files without component tests.
+- **Impact:** Major
+- **Fix:** Extract each nested `q-dialog` into `ui/dialogs/` components; move approve/reject flows into a composable like the existing `useApprovalQueueData.js`; add component tests as pieces are carved out (pairs with D1).
+- **Effort:** M
+- **Grade lift:** B- → B
 
-**E3. Container init sources plugin/user shell scripts as root at startup — Major**
-- **Where:** `docker/root/etc/cont-init.d/60-custom-setup-script` — `source /config/startup.sh` executed by the root-running init stage (the app itself then drops to the PUID user via `docker/root/etc/cont-init.d/10-init-user`, `20-permission-config`).
-- **What's wrong:** Anything that can write `/config` (the app itself runs as the PUID user with ownership of `/config`) can stage a script that runs as root on next container start — a privilege-escalation chain from app compromise (e.g. via E1 + plugin install) to container root.
-- **Impact:** Major · **Fix:** Run the custom setup hook as the PUID user (`s6-setuidgid`), or gate it behind an explicit env opt-in and refuse scripts not owned by root. · **Effort:** M.
+### C2 — No TypeScript; typing is runtime-props only
 
-**E4. Tornado `debug=True` serves tracebacks (cross-ref B2) — Major**
-- See B2 (`compresso/libs/uiserver.py:61`, `base_api_handler.py:323-328`). Counted once in the improvement list but weighed in both grades.
+- **Where:** `jsconfig.json` (not tsconfig); `eslint.config.mjs:64-77,89-101` (`@babel/eslint-parser`, `requireConfigFile: false`); coercion smells TS would catch, e.g. `ApprovalQueue.vue:833-834` (`=== true || === 'true'`); lint tier is only `vue/strongly-recommended` + prettier
+- **Impact:** Moderate
+- **Fix:** Incremental adoption — `allowJs` tsconfig + `vue-tsc` in CI, convert `src/js/` and `src/composables/` first; bump ESLint to `flat/recommended`.
+- **Effort:** L
+- **Grade lift:** B → B+/A- long-term
 
-### Positives (verified)
-- Strict CSP: `script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, no unsafe-inline/eval for scripts (`security_headers.py:50-64`); full security-header set incl. nosniff, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy, conditional HSTS (`:23-40`).
-- Remote plugin installs require a valid `package_sha256` digest and verify it streamingly (`plugins.py:487-498`); archives are size-capped, member-validated, extracted to staging with rollback and 0600/0700 modes (`plugins.py:600-680`).
-- Websocket: origin validation (`websocket.py:119`), auth during `prepare()` with the credential in a separate non-echoed subprotocol (`:122-128`).
-- No `shell=True`, no `os.system` in source; ffmpeg invocations are list-based.
-- All third-party GitHub Actions pinned to full commit SHAs across all 9 workflows; no `pull_request_target` checkout-of-PR-head patterns found.
-- `.trivyignore` suppressions each carry written justifications (see F1 for the expiry gap).
+### C3 — Split personality: `<script setup>` vs Options-wrapper `setup()`
+
+- **Where:** 49 vs 34 files; e.g. `ApprovalQueue.vue:630-633` (Options wrapper) beside `CompletedTasksListDialog.vue:496` (`<script setup>`) in the same feature area
+- **Impact:** Moderate
+- **Fix:** Migrate the 34 Options-wrapper files (mechanical — they already use Composition API inside `setup()`), then enable `vue/component-api-style: ['error', ['script-setup']]`.
+- **Effort:** M
+- **Grade lift:** B- → B (with C1)
+
+### C4 — Ad-hoc global state; installation switch does `location.reload()`
+
+- **Where:** `src/js/sharedLinksStore.js:24-29` (`setTarget()` → `localStorage.setItem` → `location.reload()`); `src/js/compressoGlobals.js:79` (`let $compresso = {}` mutable module singleton, stuffed with websocket listener registries by `compressoWebsocket.js`)
+- **What's wrong:** Full-page reload as a state transition defeats SPA routing/state; the untyped `$compresso` bag is shared mutable state with no devtools visibility, while Quasar bundles Pinia support unused.
+- **Impact:** Moderate
+- **Fix:** Pinia stores for installation target, toast settings, and websocket connection state; make target switching re-fetch instead of reloading.
+- **Effort:** M
+- **Grade lift:** +⅓ grade in maintainability
+
+### C5 — Auth retry via `window.prompt()` on the mutated global axios instance
+
+- **Where:** `src/js/apiAuth.js:33-36` (`globalThis.prompt(promptText)`); wired at `src/boot/axios.js:64-78` (401 → prompt → retry); interceptors installed on the **global** axios default instance (lines 40, 64) which every page imports directly
+- **What's wrong:** A blocking native prompt is poor UX/accessibility (no i18n, blocks the event loop) — especially since a proper `LoginDialog.vue` already exists (`src/components/drawers/partials/LoginDialog.vue`); mutating global axios leaks interceptors to any code sharing the module.
+- **Impact:** Moderate
+- **Fix:** Promise-based auth gate using the existing LoginDialog; one dedicated `axios.create()` app instance imported everywhere.
+- **Effort:** M
+- **Grade lift:** +⅓ grade (with C3)
+
+### C6 — Coverage gate honest but very low
+
+- **Where:** `compresso/webserver/frontend/vitest.config.js:17-24` — `thresholds: { lines: 24, functions: 16, branches: 17, statements: 24 }` ("Honest all-source baseline (2026-07-12). Ratchet upward…")
+- **What's wrong:** Tests concentrate on `src/js/` and `src/composables/`; the five largest, riskiest components (C1) have no component tests. Cross-referenced as D1 — the ratchet is a comment, not a mechanism.
+- **Impact:** Moderate
+- **Fix:** See D1.
+- **Effort:** M–L
+- **Grade lift:** B- → B
+
+### C7 — 11 unscoped `<style>` blocks leaking global CSS
+
+- **Where:** 44/55 style blocks scoped; unscoped include `src/components/settings/plugins/partials/PluginsInstalledTable.vue:627`, `src/components/dashboard/completed/CompletedTaskLogDialog.vue:81`, `src/components/docs/HelpSupportDialog.vue:382`, `src/pages/SettingsPlugins.vue:68`, `src/components/FooterData.vue:65`, +6 more; plus a 604-line global `app.scss`
+- **Impact:** Minor
+- **Fix:** Add `scoped` + `:deep()` where global reach isn't required; enable `vue/enforce-style-attribute`.
+- **Effort:** S
+- **Grade lift:** hygiene
+
+### C8 — Dead boilerplate axios instance with placeholder production URL
+
+- **Where:** `src/boot/axios.js:86` — `const api = axios.create({ baseURL: 'https://api.example.com' })` (verified), injected as `$api` (line 95) and exported (line 101); zero consumers found in `src/`
+- **Impact:** Minor
+- **Fix:** Delete the scaffold instance, export, and comments (lines 80-97).
+- **Effort:** S
+- **Grade lift:** hygiene
+
+**Strengths:** Layered test setup with accessibility scanning (36 colocated unit test files; axe-core audit at `tests/e2e/compresso-smoke.spec.js:405`; a live-backend Playwright config). Security-conscious API layer (`src/boot/axios.js:24-56` origin-checks every request before attaching auth/CSRF headers; `src/js/sanitize.js` wraps DOMPurify with an explicit allowlist; the auth token travels in WebSocket subprotocols, not query strings — `src/js/apiAuth.js:18-31`). Complete i18n discipline and 12 purpose-built composables, each with a matching test.
+
+---
+
+## D — Testing & Reliability — A-
+
+An unusually mature test and reliability posture: ~4,000 backend tests with genuinely behavioral assertions, an enforced 75% combined-coverage gate, cross-OS PR shards, fail-closed fuzz tests for every persistence primitive, and real-filesystem integration tests of the data-loss-critical file-move path. Kept from A/A+ by the very low frontend coverage gate, a thin marked integration suite whose coverage is invisible in Sonar, and a stale test-durations file.
+
+**Metrics:** ~4,036 Python tests on 3.13 (3,947 collected on the audit box's 3.11 with one env-only collection error); ~4,012 unit (175 files) vs **24 integration** (7 files); backend gate `fail_under = 75` (`pyproject.toml:25`) enforced in CI (`python_lint_and_run_unit_tests.yml:176`); frontend thresholds 24/16/17/24; 36 vitest files (~432 cases) + 2 Playwright specs.
+
+### D1 — Frontend coverage gate is very low relative to backend rigor
+
+- **Where:** `compresso/webserver/frontend/vitest.config.js:17-24` (24% lines / 16% functions vs backend 75%); only 6 of 15 pages in `src/pages/*.vue` have tests
+- **What's wrong:** The "ratchet upward" is a comment, not a mechanism — nothing prevents it staying at 24% forever.
+- **Impact:** Moderate
+- **Fix:** CI step that fails if achieved coverage exceeds thresholds by >2 points without a threshold bump (auto-ratchet); component tests for the 9 untested pages, starting with the C1 extraction targets.
+- **Effort:** M
+- **Grade lift:** A- → A
+
+### D2 — Marked integration suite is thin; its coverage is unenforced and invisible
+
+- **Where:** `.github/workflows/integration_test_and_build_all_packages_ci.yml:112` (`--cov-fail-under=0`); `sonar-project.properties:27-30` (documented but unimplemented cross-workflow consolidation); 24 tests across 7 files (`test_service_startup.py` has 3, `test_distributed_process_drill.py` has 1)
+- **Impact:** Moderate
+- **Fix:** Compose the unit/integration workflows via `workflow_call` under one parent (the pattern already exists — `release.yml` calls both), merge coverage artifacts, and add integration tests for remote-worker lease/handoff and websocket push paths.
+- **Effort:** M–L
+- **Grade lift:** A- → A
+
+### D3 — `.test_durations` is 2 months stale and covers ~62% of unit tests
+
+- **Where:** `.test_durations` (2,483 entries spanning 105 files vs ~4,012 tests in 174 files; last touched `2026-05-20`); `refresh_test_durations.yml:9` (monthly cron whose output hasn't landed since May — the workflow exits silently on failure/unmerged PR)
+- **Impact:** Minor
+- **Fix:** `workflow_dispatch` the refresh now; add failure notification or auto-merge label so refresh PRs don't rot.
+- **Effort:** S
+- **Grade lift:** marginal
+
+### D4 — E2E depth is one smoke spec per mode, with silent retry masking
+
+- **Where:** `tests/e2e-live/compresso-live-smoke.spec.js` (94 lines — the only test of the real frontend↔backend contract); `playwright.config.js:11` (`retries: process.env.CI ? 2 : 0`, no flake reporting)
+- **Impact:** Minor–Moderate
+- **Fix:** Add 2-3 live journeys (settings save round-trip, approval action, history pagination); enable the JSON reporter and annotate when `retry > 0` occurred.
+- **Effort:** M
+- **Grade lift:** A- → A (with D1)
+
+### D5 — Coverage-campaign test-file sprawl
+
+- **Where:** five foreman files (`test_foreman.py`, `_deep`, `_extended`, `_queue_empty`, `_run_refactor`), plus `test_additional_api_coverage.py`, `test_api_deferred_coverage.py`, `test_config_round2.py`, a broad `*_extended.py` family. Sampled tests are real (drive Tornado handlers over HTTP, assert payloads) — organizational debt, not shallow testing.
+- **Impact:** Minor
+- **Fix:** Consolidate per-module; ban `*_coverage`/`*_round2` naming in a CONTRIBUTING note.
+- **Effort:** M
+- **Grade lift:** marginal
+
+### D6 — `ThreadHealthMixin` has no dedicated unit test
+
+- **Where:** `compresso/libs/thread_health.py:1-43` (the watchdog telemetry primitive); coverage only indirect via consumers (`tests/unit/test_scheduler.py:44,451-485`, `test_postprocessor.py:674-706`)
+- **Impact:** Minor
+- **Fix:** Direct suite including a concurrent hammer test.
+- **Effort:** S
+- **Grade lift:** marginal
+
+**Strengths:** Data-loss invariants tested against the real filesystem with injected failure — `tests/integration/test_file_pipeline.py:153-187` injects `OSError` on the final rename and asserts byte-for-byte restoration of the destination, source survival, and cache retention. Fail-closed primitives each have adversarial suites (`test_safety_state.py:77-121` corrupt-state forcing pause; `test_20tb_state_fuzz.py` 200 seeded malformed-JSON iterations; `test_retry.py` 520 lines against a real SQLite DB). CI rigor: hash-locked deps, pip-audit, ruff+mypy blocking, 3-way shards × {ubuntu, macos, windows}, combined 75% gate, Docker runtime smoke test, and autouse fixtures that reap leaked threads/singletons (`tests/conftest.py:110-202`).
+
+---
+
+## E — Security — B+
+
+Genuinely strong, deliberate security engineering for a self-hosted tool: auth and CSRF are force-enabled whenever the UI listens beyond loopback (with an auto-generated token persisted at mode 0600), token comparison is constant-time, the plugin supply chain is HTTPS-only with mandatory SHA-256 and one of the most thorough zip validators you'll see in this class of app, the remote-installation proxy is SSRF-guarded with header allowlists, and the backend contains zero `eval`/`exec`/`pickle`/`shell=True`. Remaining findings are defense-in-depth and secrets-at-rest hardening, not exposed defaults. (Prior audit: C+ — the E1/E2/E3/E5/E6 hardening from that round is verifiably in place.)
+
+### E1 — WebSocket `prepare()` ignores `authorize_request`'s return value
+
+- **Where:** `compresso/webserver/websocket.py:122-123` — `def prepare(self): authorize_request(self, allow_websocket_protocol=True)` (verified: return value unchecked); contrast HTTP handlers, e.g. `proxy.py:182-184` (`if not authorize_request(self): return`)
+- **What's wrong:** Rejection relies on the side effect that `authorize_request` calls `handler.finish()` (`request_auth.py:83-85`), which aborts the handshake today because Tornado skips the upgrade after a finished response. Nothing in *this* handler enforces the auth decision; a refactor of `authorize_request` (e.g. returning without finishing) or of Tornado's prepare/upgrade sequencing silently opens every stream — workers, logs, task data — to unauthenticated clients. The socket also never re-checks auth after open despite long-lived connections.
+- **Impact:** Moderate (defense-in-depth on the heaviest data-exposure surface)
+- **Fix:** Check the return and raise `tornado.web.HTTPError(401)` when false; add a regression test asserting an unauthenticated websocket handshake is refused when `api_auth_enforced` is on.
+- **Effort:** S
+- **Grade lift:** B+ → A-
+
+### E2 — Single static bearer token; remote-installation credentials plaintext at rest
+
+- **Where:** `compresso/config.py:201-210` (auto-generated token persisted to `settings.json`); `config.py:302` (file written 0600 — good); `compresso/webserver/proxy.py:162-171` (remote basic-auth `username`/`password` and `api_token` read as plaintext from settings); `config.py:229` (`get_config_as_dict()` returns the live dict including `api_auth_token`, so any settings-dump surface must remember to redact)
+- **What's wrong:** One long-lived shared token with no rotation or expiry; compromise means silent full API access until manually changed. Remote-worker credentials sit unencrypted in the same file, and the live-dict export makes accidental token disclosure a one-line mistake in any future settings endpoint.
+- **Impact:** Moderate
+- **Fix:** Add a token-rotation endpoint/CLI and creation timestamp; return a redacted copy from `get_config_as_dict()` by default (allowlist callers that need secrets); document credential scoping for remote links.
+- **Effort:** M
+- **Grade lift:** B+ → A- (with E1)
+
+### E3 — CSRF cookie never sets the `Secure` flag
+
+- **Where:** `compresso/webserver/api_v2/base_api_handler.py:162` — `self.set_cookie(CSRF_COOKIE_NAME, csrf_token, httponly=False, samesite="Strict")` (httponly=False is required by the double-submit pattern; `Secure` is simply absent even when serving HTTPS)
+- **Impact:** Minor
+- **Fix:** `secure=self.request.protocol == "https"` (or always-on when `get_ssl_enabled()`).
+- **Effort:** S
+- **Grade lift:** marginal
+
+### E4 — Proxy SSRF check has a DNS-rebinding TOCTOU window
+
+- **Where:** `compresso/webserver/proxy.py:87-104` (`_is_blocked_address` resolves and validates), then `proxy.py:212` (`client.fetch(url, ...)` re-resolves independently). Practical risk is low — targets come only from operator-configured remote installations (`proxy.py:112-147`), not request input — but a malicious DNS answer could pass validation then rebind to loopback/metadata.
+- **Impact:** Minor
+- **Fix:** Resolve once, validate the IP, and connect to that IP with the Host header pinned (or re-validate in a custom resolver hook).
+- **Effort:** M
+- **Grade lift:** marginal
+
+### E5 — `DownloadsHandler` skips the security-header mixin and auth
+
+- **Where:** `compresso/webserver/downloads.py:77` — `class DownloadsHandler(web.RequestHandler)` (no `SecurityHeadersMixin`, no `authorize_request`). Mitigated: links are unguessable UUID4 capabilities expiring in 60s (`downloads.py:63-69`) and paths are realpath-confined to library/cache roots (`downloads.py:102-123`), so this is header hygiene plus a note that a leaked link is exercisable without a token for its 60-second life.
+- **Impact:** Minor
+- **Fix:** Add the mixin; optionally require the auth header when `api_auth_enforced` is on (links are already minted by authenticated callers).
+- **Effort:** S
+- **Grade lift:** marginal
+
+**Strengths (verified):** Secure-by-default network posture — auth+CSRF force-enabled off-loopback unless explicitly opted out (`config.py:159-161, 740-758`), auto-generated token (`config.py:201-210`), constant-time comparisons via `hmac.compare_digest` (`request_auth.py:56-65`), per-IP/path rate limiting with headers (`base_api_handler.py:115-133`). Plugin supply chain: HTTPS-only + mandatory SHA-256 with hex validation (`plugins.py:486-513`), 64 MiB download cap, and archive validation rejecting absolute/traversal paths, symlinks/special files, encrypted members, entry-count/size/compression-ratio bombs (`plugins.py:520-569`); external plugin execution requires an explicit `COMPRESSO_TRUSTED_PLUGIN_IDS` allowlist (`libs/unplugins/executor.py:155-211`). Proxy hardening: request/response header allowlists, credential injection only for the resolved target, redirect blocking, fail-closed DNS, loopback/link-local/metadata blocklist (`proxy.py:16-104`). Strict CSP with no `unsafe-inline`/`unsafe-eval` script sources (`security_headers.py:50-64`), websocket origin validation (`security_headers.py:67-81`), token carried in websocket subprotocol rather than query string. `.trivyignore` entries all carry written justifications (kernel-header CVEs unreachable in-container; npm-internal tooling), and the container drops privileges via `gosu "${PUID}:${PGID}"` (`docker/root/entrypoint.sh:167-168`). Suppression-hygiene gaps in `.trivyignore` are tracked as F2.
 
 ---
 
 ## F — Dependencies & Tech Currency — A-
 
-**Why this grade:** This is the strongest category, verified end-to-end: hash-locked reproducible Python installs (`requirements.lock` with 588 sha256 hashes, `requirements-dev.lock` with 1,133; CI installs with `--require-hashes` and a lock-drift check via `scripts/check-requirements-locks.sh`), pip-audit on both locks in CI, Trivy + cosign + SBOM in the release path, Dependabot across all five ecosystems, digest-pinned Docker bases with a weekly rebuild, and a current toolchain (Python 3.13 everywhere, Node 24 LTS, Vue 3.5 / Quasar 2.21 / Vite 7 / Vitest 4, tornado 6.5.7 / peewee current, actions/checkout v7 etc.). The findings are process refinements, not staleness.
+Runtime and dev Python dependencies are fully pinned and compiled into hash-locked files enforced with `--require-hashes`, backed by CI lock-consistency checks, `pip-audit` on both locks, `npm audit`, digest-pinned Docker base images, and six-ecosystem weekly Dependabot. Versions are current for mid-2026 (Python 3.13, Node 24 LTS, Tornado 6.5.x, urllib3 2.7.0, Vue 3.5, Vite 7, Quasar 2.21). Deductions for pre-commit tool drift, `.trivyignore` hygiene, and stale metadata.
 
-### Findings
+### F1 — Pre-commit hook versions drifted from CI-pinned tools (mypy a major version behind)
 
-**F1. `.trivyignore`: 93 suppressed CVEs, no expiry dates, one duplicate — Moderate**
-- **Where:** `.trivyignore` (93 non-comment lines, 92 unique; `CVE-2026-43185` appears at lines 84 and 108).
-- **What's wrong:** All suppressions are open-ended; ~85 are base-image entries that are *supposed* to clear on the next weekly rebuild, but nothing forces re-review if they don't. The rationale comments are good.
-- **Impact:** Moderate · **Fix:** Add `exp:` dates (30–60 days for base-image entries); delete the duplicate. · **Effort:** S · **Grade lift:** F A- → A with F2.
+- **Where:** `.pre-commit-config.yaml:12` (ruff `v0.15.7`) and `:19` (mirrors-mypy `v1.19.1`) vs `requirements-dev.txt:3` (`ruff==0.15.22`) and `:16` (`mypy==2.3.0`); `dependabot.yml` has no `pre-commit` ecosystem
+- **What's wrong:** Local hooks run mypy 1.19 while CI runs 2.3 — pass locally, fail CI (or vice versa), and nothing keeps the revs fresh.
+- **Impact:** Moderate
+- **Fix:** Bump the two `rev:` values; add pre-commit autoupdate automation or a CI assertion that revs match the dev pins.
+- **Effort:** S
+- **Grade lift:** A- → A
 
-**F2. Manual CVE hot-patching in the app Dockerfile signals base-image digest lag — Moderate**
-- **Where:** `docker/Dockerfile:5` (hand-pinned base digest), `:10-17` (apt upgrade of `linux-libc-dev` for CVE-2026-43185), `:26-45` (in-place `npm pack`/tar overwrite of `picomatch`/`sigstore` inside Node's bundled npm — fragile, silently no-ops if paths move).
-- **What's wrong:** The base rebuilds weekly (`.github/workflows/docker_base_image.yml:10-12`), but the digest in `Dockerfile:5` is updated manually, so ad-hoc patches accumulate and must be remembered and removed by hand.
-- **Impact:** Moderate · **Fix:** Have the base-image workflow open an automated PR bumping the digest after each successful rebuild; drop the patch blocks once absorbed. · **Effort:** M.
+### F2 — `.trivyignore` suppressions never expire, contain a duplicate, and suppress an already-patched CVE
 
-**F3. Unmaintained frontend runtime parsers handling user-facing markup — Moderate**
-- **Where:** `compresso/webserver/frontend/package.json:30-31,38` — `remarkable ^2.0.1` (last release ~2019), `remarkable-admonitions ^0.2.2`, `xbbcode-parser ^0.3.1` (~2014-era); used in `src/js/markupParser.js:1-5`.
-- **What's wrong:** Parser bugs/ReDoS in these will never get upstream fixes. Mitigated by DOMPurify sanitization downstream (with tests in `src/js/__tests__/sanitize.test.js`), so exposure is bounded.
-- **Impact:** Moderate · **Fix:** Migrate to `markdown-it` (+ admonition plugin); vendor-and-own or replace the tiny bbcode parser. · **Effort:** M.
+- **Where:** `.trivyignore:84` and `:108` (CVE-2026-43185 listed twice) while `docker/Dockerfile:11` patches that same CVE; ~100 suppressions with no `exp:` dates
+- **What's wrong:** A fix regression would never resurface in scans; the suppression would hide the Dockerfile patch silently breaking.
+- **Impact:** Moderate
+- **Fix:** Use `CVE-XXXX exp:YYYY-MM-DD` tied to the next base-image rebuild; dedupe; remove entries patched in the Dockerfile so the scan verifies the patch.
+- **Effort:** S
+- **Grade lift:** A- → A
 
-**F4. `vuex` declared but never imported (cross-ref C2) — Minor**
-- **Where:** `compresso/webserver/frontend/package.json:37`; zero imports repo-wide; stale `stores/` alias at `quasar.config.js:76-84`.
-- **Impact:** Minor · **Fix:** `npm uninstall vuex`; drop the alias. · **Effort:** S.
+### F3 — Stale/EOL Node engine floor in webserver package.json
 
-**F5. Stale intermediate `webserver` npm package — Minor**
-- **Where:** `compresso/webserver/package.json:17` — `"node": ">=14.17.2"` (Node 14 EOL since 2023, contradicting `.nvmrc` = 24); `package-lock.json` still lockfileVersion 2; lone dep `vendor-copy` is dormant upstream.
-- **Impact:** Minor · **Fix:** Bump engines, re-lock with modern npm, or replace `vendor-copy` with a 3-line `fs.cpSync` script. · **Effort:** S.
+- **Where:** `compresso/webserver/package.json:17-18` (`"node": ">=14.17.2"`, `"npm": ">=6.14.13"`) vs `.nvmrc` (`24`) and `frontend/package.json:71` (`"node": "^24 || ^22"`)
+- **Impact:** Minor. **Fix:** Align to `^24 || ^22` / `npm >=10`. **Effort:** S. **Lift:** hygiene.
 
-### Positives
-- CVE-driven pins documented inline (`requirements.txt:10-13` urllib3, `:24-25` click); cross-platform hash markers handled thoughtfully in the locks.
-- Dependabot: pip + all three npm roots + actions + docker, weekly, with grouping for pip/npm (`.github/dependabot.yml`). (Nit: no grouping for actions; docker only monthly.)
-- No vendored third-party code in the tree; Swagger UI assets come from the lock-tracked `swagger-ui-py` package.
+### F4 — License metadata inconsistency uncovered by the consistency check
+
+- **Where:** `setup.cfg:3` (`license = GPLv3`, non-SPDX) vs setup.py (`GPL-3.0-only`); `scripts/check-license-consistency.sh:19` checks setup.py but never setup.cfg
+- **Impact:** Minor. **Fix:** Set `GPL-3.0-only` in setup.cfg (or delete the duplicate field) and add it to the check script. **Effort:** S. **Lift:** marginal.
+
+### F5 — Dependabot pip updates can't regenerate the hash-locked `.lock` files
+
+- **Where:** `.github/dependabot.yml:3-13` (pip, weekly, grouped) + locks named `requirements.lock`/`requirements-dev.lock` (pip-compile output, `requirements.lock:1-6`) + the drift gate at `python_lint_and_run_unit_tests.yml:58`
+- **What's wrong:** Dependabot bumps `requirements.txt` but leaves the hash locks stale, so every grouped Dependabot PR fails the lock gate until a human recompiles — freshness automation and the reproducibility gate work against each other. (CI correctly blocks the stale state, so this is friction, not a gap.)
+- **Impact:** Minor
+- **Fix:** Rename to the `requirements.in`/`.txt` convention Dependabot regenerates, or add a workflow step that runs pip-compile on Dependabot branches.
+- **Effort:** M
+- **Grade lift:** A- → A (with F1)
+
+**Strengths:** True hash-locked reproducible chain end-to-end (588 sha256 hashes in `requirements.lock`; `--require-hashes` install at `docker/Dockerfile.base:201`; drift blocked by `scripts/check-requirements-locks.sh:40-41` in CI; digest-pinned base images at `docker/Dockerfile:5` / `Dockerfile.base:4`). Active vulnerability management with documented reasoning (CVE-driven pins with inline rationale at `requirements.txt:10-13,24-25`; `pip-audit` on both locks; `npm audit --omit=dev`; targeted in-image patches at `docker/Dockerfile:26-44`). Six-ecosystem grouped Dependabot plus CI-enforced license hygiene (`LICENSES/`, `THIRD_PARTY_NOTICES.md`, wheel ships license files at `setup.py:229`).
 
 ---
 
-## G — Performance & Scalability — C+
+## G — Performance & Scalability — B+
 
-**Why this grade:** The persistence layer and scan enumeration are genuinely designed for scale — WAL + single-writer queue, purposeful indexes matched to hot queries, streamed `os.walk` with a bounded test queue and resume checkpoints, keyset-paginated startup recovery, bounded in-memory buffers, enforced API pagination. But the web layer undoes much of it by running every DB and file operation on the single IOLoop thread, the per-file scan flow pays its most expensive checks first, and the CI scale benchmark measures a synthetic path that bypasses all of the real cost centers.
+Deliberate, above-average performance engineering: correct composite indexes on the two hot queries, durable scan checkpointing with backpressure, an atomic task-claim UPDATE, and a versioned scale-benchmark harness wired into CI. Held back by real hot-path costs that all bite at the 100k+ scale the tooling advertises, and a CI scale gate loose enough to let order-of-magnitude regressions through on PRs.
 
-### Findings
+### G1 — Task ingestion does 3-4 serialized writes + a dedupe SELECT + an N+1 library lookup per file
 
-**G1. All DB and file I/O in the web layer runs synchronously on the single IOLoop — Major**
-- **Where:** `compresso/webserver/api_v2/base_api_handler.py:373-381` (handlers are `async def` with 100% sync bodies); e.g. `pending_api.py:245-268`; all six websocket stream loops (`compresso/webserver/websocket.py:476-620`). Writes through `SqliteQueueDatabase` block the calling thread up to `results_timeout=15.0` s (`compresso/libs/unmodels/lib/basemodel.py:144`). Only a few newer endpoints offload via `asyncio.to_thread` (`transfer_api.py`, `upload_api.py`, `plugin_repos_mixin.py`).
-- **Impact at scale:** During a 100k-file scan the writer queue saturates; any UI write stalls the IOLoop for seconds, freezing every client's websocket streams and API calls; a bulk delete can block the whole web server for minutes (see G6).
-- **Impact:** Major · **Fix:** Route handler bodies through `asyncio.to_thread` via a decorator on `_invoke_route`; move websocket data collection off-loop. · **Effort:** M · **Grade lift:** G1+G2 lift G from C+ to ~B.
+- **Where:** `compresso/libs/task.py:271-307` (`Tasks.create(...)` then redundant `self.save()`, `set_cache_path()`, per-file `Library(...)` lookup at line 290 → `Libraries.get_or_none` per file via `library.py:277`, then `set_status("pending")` = another save); `compresso/libs/taskhandler.py:337-338` (pre-SELECT dedupe despite `abspath` being `unique=True` at `unmodels/tasks.py:52` with the `IntegrityError` path already handled at `task.py:309`)
+- **What's wrong:** Queuing one file = 1 SELECT + 1 INSERT + redundant save + 1 SELECT + 1-2 UPDATEs, all serialized through the single-writer `SqliteQueueDatabase`. The project's own real-pipeline threshold tolerates ~11 files/s; at that floor a 100k-file first scan spends hours in scheduling alone.
+- **Impact:** Major
+- **Fix:** Drop the pre-SELECT (rely on the UNIQUE constraint), remove the redundant save, cache library priority scores per scan, add a chunked `insert_many` path with a single bulk UPDATE per chunk.
+- **Effort:** M
+- **Grade lift:** B+ → A-
 
-**G2. Per-file scan flow: a DB fetch and often an ffprobe fork per file, ordered before the cheap checks — Major**
-- **Where:** `compresso/libs/filetest.py:109-146` (codec pre-filter probes), `:150-167` (near-free `.compressoignore` and indexed history checks run *after* the probe); `Library(self.library_id)` constructed per file (`compresso/libs/library.py:277` — a DB query); two plugin-list DB queries per queued file (`compresso/libs/plugins.py:1197-1208` fired from `filetest.py:272-280`, `taskhandler.py:358-367`).
-- **Impact at scale:** 100k files ⇒ ~100k library lookups + up to 100k ffprobe spawns (50–200 ms each ⇒ hours) + hundreds of thousands of sqliteq round trips, concurrent with UI traffic (G1).
-- **Impact:** Major · **Fix:** Hoist `Library(...)` and codec parsing into `FileTest.__init__`; reorder checks ignore → history → probe → plugins; TTL-cache the enabled-event-plugin list. · **Effort:** S (hoist/reorder) + M (caching).
+### G2 — Every WebSocket client re-reads the entire log file into memory every second
 
-**G3. The "large library scale" CI benchmark does not exercise the real code path — Moderate**
-- **Where:** `.github/workflows/large_library_scale.yml` + `compresso/libs/library_scale_benchmark.py:61-135` — synthetic `os.walk` iterable inserting rows via raw `sqlite3.executemany` into a hand-rolled schema; no peewee, no `SqliteQueueDatabase`, no FileTest, no dedupe SELECT. PR runs use only the 10k tier; `filetest.py`/`taskhandler.py`/`unmodels/**` aren't even in the workflow's `paths:` filter.
-- **What's wrong:** The green "500k in <600s" signal says nothing about real scan throughput; regressions in the actual hot path are invisible.
-- **Impact:** Moderate (false confidence) · **Fix:** Add a tier driving `TaskHandler.add_path_to_task_queue`/`FileTest` against a temp DB via the real models (ffprobe stubbed); extend the path filter. · **Effort:** M.
+- **Where:** `compresso/config.py:389-394` — `with open(log_file) as f: all_lines = f.readlines()` then slices the last N (verified); called from `compresso/webserver/websocket.py:484-496` (`read_system_logs(lines=1000)`) on a 1-second interval (`websocket.py:81`, `STREAM_POLL_INTERVALS["system_logs"] = 1` — verified)
+- **What's wrong:** `readlines()` loads the whole unbounded `compresso.log` (hundreds of MB on a busy server) into a list once per second per connected client, on the Tornado IO thread. The stream dedupe only skips the *send*, not the read.
+- **Impact:** Major
+- **Fix:** Tail by seeking from the end (bounded byte window, e.g. last 256 KB), and short-circuit on unchanged `st_mtime`/`st_size` between polls.
+- **Effort:** S
+- **Grade lift:** B+ → A- (with G3)
 
-**G4. Daemon threads re-derive full plugin/library configuration from DB and disk every 1–2 s — Moderate**
-- **Where:** Foreman loop → `get_current_library_configuration` (`compresso/libs/foreman.py:113-153, 893-908`) — all libraries, then per-library enabled plugins *with settings* (module/JSON loads via `library.py:599-617`), JSON-serialized and MD5-hashed every ~2 s; PostProcessor validates config every 1 s (`postprocessor.py:132-135`); EventMonitor per-library loop every ~2.5 s (`eventmonitor.py:139-186`); `get_incompatible_enabled_plugins` (`plugins.py:1097-1140`) polled independently by three threads.
-- **Impact:** Moderate (steady-state idle load growing linearly with libraries × plugins) · **Fix:** Config-generation counter bumped by settings writes; rebuild/hash only on change; share one TTL-cached incompatibility result. · **Effort:** M.
+### G3 — Per-client WS polling loops re-run full-table COUNTs; no shared broadcast
 
-**G5. Websocket: per-connection polling; system-logs stream re-reads the whole log file every second — Moderate**
-- **Where:** `compresso/webserver/websocket.py:79-94` (intervals), `:484-496` + `compresso/config.py:372-384` (`read_system_logs` does `f.readlines()` on the full 10 MB-rotated log per second per client); pending/completed loops run ~5 queries per 3 s tick per client (`webserver/helpers/pending_tasks.py:127-143`, `helpers/completed_tasks.py:88-102`); dedup still `json.dumps(sort_keys=True)` on every poll (`websocket.py:414-453`).
-- **Impact:** Moderate (5 dashboard clients ⇒ ~50 MB/s log reads + dozens of COUNTs/s on a 100k-row table, all on the IOLoop) · **Fix:** Compute each stream once in a shared periodic task and fan out; track log file offsets. · **Effort:** M.
+- **Where:** `compresso/webserver/websocket.py:504-586` (per-client 3s loops); `webserver/helpers/completed_tasks.py:87-113` (**four** COUNT queries per tick against unbounded `completedtasks`); `compresso/libs/task.py:390-392` (unfiltered COUNT with a pointless `ORDER BY`)
+- **What's wrong:** Cost is O(clients × tables scanned) every 3 seconds; 10 open dashboard tabs ≈ 27 duplicated queries/s against the same SQLite file at 100k+ rows.
+- **Impact:** Moderate
+- **Fix:** Compute each stream payload once in a single periodic broadcaster and fan out to registered handlers; cache counts for the poll interval; drop the ORDER BY.
+- **Effort:** M
+- **Grade lift:** B+ → A- (with G2)
 
-**G6. Bulk deletes are N+1 row-at-a-time; "select all filtered" loads every ID into memory — Moderate**
-- **Where:** `compresso/libs/task.py:428-459` (`delete_instance(recursive=True)` per row + per-row filesystem checks), `compresso/libs/history.py:232-257` (same), `webserver/helpers/pending_tasks.py:173-200` (unbounded ID query, Python-side exclusion), invoked from `pending_api.py:245-268` on the IOLoop.
-- **Impact:** Moderate ("delete all pending" at 100k tasks ⇒ 200k+ serialized write-queue ops, minutes-plus with the UI frozen per G1) · **Fix:** Chunked `DELETE ... WHERE id IN (...)` per child table then parent; pre-fetch paths for cleanup; run off-loop. · **Effort:** M.
+### G4 — Scan pipeline stalls at every directory boundary
 
-**G7. Scanner/tester handshake: 2 s idle sleeps + per-directory barrier — Moderate**
-- **Where:** `compresso/libs/filetest.py:239-247` (`queue.Empty → self.event.wait(2)`), `compresso/libs/libraryscanner.py:359-366` (scanner won't feed the next directory until the current fully drains), drain spin at `:342-344`.
-- **Impact:** Moderate (many-small-directory libraries — typical TV — can accrue up to ~2 s of pure sleep per directory boundary) · **Fix:** Blocking `Queue.get(timeout=0.25)` in testers; or checkpoint every N files. · **Effort:** S.
+- **Where:** `compresso/libs/libraryscanner.py:358-366` (walk blocks until all queued files in the current directory are tested — a hard drain barrier per directory); `compresso/libs/filetest.py:249-257` (testers use `get_nowait()` then `event.wait(2)` on empty queue)
+- **What's wrong:** Directory walking and file testing never overlap across boundaries, and drained testers sleep up to 2s while the next directory's files wait. Media libraries are one-directory-per-title — tens of thousands of stall points.
+- **Impact:** Moderate
+- **Fix:** Blocking `queue.get(timeout=0.25)`; checkpoint on a trailing frontier instead of a per-directory drain barrier.
+- **Effort:** M
+- **Grade lift:** B+ → A-
 
-Also noted (Minor): Foreman materializes the full processed-task list every 2 s just to count it (`foreman.py:544`, unbounded query at `taskqueue.py:105-130`); `model_to_dict(backrefs=True)` on history detail pulls entire ffmpeg command logs (`basemodel.py:230-237` via `history.py:214-230`); sqliteq pragmas omit `synchronous=NORMAL`/`busy_timeout` that the benchmark itself sets (`basemodel.py:140-150` vs `library_scale_benchmark.py:64-66`).
+### G5 — Row-at-a-time recursive deletes for history purges and task deletions
 
-### Positives
-- WAL + single-writer queue eliminates cross-thread lock storms by design (`basemodel.py:138-153`).
-- Purposeful indexes matched to hot queries: `tasks(status, priority)` (migration 007), `completedtasks(abspath, task_success)` (migration 009) with `.exists()`-based history checks (`history.py:205-212`).
-- Streamed scan: `os.walk` generator + bounded queue (500) + resume checkpoints (`libraryscanner.py:231-235,342`, `scan_checkpoint.py`) — flat memory at 500k entries.
-- Keyset-paginated startup recovery in batches of 500 (`taskhandler.py:279-284`); bounded deques for worker logs/GPU history; enforced 0–1000 API page caps (`task.py:382-383`).
-- Bulk single-statement updates where implemented: `reorder_tasks`/`set_tasks_status` (`task.py:487-506`).
+- **Where:** `compresso/libs/history.py:249-251` (`delete_instance(recursive=True)` per row, driven by the retention job at `scheduler.py:290` which selects **all** expired rows); same pattern with a per-row `os.path.exists` stat at `task.py:469-479`
+- **What's wrong:** The first retention run on a long-lived install (200k expired tasks + logs) is hundreds of thousands of serialized statements blocking all other writers.
+- **Impact:** Moderate
+- **Fix:** Chunk IDs (~500) and issue set-based deletes on the dependent tables, then the parents.
+- **Effort:** S
+- **Grade lift:** B+ → A- (small)
+
+### G6 — CI scale gate asserts little on PRs
+
+- **Where:** `.github/workflows/large_library_scale.yml:63-70,79-85` (PRs: 10k synthetic tier + real tier pinned to `--entries 2000`); `docs/performance/large-library-thresholds.json` (`real_tiers.2000.max_duration_seconds: 180` ≈ 11 entries/s pass bar; an unused `real_tiers.10000` exists); `compresso/libs/library_scale_benchmark.py:61-77,126-129` (synthetic tiers use hand-rolled raw sqlite3 `executemany` — code production never runs; production goes row-by-row through peewee, see G1)
+- **What's wrong:** A 5-10x regression in real scheduling throughput passes PR CI; the impressive 100k/500k numbers validate a synthetic floor sharing almost nothing with production; nothing asserts `entries_per_second`.
+- **Impact:** Moderate
+- **Fix:** Run the real-pipeline tier at 10,000 entries on PRs, tighten `max_duration_seconds` to ~2x recorded baseline, add a `min_entries_per_second` check to `threshold_failures` (`library_scale_benchmark.py:297-313`).
+- **Effort:** S
+- **Grade lift:** B+ → A-
+
+### G7 — Debug mode JSON-serializes every directory's file list during scans
+
+- **Where:** `compresso/libs/libraryscanner.py:335-336` — `self.logger.debug(json.dumps(files, indent=2))`
+- **What's wrong:** O(total files) extra serialization and log volume exactly when users enable debugging to report slow scans — which then feeds G2's whole-file log reads.
+- **Impact:** Minor. **Fix:** Log `len(files)` + root only. **Effort:** S. **Lift:** hygiene.
+
+**Strengths:** Indexes match the hot queries — composite `(status, priority)` on Tasks (`unmodels/tasks.py:82-83`, migration `007_add_task_queue_index.py`) matches the scheduler's claim query, `(abspath, task_success)` on history (migration 009) backs the per-file failed-path check via an indexed `.exists()` (`history.py:205-212`), and the pending-claim is an atomic conditional UPDATE (`taskqueue.py:274-281`). Scans are checkpointed, bounded, resumable (atomic-JSON journal with per-root locks; backpressure at `libraryscanner.py:342-344` caps queue depth; startup recovery pages the tasks table in 500-row keyset batches at `taskhandler.py:279-284`). Genuine versioned scale tooling with tracemalloc/RSS/p95 latency budgets and a real-pipeline mode that honestly documents its exclusions — well beyond what comparable projects ship (G6 critiques its assertion tightness, not its existence).
 
 ---
 
 ## H — Documentation & Onboarding — B+
 
-**Why this grade:** For a project of this size the documentation is unusually complete and, more importantly, *live*: 17 docs totaling ~2,600 lines including a real 1,000-line plugin-authoring guide, genuine architecture notes, env-var reference tables, and a two-path onboarding (Docker and venv) that works; a real OpenAPI spec generated from code (apispec + Marshmallow, `compresso/webserver/api_v2/schema/swagger.py:84`) served via Swagger UI at `/compresso/swagger` (`compresso/libs/uiserver.py:328-335`); an auto-maintained CHANGELOG current to today; and machine-enforced license consistency (`scripts/check-license-consistency.sh`). Held below A- by patchy docstrings exactly where the code is hardest, plus fork-era drift, including a doc that actively misinforms (AGENTS.md, counted under C2).
+The core onboarding path is genuinely good — `docs/DEVELOPING.md` is accurate and matches the real tooling, `README.md` is complete, and there are 17 topical docs including a 1,000-line plugin guide, an architecture doc, and an operator runbook. Pulled down by a ring of stale legacy documentation that actively misleads, and ~46% backend docstring coverage.
 
-### Findings
+### H1 — `tests/README.md` is almost entirely stale and misleading
 
-**H1. Docstring coverage is thinnest in the most complex orchestration modules — Moderate**
-- **Where:** (AST-sampled) `compresso/libs/library.py` 10/44 functions docstringed, `compresso/libs/uiserver.py` 2/14, `compresso/libs/foreman.py` 21/42, `compresso/libs/postprocessor.py` 24/47 — vs `compresso/webserver/api_v2/approval_api.py` 6/6 and `compresso/config.py` 56/73. Many existing docstrings are empty `:return:` stubs.
-- **Impact:** Moderate · **Fix:** Docstring the public methods of these four modules; optionally enable ruff `D1xx` for new files. · **Effort:** M · **Grade lift:** H B+ → A-.
+- **Where:** `tests/README.md:9` (`tests/scripts/setup_tests.sh` — path doesn't exist; actual is `tests/scripts_/`), `:20` (`pycodestyle ./` — repo uses ruff/mypy per `pyproject.toml:27-51`), `:41` (`pytest ... lib/common.py` — no `lib/` dir), `:84` (legacy `docker-compose` v1 syntax)
+- **What's wrong:** Every command fails or points at an abandoned tool; a contributor hits four dead ends before finding `scripts/verify-local.sh`.
+- **Impact:** Moderate. **Fix:** Rewrite to ~30 lines pointing at `pytest tests/unit`, `verify-local.sh fast|full`, and the marker scheme. **Effort:** S. **Lift:** B+ → A- (with H2).
 
-**H2. Vendored frontend docs contradict root docs; fork leftovers — Moderate**
-- **Where:** `compresso/webserver/frontend/README.md:16` claims Node 22 baseline vs Node 24 in root `README.md`/`docs/DEVELOPING.md`; `frontend/README.md:5` links to nonexistent `github.com/Compresso/compresso`; `frontend/.env.example:1` still says "Unmanic Frontend"; `AGENTS.md` documents a Vuex store that does not exist (see C2).
-- **Impact:** Moderate (misleads humans and coding agents) · **Fix:** One alignment pass. · **Effort:** S.
+### H2 — Frontend README contradicts the repo and has broken links/typos
 
-**H3. Frontend hot-reload workflow undocumented in the main dev guide — Minor**
-- **Where:** `docs/DEVELOPING.md` (frontend section) documents only ci/test/lint/build; the actual dev loop (`quasar dev` on :8889 proxying to the backend via `COMPRESSO_BACKEND_URL`, `compresso/webserver/frontend/quasar.config.js:89-104`) is only discoverable in the frontend dir.
-- **Impact:** Minor · **Fix:** Add a "Frontend dev server" subsection with the two-terminal workflow. · **Effort:** S.
+- **Where:** `compresso/webserver/frontend/README.md:16` ("Node.js 22" vs `.nvmrc` = 24), `:5` (link to nonexistent `github.com/Compresso/compresso`), `:39` ("This projected is licensed under th GPL" + MIT notice under a GPL heading), `:56` (broken `docs/CONTRIBUTING.md` relative link)
+- **Impact:** Moderate. **Fix:** One-pass rewrite. **Effort:** S. **Lift:** with H1.
 
-**H4. Small metadata/template drift — Minor**
-- **Where:** `setup.cfg:3` (`license = GPLv3`) vs `setup.py:230` (`GPL-3.0-only`), and `scripts/check-license-consistency.sh:19` doesn't check `setup.cfg`; duplicate issue/PR templates in `docs/` vs `.github/` (the `docs/` copies, still referenced from `docs/CONTRIBUTING.md:18`, silently drift); seven internal AI-audit reports committed under `.Codex/` (only `.codex_tmp/` is gitignored).
-- **Impact:** Minor · **Fix:** Align `setup.cfg`, extend the check script, delete the duplicate templates, relocate/ignore `.Codex/`. · **Effort:** S.
+### H3 — `devops/local_dev_venv.sh` and `frontend_install.sh` are undocumented and stale
 
-### Positives
-- `docs/PLUGIN_DEVELOPMENT.md` (1,000 lines, 43 sections) is a real authoring guide; `docs/CONFIGURATION.md` has full env-var/volume/port tables; `docs/ARCHITECTURE.md` genuinely explains queue states and the approval lifecycle; a 20 TB rollout runbook and `SECURITY_SUPPLY_CHAIN.md` exist.
-- OpenAPI schema is generated from code, committed (`compresso/webserver/docs/api_schema_v2.{json,yaml}`), auto-regenerated in dev mode (`uiserver.py:313-324`), and served via Swagger UI.
-- README includes working Docker quick start, source install, three real screenshots, and troubleshooting.
-- License consistency is machine-enforced across LICENSE / LICENSES/MIT.txt / THIRD_PARTY_NOTICES.md / package metadata.
+- **Where:** zero doc references to either script; `devops/local_dev_venv.sh:25` runs `git submodule update --init --recursive` against a repo with no submodules (README.md:14 says none required), installs un-hash-pinned (lines 36-37) contra `DEVELOPING.md:60`; same stale submodule call at `devops/run_docker.sh:258`
+- **Impact:** Moderate. **Fix:** Update to the lock-based flow or delete in favor of DEVELOPING.md. **Effort:** S. **Lift:** part of the stale-docs cleanup.
 
----
+### H4 — Backend docstring coverage ~46%
 
-## I — Developer Experience & Tooling — A-
+- **Where:** AST-measured across `compresso/libs/` (145 modules): functions 484/1,044 (46%), classes 73/166 (44%); worst core files: `library.py` 10/44, `taskhandler.py` 7/17, `foreman.py` 21/42
+- **Impact:** Minor–Moderate. **Fix:** Document the task-lifecycle files first (ARCHITECTURE.md points readers there). **Effort:** M. **Lift:** minor.
 
-**Why this grade:** The standout is `scripts/verify-local.sh` — fast/full lanes covering pip-audit, lock drift, lint, type-check, tests, frontend gates, actionlint, clean-wheel inspection, and Playwright — with `.github/workflows/verify-local.yml` running *the same script* in CI so local and CI cannot diverge. Add SHA-pin enforcement (`scripts/check-action-pins.sh`), hash-locked dependency drift checks, 3-way test sharding with lockfile-keyed caches, two-layer Docker builds (app layer ~1-2 min vs ~10-15), semantic-release + commitlint, shareable IDE run configurations, and pre-commit with ruff/mypy. The findings are polish items.
+### H5 — Duplicate, divergent legacy issue/PR templates
 
-### Findings
+- **Where:** `docs/ISSUE_TEMPLATE.md` and `docs/PULL_REQUEST_TEMPLATE.md` coexist with (and differ from) the live `.github/` forms; `docs/CONTRIBUTING.md:18` still points at the legacy one
+- **Impact:** Minor. **Fix:** Delete the legacy pair; point CONTRIBUTING at the .github forms. **Effort:** S.
 
-**I1. `.test_durations` shard data stale with no refresh process (cross-ref D3) — Moderate**
-- **Where:** `.test_durations` (303 KB), last regenerated 2026-04-07; no workflow runs `--store-durations`; no doc mentions refreshing it.
-- **Impact:** Moderate (CI wall time) · **Fix:** Scheduled monthly regeneration workflow. · **Effort:** S.
+### H6 — `AGENTS.md` names a nonexistent config file
 
-**I2. Machine-local and personal files committed under `.idea/` — Minor**
-- **Where:** `.idea/dataSources.local.xml` (JetBrains machine-local file referencing a local SQLite DB and `<secret-storage>master_key</secret-storage>`) and `.idea/dictionaries/josh5.xml` (previous maintainer's personal dictionary — fork residue). `.gitignore:4` excludes only `workspace.xml`. The rest of `.idea/` (run configs, code styles, inspection profiles) is legitimately shareable.
-- **Impact:** Minor · **Fix:** `git rm` both; add them to `.gitignore`. · **Effort:** S.
+- **Where:** `frontend/AGENTS.md:57` (`quasar.config.cjs` — actual file is `quasar.config.js`); line 7 carries the stale org link
+- **Impact:** Minor. **Fix:** Two-line edit. **Effort:** S.
 
-**I3. `.editorconfig` contradicts the pre-commit EOF hook — Minor**
-- **Where:** `.editorconfig:8` sets `insert_final_newline = false` while `.pre-commit-config.yaml:7` runs `end-of-file-fixer`, which adds one — a churn loop for editorconfig-aware editors.
-- **Impact:** Minor · **Fix:** Set `insert_final_newline = true`. · **Effort:** S.
-
-**I4. Pre-commit mypy runs full-repo per commit in an env that differs from CI's mypy — Minor**
-- **Where:** `.pre-commit-config.yaml:18-25` — `mirrors-mypy` with `pass_filenames: false, always_run: true` (whole-repo check per commit, isolated env without project deps, diverging from `scripts/verify-local.sh:56`'s venv mypy).
-- **Impact:** Minor · **Fix:** Convert to a `repo: local` hook using the venv mypy, or move to pre-push stage. · **Effort:** S.
-
-Also noted (Minor): no top-level Makefile/justfile mapping single gates (`lint`/`test`/`fe-dev`) to the commands buried in `verify-local.sh` and nine `devops/` scripts; dead `devops/gitlab-runner.sh` and 2020-era fork headers mislead newcomers about which tooling is live; no dev-mode docker-compose variant (the `run_docker.sh --debug` path covers it).
-
-### Positives
-- `verify-local.sh` fast/full lanes enforced by CI itself (`verify-local.yml`) — local/CI parity by construction, with skipped full gates explicitly listed.
-- Reproducibility rails: `.nvmrc` + `.python-version` + hash-locked requirements + lock-drift and action-pin check scripts.
-- Release engineering: immutable-candidate release flow (`release.yml`), recovery workflow (`recover_release.yml`), locked release tooling with its own tests (`.github/release/tests/prepare-candidate.test.mjs`), per-release SBOM.
-- Frontend DX: full npm script set incl. mocked and live-backend Playwright lanes; hot reload with websocket-aware proxying.
+**Strengths:** `docs/DEVELOPING.md:144-186` is accurate and complete — documented verify-local lanes, `SKIP_E2E=1`, and lock-regeneration commands all match the real scripts. Substantive references: `docs/ARCHITECTURE.md` (queue states, approval lifecycle, API-security model at `:37-55`), `docs/CONFIGURATION.md:5-24` env-var table. Depth beyond basics: `docs/PLUGIN_DEVELOPMENT.md` (1,000 lines), `docs/20TB_MEDIA_COMPRESSION_RUNBOOK.md`, `docs/SECURITY_SUPPLY_CHAIN.md`, and a semantic-release-maintained CHANGELOG.
 
 ---
 
-## Complete improvement register (ordered by impact, then grade lift, then effort)
+## I — Developer Experience & Tooling — A
 
-| # | ID | Impact | Effort | Where (primary) | What | Lift |
-|---|----|--------|--------|------------------|------|------|
-| 1 | E1 | Major | S–M | `compresso/config.py:156-158` | Auth + CSRF disabled by default; no login layer | E C+→B+ (with E2) |
-| 2 | B1 | Major | S–M | `compresso/libs/postprocessor.py:749` | `keep_both` calls nonexistent method; original file silently replaced | B C+→B (with B3/B7) |
-| 3 | B2/E4 | Major | S | `compresso/libs/uiserver.py:61` | `debug=True` serves tracebacks to API clients | B and E |
-| 4 | D1 | Major | S | `.github/workflows/python_lint_and_run_unit_tests.yml:140` | 75% coverage gate skipped on `pull_request` | D B→B+ (with D3) |
-| 5 | G1 | Major | M | `compresso/webserver/api_v2/base_api_handler.py:373-381` | All web-layer DB/file I/O blocks the single IOLoop | G C+→B (with G2) |
-| 6 | E2 | Major | M | `compresso/webserver/helpers/filebrowser.py:43-57` | File browser exposes entire filesystem | with E1 |
-| 7 | B3 | Major | S | `compresso/libs/task.py:709-762` | Manager-proxy mutations silently lost | with B1 |
-| 8 | G2 | Major | S–M | `compresso/libs/filetest.py:109-167` | Per-file DB fetch + ffprobe before cheap checks | with G1 |
-| 9 | E3 | Major | M | `docker/root/etc/cont-init.d/60-custom-setup-script` | `/config/startup.sh` sourced as root at container start | E |
-| 10 | A1 | Major | L | `compresso/libs/singleton.py:37-47` | Singleton wiring; silent arg-dropping constructor | A B-→B (with A2) |
-| 11 | A2 | Major | M | `compresso/libs/uiserver.py:48` et al. | `libs/`→`webserver/` layering inversion | with A1 |
-| 12 | C1 | Major | M–L | `src/pages/ApprovalQueue.vue` (1,159 lines) et al. | Eight 700–1,250-line monolith components | C C+→B- (with C2) |
-| 13 | C2 | Major | M | `src/js/compressoGlobals.js`, `package.json:37` | Ad-hoc global state; unused Vuex; AGENTS.md misdescribes it | with C1 |
-| 14 | B6 | Moderate | S | `compresso/config.py:556-586` et al. | Env-var booleans truthy — `"false"` enables features | B |
-| 15 | B4 | Moderate | S–M | `compresso/libs/taskqueue.py:247-266` | Non-atomic task claim → duplicate assignment window | B |
-| 16 | B5 | Moderate | M | `compresso/libs/foreman.py:563-657` | Worker registry mutated by two threads without locks | B |
-| 17 | D3/I1 | Moderate | S | `.test_durations` | Stale shard timings degrade CI wall time | D/I |
-| 18 | D2 | Moderate | L | `tests/integration/` (21 tests) | Mock-heavy suite blind to integration bugs (proved by B1/B3) | D B→B+/A- |
-| 19 | G3 | Moderate | M | `compresso/libs/library_scale_benchmark.py:61-135` | Scale benchmark bypasses the real code path | G |
-| 20 | B7 | Moderate | S | `compresso/libs/workers.py:573-574` | Failed runner reported as successful | B |
-| 21 | D4 | Moderate | S–M | `tests/integration/test_taskhandler.py:86-298` | Fixed sleeps + shared class state (flaky by design) | D |
-| 22 | G5 | Moderate | M | `compresso/webserver/websocket.py:484-496` | Per-client polling; full log re-read each second | G |
-| 23 | G4 | Moderate | M | `compresso/libs/foreman.py:113-153` | Full config re-derivation from DB every 1–2 s | G |
-| 24 | G6 | Moderate | M | `compresso/libs/task.py:428-459` | N+1 recursive bulk deletes on the IOLoop | G |
-| 25 | G7 | Moderate | S | `compresso/libs/filetest.py:239-247` | 2 s idle sleeps + per-directory scan barrier | G |
-| 26 | D5 | Moderate | M | `frontend/vitest.config.js:17-24` | 24% frontend coverage floor, ratchet not yet enforced | D |
-| 27 | F1 | Moderate | S | `.trivyignore` | 93 open-ended CVE suppressions, one duplicate | F A-→A |
-| 28 | F2 | Moderate | M | `docker/Dockerfile:5-45` | Manual base-digest bumps force ad-hoc CVE patches | F |
-| 29 | F3 | Moderate | M | `frontend/package.json:30-38` | Unmaintained markup parsers (remarkable, xbbcode) | F |
-| 30 | C3 | Moderate | S | `src/js/compressoWebsocket.js:335` | Unguarded `JSON.parse` in message handler | C |
-| 31 | C4 | Moderate | S | `src/boot/axios.js:86` | `$api` instance pointing at `api.example.com` | C |
-| 32 | C5 | Moderate | S | `src/pages/ApprovalQueue.vue:831-833` | Silent catches; argument-less `reject()` | C |
-| 33 | A3 | Moderate | L | `compresso/libs/installation_link.py` (1,459 lines) | God modules at highest-churn points | A |
-| 34 | A4 | Moderate | M | `compresso/libs/unplugins/executor.py:135-240` | Global `sys.path` mutation; substring module reload | A |
-| 35 | H1 | Moderate | M | `compresso/libs/{library,uiserver,foreman,postprocessor}.py` | Docstrings thinnest in the hardest modules | H B+→A- |
-| 36 | H2 | Moderate | S | `frontend/README.md`, `AGENTS.md` | Frontend docs contradict root docs; fork leftovers | H |
-| 37 | B8 | Minor | S | `compresso/libs/postprocessor.py:209-743` | Mislabeled catch-alls; dead branch; slow drain | B |
-| 38 | B9 | Minor | S | `compresso/libs/workers.py:661` | Substring path guards on recursive deletes | B |
-| 39 | D6 | Minor | S | `requirements-dev.txt` | No pytest-timeout; no clock control | D |
-| 40 | I2 | Minor | S | `.idea/dataSources.local.xml` | Machine-local/personal IDE files in VCS | I |
-| 41 | C6/C7, F4/F5, H3/H4, I3/I4 | Minor | S | various (see sections) | Dead templates, unused vuex, doc/tooling polish | small |
+Top-tier tooling for a project this size: pre-commit with ruff/ruff-format/mypy, a CI-parity `verify-local.sh` that CI itself validates, SHA-pinned actions enforced by a checker script, hash-pinned locks with drift checks and pip-audit, six-ecosystem Dependabot, Sonar, and duration-based pytest sharding with automated monthly refresh. Remaining issues are genuinely small.
+
+### I1 — `.editorconfig` contradicts the pre-commit end-of-file-fixer
+
+- **Where:** `.editorconfig:8` (`insert_final_newline = false`) vs `.pre-commit-config.yaml:7` (`end-of-file-fixer`)
+- **What's wrong:** Editor and hook fight over the last byte on every save/commit cycle.
+- **Impact:** Minor. **Fix:** `insert_final_newline = true`. **Effort:** S. **Lift:** polish.
+
+### I2 — User-local IDE state committed to VCS
+
+- **Where:** `.idea/dataSources.local.xml` (machine-specific DataGrip state) and `.idea/dictionaries/josh5.xml` tracked; `.gitignore:4` excludes only `workspace.xml`. (The committed `runConfigurations/` are a legitimate DX asset and should stay.)
+- **Impact:** Minor. **Fix:** `git rm --cached` the two files; extend `.gitignore`. **Effort:** S.
+
+### I3 — Pre-commit runs full-repo mypy on every commit and covers no frontend files
+
+- **Where:** `.pre-commit-config.yaml:18-24` (mypy with `pass_filenames: false` / `always_run: true` — the slowest configuration) and lines 6/8 (`exclude: ^compresso/webserver/frontend/` with no eslint/prettier hook anywhere)
+- **What's wrong:** Slow commits on the backend side; frontend lint errors surface only in CI.
+- **Impact:** Minor. **Fix:** Add a scoped eslint/prettier hook; scope or deliberately accept the mypy cost with a comment. **Effort:** S/M. **Lift:** polish.
+
+**Strengths:** CI-parity verification with a self-testing gate — `scripts/verify-local.sh` (154 lines) mirrors CI exactly, and `verify-local.yml:9-22` runs the script in CI whenever it or its inputs change, so the local lane cannot silently drift. Supply-chain discipline enforced by tooling, not convention (40-char SHA pins with `check-action-pins.sh` failing the build; lock drift detected by recompiling in a temp dir). Duration-balanced sharding with automated upkeep (`.test_durations` feeds 3-way pytest-split; `refresh_test_durations.yml` regenerates monthly and opens a PR only on change — see D3 for the current staleness). Well-commented configs (`pyproject.toml:37-48` documents every ruff ignore; `sonar-project.properties:12-26` explains each exclusion).
 
 ---
 
-## Closing note
+## Top 5 Highest-Leverage Improvements
 
-The overall B- is a *defect* grade, not a *neglect* grade. The infrastructure around this code — locking, pinning, gating, releasing, documenting — is in the top decile of open-source projects this size, and the crash-safety engineering inside the postprocessor is genuinely rare. What separates it from a B+/A- codebase is concentrated in a short list: turn the existing security machinery on by default (E1/E2/E3), fix the three verified Major backend bugs that mocks can't see (B1/B2/B3), close the coverage-gate hole that lets exactly those bugs through (D1/D2), and stop blocking the event loop (G1/G2). Every one of those has its fix pattern already present somewhere else in the same codebase — the work is applying the project's own best practices uniformly.
+Ranked by impact × grade lift ÷ effort, with Security and Testing weighted:
+
+1. **B1 — Fix the ffmpeg/ffprobe success check** (`compresso/libs/unffmpeg/lib/cli.py:56,81`). Major correctness bug, Small effort: non-1 exit codes pass as success and any output containing "error" fails spuriously — and probe results feed the entire pipeline. One-line fix per site plus regression tests. Lift: B+ → A- for Backend.
+
+2. **G2 — Stop re-reading the whole log file per client per second** (`compresso/config.py:389-394`, `websocket.py:81,484-496`). Major hot-path cost, Small effort: seek-from-end tailing plus an mtime/size short-circuit removes an O(log-size × clients) load from the Tornado IO thread. Lift: toward A- for Performance.
+
+3. **G1 — Batch task ingestion** (`task.py:271-307`, `taskhandler.py:337-338`). Major at the 100k-file scale the project explicitly targets: drop the redundant dedupe SELECT and save, cache library scores per scan, add chunked `insert_many`. Turns hours of first-scan scheduling into minutes. Lift: B+ → A- for Performance (pair with G6 so CI would catch regressions).
+
+4. **E1 — Enforce websocket auth explicitly** (`websocket.py:122-123`). Small effort on the heaviest data-exposure surface: check `authorize_request`'s return and raise 401 instead of relying on a `finish()` side effect, plus a regression test that an unauthenticated handshake is refused. Security-weighted. Lift: B+ → A- for Security (with E2's token rotation as the follow-up).
+
+5. **C1 — Break up the monolith components and test the pieces** (`CompletedTasksListDialog.vue` 1,251 lines, `ApprovalQueue.vue` 1,095, `VideoCompare.vue` 1,001). Major maintainability drag and the direct cause of the frontend's 24% coverage floor: extract the nested dialogs and flows into components/composables and add tests as pieces land (satisfies D1's ratchet at the same time). Lift: B- → B for Frontend and A- → A for Testing.
+
+**Strategic runner-up:** A1 (replace the `CompressoRunningThreads` service locator with an injected facade) — the largest architecture lever, prerequisite to safely splitting `Foreman` (A6).

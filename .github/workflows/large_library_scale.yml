@@ -76,12 +76,15 @@ jobs:
           --output large-library-${{ steps.tier.outputs.entries }}.json
           --assert-thresholds
 
+      # 10k entries through the real peewee pipeline is the tier that actually
+      # guards production scheduling throughput (the synthetic tiers above are
+      # a raw-SQLite floor). Thresholds include a min_entries_per_second gate.
       - name: Run real task-pipeline benchmark
         run: >-
           python scripts/library-scale-benchmark.py
           --mode real
-          --entries 2000
-          --output large-library-real-2000.json
+          --entries 10000
+          --output large-library-real-10000.json
           --assert-thresholds
 
       - name: Upload benchmark result
@@ -90,5 +93,5 @@ jobs:
           name: large-library-${{ steps.tier.outputs.entries }}
           path: |
             large-library-${{ steps.tier.outputs.entries }}.json
-            large-library-real-2000.json
+            large-library-real-10000.json
           retention-days: 90

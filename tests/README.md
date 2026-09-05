@@ -1,103 +1,51 @@
-# Unit Testing
+# Testing
 
+The authoritative testing guide is [docs/DEVELOPING.md](../docs/DEVELOPING.md)
+(see its "Testing" section). This page is a quick reference.
 
+## Layout
 
-## Setup
+- `tests/unit/` — unit tests, marked `@pytest.mark.unittest`
+- `tests/integration/` — integration tests, marked `@pytest.mark.integrationtest`
+- `tests/fixtures/` — shared fixture media/data
+- `tests/support_/`, `tests/scripts_/` — helper assets and scripts (the
+  trailing underscore keeps pytest from collecting them)
 
-Before any tests can be run, you need to execute
-```
-tests/scripts/setup_tests.sh
-```
+Markers are declared in `pyproject.toml`.
 
+## Running tests
 
------------------------------------------------------------
+From the repository root, inside a dev venv (see docs/DEVELOPING.md for setup):
 
+```bash
+# Full unit suite
+python3.13 -m pytest tests/unit -q
 
-## Python PEP8 conformity
+# A single file or test
+python3.13 -m pytest tests/unit/test_task.py -q
+python3.13 -m pytest tests/unit/test_task.py::test_name -q
 
-Prior to committing code, it should be tested against PEP8 formatting standards
-```
-pycodestyle ./
-```
-
-You can also specify the files to run individual. Eg.
-```
-pycodestyle ./lib/common.py
-```
-
-
------------------------------------------------------------
-
-
-## Python unit tests
-
-To run all tests execute from the project directory root:
-```
-pytest --log-cli-level=INFO
+# Integration suite
+python3.13 -m pytest -m integrationtest -q
 ```
 
-You can also specify the files to run individual. Eg.
-```
-pytest --log-cli-level=INFO lib/common.py
-```
+## CI-parity verification
 
-For more in-depth logging of tests, change the params to:
-```
-pytest --log-cli-level=DEBUG -s
-```
+To run the same gates CI runs (lint, format, types, locks, audits, unit tests,
+frontend gates):
 
-
------------------------------------------------------------
-
-
-## WebUI acceptance tests
-
-This is still a WIP but the idea will be to have a series of API calls to determine successful functionality of the Web API
-
-To run the test first run a docker environment. You can do this by running
-```
-tests/scripts/library_scan.sh
-```
-You can export the following variables to configure the test container:
-```
-DEBUGGING=true
-NUMBER_OF_WORKERS=1
-SCHEDULE_FULL_SCAN_MINUTES=1
-RUN_FULL_SCAN_ON_START=true
-```
-To clean the config run 
-```
-tests/scripts/library_scan.sh --clean
+```bash
+bash scripts/verify-local.sh fast   # everyday lane
+bash scripts/verify-local.sh full   # required before merge/release
 ```
 
+Linting is ruff + ruff-format + mypy (configured in `pyproject.toml`), also
+available via `pre-commit run --all-files`.
 
------------------------------------------------------------
+## Frontend tests
 
-
-## Python unit tests within docker
-
-To run the python unit tests within the test docker env
-(in order to test them in a controlled environment), run
-these commands:
-
-```
-docker-compose -f docker/docker-compose-test.yml up --force-recreate
-```
-
-Wait for the container to start, then run:
-
-```
-docker exec --workdir=/app compresso-testenv pycodestyle ./
-```
-
-and
-
-```
-docker exec --workdir=/app compresso-testenv pytest --log-cli-level=INFO
-```
-
-When developing, if you wish to run only a single test, run:
-
-```
-docker exec --workdir=/app compresso-testenv pytest --log-cli-level=INFO --maxfail 1 -s tests/test_<TEST NAME>.py
+```bash
+cd compresso/webserver/frontend
+npm run test -- --run      # vitest unit tests
+npm run test:e2e           # mocked Playwright journeys
 ```
