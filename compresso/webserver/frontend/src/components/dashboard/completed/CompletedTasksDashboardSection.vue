@@ -70,15 +70,24 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import { defineComponent, ref } from 'vue'
+import type { PropType } from 'vue'
 import CompletedTasksListDialog from 'components/dashboard/completed/CompletedTasksListDialog.vue'
+import type { DialogController } from 'src/types/ui'
+
+interface CompletedTaskSummary {
+  id: number
+  label: string
+  success: boolean
+  dateTimeSinceCompleted: string
+}
 
 export default defineComponent({
   name: 'CompletedTasks',
   components: { CompletedTasksListDialog },
   setup() {
-    const completedTasksDetailsDialogRef = ref(null)
+    const completedTasksDetailsDialogRef = ref<DialogController | null>(null)
 
     return {
       completedTasksDetailsDialogRef,
@@ -101,17 +110,18 @@ export default defineComponent({
   data() {
     return {
       completedTasksPopupInitStatusFilter: 'all',
+      showFailedHandler: null as (() => void) | null,
     }
   },
   props: {
     taskList: {
-      type: Array,
+      type: Array as PropType<CompletedTaskSummary[]>,
       required: true,
     },
   },
   methods: {
     openDetails() {
-      this.completedTasksDetailsDialogRef.show()
+      this.completedTasksDetailsDialogRef?.show()
     },
   },
 })

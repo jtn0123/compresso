@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('quasar', () => ({
   date: {
-    formatDate: (d, fmt) => {
+    formatDate: (d, _fmt) => {
       const pad = (n) => String(n).padStart(2, '0')
       const Y = d.getFullYear()
       const M = pad(d.getMonth() + 1)

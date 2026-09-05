@@ -31,8 +31,12 @@ Copyright:
 
 import asyncio
 import logging
+import logging.handlers
 import os
+import queue
 import threading
+from collections.abc import Mapping
+from typing import TypedDict
 
 import tornado.httpserver
 import tornado.ioloop
@@ -42,6 +46,7 @@ import tornado.web
 
 from compresso import config
 from compresso.libs import common
+from compresso.libs.foreman import Foreman
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.singleton import SingletonType
 from compresso.libs.startup import StartupState
@@ -51,7 +56,24 @@ public_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 # Multipart framing needs a small allowance above the 64 MiB plugin archive
 # ceiling. The upload handler still enforces the exact archive-body limit.
 MAX_HTTP_REQUEST_BODY_SIZE = 65 * 1024 * 1024
-tornado_settings = {
+
+
+class TornadoSettings(TypedDict, total=False):
+    template_loader: tornado.template.Loader
+    static_css: str
+    static_fonts: str
+    static_icons: str
+    static_img: str
+    static_js: str
+    debug: bool
+    autoreload: bool
+    serve_traceback: bool
+
+
+type DataQueues = dict[str, queue.Queue[object]]
+
+
+tornado_settings: TornadoSettings = {
     "template_loader": tornado.template.Loader(public_directory),
     "static_css": os.path.join(public_directory, "css"),
     "static_fonts": os.path.join(public_directory, "fonts"),
@@ -67,42 +89,42 @@ tornado_settings = {
 
 
 class CompressoDataQueues(metaclass=SingletonType):
-    _compresso_data_queues: dict = {}
+    _compresso_data_queues: DataQueues = {}
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Singleton — class-level attributes initialized at definition."""
 
-    def set_compresso_data_queues(self, compresso_data_queues):
+    def set_compresso_data_queues(self, compresso_data_queues: DataQueues) -> None:
         self._compresso_data_queues = compresso_data_queues
 
-    def get_compresso_data_queues(self):
+    def get_compresso_data_queues(self) -> DataQueues:
         return self._compresso_data_queues
 
 
 class CompressoRunningThreads(metaclass=SingletonType):
-    _compresso_threads: dict = {}
+    _compresso_threads: dict[str, Foreman] = {}
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Singleton — class-level attributes initialized at definition."""
 
-    def set_compresso_running_threads(self, compresso_threads):
-        self._compresso_threads = compresso_threads
+    def set_compresso_running_threads(self, compresso_threads: Mapping[str, Foreman]) -> None:
+        self._compresso_threads = dict(compresso_threads)
 
-    def get_compresso_running_thread(self, name):
+    def get_compresso_running_thread(self, name: str) -> Foreman | None:
         return self._compresso_threads.get(name)
 
 
 class UIServer(threading.Thread):
-    config = None
+    config: config.Config
     started = False
-    io_loop = None
-    server = None
-    app = None
+    io_loop: tornado.ioloop.IOLoop | None = None
+    server: tornado.httpserver.HTTPServer | None = None
+    app: tornado.web.Application | None = None
 
-    def __init__(self, compresso_data_queues, foreman, developer):
+    def __init__(self, compresso_data_queues: DataQueues, foreman: Foreman, developer: bool) -> None:
         super().__init__(name="UIServer")
         self.config = config.Config()
-        self.logger = CompressoLogging.get_logger(name=__class__.__name__)
+        self.logger = CompressoLogging.get_logger(name=type(self).__name__)
 
         self.developer = developer
         self.data_queues = compresso_data_queues
@@ -118,18 +140,18 @@ class UIServer(threading.Thread):
         urt = CompressoRunningThreads()
         urt.set_compresso_running_threads({"foreman": foreman})
 
-    def _log(self, message, message2="", level="info"):
+    def _log(self, message: object, message2: object = "", level: str = "info") -> None:
         message = common.format_message(message, message2)
         getattr(self.logger, level)(message)
 
-    def stop(self):
+    def stop(self) -> None:
         if self.started:
             self.started = False
         if self.io_loop:
             self.io_loop.add_callback(self.io_loop.stop)
             self.io_loop.close(True)
 
-    def set_logging(self):
+    def set_logging(self) -> None:
         if self.config and self.config.get_log_path():
             # Create directory if not exists
             if not os.path.exists(self.config.get_log_path()):
@@ -167,14 +189,14 @@ class UIServer(threading.Thread):
             tornado_general.addHandler(file_handler)
             tornado_general.propagate = True  # Send logs also to root logger (command line)
 
-    def update_tornado_settings(self):
+    def update_tornado_settings(self) -> None:
         # Check if this is a development environment or not
         if self.developer:
             tornado_settings["debug"] = True
             tornado_settings["autoreload"] = True
             tornado_settings["serve_traceback"] = True
 
-    def _record_network_readiness(self):
+    def _record_network_readiness(self) -> None:
         address = self.config.get_ui_address()
         loopback = address in ("127.0.0.1", "::1", "localhost")
         exposure = "loopback" if loopback else "network"
@@ -187,7 +209,7 @@ class UIServer(threading.Thread):
         if not loopback and not auth_enabled:
             self._log("UI is listening on a network interface without API authentication", level="warning")
 
-    def run(self):
+    def run(self) -> None:
         asyncio.set_event_loop(asyncio.new_event_loop())
         self.started = True
 
@@ -247,7 +269,7 @@ class UIServer(threading.Thread):
             self.started = False
             self._log("Leaving UIServer loop...")
 
-    def make_web_app(self):
+    def make_web_app(self) -> tornado.web.Application:
         # Start with web application routes
         from compresso.webserver.websocket import CompressoWebsocketHandler
 

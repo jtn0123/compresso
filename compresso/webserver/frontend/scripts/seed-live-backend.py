@@ -10,7 +10,7 @@ from compresso.libs.unmodels.tasks import Tasks
 from compresso.service import init_db
 
 
-def main():
+def main() -> None:
     home = Path(os.environ["HOME_DIR"])
     settings = config.Config()
     database = init_db(settings.get_config_path())

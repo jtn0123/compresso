@@ -225,7 +225,7 @@
   </q-card>
 </template>
 
-<script>
+<script lang="ts">
 import { onMounted, watch, ref, nextTick } from 'vue'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useQuasar } from 'quasar'
@@ -234,10 +234,13 @@ import { bbCodeToHTML } from 'src/js/markupParser'
 import { sanitizeHtml } from 'src/js/sanitize'
 import { useI18n } from 'vue-i18n'
 import PluginInfoDialog from 'components/settings/plugins/PluginInfoDialog.vue'
-import PluginInstallerDialog from 'components/settings/plugins/PluginInstallerDialog'
+import PluginInstallerDialog from 'components/settings/plugins/PluginInstallerDialog.vue'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 import CompressoStandardButtonDropdown from 'components/ui/buttons/CompressoStandardButtonDropdown.vue'
+import type { ApiSchema } from 'src/types/contracts'
+import type { DialogController } from 'src/types/ui'
+import type { InstalledPlugin, TableRequest } from 'src/types/plugins'
 
 export default {
   components: {
@@ -250,7 +253,7 @@ export default {
   setup() {
     const $q = useQuasar()
     const { t: $t } = useI18n()
-    const rows = ref([])
+    const rows = ref<InstalledPlugin[]>([])
     const filter = ref('')
     const loading = ref(false)
     const pagination = ref({
@@ -260,12 +263,12 @@ export default {
       rowsPerPage: 50,
       rowsNumber: 10,
     })
-    const selected = ref([])
-    const listedPlugins = ref([])
+    const selected = ref<InstalledPlugin[]>([])
+    const listedPlugins = ref<InstalledPlugin[]>([])
 
     const itemOffset = ref(0)
-    const pluginInstallerDialog = ref(null)
-    const pluginInfoDialogRef = ref(null)
+    const pluginInstallerDialog = ref<DialogController | null>(null)
+    const pluginInfoDialogRef = ref<DialogController | null>(null)
     const selectedPluginId = ref('')
     const pluginInfoTab = ref('info')
 
@@ -280,10 +283,10 @@ export default {
     function disableSelected() {
       if (selected.value.length !== 0) {
         // Fetch the selected row IDs
-        let id_list = []
+        const id_list: number[] = []
         for (let i = 0; i < selected.value.length; i++) {
-          let row = selected.value[i]
-          id_list[id_list.length] = row.id
+          const row = selected.value[i]
+          if (row) id_list.push(row.id)
         }
         // Send those to the backend
         let data = {
@@ -294,7 +297,7 @@ export default {
           url: getCompressoApiUrl('v2', 'plugins/disable'),
           data: data,
         })
-          .then((response) => {
+          .then(() => {
             onRequest({
               pagination: pagination.value,
               filter: filter.value,
@@ -320,7 +323,7 @@ export default {
       }
     }
 
-    function updatePluginList(id_list) {
+    function updatePluginList(id_list: number[]): void {
       let data = {
         id_list: id_list,
       }
@@ -329,7 +332,7 @@ export default {
         url: getCompressoApiUrl('v2', 'plugins/update'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           onRequest({
             pagination: pagination.value,
             filter: filter.value,
@@ -346,11 +349,11 @@ export default {
         })
     }
 
-    function updateSinglePlugin(tableId) {
+    function updateSinglePlugin(tableId: number): void {
       updatePluginList([tableId])
     }
 
-    function removePluginList(id_list) {
+    function removePluginList(id_list: number[]): void {
       let data = {
         id_list: id_list,
       }
@@ -359,7 +362,7 @@ export default {
         url: getCompressoApiUrl('v2', 'plugins/remove'),
         data: data,
       })
-        .then((response) => {
+        .then(() => {
           onRequest({
             pagination: pagination.value,
             filter: filter.value,
@@ -376,43 +379,22 @@ export default {
         })
     }
 
-    function removeSinglePlugin(tableId) {
+    function removeSinglePlugin(tableId: number): void {
       removePluginList([tableId])
     }
 
-    function uninstallSelected() {
-      if (selected.value.length !== 0) {
-        // Fetch the selected row IDs
-        let id_list = []
-        for (let i = 0; i < selected.value.length; i++) {
-          let row = selected.value[i]
-          id_list[id_list.length] = row.id
-        }
-        // Send those to the backend
-        removePluginList(id_list)
-      } else {
-        $q.notify({
-          color: 'warning',
-          position: 'top',
-          message: $t('components.plugins.nothingSelected'),
-          icon: 'report_problem',
-          actions: [{ icon: 'close', color: 'white' }],
-        })
-      }
-    }
-
-    function parseAndLimitDescription(description_text) {
+    function parseAndLimitDescription(description_text: string): string {
       // Limit description text to 280 characters
       if (description_text.length > 280) {
         description_text = description_text.substring(0, 277) + '...'
       }
       // Only show first line in multi-line description text.
-      description_text = description_text.split('\n')[0]
+      description_text = description_text.split('\n')[0] ?? ''
       // Parse BBCode
       return sanitizeHtml(bbCodeToHTML(description_text))
     }
 
-    function onRequest(props) {
+    function onRequest(props: TableRequest): void {
       const { page, rowsPerPage, sortBy, descending } = props.pagination
       const filter = props.filter
 
@@ -432,7 +414,7 @@ export default {
         order_by: sortBy,
         order_direction: descending ? 'desc' : 'asc',
       }
-      axios({
+      axios<ApiSchema<'PluginsData'>>({
         method: 'post',
         url: getCompressoApiUrl('v2', 'plugins/installed'),
         data: data,
@@ -444,8 +426,9 @@ export default {
           // Set returned data from server results
           listedPlugins.value = []
           for (let i = 0; i < response.data.results.length; i++) {
-            let results = response.data.results[i]
-            listedPlugins.value[i] = {
+            const results = response.data.results[i]
+            if (!results) continue
+            listedPlugins.value.push({
               id: results.id,
               plugin_id: results.plugin_id,
               icon: results.icon,
@@ -455,8 +438,8 @@ export default {
               author: results.author,
               version: results.version,
               status: results.status,
-              has_config: results.has_config,
-            }
+              has_config: results.has_config ?? false,
+            })
           }
 
           // clear out existing data and add new
@@ -485,12 +468,12 @@ export default {
     const showPluginInfo = ref('')
     const showPluginSettings = ref('')
 
-    function openPluginInfo(tableId, tab) {
+    function openPluginInfo(tableId: number, tab = 'info'): void {
       // Fetch the details of the plugin info to be shown
       let pluginId = ''
       for (let i = 0; i < listedPlugins.value.length; i++) {
-        let plugin = listedPlugins.value[i]
-        if (plugin.id === tableId) {
+        const plugin = listedPlugins.value[i]
+        if (plugin?.id === tableId) {
           pluginId = plugin.plugin_id
         }
       }
@@ -538,7 +521,7 @@ export default {
       return getCompressoApiUrl('v2', 'upload/plugin/file')
     }
 
-    function onRejectedPluginUpload(rejectedEntries) {
+    function onRejectedPluginUpload(_rejectedEntries: unknown[]): void {
       $q.notify({
         color: 'negative',
         position: 'top',
@@ -584,7 +567,7 @@ export default {
       })
     })
 
-    watch(filter, (currentValue, oldValue) => {
+    watch(filter, () => {
       onRequest({
         pagination: pagination.value,
         filter: filter.value,

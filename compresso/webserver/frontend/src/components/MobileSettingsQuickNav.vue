@@ -26,7 +26,7 @@
   <!--END QUICK NAV-->
 </template>
 
-<script>
+<script lang="ts">
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 
 export default {

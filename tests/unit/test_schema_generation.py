@@ -182,6 +182,47 @@ class TestGenerateSwaggerFile:
         # was removed in v2.0-prep.
         assert mock_open.call_count == 1
 
+    def test_accepts_an_explicit_json_output_path(self, tmp_path):
+        from compresso.webserver.api_v2.schema import swagger
+
+        output_path = tmp_path / "contracts" / "openapi.json"
+
+        with patch.object(swagger, "find_all_handlers", return_value=[]):
+            errors = swagger.generate_swagger_file(output_path)
+
+        assert errors == []
+        assert output_path.is_file()
+        generated = json.loads(output_path.read_text(encoding="utf-8"))
+        assert generated["openapi"] == "3.0.0"
+        assert generated["info"]["version"] == "2"
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/metadata/search",
+            "/metadata/by-task",
+            "/metadata/by-fingerprint",
+            "/metadata/by-task/{task_id}",
+            "/metadata/update",
+            "/metadata",
+            "/system/capabilities",
+            "/system/operations",
+            "/system/readiness",
+            "/system/safety",
+            "/system/safety/acknowledge",
+            "/system/safety/resume",
+        ],
+    )
+    def test_all_registered_routes_are_documented(self, tmp_path, path):
+        from compresso.webserver.api_v2.schema.swagger import generate_swagger_file
+
+        output_path = tmp_path / "openapi.json"
+        errors = generate_swagger_file(output_path)
+
+        assert errors == []
+        generated = json.loads(output_path.read_text(encoding="utf-8"))
+        assert path in generated["paths"]
+
 
 @pytest.mark.unittest
 class TestSwaggerConstants:

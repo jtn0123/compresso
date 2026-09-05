@@ -14,20 +14,74 @@ import os
 import threading
 import time
 import uuid
+from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime
 from pathlib import Path
+from typing import NoReturn, Protocol, TypedDict, cast
 
-from compresso.libs import common
+from compresso.libs import common, narrowing
 from compresso.libs.ffprobe_utils import extract_media_metadata
 from compresso.libs.library import Library
 from compresso.libs.logs import CompressoLogging
+from compresso.libs.peewee_types import execute_write, iterate_query
 from compresso.libs.unmodels import CompressionStats, FileMetadata, FileMetadataPaths, LibraryAnalysisCache
 
 logger = CompressoLogging.get_logger("library_analysis")
 ANALYSIS_METADATA_KEY = "_compresso_library_analysis"
 
+type AnalysisEntry = dict[str, object]
+type FingerprintInfo = tuple[str, str]
+
+
+class AnalysisProgress(TypedDict):
+    checked: int
+    total: int
+
+
+class AnalysisInfo(TypedDict, total=False):
+    status: str
+    progress: AnalysisProgress
+    library_id: int
+    generation: str
+    error: str
+
+
+class AnalysisGroup(TypedDict):
+    codec: str
+    resolution: str
+    count: int
+    total_size_bytes: int
+    total_bitrate: float
+
+
+class HistoricalEntry(TypedDict):
+    avg_savings_pct: float
+    count: int
+
+
+type HistoricalSavings = dict[tuple[str, str], HistoricalEntry]
+
+
+class FileMetadataGetOrCreate(Protocol):
+    def __call__(
+        self,
+        *,
+        fingerprint: str,
+        defaults: dict[str, object],
+    ) -> tuple[FileMetadata, bool]: ...
+
+
+class AnalysisCacheGetOrCreate(Protocol):
+    def __call__(
+        self,
+        *,
+        library_id: int,
+        defaults: dict[str, object],
+    ) -> tuple[LibraryAnalysisCache, bool]: ...
+
+
 # In-progress analyses keyed by library_id
-_active_analyses: dict = {}
+_active_analyses: dict[int, AnalysisInfo] = {}
 _analyses_lock = threading.Lock()
 _MEDIA_EXTENSIONS = {
     ".mp4",
@@ -51,15 +105,19 @@ _MEDIA_EXTENSIONS = {
 }
 
 
-def _raise_walk_error(error):
+def _raise_walk_error(error: OSError) -> NoReturn:
     raise error
 
 
-def _cancelled(cancel_event):
+def _cancelled(cancel_event: threading.Event | None) -> bool:
     return cancel_event is not None and cancel_event.is_set()
 
 
-def _validate_media_directories(root, directories, cancel_event):
+def _validate_media_directories(
+    root: str,
+    directories: list[str],
+    cancel_event: threading.Event | None,
+) -> bool:
     for directory in directories:
         if _cancelled(cancel_event):
             return False
@@ -69,7 +127,11 @@ def _validate_media_directories(root, directories, cancel_event):
     return True
 
 
-def _iter_directory_media(root, files, cancel_event):
+def _iter_directory_media(
+    root: str,
+    files: list[str],
+    cancel_event: threading.Event | None,
+) -> Iterator[Path]:
     for filename in sorted(files):
         if _cancelled(cancel_event):
             return
@@ -81,7 +143,12 @@ def _iter_directory_media(root, files, cancel_event):
         yield candidate
 
 
-def iter_media_files(library_path, *, on_error=None, cancel_event=None):
+def iter_media_files(
+    library_path: str | os.PathLike[str],
+    *,
+    on_error: Callable[[OSError], object] | None = None,
+    cancel_event: threading.Event | None = None,
+) -> Iterator[Path]:
     """Yield media paths deterministically while bounding each directory batch."""
     for root, directories, files in os.walk(library_path, onerror=on_error or _raise_walk_error):
         if _cancelled(cancel_event):
@@ -92,17 +159,21 @@ def iter_media_files(library_path, *, on_error=None, cancel_event=None):
         yield from _iter_directory_media(root, files, cancel_event)
 
 
-def probe_analysis_file(filepath):
+def probe_analysis_file(filepath: str | os.PathLike[str]) -> AnalysisEntry:
     """Read media metadata without updating analysis caches or task state."""
     return _probe_analysis_file(filepath)
 
 
-def lookup_savings(historical, codec, resolution):
+def lookup_savings(
+    historical: HistoricalSavings,
+    codec: str,
+    resolution: str,
+) -> tuple[float, int, str]:
     """Expose the analysis engine's evidence lookup for read-only planning."""
     return _lookup_savings(historical, codec, resolution)
 
 
-def start_analysis(library_id):
+def start_analysis(library_id: int) -> dict[str, object]:
     """
     Start a background analysis for the given library.
     Returns immediately with status info.
@@ -116,8 +187,8 @@ def start_analysis(library_id):
     library = Library(library_id)
     library_path = library.get_path()
 
-    progress = {"checked": 0, "total": 0}
-    info = {"status": "running", "progress": progress, "library_id": library_id}
+    progress: AnalysisProgress = {"checked": 0, "total": 0}
+    info: AnalysisInfo = {"status": "running", "progress": progress, "library_id": library_id}
 
     with _analyses_lock:
         existing = _active_analyses.get(library_id)
@@ -136,7 +207,7 @@ def start_analysis(library_id):
     return {"status": "running", "progress": progress}
 
 
-def get_analysis_status(library_id):
+def get_analysis_status(library_id: int) -> dict[str, object]:
     """
     Get current analysis status and cached results for a library.
     """
@@ -163,7 +234,8 @@ def get_analysis_status(library_id):
         }
 
     try:
-        results = json.loads(cache.analysis_json)
+        raw_results: object = json.loads(cache.analysis_json)
+        results = narrowing.string_keyed_dict(raw_results)
     except (json.JSONDecodeError, TypeError):
         results = {}
 
@@ -175,22 +247,22 @@ def get_analysis_status(library_id):
     }
 
 
-def _normalise_codec(codec):
-    codec = (codec or "unknown").lower()
+def _normalise_codec(codec: object) -> str:
+    codec = codec.lower() if isinstance(codec, str) and codec else "unknown"
     if " (estimated)" in codec:
         codec = codec.replace(" (estimated)", "")
     return codec
 
 
-def _load_json_dict(value):
+def _load_json_dict(value: object) -> dict[str, object]:
     try:
-        data = json.loads(value or "{}")
-        return data if isinstance(data, dict) else {}
+        raw_data: object = json.loads(value if isinstance(value, str) and value else "{}")
+        return narrowing.string_keyed_dict(raw_data)
     except (TypeError, json.JSONDecodeError):
         return {}
 
 
-def _probe_analysis_file(filepath):
+def _probe_analysis_file(filepath: str | os.PathLike[str]) -> AnalysisEntry:
     meta = extract_media_metadata(filepath)
     file_size = os.path.getsize(filepath)
     try:
@@ -203,14 +275,15 @@ def _probe_analysis_file(filepath):
         }
     except OSError:
         stat_identity = {}
-    bitrate_mbps = float(meta.get("bitrate_mbps", 0) or 0)
-    duration = float(meta.get("duration", 0) or 0)
+    bitrate_mbps = narrowing.coerce_float(meta.get("bitrate_mbps"))
+    duration = narrowing.coerce_float(meta.get("duration"))
     if bitrate_mbps <= 0 and duration > 0:
         bitrate_mbps = file_size * 8 / duration / 1000000
 
+    resolution = meta.get("resolution")
     return {
         "codec": _normalise_codec(meta.get("codec")),
-        "resolution": meta.get("resolution", "unknown"),
+        "resolution": resolution if isinstance(resolution, str) and resolution else "unknown",
         "file_size": file_size,
         "bitrate_mbps": bitrate_mbps,
         **stat_identity,
@@ -218,7 +291,10 @@ def _probe_analysis_file(filepath):
     }
 
 
-def _cached_analysis_file(filepath, generation=None):
+def _cached_analysis_file(
+    filepath: str,
+    generation: str | None = None,
+) -> tuple[AnalysisEntry | None, FingerprintInfo | None]:
     try:
         path_row = FileMetadataPaths.get_or_none(FileMetadataPaths.path == filepath)
         if not path_row:
@@ -246,7 +322,10 @@ def _cached_analysis_file(filepath, generation=None):
                     path_row.path_type = current_type
                     path_row.updated_at = datetime.now()
                     path_row.save()
-            return cached, (path_row.file_metadata.fingerprint, path_row.file_metadata.fingerprint_algo)
+            return narrowing.string_keyed_dict(cached), (
+                path_row.file_metadata.fingerprint,
+                path_row.file_metadata.fingerprint_algo,
+            )
 
         fingerprint, algo = common.get_file_fingerprint(filepath)
         return None, (fingerprint, algo)
@@ -255,12 +334,18 @@ def _cached_analysis_file(filepath, generation=None):
         return None, None
 
 
-def _persist_analysis_file(filepath, fingerprint_info, entry, generation=None):
+def _persist_analysis_file(
+    filepath: str,
+    fingerprint_info: FingerprintInfo | None,
+    entry: AnalysisEntry,
+    generation: str | None = None,
+) -> None:
     if not fingerprint_info:
         return
     try:
         fingerprint, algo = fingerprint_info
-        row, _created = FileMetadata.get_or_create(
+        get_or_create = cast("FileMetadataGetOrCreate", FileMetadata.get_or_create)
+        row, _created = get_or_create(
             fingerprint=fingerprint,
             defaults={
                 "fingerprint_algo": algo,
@@ -275,9 +360,11 @@ def _persist_analysis_file(filepath, fingerprint_info, entry, generation=None):
         row.updated_at = datetime.now()
         row.save()
 
-        FileMetadataPaths.delete().where(
-            (FileMetadataPaths.path == filepath) & (FileMetadataPaths.file_metadata != row.id)
-        ).execute()
+        execute_write(
+            FileMetadataPaths.delete().where(
+                (FileMetadataPaths.path == filepath) & (FileMetadataPaths.file_metadata != row.id)
+            )
+        )
         path_row = FileMetadataPaths.get_or_none(
             (FileMetadataPaths.file_metadata == row.id) & (FileMetadataPaths.path == filepath)
         )
@@ -292,7 +379,7 @@ def _persist_analysis_file(filepath, fingerprint_info, entry, generation=None):
         logger.debug("Unable to persist library analysis metadata cache for %s: %s", filepath, e)
 
 
-def _analyse_file_incremental(filepath, generation=None):
+def _analyse_file_incremental(filepath: str, generation: str | None = None) -> AnalysisEntry:
     cached, fingerprint = _cached_analysis_file(filepath, generation=generation)
     if cached:
         return cached
@@ -305,14 +392,14 @@ def _analyse_file_incremental(filepath, generation=None):
     return entry
 
 
-def _path_is_within(path, resolved_root):
+def _path_is_within(path: str, resolved_root: str) -> bool:
     try:
         return os.path.commonpath((os.path.realpath(path), resolved_root)) == resolved_root
     except (TypeError, ValueError):
         return False
 
 
-def _cleanup_stale_analysis_paths(library_path, generation):
+def _cleanup_stale_analysis_paths(library_path: str, generation: str) -> None:
     """Remove prior-generation path markers without retaining every scanned path."""
     try:
         resolved_library_path = os.path.realpath(library_path)
@@ -320,14 +407,18 @@ def _cleanup_stale_analysis_paths(library_path, generation):
         query = FileMetadataPaths.select().where(
             FileMetadataPaths.path_type.startswith("library_analysis") & (FileMetadataPaths.path_type != current_type)
         )
-        stale_ids = [path_row.id for path_row in query.iterator() if _path_is_within(path_row.path, resolved_library_path)]
+        stale_ids = [
+            path_row.id
+            for path_row in iterate_query(query, FileMetadataPaths)
+            if _path_is_within(path_row.path, resolved_library_path)
+        ]
         if stale_ids:
-            FileMetadataPaths.delete().where(FileMetadataPaths.id.in_(stale_ids)).execute()
+            execute_write(FileMetadataPaths.delete().where(FileMetadataPaths.id.in_(stale_ids)))
     except Exception as e:
         logger.debug("Unable to clean stale library analysis generations: %s", e)
 
 
-def _run_analysis(library_id, library_path, info):
+def _run_analysis(library_id: int, library_path: str, info: AnalysisInfo) -> None:
     """
     Background thread: walk library, probe each media file, aggregate results.
     """
@@ -337,130 +428,13 @@ def _run_analysis(library_id, library_path, info):
         info["progress"]["total"] = 0
         info["progress"]["checked"] = 0
 
-        # Group data: key = (codec, resolution). Files are consumed directly
-        # from os.walk so memory does not grow with library size.
-        groups = {}
-        for filepath in iter_media_files(library_path):
-            info["progress"]["total"] += 1
-            try:
-                analysis_entry = _analyse_file_incremental(str(filepath), generation=generation)
-                codec = analysis_entry.get("codec", "unknown")
-                resolution = analysis_entry.get("resolution", "unknown")
-                file_size = analysis_entry.get("file_size", 0)
-                bitrate_mbps = analysis_entry.get("bitrate_mbps", 0)
-
-                key = (codec, resolution)
-                if key not in groups:
-                    groups[key] = {
-                        "codec": codec,
-                        "resolution": resolution,
-                        "count": 0,
-                        "total_size_bytes": 0,
-                        "total_bitrate": 0,
-                    }
-                groups[key]["count"] += 1
-                groups[key]["total_size_bytes"] += file_size
-                groups[key]["total_bitrate"] += bitrate_mbps
-
-            except Exception as e:
-                logger.debug("Analysis skipped file %s: %s", filepath, str(e))
-
-            info["progress"]["checked"] += 1
+        groups = _collect_analysis_groups(library_path, generation, info)
 
         _cleanup_stale_analysis_paths(library_path, generation)
 
-        # Cross-reference with historical CompressionStats for savings estimates
-        historical = _get_historical_savings()
-
-        # Build final results
-        result_groups = []
-        total_files = 0
-        total_size = 0
-        total_estimated_savings = 0
-        already_optimal = 0
-
-        # Get skip codecs for this library
-        try:
-            library = Library(library_id)
-            skip_codecs = [c.lower() for c in library.get_skip_codecs()]
-        except Exception:
-            skip_codecs = []
-
-        for key, group in groups.items():
-            codec, resolution = key
-            count = group["count"]
-            size = group["total_size_bytes"]
-            avg_bitrate = group["total_bitrate"] / count if count > 0 else 0
-
-            total_files += count
-            total_size += size
-
-            # Check if already optimal (in skip list)
-            if codec in skip_codecs:
-                already_optimal += count
-                result_groups.append(
-                    {
-                        "codec": codec,
-                        "resolution": resolution,
-                        "count": count,
-                        "total_size_bytes": size,
-                        "avg_bitrate_mbps": round(avg_bitrate, 1),
-                        "estimated_savings_pct": 0,
-                        "estimated_savings_bytes": 0,
-                        "confidence": "optimal",
-                        "historical_sample_count": 0,
-                    }
-                )
-                continue
-
-            # Look up historical savings
-            savings_pct, sample_count, confidence = _lookup_savings(historical, codec, resolution)
-
-            est_savings_bytes = int(size * savings_pct / 100) if savings_pct > 0 else 0
-            total_estimated_savings += est_savings_bytes
-
-            result_groups.append(
-                {
-                    "codec": codec,
-                    "resolution": resolution,
-                    "count": count,
-                    "total_size_bytes": size,
-                    "avg_bitrate_mbps": round(avg_bitrate, 1),
-                    "estimated_savings_pct": round(savings_pct, 1),
-                    "estimated_savings_bytes": est_savings_bytes,
-                    "confidence": confidence,
-                    "historical_sample_count": sample_count,
-                }
-            )
-
-        # Sort by estimated savings descending
-        result_groups.sort(key=lambda g: g["estimated_savings_bytes"], reverse=True)
-
-        results = {
-            "groups": result_groups,
-            "total_files": total_files,
-            "total_size_bytes": total_size,
-            "already_optimal": already_optimal,
-            "total_estimated_savings_bytes": total_estimated_savings,
-            "last_run": datetime.now().isoformat(),
-        }
-
-        # Save to cache
-        cache, created = LibraryAnalysisCache.get_or_create(
-            library_id=library_id,
-            defaults={
-                "analysis_json": json.dumps(results),
-                "file_count": total_files,
-                "last_run": datetime.now(),
-                "version": 1,
-            },
-        )
-        if not created:
-            cache.analysis_json = json.dumps(results)
-            cache.file_count = total_files
-            cache.last_run = datetime.now()
-            cache.version += 1
-            cache.save()
+        results = _build_analysis_results(library_id, groups)
+        total_files = narrowing.coerce_int(results["total_files"])
+        _save_analysis_cache(library_id, results, total_files)
 
         info["status"] = "complete"
         logger.info("Library analysis complete for library %s: %d files", library_id, total_files)
@@ -471,23 +445,105 @@ def _run_analysis(library_id, library_path, info):
         info["error"] = str(e)
     finally:
         # Clean up after a delay so status can be polled
-        def cleanup():
+        def cleanup() -> None:
             time.sleep(10)
             with _analyses_lock:
-                if _active_analyses.get(library_id, {}).get("status") != "running":
+                active = _active_analyses.get(library_id)
+                if active is None or active.get("status") != "running":
                     _active_analyses.pop(library_id, None)
 
         threading.Thread(target=cleanup, daemon=True).start()
 
 
-def _get_historical_savings():
+def _collect_analysis_groups(library_path: str, generation: str, info: AnalysisInfo) -> dict[tuple[str, str], AnalysisGroup]:
+    groups: dict[tuple[str, str], AnalysisGroup] = {}
+    for filepath in iter_media_files(library_path):
+        info["progress"]["total"] += 1
+        try:
+            entry = _analyse_file_incremental(str(filepath), generation=generation)
+            codec = narrowing.strict_str(entry.get("codec"), "unknown") or "unknown"
+            resolution = narrowing.strict_str(entry.get("resolution"), "unknown") or "unknown"
+            group = groups.setdefault(
+                (codec, resolution),
+                {"codec": codec, "resolution": resolution, "count": 0, "total_size_bytes": 0, "total_bitrate": 0},
+            )
+            group["count"] += 1
+            group["total_size_bytes"] += narrowing.coerce_int(entry.get("file_size"))
+            group["total_bitrate"] += narrowing.coerce_float(entry.get("bitrate_mbps"))
+        except Exception as error:
+            logger.debug("Analysis skipped file %s: %s", filepath, error)
+        info["progress"]["checked"] += 1
+    return groups
+
+
+def _build_analysis_results(library_id: int, groups: dict[tuple[str, str], AnalysisGroup]) -> dict[str, object]:
+    historical = _get_historical_savings()
+    try:
+        skip_codecs = [codec.lower() for codec in Library(library_id).get_skip_codecs()]
+    except Exception:
+        skip_codecs = []
+    result_groups = [_analysis_group_result(key, group, historical, skip_codecs) for key, group in groups.items()]
+    result_groups.sort(key=lambda group: narrowing.coerce_int(group.get("estimated_savings_bytes")), reverse=True)
+    return {
+        "groups": result_groups,
+        "total_files": sum(group["count"] for group in groups.values()),
+        "total_size_bytes": sum(group["total_size_bytes"] for group in groups.values()),
+        "already_optimal": sum(group["count"] for key, group in groups.items() if key[0] in skip_codecs),
+        "total_estimated_savings_bytes": sum(
+            narrowing.coerce_int(group["estimated_savings_bytes"]) for group in result_groups
+        ),
+        "last_run": datetime.now().isoformat(),
+    }
+
+
+def _analysis_group_result(
+    key: tuple[str, str],
+    group: AnalysisGroup,
+    historical: HistoricalSavings,
+    skip_codecs: list[str],
+) -> dict[str, object]:
+    codec, resolution = key
+    count = group["count"]
+    size = group["total_size_bytes"]
+    savings_pct, sample_count, confidence = (
+        (0.0, 0, "optimal") if codec in skip_codecs else _lookup_savings(historical, codec, resolution)
+    )
+    savings_bytes = int(size * savings_pct / 100) if savings_pct > 0 else 0
+    return {
+        "codec": codec,
+        "resolution": resolution,
+        "count": count,
+        "total_size_bytes": size,
+        "avg_bitrate_mbps": round(group["total_bitrate"] / count if count > 0 else 0, 1),
+        "estimated_savings_pct": round(savings_pct, 1),
+        "estimated_savings_bytes": savings_bytes,
+        "confidence": confidence,
+        "historical_sample_count": sample_count,
+    }
+
+
+def _save_analysis_cache(library_id: int, results: dict[str, object], total_files: int) -> None:
+    get_or_create_cache = cast("AnalysisCacheGetOrCreate", LibraryAnalysisCache.get_or_create)
+    cache, created = get_or_create_cache(
+        library_id=library_id,
+        defaults={"analysis_json": json.dumps(results), "file_count": total_files, "last_run": datetime.now(), "version": 1},
+    )
+    if not created:
+        cache.analysis_json = json.dumps(results)
+        cache.file_count = total_files
+        cache.last_run = datetime.now()
+        cache.version += 1
+        cache.save()
+
+
+def _get_historical_savings() -> HistoricalSavings:
     """
     Query CompressionStats for historical savings grouped by (source_codec, source_resolution).
     Returns dict: {(codec, resolution): {'avg_savings_pct': float, 'count': int}}
     """
     from peewee import fn
 
-    results = {}
+    results: HistoricalSavings = {}
     try:
         query = (
             CompressionStats.select(
@@ -505,12 +561,15 @@ def _get_historical_savings():
             .group_by(CompressionStats.source_codec, CompressionStats.source_resolution)
         )
 
-        for row in query.dicts():
-            codec = (row.get("source_codec") or "").lower()
-            resolution = row.get("source_resolution") or ""
-            avg_source = row.get("avg_source", 0)
-            avg_dest = row.get("avg_dest", 0)
-            count = row.get("cnt", 0)
+        rows = cast("Iterable[dict[str, object]]", query.dicts())
+        for row in rows:
+            codec_value = row.get("source_codec")
+            resolution_value = row.get("source_resolution")
+            codec = codec_value.lower() if isinstance(codec_value, str) else ""
+            resolution = resolution_value if isinstance(resolution_value, str) else ""
+            avg_source = narrowing.coerce_float(row.get("avg_source"))
+            avg_dest = narrowing.coerce_float(row.get("avg_dest"))
+            count = narrowing.coerce_int(row.get("cnt"))
             if avg_source > 0 and count > 0:
                 savings_pct = ((avg_source - avg_dest) / avg_source) * 100
                 results[(codec, resolution)] = {
@@ -523,7 +582,11 @@ def _get_historical_savings():
     return results
 
 
-def _lookup_savings(historical, codec, resolution):
+def _lookup_savings(
+    historical: HistoricalSavings,
+    codec: str,
+    resolution: str,
+) -> tuple[float, int, str]:
     """
     Look up estimated savings for a (codec, resolution) pair.
     Falls back to codec-only average if no exact match.
@@ -548,4 +611,4 @@ def _lookup_savings(historical, codec, resolution):
             return avg_savings, total_count, confidence
 
     # No data at all
-    return 0, 0, "none"
+    return 0.0, 0, "none"

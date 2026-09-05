@@ -5,6 +5,8 @@ import pluginVue from 'eslint-plugin-vue'
 import prettier from 'eslint-config-prettier/flat'
 import babelParser from '@babel/eslint-parser'
 import globals from 'globals'
+import tseslint from 'typescript-eslint'
+import vueParser from 'vue-eslint-parser'
 
 // Globals previously declared via `env.browser` plus the explicit list in
 // the old .eslintrc.js.
@@ -35,6 +37,7 @@ export default [
       '.quasar/**',
       'node_modules/**',
       'test-results/**',
+      'src/types/generated/api.ts',
       '**/*.cjs',
       'quasar.config.*.temporary.compiled*',
       'eslint.config.mjs',
@@ -43,12 +46,13 @@ export default [
 
   // Priority B: Strongly Recommended (was 'plugin:vue/vue3-strongly-recommended').
   ...pluginVue.configs['flat/strongly-recommended'],
+  ...tseslint.configs.recommended,
 
   // Disables formatting rules that conflict with Prettier.
   prettier,
 
   {
-    files: ['**/*.js', '**/*.vue'],
+    files: ['**/*.js', '**/*.ts', '**/*.vue'],
     languageOptions: {
       ecmaVersion: 2021,
       sourceType: 'module',
@@ -56,8 +60,24 @@ export default [
     },
     rules: {
       'prefer-promise-reject-errors': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
       // Allow debugger during development only.
       'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
+    },
+  },
+
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parser: tseslint.parser,
     },
   },
 
@@ -84,18 +104,14 @@ export default [
     },
   },
 
-  // Vue SFCs keep vue-eslint-parser as the file parser; <script> blocks are
-  // parsed by @babel/eslint-parser.
+  // Vue SFCs keep vue-eslint-parser as the file parser; TypeScript script
+  // blocks are parsed by typescript-eslint.
   {
     files: ['**/*.vue'],
     languageOptions: {
+      parser: vueParser,
       parserOptions: {
-        parser: babelParser,
-        requireConfigFile: false,
-        babelOptions: {
-          babelrc: false,
-          configFile: false,
-        },
+        parser: tseslint.parser,
       },
     },
   },

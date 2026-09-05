@@ -441,3 +441,30 @@ class TestWorkerGetStatus:
 
 if __name__ == "__main__":
     pytest.main(["-s", "--log-cli-level=INFO", __file__])
+
+
+# ------------------------------------------------------------------
+# Worker.__apply_parsed_progress
+# ------------------------------------------------------------------
+
+
+@pytest.mark.unittest
+class TestApplyParsedProgress:
+    @patch("compresso.libs.workers.CompressoLogging")
+    def _make_worker(self, mock_logging):
+        from compresso.libs.workers import Worker
+
+        return Worker("w-0", "TestGroup-Worker-1", "group-1", MagicMock(), MagicMock(), MagicMock())
+
+    def test_mapping_result_updates_percent(self):
+        worker = self._make_worker()
+        worker.worker_subprocess_monitor = MagicMock()
+        worker._Worker__apply_parsed_progress({"percent": 42})
+        worker.worker_subprocess_monitor.set_subprocess_percent.assert_called_once_with(42)
+
+    def test_non_mapping_result_keeps_previous_percent(self):
+        """Regression: a parser returning a bare value used to reset progress to 0."""
+        worker = self._make_worker()
+        worker.worker_subprocess_monitor = MagicMock()
+        worker._Worker__apply_parsed_progress(55.0)
+        worker.worker_subprocess_monitor.set_subprocess_percent.assert_not_called()

@@ -57,19 +57,29 @@
   </q-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { useRelativeTime } from 'src/composables/useRelativeTime'
 
+interface LinkedNode {
+  uuid: string
+  name: string
+  address?: string
+  version?: string
+  available: boolean
+  enable_receiving_tasks?: boolean
+  enable_sending_tasks?: boolean
+}
+
 const { t: $t } = useI18n()
-const lastUpdated = ref(null)
+const lastUpdated = ref<number | null>(null)
 const { relativeTime } = useRelativeTime(lastUpdated)
-const remoteInstallations = ref([])
+const remoteInstallations = ref<LinkedNode[]>([])
 const fetchError = ref(false)
-let pollInterval = null
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
 async function fetchRemoteInstallations() {
   try {

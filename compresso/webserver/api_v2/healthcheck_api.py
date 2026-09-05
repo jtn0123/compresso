@@ -7,7 +7,13 @@ API handler for health check endpoints.
 
 """
 
-from compresso.webserver.api_v2.base_api_handler import BaseApiError, BaseApiHandler
+from compresso.webserver.api_v2.base_api_handler import (
+    BaseApiError,
+    BaseApiHandler,
+    integer_value,
+    optional_integer_value,
+    string_value,
+)
 from compresso.webserver.api_v2.schema.healthcheck_schemas import (
     HealthCheckLibraryScanResponseSchema,
     HealthCheckReadinessResponseSchema,
@@ -21,6 +27,7 @@ from compresso.webserver.api_v2.schema.healthcheck_schemas import (
     RequestHealthCheckWorkersSchema,
 )
 from compresso.webserver.helpers import healthcheck
+from compresso.webserver.helpers.healthcheck import HealthPaginationParams
 
 
 class ApiHealthcheckHandler(BaseApiHandler):
@@ -67,7 +74,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         },
     ]
 
-    async def scan_file(self):
+    async def scan_file(self) -> None:
         """
         HealthCheck - scan single file
         ---
@@ -90,12 +97,15 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckScanSchema())
 
-            healthcheck.validate_library_exists(json_request.get("library_id"))
+            # Only validate an explicitly provided library id (absent means default)
+            library_id_value = optional_integer_value(json_request.get("library_id"))
+            healthcheck.validate_library_exists(library_id_value)
+            library_id = 1 if library_id_value is None else library_id_value
 
             result = healthcheck.check_single_file(
-                filepath=json_request.get("file_path"),
-                library_id=json_request.get("library_id", 1),
-                mode=json_request.get("mode", "quick"),
+                filepath=string_value(json_request.get("file_path")),
+                library_id=library_id,
+                mode=string_value(json_request.get("mode"), "quick"),
             )
 
             response = self.build_response(
@@ -122,7 +132,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def scan_library(self):
+    async def scan_library(self) -> None:
         """
         HealthCheck - scan library
         ---
@@ -145,11 +155,14 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckLibraryScanSchema())
 
-            healthcheck.validate_library_exists(json_request.get("library_id"))
+            # Only validate an explicitly provided library id (absent means default)
+            library_id_value = optional_integer_value(json_request.get("library_id"))
+            healthcheck.validate_library_exists(library_id_value)
+            library_id = 1 if library_id_value is None else library_id_value
 
             started = healthcheck.scan_library(
-                library_id=json_request.get("library_id"),
-                mode=json_request.get("mode", "quick"),
+                library_id=library_id,
+                mode=string_value(json_request.get("mode"), "quick"),
             )
 
             message = "Library scan started" if started else "A scan is already in progress"
@@ -174,7 +187,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def cancel_scan(self):
+    async def cancel_scan(self) -> None:
         """
         HealthCheck - cancel scan
         ---
@@ -206,7 +219,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_summary(self):
+    async def get_summary(self) -> None:
         """
         HealthCheck - summary
         ---
@@ -220,10 +233,11 @@ class ApiHealthcheckHandler(BaseApiHandler):
                             HealthCheckSummaryResponseSchema
         """
         try:
-            library_id = self.get_argument("library_id", None)
-            if library_id is not None:
+            library_id_argument = self.get_argument("library_id", None)
+            library_id: int | None = None
+            if library_id_argument is not None:
                 try:
-                    library_id = int(library_id)
+                    library_id = int(library_id_argument)
                 except (ValueError, TypeError):
                     library_id = None
 
@@ -252,7 +266,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_readiness(self):
+    async def get_readiness(self) -> None:
         """
         HealthCheck - readiness
         ---
@@ -289,7 +303,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_status_list(self):
+    async def get_status_list(self) -> None:
         """
         HealthCheck - status list
         ---
@@ -312,15 +326,15 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckStatusSchema())
 
-            params = {
-                "start": json_request.get("start", 0),
-                "length": json_request.get("length", 10),
-                "search_value": json_request.get("search_value", ""),
-                "library_id": json_request.get("library_id"),
-                "status_filter": json_request.get("status_filter"),
+            params: HealthPaginationParams = {
+                "start": integer_value(json_request.get("start")),
+                "length": integer_value(json_request.get("length"), 10),
+                "search_value": string_value(json_request.get("search_value")),
+                "library_id": optional_integer_value(json_request.get("library_id")),
+                "status_filter": string_value(json_request.get("status_filter")) or None,
                 "order": {
-                    "column": json_request.get("order_by", "last_checked"),
-                    "dir": json_request.get("order_direction", "desc"),
+                    "column": string_value(json_request.get("order_by"), "last_checked"),
+                    "dir": string_value(json_request.get("order_direction"), "desc"),
                 },
             }
             statuses = healthcheck.get_health_statuses_paginated(params)
@@ -342,7 +356,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def get_workers(self):
+    async def get_workers(self) -> None:
         """
         HealthCheck - get workers
         ---
@@ -375,7 +389,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         except Exception as e:
             self.handle_unhandled_error(e)
 
-    async def set_workers(self):
+    async def set_workers(self) -> None:
         """
         HealthCheck - set workers
         ---
@@ -398,7 +412,7 @@ class ApiHealthcheckHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestHealthCheckWorkersSchema())
 
-            worker_count = healthcheck.set_scan_workers(json_request.get("worker_count", 1))
+            worker_count = healthcheck.set_scan_workers(integer_value(json_request.get("worker_count"), 1))
             workers_info = healthcheck.get_scan_workers()
 
             response = self.build_response(

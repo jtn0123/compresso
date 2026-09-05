@@ -30,18 +30,19 @@ Copyright:
 """
 
 import json
+from collections.abc import Mapping
 
-from compresso.libs import session
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.session import Session
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
 
 class ApiSessionHandler(BaseApiHandler):
-    name = None
-    session = None
-    config = None
-    params = None
-    compresso_data_queues = None
+    name: str
+    session: Session | None
+    config: object
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -71,26 +72,33 @@ class ApiSessionHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.name = "plugins_api"
-        self.session = session.Session()
+        self.session = Session()
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    def set_default_headers(self):
+    def set_default_headers(self) -> None:
         """Set the default response header to be JSON."""
         super().set_default_headers()
 
-    def get(self, path):
+    async def get(self, path: str) -> None:
         self.action_route()
 
-    def post(self, path):
+    async def post(self, path: str) -> None:
         self.action_route()
 
-    def get_sign_out_url(self, *args, **kwargs):
-        uuid = self.session.get_installation_uuid()
-        sign_out_url = self.session.get_sign_out_url()
+    def _session(self) -> Session:
+        if self.session is None:
+            raise RuntimeError("Session is unavailable")
+        return self.session
+
+    def get_sign_out_url(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
+        active_session = self._session()
+        uuid = active_session.get_installation_uuid()
+        sign_out_url = active_session.get_sign_out_url()
         if not sign_out_url:
             self.write(json.dumps({"success": False}))
             return
@@ -108,9 +116,11 @@ class ApiSessionHandler(BaseApiHandler):
             )
             return
 
-    def get_patreon_login_url(self, *args, **kwargs):
-        uuid = self.session.get_installation_uuid()
-        patreon_oauth_url = self.session.get_patreon_login_url()
+    def get_patreon_login_url(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
+        active_session = self._session()
+        uuid = active_session.get_installation_uuid()
+        patreon_oauth_url = active_session.get_patreon_login_url()
         if not patreon_oauth_url:
             self.write(json.dumps({"success": False}))
             return
@@ -128,9 +138,11 @@ class ApiSessionHandler(BaseApiHandler):
             )
             return
 
-    def get_github_login_url(self, *args, **kwargs):
-        uuid = self.session.get_installation_uuid()
-        github_oauth_url = self.session.get_github_login_url()
+    def get_github_login_url(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
+        active_session = self._session()
+        uuid = active_session.get_installation_uuid()
+        github_oauth_url = active_session.get_github_login_url()
         if not github_oauth_url:
             self.write(json.dumps({"success": False}))
             return
@@ -148,9 +160,11 @@ class ApiSessionHandler(BaseApiHandler):
             )
             return
 
-    def get_discord_login_url(self, *args, **kwargs):
-        uuid = self.session.get_installation_uuid()
-        discord_oauth_url = self.session.get_discord_login_url()
+    def get_discord_login_url(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
+        active_session = self._session()
+        uuid = active_session.get_installation_uuid()
+        discord_oauth_url = active_session.get_discord_login_url()
         if not discord_oauth_url:
             self.write(json.dumps({"success": False}))
             return
@@ -168,13 +182,17 @@ class ApiSessionHandler(BaseApiHandler):
             )
             return
 
-    def get_patreon_page(self, *args, **kwargs):
-        uuid = self.session.get_installation_uuid()
-        patreon_sponsor_page_data = self.session.get_patreon_sponsor_page()
+    def get_patreon_page(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
+        active_session = self._session()
+        uuid = active_session.get_installation_uuid()
+        patreon_sponsor_page_data: object = active_session.get_patreon_sponsor_page()
         if not patreon_sponsor_page_data:
             self.write(json.dumps({"success": False}))
             return
-        sponsor_page = patreon_sponsor_page_data.get("sponsor_page")
+        sponsor_page = (
+            patreon_sponsor_page_data.get("sponsor_page") if isinstance(patreon_sponsor_page_data, Mapping) else None
+        )
         self.write(
             json.dumps(
                 {

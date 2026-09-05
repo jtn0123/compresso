@@ -18,11 +18,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useChartTheme } from 'src/composables/useChartTheme'
+import type { Chart as ChartInstance } from 'chart.js'
 
 const $q = useQuasar()
 const { t: $t } = useI18n()
@@ -35,8 +36,8 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
 })
 
-const chartRef = ref(null)
-let chart = null
+const chartRef = ref<HTMLCanvasElement | null>(null)
+let chart: ChartInstance<'doughnut'> | null = null
 
 async function renderChart() {
   const { Chart, DoughnutController, ArcElement, Tooltip } = await import('chart.js')
@@ -72,7 +73,10 @@ async function renderChart() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString()}`,
+            label: (ctx) => {
+              const value = typeof ctx.raw === 'number' ? ctx.raw : Number(ctx.raw)
+              return ` ${ctx.label}: ${Number.isFinite(value) ? value.toLocaleString() : '0'}`
+            },
           },
         },
       },

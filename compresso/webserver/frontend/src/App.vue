@@ -1,10 +1,11 @@
 <template>
   <router-view />
 </template>
-<script>
+<script lang="ts">
 import { defineComponent, onBeforeUnmount } from 'vue'
 import { LocalStorage, useQuasar } from 'quasar'
-import { applyTheme } from 'src/js/compressoTheme'
+import { applyTheme, isPaletteName, isThemeMode } from 'src/js/compressoTheme'
+import type { PaletteName, ThemeMode } from 'src/js/compressoTheme'
 
 export default defineComponent({
   name: 'App',
@@ -12,14 +13,15 @@ export default defineComponent({
     const $q = useQuasar()
 
     // Detect system preference if no stored theme
-    let configuredTheme = LocalStorage.getItem('theme')
-    const userExplicitlyChoseTheme = !!configuredTheme
-    if (!configuredTheme) {
+    const storedTheme = LocalStorage.getItem('theme')
+    let configuredTheme: ThemeMode = isThemeMode(storedTheme) ? storedTheme : 'light'
+    if (!isThemeMode(storedTheme)) {
       const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
       configuredTheme = prefersDark ? 'dark' : 'light'
     }
 
-    const configuredPalette = LocalStorage.getItem('palette') || 'forest'
+    const storedPalette = LocalStorage.getItem('palette')
+    const configuredPalette: PaletteName = isPaletteName(storedPalette) ? storedPalette : 'forest'
 
     const darkMode = configuredTheme === 'dark'
     applyTheme(configuredTheme, configuredPalette)
@@ -27,11 +29,12 @@ export default defineComponent({
 
     // Listen for runtime OS theme preference changes
     const mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)')
-    const onThemeChange = (e) => {
+    const onThemeChange = (e: MediaQueryListEvent): void => {
       // Only auto-switch if user hasn't explicitly chosen via ThemeSwitch
       if (LocalStorage.getItem('theme_explicit')) return
       const newTheme = e.matches ? 'dark' : 'light'
-      const palette = LocalStorage.getItem('palette') || 'forest'
+      const storedPalette = LocalStorage.getItem('palette')
+      const palette: PaletteName = isPaletteName(storedPalette) ? storedPalette : 'forest'
       applyTheme(newTheme, palette)
       $q.dark.set(e.matches)
     }

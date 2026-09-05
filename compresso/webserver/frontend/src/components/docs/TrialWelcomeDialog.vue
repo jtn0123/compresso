@@ -98,28 +98,25 @@
   </CompressoDialogPopup>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import compressoGlobals, { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
 import CompressoStandardButton from 'components/ui/buttons/CompressoStandardButton.vue'
 import { createLogger } from 'src/composables/useLogger'
+import type { DialogController } from 'src/types/ui'
 
 const log = createLogger('TrialWelcome')
 
-const dialogRef = ref(null)
+const dialogRef = ref<DialogController | null>(null)
 
 const show = () => {
-  if (dialogRef.value) {
-    dialogRef.value.show()
-  }
+  dialogRef.value?.show()
 }
 
 const hide = () => {
-  if (dialogRef.value) {
-    dialogRef.value.hide()
-  }
+  dialogRef.value?.hide()
 }
 
 const onDialogHide = () => {

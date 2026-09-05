@@ -10,6 +10,8 @@ In-memory sliding window rate limiter for API endpoints.
 import threading
 import time
 
+type RateLimitResult = tuple[bool, int, int]
+
 
 class RateLimiter:
     """
@@ -41,29 +43,29 @@ class RateLimiter:
         "/healthcheck/scan-library",
     }
 
-    def __init__(self):
-        self._requests = {}  # {ip: [(timestamp, path), ...]}
+    def __init__(self) -> None:
+        self._requests: dict[str, list[tuple[float, str]]] = {}
         self._lock = threading.Lock()
         self._request_counter = 0
 
-    def _cleanup_old(self, ip, window):
+    def _cleanup_old(self, ip: str, window: int) -> None:
         """Remove requests outside the current window."""
         cutoff = time.time() - window
         if ip in self._requests:
             self._requests[ip] = [(ts, path) for ts, path in self._requests[ip] if ts > cutoff]
 
-    def is_expensive(self, path):
+    def is_expensive(self, path: str) -> bool:
         """Check if a path matches an expensive endpoint."""
         return any(path.endswith(expensive) for expensive in self.EXPENSIVE_PATHS)
 
-    def _cleanup_stale_ips(self):
+    def _cleanup_stale_ips(self) -> None:
         """Remove IPs that have no requests in the last 5 minutes."""
         cutoff = time.time() - 300
         stale = [ip for ip, reqs in self._requests.items() if not reqs or max(ts for ts, _ in reqs) < cutoff]
         for ip in stale:
             del self._requests[ip]
 
-    def check_rate_limit(self, ip, path):
+    def check_rate_limit(self, ip: str, path: str) -> RateLimitResult:
         """
         Check if a request is within rate limits.
 
@@ -110,11 +112,11 @@ class RateLimiter:
 
 
 # Singleton instance
-_rate_limiter = None
+_rate_limiter: RateLimiter | None = None
 _rate_limiter_lock = threading.Lock()
 
 
-def get_rate_limiter():
+def get_rate_limiter() -> RateLimiter:
     """Get the singleton RateLimiter instance."""
     global _rate_limiter
     if _rate_limiter is None:

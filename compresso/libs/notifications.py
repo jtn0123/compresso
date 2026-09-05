@@ -32,11 +32,27 @@ Copyright:
 import threading
 import uuid
 from queue import Empty, Queue
+from typing import NotRequired, TypedDict
 
 from compresso.libs.singleton import SingletonType
 
 
-class Notifications(Queue, metaclass=SingletonType):
+class NotificationNavigation(TypedDict, total=False):
+    push: str
+    url: str
+    events: list[str]
+
+
+class Notification(TypedDict):
+    uuid: NotRequired[str]
+    type: str
+    icon: str
+    label: str
+    message: str
+    navigation: NotificationNavigation
+
+
+class Notifications(Queue[Notification], metaclass=SingletonType):
     """
     Handles messages passed to the frontend.
 
@@ -88,17 +104,17 @@ class Notifications(Queue, metaclass=SingletonType):
 
     """
 
-    def _init(self, maxsize):
+    def _init(self, maxsize: int) -> None:
         self._lock = threading.RLock()
-        self.all_items = set()
+        self.all_items: set[str] = set()
         Queue._init(self, maxsize)
 
-    def __add_to_queue_locked(self, item):
+    def __add_to_queue_locked(self, item: Notification) -> None:
         # Add the item to the queue without blocking (lock already held)
         Queue.put_nowait(self, item)
 
     @staticmethod
-    def __validate_item(item):
+    def __validate_item(item: Notification) -> bool:
         # Ensure all required keys are present
         for key in ["type", "icon", "label", "message", "navigation"]:
             if key not in item:
@@ -113,8 +129,8 @@ class Notifications(Queue, metaclass=SingletonType):
             )
         return True
 
-    def __get_all_items_locked(self):
-        items = []
+    def __get_all_items_locked(self) -> list[Notification]:
+        items: list[Notification] = []
         while True:
             try:
                 # Get all items out of queue
@@ -123,12 +139,12 @@ class Notifications(Queue, metaclass=SingletonType):
                 break
         return items
 
-    def __requeue_items_locked(self, items):
+    def __requeue_items_locked(self, items: list[Notification]) -> None:
         # Add all given items back into the queue
         for item in items:
             Queue.put_nowait(self, item)
 
-    def add(self, item):
+    def add(self, item: Notification) -> None:
         # Ensure received item is valid
         self.__validate_item(item)
         with self._lock:
@@ -141,7 +157,7 @@ class Notifications(Queue, metaclass=SingletonType):
             self.all_items.add(item["uuid"])
             self.__add_to_queue_locked(item)
 
-    def remove(self, item_uuid):
+    def remove(self, item_uuid: str) -> bool:
         """
         Remove a single item from the notifications list given it's UUID
 
@@ -153,7 +169,7 @@ class Notifications(Queue, metaclass=SingletonType):
             # Get all items out of queue
             current_items = self.__get_all_items_locked()
             # Create list of items that will be queued again
-            requeue_items = []
+            requeue_items: list[Notification] = []
             for current_item in current_items:
                 if current_item.get("uuid") != item_uuid:
                     requeue_items.append(current_item)
@@ -165,7 +181,7 @@ class Notifications(Queue, metaclass=SingletonType):
             self.__requeue_items_locked(requeue_items)
             return success
 
-    def read_all_items(self):
+    def read_all_items(self) -> list[Notification]:
         with self._lock:
             # Get all items out of queue
             current_items = self.__get_all_items_locked()
@@ -174,7 +190,7 @@ class Notifications(Queue, metaclass=SingletonType):
             # Return items list
             return list(current_items)
 
-    def update(self, item):
+    def update(self, item: Notification) -> None:
         # Ensure received item is valid
         self.__validate_item(item)
         with self._lock:
@@ -182,7 +198,7 @@ class Notifications(Queue, metaclass=SingletonType):
             if not item.get("uuid"):
                 item["uuid"] = str(uuid.uuid4())
             current_items = self.__get_all_items_locked()
-            requeue_items = []
+            requeue_items: list[Notification] = []
             replaced = False
             for current_item in current_items:
                 if current_item.get("uuid") == item["uuid"]:

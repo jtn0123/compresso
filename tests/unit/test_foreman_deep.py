@@ -374,6 +374,7 @@ class TestHandTaskToWorkersRemote:
         foreman.init_remote_task_manager_thread.assert_called_once_with(
             library_name="Movies",
             preferred_installation_uuid="worker-a",
+            required_encoder=None,
         )
 
     def test_remote_failure_when_no_manager(self):

@@ -41,48 +41,52 @@
   </q-list>
 </template>
 
-<script>
-import { ref } from 'vue'
+<script lang="ts">
 import compressoGlobals from 'src/js/compressoGlobals'
 import CompressoListActionButton from 'components/ui/buttons/CompressoListActionButton.vue'
 import { createLogger } from 'src/composables/useLogger'
+import type { DisplayNotification } from 'src/js/compressoGlobals'
+
+const log = createLogger('Notifications')
 
 export default {
   name: 'DrawerNotifications',
   components: { CompressoListActionButton },
-  created() {
-    this._log = createLogger('Notifications')
-  },
   methods: {
-    runNotificationAction: function (index) {
+    runNotificationAction: function (index: number) {
       if (this.notificationActionsDisabled) {
-        this._log.debug('Notification actions disabled')
+        log.debug('Notification actions disabled')
         return
       }
       // Disable any other actions being triggered while this one is being run
       this.notificationActionsDisabled = true
       // Get notification by index
-      let notification = this.notificationsList[index]
+      const notification = this.notificationsList[index]
+      if (!notification) return
       if (
         typeof notification.navigation === 'object' &&
         notification.navigation !== null &&
         !Array.isArray(notification.navigation)
       ) {
         // Handle full url
-        if (typeof notification.navigation['url'] !== 'undefined') {
-          window.open(notification.navigation['url'], '_blank')
+        const navigation = notification.navigation
+        if (typeof navigation.url === 'string') {
+          window.open(navigation.url, '_blank')
         }
         // Handle routing any given 'push' links
-        if (typeof notification.navigation['push'] !== 'undefined') {
-          this.$router.push(notification.navigation['push'])
+        if (typeof navigation.push === 'string') {
+          this.$router.push(navigation.push)
         }
-        if (typeof notification.navigation['events'] !== 'undefined') {
+        const events = Array.isArray(navigation.events)
+          ? navigation.events.filter((event): event is string => typeof event === 'string')
+          : []
+        if (events.length > 0) {
           let i = 0
-          const loopEventsDelayed = function (emitter) {
-            if (i < notification.navigation['events'].length) {
+          const loopEventsDelayed = function (emitter: (event: string) => void) {
+            if (i < events.length) {
               setTimeout(function () {
-                let triggerEvent = notification.navigation['events'][i]
-                emitter(triggerEvent)
+                const triggerEvent = events[i]
+                if (triggerEvent) emitter(triggerEvent)
                 i++
                 loopEventsDelayed(emitter)
               }, 200)
@@ -94,19 +98,20 @@ export default {
       // Re-enable notification actions
       this.notificationActionsDisabled = false
     },
-    dismissNotification: function (index) {
+    dismissNotification: function (index: number) {
       // Get notification by index
-      let notification = this.notificationsList[index]
+      const notification = this.notificationsList[index]
+      if (!notification) return
       // Dismiss the matching notification
       compressoGlobals.dismissNotifications(this.$t, [notification.uuid]).then(() => {
         this.updateNotificationList()
       })
     },
     dismissAllNotifications: function () {
-      let uuidList = []
+      const uuidList: string[] = []
       for (let i = 0; i < this.notificationsList.length; i++) {
-        let notification = this.notificationsList[i]
-        uuidList[uuidList.length] = notification.uuid
+        const notification = this.notificationsList[i]
+        if (notification) uuidList.push(notification.uuid)
       }
       // Dismiss the notifications
       compressoGlobals.dismissNotifications(this.$t, uuidList).then(() => {
@@ -127,7 +132,7 @@ export default {
       }, 15000)
     },
     stopNotificationReload: function () {
-      clearInterval(this.reloadInterval)
+      if (this.reloadInterval) clearInterval(this.reloadInterval)
     },
   },
   mounted() {
@@ -138,9 +143,9 @@ export default {
   },
   data: function () {
     return {
-      reloadInterval: ref(null),
-      notificationsList: ref([]),
-      notificationActionsDisabled: ref(false),
+      reloadInterval: null as ReturnType<typeof setInterval> | null,
+      notificationsList: [] as DisplayNotification[],
+      notificationActionsDisabled: false,
     }
   },
 }

@@ -14,10 +14,18 @@ import subprocess
 import sys
 import tempfile
 import threading
+from typing import TypedDict
 
+from compresso.config import Config
 from compresso.libs.singleton import SingletonType
 
 logger = logging.getLogger("compresso.startup")
+
+
+class FFmpegInfo(TypedDict):
+    ffmpeg: str | None
+    ffprobe: str | None
+    version: str | None
 
 
 class StartupState(metaclass=SingletonType):
@@ -29,23 +37,23 @@ class StartupState(metaclass=SingletonType):
         "ui_server_ready",
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = threading.RLock()
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         with self._lock:
-            self._stages = {stage: False for stage in self.REQUIRED_STAGES}
-            self._details = {}
-            self._errors = []
+            self._stages: dict[str, bool] = dict.fromkeys(self.REQUIRED_STAGES, False)
+            self._details: dict[str, object] = {}
+            self._errors: list[dict[str, str]] = []
 
-    def mark_ready(self, stage, detail=None):
+    def mark_ready(self, stage: str, detail: object = None) -> None:
         with self._lock:
             self._stages[stage] = True
             if detail is not None:
                 self._details[stage] = detail
 
-    def mark_error(self, stage, message):
+    def mark_error(self, stage: str, message: object) -> None:
         with self._lock:
             self._stages[stage] = False
             self._details[stage] = message
@@ -56,7 +64,7 @@ class StartupState(metaclass=SingletonType):
                 }
             )
 
-    def snapshot(self):
+    def snapshot(self) -> dict[str, object]:
         with self._lock:
             stages = dict(self._stages)
             details = dict(self._details)
@@ -69,7 +77,7 @@ class StartupState(metaclass=SingletonType):
         }
 
 
-def _ensure_writable_dir(path, label, create=False):
+def _ensure_writable_dir(path: str | None, label: str, create: bool = False) -> None:
     if not path:
         raise RuntimeError(f"{label} is not configured")
 
@@ -87,7 +95,7 @@ def _ensure_writable_dir(path, label, create=False):
     os.unlink(tmp_path)
 
 
-def _ensure_readable_dir(path, label):
+def _ensure_readable_dir(path: str | None, label: str) -> None:
     if not path:
         raise RuntimeError(f"{label} is not configured")
     if not os.path.isdir(path):
@@ -96,7 +104,7 @@ def _ensure_readable_dir(path, label):
         raise RuntimeError(f"{label} '{path}' is not readable")
 
 
-def _validate_cache_path(cache_path, config_path, library_path):
+def _validate_cache_path(cache_path: str | None, config_path: str, library_path: str) -> None:
     if not cache_path:
         raise RuntimeError("cache path is not configured")
 
@@ -113,12 +121,12 @@ def _validate_cache_path(cache_path, config_path, library_path):
         raise RuntimeError(f"cache path '{cache_path}' must not equal library path")
 
 
-def _validate_ffmpeg():
+def _validate_ffmpeg() -> FFmpegInfo:
     """
     Check that ffmpeg and ffprobe are available on PATH.
     Returns a dict with paths and version info. Logs warnings if missing.
     """
-    result = {"ffmpeg": None, "ffprobe": None, "version": None}
+    result = FFmpegInfo(ffmpeg=None, ffprobe=None, version=None)
 
     result["ffmpeg"] = shutil.which("ffmpeg")
     result["ffprobe"] = shutil.which("ffprobe")
@@ -151,7 +159,7 @@ def _validate_ffmpeg():
     return result
 
 
-def validate_startup_environment(settings):
+def validate_startup_environment(settings: Config) -> None:
     config_path = settings.get_config_path()
     library_path = settings.get_library_path()
     cache_path = settings.get_cache_path()
@@ -162,7 +170,7 @@ def validate_startup_environment(settings):
     _ensure_writable_dir(cache_path, "cache path", create=True)
 
 
-def _sum_worker_groups_count():
+def _sum_worker_groups_count() -> int:
     """Sum ``number_of_workers`` across all configured worker groups.
 
     Imported lazily so this module stays import-free of peewee for
@@ -182,7 +190,7 @@ def _sum_worker_groups_count():
         return 0
 
 
-def build_startup_summary(settings, event_monitor_module):
+def build_startup_summary(settings: Config, event_monitor_module: object) -> dict[str, object]:
     ffmpeg_info = _validate_ffmpeg()
     return {
         "library_path": settings.get_library_path(),

@@ -7,15 +7,36 @@ Helper functions for compression statistics API endpoints.
 
 """
 
+from collections.abc import Iterable
+from typing import Protocol, TypedDict, cast
+
 from peewee import fn
 
 from compresso.libs import history
+from compresso.libs.history import HistoryOrder
 from compresso.libs.logs import CompressoLogging
 
 logger = CompressoLogging.get_logger("compression_stats")
 
 
-def get_compression_summary(library_id=None):
+class CompressionStatsParams(TypedDict, total=False):
+    start: int
+    length: int
+    search_value: str | None
+    library_id: int | None
+    order: HistoryOrder | None
+
+
+class _EncodingSpeedRow(Protocol):
+    date: object
+    destination_codec: str | None
+    avg_fps: float | None
+    avg_speed: float | None
+    avg_duration: float | None
+    count: int | None
+
+
+def get_compression_summary(library_id: int | None = None) -> dict[str, object]:
     """
     Get library-wide compression summary statistics.
 
@@ -26,7 +47,7 @@ def get_compression_summary(library_id=None):
     return history_logging.get_library_compression_summary(library_id=library_id)
 
 
-def get_compression_stats_paginated(params):
+def get_compression_stats_paginated(params: CompressionStatsParams) -> dict[str, object]:
     """
     Get paginated per-file compression statistics.
 
@@ -43,31 +64,31 @@ def get_compression_stats_paginated(params):
     )
 
 
-def get_codec_distribution(library_id=None):
+def get_codec_distribution(library_id: int | None = None) -> dict[str, object]:
     """Get codec distribution data."""
     history_logging = history.History()
     return history_logging.get_codec_distribution(library_id=library_id)
 
 
-def get_resolution_distribution(library_id=None):
+def get_resolution_distribution(library_id: int | None = None) -> list[dict[str, object]]:
     """Get resolution distribution data."""
     history_logging = history.History()
     return history_logging.get_resolution_distribution(library_id=library_id)
 
 
-def get_container_distribution(library_id=None):
+def get_container_distribution(library_id: int | None = None) -> dict[str, object]:
     """Get container distribution data."""
     history_logging = history.History()
     return history_logging.get_container_distribution(library_id=library_id)
 
 
-def get_space_saved_over_time(library_id=None, interval="day"):
+def get_space_saved_over_time(library_id: int | None = None, interval: str = "day") -> list[dict[str, object]]:
     """Get space saved over time data."""
     history_logging = history.History()
     return history_logging.get_space_saved_over_time(library_id=library_id, interval=interval)
 
 
-def get_encoding_speed_timeline(library_id=None):
+def get_encoding_speed_timeline(library_id: int | None = None) -> list[dict[str, object]]:
     """
     Get encoding speed data over time for charting.
 
@@ -100,8 +121,9 @@ def get_encoding_speed_timeline(library_id=None):
         .limit(200)
     )
 
-    results = []
-    for row in query:
+    results: list[dict[str, object]] = []
+    rows = cast(Iterable[_EncodingSpeedRow], query)
+    for row in rows:
         results.append(
             {
                 "date": str(row.date) if hasattr(row, "date") else "",
@@ -116,7 +138,7 @@ def get_encoding_speed_timeline(library_id=None):
     return results
 
 
-def get_pending_estimate():
+def get_pending_estimate() -> dict[str, object]:
     """
     Estimate potential space savings for pending tasks based on historical compression ratio.
 
@@ -138,14 +160,17 @@ def get_pending_estimate():
             .dicts()
             .get()
         )
-        pending_count = int(aggregate.get("pending_count") or 0)
-        total_pending_size = int(aggregate.get("total_pending_size") or 0)
+        pending_count_value: object = aggregate.get("pending_count")
+        total_pending_size_value: object = aggregate.get("total_pending_size")
+        pending_count = int(pending_count_value) if isinstance(pending_count_value, (str, int, float)) else 0
+        total_pending_size = int(total_pending_size_value) if isinstance(total_pending_size_value, (str, int, float)) else 0
     except Exception as e:
         logger.warning("Failed to query pending tasks: %s", str(e))
         pending_count = 0
         total_pending_size = 0
 
-    avg_ratio = summary.get("avg_ratio", 1.0)
+    avg_ratio_value = summary.get("avg_ratio", 1.0)
+    avg_ratio = float(avg_ratio_value) if isinstance(avg_ratio_value, (str, int, float)) else 1.0
     if avg_ratio <= 0:
         avg_ratio = 1.0
 

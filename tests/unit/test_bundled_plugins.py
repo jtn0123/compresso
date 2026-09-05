@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,6 +22,8 @@ import pytest
 from compresso.bundled_plugins import (
     _copy_plugin,
     _register_plugin_in_db,
+    _safe_child_path,
+    _validated_plugin_name,
     _version_newer,
     install_bundled_plugins,
 )
@@ -91,6 +94,26 @@ class TestVersionNewer:
     def test_different_length_versions(self):
         # [1, 0, 0, 1] > [1, 0, 0]
         assert _version_newer("1.0.0.1", "1.0.0") is True
+
+
+@pytest.mark.unittest
+class TestSafePluginPaths:
+    @pytest.mark.parametrize("name", ["encoding_presets", "plugin-2", "vendor.plugin"])
+    def test_accepts_simple_plugin_names(self, name: str) -> None:
+        assert _validated_plugin_name(name) == name
+
+    @pytest.mark.parametrize("name", ["../escape", "nested/plugin", "..", ".", "bad\nname"])
+    def test_rejects_names_that_can_escape_or_forge_logs(self, name: str) -> None:
+        with pytest.raises(ValueError):
+            _validated_plugin_name(name)
+
+    def test_safe_child_path_stays_inside_root(self, tmp_path: Path) -> None:
+        child = _safe_child_path(tmp_path, "encoding_presets")
+        assert child == os.path.join(str(tmp_path), "encoding_presets")
+
+    def test_safe_child_path_rejects_traversal(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError):
+            _safe_child_path(tmp_path, "../escape")
 
 
 # ------------------------------------------------------------------
@@ -196,6 +219,21 @@ class TestCopyPlugin:
         finally:
             shutil.rmtree(source, ignore_errors=True)
             shutil.rmtree(target, ignore_errors=True)
+
+    def test_does_not_follow_settings_symlinks(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        outside = tmp_path / "outside.json"
+        source.mkdir()
+        target.mkdir()
+        outside.write_text('{"secret": true}')
+        (source / "plugin.py").write_text("# new")
+        (target / "settings.json").symlink_to(outside)
+
+        _copy_plugin(str(source), str(target))
+
+        assert not (target / "settings.json").exists()
+        assert outside.read_text() == '{"secret": true}'
 
 
 # ------------------------------------------------------------------
@@ -479,6 +517,27 @@ class TestInstallBundledPlugins:
             # Target should use the directory name as the plugin_id
             expected_target = os.path.join(plugins_path, plugin_name)
             mock_copy.assert_called_once_with(plugin_dir, expected_target)
+        finally:
+            shutil.rmtree(source_dir, ignore_errors=True)
+            shutil.rmtree(plugins_path, ignore_errors=True)
+
+    @patch("compresso.bundled_plugins._register_plugin_in_db")
+    @patch("compresso.bundled_plugins._copy_plugin")
+    def test_rejects_plugin_id_path_traversal(self, mock_copy: MagicMock, mock_register: MagicMock) -> None:
+        source_dir = tempfile.mkdtemp(prefix="bp_src_")
+        plugins_path = tempfile.mkdtemp(prefix="bp_plugins_")
+        plugin_dir = os.path.join(source_dir, "malicious")
+        os.makedirs(plugin_dir)
+        with open(os.path.join(plugin_dir, "info.json"), "w") as f:
+            json.dump({"id": "../escape", "version": "1.0.0"}, f)
+
+        try:
+            with patch("compresso.bundled_plugins.BUNDLED_PLUGINS_DIR", source_dir):
+                install_bundled_plugins(plugins_path)
+
+            mock_copy.assert_not_called()
+            mock_register.assert_not_called()
+            assert not os.path.exists(os.path.join(os.path.dirname(plugins_path), "escape"))
         finally:
             shutil.rmtree(source_dir, ignore_errors=True)
             shutil.rmtree(plugins_path, ignore_errors=True)

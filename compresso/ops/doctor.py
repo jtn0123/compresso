@@ -21,7 +21,6 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
@@ -47,7 +46,7 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def _redact(value: Any, key: str = "") -> Any:
+def _redact(value: object, key: str = "") -> object:
     if any(fragment in key.lower() for fragment in SECRET_KEYS):
         return "[redacted]"
     if isinstance(value, dict):
@@ -57,7 +56,7 @@ def _redact(value: Any, key: str = "") -> Any:
     return value
 
 
-def _atomic_json_write(path: Path, payload: dict[str, Any]) -> None:
+def _atomic_json_write(path: Path, payload: dict[str, object]) -> None:
     atomic_json_write(path, payload, mode=0o600)
 
 
@@ -101,7 +100,7 @@ def _validated_peer_base(peer: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
 
 
-def _configured_peer_base(settings: Any, selector: str) -> str:
+def _configured_peer_base(settings: Config, selector: str) -> str:
     """Resolve a CLI selector only through the persisted linked-peer allowlist."""
     selected = selector.strip().casefold().rstrip("/")
     if not selected:
@@ -138,10 +137,10 @@ class CheckResult:
     status: str
     blocking: bool
     summary: str
-    evidence: dict[str, Any] = field(default_factory=dict)
+    evidence: dict[str, object] = field(default_factory=dict)
     remediation: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         payload = asdict(self)
         payload["evidence"] = _redact(payload["evidence"])
         return payload
@@ -155,7 +154,7 @@ class DoctorReport:
     generated_at: datetime
     expires_at: datetime
     role: str
-    node: dict[str, Any]
+    node: dict[str, object]
     overall_status: str
     strict: bool
     checks: list[CheckResult]
@@ -166,7 +165,7 @@ class DoctorReport:
         role: str,
         checks: list[CheckResult],
         *,
-        node: dict[str, Any] | None = None,
+        node: dict[str, object] | None = None,
         now: datetime | None = None,
         strict: bool = False,
     ) -> DoctorReport:
@@ -194,7 +193,7 @@ class DoctorReport:
     def exit_code(self) -> int:
         return 1 if self.overall_status == "fail" else 0
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "schema_version": SCHEMA_VERSION,
             "report_id": self.report_id,
@@ -220,7 +219,7 @@ class DoctorReport:
         return destination
 
 
-def load_latest_report(userdata_path: str) -> dict[str, Any] | None:
+def load_latest_report(userdata_path: str) -> dict[str, object] | None:
     path = Path(userdata_path) / "readiness" / "latest.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -234,13 +233,13 @@ class DeploymentDoctor:
 
     def __init__(
         self,
-        settings: Any,
+        settings: Config,
         role: str,
         *,
         peers: list[str] | None = None,
         peer_token: str = "",
         strict: bool = False,
-        capability_probe: Callable[[Any], dict[str, Any]] | None = None,
+        capability_probe: Callable[[Config], dict[str, object]] | None = None,
     ) -> None:
         if role not in {"master", "worker"}:
             raise ValueError("role must be 'master' or 'worker'")
@@ -259,7 +258,7 @@ class DeploymentDoctor:
         summary: str,
         *,
         blocking: bool = True,
-        evidence: dict[str, Any] | None = None,
+        evidence: dict[str, object] | None = None,
         remediation: str = "",
         warning: bool = False,
     ) -> CheckResult:
@@ -466,7 +465,7 @@ class DeploymentDoctor:
         )
         return checks
 
-    def _role_checks(self, capabilities: dict[str, Any]) -> list[CheckResult]:
+    def _role_checks(self, capabilities: dict[str, object]) -> list[CheckResult]:
         scanner_enabled = bool(self.settings.get_enable_library_scanner())
         safe_defaults = bool(self.settings.get_large_library_safe_defaults())
         checks = [
@@ -498,7 +497,12 @@ class DeploymentDoctor:
                     remediation="Disable library scanning and inotify on every remote worker.",
                 )
             )
-        encoders = set(capabilities.get("video_encoders") or [])
+        raw_encoders = capabilities.get("video_encoders")
+        encoders = (
+            set(raw_encoders)
+            if isinstance(raw_encoders, list) and all(isinstance(item, str) for item in raw_encoders)
+            else set()
+        )
         if self.role == "worker" and platform.system() == "Darwin" and platform.machine() == "arm64":
             required = {"h264_videotoolbox", "hevc_videotoolbox"}
             checks.append(

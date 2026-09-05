@@ -62,7 +62,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -70,16 +70,17 @@ import axios from 'axios'
 import { getCompressoApiUrl } from 'src/js/compressoGlobals'
 import { formatBytes } from 'src/js/formatUtils'
 import { useRelativeTime } from 'src/composables/useRelativeTime'
+import type { ApiSchema } from 'src/types/contracts'
 
 const router = useRouter()
 const { t: $t } = useI18n()
-const lastUpdated = ref(null)
+const lastUpdated = ref<number | null>(null)
 const { relativeTime } = useRelativeTime(lastUpdated)
 
-const compressionSummary = ref(null)
-const pendingEstimate = ref(null)
-const healthSummary = ref(null)
-const approvalCount = ref(null)
+const compressionSummary = ref<ApiSchema<'CompressionSummary'> | null>(null)
+const pendingEstimate = ref<ApiSchema<'PendingEstimate'> | null>(null)
+const healthSummary = ref<ApiSchema<'HealthCheckSummaryResponse'> | null>(null)
+const approvalCount = ref<number | null>(null)
 
 const loading = ref({
   compression: true,
@@ -145,14 +146,14 @@ const approvalStat = computed(() => ({
   loading: loading.value.approval,
 }))
 
-function navigateTo(path) {
+function navigateTo(path: string): void {
   router.push(path)
 }
 
 async function fetchAll() {
   const requests = [
     axios
-      .get(getCompressoApiUrl('v2', 'compression/summary'))
+      .get<ApiSchema<'CompressionSummary'>>(getCompressoApiUrl('v2', 'compression/summary'))
       .then((r) => {
         compressionSummary.value = r.data
         loading.value.compression = false
@@ -163,7 +164,7 @@ async function fetchAll() {
         errors.value.compression = true
       }),
     axios
-      .get(getCompressoApiUrl('v2', 'compression/pending-estimate'))
+      .get<ApiSchema<'PendingEstimate'>>(getCompressoApiUrl('v2', 'compression/pending-estimate'))
       .then((r) => {
         pendingEstimate.value = r.data
         loading.value.pending = false
@@ -174,7 +175,7 @@ async function fetchAll() {
         errors.value.pending = true
       }),
     axios
-      .get(getCompressoApiUrl('v2', 'healthcheck/summary'))
+      .get<ApiSchema<'HealthCheckSummaryResponse'>>(getCompressoApiUrl('v2', 'healthcheck/summary'))
       .then((r) => {
         healthSummary.value = r.data
         loading.value.health = false
@@ -201,7 +202,7 @@ async function fetchAll() {
   lastUpdated.value = Date.now()
 }
 
-let pollInterval = null
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   fetchAll()

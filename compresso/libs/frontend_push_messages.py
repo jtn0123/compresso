@@ -31,11 +31,20 @@ Copyright:
 
 import threading
 from queue import Empty, Queue
+from typing import TypedDict
 
 from compresso.libs.singleton import SingletonType
 
 
-class FrontendPushMessages(Queue, metaclass=SingletonType):
+class FrontendPushMessage(TypedDict):
+    id: str
+    type: str
+    code: str
+    message: str
+    timeout: float
+
+
+class FrontendPushMessages(Queue[FrontendPushMessage], metaclass=SingletonType):
     """
     Handles messages passed to the frontend.
 
@@ -48,17 +57,17 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
 
     """
 
-    def _init(self, maxsize):
+    def _init(self, maxsize: int) -> None:
         self._lock = threading.RLock()
-        self.all_items = set()
+        self.all_items: set[str] = set()
         Queue._init(self, maxsize)
 
-    def __add_to_queue_locked(self, item):
+    def __add_to_queue_locked(self, item: FrontendPushMessage) -> None:
         # Add the item to the queue without blocking (lock already held)
         Queue.put_nowait(self, item)
 
     @staticmethod
-    def __validate_item(item):
+    def __validate_item(item: FrontendPushMessage) -> bool:
         # Ensure all required keys are present
         for key in ["id", "type", "code", "message", "timeout"]:
             if key not in item:
@@ -73,8 +82,8 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
             )
         return True
 
-    def __get_all_items_locked(self):
-        items = []
+    def __get_all_items_locked(self) -> list[FrontendPushMessage]:
+        items: list[FrontendPushMessage] = []
         while True:
             try:
                 # Get all items out of queue
@@ -83,12 +92,12 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
                 break
         return items
 
-    def __requeue_items_locked(self, items):
+    def __requeue_items_locked(self, items: list[FrontendPushMessage]) -> None:
         # Add all given items back into the queue
         for item in items:
             Queue.put_nowait(self, item)
 
-    def add(self, item):
+    def add(self, item: FrontendPushMessage) -> None:
         # Ensure received item is valid
         self.__validate_item(item)
         with self._lock:
@@ -98,23 +107,23 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
             self.all_items.add(item_id)
             self.__add_to_queue_locked(item)
 
-    def get_all_items(self):
-        items = []
+    def get_all_items(self) -> list[FrontendPushMessage]:
+        items: list[FrontendPushMessage] = []
         with self._lock:
             items = self.__get_all_items_locked()
             # Add all items back into the queue for continued processing
             self.__requeue_items_locked(items)
         return items
 
-    def requeue_items(self, items):
+    def requeue_items(self, items: list[FrontendPushMessage]) -> None:
         with self._lock:
             # Add all given items back into the queue
             self.__requeue_items_locked(items)
 
-    def remove_item(self, item_id):
+    def remove_item(self, item_id: str) -> None:
         with self._lock:
             current_items = self.__get_all_items_locked()
-            requeue_items = []
+            requeue_items: list[FrontendPushMessage] = []
             # Create list of items that will be queued again
             for current_item in current_items:
                 if current_item.get("id") != item_id:
@@ -124,21 +133,21 @@ class FrontendPushMessages(Queue, metaclass=SingletonType):
             # Add all requeue_items items back into the queue
             self.__requeue_items_locked(requeue_items)
 
-    def read_all_items(self):
+    def read_all_items(self) -> list[FrontendPushMessage]:
         with self._lock:
             current_items = self.__get_all_items_locked()
             # Add all requeue_items items back into the queue
             self.__requeue_items_locked(current_items)
             return list(current_items)
 
-    def update(self, item):
+    def update(self, item: FrontendPushMessage) -> None:
         # Ensure received item is valid
         self.__validate_item(item)
         item_id = item.get("id")
         with self._lock:
             current_items = self.__get_all_items_locked()
 
-            requeue_items = []
+            requeue_items: list[FrontendPushMessage] = []
             replaced = False
             # Create list of items that will be queued again, replacing matching IDs
             for current_item in current_items:

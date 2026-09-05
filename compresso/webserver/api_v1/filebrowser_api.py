@@ -33,11 +33,11 @@ import os
 
 import tornado.escape
 
-from compresso.libs.uiserver import CompressoDataQueues
+from compresso.libs.uiserver import CompressoDataQueues, DataQueues
 from compresso.webserver.api_v1.base_api_handler import BaseApiHandler
 
 
-def _validate_browsable_path(user_path):
+def _validate_browsable_path(user_path: str) -> str:
     """Resolve and validate a user-provided filesystem path for browsing.
 
     Returns a canonical absolute path with traversal sequences resolved.
@@ -55,9 +55,9 @@ def _validate_browsable_path(user_path):
 
 
 class ApiFilebrowserHandler(BaseApiHandler):
-    name = None
-    params = None
-    compresso_data_queues = None
+    name: str
+    params: object
+    compresso_data_queues: DataQueues
 
     routes = [
         {
@@ -67,23 +67,24 @@ class ApiFilebrowserHandler(BaseApiHandler):
         },
     ]
 
-    def initialize(self, **kwargs):
+    def initialize(self, **kwargs: object) -> None:
         self.name = "file_browser_api"
         self.params = kwargs.get("params")
         udq = CompressoDataQueues()
         self.compresso_data_queues = udq.get_compresso_data_queues()
 
-    def set_default_headers(self):
+    def set_default_headers(self) -> None:
         """Set the default response header to be JSON."""
         super().set_default_headers()
 
-    def get(self, path):
+    async def get(self, path: str) -> None:
         self.action_route()
 
-    def post(self, path):
+    async def post(self, path: str) -> None:
         self.action_route()
 
-    def fetch_directory_listing(self, *args, **kwargs):
+    def fetch_directory_listing(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
         current_path = _validate_browsable_path(self.get_argument("current_path", "/"))
         list_type = self.get_argument("list_type", "all")
 
@@ -91,7 +92,7 @@ class ApiFilebrowserHandler(BaseApiHandler):
 
         self.finish(tornado.escape.json_encode(path_data))
 
-    def fetch_path_data(self, current_path, list_type="directories"):
+    def fetch_path_data(self, current_path: str, list_type: str = "directories") -> dict[str, object]:
         """
         Returns an object filled with data pertaining to a particular path
 
@@ -99,8 +100,8 @@ class ApiFilebrowserHandler(BaseApiHandler):
         :param list_type:
         :return:
         """
-        directories = []
-        files = []
+        directories: list[dict[str, str]] = []
+        files: list[dict[str, str]] = []
         if list_type == "directories" or list_type == "all":
             directories = self.fetch_directories(current_path)
         if list_type == "files" or list_type == "all":
@@ -114,7 +115,7 @@ class ApiFilebrowserHandler(BaseApiHandler):
         }
         return path_data
 
-    def fetch_directories(self, path):
+    def fetch_directories(self, path: str) -> list[dict[str, str]]:
         """
         Fetch a list of directory objects based on a given path
 
@@ -122,7 +123,7 @@ class ApiFilebrowserHandler(BaseApiHandler):
         :return:
         """
         safe_path = _validate_browsable_path(path)
-        results = []
+        results: list[dict[str, str]] = []
         if os.path.exists(safe_path):
             # check if this is a root path or if it has a parent
             parent_path = _validate_browsable_path(os.path.join(safe_path, ".."))
@@ -157,7 +158,7 @@ class ApiFilebrowserHandler(BaseApiHandler):
             )
         return results
 
-    def fetch_files(self, path):
+    def fetch_files(self, path: str) -> list[dict[str, str]]:
         """
         Fetch a list of file objects based on a given path
 
@@ -165,7 +166,7 @@ class ApiFilebrowserHandler(BaseApiHandler):
         :return:
         """
         safe_path = _validate_browsable_path(path)
-        results = []
+        results: list[dict[str, str]] = []
         if os.path.exists(safe_path):
             try:
                 for item in sorted(os.listdir(safe_path)):

@@ -289,8 +289,9 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import type { PropType, Ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { formatBytes, formatTime } from 'src/js/formatUtils'
@@ -305,21 +306,21 @@ export default {
     encodedSize: { type: Number, default: 0 },
     sourceCodec: { type: String, default: '' },
     encodedCodec: { type: String, default: '' },
-    vmafScore: { type: Number, default: null },
-    ssimScore: { type: Number, default: null },
+    vmafScore: { type: Number as PropType<number | null>, default: null },
+    ssimScore: { type: Number as PropType<number | null>, default: null },
     encodedByPipeline: { type: Boolean, default: false },
     framerate: { type: Number, default: 24 },
   },
   setup(props) {
     const $q = useQuasar()
     const { t: $t } = useI18n()
-    const rootRef = ref(null)
+    const rootRef = ref<HTMLElement | null>(null)
     const videoError = ref('')
-    const sourceVideoRef = ref(null)
-    const encodedVideoRef = ref(null)
-    const sliderViewportRef = ref(null)
-    const sourceMiniMapRef = ref(null)
-    const encodedMiniMapRef = ref(null)
+    const sourceVideoRef = ref<HTMLVideoElement | null>(null)
+    const encodedVideoRef = ref<HTMLVideoElement | null>(null)
+    const sliderViewportRef = ref<HTMLElement | null>(null)
+    const sourceMiniMapRef = ref<HTMLCanvasElement | null>(null)
+    const encodedMiniMapRef = ref<HTMLCanvasElement | null>(null)
     const playing = ref(false)
     const currentTime = ref(0)
     const duration = ref(0)
@@ -376,9 +377,9 @@ export default {
       }
     }
 
-    function onVideoError(event) {
-      const video = event.target
-      const src = video ? video.src : 'unknown'
+    function onVideoError(event: Event): void {
+      const video = event.target instanceof HTMLVideoElement ? event.target : null
+      const src = video?.src ?? 'unknown'
       videoError.value = 'Failed to load video: ' + src
       $q.notify({ type: 'negative', message: $t('components.videoCompare.videoLoadFailed') })
     }
@@ -397,7 +398,7 @@ export default {
       }
     }
 
-    function syncVideos(time) {
+    function syncVideos(time: number): void {
       // Clamp to the shorter duration to avoid one video ending early
       const maxTime = encodedVideoRef.value
         ? Math.min(duration.value, encodedVideoRef.value.duration || duration.value)
@@ -412,8 +413,8 @@ export default {
       })
     }
 
-    function onSeek(val) {
-      syncVideos(val)
+    function onSeek(val: number | null): void {
+      syncVideos(val ?? 0)
     }
 
     function togglePlay() {
@@ -452,13 +453,13 @@ export default {
       syncVideos(duration.value)
     }
 
-    function onSpeedChange(speed) {
+    function onSpeedChange(speed: number): void {
       if (sourceVideoRef.value) sourceVideoRef.value.playbackRate = speed
       if (encodedVideoRef.value) encodedVideoRef.value.playbackRate = speed
     }
 
     // A2: Zoom-to-Cursor
-    function onZoom(event) {
+    function onZoom(event: WheelEvent): void {
       const delta = event.deltaY > 0 ? -0.2 : 0.2
       const oldScale = scale.value
       const newScale = Math.max(1, Math.min(8, oldScale + delta))
@@ -466,6 +467,7 @@ export default {
 
       // Get cursor position relative to the container element
       const container = event.currentTarget
+      if (!(container instanceof HTMLElement)) return
       const rect = container.getBoundingClientRect()
       const cursorX = event.clientX - rect.left
       const cursorY = event.clientY - rect.top
@@ -501,7 +503,7 @@ export default {
     }
 
     // Pan
-    function onPanStart(event) {
+    function onPanStart(event: MouseEvent): void {
       if (scale.value <= 1) return
       isPanning = true
       panStartX = event.clientX
@@ -512,7 +514,7 @@ export default {
       document.addEventListener('mouseup', onPanEnd)
     }
 
-    function onPanMove(event) {
+    function onPanMove(event: MouseEvent): void {
       if (!isPanning) return
       translateX.value = panStartTranslateX + (event.clientX - panStartX) / scale.value
       translateY.value = panStartTranslateY + (event.clientY - panStartY) / scale.value
@@ -527,27 +529,35 @@ export default {
     // Touch support for pan and zoom
     let lastTouchDistance = 0
 
-    function onTouchStart(event) {
+    function onTouchStart(event: TouchEvent): void {
+      const firstTouch = event.touches[0]
+      if (!firstTouch) return
       if (event.touches.length === 2) {
         // Pinch-to-zoom start
-        const dx = event.touches[0].clientX - event.touches[1].clientX
-        const dy = event.touches[0].clientY - event.touches[1].clientY
+        const secondTouch = event.touches[1]
+        if (!secondTouch) return
+        const dx = firstTouch.clientX - secondTouch.clientX
+        const dy = firstTouch.clientY - secondTouch.clientY
         lastTouchDistance = Math.sqrt(dx * dx + dy * dy)
       } else if (event.touches.length === 1 && scale.value > 1) {
         // Pan start
         isPanning = true
-        panStartX = event.touches[0].clientX
-        panStartY = event.touches[0].clientY
+        panStartX = firstTouch.clientX
+        panStartY = firstTouch.clientY
         panStartTranslateX = translateX.value
         panStartTranslateY = translateY.value
       }
     }
 
-    function onTouchMove(event) {
+    function onTouchMove(event: TouchEvent): void {
+      const firstTouch = event.touches[0]
+      if (!firstTouch) return
       if (event.touches.length === 2) {
         event.preventDefault()
-        const dx = event.touches[0].clientX - event.touches[1].clientX
-        const dy = event.touches[0].clientY - event.touches[1].clientY
+        const secondTouch = event.touches[1]
+        if (!secondTouch) return
+        const dx = firstTouch.clientX - secondTouch.clientX
+        const dy = firstTouch.clientY - secondTouch.clientY
         const dist = Math.sqrt(dx * dx + dy * dy)
         if (lastTouchDistance > 0) {
           const scaleDelta = (dist - lastTouchDistance) * 0.01
@@ -560,8 +570,8 @@ export default {
         lastTouchDistance = dist
       } else if (event.touches.length === 1 && isPanning) {
         event.preventDefault()
-        translateX.value = panStartTranslateX + (event.touches[0].clientX - panStartX) / scale.value
-        translateY.value = panStartTranslateY + (event.touches[0].clientY - panStartY) / scale.value
+        translateX.value = panStartTranslateX + (firstTouch.clientX - panStartX) / scale.value
+        translateY.value = panStartTranslateY + (firstTouch.clientY - panStartY) / scale.value
       }
     }
 
@@ -571,13 +581,13 @@ export default {
     }
 
     // Slider drag
-    function onSliderDragStart(event) {
+    function onSliderDragStart(): void {
       isSliderDragging = true
       document.addEventListener('mousemove', onSliderDragMove)
       document.addEventListener('mouseup', onSliderDragEnd)
     }
 
-    function onSliderDragMove(event) {
+    function onSliderDragMove(event: MouseEvent): void {
       if (!isSliderDragging || !sliderViewportRef.value) return
       const rect = sliderViewportRef.value.getBoundingClientRect()
       const x = event.clientX - rect.left
@@ -591,17 +601,19 @@ export default {
     }
 
     // Slider touch drag
-    function onSliderTouchStart(event) {
+    function onSliderTouchStart(): void {
       isSliderDragging = true
       document.addEventListener('touchmove', onSliderTouchMove, { passive: false })
       document.addEventListener('touchend', onSliderTouchEnd)
     }
 
-    function onSliderTouchMove(event) {
+    function onSliderTouchMove(event: TouchEvent): void {
       if (!isSliderDragging || !sliderViewportRef.value || !event.touches.length) return
       event.preventDefault()
       const rect = sliderViewportRef.value.getBoundingClientRect()
-      const x = event.touches[0].clientX - rect.left
+      const touch = event.touches[0]
+      if (!touch) return
+      const x = touch.clientX - rect.left
       sliderPos.value = Math.max(0, Math.min(100, (x / rect.width) * 100))
     }
 
@@ -612,7 +624,7 @@ export default {
     }
 
     // Slider keyboard handler (Issue #18)
-    function onSliderKeyDown(event) {
+    function onSliderKeyDown(event: KeyboardEvent): void {
       if (event.key === 'ArrowLeft') {
         event.preventDefault()
         sliderPos.value = Math.max(0, sliderPos.value - 1)
@@ -623,9 +635,9 @@ export default {
     }
 
     // A1: Keyboard Shortcuts
-    function onKeyDown(event) {
+    function onKeyDown(event: KeyboardEvent): void {
       // Guard against firing when input/select/textarea is focused
-      const tag = event.target.tagName.toLowerCase()
+      const tag = event.target instanceof HTMLElement ? event.target.tagName.toLowerCase() : ''
       if (tag === 'input' || tag === 'select' || tag === 'textarea') return
 
       // Skip arrow keys if a slider element is focused
@@ -676,7 +688,7 @@ export default {
     }
 
     // A3: Mini-Map rendering
-    function drawMiniMap(canvasRef, videoRef) {
+    function drawMiniMap(canvasRef: Ref<HTMLCanvasElement | null>, videoRef: Ref<HTMLVideoElement | null>): void {
       const canvas = canvasRef.value
       const video = videoRef.value
       if (!canvas || !video) return
@@ -690,10 +702,6 @@ export default {
       // The visible portion is determined by scale and translate
       const viewportFractionW = 1 / scale.value
       const viewportFractionH = 1 / scale.value
-      // Center offset from translate
-      const offsetX = 0.5 - (translateX.value / (video.videoWidth || 1)) * scale.value
-      const offsetY = 0.5 - (translateY.value / (video.videoHeight || 1)) * scale.value
-
       const rectW = 120 * viewportFractionW
       const rectH = 80 * viewportFractionH
       const rectX = (120 - rectW) / 2 - (translateX.value / (video.videoWidth || 120)) * 120

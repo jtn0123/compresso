@@ -30,7 +30,9 @@ Copyright:
 """
 
 import hashlib
+from collections.abc import Mapping, Sequence
 
+from compresso.libs import narrowing
 from compresso.libs.logs import CompressoLogging
 from compresso.libs.plugins import PluginsHandler
 from compresso.libs.unplugins import PluginExecutor
@@ -38,7 +40,7 @@ from compresso.libs.unplugins import PluginExecutor
 logger = CompressoLogging.get_logger(name="webserver.helpers.plugins")
 
 
-def prepare_filtered_plugins(params):
+def prepare_filtered_plugins(params: Mapping[str, object]) -> dict[str, object]:
     """
     Returns a object of records filtered and sorted
     according to the provided request.
@@ -46,20 +48,15 @@ def prepare_filtered_plugins(params):
     :param params:
     :return:
     """
-    start = params.get("start", 0)
-    length = params.get("length", 0)
+    start = narrowing.strict_int(params.get("start"))
+    length = narrowing.strict_int(params.get("length"))
 
-    search_value = params.get("search_value", "")
+    search_value = narrowing.strict_str(params.get("search_value"))
 
     # Note that plugins can be ordered in multiple ways. So this must be a list
-    order = [
-        params.get(
-            "order",
-            {
-                "column": "name",
-                "dir": "desc",
-            },
-        )
+    order_value = params.get("order")
+    order: list[Mapping[str, object]] = [
+        order_value if isinstance(order_value, Mapping) else {"column": "name", "dir": "desc"}
     ]
 
     # Fetch Plugins
@@ -68,26 +65,31 @@ def prepare_filtered_plugins(params):
     # Get total count
     records_total_count = plugins.get_total_plugin_list_count()
     # Get quantity after filters (without pagination)
-    records_filtered_count = plugins.get_plugin_list_filtered_and_sorted(
-        order=order, start=0, length=0, search_value=search_value
-    ).count()
+    all_filtered = plugins.get_plugin_list_filtered_and_sorted(order=order, start=0, length=0, search_value=search_value)
+    records_filtered_count = all_filtered.count() if all_filtered is not None else 0
     # Get filtered/sorted results
     plugin_results = plugins.get_plugin_list_filtered_and_sorted(
         order=order, start=start, length=length, search_value=search_value
     )
 
     # Build return data
-    return_data = {"recordsTotal": records_total_count, "recordsFiltered": records_filtered_count, "results": []}
+    results: list[dict[str, object]] = []
+    return_data: dict[str, object] = {
+        "recordsTotal": records_total_count,
+        "recordsFiltered": records_filtered_count,
+        "results": results,
+    }
 
     # Iterate over plugins and append them to the plugin data
-    for plugin_result in plugin_results:
+    for plugin_result in plugin_results or []:
         # Set plugin status
         plugin_status = {
             "update_available": plugin_result.get("update_available"),
         }
         # Check if plugin is able to be configured
         has_config = False
-        plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_result.get("plugin_id"))
+        plugin_id = narrowing.strict_str(plugin_result.get("plugin_id"))
+        plugin_settings, _plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_id)
         if plugin_settings:
             has_config = True
         # Set params as required in template
@@ -103,13 +105,13 @@ def prepare_filtered_plugins(params):
             "status": plugin_status,
             "has_config": has_config,
         }
-        return_data["results"].append(item)
+        results.append(item)
 
     # Return results
     return return_data
 
 
-def get_plugin_types_with_flows():
+def get_plugin_types_with_flows() -> list[str]:
     """
     Returns a list of all available plugin types
 
@@ -118,7 +120,7 @@ def get_plugin_types_with_flows():
     return PluginsHandler.get_plugin_types_with_flows()
 
 
-def get_enabled_plugin_flows_for_plugin_type(plugin_type, library_id):
+def get_enabled_plugin_flows_for_plugin_type(plugin_type: str, library_id: int) -> list[dict[str, object]]:
     """
     Fetch all enabled plugin flows for a plugin type
 
@@ -130,7 +132,7 @@ def get_enabled_plugin_flows_for_plugin_type(plugin_type, library_id):
     return plugin_handler.get_enabled_plugin_flows_for_plugin_type(plugin_type, library_id)
 
 
-def get_enabled_plugin_data_panels():
+def get_enabled_plugin_data_panels() -> list[dict[str, object]]:
     """
     Returns a list of all enabled plugin data panels
 
@@ -140,7 +142,7 @@ def get_enabled_plugin_data_panels():
     return plugin_handler.get_enabled_plugin_modules_by_type("frontend.panel")
 
 
-def exec_data_panels_plugin_runner(data, plugin_id):
+def exec_data_panels_plugin_runner(data: dict[str, object], plugin_id: str) -> bool:
     """
     Exec a frontend.panel plugin runner
 
@@ -152,7 +154,7 @@ def exec_data_panels_plugin_runner(data, plugin_id):
     return plugin_handler.exec_plugin_runner(data, plugin_id, "frontend.panel")
 
 
-def get_enabled_plugin_plugin_apis():
+def get_enabled_plugin_plugin_apis() -> list[dict[str, object]]:
     """
     Returns a list of all enabled plugin APIs
 
@@ -162,7 +164,7 @@ def get_enabled_plugin_plugin_apis():
     return plugin_handler.get_enabled_plugin_modules_by_type("frontend.plugin_api")
 
 
-def exec_plugin_api_plugin_runner(data, plugin_id):
+def exec_plugin_api_plugin_runner(data: dict[str, object], plugin_id: str) -> bool:
     """
     Exec a frontend.plugin_api plugin runner
 
@@ -174,7 +176,9 @@ def exec_plugin_api_plugin_runner(data, plugin_id):
     return plugin_handler.exec_plugin_runner(data, plugin_id, "frontend.plugin_api")
 
 
-def save_enabled_plugin_flows_for_plugin_type(plugin_type, library_id, plugin_flow):
+def save_enabled_plugin_flows_for_plugin_type(
+    plugin_type: str, library_id: int, plugin_flow: Sequence[Mapping[str, object]]
+) -> bool:
     """
     Save a plugin flow given the plugin type and library ID
 
@@ -187,7 +191,7 @@ def save_enabled_plugin_flows_for_plugin_type(plugin_type, library_id, plugin_fl
     return plugins.set_plugin_flow(plugin_type, library_id, plugin_flow)
 
 
-def remove_plugins(plugin_table_ids):
+def remove_plugins(plugin_table_ids: Sequence[int]) -> int:
     """
     Removes/Uninstalls a list of plugins
 
@@ -198,7 +202,7 @@ def remove_plugins(plugin_table_ids):
     return plugins_handler.uninstall_plugins_by_db_table_id(plugin_table_ids)
 
 
-def update_plugins(plugin_table_ids):
+def update_plugins(plugin_table_ids: Sequence[int]) -> bool:
     """
     Removes/Uninstalls a list of plugins
 
@@ -209,7 +213,7 @@ def update_plugins(plugin_table_ids):
     return plugins_handler.update_plugins_by_db_table_id(plugin_table_ids)
 
 
-def get_plugin_settings(plugin_id: str, library_id=None):
+def get_plugin_settings(plugin_id: str, library_id: int | None = None) -> list[dict[str, object]]:
     """
     Given a plugin installation ID, return a list of plugin settings for that plugin
 
@@ -217,7 +221,7 @@ def get_plugin_settings(plugin_id: str, library_id=None):
     :param library_id:
     :return:
     """
-    settings = []
+    settings: list[dict[str, object]] = []
 
     # Fetch level from session
     from compresso.libs.session import Session
@@ -230,92 +234,61 @@ def get_plugin_settings(plugin_id: str, library_id=None):
     plugin_settings, plugin_settings_meta = plugin_executor.get_plugin_settings(plugin_id, library_id=library_id)
     if plugin_settings:
         for key in plugin_settings:
-            form_input = {
-                "key_id": hashlib.md5(key.encode("utf8")).hexdigest(),  # noqa: S324 — used for deterministic ID generation, not security
-                "key": key,
-                "value": plugin_settings.get(key),
-                "input_type": None,
-                "label": None,
-                "description": None,
-                "tooltip": None,
-                "select_options": [],
-                "slider_options": {},
-                "display": "visible",
-                "sub_setting": False,
-            }
-
-            plugin_setting_meta = plugin_settings_meta.get(key, {})
-
-            # Set input type for form
-            form_input["input_type"] = plugin_setting_meta.get("input_type", None)
-            if not form_input["input_type"]:
-                form_input["input_type"] = "text"
-                if isinstance(form_input["value"], bool):
-                    form_input["input_type"] = "checkbox"
-
-            # Handle unsupported input types (where they may be supported in future versions of Compresso)
-            supported_input_types = [
-                "text",
-                "textarea",
-                "select",
-                "checkbox",
-                "slider",
-                "browse_directory",
-                "section_header",
-                "section_subheader",
-                "section_details",
-                "section_admonition",
-            ]
-            if form_input["input_type"] not in supported_input_types:
-                form_input["input_type"] = "text"
-
-            # Set input display options
-            form_input["display"] = plugin_setting_meta.get("display", "visible")
-            form_input["sub_setting"] = plugin_setting_meta.get("sub_setting", False)
-
-            # Set input label text
-            form_input["label"] = plugin_setting_meta.get("label", None)
-            if not form_input["label"]:
-                form_input["label"] = key
-
-            # Set input description text
-            form_input["description"] = plugin_setting_meta.get("description", "")
-
-            # Usability level
-            req_lev = plugin_setting_meta.get("req_lev", 0)
-            if s.level < req_lev:
-                form_input["display"] = "disabled"
-                form_input["description"] += " (This option is reserved for supporters of the project)"
-
-            # Set input tooltip text
-            form_input["tooltip"] = plugin_setting_meta.get("tooltip", "")
-
-            # Set options if form input is select
-            if form_input["input_type"] == "select":
-                form_input["select_options"] = plugin_setting_meta.get("select_options", [])
-                if not form_input["select_options"]:
-                    # No options are given. Revert back to text input
-                    form_input["input_type"] = "text"
-
-            # Set options if form input is slider
-            if form_input["input_type"] == "slider":
-                slider_options = plugin_setting_meta.get("slider_options")
-                if not slider_options:
-                    # No options are given. Revert back to text input
-                    form_input["input_type"] = "text"
-                else:
-                    form_input["slider_options"] = {
-                        "min": slider_options.get("min", "0"),
-                        "max": slider_options.get("max", "1"),
-                        "step": slider_options.get("step", "1"),
-                        "suffix": slider_options.get("suffix", ""),
-                    }
-
-            settings.append(form_input)
+            plugin_setting_meta_value = plugin_settings_meta.get(key, {})
+            plugin_setting_meta = plugin_setting_meta_value if isinstance(plugin_setting_meta_value, Mapping) else {}
+            settings.append(_plugin_setting_form_input(key, plugin_settings.get(key), plugin_setting_meta, s.level))
     return settings
 
 
-def get_plugin_changelog(plugin_id):
+def _plugin_setting_form_input(key: str, value: object, meta: Mapping[str, object], supporter_level: int) -> dict[str, object]:
+    supported_types = {
+        "text",
+        "textarea",
+        "select",
+        "checkbox",
+        "slider",
+        "browse_directory",
+        "section_header",
+        "section_subheader",
+        "section_details",
+        "section_admonition",
+    }
+    input_type = meta.get("input_type") or ("checkbox" if isinstance(value, bool) else "text")
+    if input_type not in supported_types:
+        input_type = "text"
+    description = narrowing.strict_str(meta.get("description"))
+    display = meta.get("display", "visible")
+    if supporter_level < narrowing.strict_int(meta.get("req_lev")):
+        display = "disabled"
+        description += " (This option is reserved for supporters of the project)"
+    select_options = meta.get("select_options", []) if input_type == "select" else []
+    if input_type == "select" and not select_options:
+        input_type = "text"
+    slider_value = meta.get("slider_options")
+    slider_options: dict[str, object] = {}
+    if input_type == "slider" and isinstance(slider_value, Mapping):
+        slider_options = {
+            name: slider_value.get(name, default)
+            for name, default in (("min", "0"), ("max", "1"), ("step", "1"), ("suffix", ""))
+        }
+    elif input_type == "slider":
+        input_type = "text"
+    return {
+        "key_id": hashlib.md5(key.encode("utf8")).hexdigest(),  # noqa: S324 — used for deterministic ID generation, not security
+        "key": key,
+        "value": value,
+        "input_type": input_type,
+        "label": meta.get("label") or key,
+        "description": description,
+        "tooltip": meta.get("tooltip", ""),
+        "select_options": select_options,
+        "slider_options": slider_options,
+        "display": display,
+        "sub_setting": meta.get("sub_setting", False),
+    }
+
+
+def get_plugin_changelog(plugin_id: str) -> list[str]:
     """
     Given a plugin installation ID, return a list of lines read from the plugin's changelog
 
@@ -327,7 +300,7 @@ def get_plugin_changelog(plugin_id):
     return plugin_executor.get_plugin_changelog(plugin_id)
 
 
-def get_plugin_long_description(plugin_id):
+def get_plugin_long_description(plugin_id: str) -> list[str]:
     """
     Given a plugin installation ID, return a list of lines read from the plugin's changelog
 
@@ -339,7 +312,9 @@ def get_plugin_long_description(plugin_id):
     return plugin_executor.get_plugin_long_description(plugin_id)
 
 
-def prepare_plugin_info_and_settings(plugin_id, prefer_local=True, library_id=None):
+def prepare_plugin_info_and_settings(
+    plugin_id: str, prefer_local: bool = True, library_id: int | None = None
+) -> dict[str, object]:
     """
     Returns a object of plugin metadata and current settings for the requested plugin_id
 
@@ -351,7 +326,8 @@ def prepare_plugin_info_and_settings(plugin_id, prefer_local=True, library_id=No
     plugins_handler = PluginsHandler()
 
     plugin_installed = True
-    plugin_results = plugins_handler.get_plugin_list_filtered_and_sorted(plugin_id=plugin_id)
+    queried_plugins = plugins_handler.get_plugin_list_filtered_and_sorted(plugin_id=plugin_id)
+    plugin_results = list(queried_plugins or [])
 
     if not plugin_results:
         # This plugin is not installed
@@ -363,14 +339,16 @@ def prepare_plugin_info_and_settings(plugin_id, prefer_local=True, library_id=No
         for plugin in plugin_list:
             if plugin.get("plugin_id") == plugin_id:
                 # Create changelog text from remote changelog text file
-                plugin["changelog"] = plugins_handler.read_remote_changelog_file(plugin.get("changelog_url"))
+                plugin["changelog"] = plugins_handler.read_remote_changelog_file(
+                    narrowing.strict_str(plugin.get("changelog_url"))
+                )
                 # Create list as the 'plugin_results' var above will also have returned a list if any results were found.
                 plugin_results = [plugin]
                 break
 
     # Iterate over plugins and append them to the plugin data
-    plugin_data = {}
-    for plugin_result in plugin_results:
+    plugin_data: dict[str, object] = {}
+    for plugin_result in plugin_results or []:
         # Set plugin status
         plugin_status = {
             "installed": plugin_result.get("installed", False),
@@ -391,15 +369,20 @@ def prepare_plugin_info_and_settings(plugin_id, prefer_local=True, library_id=No
             "settings": [],
         }
         if plugin_installed:
-            plugin_data["settings"] = get_plugin_settings(plugin_result.get("plugin_id"), library_id=library_id)
-            plugin_data["changelog"] = "".join(get_plugin_changelog(plugin_result.get("plugin_id")))
-            plugin_data["description"] += "\n\n" + "".join(get_plugin_long_description(plugin_result.get("plugin_id")))
+            result_plugin_id = narrowing.strict_str(plugin_result.get("plugin_id"))
+            plugin_data["settings"] = get_plugin_settings(result_plugin_id, library_id=library_id)
+            plugin_data["changelog"] = "".join(get_plugin_changelog(result_plugin_id))
+            plugin_data["description"] = (
+                narrowing.strict_str(plugin_data.get("description"))
+                + "\n\n"
+                + "".join(get_plugin_long_description(result_plugin_id))
+            )
         break
 
     return plugin_data
 
 
-def check_if_plugin_is_installed(plugin_id):
+def check_if_plugin_is_installed(plugin_id: str) -> bool:
     """
     Returns true if the given plugin is installed
 
@@ -418,7 +401,7 @@ def check_if_plugin_is_installed(plugin_id):
     return plugin_installed
 
 
-def update_plugin_settings(plugin_id, settings, library_id=None):
+def update_plugin_settings(plugin_id: str, settings: Sequence[Mapping[str, object]], library_id: int | None = None) -> bool:
     """
     Updates the settings for the requested plugin_id
 
@@ -435,7 +418,7 @@ def update_plugin_settings(plugin_id, settings, library_id=None):
         return False
 
     # Loop over all plugin settings in order to find matches in the posted params
-    settings_to_save = {}
+    settings_to_save: dict[str, object] = {}
     for s in settings:
         key = s.get("key")
         input_type = s.get("input_type")
@@ -453,13 +436,14 @@ def update_plugin_settings(plugin_id, settings, library_id=None):
             elif isinstance(value, int):
                 value = value > 0
         # Add that to our dictionary of settings to save
-        settings_to_save[key] = value
+        if isinstance(key, str):
+            settings_to_save[key] = value
 
     # If we found settings that need to be saved, save them...
     if settings_to_save:
         plugin_executor = PluginExecutor()
         saved_all_settings = plugin_executor.save_plugin_settings(
-            plugin_data.get("plugin_id"), settings_to_save, library_id=library_id
+            narrowing.strict_str(plugin_data.get("plugin_id")), settings_to_save, library_id=library_id
         )
         # If the save function was successful
         if saved_all_settings:
@@ -469,7 +453,7 @@ def update_plugin_settings(plugin_id, settings, library_id=None):
     return False
 
 
-def reset_plugin_settings(plugin_id, library_id=None):
+def reset_plugin_settings(plugin_id: str, library_id: int | None = None) -> bool:
     """
     Reset a plugin's settings back to defaults (or global config if a library ID is provided)
 
@@ -486,10 +470,10 @@ def reset_plugin_settings(plugin_id, library_id=None):
 
     # Reset the plugin settings
     plugin_executor = PluginExecutor()
-    return plugin_executor.reset_plugin_settings(plugin_data.get("plugin_id"), library_id=library_id)
+    return plugin_executor.reset_plugin_settings(narrowing.strict_str(plugin_data.get("plugin_id")), library_id=library_id)
 
 
-def prepare_installable_plugins_list():
+def prepare_installable_plugins_list() -> list[dict[str, object]]:
     """
     Return a list of plugins able to be installed.
     At the moment this does not employ any pagination. The lists are small enough
@@ -502,7 +486,7 @@ def prepare_installable_plugins_list():
     return plugins.get_installable_plugins_list()
 
 
-def install_plugin_by_id(plugin_id, repo_id=None):
+def install_plugin_by_id(plugin_id: str, repo_id: int | str | None = None) -> bool:
     """
     Install a plugin given its Plugin ID
 
@@ -516,18 +500,18 @@ def install_plugin_by_id(plugin_id, repo_id=None):
     return plugins.install_plugin_by_id(plugin_id, repo_id)
 
 
-def save_plugin_repos_list(repos_list):
+def save_plugin_repos_list(repos_list: Sequence[str]) -> bool:
     plugins = PluginsHandler()
     return plugins.set_plugin_repos(repos_list)
 
 
-def prepare_plugin_repos_list():
+def prepare_plugin_repos_list() -> list[dict[str, object]]:
     """
     Return a list of plugin repos available to download from
 
     :return:
     """
-    return_repos = []
+    return_repos: list[dict[str, object]] = []
 
     plugins = PluginsHandler()
     # Fetch the data again from the database
@@ -536,15 +520,16 @@ def prepare_plugin_repos_list():
     # Remove the default plugin repo from the list
     default_repo = plugins.get_default_repo()
     for repo in current_repos:
-        if not repo.get("path").startswith(default_repo):
+        if not narrowing.strict_str(repo.get("path")).startswith(default_repo):
             return_repos.append(repo)
 
     # Append metadata from repo cache files
     for repo in return_repos:
-        repo_path = repo.get("path")
+        repo_path = narrowing.strict_str(repo.get("path"))
         repo_id = plugins.get_plugin_repo_id(repo_path)
         repo_data = plugins.read_repo_data(repo_id)
-        repo_metadata = repo_data.get("repo", {})
+        repo_metadata_value = repo_data.get("repo", {})
+        repo_metadata = repo_metadata_value if isinstance(repo_metadata_value, Mapping) else {}
         repo["id"] = repo_metadata.get("id") or repo_metadata.get("repo_id") or ""
         repo["icon"] = repo_metadata.get("icon") or repo_metadata.get("repo_icon_url") or ""
         repo["name"] = repo_metadata.get("name") or repo_metadata.get("repo_name") or ""
@@ -556,7 +541,7 @@ def prepare_plugin_repos_list():
     return return_repos
 
 
-def reload_plugin_repos_data():
+def reload_plugin_repos_data() -> bool:
     """
     Reloads all plugin repos data from the configured URL path
 

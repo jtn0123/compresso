@@ -34,7 +34,7 @@ import logging
 import os
 
 
-def read_version_string(version_type="long"):
+def read_version_string(version_type: str = "long") -> str:
     """
     Return the application's version number as a string
 
@@ -45,7 +45,12 @@ def read_version_string(version_type="long"):
         version_file = os.path.join(root_dir, "version")
         with open(version_file) as json_file:
             data = json.load(json_file)
-        return data[version_type]
+        if not isinstance(data, dict):
+            raise ValueError("version document must be a JSON object")
+        value = data.get(version_type)
+        if not isinstance(value, str):
+            raise ValueError(f"version field {version_type!r} must be a string")
+        return value
     except Exception as e:
         logging.getLogger(__name__).warning("Failed to read version file: %s", e)
         return "UNKNOWN.VERSION"
