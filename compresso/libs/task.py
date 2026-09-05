@@ -504,8 +504,6 @@ class TaskItem:
 
         return cast("CountedRows", query.dicts())
 
-        return query.dicts()
-
     def __cleanup_task_before_delete(self, task_record: Tasks) -> bool:
         """Run a task's irreversible pre-delete cleanup; return success."""
         try:
