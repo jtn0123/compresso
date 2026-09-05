@@ -1,0 +1,124 @@
+.comparison-page {
+  max-width: 1540px;
+  margin: 0 auto;
+}
+
+.setup-card {
+  overflow: hidden;
+}
+
+.setup-heading,
+.profile-heading,
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.setup-heading {
+  padding: 24px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--q-secondary) 10%, transparent), transparent 55%), var(--q-card-head);
+}
+
+.selection-badge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.profile-option:hover,
+.profile-option--selected {
+  background: color-mix(in srgb, var(--q-secondary) 7%, transparent);
+  border-color: color-mix(in srgb, var(--q-secondary) 62%, transparent);
+}
+
+.profile-option--disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.source-input :deep(.q-field__control) {
+  cursor: pointer;
+}
+
+.profile-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.profile-copy span,
+.profile-copy small {
+  color: var(--compresso-grey-7);
+}
+
+.profile-copy small {
+  margin-top: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.batch-toolbar {
+  min-height: 48px;
+}
+
+.batch-source {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.batch-source span {
+  color: var(--compresso-grey-7);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.batch-source strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.winner-handoff {
+  border-color: color-mix(in srgb, var(--q-secondary) 55%, var(--border-subtle));
+}
+
+@media (max-width: 760px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-heading,
+  .profile-heading,
+  .batch-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .selection-badge {
+    align-self: flex-start;
+  }
+}

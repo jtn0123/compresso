@@ -241,6 +241,19 @@ class TestTaskQueue:
         assert result is False
 
     @pytest.mark.unittest
+    def test_remote_worker_query_skips_force_local_tasks(self):
+        from compresso.libs.taskqueue import build_tasks_query
+
+        local_only_task = self._create_task("/media/comparison-winner.mkv")
+        local_only_task.force_local = True
+        local_only_task.save()
+        remote_eligible = self._create_task("/media/normal-task.mkv")
+
+        result = build_tasks_query("pending", sort_by=Tasks.id, local_only=True)
+
+        assert result.id == remote_eligible.id
+
+    @pytest.mark.unittest
     def test_build_tasks_query_library_filter(self):
         second_library = Libraries.create(
             name="second_lib",

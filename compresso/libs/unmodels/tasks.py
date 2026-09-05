@@ -78,6 +78,7 @@ class Tasks(BaseModel):
     heartbeat_at = DateTimeField(null=True, default=None)
     remote_result_checksum = TextField(null=True, default=None)
     remote_completed_at = DateTimeField(null=True, default=None)
+    force_local = BooleanField(null=False, default=False, index=True)
 
     class Meta:
         indexes = ((("status", "priority"), False),)

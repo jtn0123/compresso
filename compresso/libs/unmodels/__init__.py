@@ -29,6 +29,8 @@ Copyright:
 
 """
 
+from .comparisonbatches import ComparisonBatches
+from .comparisoncandidates import ComparisonCandidates
 from .completedtasks import CompletedTasks
 from .completedtaskscommandlogs import CompletedTasksCommandLogs
 from .compressionstats import CompressionStats

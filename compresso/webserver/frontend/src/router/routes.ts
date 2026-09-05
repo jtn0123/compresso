@@ -130,6 +130,15 @@ const routes = [
       showMainNavDrawer: true,
     },
   },
+  {
+    path: '/ui/comparison',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{ name: 'comparison', path: '', component: () => import('pages/SampleComparison.vue') }],
+    meta: {
+      showHome: true,
+      showMainNavDrawer: true,
+    },
+  },
   // Always leave this as last one,
   // but you can also remove it
   {

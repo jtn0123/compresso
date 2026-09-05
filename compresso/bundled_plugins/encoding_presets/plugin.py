@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from typing import Protocol, cast
 
 from compresso.libs import narrowing
+from compresso.libs.task import load_task_metadata
 from compresso.libs.unplugins.settings import PluginSettings
 
 logger = logging.getLogger(__name__)
@@ -189,6 +190,7 @@ CPU_USED_PRESET_MAP = {
 }
 
 VIDEOTOOLBOX_ENCODERS = {"h264_videotoolbox", "hevc_videotoolbox"}
+AMF_ENCODERS = {"h264_amf", "hevc_amf", "av1_amf"}
 
 # CRF parameter name varies by encoder
 CRF_PARAM_MAP = {
@@ -214,6 +216,33 @@ def _videotoolbox_quality_from_crf(crf: object) -> int:
     """Map the UI's lower-is-better CRF scale to VideoToolbox 1-100 quality."""
     bounded_crf = max(0, min(63, narrowing.strict_int(crf, 23)))
     return round(100 - (bounded_crf / 63) * 99)
+
+
+def _load_task_profile_override(task_id: int | None) -> dict[str, object]:
+    """Load a one-job comparison winner without changing library settings."""
+    if task_id is None:
+        return {}
+    try:
+        payload = load_task_metadata(task_id)
+        metadata = payload.get("__meta__", {}) if isinstance(payload, dict) else {}
+        profile = metadata.get("comparison_profile", {}) if isinstance(metadata, dict) else {}
+        if not isinstance(profile, dict):
+            return {}
+        allowed = {
+            "video_codec",
+            "video_encoder",
+            "crf",
+            "encoder_preset",
+            "max_bitrate",
+            "scale_height",
+            "audio_codec",
+            "audio_bitrate",
+            "output_format",
+        }
+        return {key: value for key, value in profile.items() if key in allowed}
+    except (TypeError, ValueError):
+        logger.warning("Ignoring invalid task comparison profile metadata for task %s", task_id)
+        return {}
 
 
 def _get_source_extension(file_path: str) -> str:
@@ -282,7 +311,8 @@ def on_worker_process(data: dict[str, object], **kwargs: object) -> None:
     settings = Settings(library_id=library_id if isinstance(library_id, int) and not isinstance(library_id, bool) else None)
     settings.get_setting()
 
-    s = settings.settings_configured
+    s = dict(settings.settings_configured)
+    s.update(_load_task_profile_override(narrowing.strict_int_or_none(data.get("task_id"))))
 
     file_in = narrowing.strict_str(data.get("file_in"))
     worker_log_value = data.get("worker_log")
@@ -363,14 +393,17 @@ def _append_video_settings(cmd: list[str], settings: Mapping[str, object]) -> st
         return ""
     cmd.extend(["-c:v", video_encoder])
     crf = narrowing.strict_int(settings.get("crf"), 23)
-    crf_args = (
-        ["-q:v", str(_videotoolbox_quality_from_crf(crf))]
-        if video_encoder in VIDEOTOOLBOX_ENCODERS
-        else [CRF_PARAM_MAP.get(video_encoder, "-crf"), str(crf)]
-    )
+    if video_encoder in VIDEOTOOLBOX_ENCODERS:
+        crf_args = ["-q:v", str(_videotoolbox_quality_from_crf(crf))]
+    elif video_encoder in AMF_ENCODERS:
+        crf_args = ["-rc", "cqp", "-qp_i", str(crf), "-qp_p", str(crf)]
+    else:
+        crf_args = [CRF_PARAM_MAP.get(video_encoder, "-crf"), str(crf)]
     cmd.extend(crf_args)
     preset = narrowing.strict_str(settings.get("encoder_preset"), "medium").strip()
-    if preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
+    if preset and video_encoder in AMF_ENCODERS:
+        cmd.extend(["-quality", preset])
+    elif preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
         preset_value = _encoder_preset_value(video_encoder, preset)
         cmd.extend([PRESET_PARAM_MAP.get(video_encoder, "-preset"), preset_value])
     max_bitrate = narrowing.strict_str(settings.get("max_bitrate")).strip()
@@ -383,7 +416,7 @@ def _append_video_settings(cmd: list[str], settings: Mapping[str, object]) -> st
 
 def _encoder_preset_value(video_encoder: str, preset: str) -> str:
     if video_encoder == "libsvtav1":
-        return SVTAV1_PRESET_MAP.get(preset, "5")
+        return preset if preset.isdigit() else SVTAV1_PRESET_MAP.get(preset, "5")
     if video_encoder in ("libvpx-vp9", "libaom-av1"):
         return CPU_USED_PRESET_MAP.get(preset, "3")
     return preset

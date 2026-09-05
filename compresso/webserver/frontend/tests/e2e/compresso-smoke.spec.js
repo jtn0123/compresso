@@ -52,6 +52,48 @@ const completedTasks = [
   },
 ]
 
+const comparisonCandidates = [
+  ['candidate-x265', 'x265_crf_22', 'x265 CRF 22', 'libx265', 95.4, 0.985, 38.2],
+  ['candidate-av1', 'svt_av1_crf_30', 'SVT-AV1 CRF 30', 'libsvtav1', 94.8, 0.981, 46.7],
+  ['candidate-x264', 'x264_crf_23', 'x264 CRF 23', 'libx264', 93.9, 0.976, 24.5],
+].map(([candidate_uuid, profile_key, profile_label, encoder, vmaf_score, ssim_score, size_saved_percent], index) => ({
+  id: index + 1,
+  candidate_uuid,
+  profile_key,
+  profile_label,
+  encoder,
+  codec: profile_key.includes('av1') ? 'av1' : profile_key.includes('x264') ? 'h264' : 'hevc',
+  status: 'completed',
+  progress: 100,
+  output_url: 'data:video/mp4;base64,',
+  output_size: 620000 - index * 40000,
+  source_size: 1000000,
+  size_saved_bytes: 380000 + index * 40000,
+  size_saved_percent,
+  vmaf_score,
+  ssim_score,
+  error: null,
+}))
+
+function comparisonStatus(overrides = {}) {
+  return {
+    batch_uuid: 'comparison-1',
+    source_path: '/media/movies/Big Buck Bunny.mkv',
+    source_size: 1000000,
+    source_url: 'data:video/mp4;base64,',
+    library_id: 1,
+    start_time: 0,
+    duration: 10,
+    status: 'completed',
+    progress: 100,
+    winner_candidate_id: null,
+    full_encode_task_id: null,
+    error: null,
+    candidates: comparisonCandidates,
+    ...overrides,
+  }
+}
+
 function json(body) {
   return {
     status: 200,
@@ -87,7 +129,7 @@ async function installApiMocks(page, requests = [], options = {}) {
             onboarding_completed: onboardingCompleted,
             approval_required: true,
             release_notes_viewed: '0.0.0-e2e',
-            libraries: [{ id: 1, name: 'Movies' }],
+            libraries: [{ id: 1, name: 'Movies', path: '/media/movies' }],
             remote_installations: [],
           },
         }),
@@ -232,6 +274,75 @@ async function installApiMocks(page, requests = [], options = {}) {
           ssim_score: 0.98,
         }),
       )
+    }
+    if (endpoint === 'comparison/profiles') {
+      return route.fulfill(
+        json({
+          profiles: [
+            {
+              key: 'x265_crf_22',
+              label: 'x265 CRF 22',
+              description: 'High-quality HEVC software encode',
+              encoder: 'libx265',
+              codec: 'hevc',
+              crf: 22,
+              preset: 'medium',
+              hardware: false,
+              available: true,
+            },
+            {
+              key: 'svt_av1_crf_30',
+              label: 'SVT-AV1 CRF 30',
+              description: 'Efficient AV1 software encode',
+              encoder: 'libsvtav1',
+              codec: 'av1',
+              crf: 30,
+              preset: '8',
+              hardware: false,
+              available: true,
+            },
+            {
+              key: 'x264_crf_23',
+              label: 'x264 CRF 23',
+              description: 'Compatible H.264 software baseline',
+              encoder: 'libx264',
+              codec: 'h264',
+              crf: 23,
+              preset: 'medium',
+              hardware: false,
+              available: true,
+            },
+          ],
+        }),
+      )
+    }
+    if (endpoint === 'filebrowser/list') {
+      return route.fulfill(
+        json({
+          directories: [{ name: '..', full_path: '/media' }],
+          files: [{ name: 'Big Buck Bunny.mkv', full_path: '/media/movies/Big Buck Bunny.mkv' }],
+        }),
+      )
+    }
+    if (endpoint === 'comparison/create') {
+      return route.fulfill(json({ batch_uuid: 'comparison-1' }))
+    }
+    if (endpoint === 'comparison/status') {
+      return route.fulfill(json(comparisonStatus()))
+    }
+    if (endpoint === 'comparison/winner') {
+      const winner = comparisonCandidates.find((candidate) => candidate.candidate_uuid === payload?.candidate_uuid)
+      return route.fulfill(
+        json(
+          comparisonStatus({
+            winner_candidate_id: winner?.id || null,
+            full_encode_task_id: payload?.queue_full_encode ? 401 : null,
+          }),
+        ),
+      )
+    }
+    if (endpoint === 'comparison/cleanup') {
+      return route.fulfill(json({ success: true }))
     }
     if (endpoint === 'pending/tasks') {
       return route.fulfill(json({ recordsFiltered: pendingTasks.length, results: pendingTasks }))
@@ -380,6 +491,30 @@ test('opens approval detail and starts the compare preview', async ({ page }) =>
   await page.getByTestId('approval-compare-quality').click()
   await expect(page.getByRole('button', { name: 'Side by Side' })).toBeVisible()
   await expect(page.getByRole('dialog').getByText('VMAF: 94.2').first()).toBeVisible()
+})
+
+test('runs the polished sample comparison flow', async ({ page }) => {
+  const requests = []
+  await installApiMocks(page, requests)
+
+  await page.goto('/compresso/ui/comparison')
+  await expect(page.getByText('Build a comparison batch')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Browse media files' }).click()
+  await page.getByText('Big Buck Bunny.mkv', { exact: true }).click()
+  await page.getByRole('button', { name: 'Start Bake-Off' }).click()
+
+  const viewer = page.getByRole('region', { name: 'Synchronized sample comparison viewer' })
+  await expect(viewer).toBeVisible()
+  await expect(viewer.getByText('3 of 3 ready')).toBeVisible()
+  await expect(viewer.getByText('95.4')).toBeVisible()
+
+  await viewer.getByRole('button', { name: 'Pick Winner' }).first().click()
+  await expect.poll(() => requests.some((entry) => entry.endpoint === 'comparison/winner')).toBe(true)
+
+  await viewer.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(viewer.getByText('Frame analysis')).toBeVisible()
 })
 
 test('onboarding and plugin controls stay usable on narrow keyboard layouts @mobile @accessibility', async ({

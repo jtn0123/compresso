@@ -346,6 +346,8 @@ def create_task(
     task_type: str = "local",
     priority_score: int = 0,
     job_id: str | None = None,
+    task_metadata: dict[str, object] | None = None,
+    force_local: bool = False,
 ) -> dict[str, object] | bool:
     """
     Create a pending task given the path to a file and a library ID or name
@@ -377,6 +379,8 @@ def create_task(
         library_id=selected_library.get_id(),
         priority_score=priority_score,
         job_id=job_id,
+        task_metadata=task_metadata,
+        force_local=force_local,
     ):
         # File was not created.
         # Do not carry on.

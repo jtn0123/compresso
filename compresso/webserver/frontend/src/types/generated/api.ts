@@ -654,6 +654,200 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/comparison/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List built-in sample encode profiles and local encoder availability. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Available comparison profiles. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ComparisonProfilesResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comparison/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Create a persistent two-to-four candidate sample encode batch. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestComparisonCreate"];
+                };
+            };
+            responses: {
+                /** @description Comparison batch created. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ComparisonCreateResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comparison/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Read batch and per-candidate status, progress, paths, and metrics. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestComparisonStatus"];
+                };
+            };
+            responses: {
+                /** @description Current comparison status. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ComparisonStatusResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comparison/winner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Pick a completed candidate and optionally queue the full source with that profile. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestComparisonWinner"];
+                };
+            };
+            responses: {
+                /** @description Updated comparison status. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ComparisonStatusResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comparison/cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Remove a terminal comparison batch and its cached samples. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RequestComparisonCleanup"];
+                };
+            };
+            responses: {
+                /** @description Comparison removed. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/docs/privacypolicy": {
         parameters: {
             query?: never;
@@ -7746,6 +7940,108 @@ export interface components {
              */
             success: boolean;
             data?: unknown[];
+        };
+        ComparisonProfile: {
+            key: string;
+            label: string;
+            description: string;
+            encoder: string;
+            codec: string;
+            crf: number;
+            preset: string;
+            hardware: boolean;
+            available: boolean;
+        };
+        ComparisonProfilesResponse: {
+            /**
+             * @description This is always "True" when a request succeeds
+             * @example true
+             */
+            success: boolean;
+            profiles: components["schemas"]["ComparisonProfile"][];
+        };
+        RequestComparisonCreate: {
+            source_path: string;
+            /** @default 0 */
+            start_time: number;
+            /** @default 10 */
+            duration: number;
+            /** @default 1 */
+            library_id: number;
+            profile_keys: string[];
+        };
+        ComparisonCreateResponse: {
+            /**
+             * @description This is always "True" when a request succeeds
+             * @example true
+             */
+            success: boolean;
+            batch_uuid: string;
+        };
+        RequestComparisonStatus: {
+            batch_uuid: string;
+        };
+        ComparisonCandidate: {
+            id: number;
+            candidate_uuid: string;
+            profile_key: string;
+            profile_label: string;
+            encoder: string;
+            codec: string;
+            status: string;
+            progress: number;
+            /** @default  */
+            output_path: string;
+            /** @default  */
+            output_url: string;
+            /** @default 0 */
+            output_size: number;
+            /** @default 0 */
+            source_size: number;
+            /** @default 0 */
+            size_saved_bytes: number;
+            /** @default 0 */
+            size_saved_percent: number;
+            /** @default null */
+            vmaf_score: number | null;
+            /** @default null */
+            ssim_score: number | null;
+            /** @default null */
+            error: string | null;
+        };
+        ComparisonStatusResponse: {
+            /**
+             * @description This is always "True" when a request succeeds
+             * @example true
+             */
+            success: boolean;
+            batch_uuid: string;
+            source_path: string;
+            /** @default 0 */
+            source_size: number;
+            /** @default  */
+            source_url: string;
+            library_id: number;
+            start_time: number;
+            duration: number;
+            status: string;
+            progress: number;
+            /** @default null */
+            winner_candidate_id: number | null;
+            /** @default null */
+            full_encode_task_id: number | null;
+            /** @default null */
+            error: string | null;
+            candidates: components["schemas"]["ComparisonCandidate"][];
+        };
+        RequestComparisonWinner: {
+            batch_uuid: string;
+            candidate_uuid: string;
+            /** @default false */
+            queue_full_encode: boolean;
+        };
+        RequestComparisonCleanup: {
+            batch_uuid: string;
         };
         DocumentContentSuccess: {
             /**
