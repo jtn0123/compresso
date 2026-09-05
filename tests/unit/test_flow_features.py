@@ -904,6 +904,15 @@ class TestCompressionApiAnalysis:
 class TestAnalysisApiEndpoints:
     """Endpoint-level tests for analysis and optimization-progress."""
 
+    @pytest.fixture(autouse=True)
+    def isolate_nested_handler_security(self, monkeypatch):
+        # These tests construct AsyncHTTPTestCase manually, so the shared
+        # fixture cannot identify the nested handler from request.instance.
+        from compresso.config import Config
+
+        monkeypatch.setattr(Config, "get_api_auth_enforced", lambda _self: False)
+        monkeypatch.setattr(Config, "get_csrf_protection_enforced", lambda _self: False)
+
     from tests.unit.api_test_base import ApiTestBase
 
     class _AnalysisApiTest(ApiTestBase):
