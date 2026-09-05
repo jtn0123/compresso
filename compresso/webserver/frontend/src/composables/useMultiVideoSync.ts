@@ -7,7 +7,9 @@ export function useMultiVideoSync(videoRefs: Ref<(HTMLVideoElement | null)[]>, f
   const duration = ref(0)
   const syncing = ref(false)
 
-  const readyVideos = computed(() => videoRefs.value.filter((video): video is HTMLVideoElement => video !== null && Number.isFinite(video.duration)))
+  const readyVideos = computed(() =>
+    videoRefs.value.filter((video): video is HTMLVideoElement => video !== null && Number.isFinite(video.duration)),
+  )
 
   function updateDuration() {
     const durations = readyVideos.value.map((video) => video.duration).filter((value) => value > 0)
