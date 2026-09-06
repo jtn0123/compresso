@@ -201,6 +201,111 @@ class TestDeleteTasksRecursively:
         result = t.delete_tasks_recursively(None)
         assert result is False
 
+    def _setup_metadata_table(self, in_memory_db):
+        from compresso.libs.unmodels.taskmetadata import TaskMetadata
+
+        in_memory_db.create_tables([TaskMetadata])
+        return TaskMetadata
+
+    def test_deletes_tasks_and_metadata_in_chunks(self, in_memory_db):
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        TaskMetadata = self._setup_metadata_table(in_memory_db)
+        Tasks.delete().execute()
+        t1 = Tasks.create(abspath="/del_a.mkv", status="pending", library_id=1, priority=1)
+        t2 = Tasks.create(abspath="/del_b.mkv", status="pending", library_id=1, priority=2)
+        keep = Tasks.create(abspath="/keep.mkv", status="pending", library_id=1, priority=3)
+        TaskMetadata.create(task=t1.id, json_blob='{"checksum": "abc"}')
+
+        t = Task()
+        assert t.delete_tasks_recursively([t1.id, t2.id]) is True
+
+        remaining = [row.id for row in Tasks.select(Tasks.id)]
+        assert remaining == [keep.id]
+        assert TaskMetadata.select().count() == 0
+
+    def test_remote_task_cleans_up_cache_directory(self, in_memory_db, tmp_path):
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        self._setup_metadata_table(in_memory_db)
+        Tasks.delete().execute()
+        remote_dir = tmp_path / "compresso_remote_pending_library-xyz"
+        remote_dir.mkdir()
+        remote_file = remote_dir / "media.mkv"
+        remote_file.write_text("data")
+        task = Tasks.create(abspath=str(remote_file), status="pending", library_id=1, priority=1, type="remote")
+
+        t = Task()
+        assert t.delete_tasks_recursively([task.id]) is True
+        assert not remote_dir.exists()
+        assert Tasks.select().count() == 0
+
+    def test_returns_false_when_per_task_cleanup_fails(self, in_memory_db):
+        from compresso.libs.task import Task, TaskDataStore
+        from compresso.libs.unmodels.tasks import Tasks
+
+        self._setup_metadata_table(in_memory_db)
+        Tasks.delete().execute()
+        task = Tasks.create(abspath="/cleanup_fail.mkv", status="pending", library_id=1, priority=1)
+
+        t = Task()
+        with patch.object(TaskDataStore, "clear_task", side_effect=RuntimeError("datastore down")):
+            assert t.delete_tasks_recursively([task.id]) is False
+        # The task must survive when its cleanup failed
+        assert Tasks.select().count() == 1
+
+    def test_partial_cleanup_failure_still_deletes_cleaned_tasks(self, in_memory_db):
+        # Regression: a cleanup failure mid-batch must not orphan tasks whose
+        # irreversible cleanup already succeeded - their rows must still be
+        # deleted, while the failed task keeps its row and the call reports
+        # failure.
+        from compresso.libs.task import Task, TaskDataStore
+        from compresso.libs.unmodels.tasks import Tasks
+
+        TaskMetadata = self._setup_metadata_table(in_memory_db)
+        Tasks.delete().execute()
+        t1 = Tasks.create(abspath="/part_a.mkv", status="pending", library_id=1, priority=1)
+        t2 = Tasks.create(abspath="/part_b.mkv", status="pending", library_id=1, priority=2)
+        t3 = Tasks.create(abspath="/part_c.mkv", status="pending", library_id=1, priority=3)
+        TaskMetadata.create(task=t1.id, json_blob="{}")
+        TaskMetadata.create(task=t2.id, json_blob="{}")
+
+        t = Task()
+        with patch.object(TaskDataStore, "clear_task", side_effect=[None, RuntimeError("datastore down"), None]):
+            assert t.delete_tasks_recursively([t1.id, t2.id, t3.id]) is False
+
+        remaining = [row.id for row in Tasks.select(Tasks.id)]
+        assert remaining == [t2.id]
+        remaining_metadata = [row.task_id for row in TaskMetadata.select(TaskMetadata.task)]
+        assert remaining_metadata == [t2.id]
+
+    def test_deletes_large_batches_beyond_sql_variable_limits(self, in_memory_db):
+        # Regression: the SELECT must be chunked too - a single IN clause over
+        # 1000+ ids can exceed SQLite's bound-variable limit.
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        self._setup_metadata_table(in_memory_db)
+        Tasks.delete().execute()
+        rows = [{"abspath": f"/bulk_{i:05d}.mkv", "status": "pending", "library_id": 1, "priority": i} for i in range(1200)]
+        Tasks.insert_many(rows).execute()
+        all_ids = [row.id for row in Tasks.select(Tasks.id)]
+        assert len(all_ids) == 1200
+
+        t = Task()
+        assert t.delete_tasks_recursively(all_ids) is True
+        assert Tasks.select().count() == 0
+
+    def test_returns_false_on_query_error(self):
+        from compresso.libs.task import Task
+        from compresso.libs.unmodels.tasks import Tasks
+
+        t = Task()
+        with patch.object(Tasks, "select", side_effect=RuntimeError("no database")):
+            assert t.delete_tasks_recursively([1, 2]) is False
+
 
 @pytest.mark.unittest
 class TestReorderTasks:

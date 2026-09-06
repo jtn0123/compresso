@@ -4,7 +4,7 @@ This document is designed to help AI agents understand the structure, technology
 
 ## Project Overview
 
-**Compresso Frontend** is the web-based user interface for [Compresso](https://github.com/Compresso/compresso), a tool for optimizing video libraries to a uniform format. It interacts with the Compresso backend API to manage tasks, plugins, settings, and monitor progress.
+**Compresso Frontend** is the web-based user interface for [Compresso](https://github.com/jtn0123/compresso), a tool for optimizing video libraries to a uniform format. It interacts with the Compresso backend API to manage tasks, plugins, settings, and monitor progress.
 
 ## Technology Stack
 
