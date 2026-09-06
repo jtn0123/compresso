@@ -416,6 +416,48 @@ class TestReadSystemLogs:
         result = c.read_system_logs()
         assert result == []
 
+    def test_bounded_tail_reads_only_window_of_large_log(self, tmp_path):
+        # Regression: with a lines= limit, only a bounded window at the end of
+        # the file may be read - never the whole (unbounded) log.
+        c = _make_config(tmp_path)
+        log_dir = tmp_path / ".compresso" / "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = log_dir / "compresso.log"
+        # Build a log much larger than the tail window
+        line_count = (c.SYSTEM_LOG_TAIL_BYTES // 20) * 2
+        log_file.write_text("".join(f"log line {i:010d}\n" for i in range(line_count)))
+        c.log_path = str(log_dir)
+
+        result = c.read_system_logs(lines=1000)
+
+        assert len(result) == 1000
+        # Must be the *last* 1000 lines, intact (no partial first line)
+        assert result[-1] == f"log line {line_count - 1:010d}"
+        assert result[0] == f"log line {line_count - 1000:010d}"
+        assert all(line.startswith("log line ") for line in result)
+
+    def test_bounded_tail_on_small_log_returns_all_lines(self, tmp_path):
+        c = _make_config(tmp_path)
+        log_dir = tmp_path / ".compresso" / "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        (log_dir / "compresso.log").write_text("a\nb\nc\n")
+        c.log_path = str(log_dir)
+        assert c.read_system_logs(lines=1000) == ["a", "b", "c"]
+
+
+@pytest.mark.unittest
+class TestGetConfigAsDict:
+    def test_returns_copy_not_live_state(self, tmp_path):
+        # Regression: mutating the returned mapping must never rewrite live
+        # config state (e.g. clobbering api_auth_token).
+        c = _make_config(tmp_path)
+        exported = c.get_config_as_dict()
+        injected = "attacker-controlled"  # noqa: S105 - test sentinel, not a credential
+        exported["ui_port"] = 99999
+        exported["api_auth_token"] = injected
+        assert c.ui_port != 99999
+        assert c.api_auth_token != injected
+
 
 @pytest.mark.unittest
 class TestConstructorArgs:

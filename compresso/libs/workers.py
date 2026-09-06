@@ -888,12 +888,20 @@ class Worker(threading.Thread):
         # Convert file
         try:
             sub_proc = self._start_command_subprocess(exec_command)
-            self.monitor.set_proc(sub_proc.pid)
-            self._configure_process_priority(sub_proc.pid)
-            self._stream_command_output(sub_proc, command_progress_parser)
-            self._finish_command_subprocess(sub_proc)
-            if isinstance(current_command_ref, list):
-                current_command_ref.clear()
+            try:
+                self.monitor.set_proc(sub_proc.pid)
+                self._configure_process_priority(sub_proc.pid)
+                self._stream_command_output(sub_proc, command_progress_parser)
+                self._finish_command_subprocess(sub_proc)
+            finally:
+                try:
+                    self.monitor.terminate_proc()
+                finally:
+                    self.monitor.unset_proc()
+                    if sub_proc.stdout is not None:
+                        sub_proc.stdout.close()
+                    if isinstance(current_command_ref, list):
+                        current_command_ref.clear()
 
             if sub_proc.returncode == 0:
                 return True
@@ -970,8 +978,6 @@ class Worker(threading.Thread):
                 process.communicate(timeout=30)
             except subprocess.TimeoutExpired:
                 self.logger.warning("Subprocess communicate() timed out after 30s, terminating")
-        self.monitor.terminate_proc()
-        self.monitor.unset_proc()
 
 
 # Backward-compatible imports

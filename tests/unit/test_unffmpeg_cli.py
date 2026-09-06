@@ -49,11 +49,19 @@ class TestFfmpegCmd:
         with pytest.raises(FFMpegError):
             cli.ffmpeg_cmd(["-bad"])
 
+    @pytest.mark.parametrize("returncode", [2, 8, 69, 234, -9])
     @patch("compresso.libs.unffmpeg.lib.cli.subprocess.Popen")
-    def test_output_containing_error_raises_ffmpeg_error(self, mock_popen):
-        mock_popen.return_value = _mock_popen(b"error: something went wrong", returncode=0)
+    def test_any_nonzero_returncode_raises_ffmpeg_error(self, mock_popen, returncode):
+        mock_popen.return_value = _mock_popen(b"some output", returncode=returncode)
         with pytest.raises(FFMpegError):
-            cli.ffmpeg_cmd(["-x"])
+            cli.ffmpeg_cmd(["-bad"])
+
+    @patch("compresso.libs.unffmpeg.lib.cli.subprocess.Popen")
+    def test_output_containing_error_word_succeeds_on_zero_returncode(self, mock_popen):
+        # Regression: a path or description containing "error" must not be
+        # mistaken for a failure when the process exited successfully.
+        mock_popen.return_value = _mock_popen(b"/media/error prone films/movie.mkv", returncode=0)
+        assert cli.ffmpeg_cmd(["-x"]) == "/media/error prone films/movie.mkv"
 
     @patch("compresso.libs.unffmpeg.lib.cli.subprocess.Popen")
     def test_empty_output_raises_ffmpeg_error(self, mock_popen):
@@ -94,11 +102,19 @@ class TestFfprobeCmd:
         with pytest.raises(FFProbeError):
             cli.ffprobe_cmd(["-bad"])
 
+    @pytest.mark.parametrize("returncode", [2, 8, 69, 234, -9])
     @patch("compresso.libs.unffmpeg.lib.cli.subprocess.Popen")
-    def test_output_containing_error_raises_ffprobe_error(self, mock_popen):
-        mock_popen.return_value = _mock_popen(b"error: not found", returncode=0)
+    def test_any_nonzero_returncode_raises_ffprobe_error(self, mock_popen, returncode):
+        mock_popen.return_value = _mock_popen(b"output", returncode=returncode)
         with pytest.raises(FFProbeError):
-            cli.ffprobe_cmd(["-x"])
+            cli.ffprobe_cmd(["-bad"])
+
+    @patch("compresso.libs.unffmpeg.lib.cli.subprocess.Popen")
+    def test_output_containing_error_word_succeeds_on_zero_returncode(self, mock_popen):
+        # Regression: probe JSON legitimately containing the word "error"
+        # (e.g. tags or filenames) must not be treated as a failure.
+        mock_popen.return_value = _mock_popen(b'{"format": {"filename": "error of comedy.mp4"}}', returncode=0)
+        assert "error of comedy" in cli.ffprobe_cmd(["-x"])
 
     @patch("compresso.libs.unffmpeg.lib.cli.subprocess.Popen")
     def test_empty_output_raises_ffprobe_error(self, mock_popen):
