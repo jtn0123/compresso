@@ -94,7 +94,7 @@ def build_tasks_query(
 
     # Limit to one result
     if local_only:
-        query = query.where(Tasks.type == "local")
+        query = query.where((Tasks.type == "local") & ~Tasks.force_local)
 
     query = query.join(Libraries, on=(Libraries.id == Tasks.library_id))
     if library_names is not None:

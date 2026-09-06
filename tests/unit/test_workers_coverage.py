@@ -47,6 +47,13 @@ def reset_singletons():
     SingletonType._instances = {}
 
 
+@pytest.fixture
+def empty_task_metadata():
+    """Supply metadata for mocked tasks in worker orchestration tests."""
+    with patch("compresso.libs.workers.load_task_metadata", return_value={}):
+        yield
+
+
 def _make_parent_worker():
     parent = MagicMock()
     parent.event = MagicMock()
@@ -421,6 +428,7 @@ class TestProcessTaskEncodingSpeedStats:
 
 
 @pytest.mark.unittest
+@pytest.mark.usefixtures("empty_task_metadata")
 class TestExecRunnerBreakOnFailure:
     def test_second_plugin_skipped_when_first_fails(self):
         """Line 353: If overall_success is False entering a plugin iteration, we break."""
@@ -471,6 +479,7 @@ class TestExecRunnerBreakOnFailure:
 
 
 @pytest.mark.unittest
+@pytest.mark.usefixtures("empty_task_metadata")
 class TestExecRunnerRedundantFlagDuringThread:
     def test_redundant_flag_aborts_during_thread_monitoring(self):
         """Lines 399-410: redundant_flag set while monitoring runner thread marks failure.
@@ -540,6 +549,7 @@ class TestExecRunnerRedundantFlagDuringThread:
 
 
 @pytest.mark.unittest
+@pytest.mark.usefixtures("empty_task_metadata")
 class TestExecRunnerWithExecCommand:
     def _setup_worker_with_one_plugin(self, plugin_id="p1"):
         worker = _make_worker()
@@ -770,6 +780,7 @@ class TestExecRunnerWithExecCommand:
 
 
 @pytest.mark.unittest
+@pytest.mark.usefixtures("empty_task_metadata")
 class TestExecRunnerFinalMoveError:
     def test_os_error_in_final_move_returns_false(self):
         """Lines 569-575: OSError during shutil.move sets overall_success=False."""

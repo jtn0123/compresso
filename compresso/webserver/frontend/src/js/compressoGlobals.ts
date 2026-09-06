@@ -157,6 +157,9 @@ export const getCompressoApiUrl = function (apiVersion: string, apiEndpoint: str
   return $compresso.apiUrl + '/' + apiVersion + '/' + apiEndpoint
 }
 
+/** The configured Axios instance shared with this.$axios for Composition API callers. */
+export const getCompressoApiClient = () => axios
+
 export const setTheme = function (mode: ThemeMode): void {
   const storedPalette = LocalStorage.getItem('palette')
   const palette = isPaletteName(storedPalette) ? storedPalette : 'forest'

@@ -29,6 +29,8 @@ Copyright:
 
 """
 
+from .comparisonbatches import ComparisonBatches
+from .comparisoncandidates import ComparisonCandidates
 from .completedtasks import CompletedTasks
 from .completedtaskscommandlogs import CompletedTasksCommandLogs
 from .compressionstats import CompressionStats
@@ -51,6 +53,8 @@ from .workerschedules import WorkerSchedules
 __author__ = "Josh.5 (jsunnex@gmail.com)"
 
 __all__ = (
+    "ComparisonBatches",
+    "ComparisonCandidates",
     "CompletedTasks",
     "CompletedTasksCommandLogs",
     "CompressionStats",

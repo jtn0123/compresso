@@ -39,6 +39,7 @@ class RateLimiter:
 
     EXPENSIVE_PATHS = {
         "/preview/create",
+        "/comparison/create",
         "/healthcheck/scan",
         "/healthcheck/scan-library",
     }

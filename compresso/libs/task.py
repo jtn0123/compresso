@@ -97,6 +97,25 @@ def prepare_file_destination_data(pathname: str, file_extension: str) -> TaskPat
     return file_data
 
 
+def load_task_metadata(task_id: int | None, *, strict: bool = False) -> dict[str, object]:
+    """Read a task's staged metadata without creating or mutating it."""
+    if task_id is None:
+        return {}
+    try:
+        from compresso.libs.unmodels import TaskMetadata
+
+        row = TaskMetadata.get_or_none(TaskMetadata.task == task_id)
+        payload = json.loads(row.json_blob or "{}") if row is not None else {}
+        if not isinstance(payload, dict):
+            raise ValueError("Task metadata must be an object")
+        return payload
+    except Exception as exc:
+        if strict:
+            raise TaskError("Unable to read task metadata safely") from exc
+        # Import-only and startup contexts can run before the metadata table exists.
+        return {}
+
+
 class TaskItem:
     """
     Task
@@ -299,6 +318,8 @@ class TaskItem:
         library_id: int = 1,
         priority_score: int = 0,
         job_id: str | None = None,
+        task_metadata: dict[str, object] | None = None,
+        force_local: bool = False,
     ) -> bool:
         """
         Creates the task by its absolute path.
@@ -310,10 +331,14 @@ class TaskItem:
         :param task_type:
         :param library_id:
         :param priority_score:
+        :param task_metadata: optional metadata to persist before the task becomes runnable
+        :param force_local: keep this task on a local worker instead of a linked installation
         :return:
         """
         if task_type not in {"local", "remote"}:
             raise TaskError(f'Unable to create task with type "{task_type}". Type must be one of [local, remote].')
+        if task_metadata is not None and not isinstance(task_metadata, dict):
+            raise TaskError("Task metadata must be a dictionary")
 
         try:
             # Record source file size at task creation
@@ -331,6 +356,7 @@ class TaskItem:
                 library_id=library_id,
                 source_size=source_size,
                 job_id=job_id or str(uuid.uuid4()),
+                force_local=bool(force_local),
             )
             self.logger.debug(
                 "Created new task with ID: %s for %s (source_size=%d)",
@@ -350,6 +376,21 @@ class TaskItem:
 
             # Set the task type
             self.task.type = task_type
+
+            # Task-scoped metadata must exist before a local task becomes runnable.
+            # This is used by features such as comparison-profile handoff without
+            # mutating the library-wide plugin configuration.
+            if task_metadata is not None:
+                import json
+
+                from compresso.libs.unmodels import TaskMetadata
+
+                try:
+                    TaskMetadata.create(task=self.task.id, json_blob=json.dumps(task_metadata))
+                except Exception as exc:
+                    self.task.delete_instance(recursive=True)
+                    self.task = None
+                    raise TaskError("Unable to save task metadata before queueing") from exc
 
             # Only local tasks should be progressed automatically
             # Remote tasks need to be progressed to pending by a remote trigger
