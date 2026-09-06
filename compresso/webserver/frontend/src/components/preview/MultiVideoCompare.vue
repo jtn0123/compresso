@@ -123,9 +123,27 @@
 
     <footer class="transport-bar">
       <div class="transport-buttons">
-        <q-btn flat round icon="skip_previous" :aria-label="t('pages.sampleComparison.seekStart')" @click="seek(0)" />
-        <q-btn flat round icon="first_page" :aria-label="t('pages.sampleComparison.previousFrame')" @click="step(-1)" />
         <q-btn
+          flat
+          dense
+          round
+          color="secondary"
+          icon="skip_previous"
+          :aria-label="t('pages.sampleComparison.seekStart')"
+          @click="seek(0)"
+        />
+        <q-btn
+          flat
+          dense
+          round
+          color="secondary"
+          icon="first_page"
+          :aria-label="t('pages.sampleComparison.previousFrame')"
+          @click="step(-1)"
+        />
+        <q-btn
+          flat
+          dense
           round
           color="warning"
           text-color="dark"
@@ -134,18 +152,35 @@
           :disable="completedCount === 0"
           @click="togglePlayback"
         />
-        <q-btn flat round icon="last_page" :aria-label="t('pages.sampleComparison.nextFrame')" @click="step(1)" />
         <q-btn
           flat
+          dense
+          round
+          color="secondary"
+          icon="last_page"
+          :aria-label="t('pages.sampleComparison.nextFrame')"
+          @click="step(1)"
+        />
+        <q-btn
+          flat
+          dense
           round
           :icon="freezeAnalysis ? 'ac_unit' : 'center_focus_strong'"
-          :color="freezeAnalysis ? 'warning' : 'white'"
+          :color="freezeAnalysis ? 'warning' : 'secondary'"
           :aria-label="t('pages.sampleComparison.freezeFrame')"
           @click="toggleFreeze"
         >
           <q-tooltip>{{ t('pages.sampleComparison.freezeFrame') }}</q-tooltip>
         </q-btn>
-        <q-btn flat round icon="zoom_out_map" :aria-label="t('pages.sampleComparison.resetZoom')" @click="resetZoom">
+        <q-btn
+          flat
+          dense
+          round
+          color="secondary"
+          icon="zoom_out_map"
+          :aria-label="t('pages.sampleComparison.resetZoom')"
+          @click="resetZoom"
+        >
           <q-tooltip>{{ t('pages.sampleComparison.resetZoom') }}</q-tooltip>
         </q-btn>
       </div>
@@ -167,13 +202,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { ComponentPublicInstance, PropType } from 'vue'
-import type { ComparisonCandidate } from 'src/types/comparison'
+import type { ComparisonCandidateView } from 'src/types/comparison'
 import { useI18n } from 'vue-i18n'
 import { formatBytes, formatTime } from 'src/js/formatUtils'
 import { useMultiVideoSync } from 'src/composables/useMultiVideoSync'
 
 const props = defineProps({
-  candidates: { type: Array as PropType<ComparisonCandidate[]>, required: true },
+  candidates: { type: Array as PropType<ComparisonCandidateView[]>, required: true },
   selectedCandidateUuid: { type: String, default: '' },
   winnerEnabled: { type: Boolean, default: true },
   frameRate: { type: Number, default: 24 },
@@ -199,7 +234,7 @@ const completedCount = computed(() => props.candidates.filter((candidate) => can
 const allReady = computed(() => completedCount.value === props.candidates.length)
 const leadIndex = computed(() => props.candidates.findIndex((candidate) => candidate.status === 'completed'))
 const videoTransform = computed(() => ({
-  transform: `translate(${panX.value}px, ${panY.value}px) scale(${zoom.value})`,
+  '--comparison-video-transform': `translate(${panX.value}px, ${panY.value}px) scale(${zoom.value})`,
 }))
 
 function setVideoRef(element: Element | ComponentPublicInstance | null, index: number) {
@@ -219,7 +254,7 @@ function formatPercent(value: number | undefined) {
   return `${number > 0 ? '+' : ''}${number.toFixed(1)}%`
 }
 
-function savingsClass(candidate: ComparisonCandidate) {
+function savingsClass(candidate: ComparisonCandidateView) {
   if (candidate.status !== 'completed') return ''
   return Number(candidate.size_saved_percent) >= 0 ? 'text-positive' : 'text-negative'
 }

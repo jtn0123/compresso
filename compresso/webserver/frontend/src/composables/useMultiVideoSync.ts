@@ -33,7 +33,8 @@ export function useMultiVideoSync(videoRefs: Ref<(HTMLVideoElement | null)[]>, f
   async function play() {
     if (!readyVideos.value.length) return
     const results = await Promise.allSettled(readyVideos.value.map((video) => video.play()))
-    playing.value = results.some((result) => result.status === 'fulfilled')
+    playing.value = results.every((result) => result.status === 'fulfilled')
+    if (!playing.value) pause()
   }
 
   function pause() {

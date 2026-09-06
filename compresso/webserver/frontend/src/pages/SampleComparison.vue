@@ -63,6 +63,7 @@
                 outlined
                 color="primary"
                 :label="t('pages.sampleComparison.startTime')"
+                :rules="[(value) => validStartTime(value) || t('pages.sampleComparison.invalidStartTime')]"
                 :suffix="t('pages.sampleComparison.secondsShort')"
               />
             </div>
@@ -209,17 +210,22 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import axios from 'axios'
-import type { ComparisonBatch, ComparisonCandidate, ComparisonProfile, LibraryOption } from 'src/types/comparison'
+import type {
+  ComparisonBatchView,
+  ComparisonCandidateView,
+  ComparisonProfile,
+  LibraryOption,
+} from 'src/types/comparison'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { getCompressoApiUrl, getCompressoApiClient } from 'src/js/compressoGlobals'
 import { createLogger } from 'src/composables/useLogger'
 import AdmonitionBanner from 'components/ui/AdmonitionBanner.vue'
 import MultiVideoCompare from 'components/preview/MultiVideoCompare.vue'
 import PageHeader from 'components/ui/PageHeader.vue'
 import SelectMediaFileDialog from 'components/ui/pickers/SelectMediaFileDialog.vue'
 
+const axios = getCompressoApiClient()
 const $q = useQuasar()
 const { t } = useI18n()
 const log = createLogger('SampleComparison')
@@ -234,10 +240,16 @@ const profilesLoading = ref(true)
 const creating = ref(false)
 const queueingWinner = ref(false)
 const batchUuid = ref('')
-const batch = ref<ComparisonBatch | null>(null)
+const batch = ref<ComparisonBatchView | null>(null)
 const selectedWinnerUuid = ref('')
 const filePickerRef = ref<InstanceType<typeof SelectMediaFileDialog> | null>(null)
 let pollTimer: ReturnType<typeof setTimeout> | null = null
+let pollGeneration = 0
+let disposed = false
+
+function validStartTime(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
 
 const selectionValid = computed(() => selectedProfileKeys.value.length >= 2 && selectedProfileKeys.value.length <= 4)
 const selectedLibrary = computed(() => libraryOptions.value.find((option) => option.value === libraryId.value))
@@ -246,6 +258,7 @@ const canCreate = computed(
     Boolean(sourcePath.value) &&
     Boolean(selectedLibrary.value) &&
     selectionValid.value &&
+    validStartTime(startTime.value) &&
     Number(sampleDuration.value) >= 1 &&
     Number(sampleDuration.value) <= 30 &&
     !profilesLoading.value &&
@@ -300,7 +313,7 @@ async function loadSetupData() {
     const firstLibrary = libraryOptions.value[0]
     if (firstLibrary) libraryId.value = firstLibrary.value
   } catch (error) {
-    log.error('Failed to load comparison setup: ' + error)
+    log.error(t('pages.sampleComparison.failedLoadSetup') + ': ' + error)
     $q.notify({ type: 'negative', message: t('pages.sampleComparison.failedLoadSetup') })
   } finally {
     profilesLoading.value = false
@@ -316,7 +329,7 @@ function toggleProfile(profileKey: string) {
   }
 }
 
-function placeholderCandidates(): ComparisonCandidate[] {
+function placeholderCandidates(): ComparisonCandidateView[] {
   return selectedProfileKeys.value.map((profileKey) => {
     const profile = profiles.value.find((item) => item.key === profileKey)
     return {
@@ -346,7 +359,7 @@ async function createComparison() {
     batch.value = { status: 'queued', progress: 0, candidates: placeholderCandidates() }
     await refreshStatus()
   } catch (error) {
-    log.error('Failed to create comparison: ' + error)
+    log.error(t('pages.sampleComparison.failedCreate') + ': ' + error)
     $q.notify({ type: 'negative', message: t('pages.sampleComparison.failedCreate') })
   } finally {
     creating.value = false
@@ -354,32 +367,36 @@ async function createComparison() {
 }
 
 function schedulePoll() {
-  stopPolling()
-  if (!isTerminal.value) pollTimer = setTimeout(refreshStatus, 1000)
+  if (pollTimer) clearTimeout(pollTimer)
+  if (!disposed && batchUuid.value && !isTerminal.value) pollTimer = setTimeout(refreshStatus, 1000)
 }
 
 async function refreshStatus() {
-  if (!batchUuid.value) return
+  if (!batchUuid.value || disposed) return
+  const generation = pollGeneration
   try {
     const response = await axios.post(getCompressoApiUrl('v2', 'comparison/status'), {
       batch_uuid: batchUuid.value,
     })
+    if (disposed || generation !== pollGeneration) return
     batch.value = response.data
     if (response.data.winner_candidate_id && !selectedWinnerUuid.value) {
       const savedWinner = response.data.candidates.find(
-        (candidate: ComparisonCandidate) => candidate.id === response.data.winner_candidate_id,
+        (candidate: ComparisonCandidateView) => candidate.id === response.data.winner_candidate_id,
       )
       selectedWinnerUuid.value = savedWinner?.candidate_uuid || ''
     }
     schedulePoll()
   } catch (error) {
-    log.error('Failed to refresh comparison status: ' + error)
+    if (disposed || generation !== pollGeneration) return
+    log.error(t('pages.sampleComparison.failedStatus') + ': ' + error)
     stopPolling()
     $q.notify({ type: 'negative', message: t('pages.sampleComparison.failedStatus') })
   }
 }
 
 function stopPolling() {
+  pollGeneration++
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = null
 }
@@ -396,7 +413,7 @@ async function selectWinner(candidateUuid: string) {
     batch.value = response.data
   } catch (error) {
     selectedWinnerUuid.value = previous
-    log.error('Failed to save comparison winner: ' + error)
+    log.error(t('pages.sampleComparison.failedWinner') + ': ' + error)
     $q.notify({ type: 'negative', message: t('pages.sampleComparison.failedWinner') })
   }
 }
@@ -413,7 +430,7 @@ async function queueWinner() {
     batch.value = response.data
     $q.notify({ type: 'positive', message: t('pages.sampleComparison.queuedSuccess') })
   } catch (error) {
-    log.error('Failed to queue comparison winner: ' + error)
+    log.error(t('pages.sampleComparison.failedQueue') + ': ' + error)
     $q.notify({ type: 'negative', message: t('pages.sampleComparison.failedQueue') })
   } finally {
     queueingWinner.value = false
@@ -426,7 +443,7 @@ async function resetComparison() {
     try {
       await axios.post(getCompressoApiUrl('v2', 'comparison/cleanup'), { batch_uuid: batchUuid.value })
     } catch (error) {
-      log.warn('Failed to clean up comparison cache: ' + error)
+      log.warn(t('pages.sampleComparison.failedCleanup') + ': ' + error)
     }
   }
   batchUuid.value = ''
@@ -447,7 +464,10 @@ function onFileSelected({ selectedPath }: { selectedPath: string }) {
 }
 
 onMounted(loadSetupData)
-onBeforeUnmount(stopPolling)
+onBeforeUnmount(() => {
+  disposed = true
+  stopPolling()
+})
 </script>
 
 <style scoped src="./SampleComparison.css"></style>

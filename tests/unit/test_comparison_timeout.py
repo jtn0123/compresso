@@ -5,11 +5,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from compresso.libs.comparison import ComparisonManager
+from compresso.libs.comparison_encoder import run_encode_with_progress
 
 
 def test_silent_encoder_obeys_timeout():
-    manager = object.__new__(ComparisonManager)
-    manager.ENCODE_TIMEOUT = 0.1
+    command = [sys.executable, "-c", "import time; time.sleep(1)"]
+    candidate = MagicMock()
     with pytest.raises(RuntimeError, match="timed out"):
-        manager._run_encode_with_progress([sys.executable, "-c", "import time; time.sleep(1)"], MagicMock(), duration=10)
+        run_encode_with_progress(command, candidate, duration=10, timeout=0.1)

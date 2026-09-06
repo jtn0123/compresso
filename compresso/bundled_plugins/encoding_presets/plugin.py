@@ -223,7 +223,7 @@ def _load_task_profile_override(task_id: int | None) -> dict[str, object]:
     if task_id is None:
         return {}
     try:
-        payload = load_task_metadata(task_id)
+        payload = load_task_metadata(task_id, strict=True)
         metadata = payload.get("__meta__", {}) if isinstance(payload, dict) else {}
         profile = metadata.get("comparison_profile", {}) if isinstance(metadata, dict) else {}
         if not isinstance(profile, dict):
@@ -402,7 +402,19 @@ def _append_video_settings(cmd: list[str], settings: Mapping[str, object]) -> st
     cmd.extend(crf_args)
     preset = narrowing.strict_str(settings.get("encoder_preset"), "medium").strip()
     if preset and video_encoder in AMF_ENCODERS:
-        cmd.extend(["-quality", preset])
+        amf_quality = {
+            "ultrafast": "speed",
+            "superfast": "speed",
+            "veryfast": "speed",
+            "faster": "speed",
+            "fast": "speed",
+            "medium": "balanced",
+            "slow": "quality",
+            "slower": "quality",
+            "veryslow": "quality",
+            "placebo": "quality",
+        }.get(preset, preset)
+        cmd.extend(["-quality", amf_quality])
     elif preset and video_encoder not in VIDEOTOOLBOX_ENCODERS:
         preset_value = _encoder_preset_value(video_encoder, preset)
         cmd.extend([PRESET_PARAM_MAP.get(video_encoder, "-preset"), preset_value])

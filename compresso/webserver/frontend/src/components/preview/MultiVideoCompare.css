@@ -3,6 +3,7 @@
   --stage-panel: #111619;
   --stage-line: rgba(255, 255, 255, 0.14);
   --stage-amber: #f3b33d;
+
   overflow: hidden;
   color: #f5f0e6;
   background: var(--stage-ink);
@@ -91,6 +92,7 @@
 }
 
 .video-viewport video {
+  transform: var(--comparison-video-transform, none);
   width: 100%;
   height: 100%;
   object-fit: contain;

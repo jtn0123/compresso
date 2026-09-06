@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import axios from 'axios'
 
 vi.mock('axios', () => ({ default: { post: vi.fn() } }))
 vi.mock('src/js/compressoGlobals', () => ({
+  getCompressoApiClient: () => axios,
   getCompressoApiUrl: vi.fn((version, endpoint) => `/compresso/api/${version}/${endpoint}`),
 }))
 vi.mock('quasar', () => ({

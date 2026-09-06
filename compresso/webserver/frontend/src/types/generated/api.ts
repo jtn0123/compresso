@@ -7990,24 +7990,15 @@ export interface components {
             codec: string;
             status: string;
             progress: number;
-            /** @default  */
-            output_path: string;
-            /** @default  */
-            output_url: string;
-            /** @default 0 */
-            output_size: number;
-            /** @default 0 */
-            source_size: number;
-            /** @default 0 */
-            size_saved_bytes: number;
-            /** @default 0 */
-            size_saved_percent: number;
-            /** @default null */
-            vmaf_score: number | null;
-            /** @default null */
-            ssim_score: number | null;
-            /** @default null */
-            error: string | null;
+            output_path?: string;
+            output_url?: string;
+            output_size?: number;
+            source_size?: number;
+            size_saved_bytes?: number;
+            size_saved_percent?: number;
+            vmaf_score?: number | null;
+            ssim_score?: number | null;
+            error?: string | null;
         };
         ComparisonStatusResponse: {
             /**
@@ -8017,21 +8008,16 @@ export interface components {
             success: boolean;
             batch_uuid: string;
             source_path: string;
-            /** @default 0 */
-            source_size: number;
-            /** @default  */
-            source_url: string;
+            source_size?: number;
+            source_url?: string;
             library_id: number;
             start_time: number;
             duration: number;
             status: string;
             progress: number;
-            /** @default null */
-            winner_candidate_id: number | null;
-            /** @default null */
-            full_encode_task_id: number | null;
-            /** @default null */
-            error: string | null;
+            winner_candidate_id?: number | null;
+            full_encode_task_id?: number | null;
+            error?: string | null;
             candidates: components["schemas"]["ComparisonCandidate"][];
         };
         RequestComparisonWinner: {

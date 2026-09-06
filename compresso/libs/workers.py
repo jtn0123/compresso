@@ -434,7 +434,7 @@ class Worker(threading.Thread):
         # A bake-off winner is a task-scoped use of the existing Encoding Presets
         # runner. If that runner is not enabled library-wide, append its installed
         # module for this task only so the selected profile cannot be silently lost.
-        task_metadata = load_task_metadata(task_id)
+        task_metadata = load_task_metadata(task_id, strict=True)
         task_meta = task_metadata.get("__meta__", {}) if isinstance(task_metadata, dict) else {}
         comparison_profile = task_meta.get("comparison_profile") if isinstance(task_meta, dict) else None
         if (

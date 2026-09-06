@@ -97,7 +97,7 @@ def prepare_file_destination_data(pathname: str, file_extension: str) -> TaskPat
     return file_data
 
 
-def load_task_metadata(task_id: int | None) -> dict[str, object]:
+def load_task_metadata(task_id: int | None, *, strict: bool = False) -> dict[str, object]:
     """Read a task's staged metadata without creating or mutating it."""
     if task_id is None:
         return {}
@@ -106,10 +106,12 @@ def load_task_metadata(task_id: int | None) -> dict[str, object]:
 
         row = TaskMetadata.get_or_none(TaskMetadata.task == task_id)
         payload = json.loads(row.json_blob or "{}") if row is not None else {}
-        return payload if isinstance(payload, dict) else {}
-    except (TypeError, ValueError):
-        return {}
-    except Exception:
+        if not isinstance(payload, dict):
+            raise ValueError("Task metadata must be an object")
+        return payload
+    except Exception as exc:
+        if strict:
+            raise TaskError("Unable to read task metadata safely") from exc
         # Import-only and startup contexts can run before the metadata table exists.
         return {}
 

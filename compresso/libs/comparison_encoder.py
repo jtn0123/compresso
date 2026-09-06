@@ -34,15 +34,7 @@ def run_encode_with_progress(command: list[str], candidate: ComparisonCandidates
         for raw_line in iter(process.stdout.readline, ""):
             line = raw_line.strip()
             output_lines.append(line)
-            if line.startswith("out_time_ms="):
-                try:
-                    encoded_seconds = int(line.split("=", 1)[1]) / 1_000_000
-                    progress = min(75, max(1, int((encoded_seconds / duration) * 75)))
-                    if progress > candidate.progress:
-                        candidate.progress = progress
-                        candidate.save()
-                except (TypeError, ValueError, ZeroDivisionError):
-                    pass
+            update_progress(line, candidate, duration)
             if (time.monotonic() - started) > timeout:
                 process.kill()
                 raise RuntimeError("Sample encode timed out")
@@ -58,3 +50,16 @@ def run_encode_with_progress(command: list[str], candidate: ComparisonCandidates
             process.stdout.close()
     if return_code != 0:
         raise RuntimeError(f"Sample encode failed: {' '.join(output_lines[-10:])[-500:]}")
+
+
+def update_progress(line: str, candidate: ComparisonCandidates, duration: float) -> None:
+    if not line.startswith("out_time_ms="):
+        return
+    try:
+        encoded_seconds = int(line.split("=", 1)[1]) / 1_000_000
+        progress = min(75, max(1, int((encoded_seconds / duration) * 75)))
+        if progress > candidate.progress:
+            candidate.progress = progress
+            candidate.save()
+    except (TypeError, ValueError, ZeroDivisionError):
+        pass

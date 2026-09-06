@@ -1226,6 +1226,8 @@
       "filePickerTitle": "Select a media file",
       "noMediaFiles": "No supported media files in this directory.",
       "failedLoadSetup": "Failed to load comparison profiles or libraries.",
+      "invalidStartTime": "Start time must be a finite number greater than or equal to zero.",
+      "failedCleanup": "Failed to clean up comparison cache.",
       "failedCreate": "Failed to start the sample comparison.",
       "failedStatus": "Failed to refresh comparison progress.",
       "failedWinner": "Failed to save the selected winner.",

@@ -722,9 +722,10 @@ class TestWorkerRunLifecycle:
 
 @pytest.mark.unittest
 class TestWorkerExecRunners:
+    @patch("compresso.libs.workers.load_task_metadata", return_value={})
     @patch("compresso.libs.workers.os.path.exists", return_value=False)
     @patch("compresso.libs.workers.PluginsHandler")
-    def test_no_plugins_returns_true(self, mock_ph_cls, mock_exists):
+    def test_no_plugins_returns_true(self, mock_ph_cls, mock_exists, _metadata):
         worker = _make_worker()
         mock_task = MagicMock()
         mock_task.get_task_library_id.return_value = 1
@@ -796,8 +797,9 @@ class TestWorkerExecRunners:
         mock_ph.exec_plugin_runner.assert_called_once()
         assert mock_ph.exec_plugin_runner.call_args.args[1:] == ("encoding_presets", "worker.process")
 
+    @patch("compresso.libs.workers.load_task_metadata", return_value={})
     @patch("compresso.libs.workers.PluginsHandler")
-    def test_plugin_failure_returns_false(self, mock_ph_cls):
+    def test_plugin_failure_returns_false(self, mock_ph_cls, _metadata):
         worker = _make_worker()
         mock_task = MagicMock()
         mock_task.get_task_library_id.return_value = 1

@@ -3,6 +3,7 @@ import { flushPromises } from '@vue/test-utils'
 
 vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }))
 vi.mock('src/js/compressoGlobals', () => ({
+  getCompressoApiClient: () => axios,
   getCompressoApiUrl: vi.fn((version, endpoint) => `/compresso/api/${version}/${endpoint}`),
 }))
 vi.mock('src/composables/useLogger', () => ({
@@ -142,5 +143,34 @@ describe('SampleComparison', () => {
     }
 
     expect(wrapper.vm.batchProgress).toBe(40)
+  })
+
+  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])('rejects invalid start time %s', async (start) => {
+    const wrapper = shallowMountWithQuasar(SampleComparison)
+    await flushPromises()
+    wrapper.vm.sourcePath = '/media/movies/movie.mkv'
+    wrapper.vm.startTime = start
+    await wrapper.vm.createComparison()
+    expect(axios.post.mock.calls.filter(([url]) => url.includes('comparison/create'))).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  it('does not restart polling when an in-flight status resolves after unmount', async () => {
+    vi.useFakeTimers()
+    const wrapper = shallowMountWithQuasar(SampleComparison)
+    await flushPromises()
+    wrapper.vm.batchUuid = 'batch-1'
+    let resolveStatus
+    axios.post.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStatus = resolve
+      }),
+    )
+    const request = wrapper.vm.refreshStatus()
+    wrapper.unmount()
+    resolveStatus({ data: { ...completedStatus, status: 'running' } })
+    await request
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
   })
 })

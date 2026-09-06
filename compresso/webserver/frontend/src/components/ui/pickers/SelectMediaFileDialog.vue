@@ -37,17 +37,17 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import axios from 'axios'
 import type { MediaEntry } from 'src/types/comparison'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
-import { getCompressoApiUrl } from 'src/js/compressoGlobals'
+import { getCompressoApiUrl, getCompressoApiClient } from 'src/js/compressoGlobals'
 import CompressoDialogPopup from 'components/ui/dialogs/CompressoDialogPopup.vue'
 
 const props = defineProps({
   initialPath: { type: String, default: '/' },
 })
 const emit = defineEmits(['selected', 'hide'])
+const axios = getCompressoApiClient()
 const $q = useQuasar()
 const { t } = useI18n()
 const dialogRef = ref<InstanceType<typeof CompressoDialogPopup> | null>(null)
@@ -117,7 +117,11 @@ function onDialogHide() {
   emit('hide')
 }
 
-defineExpose({ show })
+function hide() {
+  dialogRef.value?.hide()
+}
+
+defineExpose({ show, hide })
 </script>
 
 <style scoped>

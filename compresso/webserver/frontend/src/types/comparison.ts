@@ -1,39 +1,17 @@
-export interface ComparisonCandidate {
-  id?: number
-  candidate_uuid: string
-  profile_key: string
-  profile_label: string
-  encoder: string
-  codec: string
-  status: string
-  progress: number
-  output_url?: string
-  output_size?: number
-  size_saved_percent?: number
-  vmaf_score?: number | null
-  ssim_score?: number | null
-  error?: string | null
-}
+import type { ApiSchema } from './contracts'
 
-export interface ComparisonBatch {
-  status: string
-  progress: number
-  candidates: ComparisonCandidate[]
-  source_path?: string
-  winner_candidate_id?: number | null
-  full_encode_task_id?: number | null
-  error?: string | null
-}
+export type ComparisonCandidate = ApiSchema<'ComparisonCandidate'>
+export type ComparisonBatch = ApiSchema<'ComparisonStatusResponse'>
+export type ComparisonProfile = ApiSchema<'ComparisonProfile'>
 
-export interface ComparisonProfile {
-  key: string
-  label: string
-  description: string
-  encoder: string
-  codec: string
-  hardware: boolean
-  available: boolean
-}
+// Queued UI placeholders intentionally omit fields not returned by the API yet.
+export type ComparisonCandidateView = Partial<ComparisonCandidate> &
+  Pick<
+    ComparisonCandidate,
+    'candidate_uuid' | 'profile_key' | 'profile_label' | 'encoder' | 'codec' | 'status' | 'progress'
+  >
+export type ComparisonBatchView = Partial<Omit<ComparisonBatch, 'candidates'>> &
+  Pick<ComparisonBatch, 'status' | 'progress'> & { candidates: ComparisonCandidateView[] }
 
 export interface MediaEntry {
   name: string

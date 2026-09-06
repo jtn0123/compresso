@@ -14,6 +14,16 @@ function video(duration = 10) {
 }
 
 describe('useMultiVideoSync', () => {
+  it('pauses all candidates when one cannot start playback', async () => {
+    const first = video()
+    const second = video()
+    second.play.mockRejectedValue(new Error('Unsupported codec'))
+    const sync = useMultiVideoSync(ref([first, second]))
+    await sync.play()
+    expect(sync.playing.value).toBe(false)
+    expect(first.pause).toHaveBeenCalledOnce()
+    expect(second.pause).toHaveBeenCalledOnce()
+  })
   it('plays, pauses, and seeks every candidate together', async () => {
     const first = video()
     const second = video()
