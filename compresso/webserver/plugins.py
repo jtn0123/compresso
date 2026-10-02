@@ -219,8 +219,13 @@ class PluginStaticFileHandler(tornado.web.StaticFileHandler):
     A static file handler which serves static content from a plugin '/static/' directory.
     """
 
-    def initialize(self, path: str, default_filename: str | None = None) -> None:
+    def initialize(
+        self,
+        path: str,
+        default_filename: str | None = None,
+        allowed_symlink_directory: str | list[str] | None = None,
+    ) -> None:
         plugin_module = get_plugin_by_path(self.request.path)
         if plugin_module:
             path = os.path.join(narrowing.strict_str(plugin_module.get("plugin_path")), "static")
-        super().initialize(path, default_filename)
+        super().initialize(path, default_filename, allowed_symlink_directory)
