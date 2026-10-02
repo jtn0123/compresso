@@ -8,6 +8,7 @@ import tornado.web
 
 from compresso import config
 from compresso.libs.installation_link import Links
+from compresso.webserver.api_v2.base_api_handler import BaseApiHandler
 
 _HTTP_SCHEME = "http://"
 
@@ -113,11 +114,8 @@ def resolve_proxy_target(target_id):
     return {"url_base": url_base, "headers": auth_headers, "config": target_config}
 
 
-class ProxyHandler(tornado.web.RequestHandler):
+class ProxyHandler(BaseApiHandler):
     SUPPORTED_METHODS = ("GET", "HEAD", "POST", "DELETE", "PATCH", "PUT", "OPTIONS")
-
-    async def prepare(self):
-        """No-op — base handler prepare is sufficient."""
 
     async def _handle_request(self, method):
         target_id = self.request.headers.get("X-Compresso-Target-Installation")

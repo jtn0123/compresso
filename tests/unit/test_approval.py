@@ -221,20 +221,24 @@ class TestApprovalHelpers:
         assert info["size"] == 0
         assert info["path"] == ""
 
-    @patch("compresso.webserver.helpers.approval.task")
-    def test_approve_tasks_sets_approved_status(self, mock_task_module):
-        """approve_tasks should call set_tasks_status with 'approved'."""
+    @patch("compresso.webserver.helpers.approval.Tasks")
+    @patch("compresso.webserver.helpers.approval._require_awaiting_approval")
+    def test_approve_tasks_sets_approved_status(self, mock_require_state, mock_tasks_model):
+        """approve_tasks should conditionally update validated tasks."""
         from compresso.webserver.helpers.approval import approve_tasks
 
-        mock_task_module.Task.set_tasks_status.return_value = 3
+        mock_require_state.return_value = [1, 2, 3]
+        mock_tasks_model.update.return_value.where.return_value.execute.return_value = 3
         result = approve_tasks([1, 2, 3])
-        mock_task_module.Task.set_tasks_status.assert_called_once_with([1, 2, 3], "approved")
+        mock_require_state.assert_called_once_with([1, 2, 3])
+        mock_tasks_model.update.assert_called_once_with(status="approved")
         assert result == 3
 
+    @patch("compresso.webserver.helpers.approval._require_awaiting_approval", return_value=[5])
     @patch("compresso.webserver.helpers.approval.Tasks")
     @patch("compresso.webserver.helpers.approval.config.Config")
     @patch("compresso.webserver.helpers.approval.task")
-    def test_reject_tasks_deletes_by_default(self, mock_task_module, mock_config_class, mock_tasks_model):
+    def test_reject_tasks_deletes_by_default(self, mock_task_module, mock_config_class, mock_tasks_model, _mock_require_state):
         """reject_tasks without requeue should delete tasks."""
         from compresso.webserver.helpers.approval import reject_tasks
 
@@ -264,10 +268,13 @@ class TestApprovalHelpers:
         # Tasks should be deleted
         mock_task_handler.delete_tasks_recursively.assert_called_once_with([5])
 
+    @patch("compresso.webserver.helpers.approval._require_awaiting_approval", return_value=[5])
     @patch("compresso.webserver.helpers.approval.Tasks")
     @patch("compresso.webserver.helpers.approval.config.Config")
     @patch("compresso.webserver.helpers.approval.task")
-    def test_reject_tasks_requeues_when_requested(self, mock_task_module, mock_config_class, mock_tasks_model):
+    def test_reject_tasks_requeues_when_requested(
+        self, mock_task_module, mock_config_class, mock_tasks_model, _mock_require_state
+    ):
         """reject_tasks with requeue=True should set status to pending."""
         from compresso.webserver.helpers.approval import reject_tasks
 
@@ -277,10 +284,10 @@ class TestApprovalHelpers:
 
         mock_tasks_model.get_by_id.return_value = MagicMock(cache_path=None)
 
-        mock_task_module.Task.set_tasks_status.return_value = 1
+        mock_tasks_model.update.return_value.where.return_value.execute.return_value = 1
 
-        reject_tasks([5], requeue=True)
-        mock_task_module.Task.set_tasks_status.assert_called_once_with([5], "pending")
+        assert reject_tasks([5], requeue=True) == 1
+        mock_tasks_model.update.assert_called_once_with(status="pending")
 
 
 # ------------------------------------------------------------------

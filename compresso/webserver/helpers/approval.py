@@ -23,6 +23,26 @@ from compresso.webserver.api_v2.schema.approval_schemas import APPROVAL_TASK_ORD
 logger = CompressoLogging.get_logger(name=__name__)
 
 
+class ApprovalTaskStateError(ValueError):
+    """Raised when an approval action targets a task in an illegal state."""
+
+
+def _normalise_task_ids(task_ids):
+    return list(dict.fromkeys(int(task_id) for task_id in (task_ids or [])))
+
+
+def _require_awaiting_approval(task_ids):
+    task_ids = _normalise_task_ids(task_ids)
+    if not task_ids:
+        return task_ids
+
+    task_states = {row.id: row.status for row in Tasks.select(Tasks.id, Tasks.status).where(Tasks.id.in_(task_ids))}
+    invalid_ids = [task_id for task_id in task_ids if task_states.get(task_id) != "awaiting_approval"]
+    if invalid_ids:
+        raise ApprovalTaskStateError(f"Tasks must exist and be awaiting approval before this action: {invalid_ids}")
+    return task_ids
+
+
 def _normalise_codec_filter(codec):
     return str(codec or "").strip().lower()
 
@@ -392,7 +412,15 @@ def approve_tasks(task_ids):
     :param task_ids: list of int
     :return: int count of updated tasks
     """
-    return task.Task.set_tasks_status(task_ids, "approved")
+    task_ids = _normalise_task_ids(task_ids)
+    if not task_ids:
+        return 0
+
+    _require_awaiting_approval(task_ids)
+    updated = Tasks.update(status="approved").where((Tasks.id.in_(task_ids)) & (Tasks.status == "awaiting_approval")).execute()
+    if updated != len(task_ids):
+        raise ApprovalTaskStateError("One or more tasks changed state before approval completed")
+    return updated
 
 
 def reject_tasks(task_ids, requeue=False):
@@ -404,6 +432,10 @@ def reject_tasks(task_ids, requeue=False):
     :param requeue: if True, set status back to 'pending' instead of deleting
     :return: bool success
     """
+    task_ids = _require_awaiting_approval(task_ids)
+    if not task_ids:
+        return 0 if requeue else True
+
     settings = config.Config()
     staging_path = settings.get_staging_path()
 
@@ -429,7 +461,12 @@ def reject_tasks(task_ids, requeue=False):
             logger.warning("Could not clean cache for task %s: %s", task_id, e)
 
     if requeue:
-        return task.Task.set_tasks_status(task_ids, "pending")
+        updated = (
+            Tasks.update(status="pending").where((Tasks.id.in_(task_ids)) & (Tasks.status == "awaiting_approval")).execute()
+        )
+        if updated != len(task_ids):
+            raise ApprovalTaskStateError("One or more tasks changed state before rejection completed")
+        return updated
     else:
         task_handler = task.Task()
         return task_handler.delete_tasks_recursively(task_ids)

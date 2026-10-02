@@ -16,24 +16,29 @@ APPROVAL_MODULE = "compresso.webserver.helpers.approval"
 
 @pytest.mark.unittest
 class TestApproveTasksHelper:
-    @patch(APPROVAL_MODULE + ".task")
-    def test_approve_tasks_calls_set_status(self, mock_task_module):
+    @patch(APPROVAL_MODULE + ".Tasks")
+    @patch(APPROVAL_MODULE + "._require_awaiting_approval", return_value=[1, 2])
+    def test_approve_tasks_calls_set_status(self, mock_require_state, mock_tasks_model):
         from compresso.webserver.helpers.approval import approve_tasks
 
-        mock_task_module.Task.set_tasks_status.return_value = 2
+        mock_tasks_model.update.return_value.where.return_value.execute.return_value = 2
         result = approve_tasks([1, 2])
-        mock_task_module.Task.set_tasks_status.assert_called_once_with([1, 2], "approved")
+        mock_require_state.assert_called_once_with([1, 2])
+        mock_tasks_model.update.assert_called_once_with(status="approved")
         assert result == 2
 
 
 @pytest.mark.unittest
 class TestRejectTasksHelper:
+    @patch(APPROVAL_MODULE + "._require_awaiting_approval", return_value=[1])
     @patch(APPROVAL_MODULE + ".shutil")
     @patch(APPROVAL_MODULE + ".os")
     @patch(APPROVAL_MODULE + ".Tasks")
     @patch(APPROVAL_MODULE + ".config")
     @patch(APPROVAL_MODULE + ".task")
-    def test_reject_tasks_with_requeue(self, mock_task_module, mock_config, mock_tasks_model, mock_os, mock_shutil):
+    def test_reject_tasks_with_requeue(
+        self, mock_task_module, mock_config, mock_tasks_model, mock_os, mock_shutil, _mock_require_state
+    ):
         from compresso.webserver.helpers.approval import reject_tasks
 
         mock_settings = MagicMock()
@@ -45,17 +50,20 @@ class TestRejectTasksHelper:
         mock_task_record.cache_path = ""
         mock_tasks_model.get_by_id.return_value = mock_task_record
 
-        mock_task_module.Task.set_tasks_status.return_value = True
+        mock_tasks_model.update.return_value.where.return_value.execute.return_value = 1
         result = reject_tasks([1], requeue=True)
-        mock_task_module.Task.set_tasks_status.assert_called_once_with([1], "pending")
-        assert result is True
+        mock_tasks_model.update.assert_called_once_with(status="pending")
+        assert result == 1
 
+    @patch(APPROVAL_MODULE + "._require_awaiting_approval", return_value=[1])
     @patch(APPROVAL_MODULE + ".shutil")
     @patch(APPROVAL_MODULE + ".os")
     @patch(APPROVAL_MODULE + ".Tasks")
     @patch(APPROVAL_MODULE + ".config")
     @patch(APPROVAL_MODULE + ".task")
-    def test_reject_tasks_without_requeue_deletes(self, mock_task_module, mock_config, mock_tasks_model, mock_os, mock_shutil):
+    def test_reject_tasks_without_requeue_deletes(
+        self, mock_task_module, mock_config, mock_tasks_model, mock_os, mock_shutil, _mock_require_state
+    ):
         from compresso.webserver.helpers.approval import reject_tasks
 
         mock_settings = MagicMock()
@@ -75,12 +83,15 @@ class TestRejectTasksHelper:
         mock_task_handler.delete_tasks_recursively.assert_called_once_with([1])
         assert result is True
 
+    @patch(APPROVAL_MODULE + "._require_awaiting_approval", return_value=[5])
     @patch(APPROVAL_MODULE + ".shutil")
     @patch(APPROVAL_MODULE + ".os")
     @patch(APPROVAL_MODULE + ".Tasks")
     @patch(APPROVAL_MODULE + ".config")
     @patch(APPROVAL_MODULE + ".task")
-    def test_reject_tasks_cleans_staging_dir(self, mock_task_module, mock_config, mock_tasks_model, mock_os, mock_shutil):
+    def test_reject_tasks_cleans_staging_dir(
+        self, mock_task_module, mock_config, mock_tasks_model, mock_os, mock_shutil, _mock_require_state
+    ):
         from compresso.webserver.helpers.approval import reject_tasks
 
         mock_settings = MagicMock()

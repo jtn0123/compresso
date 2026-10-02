@@ -14,7 +14,10 @@
     "dev": "quasar dev",
     "build": "quasar build",
     "build:publish": "quasar build --publish",
-    "test:e2e": "npm run build:publish && playwright test"
+    "test:e2e": "npm run build:publish && playwright test",
+    "test:e2e:run": "playwright test",
+    "test:e2e:live": "npm run build:publish && playwright test --config=playwright.live.config.js",
+    "test:e2e:live:run": "playwright test --config=playwright.live.config.js"
   },
   "dependencies": {
     "@quasar/extras": "^1.18.0",

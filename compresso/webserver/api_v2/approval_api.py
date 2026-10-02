@@ -19,6 +19,7 @@ from compresso.webserver.api_v2.schema.approval_schemas import (
     RequestApprovalTasksSchema,
     RequestRejectActionSchema,
 )
+from compresso.webserver.helpers import approval
 
 
 class ApiApprovalHandler(BaseApiHandler):
@@ -78,8 +79,6 @@ class ApiApprovalHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestApprovalTasksSchema())
 
-            from compresso.webserver.helpers import approval
-
             result = approval.prepare_filtered_approval_tasks(
                 params={
                     "start": json_request.get("start", 0),
@@ -127,8 +126,6 @@ class ApiApprovalHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestApprovalTasksSchema())
 
-            from compresso.webserver.helpers import approval
-
             result = approval.prepare_approval_summary(
                 params={
                     "search_value": json_request.get("search_value", ""),
@@ -174,8 +171,6 @@ class ApiApprovalHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestApprovalActionSchema())
 
-            from compresso.webserver.helpers import approval
-
             if json_request.get("all_matching", False):
                 ids = approval.get_all_matching_task_ids(
                     search_value=json_request.get("search_value", ""),
@@ -188,6 +183,10 @@ class ApiApprovalHandler(BaseApiHandler):
             approval.approve_tasks(ids)
 
             self.write_success()
+            return
+        except approval.ApprovalTaskStateError as exc:
+            self.set_status(self.STATUS_ERROR_CONFLICT, reason=str(exc))
+            self.write_error()
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -219,8 +218,6 @@ class ApiApprovalHandler(BaseApiHandler):
         try:
             json_request = self.read_json_request(RequestRejectActionSchema())
 
-            from compresso.webserver.helpers import approval
-
             if json_request.get("all_matching", False):
                 ids = approval.get_all_matching_task_ids(
                     search_value=json_request.get("search_value", ""),
@@ -236,6 +233,10 @@ class ApiApprovalHandler(BaseApiHandler):
             )
 
             self.write_success()
+            return
+        except approval.ApprovalTaskStateError as exc:
+            self.set_status(self.STATUS_ERROR_CONFLICT, reason=str(exc))
+            self.write_error()
             return
         except BaseApiError as bae:
             self.handle_base_api_error(bae)
@@ -265,8 +266,6 @@ class ApiApprovalHandler(BaseApiHandler):
         """
         try:
             json_request = self.read_json_request(RequestApprovalDetailSchema())
-
-            from compresso.webserver.helpers import approval
 
             detail = approval.get_approval_task_detail(json_request.get("id"))
 
@@ -299,8 +298,6 @@ class ApiApprovalHandler(BaseApiHandler):
                             ApprovalCountResponseSchema
         """
         try:
-            from compresso.webserver.helpers import approval
-
             count = approval.get_approval_count()
 
             response = self.build_response(ApprovalCountResponseSchema(), {"success": True, "count": count})

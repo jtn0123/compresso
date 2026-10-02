@@ -2,26 +2,48 @@ import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 import { sharedLinksStore } from 'src/js/sharedLinksStore'
 
-// Add interceptor to safely attach the proxy header only to internal requests
-axios.interceptors.request.use(
-  (config) => {
-    const target = sharedLinksStore.target
-    if (target && target !== 'local' && !config.skipProxy) {
-      // Determine if the request is destined for this Compresso instance (Internal)
-      // Relative URLs are internal. Absolute URLs must match the current origin.
-      const isAbsolute = config.url.startsWith('http://') || config.url.startsWith('https://')
-      const isInternal = !isAbsolute || config.url.startsWith(window.location.origin)
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 
-      if (isInternal) {
-        config.headers['X-Compresso-Target-Installation'] = target
-      }
-    }
+function readCookie(name) {
+  const prefix = `${encodeURIComponent(name)}=`
+  const cookie = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix))
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : ''
+}
+
+function isInternalRequest(url = '') {
+  const isAbsolute = url.startsWith('http://') || url.startsWith('https://')
+  return !isAbsolute || url.startsWith(window.location.origin)
+}
+
+export function applyCompressoRequestHeaders(config) {
+  config.headers = config.headers || {}
+  if (!isInternalRequest(config.url)) {
     return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  },
-)
+  }
+
+  const target = sharedLinksStore.target
+  if (target && target !== 'local' && !config.skipProxy) {
+    config.headers['X-Compresso-Target-Installation'] = target
+  }
+
+  const method = String(config.method || 'get').toLowerCase()
+  if (MUTATING_METHODS.has(method)) {
+    const csrfToken = readCookie('compresso_csrf_token')
+    if (csrfToken) {
+      config.headers['X-Compresso-CSRF-Token'] = csrfToken
+    }
+  }
+
+  return config
+}
+
+// Add internal proxy and CSRF headers without leaking them to external requests.
+axios.interceptors.request.use(applyCompressoRequestHeaders, (error) => {
+  return Promise.reject(error)
+})
 
 // Be careful when using SSR for cross-request state pollution
 // due to creating a Singleton instance here;

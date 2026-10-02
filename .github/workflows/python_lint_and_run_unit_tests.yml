@@ -124,7 +124,6 @@ jobs:
     name: Coverage Summary
     needs: py_unit_test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
 
     steps:
     - uses: actions/checkout@v4
@@ -140,7 +139,9 @@ jobs:
     - name: Download shard coverage
       uses: actions/download-artifact@v8
       with:
-        pattern: coverage-*
+        # Use one OS for the coverage gate so the same tests are not combined
+        # three times on pull requests. Other OS shards still enforce behavior.
+        pattern: coverage-ubuntu-latest-shard-*
         merge-multiple: true
 
     - name: Combine and report coverage

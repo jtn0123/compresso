@@ -14,6 +14,7 @@ import pytest
 
 from compresso.libs.singleton import SingletonType
 from compresso.webserver.api_v2.approval_api import ApiApprovalHandler
+from compresso.webserver.helpers.approval import ApprovalTaskStateError
 from tests.unit.api_test_base import ApiTestBase
 
 APPROVAL_HELPERS = "compresso.webserver.helpers.approval"
@@ -171,6 +172,11 @@ class TestApprovalApiApprove(ApiTestBase):
         resp = self.post_json("/approval/approve", {"id_list": [1]})
         assert resp.code == 500
 
+    @patch(APPROVAL_HELPERS + ".approve_tasks", side_effect=ApprovalTaskStateError("not awaiting approval"))
+    def test_approve_tasks_rejects_invalid_state(self, _mock_approve):
+        resp = self.post_json("/approval/approve", {"id_list": [1]})
+        assert resp.code == 409
+
     @patch(APPROVAL_HELPERS + ".approve_tasks")
     @patch(APPROVAL_HELPERS + ".get_all_matching_task_ids", return_value=[1, 3])
     def test_approve_all_matching_passes_filters(self, mock_matching, _mock_approve):
@@ -221,6 +227,11 @@ class TestApprovalApiReject(ApiTestBase):
         mock_reject.side_effect = Exception("error")
         resp = self.post_json("/approval/reject", {"id_list": [1]})
         assert resp.code == 500
+
+    @patch(APPROVAL_HELPERS + ".reject_tasks", side_effect=ApprovalTaskStateError("not awaiting approval"))
+    def test_reject_tasks_rejects_invalid_state(self, _mock_reject):
+        resp = self.post_json("/approval/reject", {"id_list": [1]})
+        assert resp.code == 409
 
     @patch(APPROVAL_HELPERS + ".reject_tasks")
     @patch(APPROVAL_HELPERS + ".get_all_matching_task_ids", return_value=[2])
