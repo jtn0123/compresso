@@ -363,7 +363,21 @@ class TestPluginStaticFileHandler:
         handler.initialize(path="/default/path")
 
         # Should use the default path
-        mock_super_init.assert_called_once_with("/default/path", None)
+        mock_super_init.assert_called_once_with("/default/path", None, None)
+
+    @patch(f"{PLUGINS_MOD}.get_plugin_by_path", return_value=None)
+    @patch(f"{PLUGINS_MOD}.tornado.web.StaticFileHandler.initialize")
+    def test_initialize_forwards_allowed_symlink_directory(self, mock_super_init, mock_get_plugin):
+        from compresso.webserver.plugins import PluginStaticFileHandler
+
+        request = MagicMock()
+        request.path = "/compresso/panel/data_panel/unknown/static/file.js"
+
+        handler = PluginStaticFileHandler.__new__(PluginStaticFileHandler)
+        handler.request = request
+        handler.initialize(path="/default/path", allowed_symlink_directory="/shared")
+
+        mock_super_init.assert_called_once_with("/default/path", None, "/shared")
 
 
 if __name__ == "__main__":
