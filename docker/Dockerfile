@@ -9,8 +9,9 @@ FROM ${BASE_IMAGE}
 # Drop entries here once the base image is rebuilt with the fix included.
 RUN \
     echo "**** Patch linux-libc-dev CVE-2026-43185 (fixed in 6.8.0-134.134) ****" \
+        && echo "**** Patch libssl3t64/openssl CVE-2026-84782 (fixed in 3.0.13-0ubuntu3.16) ****" \
         && apt-get update \
-        && apt-get install -y --only-upgrade linux-libc-dev \
+        && apt-get install -y --only-upgrade linux-libc-dev libssl3t64 openssl \
         && apt-get clean autoclean -y \
         && apt-get autoremove -y \
         && rm -rf /var/lib/apt/lists/*
