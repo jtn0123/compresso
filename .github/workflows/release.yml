@@ -147,19 +147,19 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download release metadata
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release-candidate-${{ github.run_id }}
           path: release-candidate
 
       - name: Download Python distribution
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: compresso-py-dist-data-${{ needs.prepare_candidate.outputs.release_version }}
           path: release-dist
 
       - name: Download SBOMs
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: sbom-*-${{ needs.prepare_candidate.outputs.release_sha }}
           path: release-sboms
