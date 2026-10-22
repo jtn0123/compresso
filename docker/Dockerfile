@@ -24,6 +24,11 @@ RUN \
         && echo "Installing ${WHEEL_PATH}" \
         && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir "${WHEEL_PATH}" \
     && \
+    echo "**** Upgrade venv pip (vendored certifi GHSA-6q48-6c7w-9gw2) ****" \
+        && echo "pip==26.2.2 --hash=sha256:fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70" > /tmp/pip.req \
+        && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir --require-hashes -r /tmp/pip.req \
+        && rm -f /tmp/pip.req \
+    && \
     echo "**** Patch picomatch CVE-2026-33671 in bundled npm ****" \
         && PICO_DIR="/usr/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch" \
         && if [ -d "$PICO_DIR" ]; then \
@@ -61,6 +66,26 @@ RUN \
             && npm pack tar@7.5.22 2>/dev/null \
             && tar -xzf tar-*.tgz --strip-components=1 \
             && rm -f tar-*.tgz \
+            && cd /; \
+        fi \
+    && \
+    echo "**** Patch brace-expansion CVE-2026-102276/102278/14257/69152 in bundled npm ****" \
+        && BRACE_DIR="/usr/lib/node_modules/npm/node_modules/brace-expansion" \
+        && if [ -d "$BRACE_DIR" ]; then \
+            cd "$BRACE_DIR" \
+            && npm pack brace-expansion@5.0.12 2>/dev/null \
+            && tar -xzf brace-expansion-*.tgz --strip-components=1 \
+            && rm -f brace-expansion-*.tgz \
+            && cd /; \
+        fi \
+    && \
+    echo "**** Patch undici CVE-2026-19534 in bundled npm ****" \
+        && UNDICI_DIR="/usr/lib/node_modules/npm/node_modules/undici" \
+        && if [ -d "$UNDICI_DIR" ]; then \
+            cd "$UNDICI_DIR" \
+            && npm pack undici@6.29.1 2>/dev/null \
+            && tar -xzf undici-*.tgz --strip-components=1 \
+            && rm -f undici-*.tgz \
             && cd /; \
         fi \
     && \
