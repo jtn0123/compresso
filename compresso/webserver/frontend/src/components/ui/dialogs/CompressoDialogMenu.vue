@@ -15,7 +15,7 @@
       class="column no-wrap dialog-card"
       :class="{ 'mobile-layout': isMobile }"
       :style="{ '--dialog-width': requestedWidth }"
-      v-touch-swipe.touch.left="onSwipeLeft"
+      v-touch-swipe.left="onSwipeLeft"
     >
       <!-- HEADER -->
       <q-card-section class="bg-card-head col-auto dialog-sticky-header q-py-sm">
