@@ -135,4 +135,5 @@ CVE-2026-41651 exp:2026-10-31
 # versions. Drop each line once a pip release bumps the vendored copy.
 GHSA-6v7p-g79w-8964 exp:2026-11-22
 CVE-2026-97687 exp:2026-11-22
+CVE-2026-97689 exp:2026-11-22
 CVE-2025-47273 exp:2026-11-22
