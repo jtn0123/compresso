@@ -127,3 +127,13 @@ CVE-2026-45447 exp:2026-10-31
 # transitively by base image packages. Fix is in 1.2.8-2ubuntu1.5,
 # which will land via a base-image rebuild.
 CVE-2026-41651 exp:2026-10-31
+
+# pip's own vendored libraries (pip/_vendor/vendor.txt in /opt/venv). The
+# venv's real msgpack/urllib3 are current; these copies are private to pip,
+# which compresso only runs to install plugin dependencies. Even pip 26.2.2
+# (installed in docker/Dockerfile for its certifi fix) still vendors these
+# versions. Drop each line once a pip release bumps the vendored copy.
+GHSA-6v7p-g79w-8964 exp:2026-11-22
+CVE-2026-97687 exp:2026-11-22
+CVE-2026-97689 exp:2026-11-22
+CVE-2025-47273 exp:2026-11-22

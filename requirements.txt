@@ -14,7 +14,7 @@ urllib3==2.8.0
 py-cpuinfo==9.0.0
 JSON-log-formatter==1.2.1
 xxhash==4.0.1
-filelock==4.0.1
+filelock==4.2.4
 
 # Optional requirements
 watchdog==6.0.0
