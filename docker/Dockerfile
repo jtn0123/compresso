@@ -10,8 +10,10 @@ FROM ${BASE_IMAGE}
 RUN \
     echo "**** Patch linux-libc-dev CVE-2026-43185 (fixed in 6.8.0-134.134) ****" \
         && echo "**** Patch libssl3t64/openssl CVE-2026-84782 (fixed in 3.0.13-0ubuntu3.16) ****" \
+        && echo "**** Patch apt/libapt-pkg6.0t64 CVE-2026-109518 (fixed in 2.8.4ubuntu0.1) ****" \
+        && echo "**** Patch libbrotli1 CVE-2026-111497 (fixed in 1.1.0-2ubuntu0.1) ****" \
         && apt-get update \
-        && apt-get install -y --only-upgrade linux-libc-dev libssl3t64 openssl \
+        && apt-get install -y --only-upgrade linux-libc-dev libssl3t64 openssl apt libapt-pkg6.0t64 libbrotli1 \
         && apt-get clean autoclean -y \
         && apt-get autoremove -y \
         && rm -rf /var/lib/apt/lists/*
@@ -24,8 +26,8 @@ RUN \
         && echo "Installing ${WHEEL_PATH}" \
         && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir "${WHEEL_PATH}" \
     && \
-    echo "**** Upgrade venv pip (vendored certifi GHSA-6q48-6c7w-9gw2) ****" \
-        && echo "pip==26.2.2 --hash=sha256:fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70" > /tmp/pip.req \
+    echo "**** Upgrade venv pip (vendored certifi GHSA-6q48-6c7w-9gw2, vendored msgpack CVE-2026-114613) ****" \
+        && echo "pip==26.3 --hash=sha256:f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13" > /tmp/pip.req \
         && "${VIRTUAL_ENV:?}"/bin/pip install --no-cache-dir --require-hashes -r /tmp/pip.req \
         && rm -f /tmp/pip.req \
     && \

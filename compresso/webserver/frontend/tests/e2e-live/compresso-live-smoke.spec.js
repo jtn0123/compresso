@@ -2,6 +2,21 @@ import { expect, test } from '@playwright/test'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
+// Reads a file the backend may be swapping out. An approved task's source is
+// removed before the encoded file is moved into its place (PostProcessor
+// ._perform_file_copy), and a poll that lands in that gap would throw
+// ENOENT. expect.poll fails on a thrown error instead of retrying, and the
+// retry then finds the approval queue already empty, so the whole test fails.
+// Treat "not there yet" as one more poll.
+function readIfPresent(file) {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw error
+  }
+}
+
 test('serves core API contracts from a fresh real backend', async ({ request }) => {
   const readinessResponse = await request.get('/compresso/api/v2/healthcheck/readiness')
   expect(readinessResponse.ok()).toBe(true)
@@ -65,7 +80,7 @@ test('runs approval and rejection through the packaged backend and survives rest
     data: { id_list: [fixtures.approve.id] },
   })
   expect(approve.ok()).toBe(true)
-  await expect.poll(() => readFileSync(fixtures.approve.source, 'utf8')).toBe('encoded-approve')
+  await expect.poll(() => readIfPresent(fixtures.approve.source)).toBe('encoded-approve')
   await expect.poll(() => existsSync(fixtures.approve.staged_dir)).toBe(false)
 
   const historyCount = async () => {
@@ -79,7 +94,7 @@ test('runs approval and rejection through the packaged backend and survives rest
 
   const oldPid = readFileSync(path.join(homeDir, 'backend.pid'), 'utf8')
   writeFileSync(path.join(homeDir, 'restart-requested'), 'restart')
-  await expect.poll(() => readFileSync(path.join(homeDir, 'backend.pid'), 'utf8')).not.toBe(oldPid)
+  await expect.poll(() => readIfPresent(path.join(homeDir, 'backend.pid'))).not.toBe(oldPid)
   await expect
     .poll(async () => {
       try {
