@@ -1,7 +1,7 @@
 # Required
 schedule==1.2.2
 tornado==6.6
-marshmallow==4.3.1
+marshmallow==4.4.0
 peewee==4.5.3
 peewee_migrate==2.3.0
 psutil==7.2.2
@@ -13,16 +13,16 @@ requests_toolbelt==1.0.0
 urllib3==2.8.0
 py-cpuinfo==9.0.0
 JSON-log-formatter==1.2.1
-xxhash==4.0.2
-filelock==4.2.6
+xxhash==4.1.0
+filelock==4.2.9
 
 # Optional requirements
-watchdog==7.0.0
+watchdog==7.1.0
 
 # Required for CLI only
 inquirer==3.4.1
 # Direct pin keeps the CLI dependency above the PYSEC-2026-2132 fix floor.
-click==8.5.0
+click==8.5.1
 # blessed only declares these terminal helpers on Windows. Keep the small
 # pure-Python packages unconditional because pip-compile evaluates environment
 # markers on the compile host; otherwise a Linux/macOS-generated hash lock is
