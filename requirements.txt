@@ -1,6 +1,6 @@
 # Required
 schedule==1.2.2
-tornado==6.6
+tornado==6.6.1
 marshmallow==4.3.1
 peewee==4.5.3
 peewee_migrate==2.3.0
